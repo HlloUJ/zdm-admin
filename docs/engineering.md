@@ -30,7 +30,8 @@
 - Codex GitHub 插件：已安装并连接，可用于后续查看仓库、PR 和 GitHub Actions。
 - 本地仓库：已初始化 Git。
 - 远程仓库：当前尚未绑定 `origin`。本地也未安装 `gh` 命令。
-- 推荐下一步：在 GitHub 新建一个空仓库，然后执行 `git remote add origin <repo-url>` 与 `git push -u origin main --tags`；或安装 GitHub CLI 后由 Codex 继续创建远程仓库。
+- GitHub App 安装范围：当前没有可访问仓库，需要在 GitHub 创建空仓库并安装/授权 GitHub App 后，CI 才会真正运行。
+- 首次推送：在 GitHub 新建空仓库后执行 `npm run github:publish -- <repo-url>`，脚本会绑定 `origin`、推送 `main` 和所有 tags。
 
 ## 本地启动
 

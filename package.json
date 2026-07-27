@@ -25,6 +25,7 @@
     "backend:quality:docker": "docker compose run --rm backend mvn -B test checkstyle:check spotbugs:check jacoco:report",
     "backend:test:docker": "docker compose run --rm backend mvn test",
     "backend:test": "cd backend && mvn test",
+    "github:publish": "scripts/publish-github.sh",
     "prepare": "husky"
   },
   "lint-staged": {

@@ -139,3 +139,35 @@ scripts/rollback-code.sh v0.7.4-backend-api-smoke-gate
 ```
 
 该脚本会进入 detached HEAD。需要继续修复时，先基于该版本创建分支。
+
+## GitHub 首次推送
+
+当前本地仓库已经初始化并持续打 tag，但 `origin` 还未绑定。首次推送前需要先在 GitHub 创建一个空仓库，推荐私有仓库。
+
+推荐仓库名：
+
+```text
+zdm-admin
+```
+
+创建空仓库后执行：
+
+```bash
+npm run github:publish -- git@github.com:<owner>/zdm-admin.git
+```
+
+或使用 HTTPS：
+
+```bash
+npm run github:publish -- https://github.com/<owner>/zdm-admin.git
+```
+
+脚本会完成：
+
+- 检查当前工作区必须干净。
+- 如果没有 `origin`，自动绑定远程仓库。
+- 如果已有 `origin`，要求它必须和传入 URL 一致。
+- 推送 `main` 分支。
+- 推送所有 Git tags。
+
+首次推送完成后，GitHub Actions 会按 `.github/workflows/quality.yml` 自动执行前后端质量门禁。
