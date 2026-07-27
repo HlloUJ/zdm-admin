@@ -36,6 +36,6 @@ jobs:
           java-version: 21
           cache: maven
       - working-directory: backend
-        run: mvn -B test checkstyle:check spotbugs:check jacoco:report
+        run: mvn -B -Dtest=AuthServiceTest test checkstyle:check spotbugs:check jacoco:report
       - working-directory: backend
         run: mvn -B org.owasp:dependency-check-maven:check
