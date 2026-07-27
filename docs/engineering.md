@@ -34,6 +34,8 @@
 
 ## 本地启动
 
+完整本地启动、验收、备份与回滚步骤见 `docs/dev-setup.md`。
+
 1. 安装 JDK 21、Maven、Docker、Node.js 22。
 2. 安装前端依赖：`npm install`。
 3. 启动数据库：`docker compose up -d mysql`。
@@ -51,9 +53,10 @@
 
 - 前端综合检查：`npm run quality`。
 - 前端构建：`npm run build`。
-- E2E 测试：先执行 `npm run test:e2e:install`，再执行 `npm run test:e2e`。
+- E2E 测试：CI 使用 `npm run test:e2e`；本机已安装 Chrome 时可使用 `npm run test:e2e:chrome`。
 - 后端测试：`npm run backend:test`。
-- 后端扩展检查：进入 `backend/` 后执行 `mvn checkstyle:check spotbugs:check jacoco:report`。
+- 后端 Docker 质量检查：`npm run backend:quality:docker`。
+- 本地一键验收：`npm run verify:local`。
 
 ## 备份与回滚
 

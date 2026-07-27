@@ -1,0 +1,141 @@
+# 本地启动与验收指南
+
+## 环境要求
+
+- Node.js 22
+- Docker Desktop
+- Google Chrome，用于本机 E2E 测试
+- 可选：JDK 21、Maven。本机未安装时，后端可使用 Docker 运行。
+
+## 首次准备
+
+```bash
+npm install
+```
+
+本机没有 Playwright Chromium 时，可执行：
+
+```bash
+npm run test:e2e:install
+```
+
+如果已安装 Google Chrome，本地 E2E 推荐使用：
+
+```bash
+npm run test:e2e:chrome
+```
+
+## 启动服务
+
+### Docker 方式
+
+```bash
+docker compose up backend
+```
+
+该命令会启动 MySQL 和 Spring Boot 后端。
+
+另开一个终端启动前端：
+
+```bash
+npm run dev
+```
+
+### 本机 Maven 方式
+
+```bash
+docker compose up -d mysql
+npm run backend:dev
+npm run dev
+```
+
+## 访问地址
+
+- 前端管理后台：`http://127.0.0.1:5173`
+- 后端健康检查：`http://127.0.0.1:8080/actuator/health`
+- Swagger UI：`http://127.0.0.1:8080/swagger-ui.html`
+- OpenAPI JSON：`http://127.0.0.1:8080/v3/api-docs`
+
+## 登录账号
+
+- 手机号：`15926626945`
+- 开发验证码：`888888`
+
+当前验证码未接入短信服务商，开发阶段由后端固定校验 `888888`。
+
+## 常用验收命令
+
+```bash
+npm run quality
+npm run build
+npm run test:e2e:chrome
+npm run backend:quality:docker
+```
+
+本机完整验收：
+
+```bash
+npm run verify:local
+```
+
+CI 完整验收：
+
+```bash
+npm run verify
+```
+
+说明：`backend:quality:docker` 会在 Maven 容器内执行编译、普通单测、Checkstyle、SpotBugs 和 JaCoCo。本机 Maven 容器无法访问 Docker Desktop daemon 时，Testcontainers 集成测试会跳过；GitHub Actions 后端任务在宿主机 Maven 环境运行，会真实执行 Testcontainers 测试。
+
+## 数据库位置
+
+本地数据库运行在 Docker 容器 `zdm-platform-mysql` 中，不会出现在 macOS 应用列表里。
+
+- 数据库名：`zdm_admin`
+- 用户名：`zdm_admin`
+- 密码：`zdm_admin_pwd`
+- 端口：`3306`
+- 数据卷：`zdm-admin_zdm_platform_mysql`
+
+查看容器：
+
+```bash
+docker ps --filter name=zdm-platform-mysql
+```
+
+进入 MySQL：
+
+```bash
+docker exec -it zdm-platform-mysql mysql -uzdm_admin -pzdm_admin_pwd zdm_admin
+```
+
+## 备份与恢复
+
+备份当前数据库：
+
+```bash
+scripts/backup-db.sh
+```
+
+恢复数据库：
+
+```bash
+scripts/restore-db.sh backups/zdm_admin-YYYYmmdd-HHMMSS.sql.gz
+```
+
+脚本会优先使用正在运行的 Docker MySQL 容器；如果容器不存在，则回退到本机 `mysqldump` 或 `mysql` 命令。
+
+## 代码回滚
+
+查看版本标签：
+
+```bash
+git tag --list
+```
+
+切到某个验收版本：
+
+```bash
+scripts/rollback-code.sh v0.7.4-backend-api-smoke-gate
+```
+
+该脚本会进入 detached HEAD。需要继续修复时，先基于该版本创建分支。
