@@ -19,6 +19,7 @@
     "quality": "npm run typecheck && npm run lint && npm run stylelint && npm run format:check && npm run test:unit",
     "backend:dev": "cd backend && mvn spring-boot:run",
     "backend:dev:docker": "docker compose up backend",
+    "backend:quality:docker": "docker compose run --rm backend mvn -B test checkstyle:check spotbugs:check jacoco:report",
     "backend:test:docker": "docker compose run --rm backend mvn test",
     "backend:test": "cd backend && mvn test",
     "prepare": "husky"
