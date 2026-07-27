@@ -8,7 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@zdm-admin-ui': fileURLToPath(new URL('../管理后台原型基座/zdm-admin-ui', import.meta.url)),
     },
   },
   server: {

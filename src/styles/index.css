@@ -142,6 +142,61 @@ body {
   margin-bottom: var(--td-comp-margin-l);
 }
 
+.admin-page-frame {
+  min-height: 100vh;
+}
+
+.admin-page-header__main {
+  min-width: 0;
+}
+
+.admin-page-header h1 {
+  margin: 0;
+  color: var(--td-text-color-primary);
+  font: var(--td-font-title-large);
+}
+
+.admin-page-header__breadcrumb {
+  margin-bottom: var(--td-comp-margin-xs);
+}
+
+.admin-list-layout {
+  display: grid;
+  gap: var(--td-comp-margin-l);
+}
+
+.admin-list-layout__filters,
+.admin-list-layout__table-card,
+.admin-section-card,
+.admin-pagination-bar {
+  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: 8px;
+}
+
+.admin-list-layout__table-card {
+  display: grid;
+  gap: var(--td-comp-margin-l);
+}
+
+.admin-list-layout__toolbar,
+.admin-list-layout__pagination,
+.admin-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
+
+.admin-list-layout__toolbar {
+  justify-content: space-between;
+}
+
+.admin-pagination {
+  width: 100%;
+}
+
 .admin-layout .side-nav .menu {
   width: 224px;
   margin: 0 auto;
