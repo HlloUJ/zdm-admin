@@ -639,12 +639,6 @@ const closeOptionDialog = () => {
   optionCodeInput.value = '';
 };
 
-const ensureOptionPage = () => {
-  if (optionPagination.current > optionPageCount.value) {
-    optionPagination.current = optionPageCount.value;
-  }
-};
-
 const handleOptionPageSizeChange = (value: unknown) => {
   optionPagination.pageSize = Number(value);
   optionPagination.current = 1;

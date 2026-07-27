@@ -390,7 +390,6 @@ interface CategoryRow {
   level: number;
 }
 
-const maxCategoryLevel = 4;
 const route = useRoute();
 
 const globalKeyword = ref('');
@@ -705,15 +704,6 @@ function findCategory(id: string, nodes = categoryTree.value): CategoryNode | nu
   return null;
 }
 
-function getCategoryLevel(id: string, nodes = categoryTree.value, level = 0): number {
-  for (const node of nodes) {
-    if (node.id === id) return level;
-    const childLevel = getCategoryLevel(id, node.children, level + 1);
-    if (childLevel >= 0) return childLevel;
-  }
-  return -1;
-}
-
 function containsCategory(nodes: CategoryNode[], id: string): boolean {
   return nodes.some((node) => node.id === id || containsCategory(node.children, id));
 }
@@ -771,26 +761,6 @@ const toggleCategory = (node: CategoryNode) => {
   node.expanded = !node.expanded;
 };
 
-const openCreateDialog = (parent?: CategoryNode) => {
-  if (parent && getCategoryLevel(parent.id) >= maxCategoryLevel - 1) {
-    MessagePlugin.warning('类目最多支持创建4级');
-    return;
-  }
-  categoryDialogMode.value = 'create';
-  editingCategoryId.value = '';
-  parentCategoryId.value = parent?.id ?? '';
-  categoryForm.name = '';
-  categoryDialogVisible.value = true;
-};
-
-const openEditDialog = (node: CategoryNode) => {
-  categoryDialogMode.value = 'edit';
-  editingCategoryId.value = node.id;
-  parentCategoryId.value = '';
-  categoryForm.name = node.name;
-  categoryDialogVisible.value = true;
-};
-
 const closeCategoryDialog = () => {
   categoryDialogVisible.value = false;
   categoryFormRef.value?.clearValidate();
@@ -819,14 +789,6 @@ const handleCategorySubmit = async () => {
 
   closeCategoryDialog();
   MessagePlugin.success('操作成功');
-};
-
-const openDeleteCategoryConfirm = (node: CategoryNode) => {
-  confirmState.type = 'delete-category';
-  confirmState.category = node;
-  confirmState.attribute = null;
-  confirmState.content = `是否删除类目【${node.name}】？`;
-  confirmDialogVisible.value = true;
 };
 
 const openAttributeTransferDialog = () => {

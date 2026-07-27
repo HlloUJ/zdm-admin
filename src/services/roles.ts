@@ -4,7 +4,7 @@ export interface RoleRecord {
   id: number;
   name: string;
   code: string;
-  category?: 'partner-store' | 'supplier-store' | 'operation-platform';
+  category?: 'partner-store' | 'supplier-store' | 'operation-platform' | 'terminal-policy';
   clientCode?: string;
   dataScope: string;
   status: 'enabled' | 'disabled';
@@ -17,7 +17,7 @@ export interface RoleRecord {
 export interface RolePayload {
   name: string;
   code: string;
-  category: 'partner-store' | 'supplier-store' | 'operation-platform';
+  category: 'partner-store' | 'supplier-store' | 'operation-platform' | 'terminal-policy';
   clientCode: string;
   dataScope: string;
   status: 'enabled' | 'disabled';

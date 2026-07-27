@@ -522,13 +522,6 @@ const closeOptionDialog = () => {
   optionCodeInput.value = '';
 };
 
-const ensureOptionPage = () => {
-  const maxPage = Math.max(Math.ceil(currentOptions.value.length / optionPagination.pageSize), 1);
-  if (optionPagination.current > maxPage) {
-    optionPagination.current = maxPage;
-  }
-};
-
 const handleAddOption = () => {
   const value = optionInput.value.trim();
   const code = optionCodeInput.value.trim();

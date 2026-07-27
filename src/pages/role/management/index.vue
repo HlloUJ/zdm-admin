@@ -772,7 +772,7 @@ const loadRoles = async () => {
   loading.value = true;
   try {
     const records = await listRoles();
-    roles.value = records.map(toRoleItem);
+    roles.value = records.filter((record) => record.category !== 'terminal-policy').map(toRoleItem);
     ensureCurrentPage();
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '角色列表加载失败');

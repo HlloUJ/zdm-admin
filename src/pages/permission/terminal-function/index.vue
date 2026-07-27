@@ -127,8 +127,8 @@
           </div>
 
           <footer class="page-actions">
-            <t-button theme="primary" @click="saveAllocation">保存</t-button>
-            <t-button theme="default" variant="base" @click="resetAllocation">重置</t-button>
+            <t-button theme="primary" :loading="loading" @click="saveAllocation">保存</t-button>
+            <t-button theme="default" variant="base" :disabled="loading" @click="resetAllocation">重置</t-button>
           </footer>
         </section>
       </main>
@@ -138,9 +138,10 @@
 
 <script setup lang="ts">
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import { createRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
 
 type TerminalType = 'store' | 'supplier';
 
@@ -309,10 +310,12 @@ const initialAllocationValues: Record<TerminalType, string[]> = {
 const activeTerminal = ref<TerminalType>('store');
 const activeModuleValue = ref(terminalFunctionTrees.store[0]?.value ?? '');
 const checkedValues = ref<string[]>([]);
+const loading = ref(false);
 const savedAllocationValues = reactive<Record<TerminalType, string[]>>({
   store: [...initialAllocationValues.store],
   supplier: [...initialAllocationValues.supplier],
 });
+const terminalPolicyRoles = reactive<Partial<Record<TerminalType, RoleRecord>>>({});
 
 const currentTree = computed(() => terminalFunctionTrees[activeTerminal.value]);
 
@@ -407,14 +410,64 @@ const clearAllNodes = () => {
   checkedValues.value = [];
 };
 
+const parsePermissions = (value?: string) => value?.split(',').filter(Boolean) ?? [];
+
+const terminalCode = (terminal: TerminalType) =>
+  terminal === 'store' ? 'TERMINAL_STORE_POLICY' : 'TERMINAL_SUPPLIER_POLICY';
+
+const terminalName = (terminal: TerminalType) => (terminal === 'store' ? '门店端终端功能配置' : '供应商端终端功能配置');
+
+const toPolicyPayload = (terminal: TerminalType, permissions: string[]): RolePayload => ({
+  name: terminalName(terminal),
+  code: terminalCode(terminal),
+  category: 'terminal-policy',
+  clientCode: terminal,
+  dataScope: 'store',
+  status: 'enabled',
+  remark: `系统配置：${terminal === 'store' ? '门店端' : '供应商端'}可下放功能范围`,
+  functionPermissions: permissions.join(','),
+});
+
+const loadAllocation = async () => {
+  loading.value = true;
+  try {
+    const roles = await listRoles();
+    (['store', 'supplier'] as TerminalType[]).forEach((terminal) => {
+      const policy = roles.find((role) => role.code === terminalCode(terminal));
+      if (policy) {
+        terminalPolicyRoles[terminal] = policy;
+        savedAllocationValues[terminal] = parsePermissions(policy.functionPermissions);
+      }
+    });
+    checkedValues.value = [...savedAllocationValues[activeTerminal.value]];
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '终端功能配置加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const resetAllocation = () => {
   checkedValues.value = [...savedAllocationValues[activeTerminal.value]];
   MessagePlugin.info('已重置为上次保存状态');
 };
 
-const saveAllocation = () => {
-  savedAllocationValues[activeTerminal.value] = [...checkedValues.value];
-  MessagePlugin.success('保存成功');
+const saveAllocation = async () => {
+  const terminal = activeTerminal.value;
+  const payload = toPolicyPayload(terminal, checkedValues.value);
+  loading.value = true;
+  try {
+    const policy = terminalPolicyRoles[terminal];
+    const saved = policy ? await updateRole(policy.id, payload) : await createRole(payload);
+    terminalPolicyRoles[terminal] = saved;
+    savedAllocationValues[terminal] = parsePermissions(saved.functionPermissions);
+    checkedValues.value = [...savedAllocationValues[terminal]];
+    MessagePlugin.success('保存成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '保存失败');
+  } finally {
+    loading.value = false;
+  }
 };
 
 watch(
@@ -425,6 +478,8 @@ watch(
   },
   { immediate: true },
 );
+
+onMounted(loadAllocation);
 </script>
 
 <style scoped>
