@@ -15,6 +15,7 @@
     "stylelint": "stylelint \"src/**/*.{css,vue}\"",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test --workers=1",
     "test:e2e:chrome": "PLAYWRIGHT_CHANNEL=chrome playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
     "quality": "npm run typecheck && npm run lint && npm run stylelint && npm run format:check && npm run test:unit",
