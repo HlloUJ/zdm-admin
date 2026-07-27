@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+import { installAdminApiMocks } from './admin-api-mocks';
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
   });
+  await installAdminApiMocks(page);
 });
 
 test('opens employee invite and edit dialogs', async ({ page }) => {
@@ -24,7 +27,7 @@ test('opens employee invite and edit dialogs', async ({ page }) => {
   await firstEmployeeRow.getByText('编辑').click();
   const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑员工' });
   await expect(editDialog).toBeVisible();
-  await expect(editDialog.getByText('角色')).toBeVisible();
+  await expect(editDialog.locator('label').filter({ hasText: '角色' })).toBeVisible();
   await expect(editDialog.getByText('数据权限')).toBeVisible();
   await editDialog.getByRole('button', { name: '取消' }).click();
 });

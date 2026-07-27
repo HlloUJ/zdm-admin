@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+import { installAdminApiMocks } from './admin-api-mocks';
+
 test('opens finished stock inventory movements drawer', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
   });
+  await installAdminApiMocks(page);
 
   await page.goto('/finished-stock-management');
 

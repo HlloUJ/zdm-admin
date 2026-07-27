@@ -1,67 +1,12 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-const apiOk = (data: unknown) => ({
-  code: 0,
-  message: 'ok',
-  data,
-});
-
-const fulfillJson = (route: Route, data: unknown) =>
-  route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(apiOk(data)),
-  });
-
-const tenants = [
-  {
-    id: 1,
-    name: '装点猫直营租户',
-    contactName: '超级管理员',
-    contactPhone: '15926626945',
-    status: 'enabled',
-    businessTypes: 'cityPartner,slabSupplier,finishedSupplier,factory',
-    remark: '系统内置平台租户',
-    createdAt: '2026-07-27T09:00:00',
-  },
-];
-
-const stores = [
-  {
-    id: 1,
-    tenantId: 1,
-    name: '杭州体验门店',
-    type: 'cityPartner',
-    shopLevel: 'level1',
-    manager: '超级管理员',
-    region: 'zhejiang/hangzhou/xihu',
-    detailAddress: '样例地址 1 号',
-    address: '浙江省杭州市西湖区样例地址 1 号',
-    status: 'enabled',
-    remark: '系统内置门店',
-    createdAt: '2026-07-27T09:00:00',
-  },
-];
-
-const suppliers = [
-  {
-    id: 1,
-    name: '装点猫大板供应商',
-    type: 'slab',
-    contactName: '供应商联系人',
-    contactPhone: '15926626946',
-    qualificationStatus: 'approved',
-    status: 'enabled',
-    remark: '系统内置供应商',
-    createdAt: '2026-07-27T09:00:00',
-  },
-];
+import { installAdminApiMocks } from './admin-api-mocks';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
   });
-  await mockFoundationApis(page);
+  await installAdminApiMocks(page);
 });
 
 test('opens tenant create, business and edit dialogs', async ({ page }) => {
@@ -153,29 +98,3 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   await editDialog.getByRole('button', { name: '取消' }).click();
   await expect(editDialog).toBeHidden();
 });
-
-async function mockFoundationApis(page: Page) {
-  await page.route('**/api/admin/tenants', async (route) => {
-    if (route.request().method() === 'GET') {
-      await fulfillJson(route, tenants);
-      return;
-    }
-    await fulfillJson(route, tenants[0]);
-  });
-
-  await page.route('**/api/admin/stores', async (route) => {
-    if (route.request().method() === 'GET') {
-      await fulfillJson(route, stores);
-      return;
-    }
-    await fulfillJson(route, stores[0]);
-  });
-
-  await page.route('**/api/admin/suppliers', async (route) => {
-    if (route.request().method() === 'GET') {
-      await fulfillJson(route, suppliers);
-      return;
-    }
-    await fulfillJson(route, suppliers[0]);
-  });
-}
