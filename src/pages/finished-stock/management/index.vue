@@ -110,7 +110,7 @@
               <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
             </div>
 
-            <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+            <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
               <template #selectTitle>
                 <t-checkbox
                   :checked="pageAllSelected"
@@ -520,7 +520,7 @@
             </t-tabs>
 
             <div class="form-submit-bar">
-              <t-button theme="primary" @click="submitProductForm">
+              <t-button theme="primary" :loading="saving" @click="submitProductForm">
                 <template #icon><t-icon name="check" /></template>
                 提交商品信息
               </t-button>
@@ -979,6 +979,17 @@ import type { PrimaryTableCol, RowspanColspan, TableRowData } from 'tdesign-vue-
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
+import {
+  createFinishedProduct,
+  deleteFinishedProduct,
+  listFinishedProducts,
+  updateFinishedProduct,
+  type FinishedProductPayload,
+  type FinishedProductRecord,
+} from '@/services/finishedProducts';
+import { createInventoryMovement } from '@/services/inventoryMovements';
+import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
+import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
@@ -1030,12 +1041,15 @@ interface StockItem {
   code: string;
   image: string;
   name: string;
+  categoryId?: number;
+  supplierId?: number;
   category: string;
   stock: number;
   tenant: string;
   store: string;
   publisherType: PublisherType;
   isExternalSupplier: boolean;
+  guidePrice?: number;
   priceRange: string;
   status: StockStatus;
   offShelfReason?: string;
@@ -1153,11 +1167,11 @@ interface CategoryCascaderOption {
 }
 
 const tabs: TabConfig[] = [
-  { value: 'warehouse', label: '仓库中', count: 153 },
-  { value: 'selling', label: '出售中', count: 10589 },
-  { value: 'offShelf', label: '已下架', count: 856 },
-  { value: 'soldOut', label: '已售完', count: 342 },
-  { value: 'recycle', label: '回收站', count: 27 },
+  { value: 'warehouse', label: '仓库中' },
+  { value: 'selling', label: '出售中' },
+  { value: 'offShelf', label: '已下架' },
+  { value: 'soldOut', label: '已售完' },
+  { value: 'recycle', label: '回收站' },
 ];
 
 const categoryCascaderOptions: CategoryCascaderOption[] = [
@@ -1240,14 +1254,9 @@ const categoryCascaderOptions: CategoryCascaderOption[] = [
   },
 ];
 
-const categoryOptions = categoryCascaderOptions.flatMap(
-  (firstLevel) =>
-    firstLevel.children?.flatMap((secondLevel) => secondLevel.children?.map((thirdLevel) => thirdLevel.value) ?? []) ??
-    [],
-);
 const tenantOptions = ['杭州云栖装饰', '平台自营', '南山设计中心', '云石供应链', '外部精品供应商'];
 const storeOptions = ['杭州旗舰店', '深圳体验店', '上海设计中心', '云浮仓', '平台仓'];
-const supplierOptions = ['云石供应链', '平台自营', '星河矿业', '南山石材', '外部精品供应商'];
+const fallbackSupplierOptions = ['云石供应链', '平台自营', '星河矿业', '南山石材', '外部精品供应商'];
 const pageSizeOptions = [10, 20, 50];
 const rejectReasons = ['图片不清晰', '资料不完整', '规格填写异常', '价格信息缺失'];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
@@ -1266,6 +1275,8 @@ const batchFilterLabels: Record<BatchFilterField, string> = {
 const activeTab = ref<StockStatus>('warehouse');
 const route = useRoute();
 const router = useRouter();
+const loading = ref(false);
+const saving = ref(false);
 const selectedKeys = ref<number[]>([]);
 const formPageVisible = ref(false);
 const formPageMode = ref<ProductFormMode>('create');
@@ -1302,6 +1313,9 @@ const uploadState = reactive({
   mainImage: false,
   video: false,
 });
+const productCategories = ref<ProductCategoryRecord[]>([]);
+const productSuppliers = ref<SupplierRecord[]>([]);
+const dataItems = ref<StockItem[]>([]);
 
 const defaultFilter = (): FilterState => ({
   id: '',
@@ -1470,31 +1484,136 @@ const createStoneImage = (seed: number) => {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 };
 
-const dataItems = ref<StockItem[]>(
-  Array.from({ length: 36 }, (_, index) => {
-    const statuses: StockStatus[] = ['warehouse', 'selling', 'offShelf', 'soldOut', 'recycle'];
-    const publishers: PublisherType[] = ['租户发布', '平台发布'];
-    const status = statuses[index % statuses.length];
-    const publisherType = publishers[index % publishers.length];
-    const isExternalSupplier = publisherType === '平台发布' && index % 4 === 1;
-    const category = categoryOptions[index % categoryOptions.length];
-    return {
-      id: 900100 + index,
-      code: `CPXH-${String(index + 1).padStart(4, '0')}`,
-      image: createStoneImage(index),
-      name: ['奢石圆角餐桌', '岩板茶几组合', '轻奢玄关边柜', '云纹餐边柜'][index % 4],
-      category,
-      stock: status === 'soldOut' ? 0 : 4 + ((index * 3) % 26),
-      tenant: isExternalSupplier ? '外部精品供应商' : tenantOptions[index % tenantOptions.length],
-      store: isExternalSupplier ? '外部供应商仓' : storeOptions[index % storeOptions.length],
-      publisherType,
-      isExternalSupplier,
-      priceRange: `￥${1800 + index * 70} - ￥${3200 + index * 90}`,
-      status,
-      offShelfReason: status === 'offShelf' ? offShelfReasons[index % offShelfReasons.length] : undefined,
-    };
-  }),
-);
+const supplierOptions = computed(() => {
+  const remoteOptions = productSuppliers.value
+    .filter((supplier) => supplier.status !== 'disabled')
+    .map((supplier) => supplier.name);
+  return remoteOptions.length ? remoteOptions : fallbackSupplierOptions;
+});
+
+const countByStatus = computed<Record<StockStatus, number>>(() => ({
+  warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,
+  selling: dataItems.value.filter((item) => item.status === 'selling').length,
+  offShelf: dataItems.value.filter((item) => item.status === 'offShelf').length,
+  soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,
+  recycle: dataItems.value.filter((item) => item.status === 'recycle').length,
+}));
+
+const normalizeStatus = (status?: string): StockStatus =>
+  status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';
+
+const normalizePublisherType = (type?: string): PublisherType => (type === '租户发布' ? '租户发布' : '平台发布');
+
+const categoryPathById = (categoryId?: number) => {
+  if (!categoryId) return '未分类';
+  const categoryMap = new Map(productCategories.value.map((category) => [category.id, category]));
+  const names: string[] = [];
+  let current = categoryMap.get(categoryId);
+  while (current) {
+    names.unshift(current.name);
+    current = current.parentId ? categoryMap.get(current.parentId) : undefined;
+  }
+  return names.length ? names.join(' / ') : '未分类';
+};
+
+const categoryIdByPath = (path: string) => {
+  const leafName = path
+    .split(/[>/]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .at(-1);
+  const matched = productCategories.value.find(
+    (category) => category.scope === 'finished' && category.name === leafName && category.status !== 'disabled',
+  );
+  return matched?.id ?? productCategories.value.find((category) => category.scope === 'finished')?.id;
+};
+
+const supplierNameById = (supplierId?: number) =>
+  productSuppliers.value.find((supplier) => supplier.id === supplierId)?.name ?? '平台自营';
+
+const supplierIdByName = (name: string) =>
+  productSuppliers.value.find((supplier) => supplier.name === name && supplier.status !== 'disabled')?.id ??
+  productSuppliers.value.find((supplier) => supplier.type === 'finished' && supplier.status !== 'disabled')?.id;
+
+const formatPriceRange = (guidePrice?: number) => {
+  const value = Number(guidePrice ?? 0);
+  return value > 0 ? `￥${value.toFixed(2)}` : '-';
+};
+
+const toStockItem = (record: FinishedProductRecord, index: number): StockItem => {
+  const status = normalizeStatus(record.status);
+  const publisherType = normalizePublisherType(record.publisherType);
+  return {
+    id: record.id,
+    code: record.sku,
+    image: record.coverImage || createStoneImage(Number(record.id || index)),
+    name: record.name,
+    categoryId: record.categoryId,
+    supplierId: record.supplierId,
+    category: categoryPathById(record.categoryId),
+    stock: status === 'soldOut' ? 0 : (record.totalStock ?? 0),
+    tenant: supplierNameById(record.supplierId),
+    store: publisherType === '平台发布' ? '平台仓' : '门店仓',
+    publisherType,
+    isExternalSupplier: Boolean(record.supplierId),
+    guidePrice: record.guidePrice,
+    priceRange: formatPriceRange(record.guidePrice),
+    status,
+  };
+};
+
+const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): FinishedProductPayload => {
+  const nextItem = { ...item, ...patch };
+  return {
+    categoryId: nextItem.categoryId,
+    supplierId: nextItem.supplierId,
+    name: nextItem.name,
+    sku: nextItem.code,
+    coverImage: nextItem.image,
+    publisherType: nextItem.publisherType,
+    totalStock: nextItem.stock,
+    guidePrice: nextItem.guidePrice,
+    status: nextItem.status,
+  };
+};
+
+const createMovement = async (
+  productId: number,
+  movementType: 'initial' | 'adjustment' | 'status_change',
+  beforeQuantity: number,
+  afterQuantity: number,
+  reason: string,
+) => {
+  await createInventoryMovement({
+    inventoryType: 'finished_product',
+    inventoryId: productId,
+    movementType,
+    quantity: afterQuantity - beforeQuantity,
+    beforeQuantity,
+    afterQuantity,
+    reason,
+    remark: '管理后台成品库存操作',
+  });
+};
+
+const loadInventoryData = async () => {
+  loading.value = true;
+  try {
+    const [categories, suppliers, products] = await Promise.all([
+      listProductCategories(),
+      listSuppliers(),
+      listFinishedProducts(),
+    ]);
+    productCategories.value = categories;
+    productSuppliers.value = suppliers;
+    dataItems.value = products.map(toStockItem);
+    selectedKeys.value = [];
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '成品库存加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 
 const currentFilter = computed(() => filters[activeTab.value]);
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
@@ -1515,6 +1634,7 @@ const handleMenuReselect = (event: Event) => {
 
 onMounted(() => {
   window.addEventListener('admin-menu-reselect', handleMenuReselect);
+  loadInventoryData();
 });
 
 onBeforeUnmount(() => {
@@ -1701,7 +1821,7 @@ const batchFillMatchedRows = computed(() =>
   ),
 );
 
-const tabLabel = (tab: TabConfig) => (typeof tab.count === 'number' ? `${tab.label}（${tab.count}）` : tab.label);
+const tabLabel = (tab: TabConfig) => `${tab.label}（${countByStatus.value[tab.value]}）`;
 
 const publisherTagClass = (type: PublisherType) => {
   if (type === '租户发布') return 'tenant-publish';
@@ -1990,11 +2110,12 @@ const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
     productForm.merchantCode = row.code;
     productForm.totalStock = row.stock;
     productForm.supplier = row.publisherType === '平台发布' ? '平台自营' : row.tenant;
+    productForm.shelfNow = row.status === 'selling' ? 'now' : 'later';
     productForm.brand = '装点猫甄选';
     productForm.style = '现代轻奢';
     productForm.material = '大理石';
     productForm.detail = '天然奢石纹理，适配门店、设计师和 C 端客户选品场景。';
-    selectedCategoryPath.value = row.category.replaceAll('/', '>');
+    selectedCategoryPath.value = row.category.replaceAll('/', ' > ');
     specRows.value = createEditSpecRows(row);
     confirmedSpecMode.value = 'layered';
     confirmedLayeredFields.value = ['material', 'color', 'size', 'length'];
@@ -2470,11 +2591,57 @@ const validateProductForm = () => {
   return true;
 };
 
-const submitProductForm = () => {
+const buildProductPayloadFromForm = (): FinishedProductPayload => {
+  const stock = totalStock.value || Number(productForm.totalStock || 0);
+  const guidePrice = Number(specRows.value.find((row) => row.guide)?.guide || 0);
+  const status = productForm.shelfNow === 'now' ? 'selling' : 'warehouse';
+  return {
+    categoryId: categoryIdByPath(selectedCategoryPath.value),
+    supplierId: supplierIdByName(productForm.supplier),
+    name: productForm.name.trim(),
+    sku: productForm.merchantCode.trim() || `FP-${Date.now()}`,
+    coverImage: editingProduct.value?.image || (uploadState.mainImage ? createStoneImage(Date.now()) : undefined),
+    publisherType: '平台发布',
+    totalStock: stock,
+    guidePrice: guidePrice > 0 ? guidePrice : undefined,
+    status,
+  };
+};
+
+const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {
+  const nextItem = toStockItem(record, dataItems.value.length);
+  nextItem.offShelfReason = offShelfReason;
+  const index = dataItems.value.findIndex((item) => item.id === record.id);
+  if (index >= 0) dataItems.value[index] = nextItem;
+  else dataItems.value.unshift(nextItem);
+  return nextItem;
+};
+
+const submitProductForm = async () => {
   submitAttempted.value = true;
   if (!validateProductForm()) return;
-  formPageVisible.value = false;
-  MessagePlugin.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+  saving.value = true;
+  try {
+    const payload = buildProductPayloadFromForm();
+    if (formPageMode.value === 'edit' && editingProduct.value) {
+      const beforeStock = editingProduct.value.stock;
+      const updated = await updateFinishedProduct(editingProduct.value.id, payload);
+      upsertStockItem(updated);
+      if (beforeStock !== (payload.totalStock ?? 0)) {
+        await createMovement(updated.id, 'adjustment', beforeStock, payload.totalStock ?? 0, '编辑成品库存数量');
+      }
+    } else {
+      const created = await createFinishedProduct(payload);
+      upsertStockItem(created);
+      await createMovement(created.id, 'initial', 0, payload.totalStock ?? 0, '新建成品库存');
+    }
+    formPageVisible.value = false;
+    MessagePlugin.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '商品提交失败');
+  } finally {
+    saving.value = false;
+  }
 };
 
 const openReasonDialog = (type: 'reject' | 'offShelf', product: StockItem | null, isBatch: boolean) => {
@@ -2490,24 +2657,31 @@ const closeReasonDialog = () => {
   reasonDialogVisible.value = false;
 };
 
-const submitReason = () => {
+const submitReason = async () => {
   if (!reasonForm.reason) {
     MessagePlugin.warning('请选择原因');
     return;
   }
   closeReasonDialog();
-  if (reasonState.type === 'reject' && reasonState.product) {
-    updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason || '平台驳回');
-    MessagePlugin.success('商品已驳回');
-    return;
-  }
-  if (reasonState.isBatch) {
-    selectedKeys.value.forEach((id) => updateProductStatus(id, 'offShelf', reasonForm.reason));
-    selectedKeys.value = [];
-    MessagePlugin.success('已批量下架');
-  } else if (reasonState.product) {
-    updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason);
-    MessagePlugin.success('商品已下架');
+  saving.value = true;
+  try {
+    if (reasonState.type === 'reject' && reasonState.product) {
+      await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason || '平台驳回');
+      MessagePlugin.success('商品已驳回');
+      return;
+    }
+    if (reasonState.isBatch) {
+      await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'offShelf', reasonForm.reason)));
+      selectedKeys.value = [];
+      MessagePlugin.success('已批量下架');
+    } else if (reasonState.product) {
+      await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason);
+      MessagePlugin.success('商品已下架');
+    }
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  } finally {
+    saving.value = false;
   }
 };
 
@@ -2538,48 +2712,62 @@ const closeImagePreview = () => {
   imagePreviewSrc.value = '';
 };
 
-const updateProductStatus = (id: number, status: StockStatus, reason?: string) => {
-  dataItems.value = dataItems.value.map((item) =>
-    item.id === id
-      ? {
-          ...item,
-          status,
-          stock: status === 'soldOut' ? 0 : item.stock,
-          offShelfReason: status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined,
-        }
-      : item,
+const updateProductStatus = async (id: number, status: StockStatus, reason?: string) => {
+  const item = dataItems.value.find((product) => product.id === id);
+  if (!item) return;
+  const beforeStock = item.stock;
+  const afterStock = status === 'soldOut' ? 0 : item.stock;
+  const updated = await updateFinishedProduct(
+    id,
+    toProductPayload(item, {
+      status,
+      stock: afterStock,
+    }),
   );
+  upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);
+  await createMovement(id, 'status_change', beforeStock, afterStock, reason || `状态变更为 ${status}`);
 };
 
-const handleConfirm = () => {
+const handleConfirm = async () => {
   const type = confirmState.type;
   const product = confirmState.product;
-  if (type === 'shelf' && product) {
-    updateProductStatus(product.id, 'selling');
-  } else if (type === 'delete' && product) {
-    updateProductStatus(product.id, 'recycle');
-  } else if (type === 'restore' && product) {
-    updateProductStatus(product.id, 'warehouse');
-  } else if (type === 'purge' && product) {
-    dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
-  } else if (type === 'reject' && product) {
-    updateProductStatus(product.id, 'offShelf', reasonForm.reason || '平台驳回');
-  } else if (type === 'batchShelf') {
-    selectedKeys.value.forEach((id) => updateProductStatus(id, 'selling'));
-    selectedKeys.value = [];
-  } else if (type === 'batchRestore') {
-    selectedKeys.value.forEach((id) => updateProductStatus(id, 'warehouse'));
-    selectedKeys.value = [];
-  } else if (type === 'batchPurge') {
-    const selected = new Set(selectedKeys.value);
-    dataItems.value = dataItems.value.filter((item) => !selected.has(item.id));
-    selectedKeys.value = [];
-  } else if (type === 'clearRecycle') {
-    dataItems.value = dataItems.value.filter((item) => item.status !== 'recycle');
-    selectedKeys.value = [];
+  saving.value = true;
+  try {
+    if (type === 'shelf' && product) {
+      await updateProductStatus(product.id, 'selling');
+    } else if (type === 'delete' && product) {
+      await updateProductStatus(product.id, 'recycle');
+    } else if (type === 'restore' && product) {
+      await updateProductStatus(product.id, 'warehouse');
+    } else if (type === 'purge' && product) {
+      await deleteFinishedProduct(product.id);
+      dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
+    } else if (type === 'reject' && product) {
+      await updateProductStatus(product.id, 'offShelf', reasonForm.reason || '平台驳回');
+    } else if (type === 'batchShelf') {
+      await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'selling')));
+      selectedKeys.value = [];
+    } else if (type === 'batchRestore') {
+      await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
+      selectedKeys.value = [];
+    } else if (type === 'batchPurge') {
+      await Promise.all(selectedKeys.value.map((id) => deleteFinishedProduct(id)));
+      const selected = new Set(selectedKeys.value);
+      dataItems.value = dataItems.value.filter((item) => !selected.has(item.id));
+      selectedKeys.value = [];
+    } else if (type === 'clearRecycle') {
+      const recycleIds = dataItems.value.filter((item) => item.status === 'recycle').map((item) => item.id);
+      await Promise.all(recycleIds.map((id) => deleteFinishedProduct(id)));
+      dataItems.value = dataItems.value.filter((item) => item.status !== 'recycle');
+      selectedKeys.value = [];
+    }
+    closeConfirmDialog();
+    MessagePlugin.success('操作已完成');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  } finally {
+    saving.value = false;
   }
-  closeConfirmDialog();
-  MessagePlugin.success('操作已完成');
 };
 </script>
 
