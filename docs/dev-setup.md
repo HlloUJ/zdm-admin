@@ -142,7 +142,20 @@ scripts/rollback-code.sh v0.7.4-backend-api-smoke-gate
 
 ## GitHub 首次推送
 
-当前本地仓库已经初始化并持续打 tag，但 `origin` 还未绑定。首次推送前需要先在 GitHub 创建一个空仓库，推荐私有仓库。
+当前本地仓库已经初始化并持续打 tag，`origin` 已绑定到：
+
+```text
+git@github.com:HlloUJ/zdm-admin.git
+```
+
+`main` 和所有 tags 已完成首次推送。后续正常提交后可直接执行：
+
+```bash
+git push
+git push origin --tags
+```
+
+如果需要重新绑定到新的空仓库，可使用以下流程。
 
 推荐仓库名：
 

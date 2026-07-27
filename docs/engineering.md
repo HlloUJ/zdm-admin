@@ -29,9 +29,9 @@
 
 - Codex GitHub 插件：已安装并连接，可用于后续查看仓库、PR 和 GitHub Actions。
 - 本地仓库：已初始化 Git。
-- 远程仓库：当前尚未绑定 `origin`。本地也未安装 `gh` 命令。
-- GitHub App 安装范围：当前没有可访问仓库，需要在 GitHub 创建空仓库并安装/授权 GitHub App 后，CI 才会真正运行。
-- 首次推送：在 GitHub 新建空仓库后执行 `npm run github:publish -- <repo-url>`，脚本会绑定 `origin`、推送 `main` 和所有 tags。
+- 远程仓库：已绑定 `origin` 到 `git@github.com:HlloUJ/zdm-admin.git`，`main` 和所有 tags 已完成首次推送。
+- SSH 配置：本机已使用 `/Users/uj/.ssh/id_ed25519_github` 作为 GitHub 专用 key，普通 `git push` 可直接使用。
+- GitHub App 安装范围：当前 Codex GitHub App 仍没有可访问仓库；如需 Codex 直接查看 Actions、PR 和仓库内容，需要在 GitHub 上为 `HlloUJ/zdm-admin` 安装/授权 GitHub App。
 
 ## 本地启动
 
