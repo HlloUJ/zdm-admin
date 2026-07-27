@@ -2270,13 +2270,13 @@ const simulateUpload = (target: UploadTarget) => {
   if (target === 'mainImage' || target === 'video') {
     uploadState[target] = true;
   }
-  MessagePlugin.success(`${labelMap[target]}已加入模拟上传队列`);
+  MessagePlugin.success(`${labelMap[target]}已选择占位资源`);
 };
 
 const simulateSpecImageUpload = (row: SpecRow, field: SpecImageField) => {
   const key = `${field}Image` as 'specImage' | 'materialImage' | 'lengthImage' | 'colorImage' | 'sizeImage';
   row[key] = true;
-  MessagePlugin.success('规格图片已加入模拟上传队列');
+  MessagePlugin.success('规格图片已选择占位资源');
 };
 
 const isConfirmedImageField = (field: LayeredSpecField) => confirmedImageField.value === field;
