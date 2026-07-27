@@ -896,6 +896,50 @@
       </t-table>
     </t-drawer>
 
+    <t-drawer
+      v-model:visible="movementDrawerVisible"
+      header="库存流水"
+      placement="right"
+      size="780px"
+      lazy
+      destroy-on-close
+      :footer="false"
+      @close="closeMovementDrawer"
+    >
+      <div class="movement-drawer">
+        <div v-if="movementTarget" class="movement-head">
+          <div>
+            <strong>{{ movementTarget.name }}</strong>
+            <span>ID：{{ movementTarget.id }} ｜ 编码：{{ movementTarget.code }}</span>
+          </div>
+          <t-tag :theme="movementTarget.status === 'selling' ? 'success' : 'primary'" variant="light">
+            当前库存 {{ movementTarget.stock }}
+          </t-tag>
+        </div>
+
+        <t-table
+          row-key="id"
+          :data="movementRows"
+          :columns="movementColumns"
+          :loading="movementLoading"
+          hover
+          table-layout="fixed"
+        >
+          <template #movementType="{ row }">{{ movementTypeLabel(row.movementType) }}</template>
+          <template #quantity="{ row }">
+            <span :class="movementQuantityClass(row.quantity)">{{ formatMovementQuantity(row.quantity) }}</span>
+          </template>
+          <template #stockChange="{ row }">
+            {{ formatMovementNumber(row.beforeQuantity) }} → {{ formatMovementNumber(row.afterQuantity) }}
+          </template>
+          <template #createdAt="{ row }">{{ formatMovementTime(row.createdAt) }}</template>
+          <template #empty>
+            <div class="table-empty">暂无库存流水</div>
+          </template>
+        </t-table>
+      </div>
+    </t-drawer>
+
     <t-dialog
       v-model:visible="reasonDialogVisible"
       :header="reasonState.type === 'reject' ? '驳回' : '下架'"
@@ -987,14 +1031,19 @@ import {
   type FinishedProductPayload,
   type FinishedProductRecord,
 } from '@/services/finishedProducts';
-import { createInventoryMovement } from '@/services/inventoryMovements';
+import {
+  createInventoryMovement,
+  listInventoryMovements,
+  type InventoryMovementRecord,
+  type MovementType,
+} from '@/services/inventoryMovements';
 import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 type PublisherType = '租户发布' | '平台发布';
-type RowAction = 'shelf' | 'edit' | 'reject' | 'delete' | 'offShelf' | 'restore' | 'purge';
+type RowAction = 'shelf' | 'edit' | 'reject' | 'delete' | 'offShelf' | 'restore' | 'purge' | 'movement';
 type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type FormTabKey = 'description' | 'base' | 'sales';
 type UploadTarget = 'mainImage' | 'video' | 'attributeImage';
@@ -1284,6 +1333,7 @@ const formTab = ref<FormTabKey>('description');
 const categoryDialogVisible = ref(false);
 const specDialogVisible = ref(false);
 const priceDrawerVisible = ref(false);
+const movementDrawerVisible = ref(false);
 const reasonDialogVisible = ref(false);
 const confirmDialogVisible = ref(false);
 const detailDialogVisible = ref(false);
@@ -1291,6 +1341,9 @@ const imagePreviewVisible = ref(false);
 const priceDrawerMode = ref<PriceDrawerMode>('batchFill');
 const detailProduct = ref<StockItem | null>(null);
 const editingProduct = ref<StockItem | null>(null);
+const movementTarget = ref<StockItem | null>(null);
+const movementLoading = ref(false);
+const movementRows = ref<InventoryMovementRecord[]>([]);
 const imagePreviewSrc = ref('');
 const imagePreviewTitle = ref('商品主图');
 const selectedCategoryPath = ref('家具 > 餐桌 > 奢石餐桌');
@@ -1710,7 +1763,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     base.splice(5, 0, { colKey: 'offShelfReason', title: '下架原因', width: 140 });
   }
   if (activeTab.value !== 'soldOut') {
-    base.push({ colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' });
+    base.push({ colKey: 'operation', title: '操作', width: 230, align: 'left', fixed: 'right' });
   }
   return base;
 });
@@ -1767,6 +1820,14 @@ const priceColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   ];
   return [...dimensionColumns, ...editableColumns];
 });
+
+const movementColumns: PrimaryTableCol<TableRowData>[] = [
+  { colKey: 'createdAt', title: '时间', width: 150 },
+  { colKey: 'movementType', title: '类型', width: 100 },
+  { colKey: 'quantity', title: '变动', width: 90, align: 'center' },
+  { colKey: 'stockChange', title: '库存变化', width: 130, align: 'center' },
+  { colKey: 'reason', title: '原因', minWidth: 140, ellipsis: true },
+];
 
 const getSpecGroupKey = (row: SpecRow, fields: LayeredSpecField[]) =>
   fields.map((field) => row[field] || '').join('\u0001');
@@ -1829,45 +1890,50 @@ const publisherTagClass = (type: PublisherType) => {
   return 'platform-publish';
 };
 
+const withMovementAction = (actions: { action: RowAction; label: string; theme: string }[]) => [
+  ...actions,
+  { action: 'movement' as const, label: '流水', theme: 'primary' },
+];
+
 const rowActions = (row: StockItem): { action: RowAction; label: string; theme: string }[] => {
   if (activeTab.value === 'warehouse') {
     const lastAction =
       row.publisherType === '租户发布'
         ? { action: 'reject' as const, label: '驳回', theme: 'warning' }
         : { action: 'delete' as const, label: '删除', theme: 'danger' };
-    return [
+    return withMovementAction([
       { action: 'shelf', label: '上架', theme: 'primary' },
       { action: 'edit', label: '编辑', theme: 'primary' },
       lastAction,
-    ];
+    ]);
   }
   if (activeTab.value === 'selling') {
     if (row.publisherType === '租户发布') {
-      return [
+      return withMovementAction([
         { action: 'reject', label: '驳回', theme: 'warning' },
         { action: 'edit', label: '编辑', theme: 'primary' },
-      ];
+      ]);
     }
-    return [
+    return withMovementAction([
       { action: 'offShelf', label: '下架', theme: 'warning' },
       { action: 'edit', label: '编辑', theme: 'primary' },
       { action: 'delete', label: '删除', theme: 'danger' },
-    ];
+    ]);
   }
   if (activeTab.value === 'offShelf') {
-    return [
+    return withMovementAction([
       { action: 'restore', label: '放回到仓库', theme: 'primary' },
       { action: 'edit', label: '编辑', theme: 'primary' },
       { action: 'delete', label: '删除', theme: 'danger' },
-    ];
+    ]);
   }
   if (activeTab.value === 'soldOut') {
     return [];
   }
-  return [
+  return withMovementAction([
     { action: 'restore', label: '放回到仓库', theme: 'primary' },
     { action: 'purge', label: '彻底删除', theme: 'danger' },
-  ];
+  ]);
 };
 
 const handleTabChange = () => {
@@ -1949,6 +2015,10 @@ const handleBatchAction = (action: BatchAction) => {
 
 const handleRowAction = (action: RowAction, row: StockItem) => {
   const fullName = `${row.name}（${row.code}）`;
+  if (action === 'movement') {
+    openMovementDrawer(row);
+    return;
+  }
   if (action === 'edit') {
     openFormPage('edit', row);
     return;
@@ -1974,6 +2044,63 @@ const handleRowAction = (action: RowAction, row: StockItem) => {
     return;
   }
   openConfirm('purge', row, `是否彻底删除商品【${fullName}】？`);
+};
+
+const movementTypeLabel = (type: MovementType) =>
+  ({
+    initial: '初始入库',
+    adjustment: '库存调整',
+    status_change: '状态变更',
+    inbound: '入库',
+    outbound: '出库',
+  })[type] ?? type;
+
+const formatMovementNumber = (value?: number) => Number(value ?? 0).toFixed(2);
+
+const formatMovementQuantity = (value?: number) => {
+  const quantity = Number(value ?? 0);
+  if (quantity > 0) return `+${quantity.toFixed(2)}`;
+  return quantity.toFixed(2);
+};
+
+const movementQuantityClass = (value?: number) => {
+  const quantity = Number(value ?? 0);
+  if (quantity > 0) return 'movement-positive';
+  if (quantity < 0) return 'movement-negative';
+  return 'movement-neutral';
+};
+
+const formatMovementTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace('T', ' ');
+  return date.toLocaleString('zh-CN', { hour12: false });
+};
+
+const openMovementDrawer = async (row: StockItem) => {
+  movementTarget.value = row;
+  movementDrawerVisible.value = true;
+  movementLoading.value = true;
+  try {
+    const records = await listInventoryMovements();
+    movementRows.value = records
+      .filter((item) => item.inventoryType === 'finished_product' && item.inventoryId === row.id)
+      .sort((first, second) => {
+        const firstTime = new Date(first.createdAt ?? '').getTime();
+        const secondTime = new Date(second.createdAt ?? '').getTime();
+        return (Number.isNaN(secondTime) ? 0 : secondTime) - (Number.isNaN(firstTime) ? 0 : firstTime);
+      });
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '库存流水加载失败');
+  } finally {
+    movementLoading.value = false;
+  }
+};
+
+const closeMovementDrawer = () => {
+  movementDrawerVisible.value = false;
+  movementTarget.value = null;
+  movementRows.value = [];
 };
 
 const openCategoryDialog = () => {
@@ -3460,6 +3587,52 @@ const handleConfirm = async () => {
 .drawer-head span {
   color: #6b7280;
   font-size: 13px;
+}
+
+.movement-drawer {
+  display: grid;
+  gap: 16px;
+}
+
+.movement-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--td-component-border);
+  border-radius: 6px;
+}
+
+.movement-head div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.movement-head strong {
+  color: #111827;
+  font-weight: 700;
+}
+
+.movement-head span {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.movement-positive {
+  color: var(--td-success-color);
+  font-weight: 700;
+}
+
+.movement-negative {
+  color: var(--td-error-color);
+  font-weight: 700;
+}
+
+.movement-neutral {
+  color: var(--td-text-color-secondary);
 }
 
 .batch-fill-panel {
