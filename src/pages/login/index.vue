@@ -80,9 +80,9 @@ const FORM_RULES: Record<string, FormRule[]> = {
 };
 
 const formData = reactive({
-  phone: '13800000000',
-  verifyCode: '888888',
-  rememberAccount: true,
+  phone: '',
+  verifyCode: '',
+  rememberAccount: false,
 });
 
 const stopCounter = () => {

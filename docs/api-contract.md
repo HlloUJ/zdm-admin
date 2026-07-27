@@ -15,7 +15,7 @@
 ## 鉴权
 
 - 管理后台登录：`POST /api/admin/auth/login`
-- 请求：`{ "phone": "13800000000", "verifyCode": "888888" }`
+- 请求：`{ "phone": "15926626945", "verifyCode": "888888" }`
 - 响应：`token`、用户信息、角色、权限。
 - 后续请求使用 `Authorization: Bearer <token>`。
 
