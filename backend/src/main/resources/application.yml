@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: zdm-admin-backend
+  datasource:
+    url: ${ZDM_DB_URL:jdbc:mysql://127.0.0.1:3306/zdm_admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${ZDM_DB_USERNAME:zdm_admin}
+    password: ${ZDM_DB_PASSWORD:zdm_admin_pwd}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

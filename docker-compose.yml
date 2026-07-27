@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: zdm-admin-mysql
+    environment:
+      MYSQL_DATABASE: zdm_admin
+      MYSQL_USER: zdm_admin
+      MYSQL_PASSWORD: zdm_admin_pwd
+      MYSQL_ROOT_PASSWORD: zdm_root_pwd
+      TZ: Asia/Shanghai
+    ports:
+      - '3306:3306'
+    volumes:
+      - zdm_admin_mysql:/var/lib/mysql
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uzdm_admin -pzdm_admin_pwd --silent']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  zdm_admin_mysql:

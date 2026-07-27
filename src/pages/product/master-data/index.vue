@@ -1,0 +1,287 @@
+<template>
+  <div class="admin-layout">
+    <header class="top-nav">
+      <div class="brand">
+        <div class="brand-logo">装</div>
+        <div>
+          <div class="brand-title">装点猫</div>
+          <div class="brand-subtitle">管理后台</div>
+        </div>
+      </div>
+      <div class="top-actions"><t-avatar size="small">超</t-avatar><span>超级管理员</span></div>
+    </header>
+    <div class="admin-shell">
+      <AdminSideMenu />
+      <main class="page">
+        <header class="page-header">
+          <t-breadcrumb
+            ><t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item
+            ><t-breadcrumb-item>{{ config.title }}</t-breadcrumb-item></t-breadcrumb
+          ><t-tag theme="primary" variant="light">平台主数据</t-tag>
+        </header>
+        <t-alert theme="info" class="page-tip">{{ config.tip }}</t-alert>
+        <section class="filter-card">
+          <t-form :data="searchForm" label-width="72px" colon
+            ><div class="filter-row">
+              <div class="filter-fields">
+                <t-form-item :label="config.entityName"
+                  ><t-input
+                    v-model="searchForm.keyword"
+                    clearable
+                    :placeholder="`名称或${config.codeLabel}`" /></t-form-item
+                ><t-form-item label="状态"
+                  ><t-select v-model="searchForm.status" clearable placeholder="全部"
+                    ><t-option label="启用" value="enabled" /><t-option label="停用" value="disabled" /></t-select
+                ></t-form-item>
+              </div>
+              <div class="filter-actions">
+                <t-button theme="primary" @click="search"
+                  ><template #icon><t-icon name="search" /></template>查询</t-button
+                ><t-button variant="base" @click="reset">重置</t-button>
+              </div>
+            </div></t-form
+          >
+        </section>
+        <section class="table-card">
+          <div class="table-toolbar">
+            <t-button theme="primary" @click="openCreate"
+              ><template #icon><t-icon name="add" /></template>新增{{ config.entityName }}</t-button
+            ><span>{{ config.toolbarTip }}</span>
+          </div>
+          <t-table row-key="id" :data="filteredData" :columns="columns" hover table-layout="fixed"
+            ><template #status="{ row }"
+              ><t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">{{
+                row.status === 'enabled' ? '启用' : '停用'
+              }}</t-tag></template
+            ><template #operation="{ row }"
+              ><div class="table-actions">
+                <t-link @click="openEdit(row)">编辑</t-link
+                ><t-link :theme="row.status === 'enabled' ? 'warning' : 'success'" @click="toggle(row)">{{
+                  row.status === 'enabled' ? '停用' : '启用'
+                }}</t-link>
+              </div></template
+            ></t-table
+          >
+        </section>
+      </main>
+    </div>
+    <t-dialog
+      v-model:visible="dialogVisible"
+      :header="`${editingRow ? '编辑' : '新增'}${config.entityName}`"
+      width="520px"
+      confirm-btn="提交"
+      @confirm="submit"
+      ><t-form :data="form" label-width="96px" colon
+        ><t-form-item :label="`${config.entityName}名称`"><t-input v-model="form.name" clearable /></t-form-item
+        ><t-form-item :label="config.codeLabel"
+          ><t-input v-model="form.code" clearable :placeholder="config.codePlaceholder" /></t-form-item
+        ><t-form-item :label="config.extraLabel"
+          ><t-input v-model="form.extra" clearable :placeholder="config.extraPlaceholder" /></t-form-item></t-form
+    ></t-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
+import { MessagePlugin } from 'tdesign-vue-next';
+import { computed, reactive, ref } from 'vue';
+import AdminSideMenu from '@/components/AdminSideMenu.vue';
+
+type Status = 'enabled' | 'disabled';
+interface MasterDataItem {
+  id: number;
+  code: string;
+  name: string;
+  extra: string;
+  useCount: number;
+  status: Status;
+}
+
+const config = computed(() => ({
+  title: '计量单位管理',
+  entityName: '计量单位',
+  codeLabel: '单位编码',
+  codePlaceholder: '如 mm / piece',
+  extraLabel: '单位类型',
+  extraPlaceholder: '如 长度 / 件数',
+  tip: '计量单位是平台共享主数据。数值型属性、商品规格和库存计量统一引用单位，避免同义单位造成统计与换算错误。',
+  toolbarTip: '停用单位后不可在新建属性和商品中选择，已使用数据保留原单位。',
+  extraColumn: '单位类型',
+  useColumn: '引用属性数',
+  data: [
+    { id: 1, code: 'mm', name: '毫米', extra: '长度', useCount: 12, status: 'enabled' as Status },
+    { id: 2, code: 'cm', name: '厘米', extra: '长度', useCount: 4, status: 'enabled' as Status },
+    { id: 3, code: 'piece', name: '件', extra: '件数', useCount: 16, status: 'enabled' as Status },
+    { id: 4, code: 'kg', name: '千克', extra: '重量', useCount: 3, status: 'enabled' as Status },
+  ],
+}));
+const data = ref<MasterDataItem[]>(config.value.data);
+const searchForm = reactive({ keyword: '', status: '' as '' | Status });
+const applied = reactive({ ...searchForm });
+const dialogVisible = ref(false);
+const editingRow = ref<MasterDataItem | null>(null);
+const form = reactive({ name: '', code: '', extra: '' });
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  { colKey: 'code', title: config.value.codeLabel, minWidth: 170 },
+  { colKey: 'name', title: `${config.value.entityName}名称`, minWidth: 160 },
+  { colKey: 'extra', title: config.value.extraColumn, minWidth: 180 },
+  { colKey: 'useCount', title: config.value.useColumn, width: 120, align: 'right' },
+  { colKey: 'status', title: '状态', width: 90, align: 'center' },
+  { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
+]);
+const filteredData = computed(() =>
+  data.value.filter(
+    (item) =>
+      (!applied.keyword || `${item.code}${item.name}${item.extra}`.includes(applied.keyword)) &&
+      (!applied.status || item.status === applied.status),
+  ),
+);
+const search = () => Object.assign(applied, searchForm);
+const reset = () => {
+  searchForm.keyword = '';
+  searchForm.status = '';
+  search();
+};
+const openCreate = () => {
+  editingRow.value = null;
+  form.name = '';
+  form.code = '';
+  form.extra = '';
+  dialogVisible.value = true;
+};
+const openEdit = (row: MasterDataItem) => {
+  editingRow.value = row;
+  form.name = row.name;
+  form.code = row.code;
+  form.extra = row.extra;
+  dialogVisible.value = true;
+};
+const submit = () => {
+  if (!form.name.trim() || !form.code.trim()) {
+    MessagePlugin.warning(`请填写${config.value.entityName}名称和${config.value.codeLabel}`);
+    return;
+  }
+  if (
+    data.value.some(
+      (item) => item.id !== editingRow.value?.id && (item.code === form.code.trim() || item.name === form.name.trim()),
+    )
+  ) {
+    MessagePlugin.warning('名称或编码已存在');
+    return;
+  }
+  if (editingRow.value)
+    Object.assign(editingRow.value, { name: form.name.trim(), code: form.code.trim(), extra: form.extra.trim() });
+  else
+    data.value.unshift({
+      id: Date.now(),
+      name: form.name.trim(),
+      code: form.code.trim(),
+      extra: form.extra.trim(),
+      useCount: 0,
+      status: 'enabled',
+    });
+  dialogVisible.value = false;
+  MessagePlugin.success(editingRow.value ? '已保存修改' : `已新增${config.value.entityName}`);
+};
+const toggle = (row: MasterDataItem) => {
+  row.status = row.status === 'enabled' ? 'disabled' : 'enabled';
+  MessagePlugin.success(row.status === 'enabled' ? '已启用' : '已停用');
+};
+</script>
+
+<style scoped>
+.admin-layout {
+  min-height: 100vh;
+  background: var(--td-bg-color-page);
+}
+.top-nav {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--td-comp-paddingLR-xl);
+  background: var(--td-bg-color-container);
+  border-bottom: 1px solid var(--td-component-border);
+}
+.admin-shell {
+  min-height: calc(100vh - 64px);
+  display: flex;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--td-brand-color);
+  color: #fff;
+  font-weight: 700;
+}
+.brand-title {
+  font: var(--td-font-title-medium);
+}
+.brand-subtitle {
+  font-size: 12px;
+  color: var(--td-text-color-placeholder);
+}
+.top-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--td-text-color-secondary);
+}
+.page {
+  min-width: 0;
+  flex: 1;
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.page-tip,
+.filter-card {
+  margin-bottom: 16px;
+}
+.filter-card,
+.table-card {
+  padding: 24px;
+  background: var(--td-bg-color-container);
+  border-radius: 6px;
+  box-shadow: var(--td-shadow-1);
+}
+.filter-row,
+.filter-fields,
+.filter-actions,
+.table-toolbar,
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.filter-row {
+  justify-content: space-between;
+}
+.filter-fields {
+  flex: 1;
+}
+.filter-fields :deep(.t-form__item) {
+  margin-bottom: 0;
+}
+.table-toolbar {
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+}
+.table-actions {
+  gap: 12px;
+}
+</style>

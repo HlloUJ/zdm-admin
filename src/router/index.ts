@@ -1,0 +1,108 @@
+import { createRouter, createWebHistory } from 'vue-router';
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/',
+      redirect: '/login',
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/pages/login/index.vue'),
+    },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('@/pages/dashboard/index.vue'),
+    },
+    {
+      path: '/finished-stock-management',
+      name: 'finishedStockManagement',
+      component: () => import('@/pages/finished-stock/management/index.vue'),
+    },
+    {
+      path: '/finished-stock-craft',
+      name: 'finishedStockCraft',
+      component: () => import('@/pages/craft/finished-stock/index.vue'),
+    },
+    {
+      path: '/employee-management',
+      name: 'employeeManagement',
+      component: () => import('@/pages/permission/employee/index.vue'),
+    },
+    {
+      path: '/role-management',
+      name: 'roleManagement',
+      component: () => import('@/pages/role/management/index.vue'),
+    },
+    {
+      path: '/terminal-function-allocation',
+      name: 'terminalFunctionAllocation',
+      component: () => import('@/pages/permission/terminal-function/index.vue'),
+    },
+    {
+      path: '/product-category',
+      name: 'productCategory',
+      component: () => import('@/pages/product/category/index.vue'),
+    },
+    {
+      path: '/product-attribute',
+      name: 'productAttribute',
+      component: () => import('@/pages/product/attribute/index.vue'),
+    },
+    {
+      path: '/unit-management',
+      name: 'unitManagement',
+      component: () => import('@/pages/product/master-data/index.vue'),
+      meta: { masterDataType: 'unit' },
+    },
+    {
+      path: '/slab-variety',
+      name: 'slabVariety',
+      component: () => import('@/pages/slab/variety/index.vue'),
+    },
+    {
+      path: '/slab-management',
+      name: 'slabManagement',
+      component: () => import('@/pages/slab/management/index.vue'),
+    },
+    {
+      path: '/supplier-management',
+      name: 'supplierManagement',
+      component: () => import('@/pages/supplier/management/index.vue'),
+    },
+    {
+      path: '/tenant-management',
+      name: 'tenantManagement',
+      component: () => import('@/pages/tenant/management/index.vue'),
+    },
+    {
+      path: '/tenant-store-management',
+      name: 'tenantStoreManagement',
+      component: () => import('@/pages/tenant/store/index.vue'),
+    },
+    {
+      path: '/store-category-management',
+      name: 'storeCategoryManagement',
+      component: () => import('@/pages/store-category/management/index.vue'),
+    },
+    {
+      path: '/product-attribute-value',
+      name: 'productAttributeValue',
+      component: () => import('@/pages/product/attribute-value/index.vue'),
+    },
+    {
+      path: '/category-attribute-template',
+      name: 'categoryAttributeTemplate',
+      component: () => import('@/pages/accessory/category/index.vue'),
+    },
+    { path: '/finished-stock-category', redirect: '/product-category' },
+    { path: '/accessory-category', redirect: '/category-attribute-template' },
+    { path: '/finished-stock-attribute', redirect: '/product-attribute' },
+    { path: '/accessory-attribute', redirect: '/product-attribute-value' },
+  ],
+});
+
+export default router;

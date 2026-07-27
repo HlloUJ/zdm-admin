@@ -1,0 +1,774 @@
+<template>
+  <div class="admin-layout">
+    <header class="top-nav">
+      <div class="brand">
+        <div class="brand-logo">装</div>
+        <div>
+          <div class="brand-title">装点猫</div>
+          <div class="brand-subtitle">管理后台</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <t-button shape="square" variant="text" aria-label="消息通知"><t-icon name="notification" /></t-button>
+        <div class="user-entry"><t-avatar size="small">超</t-avatar><span>超级管理员</span></div>
+      </div>
+    </header>
+
+    <div class="admin-shell">
+      <AdminSideMenu />
+
+      <main class="page">
+        <header class="page-header">
+          <t-breadcrumb
+            ><t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item
+            ><t-breadcrumb-item>商品分类管理</t-breadcrumb-item></t-breadcrumb
+          >
+          <t-tag theme="primary" variant="light">最多支持 4 级分类</t-tag>
+        </header>
+
+        <t-tabs v-if="!lockedScope" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
+
+        <section class="filter-card">
+          <t-form :data="searchForm" label-width="74px" colon>
+            <div class="filter-row">
+              <div class="filter-fields">
+                <t-form-item label="分类名称"
+                  ><t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称"
+                /></t-form-item>
+                <t-form-item label="分类状态"
+                  ><t-select v-model="searchForm.status" clearable placeholder="全部"
+                    ><t-option label="启用" value="enabled" /><t-option label="停用" value="disabled" /></t-select
+                ></t-form-item>
+              </div>
+              <div class="filter-actions">
+                <t-button theme="primary" @click="handleSearch"
+                  ><template #icon><t-icon name="search" /></template>查询</t-button
+                ><t-button variant="base" @click="handleReset"
+                  ><template #icon><t-icon name="refresh" /></template>重置</t-button
+                >
+              </div>
+            </div>
+          </t-form>
+        </section>
+
+        <section class="category-card">
+          <div class="category-toolbar">
+            <div>
+              <h2>{{ activeScope === 'finished' ? '成品现货分类' : '配件分类' }}</h2>
+              <p>通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</p>
+            </div>
+            <t-button theme="primary" @click="openCreateDialog()"
+              ><template #icon><t-icon name="add" /></template>新增一级分类</t-button
+            >
+          </div>
+
+          <t-alert v-if="tipVisible" theme="info" class="category-tip" close-btn @close="tipVisible = false">
+            已关联商品的分类不支持删除；停用后不可用于新商品发布，历史商品保留原分类。
+          </t-alert>
+
+          <t-table
+            v-if="displayRows.length"
+            row-key="key"
+            :data="displayRows"
+            :columns="columns"
+            hover
+            table-layout="fixed"
+          >
+            <template #name="{ row }">
+              <div :class="['category-name-cell', `level-${row.level}`]">
+                <t-button
+                  v-if="row.node.children.length"
+                  class="tree-toggle"
+                  variant="text"
+                  shape="square"
+                  size="small"
+                  :aria-label="isExpanded(row.node) ? '收起下级分类' : '展开下级分类'"
+                  @click.stop="toggleExpanded(row.node)"
+                >
+                  <template #icon><t-icon :name="isExpanded(row.node) ? 'chevron-down' : 'chevron-right'" /></template>
+                </t-button>
+                <span v-else class="tree-toggle-placeholder"><t-icon name="minus" /></span>
+                <span>{{ row.name }}</span>
+              </div>
+            </template>
+            <template #level="{ row }"
+              ><span class="level-label">{{ levelLabel(row.level) }}</span></template
+            >
+            <template #status="{ row }"
+              ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
+                row.status === 'enabled' ? '启用' : '停用'
+              }}</t-tag></template
+            >
+            <template #sort="{ row }">{{ row.sort }}</template>
+            <template #operation="{ row }">
+              <div class="table-actions">
+                <t-link v-if="row.level < maxCategoryLevel" theme="primary" @click="openCreateDialog(row)"
+                  >新增下级</t-link
+                >
+                <t-link theme="primary" @click="openEditDialog(row)">编辑</t-link>
+                <t-link theme="primary" :disabled="siblingIndex(row) === 0" @click="moveCategory(row, -1)">上移</t-link>
+                <t-link
+                  theme="primary"
+                  :disabled="siblingIndex(row) === siblingNodes(row).length - 1"
+                  @click="moveCategory(row, 1)"
+                  >下移</t-link
+                >
+                <t-link
+                  :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                  @click="openStatusConfirm(row.node)"
+                  >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
+                >
+                <t-link theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+              </div>
+            </template>
+          </t-table>
+          <t-empty v-else description="未找到符合条件的分类" />
+        </section>
+      </main>
+    </div>
+
+    <t-dialog
+      v-model:visible="formVisible"
+      :header="formMode === 'create' ? `新增${levelLabel(formLevel)}` : '编辑分类'"
+      width="520px"
+      placement="center"
+      :prevent-scroll-through="false"
+      confirm-btn="保存"
+      @confirm="handleSubmit"
+      @close="closeFormDialog"
+      @opened="restorePageScroll"
+      @closed="restorePageScroll"
+    >
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+        <t-form-item v-if="formData.parentId" label="上级分类"><t-input :value="parentName" disabled /></t-form-item>
+        <t-form-item label="分类名称" name="name" required-mark
+          ><t-input v-model="formData.name" :maxlength="20" clearable placeholder="请输入，最多20个字符"
+        /></t-form-item>
+        <t-form-item label="分类状态" name="status" required-mark
+          ><t-radio-group v-model="formData.status"
+            ><t-radio value="enabled">启用</t-radio><t-radio value="disabled">停用</t-radio></t-radio-group
+          >
+          <p class="form-help">停用分类不可用于新商品发布。</p></t-form-item
+        >
+      </t-form>
+    </t-dialog>
+
+    <t-dialog
+      v-model:visible="deleteVisible"
+      header="系统提示"
+      width="440px"
+      placement="center"
+      :prevent-scroll-through="false"
+      :confirm-btn="canDeleteTarget ? '确认' : '我知道了'"
+      :cancel-btn="canDeleteTarget ? '取消' : null"
+      @confirm="handleDeleteConfirm"
+      @close="closeDeleteDialog"
+      @opened="restorePageScroll"
+      @closed="restorePageScroll"
+    >
+      <template v-if="deleteTarget?.productCount"
+        >分类“{{ deleteTarget.name }}”已关联
+        {{ deleteTarget.productCount }} 个商品，不能删除。请停用该分类，避免新商品继续使用。</template
+      >
+      <template v-else-if="deleteTarget?.children.length"
+        >分类“{{ deleteTarget.name }}”包含下级分类，请先删除或转移下级分类。</template
+      >
+      <template v-else>是否删除分类【{{ deleteTarget?.name }}】？</template>
+    </t-dialog>
+
+    <t-dialog
+      v-model:visible="statusConfirmVisible"
+      header="系统提示"
+      width="420px"
+      placement="center"
+      :prevent-scroll-through="false"
+      confirm-btn="确认"
+      cancel-btn="取消"
+      @confirm="handleStatusConfirm"
+      @close="closeStatusConfirm"
+      @opened="restorePageScroll"
+      @closed="restorePageScroll"
+    >
+      {{ statusConfirmText }}
+    </t-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
+import { MessagePlugin } from 'tdesign-vue-next';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import AdminSideMenu from '@/components/AdminSideMenu.vue';
+
+type Scope = 'finished' | 'accessory';
+type Status = 'enabled' | 'disabled';
+type FormMode = 'create' | 'edit';
+
+interface CategoryNode {
+  id: number;
+  name: string;
+  status: Status;
+  productCount: number;
+  children: CategoryNode[];
+}
+interface CategoryRow {
+  key: string;
+  node: CategoryNode;
+  parent: CategoryNode | null;
+  level: number;
+  name: string;
+  status: Status;
+  productCount: number;
+  sort: number;
+}
+interface CategoryForm {
+  id: number | null;
+  parentId: number | null;
+  name: string;
+  status: Status;
+}
+
+const maxCategoryLevel = 4;
+const route = useRoute();
+const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
+const activeScope = ref<Scope>(resolveScope(route.query.scope));
+const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');
+const scopeTabs = [
+  { label: '成品现货分类', value: 'finished' },
+  { label: '配件分类', value: 'accessory' },
+];
+
+const categoryData = ref<Record<Scope, CategoryNode[]>>({
+  finished: [
+    {
+      id: 1,
+      name: '住宅家具',
+      status: 'enabled',
+      productCount: 0,
+      children: [
+        {
+          id: 2,
+          name: '餐厅成套家具',
+          status: 'enabled',
+          productCount: 0,
+          children: [
+            {
+              id: 3,
+              name: '餐桌',
+              status: 'enabled',
+              productCount: 0,
+              children: [
+                { id: 4, name: '大理石餐桌', status: 'enabled', productCount: 42, children: [] },
+                { id: 5, name: '奢石餐桌', status: 'enabled', productCount: 18, children: [] },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 6,
+      name: '客厅家具',
+      status: 'enabled',
+      productCount: 0,
+      children: [{ id: 7, name: '茶几', status: 'enabled', productCount: 12, children: [] }],
+    },
+  ],
+  accessory: [
+    {
+      id: 101,
+      name: '五金配件',
+      status: 'enabled',
+      productCount: 0,
+      children: [
+        {
+          id: 102,
+          name: '桌腿',
+          status: 'enabled',
+          productCount: 0,
+          children: [
+            {
+              id: 103,
+              name: '金属桌腿',
+              status: 'enabled',
+              productCount: 0,
+              children: [{ id: 104, name: '不锈钢桌腿', status: 'enabled', productCount: 26, children: [] }],
+            },
+          ],
+        },
+        { id: 105, name: '连接件', status: 'disabled', productCount: 8, children: [] },
+      ],
+    },
+  ],
+});
+
+const searchForm = reactive({ keyword: '', status: '' as Status | '' });
+const appliedSearch = reactive({ keyword: '', status: '' as Status | '' });
+const expandedNodeKeys = ref<Set<string>>(new Set());
+const pageScrollTop = ref(0);
+const tipVisible = ref(true);
+const formVisible = ref(false);
+const deleteVisible = ref(false);
+const statusConfirmVisible = ref(false);
+const formRef = ref<FormInstanceFunctions>();
+const formMode = ref<FormMode>('create');
+const formData = reactive<CategoryForm>({ id: null, parentId: null, name: '', status: 'enabled' });
+const deleteTarget = ref<CategoryNode | null>(null);
+const statusTarget = ref<CategoryNode | null>(null);
+
+const formRules: Record<string, FormRule[]> = {
+  name: [
+    { required: true, message: '请输入分类名称', type: 'error' },
+    { max: 20, message: '分类名称最多20个字符', type: 'error' },
+  ],
+};
+
+const columns: PrimaryTableCol<TableRowData>[] = [
+  { colKey: 'name', title: '分类名称', minWidth: 210, align: 'left' },
+  { colKey: 'level', title: '分类级别', width: 110, align: 'left' },
+  { colKey: 'productCount', title: '关联商品', width: 90, align: 'center' },
+  { colKey: 'status', title: '状态', width: 75, align: 'center' },
+  { colKey: 'sort', title: '排序', width: 60, align: 'center' },
+  { colKey: 'operation', title: '操作', width: 368, align: 'left', fixed: 'right' },
+];
+
+const activeNodes = computed(() => categoryData.value[activeScope.value]);
+const hasSearch = computed(() => Boolean(appliedSearch.keyword.trim() || appliedSearch.status));
+const parentName = computed(() => (formData.parentId ? (findNode(formData.parentId)?.name ?? '') : ''));
+const formLevel = computed(() => (formData.parentId ? getNodeLevel(formData.parentId) + 1 : 1));
+const canDeleteTarget = computed(() =>
+  Boolean(deleteTarget.value && !deleteTarget.value.productCount && !deleteTarget.value.children.length),
+);
+const statusConfirmText = computed(() => {
+  if (!statusTarget.value) return '';
+  return statusTarget.value.status === 'enabled'
+    ? `是否停用分类【${statusTarget.value.name}】？`
+    : `是否启用分类【${statusTarget.value.name}】？`;
+});
+
+const displayRows = computed<CategoryRow[]>(() => {
+  const rows: CategoryRow[] = [];
+  collectRows(activeNodes.value, 1, null, rows, false);
+  return rows;
+});
+
+function levelLabel(level: number) {
+  return `${['一', '二', '三', '四'][level - 1]}级分类`;
+}
+function nodeKey(node: CategoryNode) {
+  return `${activeScope.value}-${node.id}`;
+}
+function isExpanded(node: CategoryNode) {
+  return hasSearch.value || expandedNodeKeys.value.has(nodeKey(node));
+}
+function toggleExpanded(node: CategoryNode) {
+  const key = nodeKey(node);
+  const nextKeys = new Set(expandedNodeKeys.value);
+  if (nextKeys.has(key)) nextKeys.delete(key);
+  else nextKeys.add(key);
+  expandedNodeKeys.value = nextKeys;
+}
+function nodeMatches(node: CategoryNode) {
+  const keyword = appliedSearch.keyword.trim().toLowerCase();
+  return (
+    (!keyword || node.name.toLowerCase().includes(keyword)) &&
+    (!appliedSearch.status || node.status === appliedSearch.status)
+  );
+}
+function hasMatchingDescendant(node: CategoryNode): boolean {
+  return node.children.some((child) => nodeMatches(child) || hasMatchingDescendant(child));
+}
+function collectRows(
+  nodes: CategoryNode[],
+  level: number,
+  parent: CategoryNode | null,
+  rows: CategoryRow[],
+  forceVisible: boolean,
+) {
+  nodes.forEach((node, index) => {
+    const selfMatches = nodeMatches(node);
+    const descendantMatches = hasMatchingDescendant(node);
+    const visible = !hasSearch.value || forceVisible || selfMatches || descendantMatches;
+    if (!visible) return;
+    rows.push({
+      key: `${activeScope.value}-${node.id}`,
+      node,
+      parent,
+      level,
+      name: node.name,
+      status: node.status,
+      productCount: node.productCount,
+      sort: index + 1,
+    });
+    if (node.children.length && (hasSearch.value || isExpanded(node))) {
+      collectRows(node.children, level + 1, node, rows, forceVisible || selfMatches);
+    }
+  });
+}
+function findNode(id: number, nodes = activeNodes.value): CategoryNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const child = findNode(id, node.children);
+    if (child) return child;
+  }
+  return null;
+}
+function getNodeLevel(id: number, nodes = activeNodes.value, level = 1): number {
+  for (const node of nodes) {
+    if (node.id === id) return level;
+    const childLevel = getNodeLevel(id, node.children, level + 1);
+    if (childLevel) return childLevel;
+  }
+  return 0;
+}
+function siblingNodes(row: CategoryRow) {
+  return row.parent ? row.parent.children : activeNodes.value;
+}
+function siblingIndex(row: CategoryRow) {
+  return siblingNodes(row).findIndex((node) => node.id === row.node.id);
+}
+function resetForm() {
+  Object.assign(formData, { id: null, parentId: null, name: '', status: 'enabled' });
+}
+function rememberPageScroll() {
+  if (typeof window !== 'undefined') pageScrollTop.value = window.scrollY || document.documentElement.scrollTop || 0;
+}
+function restorePageScroll() {
+  if (typeof window === 'undefined') return;
+  window.requestAnimationFrame(() => window.scrollTo(0, pageScrollTop.value));
+}
+function restoreSortScroll() {
+  if (typeof window === 'undefined') return;
+  const scrollTop = pageScrollTop.value;
+  const restore = () => window.scrollTo(0, scrollTop);
+  restore();
+  window.requestAnimationFrame(() => {
+    restore();
+    window.requestAnimationFrame(restore);
+  });
+  window.setTimeout(restore, 120);
+}
+function categoryExists() {
+  const siblings = formData.parentId ? (findNode(formData.parentId)?.children ?? []) : activeNodes.value;
+  return siblings.some((node) => node.name === formData.name.trim() && node.id !== formData.id);
+}
+function openCreateDialog(parent?: CategoryRow) {
+  if (parent && parent.level >= maxCategoryLevel) {
+    MessagePlugin.warning('分类最多支持 4 级，不能继续新增下级分类');
+    return;
+  }
+  formMode.value = 'create';
+  resetForm();
+  formData.parentId = parent?.node.id ?? null;
+  rememberPageScroll();
+  formVisible.value = true;
+}
+function openEditDialog(row: CategoryRow) {
+  formMode.value = 'edit';
+  Object.assign(formData, {
+    id: row.node.id,
+    parentId: row.parent?.id ?? null,
+    name: row.node.name,
+    status: row.node.status,
+  });
+  rememberPageScroll();
+  formVisible.value = true;
+}
+function closeFormDialog() {
+  formVisible.value = false;
+  resetForm();
+  formRef.value?.clearValidate();
+}
+async function handleSubmit() {
+  const result = await formRef.value?.validate();
+  if (result !== true) return;
+  if (categoryExists()) {
+    MessagePlugin.warning('同级分类名称不能重复');
+    return;
+  }
+  const name = formData.name.trim();
+  if (formMode.value === 'create') {
+    const node: CategoryNode = { id: Date.now(), name, status: formData.status, productCount: 0, children: [] };
+    if (formData.parentId) findNode(formData.parentId)?.children.push(node);
+    else activeNodes.value.push(node);
+    MessagePlugin.success('新增成功');
+  } else if (formData.id) {
+    const node = findNode(formData.id);
+    if (node) Object.assign(node, { name, status: formData.status });
+    MessagePlugin.success('保存成功');
+  }
+  closeFormDialog();
+}
+function moveCategory(row: CategoryRow, offset: number) {
+  const siblings = siblingNodes(row);
+  const index = siblingIndex(row);
+  const targetIndex = index + offset;
+  if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
+  rememberPageScroll();
+  [siblings[index], siblings[targetIndex]] = [siblings[targetIndex], siblings[index]];
+  void nextTick(restoreSortScroll);
+  MessagePlugin.success('排序已更新');
+}
+function openStatusConfirm(node: CategoryNode) {
+  statusTarget.value = node;
+  rememberPageScroll();
+  statusConfirmVisible.value = true;
+}
+function closeStatusConfirm() {
+  statusConfirmVisible.value = false;
+  statusTarget.value = null;
+}
+function updateDescendantStatus(node: CategoryNode, status: Status) {
+  node.status = status;
+  node.children.forEach((child) => updateDescendantStatus(child, status));
+}
+function handleStatusConfirm() {
+  if (statusTarget.value) {
+    const nextStatus: Status = statusTarget.value.status === 'enabled' ? 'disabled' : 'enabled';
+    updateDescendantStatus(statusTarget.value, nextStatus);
+    MessagePlugin.success(nextStatus === 'enabled' ? '已启用分类' : '已停用分类');
+  }
+  closeStatusConfirm();
+}
+function openDeleteDialog(node: CategoryNode) {
+  deleteTarget.value = node;
+  rememberPageScroll();
+  deleteVisible.value = true;
+}
+function closeDeleteDialog() {
+  deleteVisible.value = false;
+  deleteTarget.value = null;
+}
+function removeNode(nodes: CategoryNode[], id: number): boolean {
+  const index = nodes.findIndex((node) => node.id === id);
+  if (index >= 0) {
+    nodes.splice(index, 1);
+    return true;
+  }
+  return nodes.some((node) => removeNode(node.children, id));
+}
+function handleDeleteConfirm() {
+  const node = deleteTarget.value;
+  if (!node) return;
+  if (node.productCount || node.children.length) {
+    closeDeleteDialog();
+    return;
+  }
+  removeNode(activeNodes.value, node.id);
+  MessagePlugin.success('删除成功');
+  closeDeleteDialog();
+}
+function handleSearch() {
+  appliedSearch.keyword = searchForm.keyword;
+  appliedSearch.status = searchForm.status;
+}
+function handleReset() {
+  searchForm.keyword = '';
+  searchForm.status = '';
+  handleSearch();
+}
+
+watch(
+  () => route.query.scope,
+  (scope) => {
+    activeScope.value = resolveScope(scope);
+    handleReset();
+  },
+);
+</script>
+
+<style scoped>
+.admin-layout {
+  min-height: 100vh;
+  background: var(--td-bg-color-page);
+}
+.top-nav {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--td-comp-paddingLR-xl);
+  background: var(--td-bg-color-container);
+  border-bottom: 1px solid var(--td-component-border);
+}
+.admin-shell {
+  min-height: calc(100vh - 64px);
+  display: flex;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+}
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--td-brand-color);
+  color: #fff;
+  font-weight: 700;
+}
+.brand-title {
+  font: var(--td-font-title-medium);
+}
+.brand-subtitle {
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
+}
+.top-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+}
+.user-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+  color: var(--td-text-color-secondary);
+}
+.page {
+  min-width: 0;
+  flex: 1;
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--td-comp-margin-l);
+}
+.scope-tabs,
+.filter-card {
+  margin-bottom: var(--td-comp-margin-l);
+}
+.filter-card,
+.category-card {
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: 6px;
+}
+.category-card {
+  overflow-anchor: none;
+}
+.filter-row,
+.filter-fields,
+.filter-actions,
+.category-toolbar,
+.table-actions,
+.category-name-cell {
+  display: flex;
+  align-items: center;
+}
+.filter-row {
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
+}
+.filter-fields {
+  flex: 1;
+  gap: var(--td-comp-margin-xl);
+}
+.filter-fields :deep(.t-form__item) {
+  width: 280px;
+  margin-bottom: 0;
+}
+.filter-fields :deep(.t-input),
+.filter-fields :deep(.t-select) {
+  width: 100%;
+}
+.filter-actions {
+  flex: 0 0 auto;
+  gap: var(--td-comp-margin-s);
+}
+.category-toolbar {
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
+}
+.category-toolbar h2 {
+  margin: 0;
+  font: var(--td-font-title-medium);
+}
+.category-toolbar p {
+  margin: 4px 0 0;
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
+}
+.category-tip {
+  margin-top: var(--td-comp-margin-l);
+}
+.category-card :deep(.t-table) {
+  width: calc(100% - 12px);
+  margin-top: var(--td-comp-margin-l);
+  margin-left: 12px;
+}
+.category-name-cell {
+  gap: var(--td-comp-margin-s);
+}
+.category-name-cell.level-1 {
+  font-weight: 600;
+}
+.category-name-cell.level-2 {
+  padding-left: 28px;
+  color: var(--td-text-color-secondary);
+}
+.category-name-cell.level-3 {
+  padding-left: 56px;
+  color: var(--td-text-color-secondary);
+}
+.category-name-cell.level-4 {
+  padding-left: 84px;
+  color: var(--td-text-color-secondary);
+}
+.tree-toggle,
+.tree-toggle-placeholder {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+}
+.tree-toggle {
+  color: var(--td-text-color-secondary);
+}
+.tree-toggle-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--td-text-color-placeholder);
+}
+.level-label {
+  color: var(--td-text-color-secondary);
+}
+.table-actions {
+  flex-wrap: nowrap;
+  gap: var(--td-comp-margin-m);
+}
+.table-actions :deep(.t-link) {
+  white-space: nowrap;
+}
+.form-help {
+  margin: 6px 0 0;
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
+}
+@media (max-width: 1180px) {
+  .category-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 860px) {
+  .filter-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .filter-fields {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .filter-actions {
+    align-self: flex-end;
+  }
+}
+</style>

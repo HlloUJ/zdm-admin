@@ -1,0 +1,64 @@
+{
+  "name": "zdm-admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --configLoader runner --host 127.0.0.1",
+    "build": "npm run typecheck && vite build --configLoader runner",
+    "preview": "vite preview --configLoader runner --host 127.0.0.1",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "stylelint": "stylelint \"src/**/*.{css,vue}\"",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "quality": "npm run typecheck && npm run lint && npm run stylelint && npm run format:check && npm run test:unit",
+    "backend:dev": "cd backend && mvn spring-boot:run",
+    "backend:test": "cd backend && mvn test",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,ts,vue}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,md,json,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "tdesign-icons-vue-next": "^0.4.4",
+    "tdesign-vue-next": "^1.20.2",
+    "typescript": "~6.0.3",
+    "vite": "^8.1.2",
+    "vue": "^3.5.39",
+    "vue-router": "^5.1.0",
+    "vue-tsc": "^3.3.6"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.0",
+    "@types/node": "^24.1.0",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vue/test-utils": "2.2.7",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.10.0",
+    "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.9.4",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0",
+    "stylelint-config-standard-vue": "^1.0.0",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  }
+}
