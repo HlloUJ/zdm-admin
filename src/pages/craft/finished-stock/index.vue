@@ -88,7 +88,7 @@
             </t-button>
           </div>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -227,7 +227,15 @@
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, UploadFile } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
-import { computed, reactive, ref } from 'vue';
+import {
+  createCraft,
+  deleteCraft,
+  listCrafts,
+  updateCraft,
+  type CraftPayload,
+  type CraftRecord,
+} from '@/services/crafts';
+import { computed, onMounted, reactive, ref } from 'vue';
 type CraftStatus = 'normal' | 'disabled';
 type ConfirmType = 'enable' | 'disable' | 'delete';
 
@@ -290,18 +298,8 @@ const createDemoImage = (name: string): UploadFile[] => [
   },
 ];
 
-const tableData = ref<CraftItem[]>(
-  Array.from({ length: 5 }, (_, index) => ({
-    id: index + 1,
-    image: createDemoImage(`craft-${index + 1}.png`),
-    name: '对破吊加厚',
-    type: '边工艺',
-    width: '5',
-    status: index % 5 === 4 ? 'disabled' : 'normal',
-    createdAt: '2022/05/30 14:58',
-    remark: index === 0 ? '成品现货边部加厚处理' : '',
-  })),
-);
+const tableData = ref<CraftItem[]>([]);
+const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 72, align: 'left' },
@@ -387,6 +385,75 @@ const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / pagination.pageSize), 1));
 const pageNumbers = computed(() => Array.from({ length: pageCount.value }, (_, index) => index + 1));
 
+const normalizeStatus = (status?: CraftRecord['status']): CraftStatus =>
+  status === 'disabled' ? 'disabled' : 'normal';
+
+const toBackendStatus = (status: CraftStatus): CraftPayload['status'] =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toUploadFiles = (record: CraftRecord): UploadFile[] => {
+  if (record.imageUrl) {
+    return [{ name: `${record.name || 'craft'}.png`, status: 'success', url: record.imageUrl }];
+  }
+
+  return createDemoImage(`craft-${record.id}.png`);
+};
+
+const toCraftItem = (record: CraftRecord): CraftItem => ({
+  id: record.id,
+  image: toUploadFiles(record),
+  name: record.name,
+  type: record.type,
+  width: record.width ?? '',
+  status: normalizeStatus(record.status),
+  createdAt: formatDateTime(record.createdAt),
+  remark: record.remark ?? '',
+});
+
+const toCraftPayload = (status: CraftStatus): CraftPayload => ({
+  name: formData.name.trim(),
+  type: formData.type,
+  width: formData.width,
+  imageUrl: formData.image[0]?.url,
+  description: formData.remark.trim(),
+  pricingMethod: formData.width ? 'width' : undefined,
+  remark: formData.remark.trim(),
+  status: toBackendStatus(status),
+});
+
+const toCraftPayloadFromItem = (item: CraftItem): CraftPayload => ({
+  name: item.name,
+  type: item.type,
+  width: item.width,
+  imageUrl: item.image[0]?.url,
+  description: item.remark ?? '',
+  pricingMethod: item.width ? 'width' : undefined,
+  remark: item.remark ?? '',
+  status: toBackendStatus(item.status),
+});
+
+const loadCrafts = async () => {
+  loading.value = true;
+  try {
+    const records = await listCrafts();
+    tableData.value = records.map(toCraftItem);
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '工艺列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const resetFormData = () => {
   formData.image = [];
   formData.name = '';
@@ -461,32 +528,22 @@ const handleSubmit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
 
-  if (dialogMode.value === 'create') {
-    const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;
-    tableData.value.unshift({
-      id: nextId,
-      image: [...formData.image],
-      name: formData.name.trim(),
-      type: formData.type,
-      width: formData.width,
-      status: 'normal',
-      createdAt: '2022/05/30 14:58',
-      remark: formData.remark.trim(),
-    });
-    pagination.current = 1;
-  } else if (editingId.value) {
-    const target = tableData.value.find((item) => item.id === editingId.value);
-    if (target) {
-      target.image = [...formData.image];
-      target.name = formData.name.trim();
-      target.type = formData.type;
-      target.width = formData.width;
-      target.remark = formData.remark.trim();
+  try {
+    if (dialogMode.value === 'create') {
+      await createCraft(toCraftPayload('normal'));
+      await loadCrafts();
+      pagination.current = 1;
+    } else if (editingId.value) {
+      const current = tableData.value.find((item) => item.id === editingId.value);
+      await updateCraft(editingId.value, toCraftPayload(current?.status ?? 'normal'));
+      await loadCrafts();
     }
-  }
 
-  closeFormDialog();
-  MessagePlugin.success('操作成功');
+    closeFormDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openStatusConfirm = (row: CraftItem) => {
@@ -522,19 +579,36 @@ const ensureCurrentPage = () => {
   }
 };
 
-const handleConfirm = () => {
+const handleConfirm = async () => {
   if (!confirmState.row) return;
 
-  if (confirmState.type === 'delete') {
-    tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
-    ensureCurrentPage();
-  } else {
-    confirmState.row.status = confirmState.type === 'enable' ? 'normal' : 'disabled';
-  }
+  try {
+    if (confirmState.type === 'delete') {
+      await deleteCraft(confirmState.row.id);
+      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      ensureCurrentPage();
+    } else {
+      const updated = await updateCraft(
+        confirmState.row.id,
+        toCraftPayloadFromItem({
+          ...confirmState.row,
+          status: confirmState.type === 'enable' ? 'normal' : 'disabled',
+        }),
+      );
+      const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
+      if (targetIndex !== -1) {
+        tableData.value.splice(targetIndex, 1, toCraftItem(updated));
+      }
+    }
 
-  closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+    closeConfirmDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
+
+onMounted(loadCrafts);
 </script>
 
 <style scoped>

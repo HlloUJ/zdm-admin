@@ -21,12 +21,16 @@ public class Store {
   @NotBlank
   private String type;
 
+  private String shopLevel;
+  private String manager;
   private String region;
+  private String detailAddress;
   private String address;
 
   @NotBlank
   private String status;
 
+  private String remark;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -62,12 +66,36 @@ public class Store {
     this.type = type;
   }
 
+  public String getShopLevel() {
+    return shopLevel;
+  }
+
+  public void setShopLevel(String shopLevel) {
+    this.shopLevel = shopLevel;
+  }
+
+  public String getManager() {
+    return manager;
+  }
+
+  public void setManager(String manager) {
+    this.manager = manager;
+  }
+
   public String getRegion() {
     return region;
   }
 
   public void setRegion(String region) {
     this.region = region;
+  }
+
+  public String getDetailAddress() {
+    return detailAddress;
+  }
+
+  public void setDetailAddress(String detailAddress) {
+    this.detailAddress = detailAddress;
   }
 
   public String getAddress() {
@@ -84,6 +112,14 @@ public class Store {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public String getRemark() {
+    return remark;
+  }
+
+  public void setRemark(String remark) {
+    this.remark = remark;
   }
 
   public LocalDateTime getCreatedAt() {

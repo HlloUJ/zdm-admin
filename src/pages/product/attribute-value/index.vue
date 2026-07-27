@@ -58,7 +58,7 @@
               ><template #icon><t-icon name="add" /></template>新增</t-button
             >
           </div>
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed"
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed"
             ><template #attribute="{ row }">{{ attributeName[row.attribute] }}</template
             ><template #status="{ row }"
               ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
@@ -123,10 +123,19 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import { AdminPagination } from '@/components/foundation';
+import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
+import {
+  createProductAttributeValue,
+  deleteProductAttributeValue,
+  listProductAttributeValues,
+  updateProductAttributeValue,
+  type ProductAttributeValuePayload,
+  type ProductAttributeValueRecord,
+} from '@/services/productAttributeValues';
 
 type Scope = 'shared' | 'finished' | 'accessory';
 type Status = 'enabled' | 'disabled';
@@ -139,6 +148,7 @@ interface AttributeOption {
 interface Value {
   id: number;
   attribute: string;
+  code: string;
   scope: Scope;
   name: string;
   useCount: number;
@@ -146,22 +156,13 @@ interface Value {
 }
 
 const route = useRoute();
-const attributeOptions: AttributeOption[] = [
-  { code: 'brand', name: '品牌', scope: 'shared' },
-  { code: 'style', name: '设计风格', scope: 'shared' },
-  { code: 'applicable_space', name: '适用空间', scope: 'shared' },
-  { code: 'stone_material', name: '石材材质', scope: 'finished' },
-  { code: 'surface_finish', name: '表面工艺', scope: 'finished' },
-  { code: 'table_size', name: '成品规格尺寸', scope: 'finished' },
-  { code: 'hardware_material', name: '五金材质', scope: 'accessory' },
-  { code: 'hardware_finish', name: '表面处理', scope: 'accessory' },
-];
-const attributeName = Object.fromEntries(attributeOptions.map((item) => [item.code, item.name]));
+const attributeOptions = ref<AttributeOption[]>([]);
+const attributeName = computed(() => Object.fromEntries(attributeOptions.value.map((item) => [item.code, item.name])));
 const initialAttribute = typeof route.query.attribute === 'string' ? route.query.attribute : '';
 const resolveScope = (value: unknown): Scope =>
   value === 'finished' || value === 'accessory' || value === 'shared'
     ? value
-    : ((attributeOptions.find((item) => item.code === initialAttribute)?.scope ?? 'shared') as Scope);
+    : ((attributeOptions.value.find((item) => item.code === initialAttribute)?.scope ?? 'shared') as Scope);
 const initialScope = resolveScope(route.query.scope);
 const activeScope = ref<Scope>(initialScope);
 const lockedScope = computed(
@@ -180,17 +181,9 @@ const sourceDescription = computed(
       accessory: '只随配件专属属性被配件类目模板引用。',
     })[activeScope.value],
 );
-const data = ref<Value[]>([
-  { id: 1, attribute: 'brand', scope: 'shared', name: '装点猫', useCount: 8, status: 'enabled' },
-  { id: 2, attribute: 'style', scope: 'shared', name: '现代', useCount: 14, status: 'enabled' },
-  { id: 3, attribute: 'applicable_space', scope: 'shared', name: '餐厅', useCount: 16, status: 'enabled' },
-  { id: 4, attribute: 'stone_material', scope: 'finished', name: '大理石', useCount: 22, status: 'enabled' },
-  { id: 5, attribute: 'stone_material', scope: 'finished', name: '奢石', useCount: 16, status: 'enabled' },
-  { id: 6, attribute: 'surface_finish', scope: 'finished', name: '亮光', useCount: 11, status: 'enabled' },
-  { id: 8, attribute: 'hardware_material', scope: 'accessory', name: '不锈钢', useCount: 9, status: 'enabled' },
-  { id: 9, attribute: 'hardware_finish', scope: 'accessory', name: '哑光黑', useCount: 8, status: 'enabled' },
-]);
-const attributesInScope = computed(() => attributeOptions.filter((item) => item.scope === activeScope.value));
+const data = ref<Value[]>([]);
+const loading = ref(false);
+const attributesInScope = computed(() => attributeOptions.value.filter((item) => item.scope === activeScope.value));
 const searchForm = reactive({ attribute: initialAttribute, keyword: '', status: '' as '' | Status });
 const applied = reactive({ ...searchForm });
 const pageSizeOptions = [10, 20, 50];
@@ -202,10 +195,10 @@ const confirmTarget = ref<Value | null>(null);
 const formRef = ref<FormInstanceFunctions>();
 const form = reactive({
   scope: initialScope,
-  attribute: initialAttribute || attributeOptions.find((item) => item.scope === initialScope)!.code,
+  attribute: initialAttribute,
   name: '',
 });
-const formAttributes = computed(() => attributeOptions.filter((item) => item.scope === form.scope));
+const formAttributes = computed(() => attributeOptions.value.filter((item) => item.scope === form.scope));
 const formRules: Record<string, FormRule[]> = {
   attribute: [{ required: true, message: '请选择所属属性', type: 'error' }],
   name: [{ required: true, message: '请输入值名称', type: 'error' }],
@@ -230,6 +223,45 @@ const pageData = computed(() =>
   filteredData.value.slice((pagination.current - 1) * pagination.pageSize, pagination.current * pagination.pageSize),
 );
 const totalCount = computed(() => filteredData.value.length);
+const normalizeStatus = (status?: ProductAttributeValueRecord['status']): Status =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+const toAttributeOption = (record: ProductAttributeRecord): AttributeOption => ({
+  code: String(record.id),
+  name: record.name,
+  scope: record.scope,
+});
+const toValue = (record: ProductAttributeValueRecord): Value => ({
+  id: record.id,
+  attribute: String(record.attributeId),
+  code: record.code,
+  scope: record.scope,
+  name: record.value,
+  useCount: 0,
+  status: normalizeStatus(record.status),
+});
+const createValueCode = (attributeId: string, name: string) =>
+  `attr-value-${attributeId}-${name.trim().length}-${Date.now()}`;
+const toValuePayload = (item: Value): ProductAttributeValuePayload => ({
+  attributeId: Number(item.attribute),
+  scope: item.scope,
+  value: item.name,
+  code: item.code,
+  status: item.status,
+});
+const loadValues = async () => {
+  loading.value = true;
+  try {
+    const [attributes, values] = await Promise.all([listProductAttributes(), listProductAttributeValues()]);
+    attributeOptions.value = attributes.map(toAttributeOption);
+    data.value = values.map(toValue);
+    if (!form.attribute) syncFormAttribute();
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '属性值列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 const search = () => {
   Object.assign(applied, searchForm);
   pagination.current = 1;
@@ -250,7 +282,7 @@ const ensureCurrentPage = () => {
   if (pagination.current > maxPage) pagination.current = maxPage;
 };
 const syncFormAttribute = () => {
-  form.attribute = formAttributes.value[0].code;
+  form.attribute = formAttributes.value[0]?.code ?? '';
 };
 const openCreate = () => {
   form.scope = activeScope.value;
@@ -267,21 +299,29 @@ const submit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
   const name = form.name.trim();
+  if (!form.attribute) {
+    MessagePlugin.warning('请先新增可选类型的属性');
+    return;
+  }
   if (data.value.some((item) => item.attribute === form.attribute && item.name === name)) {
     MessagePlugin.warning('该属性下的值名称已存在');
     return;
   }
-  data.value.unshift({
-    id: Date.now(),
-    attribute: form.attribute,
-    scope: form.scope,
-    name,
-    useCount: 0,
-    status: 'enabled',
-  });
-  pagination.current = 1;
-  closeFormDialog();
-  MessagePlugin.success('新增成功');
+  try {
+    await createProductAttributeValue({
+      attributeId: Number(form.attribute),
+      scope: form.scope,
+      value: name,
+      code: createValueCode(form.attribute, name),
+      status: 'enabled',
+    });
+    await loadValues();
+    pagination.current = 1;
+    closeFormDialog();
+    MessagePlugin.success('新增成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 const openStatusConfirm = (row: Value) => {
   confirmTarget.value = row;
@@ -301,17 +341,33 @@ const confirmText = computed(() => {
   const name = confirmTarget.value?.name ?? '';
   return `是否${confirmType.value === 'disable' ? '停用' : confirmType.value === 'enable' ? '启用' : '删除'}属性值【${name}】？`;
 });
-const handleConfirm = () => {
+const handleConfirm = async () => {
   if (!confirmTarget.value) return;
-  if (confirmType.value === 'delete') {
-    data.value = data.value.filter((item) => item.id !== confirmTarget.value?.id);
-    ensureCurrentPage();
-    MessagePlugin.success('删除成功');
-  } else {
-    confirmTarget.value.status = confirmType.value === 'enable' ? 'enabled' : 'disabled';
-    MessagePlugin.success(confirmType.value === 'enable' ? '已启用标准值' : '已停用标准值');
+
+  try {
+    if (confirmType.value === 'delete') {
+      await deleteProductAttributeValue(confirmTarget.value.id);
+      data.value = data.value.filter((item) => item.id !== confirmTarget.value?.id);
+      ensureCurrentPage();
+      MessagePlugin.success('删除成功');
+    } else {
+      const updated = await updateProductAttributeValue(
+        confirmTarget.value.id,
+        toValuePayload({
+          ...confirmTarget.value,
+          status: confirmType.value === 'enable' ? 'enabled' : 'disabled',
+        }),
+      );
+      const targetIndex = data.value.findIndex((item) => item.id === confirmTarget.value?.id);
+      if (targetIndex !== -1) {
+        data.value.splice(targetIndex, 1, toValue(updated));
+      }
+      MessagePlugin.success(confirmType.value === 'enable' ? '已启用标准值' : '已停用标准值');
+    }
+    closeConfirmDialog();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
   }
-  closeConfirmDialog();
 };
 watch(
   () => route.query.scope,
@@ -327,6 +383,7 @@ watch(activeScope, () => {
   applied.attribute = '';
   pagination.current = 1;
 });
+onMounted(loadValues);
 </script>
 
 <style scoped>

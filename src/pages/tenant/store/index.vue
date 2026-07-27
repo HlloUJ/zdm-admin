@@ -86,7 +86,7 @@
             </t-button>
           </div>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -267,9 +267,18 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import {
+  createStore,
+  deleteStore,
+  listStores,
+  updateStore,
+  type StorePayload,
+  type StoreRecord,
+} from '@/services/stores';
+import { listTenants, type TenantRecord } from '@/services/tenants';
 
 type ShopType = 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
 type ShopLevel = 'level1' | 'level2' | 'level3';
@@ -277,6 +286,7 @@ type StoreStatus = 'normal' | 'disabled';
 type ConfirmType = 'enable' | 'disable' | 'delete';
 
 interface TenantOption {
+  id: number;
   name: string;
   businesses: ShopType[];
 }
@@ -319,16 +329,7 @@ const shopLevelOptions: { label: string; value: ShopLevel }[] = [
   { label: '3级', value: 'level3' },
 ];
 
-const tenantOptions: TenantOption[] = [
-  { name: '林嘉禾', businesses: ['cityPartner'] },
-  { name: '周明远', businesses: ['slabSupplier'] },
-  { name: '陈书瑶', businesses: ['finishedSupplier'] },
-  { name: '赵承宇', businesses: ['factory'] },
-  { name: '吴清扬', businesses: ['cityPartner', 'finishedSupplier'] },
-  { name: '沈若宁', businesses: ['slabSupplier', 'factory'] },
-  { name: '许安然', businesses: ['cityPartner', 'slabSupplier'] },
-  { name: '郑一航', businesses: ['finishedSupplier', 'factory'] },
-];
+const tenantOptions = ref<TenantOption[]>([]);
 
 const regionOptions = [
   {
@@ -412,42 +413,8 @@ const regionLabel = (value: string) => {
   return '';
 };
 
-const storeSeeds = [
-  { shopName: '杭州滨江门店', region: 'binjiang', detailAddress: '江南大道 88 号', manager: '刘店长' },
-  { shopName: '广州天河体验店', region: 'tianhe', detailAddress: '珠江新城华夏路 16 号', manager: '黄雅婷' },
-  { shopName: '佛山南海供应店', region: 'nanhai', detailAddress: '石材城 A 区 12 栋', manager: '' },
-  { shopName: '苏州园区旗舰店', region: 'sip', detailAddress: '星湖街 328 号', manager: '顾晨' },
-  { shopName: '宁波鄞州服务店', region: 'yinzhou', detailAddress: '首南街道创意园 6 号', manager: '' },
-  { shopName: '南京建邺工厂店', region: 'jianye', detailAddress: '江东中路 118 号', manager: '孟凡' },
-];
-
-const tableData = ref<StoreItem[]>(
-  Array.from({ length: 5 }, (_, index) => {
-    const tenant = tenantOptions[index % tenantOptions.length];
-    const shopType = tenant.businesses[index % tenant.businesses.length];
-    const level = shopLevelOptions[index % shopLevelOptions.length].value;
-    const seed = storeSeeds[index % storeSeeds.length];
-    const current = index + 1;
-    const day = ((index % 20) + 1).toString().padStart(2, '0');
-    const hour = (8 + (index % 10)).toString().padStart(2, '0');
-    const regionText = regionLabel(seed.region);
-
-    return {
-      id: current,
-      shopName: `${seed.shopName}${current.toString().padStart(2, '0')}`,
-      shopType,
-      shopLevel: level,
-      manager: seed.manager,
-      region: seed.region,
-      detailAddress: seed.detailAddress,
-      address: `${regionText}${seed.detailAddress}`,
-      tenantName: tenant.name,
-      status: index % 9 === 3 || index % 13 === 5 ? 'disabled' : 'normal',
-      createdAt: `2026/07/${day} ${hour}:30`,
-      remark: '租户开通业务后生成的门店',
-    };
-  }),
-);
+const tableData = ref<StoreItem[]>([]);
+const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
@@ -521,7 +488,7 @@ const confirmState = reactive<{
   row: null,
 });
 
-const selectedTenant = computed(() => tenantOptions.find((item) => item.name === formData.tenantName));
+const selectedTenant = computed(() => tenantOptions.value.find((item) => item.name === formData.tenantName));
 const availableShopTypeOptions = computed(() => {
   if (!selectedTenant.value) return shopTypeOptions;
   return shopTypeOptions.filter((item) => selectedTenant.value?.businesses.includes(item.value));
@@ -552,6 +519,110 @@ const pageData = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize;
   return filteredData.value.slice(start, start + pagination.pageSize);
 });
+
+const parseBusinessTypes = (value?: string): ShopType[] =>
+  (value?.split(',').filter(Boolean) as ShopType[] | undefined) ?? [];
+
+const normalizeStatus = (status: StoreRecord['status']): StoreStatus => (status === 'disabled' ? 'disabled' : 'normal');
+
+const toBackendStatus = (status: StoreStatus): StorePayload['status'] =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toTenantOption = (record: TenantRecord): TenantOption => ({
+  id: record.id,
+  name: record.name,
+  businesses: parseBusinessTypes(record.businessTypes),
+});
+
+const normalizeShopType = (value: string): ShopType =>
+  shopTypeOptions.some((item) => item.value === value) ? (value as ShopType) : 'cityPartner';
+
+const normalizeShopLevel = (value?: string): ShopLevel =>
+  shopLevelOptions.some((item) => item.value === value) ? (value as ShopLevel) : 'level1';
+
+const toStoreItem = (record: StoreRecord): StoreItem => {
+  const tenant = tenantOptions.value.find((item) => item.id === record.tenantId);
+  const detailAddress = record.detailAddress ?? record.address ?? '';
+
+  return {
+    id: record.id,
+    shopName: record.name,
+    shopType: normalizeShopType(record.type),
+    shopLevel: normalizeShopLevel(record.shopLevel),
+    manager: record.manager ?? '',
+    region: record.region ?? '',
+    detailAddress,
+    address: record.address ?? `${regionLabel(record.region ?? '')}${detailAddress}`,
+    tenantName: tenant?.name ?? `租户#${record.tenantId}`,
+    status: normalizeStatus(record.status),
+    createdAt: formatDateTime(record.createdAt),
+    remark: record.remark ?? '',
+  };
+};
+
+const toStorePayload = (status: StoreStatus, shopLevel: ShopLevel, manager = ''): StorePayload => {
+  const tenant = selectedTenant.value;
+  if (!tenant || !formData.shopType) {
+    throw new Error('请选择租户和店铺类型');
+  }
+
+  const detailAddress = formData.detailAddress.trim();
+  return {
+    tenantId: tenant.id,
+    name: formData.shopName.trim(),
+    type: formData.shopType,
+    shopLevel,
+    manager,
+    region: formData.region,
+    detailAddress,
+    address: `${regionLabel(formData.region)}${detailAddress}`,
+    status: toBackendStatus(status),
+    remark: formData.remark.trim(),
+  };
+};
+
+const toStorePayloadFromItem = (item: StoreItem): StorePayload => {
+  const tenant = tenantOptions.value.find((option) => option.name === item.tenantName);
+  if (!tenant) {
+    throw new Error('未找到门店所属租户');
+  }
+
+  return {
+    tenantId: tenant.id,
+    name: item.shopName,
+    type: item.shopType,
+    shopLevel: item.shopLevel,
+    manager: item.manager,
+    region: item.region,
+    detailAddress: item.detailAddress,
+    address: item.address,
+    status: toBackendStatus(item.status),
+    remark: item.remark ?? '',
+  };
+};
+
+const loadStorePage = async () => {
+  loading.value = true;
+  try {
+    const [tenants, stores] = await Promise.all([listTenants(), listStores()]);
+    tenantOptions.value = tenants.map(toTenantOption);
+    tableData.value = stores.map(toStoreItem);
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '门店列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 
 const resetFormData = () => {
   formData.tenantName = '';
@@ -640,39 +711,26 @@ const handleSubmit = async () => {
   if (result !== true) return;
 
   if (!formData.region) return;
-  const address = `${regionLabel(formData.region)}${formData.detailAddress.trim()}`;
-
-  if (dialogMode.value === 'create') {
-    if (!formData.shopType || !formData.shopLevel) return;
-    const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;
-    tableData.value.unshift({
-      id: nextId,
-      shopName: formData.shopName.trim(),
-      shopType: formData.shopType,
-      shopLevel: formData.shopLevel,
-      manager: '',
-      region: formData.region,
-      detailAddress: formData.detailAddress.trim(),
-      address,
-      tenantName: formData.tenantName,
-      status: 'normal',
-      createdAt: '2026/07/19 10:00',
-      remark: formData.remark.trim(),
-    });
-    pagination.current = 1;
-  } else if (editingId.value) {
-    const target = tableData.value.find((item) => item.id === editingId.value);
-    if (target) {
-      target.shopName = formData.shopName.trim();
-      target.region = formData.region;
-      target.detailAddress = formData.detailAddress.trim();
-      target.address = address;
-      target.remark = formData.remark.trim();
+  try {
+    if (dialogMode.value === 'create') {
+      if (!formData.shopLevel) return;
+      await createStore(toStorePayload('normal', formData.shopLevel));
+      await loadStorePage();
+      pagination.current = 1;
+    } else if (editingId.value) {
+      const current = tableData.value.find((item) => item.id === editingId.value);
+      await updateStore(
+        editingId.value,
+        toStorePayload(current?.status ?? 'normal', current?.shopLevel ?? 'level1', current?.manager ?? ''),
+      );
+      await loadStorePage();
     }
-  }
 
-  closeFormDialog();
-  MessagePlugin.success('操作成功');
+    closeFormDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openLevelDialog = (row: StoreItem) => {
@@ -692,12 +750,23 @@ const handleLevelSubmit = async () => {
   if (result !== true || !levelFormData.shopLevel) return;
 
   const target = tableData.value.find((item) => item.id === levelEditingId.value);
-  if (target) {
-    target.shopLevel = levelFormData.shopLevel;
-  }
+  if (!target) return;
 
-  closeLevelDialog();
-  MessagePlugin.success('操作成功');
+  try {
+    const updated = await updateStore(
+      target.id,
+      toStorePayloadFromItem({ ...target, shopLevel: levelFormData.shopLevel }),
+    );
+    const targetIndex = tableData.value.findIndex((item) => item.id === target.id);
+    if (targetIndex !== -1) {
+      tableData.value.splice(targetIndex, 1, toStoreItem(updated));
+    }
+
+    closeLevelDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openStatusConfirm = (row: StoreItem) => {
@@ -720,19 +789,36 @@ const closeConfirmDialog = () => {
   confirmState.row = null;
 };
 
-const handleConfirm = () => {
+const handleConfirm = async () => {
   if (!confirmState.row) return;
 
-  if (confirmState.type === 'delete') {
-    tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
-  } else {
-    confirmState.row.status = confirmState.type === 'enable' ? 'normal' : 'disabled';
-  }
+  try {
+    if (confirmState.type === 'delete') {
+      await deleteStore(confirmState.row.id);
+      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+    } else {
+      const updated = await updateStore(
+        confirmState.row.id,
+        toStorePayloadFromItem({
+          ...confirmState.row,
+          status: confirmState.type === 'enable' ? 'normal' : 'disabled',
+        }),
+      );
+      const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
+      if (targetIndex !== -1) {
+        tableData.value.splice(targetIndex, 1, toStoreItem(updated));
+      }
+    }
 
-  closeConfirmDialog();
-  MessagePlugin.success('操作成功');
-  ensureCurrentPage();
+    closeConfirmDialog();
+    MessagePlugin.success('操作成功');
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
+
+onMounted(loadStorePage);
 </script>
 
 <style scoped>

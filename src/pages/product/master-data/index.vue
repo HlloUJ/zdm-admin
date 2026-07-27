@@ -48,7 +48,7 @@
               ><template #icon><t-icon name="add" /></template>新增{{ config.entityName }}</t-button
             ><span>{{ config.toolbarTip }}</span>
           </div>
-          <t-table row-key="id" :data="filteredData" :columns="columns" hover table-layout="fixed"
+          <t-table row-key="id" :data="filteredData" :columns="columns" :loading="loading" hover table-layout="fixed"
             ><template #status="{ row }"
               ><t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">{{
                 row.status === 'enabled' ? '启用' : '停用'
@@ -84,12 +84,20 @@
 <script setup lang="ts">
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import {
+  createMasterData,
+  listMasterData,
+  updateMasterData,
+  type MasterDataPayload,
+  type MasterDataRecord,
+} from '@/services/masterData';
 
 type Status = 'enabled' | 'disabled';
 interface MasterDataItem {
   id: number;
+  dataType: string;
   code: string;
   name: string;
   extra: string;
@@ -108,14 +116,10 @@ const config = computed(() => ({
   toolbarTip: '停用单位后不可在新建属性和商品中选择，已使用数据保留原单位。',
   extraColumn: '单位类型',
   useColumn: '引用属性数',
-  data: [
-    { id: 1, code: 'mm', name: '毫米', extra: '长度', useCount: 12, status: 'enabled' as Status },
-    { id: 2, code: 'cm', name: '厘米', extra: '长度', useCount: 4, status: 'enabled' as Status },
-    { id: 3, code: 'piece', name: '件', extra: '件数', useCount: 16, status: 'enabled' as Status },
-    { id: 4, code: 'kg', name: '千克', extra: '重量', useCount: 3, status: 'enabled' as Status },
-  ],
+  dataType: 'unit',
 }));
-const data = ref<MasterDataItem[]>(config.value.data);
+const data = ref<MasterDataItem[]>([]);
+const loading = ref(false);
 const searchForm = reactive({ keyword: '', status: '' as '' | Status });
 const applied = reactive({ ...searchForm });
 const dialogVisible = ref(false);
@@ -132,10 +136,40 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
 const filteredData = computed(() =>
   data.value.filter(
     (item) =>
+      item.dataType === config.value.dataType &&
       (!applied.keyword || `${item.code}${item.name}${item.extra}`.includes(applied.keyword)) &&
       (!applied.status || item.status === applied.status),
   ),
 );
+const normalizeStatus = (status?: MasterDataRecord['status']): Status =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+const toMasterDataItem = (record: MasterDataRecord): MasterDataItem => ({
+  id: record.id,
+  dataType: record.dataType,
+  name: record.name,
+  code: record.code,
+  extra: record.extra ?? '',
+  useCount: 0,
+  status: normalizeStatus(record.status),
+});
+const toMasterDataPayload = (status: Status): MasterDataPayload => ({
+  dataType: config.value.dataType,
+  name: form.name.trim(),
+  code: form.code.trim(),
+  extra: form.extra.trim(),
+  status,
+});
+const loadData = async () => {
+  loading.value = true;
+  try {
+    const records = await listMasterData();
+    data.value = records.map(toMasterDataItem);
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '主数据加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 const search = () => Object.assign(applied, searchForm);
 const reset = () => {
   searchForm.keyword = '';
@@ -156,7 +190,7 @@ const openEdit = (row: MasterDataItem) => {
   form.extra = row.extra;
   dialogVisible.value = true;
 };
-const submit = () => {
+const submit = async () => {
   if (!form.name.trim() || !form.code.trim()) {
     MessagePlugin.warning(`请填写${config.value.entityName}名称和${config.value.codeLabel}`);
     return;
@@ -169,24 +203,37 @@ const submit = () => {
     MessagePlugin.warning('名称或编码已存在');
     return;
   }
-  if (editingRow.value)
-    Object.assign(editingRow.value, { name: form.name.trim(), code: form.code.trim(), extra: form.extra.trim() });
-  else
-    data.value.unshift({
-      id: Date.now(),
-      name: form.name.trim(),
-      code: form.code.trim(),
-      extra: form.extra.trim(),
-      useCount: 0,
-      status: 'enabled',
+  try {
+    if (editingRow.value) {
+      await updateMasterData(editingRow.value.id, toMasterDataPayload(editingRow.value.status));
+    } else {
+      await createMasterData(toMasterDataPayload('enabled'));
+    }
+    await loadData();
+    dialogVisible.value = false;
+    MessagePlugin.success(editingRow.value ? '已保存修改' : `已新增${config.value.entityName}`);
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
+};
+const toggle = async (row: MasterDataItem) => {
+  const nextStatus = row.status === 'enabled' ? 'disabled' : 'enabled';
+  try {
+    const updated = await updateMasterData(row.id, {
+      dataType: row.dataType,
+      name: row.name,
+      code: row.code,
+      extra: row.extra,
+      status: nextStatus,
     });
-  dialogVisible.value = false;
-  MessagePlugin.success(editingRow.value ? '已保存修改' : `已新增${config.value.entityName}`);
+    Object.assign(row, toMasterDataItem(updated));
+    MessagePlugin.success(nextStatus === 'enabled' ? '已启用' : '已停用');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
-const toggle = (row: MasterDataItem) => {
-  row.status = row.status === 'enabled' ? 'disabled' : 'enabled';
-  MessagePlugin.success(row.status === 'enabled' ? '已启用' : '已停用');
-};
+
+onMounted(loadData);
 </script>
 
 <style scoped>

@@ -80,7 +80,7 @@
             </t-button>
           </div>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -203,7 +203,15 @@
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
-import { computed, reactive, ref } from 'vue';
+import {
+  createSupplier,
+  deleteSupplier,
+  listSuppliers,
+  updateSupplier,
+  type SupplierPayload,
+  type SupplierRecord,
+} from '@/services/suppliers';
+import { computed, onMounted, reactive, ref } from 'vue';
 type SupplierType = 'slab' | 'finished' | 'accessory';
 type SupplierStatus = 'normal' | 'disabled';
 type ConfirmType = 'enable' | 'disable' | 'delete';
@@ -235,31 +243,8 @@ const supplierTypeOptions: { label: string; value: SupplierType }[] = [
 
 const supplierTypeLabel = (type: SupplierType) => supplierTypeOptions.find((item) => item.value === type)?.label ?? '';
 
-const supplierSeeds = [
-  { name: '华南石材源头工厂', type: 'slab' as SupplierType, contact: '李建国', phone: '13821560001' },
-  { name: '云山成品加工中心', type: 'finished' as SupplierType, contact: '王晓敏', phone: '13921560002' },
-  { name: '东区辅材配件仓', type: 'accessory' as SupplierType, contact: '陈立', phone: '13721560003' },
-  { name: '鼎石大板供应链', type: 'slab' as SupplierType, contact: '赵一鸣', phone: '13621560004' },
-  { name: '新艺成品定制厂', type: 'finished' as SupplierType, contact: '周可', phone: '13521560005' },
-  { name: '精工五金配件行', type: 'accessory' as SupplierType, contact: '孙宁', phone: '13421560006' },
-];
-
-const tableData = ref<SupplierItem[]>(
-  Array.from({ length: 5 }, (_, index) => {
-    const seed = supplierSeeds[index % supplierSeeds.length];
-    const current = index + 1;
-    return {
-      id: current,
-      name: `${seed.name}${current.toString().padStart(2, '0')}`,
-      type: seed.type,
-      contact: seed.contact,
-      phone: seed.phone,
-      status: index % 7 === 2 ? 'disabled' : 'normal',
-      createdAt: `2026/07/${((index % 18) + 1).toString().padStart(2, '0')} ${String(9 + (index % 9)).padStart(2, '0')}:30`,
-      remark: '平台自寻供应商',
-    };
-  }),
-);
+const tableData = ref<SupplierItem[]>([]);
+const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
@@ -346,6 +331,55 @@ const pageData = computed(() => {
 
 const maskPhone = (phone: string) => phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2');
 
+const normalizeStatus = (status?: SupplierRecord['status']): SupplierStatus =>
+  status === 'disabled' ? 'disabled' : 'normal';
+
+const toBackendStatus = (status: SupplierStatus): SupplierPayload['status'] =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toSupplierItem = (record: SupplierRecord): SupplierItem => ({
+  id: record.id,
+  name: record.name,
+  type: record.type,
+  contact: record.contactName ?? '',
+  phone: record.contactPhone ?? '',
+  status: normalizeStatus(record.status),
+  createdAt: formatDateTime(record.createdAt),
+  remark: record.remark ?? '',
+});
+
+const toSupplierPayload = (status: SupplierStatus): SupplierPayload => ({
+  name: formData.name.trim(),
+  type: formData.type as SupplierType,
+  contactName: formData.contact.trim(),
+  contactPhone: formData.phone.trim(),
+  qualificationStatus: 'approved',
+  status: toBackendStatus(status),
+  remark: formData.remark.trim(),
+});
+
+const loadSuppliers = async () => {
+  loading.value = true;
+  try {
+    const records = await listSuppliers();
+    tableData.value = records.map(toSupplierItem);
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '供应商列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const handlePhoneInput = (value: string) => {
   formData.phone = value.replace(/\D/g, '').slice(0, 11);
 };
@@ -427,32 +461,22 @@ const handleSubmit = async () => {
 
   if (!formData.type) return;
 
-  if (dialogMode.value === 'create') {
-    const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;
-    tableData.value.unshift({
-      id: nextId,
-      name: formData.name.trim(),
-      type: formData.type,
-      contact: formData.contact.trim(),
-      phone: formData.phone.trim(),
-      status: 'normal',
-      createdAt: '2026/07/18 10:00',
-      remark: formData.remark.trim(),
-    });
-    pagination.current = 1;
-  } else if (editingId.value) {
-    const target = tableData.value.find((item) => item.id === editingId.value);
-    if (target) {
-      target.name = formData.name.trim();
-      target.type = formData.type;
-      target.contact = formData.contact.trim();
-      target.phone = formData.phone.trim();
-      target.remark = formData.remark.trim();
+  try {
+    if (dialogMode.value === 'create') {
+      await createSupplier(toSupplierPayload('normal'));
+      await loadSuppliers();
+      pagination.current = 1;
+    } else if (editingId.value) {
+      const current = tableData.value.find((item) => item.id === editingId.value);
+      await updateSupplier(editingId.value, toSupplierPayload(current?.status ?? 'normal'));
+      await loadSuppliers();
     }
-  }
 
-  closeFormDialog();
-  MessagePlugin.success('操作成功');
+    closeFormDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openStatusConfirm = (row: SupplierItem) => {
@@ -475,19 +499,45 @@ const closeConfirmDialog = () => {
   confirmState.row = null;
 };
 
-const handleConfirm = () => {
+const persistSupplierItem = async (item: SupplierItem) => {
+  const updated = await updateSupplier(item.id, {
+    name: item.name,
+    type: item.type,
+    contactName: item.contact,
+    contactPhone: item.phone,
+    qualificationStatus: 'approved',
+    status: toBackendStatus(item.status),
+    remark: item.remark ?? '',
+  });
+  const targetIndex = tableData.value.findIndex((row) => row.id === item.id);
+  if (targetIndex !== -1) {
+    tableData.value.splice(targetIndex, 1, toSupplierItem(updated));
+  }
+};
+
+const handleConfirm = async () => {
   if (!confirmState.row) return;
 
-  if (confirmState.type === 'delete') {
-    tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
-    ensureCurrentPage();
-  } else {
-    confirmState.row.status = confirmState.type === 'enable' ? 'normal' : 'disabled';
-  }
+  try {
+    if (confirmState.type === 'delete') {
+      await deleteSupplier(confirmState.row.id);
+      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      ensureCurrentPage();
+    } else {
+      await persistSupplierItem({
+        ...confirmState.row,
+        status: confirmState.type === 'enable' ? 'normal' : 'disabled',
+      });
+    }
 
-  closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+    closeConfirmDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
+
+onMounted(loadSuppliers);
 </script>
 
 <style scoped>

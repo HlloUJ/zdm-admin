@@ -71,7 +71,7 @@
             </t-button>
           </div>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -154,12 +154,21 @@
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
-import { computed, reactive, ref } from 'vue';
+import {
+  createSlabVariety,
+  deleteSlabVariety,
+  listSlabVarieties,
+  updateSlabVariety,
+  type SlabVarietyPayload,
+  type SlabVarietyRecord,
+} from '@/services/slabVarieties';
+import { computed, onMounted, reactive, ref } from 'vue';
 type VarietyStatus = 'normal' | 'disabled';
 type ConfirmType = 'enable' | 'disable' | 'delete';
 
 interface VarietyItem {
   id: number;
+  code: string;
   name: string;
   status: VarietyStatus;
   createdAt: string;
@@ -171,39 +180,8 @@ interface VarietyForm {
   remark: string;
 }
 
-const tableData = ref<VarietyItem[]>([
-  {
-    id: 1,
-    name: '粉红佳人',
-    status: 'normal',
-    createdAt: '2022/05/30 14:58',
-    remark: '平台统一大板品种',
-  },
-  {
-    id: 2,
-    name: '粉红佳人',
-    status: 'normal',
-    createdAt: '2022/05/30 14:58',
-  },
-  {
-    id: 3,
-    name: '粉红佳人',
-    status: 'disabled',
-    createdAt: '2022/05/30 14:58',
-  },
-  {
-    id: 4,
-    name: '粉红佳人',
-    status: 'normal',
-    createdAt: '2022/05/30 14:58',
-  },
-  {
-    id: 5,
-    name: '粉红佳人',
-    status: 'normal',
-    createdAt: '2022/05/30 14:58',
-  },
-]);
+const tableData = ref<VarietyItem[]>([]);
+const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
@@ -272,6 +250,59 @@ const pageData = computed(() => {
 });
 const totalCount = computed(() => filteredData.value.length);
 
+const normalizeStatus = (status?: SlabVarietyRecord['status']): VarietyStatus =>
+  status === 'disabled' ? 'disabled' : 'normal';
+
+const toBackendStatus = (status: VarietyStatus): SlabVarietyPayload['status'] =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const createCode = (name: string) => `slab-variety-${name.trim().length}-${Date.now()}`;
+
+const toVarietyItem = (record: SlabVarietyRecord): VarietyItem => ({
+  id: record.id,
+  code: record.code,
+  name: record.name,
+  status: normalizeStatus(record.status),
+  createdAt: formatDateTime(record.createdAt),
+  remark: record.remark ?? '',
+});
+
+const toVarietyPayload = (status: VarietyStatus, code?: string): SlabVarietyPayload => ({
+  name: formData.name.trim(),
+  code: code ?? createCode(formData.name),
+  status: toBackendStatus(status),
+  remark: formData.remark.trim(),
+});
+
+const toVarietyPayloadFromItem = (item: VarietyItem): SlabVarietyPayload => ({
+  name: item.name,
+  code: item.code,
+  status: toBackendStatus(item.status),
+  remark: item.remark ?? '',
+});
+
+const loadVarieties = async () => {
+  loading.value = true;
+  try {
+    const records = await listSlabVarieties();
+    tableData.value = records.map(toVarietyItem);
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '品种列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const resetFormData = () => {
   formData.name = '';
   formData.remark = '';
@@ -322,26 +353,22 @@ const handleSubmit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
 
-  if (dialogMode.value === 'create') {
-    const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;
-    tableData.value.unshift({
-      id: nextId,
-      name: formData.name.trim(),
-      status: 'normal',
-      createdAt: '2022/05/30 14:58',
-      remark: formData.remark.trim(),
-    });
-    pagination.current = 1;
-  } else if (editingId.value) {
-    const target = tableData.value.find((item) => item.id === editingId.value);
-    if (target) {
-      target.name = formData.name.trim();
-      target.remark = formData.remark.trim();
+  try {
+    if (dialogMode.value === 'create') {
+      await createSlabVariety(toVarietyPayload('normal'));
+      await loadVarieties();
+      pagination.current = 1;
+    } else if (editingId.value) {
+      const current = tableData.value.find((item) => item.id === editingId.value);
+      await updateSlabVariety(editingId.value, toVarietyPayload(current?.status ?? 'normal', current?.code));
+      await loadVarieties();
     }
-  }
 
-  closeFormDialog();
-  MessagePlugin.success('操作成功');
+    closeFormDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openStatusConfirm = (row: VarietyItem) => {
@@ -373,19 +400,36 @@ const ensureCurrentPage = () => {
   }
 };
 
-const handleConfirm = () => {
+const handleConfirm = async () => {
   if (!confirmState.row) return;
 
-  if (confirmState.type === 'delete') {
-    tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
-    ensureCurrentPage();
-  } else {
-    confirmState.row.status = confirmState.type === 'enable' ? 'normal' : 'disabled';
-  }
+  try {
+    if (confirmState.type === 'delete') {
+      await deleteSlabVariety(confirmState.row.id);
+      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      ensureCurrentPage();
+    } else {
+      const updated = await updateSlabVariety(
+        confirmState.row.id,
+        toVarietyPayloadFromItem({
+          ...confirmState.row,
+          status: confirmState.type === 'enable' ? 'normal' : 'disabled',
+        }),
+      );
+      const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
+      if (targetIndex !== -1) {
+        tableData.value.splice(targetIndex, 1, toVarietyItem(updated));
+      }
+    }
 
-  closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+    closeConfirmDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
+
+onMounted(loadVarieties);
 </script>
 
 <style scoped>

@@ -44,7 +44,7 @@
             ></template
           >
           <template #table>
-            <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+            <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
               <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
               <template #status="{ row }"
                 ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
@@ -117,10 +117,18 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import {
+  createProductAttribute,
+  deleteProductAttribute,
+  listProductAttributes,
+  updateProductAttribute,
+  type ProductAttributePayload,
+  type ProductAttributeRecord,
+} from '@/services/productAttributes';
 
 type Scope = 'shared' | 'finished' | 'accessory';
 type ValueType = 'select' | 'number' | 'text';
@@ -159,73 +167,8 @@ const sourceDescription = computed(
       accessory: '仅供配件类目模板引用，例如五金材质、承重与表面处理。',
     })[activeScope.value],
 );
-const data = ref<Attribute[]>([
-  { id: 1, code: 'brand', name: '品牌', scope: 'shared', valueType: 'select', templateCount: 8, status: 'enabled' },
-  { id: 2, code: 'style', name: '设计风格', scope: 'shared', valueType: 'select', templateCount: 6, status: 'enabled' },
-  {
-    id: 3,
-    code: 'applicable_space',
-    name: '适用空间',
-    scope: 'shared',
-    valueType: 'select',
-    templateCount: 5,
-    status: 'enabled',
-  },
-  {
-    id: 4,
-    code: 'stone_material',
-    name: '石材材质',
-    scope: 'finished',
-    valueType: 'select',
-    templateCount: 5,
-    status: 'enabled',
-  },
-  {
-    id: 5,
-    code: 'surface_finish',
-    name: '表面工艺',
-    scope: 'finished',
-    valueType: 'select',
-    templateCount: 4,
-    status: 'enabled',
-  },
-  {
-    id: 6,
-    code: 'table_size',
-    name: '成品规格尺寸',
-    scope: 'finished',
-    valueType: 'select',
-    templateCount: 3,
-    status: 'enabled',
-  },
-  {
-    id: 7,
-    code: 'hardware_material',
-    name: '五金材质',
-    scope: 'accessory',
-    valueType: 'select',
-    templateCount: 2,
-    status: 'enabled',
-  },
-  {
-    id: 8,
-    code: 'hardware_finish',
-    name: '表面处理',
-    scope: 'accessory',
-    valueType: 'select',
-    templateCount: 2,
-    status: 'enabled',
-  },
-  {
-    id: 9,
-    code: 'load_capacity',
-    name: '承重',
-    scope: 'accessory',
-    valueType: 'number',
-    templateCount: 2,
-    status: 'enabled',
-  },
-]);
+const data = ref<Attribute[]>([]);
+const loading = ref(false);
 const searchForm = reactive({ keyword: '' });
 const applied = reactive({ ...searchForm });
 const pageSizeOptions = [10, 20, 50];
@@ -257,6 +200,37 @@ const pageData = computed(() =>
 );
 const totalCount = computed(() => filteredData.value.length);
 const valueTypeLabel = (type: ValueType) => ({ select: '标准选项', number: '数值 + 单位', text: '文本输入' })[type];
+const normalizeStatus = (status?: ProductAttributeRecord['status']): Status =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+const createAttributeCode = (record: ProductAttributeRecord) => `attribute-${record.id}`;
+const toAttribute = (record: ProductAttributeRecord): Attribute => ({
+  id: record.id,
+  code: createAttributeCode(record),
+  name: record.name,
+  scope: record.scope,
+  valueType: record.valueType,
+  templateCount: 0,
+  status: normalizeStatus(record.status),
+});
+const toAttributePayload = (item: Attribute): ProductAttributePayload => ({
+  scope: item.scope,
+  name: item.name,
+  valueType: item.valueType,
+  attributeRole: 'basic',
+  status: item.status,
+});
+const loadAttributes = async () => {
+  loading.value = true;
+  try {
+    const records = await listProductAttributes();
+    data.value = records.map(toAttribute);
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '属性列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 const search = () => {
   Object.assign(applied, searchForm);
   pagination.current = 1;
@@ -295,19 +269,22 @@ const closeCreateDialog = () => {
 const submit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
-  data.value.unshift({
-    id: Date.now(),
-    code: `ATTR_${Date.now()}`,
-    name: form.name.trim(),
-    scope: form.scope,
-    valueType: form.valueType as ValueType,
-    templateCount: 0,
-    status: 'enabled',
-  });
-  pagination.current = 1;
-  dialogVisible.value = false;
-  formRef.value?.clearValidate();
-  MessagePlugin.success('已新增标准属性');
+  try {
+    await createProductAttribute({
+      scope: form.scope,
+      name: form.name.trim(),
+      valueType: form.valueType as ValueType,
+      attributeRole: 'basic',
+      status: 'enabled',
+    });
+    await loadAttributes();
+    pagination.current = 1;
+    dialogVisible.value = false;
+    formRef.value?.clearValidate();
+    MessagePlugin.success('已新增标准属性');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 const openStatusConfirm = (row: Attribute) => {
   confirmTarget.value = row;
@@ -330,17 +307,33 @@ const confirmText = computed(() => {
   const name = confirmTarget.value?.name ?? '';
   return `是否${confirmType.value === 'disable' ? '停用' : confirmType.value === 'enable' ? '启用' : '删除'}属性【${name}】？`;
 });
-const handleConfirm = () => {
+const handleConfirm = async () => {
   if (!confirmTarget.value) return;
-  if (confirmType.value === 'delete') {
-    data.value = data.value.filter((item) => item.id !== confirmTarget.value?.id);
-    ensureCurrentPage();
-    MessagePlugin.success('删除成功');
-  } else {
-    confirmTarget.value.status = confirmType.value === 'enable' ? 'enabled' : 'disabled';
-    MessagePlugin.success(confirmType.value === 'enable' ? '已启用属性' : '已停用属性');
+
+  try {
+    if (confirmType.value === 'delete') {
+      await deleteProductAttribute(confirmTarget.value.id);
+      data.value = data.value.filter((item) => item.id !== confirmTarget.value?.id);
+      ensureCurrentPage();
+      MessagePlugin.success('删除成功');
+    } else {
+      const updated = await updateProductAttribute(
+        confirmTarget.value.id,
+        toAttributePayload({
+          ...confirmTarget.value,
+          status: confirmType.value === 'enable' ? 'enabled' : 'disabled',
+        }),
+      );
+      const targetIndex = data.value.findIndex((item) => item.id === confirmTarget.value?.id);
+      if (targetIndex !== -1) {
+        data.value.splice(targetIndex, 1, toAttribute(updated));
+      }
+      MessagePlugin.success(confirmType.value === 'enable' ? '已启用属性' : '已停用属性');
+    }
+    closeConfirmDialog();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
   }
-  closeConfirmDialog();
 };
 watch(
   () => route.query.scope,
@@ -352,6 +345,7 @@ watch(
 watch(activeScope, () => {
   pagination.current = 1;
 });
+onMounted(loadAttributes);
 </script>
 
 <style scoped>

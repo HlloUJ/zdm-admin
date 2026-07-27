@@ -1,0 +1,50 @@
+import { request } from './http';
+
+export interface CraftRecord {
+  id: number;
+  name: string;
+  type: string;
+  width?: string;
+  description?: string;
+  imageUrl?: string;
+  pricingMethod?: string;
+  remark?: string;
+  status?: 'enabled' | 'disabled';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CraftPayload {
+  name: string;
+  type: string;
+  width?: string;
+  description?: string;
+  imageUrl?: string;
+  pricingMethod?: string;
+  remark?: string;
+  status: 'enabled' | 'disabled';
+}
+
+export function listCrafts() {
+  return request<CraftRecord[]>('/admin/crafts');
+}
+
+export function createCraft(payload: CraftPayload) {
+  return request<CraftRecord>('/admin/crafts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateCraft(id: number, payload: CraftPayload) {
+  return request<CraftRecord>(`/admin/crafts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteCraft(id: number) {
+  return request<boolean>(`/admin/crafts/${id}`, {
+    method: 'DELETE',
+  });
+}

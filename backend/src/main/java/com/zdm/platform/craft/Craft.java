@@ -12,9 +12,11 @@ public class Craft extends BaseEntity {
   @NotBlank
   private String type;
 
+  private String width;
   private String description;
   private String imageUrl;
   private String pricingMethod;
+  private String remark;
 
   public String getName() {
     return name;
@@ -30,6 +32,14 @@ public class Craft extends BaseEntity {
 
   public void setType(String type) {
     this.type = type;
+  }
+
+  public String getWidth() {
+    return width;
+  }
+
+  public void setWidth(String width) {
+    this.width = width;
   }
 
   public String getDescription() {
@@ -54,5 +64,13 @@ public class Craft extends BaseEntity {
 
   public void setPricingMethod(String pricingMethod) {
     this.pricingMethod = pricingMethod;
+  }
+
+  public String getRemark() {
+    return remark;
+  }
+
+  public void setRemark(String remark) {
+    this.remark = remark;
   }
 }

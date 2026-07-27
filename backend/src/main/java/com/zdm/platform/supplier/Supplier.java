@@ -17,6 +17,7 @@ public class Supplier extends BaseEntity {
   private String region;
   private String address;
   private String qualificationStatus;
+  private String remark;
 
   public String getName() {
     return name;
@@ -72,5 +73,13 @@ public class Supplier extends BaseEntity {
 
   public void setQualificationStatus(String qualificationStatus) {
     this.qualificationStatus = qualificationStatus;
+  }
+
+  public String getRemark() {
+    return remark;
+  }
+
+  public void setRemark(String remark) {
+    this.remark = remark;
   }
 }
