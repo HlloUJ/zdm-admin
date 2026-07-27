@@ -15,7 +15,16 @@ public class AuthService {
         "系统管理员",
         request.phone(),
         List.of("ADMIN"),
-        List.of("admin:tenant:manage", "admin:store:manage", "admin:role:manage", "admin:employee:manage"));
+        List.of(
+            "admin:tenant:manage",
+            "admin:store:manage",
+            "admin:role:manage",
+            "admin:employee:manage",
+            "admin:catalog:manage",
+            "admin:inventory:manage",
+            "admin:supplier:manage",
+            "admin:craft:manage",
+            "admin:order:manage"));
     return new LoginResponse(TokenAuthenticationFilter.DEV_TOKEN, user);
   }
 }
