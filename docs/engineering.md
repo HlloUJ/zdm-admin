@@ -41,6 +41,12 @@
 5. 启动前端：`npm run dev`。
 6. 使用手机号 `15926626945`、验证码 `888888` 登录管理后台。
 
+如果本机未安装 JDK 21 或 Maven，可以使用 Docker 方式启动后端：
+
+1. 启动 Docker Desktop。
+2. 启动数据库和后端：`docker compose up backend`。
+3. 另开终端启动前端：`npm run dev`。
+
 ## 质量检查
 
 - 前端综合检查：`npm run quality`。

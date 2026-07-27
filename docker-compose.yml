@@ -1,3 +1,5 @@
+name: zdm-admin
+
 services:
   mysql:
     image: mysql:8.4
@@ -18,5 +20,24 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    image: maven:3.9.9-eclipse-temurin-21
+    container_name: zdm-platform-backend
+    working_dir: /workspace/backend
+    command: mvn spring-boot:run
+    environment:
+      ZDM_DB_URL: jdbc:mysql://mysql:3306/zdm_admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      ZDM_DB_USERNAME: zdm_admin
+      ZDM_DB_PASSWORD: zdm_admin_pwd
+    ports:
+      - '8080:8080'
+    volumes:
+      - .:/workspace
+      - zdm_maven_repo:/root/.m2
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   zdm_platform_mysql:
+  zdm_maven_repo:
