@@ -12,10 +12,10 @@
   </parent>
 
   <groupId>com.zdm</groupId>
-  <artifactId>zdm-admin-backend</artifactId>
+  <artifactId>zdm-platform-backend</artifactId>
   <version>0.1.0</version>
-  <name>zdm-admin-backend</name>
-  <description>装点猫管理后台后端服务</description>
+  <name>zdm-platform-backend</name>
+  <description>装点猫多端平台后端服务</description>
 
   <properties>
     <java.version>21</java.version>

@@ -17,7 +17,7 @@ export interface LoginResult {
 }
 
 export async function login(payload: LoginPayload) {
-  const result = await request<LoginResult>('/auth/login', {
+  const result = await request<LoginResult>('/admin/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

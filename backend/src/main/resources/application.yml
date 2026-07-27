@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: zdm-admin-backend
+    name: zdm-platform-backend
   datasource:
     url: ${ZDM_DB_URL:jdbc:mysql://127.0.0.1:3306/zdm_admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
     username: ${ZDM_DB_USERNAME:zdm_admin}
