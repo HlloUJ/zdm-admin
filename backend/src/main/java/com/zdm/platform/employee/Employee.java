@@ -18,6 +18,8 @@ public class Employee {
   @NotBlank
   private String name;
 
+  private String gender;
+
   @NotBlank
   @Pattern(regexp = "^1[3-9]\\d{9}$")
   private String phone;
@@ -25,6 +27,9 @@ public class Employee {
   @NotBlank
   private String status;
 
+  private String roleIds;
+  private String dataPermission;
+  private String remark;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -60,6 +65,14 @@ public class Employee {
     this.name = name;
   }
 
+  public String getGender() {
+    return gender;
+  }
+
+  public void setGender(String gender) {
+    this.gender = gender;
+  }
+
   public String getPhone() {
     return phone;
   }
@@ -74,6 +87,30 @@ public class Employee {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public String getRoleIds() {
+    return roleIds;
+  }
+
+  public void setRoleIds(String roleIds) {
+    this.roleIds = roleIds;
+  }
+
+  public String getDataPermission() {
+    return dataPermission;
+  }
+
+  public void setDataPermission(String dataPermission) {
+    this.dataPermission = dataPermission;
+  }
+
+  public String getRemark() {
+    return remark;
+  }
+
+  public void setRemark(String remark) {
+    this.remark = remark;
   }
 
   public LocalDateTime getCreatedAt() {

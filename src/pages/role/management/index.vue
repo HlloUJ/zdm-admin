@@ -43,7 +43,15 @@
             </t-button>
           </div>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed" class="role-table">
+          <t-table
+            row-key="id"
+            :data="pageData"
+            :columns="columns"
+            :loading="loading"
+            hover
+            table-layout="fixed"
+            class="role-table"
+          >
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -240,18 +248,24 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import { createRole, deleteRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
 
 type RoleCategory = 'partner-store' | 'supplier-store' | 'operation-platform';
 type DialogMode = 'create' | 'edit';
 
 interface RoleItem {
   id: number;
+  code: string;
+  category: RoleCategory;
+  dataScope: string;
+  status: 'enabled' | 'disabled';
   name: string;
   createdAt: string;
   remark: string;
+  functionPermissions: string[];
 }
 
 interface RoleForm {
@@ -292,26 +306,8 @@ const roleTabs = [
   { label: '运营管理平台角色', value: 'operation-platform' },
 ];
 
-const roleCollections = reactive<Record<RoleCategory, RoleItem[]>>({
-  'partner-store': [
-    { id: 101, name: '店长', createdAt: '2026/07/19 09:30', remark: '负责门店经营管理' },
-    { id: 102, name: '门店导购', createdAt: '2026/07/19 09:35', remark: '负责客户接待与产品介绍' },
-    { id: 103, name: '驻店设计师', createdAt: '2026/07/19 09:40', remark: '负责方案设计与深化沟通' },
-    { id: 104, name: '安装工人', createdAt: '2026/07/19 09:45', remark: '负责安装履约' },
-  ],
-  'supplier-store': [
-    { id: 201, name: '店长', createdAt: '2026/07/19 09:30', remark: '负责供应商门店运营' },
-    { id: 202, name: '门店导购', createdAt: '2026/07/19 09:35', remark: '负责供应商门店客户接待' },
-    { id: 203, name: '驻店设计师', createdAt: '2026/07/19 09:40', remark: '负责供应商门店设计支持' },
-    { id: 204, name: '安装工人', createdAt: '2026/07/19 09:45', remark: '负责供应商门店安装履约' },
-  ],
-  'operation-platform': [
-    { id: 301, name: '超级管理员', createdAt: '2026/07/19 09:30', remark: '拥有平台全局管理权限' },
-    { id: 302, name: '管理员', createdAt: '2026/07/19 09:35', remark: '负责基础配置与日常管理' },
-    { id: 303, name: '运营', createdAt: '2026/07/19 09:40', remark: '负责平台运营维护' },
-    { id: 304, name: '客服', createdAt: '2026/07/19 09:45', remark: '负责客户服务处理' },
-  ],
-});
+const roles = ref<RoleItem[]>([]);
+const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: '22%', align: 'left' },
@@ -703,13 +699,12 @@ const formData = reactive<RoleForm>({
 const permissionDraft = reactive<RolePermissionConfig>({
   functionPermissions: [],
 });
-const rolePermissionStore = reactive<Record<number, RolePermissionConfig>>({});
 
 const formRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入角色名称', type: 'error' }],
 };
 
-const currentRoles = computed(() => roleCollections[activeCategory.value]);
+const currentRoles = computed(() => roles.value.filter((item) => item.category === activeCategory.value));
 const isOperationPlatformTab = computed(() => activeCategory.value === 'operation-platform');
 const paginationTotal = computed(() => currentRoles.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / pagination.pageSize), 1));
@@ -722,6 +717,69 @@ const deleteConfirmText = computed(() => `是否删除角色【${deletingRole.va
 const activePermissionModule = computed(
   () => permissionModules.find((module) => module.value === activePermissionModuleValue.value) ?? permissionModules[0],
 );
+
+const normalizeCategory = (value?: string): RoleCategory =>
+  value === 'partner-store' || value === 'supplier-store' || value === 'operation-platform'
+    ? value
+    : 'operation-platform';
+
+const parsePermissions = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toRoleItem = (record: RoleRecord): RoleItem => ({
+  id: record.id,
+  code: record.code,
+  category: normalizeCategory(record.category),
+  dataScope: record.dataScope,
+  status: record.status,
+  name: record.name,
+  createdAt: formatDateTime(record.createdAt),
+  remark: record.remark ?? '',
+  functionPermissions: parsePermissions(record.functionPermissions),
+});
+
+const categoryClientCode = (category: RoleCategory) => {
+  if (category === 'partner-store') return 'store';
+  if (category === 'supplier-store') return 'supplier';
+  return 'admin';
+};
+
+const categoryDataScope = (category: RoleCategory) => (category === 'operation-platform' ? 'all' : 'store');
+
+const createRoleCode = (category: RoleCategory, roleName: string) =>
+  `${category.replace(/-/g, '_')}_${roleName.trim().length}_${Date.now()}`.toUpperCase();
+
+const toRolePayload = (role: RoleItem): RolePayload => ({
+  name: role.name,
+  code: role.code,
+  category: role.category,
+  clientCode: categoryClientCode(role.category),
+  dataScope: role.dataScope,
+  status: role.status,
+  remark: role.remark,
+  functionPermissions: role.functionPermissions.join(','),
+});
+
+const loadRoles = async () => {
+  loading.value = true;
+  try {
+    const records = await listRoles();
+    roles.value = records.map(toRoleItem);
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '角色列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 
 const getModuleActionValues = (module?: PermissionModule) =>
   module?.pages.flatMap((page) => page.actions.map((action) => action.value)) ?? [];
@@ -766,12 +824,6 @@ const togglePagePermissions = (page: PermissionPage, checked: unknown) =>
   setPermissionRange(getPageActionValues(page), checked);
 const toggleModulePermissions = (module: PermissionModule | undefined, checked: unknown) =>
   setPermissionRange(getModuleActionValues(module), checked);
-
-const getCreatedAt = () => {
-  const now = new Date();
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-};
 
 const resetFormData = () => {
   formData.name = '';
@@ -843,30 +895,33 @@ const handleSubmit = async () => {
   const roleName = formData.name.trim();
   const roleRemark = formData.remark.trim().slice(0, 100);
 
-  if (dialogMode.value === 'create') {
-    const nextId = Math.max(...currentRoles.value.map((item) => item.id), 0) + 1;
-    currentRoles.value.unshift({
-      id: nextId,
-      name: roleName,
-      createdAt: getCreatedAt(),
-      remark: roleRemark,
-    });
-    if (activeCategory.value === 'operation-platform') {
-      rolePermissionStore[nextId] = {
-        functionPermissions: [],
-      };
+  try {
+    if (dialogMode.value === 'create') {
+      await createRole({
+        name: roleName,
+        code: createRoleCode(activeCategory.value, roleName),
+        category: activeCategory.value,
+        clientCode: categoryClientCode(activeCategory.value),
+        dataScope: categoryDataScope(activeCategory.value),
+        status: 'enabled',
+        remark: roleRemark,
+        functionPermissions: '',
+      });
+      await loadRoles();
+      pagination.current = 1;
+    } else if (editingId.value) {
+      const target = currentRoles.value.find((item) => item.id === editingId.value);
+      if (target) {
+        await updateRole(editingId.value, toRolePayload({ ...target, name: roleName, remark: roleRemark }));
+        await loadRoles();
+      }
     }
-    pagination.current = 1;
-  } else if (editingId.value) {
-    const target = currentRoles.value.find((item) => item.id === editingId.value);
-    if (target) {
-      target.name = roleName;
-      target.remark = roleRemark;
-    }
-  }
 
-  closeFormDialog();
-  MessagePlugin.success('操作成功');
+    closeFormDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openDeleteConfirm = (row: RoleItem) => {
@@ -879,22 +934,25 @@ const closeDeleteDialog = () => {
   deletingRole.value = null;
 };
 
-const handleDeleteConfirm = () => {
+const handleDeleteConfirm = async () => {
   if (!deletingRole.value) return;
 
-  roleCollections[activeCategory.value] = currentRoles.value.filter((item) => item.id !== deletingRole.value?.id);
-  delete rolePermissionStore[deletingRole.value.id];
-  ensureCurrentPage();
-  closeDeleteDialog();
-  MessagePlugin.success('操作成功');
+  try {
+    await deleteRole(deletingRole.value.id);
+    roles.value = roles.value.filter((item) => item.id !== deletingRole.value?.id);
+    ensureCurrentPage();
+    closeDeleteDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openPermissionDialog = (row: RoleItem) => {
   permissionRole.value = row;
-  const savedPermission = rolePermissionStore[row.id] ?? {
-    functionPermissions: [],
-  };
-  permissionDraft.functionPermissions = [...savedPermission.functionPermissions];
+  permissionDraft.functionPermissions = row.functionPermissions.includes('all')
+    ? [...allPermissionValues]
+    : [...row.functionPermissions];
   permissionDialogVisible.value = true;
 };
 
@@ -912,15 +970,26 @@ const clearAllPermissions = () => {
   permissionDraft.functionPermissions = [];
 };
 
-const handlePermissionSave = () => {
+const handlePermissionSave = async () => {
   if (!permissionRole.value) return;
 
-  rolePermissionStore[permissionRole.value.id] = {
-    functionPermissions: [...permissionDraft.functionPermissions],
-  };
-  closePermissionDialog();
-  MessagePlugin.success('保存成功');
+  try {
+    const updated = await updateRole(
+      permissionRole.value.id,
+      toRolePayload({ ...permissionRole.value, functionPermissions: [...permissionDraft.functionPermissions] }),
+    );
+    const targetIndex = roles.value.findIndex((item) => item.id === permissionRole.value?.id);
+    if (targetIndex !== -1) {
+      roles.value.splice(targetIndex, 1, toRoleItem(updated));
+    }
+    closePermissionDialog();
+    MessagePlugin.success('保存成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '保存失败');
+  }
 };
+
+onMounted(loadRoles);
 </script>
 
 <style scoped>

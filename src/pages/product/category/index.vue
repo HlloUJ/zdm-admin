@@ -71,6 +71,7 @@
             row-key="key"
             :data="displayRows"
             :columns="columns"
+            :loading="loading"
             hover
             table-layout="fixed"
           >
@@ -197,9 +198,17 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import {
+  createProductCategory,
+  deleteProductCategory,
+  listProductCategories,
+  updateProductCategory,
+  type ProductCategoryPayload,
+  type ProductCategoryRecord,
+} from '@/services/productCategories';
 
 type Scope = 'finished' | 'accessory';
 type Status = 'enabled' | 'disabled';
@@ -207,9 +216,11 @@ type FormMode = 'create' | 'edit';
 
 interface CategoryNode {
   id: number;
+  parentId: number | null;
   name: string;
   status: Status;
   productCount: number;
+  sortOrder: number;
   children: CategoryNode[];
 }
 interface CategoryRow {
@@ -239,69 +250,8 @@ const scopeTabs = [
   { label: '配件分类', value: 'accessory' },
 ];
 
-const categoryData = ref<Record<Scope, CategoryNode[]>>({
-  finished: [
-    {
-      id: 1,
-      name: '住宅家具',
-      status: 'enabled',
-      productCount: 0,
-      children: [
-        {
-          id: 2,
-          name: '餐厅成套家具',
-          status: 'enabled',
-          productCount: 0,
-          children: [
-            {
-              id: 3,
-              name: '餐桌',
-              status: 'enabled',
-              productCount: 0,
-              children: [
-                { id: 4, name: '大理石餐桌', status: 'enabled', productCount: 42, children: [] },
-                { id: 5, name: '奢石餐桌', status: 'enabled', productCount: 18, children: [] },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 6,
-      name: '客厅家具',
-      status: 'enabled',
-      productCount: 0,
-      children: [{ id: 7, name: '茶几', status: 'enabled', productCount: 12, children: [] }],
-    },
-  ],
-  accessory: [
-    {
-      id: 101,
-      name: '五金配件',
-      status: 'enabled',
-      productCount: 0,
-      children: [
-        {
-          id: 102,
-          name: '桌腿',
-          status: 'enabled',
-          productCount: 0,
-          children: [
-            {
-              id: 103,
-              name: '金属桌腿',
-              status: 'enabled',
-              productCount: 0,
-              children: [{ id: 104, name: '不锈钢桌腿', status: 'enabled', productCount: 26, children: [] }],
-            },
-          ],
-        },
-        { id: 105, name: '连接件', status: 'disabled', productCount: 8, children: [] },
-      ],
-    },
-  ],
-});
+const categoryData = ref<Record<Scope, CategoryNode[]>>({ finished: [], accessory: [] });
+const loading = ref(false);
 
 const searchForm = reactive({ keyword: '', status: '' as Status | '' });
 const appliedSearch = reactive({ keyword: '', status: '' as Status | '' });
@@ -428,6 +378,57 @@ function siblingNodes(row: CategoryRow) {
 function siblingIndex(row: CategoryRow) {
   return siblingNodes(row).findIndex((node) => node.id === row.node.id);
 }
+function toNode(record: ProductCategoryRecord): CategoryNode {
+  return {
+    id: record.id,
+    parentId: record.parentId ?? null,
+    name: record.name,
+    status: record.status ?? 'enabled',
+    productCount: record.productCount ?? 0,
+    sortOrder: record.sortOrder ?? 0,
+    children: [],
+  };
+}
+function buildCategoryTree(records: ProductCategoryRecord[], scope: Scope) {
+  const nodes = records
+    .filter((record) => record.scope === scope)
+    .map(toNode)
+    .sort((first, second) => first.sortOrder - second.sortOrder || first.id - second.id);
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const roots: CategoryNode[] = [];
+  nodes.forEach((node) => {
+    if (node.parentId && nodeMap.has(node.parentId)) {
+      nodeMap.get(node.parentId)?.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  return roots;
+}
+function toCategoryPayload(node: CategoryNode, parentId = node.parentId): ProductCategoryPayload {
+  return {
+    parentId: parentId ?? undefined,
+    scope: activeScope.value,
+    name: node.name,
+    sortOrder: node.sortOrder,
+    productCount: node.productCount,
+    status: node.status,
+  };
+}
+async function loadCategories() {
+  loading.value = true;
+  try {
+    const records = await listProductCategories();
+    categoryData.value = {
+      finished: buildCategoryTree(records, 'finished'),
+      accessory: buildCategoryTree(records, 'accessory'),
+    };
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '分类列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+}
 function resetForm() {
   Object.assign(formData, { id: null, parentId: null, name: '', status: 'enabled' });
 }
@@ -488,27 +489,51 @@ async function handleSubmit() {
     return;
   }
   const name = formData.name.trim();
-  if (formMode.value === 'create') {
-    const node: CategoryNode = { id: Date.now(), name, status: formData.status, productCount: 0, children: [] };
-    if (formData.parentId) findNode(formData.parentId)?.children.push(node);
-    else activeNodes.value.push(node);
-    MessagePlugin.success('新增成功');
-  } else if (formData.id) {
-    const node = findNode(formData.id);
-    if (node) Object.assign(node, { name, status: formData.status });
-    MessagePlugin.success('保存成功');
+  try {
+    if (formMode.value === 'create') {
+      const siblings = formData.parentId ? (findNode(formData.parentId)?.children ?? []) : activeNodes.value;
+      await createProductCategory({
+        parentId: formData.parentId ?? undefined,
+        scope: activeScope.value,
+        name,
+        sortOrder: siblings.length + 1,
+        productCount: 0,
+        status: formData.status,
+      });
+      MessagePlugin.success('新增成功');
+    } else if (formData.id) {
+      const node = findNode(formData.id);
+      if (node) {
+        await updateProductCategory(formData.id, toCategoryPayload({ ...node, name, status: formData.status }));
+      }
+      MessagePlugin.success('保存成功');
+    }
+    await loadCategories();
+    closeFormDialog();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
   }
-  closeFormDialog();
 }
-function moveCategory(row: CategoryRow, offset: number) {
+async function moveCategory(row: CategoryRow, offset: number) {
   const siblings = siblingNodes(row);
   const index = siblingIndex(row);
   const targetIndex = index + offset;
   if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
   rememberPageScroll();
   [siblings[index], siblings[targetIndex]] = [siblings[targetIndex], siblings[index]];
-  void nextTick(restoreSortScroll);
-  MessagePlugin.success('排序已更新');
+  siblings.forEach((node, nodeIndex) => {
+    node.sortOrder = nodeIndex + 1;
+  });
+  try {
+    await Promise.all(
+      siblings.map((node) => updateProductCategory(node.id, toCategoryPayload(node, row.parent?.id ?? null))),
+    );
+    void nextTick(restoreSortScroll);
+    MessagePlugin.success('排序已更新');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '排序保存失败');
+    await loadCategories();
+  }
 }
 function openStatusConfirm(node: CategoryNode) {
   statusTarget.value = node;
@@ -523,11 +548,22 @@ function updateDescendantStatus(node: CategoryNode, status: Status) {
   node.status = status;
   node.children.forEach((child) => updateDescendantStatus(child, status));
 }
-function handleStatusConfirm() {
+function flattenNode(node: CategoryNode): CategoryNode[] {
+  return [node, ...node.children.flatMap(flattenNode)];
+}
+async function handleStatusConfirm() {
   if (statusTarget.value) {
     const nextStatus: Status = statusTarget.value.status === 'enabled' ? 'disabled' : 'enabled';
-    updateDescendantStatus(statusTarget.value, nextStatus);
-    MessagePlugin.success(nextStatus === 'enabled' ? '已启用分类' : '已停用分类');
+    try {
+      const nodes = flattenNode(statusTarget.value);
+      await Promise.all(
+        nodes.map((node) => updateProductCategory(node.id, toCategoryPayload({ ...node, status: nextStatus }))),
+      );
+      updateDescendantStatus(statusTarget.value, nextStatus);
+      MessagePlugin.success(nextStatus === 'enabled' ? '已启用分类' : '已停用分类');
+    } catch (error) {
+      MessagePlugin.error(error instanceof Error ? error.message : '状态保存失败');
+    }
   }
   closeStatusConfirm();
 }
@@ -548,16 +584,21 @@ function removeNode(nodes: CategoryNode[], id: number): boolean {
   }
   return nodes.some((node) => removeNode(node.children, id));
 }
-function handleDeleteConfirm() {
+async function handleDeleteConfirm() {
   const node = deleteTarget.value;
   if (!node) return;
   if (node.productCount || node.children.length) {
     closeDeleteDialog();
     return;
   }
-  removeNode(activeNodes.value, node.id);
-  MessagePlugin.success('删除成功');
-  closeDeleteDialog();
+  try {
+    await deleteProductCategory(node.id);
+    removeNode(activeNodes.value, node.id);
+    MessagePlugin.success('删除成功');
+    closeDeleteDialog();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '删除失败');
+  }
 }
 function handleSearch() {
   appliedSearch.keyword = searchForm.keyword;
@@ -576,6 +617,7 @@ watch(
     handleReset();
   },
 );
+onMounted(loadCategories);
 </script>
 
 <style scoped>

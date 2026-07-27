@@ -88,7 +88,7 @@
             </t-button>
           </div>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -248,9 +248,17 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import {
+  deleteEmployee,
+  listEmployees,
+  updateEmployee,
+  type EmployeePayload,
+  type EmployeeRecord,
+} from '@/services/employees';
+import { listRoles, type RoleRecord } from '@/services/roles';
 
 type EmployeeStatus = 'normal' | 'disabled';
 type Gender = 'male' | 'female' | '';
@@ -302,46 +310,22 @@ interface PermissionModule {
   pages: PermissionPage[];
 }
 
-const operationRoleOptions = [
-  { label: '超级管理员', value: 'super-admin' },
-  { label: '管理员', value: 'admin' },
-  { label: '运营', value: 'operator' },
-  { label: '客服', value: 'service' },
-];
+const operationRoles = ref<RoleRecord[]>([]);
+const operationRoleOptions = computed(() =>
+  operationRoles.value.map((role) => ({
+    label: role.name,
+    value: String(role.id),
+  })),
+);
 
-const rolePermissionMap: Record<string, string[]> = {
-  'super-admin': ['all'],
-  admin: [
-    'admin.tenant.tenant-management.query',
-    'admin.tenant.tenant-management.reset',
-    'admin.tenant.tenant-store-management.query',
-    'admin.tenant.store-category-management.query',
-    'admin.permission-management.employee-management.query',
-    'admin.permission-management.employee-management.create',
-    'admin.permission-management.employee-management.edit',
-    'admin.permission-management.role-management.create',
-    'admin.permission-management.role-management.permission',
-    'admin.product-data-center.attribute.query',
-    'admin.product-data-center.attribute.create',
-    'admin.product-data-center.attribute-value.query',
-    'admin.product-data-center.attribute-value.create',
-  ],
-  operator: [
-    'admin.finished-stock-management.warehouse.query',
-    'admin.finished-stock-management.warehouse.publish',
-    'admin.finished-stock-management.selling.query',
-    'admin.slab-management.warehouse.query',
-    'admin.supplier-management.query',
-    'admin.product-data-center.category.query',
-  ],
-  service: [
-    'admin.tenant.tenant-management.query',
-    'admin.tenant.tenant-store-management.query',
-    'admin.tenant.store-category-management.query',
-    'admin.finished-stock-management.selling.query',
-    'admin.supplier-management.query',
-  ],
-};
+const rolePermissionMap = computed<Record<string, string[]>>(() =>
+  Object.fromEntries(
+    operationRoles.value.map((role) => [
+      String(role.id),
+      role.functionPermissions === 'all' ? ['all'] : (role.functionPermissions?.split(',').filter(Boolean) ?? []),
+    ]),
+  ),
+);
 
 const buildActionNodes = (scope: string, actions: Array<{ label: string; value: string }>): PermissionAction[] =>
   actions.map((action) => ({
@@ -594,79 +578,13 @@ const allPermissionValues = computed(() =>
 );
 
 const expandRolePermissions = (roleIds: string[]) => {
-  const values = roleIds.flatMap((roleId) => rolePermissionMap[roleId] ?? []);
+  const values = roleIds.flatMap((roleId) => rolePermissionMap.value[roleId] ?? []);
   if (values.includes('all')) return allPermissionValues.value;
   return Array.from(new Set(values));
 };
 
-const employees = ref<EmployeeItem[]>([
-  {
-    id: 1,
-    name: '林清予',
-    gender: 'female',
-    phone: '13800010001',
-    roleIds: ['super-admin'],
-    status: 'normal',
-    remark: '负责平台全局权限与关键配置',
-    functionPermissions: expandRolePermissions(['super-admin']),
-    dataPermission: 'all',
-  },
-  {
-    id: 2,
-    name: '周景行',
-    gender: 'male',
-    phone: '13800010002',
-    roleIds: ['admin'],
-    status: 'normal',
-    remark: '负责基础资料与账号维护',
-    functionPermissions: expandRolePermissions(['admin']),
-    dataPermission: 'all',
-  },
-  {
-    id: 3,
-    name: '陈知夏',
-    gender: 'female',
-    phone: '13800010003',
-    roleIds: ['operator'],
-    status: 'normal',
-    remark: '负责商品运营与供应商协同',
-    functionPermissions: expandRolePermissions(['operator']),
-    dataPermission: 'self',
-  },
-  {
-    id: 4,
-    name: '许明远',
-    gender: 'male',
-    phone: '13800010004',
-    roleIds: ['service'],
-    status: 'disabled',
-    remark: '客服账号，暂时停用',
-    functionPermissions: expandRolePermissions(['service']),
-    dataPermission: 'self',
-  },
-  {
-    id: 5,
-    name: '顾念安',
-    gender: 'female',
-    phone: '13800010005',
-    roleIds: ['operator', 'service'],
-    status: 'normal',
-    remark: '兼顾运营查询与客户问题处理',
-    functionPermissions: expandRolePermissions(['operator', 'service']),
-    dataPermission: 'all',
-  },
-  {
-    id: 6,
-    name: '陆言',
-    gender: 'male',
-    phone: '13800010006',
-    roleIds: ['operator'],
-    status: 'disabled',
-    remark: '岗位调整，账号保留',
-    functionPermissions: expandRolePermissions(['operator']),
-    dataPermission: 'self',
-  },
-]);
+const employees = ref<EmployeeItem[]>([]);
+const loading = ref(false);
 
 const makeEmptyFilter = (): EmployeeFilter => ({
   name: '',
@@ -716,9 +634,12 @@ const pageNumbers = computed(() => {
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 });
 const pageData = computed(() => {
-  if (pagination.current > pageCount.value) pagination.current = pageCount.value;
   const start = (pagination.current - 1) * pagination.pageSize;
   return filteredEmployees.value.slice(start, start + pagination.pageSize);
+});
+
+watch(pageCount, (count) => {
+  if (pagination.current > count) pagination.current = count;
 });
 
 const formRef = ref<FormInstanceFunctions>();
@@ -759,9 +680,55 @@ const genderLabel = (gender: Gender) => {
 
 const roleNames = (roleIds: string[]) =>
   roleIds
-    .map((roleId) => operationRoleOptions.find((role) => role.value === roleId)?.label)
+    .map((roleId) => operationRoleOptions.value.find((role) => role.value === roleId)?.label)
     .filter(Boolean)
     .join('、') || '-';
+
+const normalizeStatus = (status: EmployeeRecord['status']): EmployeeStatus =>
+  status === 'disabled' ? 'disabled' : 'normal';
+
+const toBackendStatus = (status: EmployeeStatus): EmployeePayload['status'] =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+
+const parseRoleIds = (value?: string) => value?.split(',').filter(Boolean) ?? [];
+
+const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
+  const roleIds = parseRoleIds(record.roleIds);
+  return {
+    id: record.id,
+    name: record.name,
+    gender: record.gender ?? 'male',
+    phone: record.phone,
+    roleIds,
+    status: normalizeStatus(record.status),
+    remark: record.remark ?? '',
+    functionPermissions: expandRolePermissions(roleIds),
+    dataPermission: record.dataPermission ?? 'self',
+  };
+};
+
+const toEmployeePayload = (employee: EmployeeItem): EmployeePayload => ({
+  name: employee.name,
+  gender: employee.gender,
+  phone: employee.phone,
+  status: toBackendStatus(employee.status),
+  roleIds: employee.roleIds.join(','),
+  dataPermission: employee.dataPermission,
+  remark: employee.remark,
+});
+
+const loadPermissionCenter = async () => {
+  loading.value = true;
+  try {
+    const [roles, records] = await Promise.all([listRoles(), listEmployees()]);
+    operationRoles.value = roles.filter((role) => role.category === 'operation-platform' && role.status === 'enabled');
+    employees.value = records.map(toEmployeeItem);
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '员工列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 
 const normalizePhone = (value: unknown) =>
   String(value ?? '')
@@ -839,16 +806,31 @@ const handleEmployeeSubmit = async () => {
   const rolePermissionValues = expandRolePermissions(formData.roleIds);
 
   if (activeEmployee.value) {
-    activeEmployee.value.name = formData.name.trim();
-    activeEmployee.value.gender = formData.gender as Exclude<Gender, ''>;
-    activeEmployee.value.phone = formData.phone.trim();
-    activeEmployee.value.roleIds = [...formData.roleIds];
-    activeEmployee.value.dataPermission = formData.dataPermission;
-    activeEmployee.value.remark = formData.remark.trim();
-    activeEmployee.value.functionPermissions = Array.from(
-      new Set([...rolePermissionValues, ...activeEmployee.value.functionPermissions]),
-    );
-    MessagePlugin.success('更新成功');
+    try {
+      const updated = await updateEmployee(
+        activeEmployee.value.id,
+        toEmployeePayload({
+          ...activeEmployee.value,
+          name: formData.name.trim(),
+          gender: formData.gender as Exclude<Gender, ''>,
+          phone: formData.phone.trim(),
+          roleIds: [...formData.roleIds],
+          dataPermission: formData.dataPermission,
+          remark: formData.remark.trim(),
+          functionPermissions: Array.from(
+            new Set([...rolePermissionValues, ...activeEmployee.value.functionPermissions]),
+          ),
+        }),
+      );
+      const targetIndex = employees.value.findIndex((employee) => employee.id === activeEmployee.value?.id);
+      if (targetIndex !== -1) {
+        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
+      }
+      MessagePlugin.success('更新成功');
+    } catch (error) {
+      MessagePlugin.error(error instanceof Error ? error.message : '更新失败');
+      return;
+    }
   }
 
   closeEditDialog();
@@ -906,18 +888,37 @@ const confirmText = computed(() => {
   return `是否删除员工【${name}】？删除后账号数据不可恢复。`;
 });
 
-const handleConfirmSubmit = () => {
+const handleConfirmSubmit = async () => {
   if (!confirmEmployee.value) return;
-  if (confirmType.value === 'delete') {
-    employees.value = employees.value.filter((employee) => employee.id !== confirmEmployee.value?.id);
-    if (pagination.current > pageCount.value) pagination.current = pageCount.value;
-    MessagePlugin.success('删除成功');
-  } else {
-    confirmEmployee.value.status = confirmType.value === 'disable' ? 'disabled' : 'normal';
-    MessagePlugin.success('操作成功');
+
+  try {
+    if (confirmType.value === 'delete') {
+      await deleteEmployee(confirmEmployee.value.id);
+      employees.value = employees.value.filter((employee) => employee.id !== confirmEmployee.value?.id);
+      if (pagination.current > pageCount.value) pagination.current = pageCount.value;
+      MessagePlugin.success('删除成功');
+    } else {
+      const updated = await updateEmployee(
+        confirmEmployee.value.id,
+        toEmployeePayload({
+          ...confirmEmployee.value,
+          status: confirmType.value === 'disable' ? 'disabled' : 'normal',
+        }),
+      );
+      const targetIndex = employees.value.findIndex((employee) => employee.id === confirmEmployee.value?.id);
+      if (targetIndex !== -1) {
+        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
+      }
+      MessagePlugin.success('操作成功');
+    }
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    return;
   }
   closeConfirmDialog();
 };
+
+onMounted(loadPermissionCenter);
 </script>
 
 <style scoped>

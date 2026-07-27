@@ -17,6 +17,9 @@ public class Role {
   @NotBlank
   private String code;
 
+  private String category;
+  private String clientCode;
+
   @NotBlank
   private String dataScope;
 
@@ -24,6 +27,7 @@ public class Role {
   private String status;
 
   private String remark;
+  private String functionPermissions;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -51,6 +55,22 @@ public class Role {
     this.code = code;
   }
 
+  public String getCategory() {
+    return category;
+  }
+
+  public void setCategory(String category) {
+    this.category = category;
+  }
+
+  public String getClientCode() {
+    return clientCode;
+  }
+
+  public void setClientCode(String clientCode) {
+    this.clientCode = clientCode;
+  }
+
   public String getDataScope() {
     return dataScope;
   }
@@ -73,6 +93,14 @@ public class Role {
 
   public void setRemark(String remark) {
     this.remark = remark;
+  }
+
+  public String getFunctionPermissions() {
+    return functionPermissions;
+  }
+
+  public void setFunctionPermissions(String functionPermissions) {
+    this.functionPermissions = functionPermissions;
   }
 
   public LocalDateTime getCreatedAt() {
