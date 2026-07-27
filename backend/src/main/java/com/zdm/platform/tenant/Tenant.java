@@ -25,6 +25,8 @@ public class Tenant {
   @NotBlank
   private String status;
 
+  private String businessTypes;
+  private String remark;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -66,6 +68,22 @@ public class Tenant {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public String getBusinessTypes() {
+    return businessTypes;
+  }
+
+  public void setBusinessTypes(String businessTypes) {
+    this.businessTypes = businessTypes;
+  }
+
+  public String getRemark() {
+    return remark;
+  }
+
+  public void setRemark(String remark) {
+    this.remark = remark;
   }
 
   public LocalDateTime getCreatedAt() {

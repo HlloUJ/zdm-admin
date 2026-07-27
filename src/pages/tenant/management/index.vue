@@ -74,7 +74,7 @@
             </t-button>
           </div>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -222,9 +222,17 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import {
+  createTenant,
+  deleteTenant,
+  listTenants,
+  updateTenant,
+  type TenantPayload,
+  type TenantRecord,
+} from '@/services/tenants';
 
 type BusinessType = 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
 type TenantStatus = 'normal' | 'disabled';
@@ -255,74 +263,8 @@ const businessOptions: { label: string; value: BusinessType }[] = [
 
 const businessLabel = (type: BusinessType) => businessOptions.find((item) => item.value === type)?.label ?? '';
 
-const tenantSeeds: Omit<TenantItem, 'id' | 'createdAt'>[] = [
-  {
-    tenantName: '林嘉禾',
-    phone: '13821560001',
-    businesses: ['cityPartner'],
-    status: 'normal',
-    remark: '华东城市合伙人',
-  },
-  {
-    tenantName: '周明远',
-    phone: '13921560002',
-    businesses: ['slabSupplier'],
-    status: 'normal',
-    remark: '大板资源供应商',
-  },
-  {
-    tenantName: '陈书瑶',
-    phone: '13721560003',
-    businesses: ['finishedSupplier'],
-    status: 'normal',
-    remark: '成品供应商',
-  },
-  { tenantName: '赵承宇', phone: '13621560004', businesses: ['factory'], status: 'disabled', remark: '加工工厂' },
-  {
-    tenantName: '吴清扬',
-    phone: '13521560005',
-    businesses: ['cityPartner', 'finishedSupplier'],
-    status: 'normal',
-    remark: '复合业务租户',
-  },
-  {
-    tenantName: '沈若宁',
-    phone: '13421560006',
-    businesses: ['slabSupplier', 'factory'],
-    status: 'normal',
-    remark: '供应与加工一体',
-  },
-  {
-    tenantName: '许安然',
-    phone: '13321560007',
-    businesses: ['cityPartner', 'slabSupplier'],
-    status: 'disabled',
-    remark: '区域试点租户',
-  },
-  {
-    tenantName: '郑一航',
-    phone: '13221560008',
-    businesses: ['finishedSupplier', 'factory'],
-    status: 'normal',
-    remark: '成品加工协作方',
-  },
-];
-
-const tableData = ref<TenantItem[]>(
-  Array.from({ length: 5 }, (_, index) => {
-    const seed = tenantSeeds[index % tenantSeeds.length];
-    const current = index + 1;
-    const day = ((index % 19) + 1).toString().padStart(2, '0');
-    const hour = (9 + (index % 9)).toString().padStart(2, '0');
-    return {
-      ...seed,
-      id: current,
-      tenantName: `${seed.tenantName}${current.toString().padStart(2, '0')}`,
-      phone: `13${(821560000 + current).toString().slice(0, 9)}`,
-      createdAt: `2026/07/${day} ${hour}:30`,
-    };
-  }),
-);
+const tableData = ref<TenantItem[]>([]);
+const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
@@ -409,6 +351,56 @@ const pageData = computed(() => {
 
 const maskPhone = (phone: string) => phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2');
 
+const parseBusinessTypes = (value?: string): BusinessType[] =>
+  (value?.split(',').filter(Boolean) as BusinessType[] | undefined) ?? [];
+
+const normalizeStatus = (status: TenantRecord['status']): TenantStatus =>
+  status === 'disabled' ? 'disabled' : 'normal';
+
+const toBackendStatus = (status: TenantStatus): TenantPayload['status'] =>
+  status === 'disabled' ? 'disabled' : 'enabled';
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toTenantItem = (record: TenantRecord): TenantItem => ({
+  id: record.id,
+  tenantName: record.name,
+  phone: record.contactPhone,
+  businesses: parseBusinessTypes(record.businessTypes),
+  status: normalizeStatus(record.status),
+  createdAt: formatDateTime(record.createdAt),
+  remark: record.remark ?? '',
+});
+
+const toTenantPayload = (status: TenantStatus, businesses: BusinessType[] = []): TenantPayload => ({
+  name: formData.tenantName.trim(),
+  contactName: formData.tenantName.trim(),
+  contactPhone: formData.phone.trim(),
+  status: toBackendStatus(status),
+  businessTypes: businesses.join(','),
+  remark: formData.remark.trim(),
+});
+
+const loadTenants = async () => {
+  loading.value = true;
+  try {
+    const records = await listTenants();
+    tableData.value = records.map(toTenantItem);
+    ensureCurrentPage();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '租户列表加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const handlePhoneInput = (value: string) => {
   formData.phone = value.replace(/\D/g, '').slice(0, 11);
 };
@@ -484,59 +476,50 @@ const handleSubmit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
 
-  if (dialogMode.value === 'create') {
-    const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;
-    tableData.value.unshift({
-      id: nextId,
-      tenantName: formData.tenantName.trim(),
-      phone: formData.phone.trim(),
-      businesses: [],
-      status: 'normal',
-      createdAt: '2026/07/19 10:00',
-      remark: formData.remark.trim(),
-    });
-    pagination.current = 1;
-  } else if (editingId.value) {
-    const target = tableData.value.find((item) => item.id === editingId.value);
-    if (target) {
-      target.tenantName = formData.tenantName.trim();
-      target.phone = formData.phone.trim();
-      target.remark = formData.remark.trim();
+  try {
+    if (dialogMode.value === 'create') {
+      await createTenant(toTenantPayload('normal'));
+      await loadTenants();
+      pagination.current = 1;
+    } else if (editingId.value) {
+      const current = tableData.value.find((item) => item.id === editingId.value);
+      await updateTenant(editingId.value, toTenantPayload(current?.status ?? 'normal', current?.businesses));
+      await loadTenants();
     }
-  }
 
-  closeFormDialog();
-  MessagePlugin.success('操作成功');
-};
-
-const openBusinessDialog = (row: TenantItem) => {
-  businessEditingId.value = row.id;
-  businessSelection.value = [...row.businesses];
-  businessDialogVisible.value = true;
-};
-
-const closeBusinessDialog = () => {
-  businessDialogVisible.value = false;
-  businessEditingId.value = null;
-  businessSelection.value = [];
-};
-
-const toggleBusiness = (business: BusinessType) => {
-  if (businessSelection.value.includes(business)) {
-    businessSelection.value = businessSelection.value.filter((item) => item !== business);
-  } else {
-    businessSelection.value = [...businessSelection.value, business];
+    closeFormDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
-const handleBusinessSubmit = () => {
+const persistTenantItem = async (item: TenantItem) => {
+  const updated = await updateTenant(item.id, {
+    name: item.tenantName,
+    contactName: item.tenantName,
+    contactPhone: item.phone,
+    status: toBackendStatus(item.status),
+    businessTypes: item.businesses.join(','),
+    remark: item.remark ?? '',
+  });
+  const targetIndex = tableData.value.findIndex((row) => row.id === item.id);
+  if (targetIndex !== -1) {
+    tableData.value.splice(targetIndex, 1, toTenantItem(updated));
+  }
+};
+
+const handleBusinessSubmit = async () => {
   const target = tableData.value.find((item) => item.id === businessEditingId.value);
-  if (target) {
-    target.businesses = [...businessSelection.value];
-  }
+  if (!target) return;
 
-  closeBusinessDialog();
-  MessagePlugin.success('操作成功');
+  try {
+    await persistTenantItem({ ...target, businesses: [...businessSelection.value] });
+    closeBusinessDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
 };
 
 const openStatusConfirm = (row: TenantItem) => {
@@ -559,18 +542,48 @@ const closeConfirmDialog = () => {
   confirmState.row = null;
 };
 
-const handleConfirm = () => {
+const handleConfirm = async () => {
   if (!confirmState.row) return;
 
-  if (confirmState.type === 'delete') {
-    tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
-    ensureCurrentPage();
-  } else {
-    confirmState.row.status = confirmState.type === 'enable' ? 'normal' : 'disabled';
-  }
+  try {
+    if (confirmState.type === 'delete') {
+      await deleteTenant(confirmState.row.id);
+      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      ensureCurrentPage();
+    } else {
+      await persistTenantItem({
+        ...confirmState.row,
+        status: confirmState.type === 'enable' ? 'normal' : 'disabled',
+      });
+    }
 
-  closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+    closeConfirmDialog();
+    MessagePlugin.success('操作成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+  }
+};
+
+onMounted(loadTenants);
+
+const openBusinessDialog = (row: TenantItem) => {
+  businessEditingId.value = row.id;
+  businessSelection.value = [...row.businesses];
+  businessDialogVisible.value = true;
+};
+
+const closeBusinessDialog = () => {
+  businessDialogVisible.value = false;
+  businessEditingId.value = null;
+  businessSelection.value = [];
+};
+
+const toggleBusiness = (business: BusinessType) => {
+  if (businessSelection.value.includes(business)) {
+    businessSelection.value = businessSelection.value.filter((item) => item !== business);
+  } else {
+    businessSelection.value = [...businessSelection.value, business];
+  }
 };
 </script>
 
