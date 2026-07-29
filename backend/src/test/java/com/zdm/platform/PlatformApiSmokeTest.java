@@ -132,13 +132,13 @@ class PlatformApiSmokeTest {
     mockMvc.perform(get("/api/admin/employees")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.phone == '15926629999')][0].inviterName").value("韩健"));
+        .andExpect(jsonPath("$.data[?(@.phone == '15926629999')][0].createdByName").value("韩健"));
 
-    String inviterName = jdbcTemplate.queryForObject(
-        "SELECT inviter_name FROM employees WHERE id = ?",
+    String createdByName = jdbcTemplate.queryForObject(
+        "SELECT created_by_name FROM employees WHERE id = ?",
         String.class,
         Long.valueOf(employeeId));
-    assertThat(inviterName).isEqualTo("韩健");
+    assertThat(createdByName).isEqualTo("韩健");
 
     mockMvc.perform(get("/api/open/employee-invites/{token}", token))
         .andExpect(status().isBadRequest())
