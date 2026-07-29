@@ -8,66 +8,33 @@
       @change="handleMenuChange"
       @expand="handleMenuExpand"
     >
-      <t-menu-item value="/dashboard" class="menu-level-one-item">
-        <template #icon>
-          <t-icon name="dashboard" />
-        </template>
-        工作台
-      </t-menu-item>
-      <t-submenu value="tenant-management" title="租户与门店" class="menu-level-one">
-        <template #icon>
-          <t-icon name="usergroup" />
-        </template>
-        <t-menu-item value="/tenant-management" class="menu-level-two-item">租户管理</t-menu-item>
-        <t-menu-item value="/tenant-store-management" class="menu-level-two-item">门店管理</t-menu-item>
-      </t-submenu>
-      <t-menu-item
-        value="/finished-stock-management"
-        data-menu-path="/finished-stock-management"
-        class="menu-level-one-item"
-      >
-        <template #icon>
-          <t-icon name="shop" />
-        </template>
-        成品现货管理
-      </t-menu-item>
-      <t-menu-item value="/slab-management" class="menu-level-one-item">
-        <template #icon>
-          <t-icon name="image" />
-        </template>
-        大板管理
-      </t-menu-item>
-      <t-menu-item value="/supplier-management" class="menu-level-one-item">
-        <template #icon>
-          <t-icon name="usergroup" />
-        </template>
-        供应商管理
-      </t-menu-item>
-      <t-menu-item value="/store-category-management" class="menu-level-one-item">
-        <template #icon>
-          <t-icon name="folder" />
-        </template>
-        门店分类管理
-      </t-menu-item>
-      <t-submenu value="product-data-center" title="商品基础数据中心" class="menu-level-one">
-        <template #icon>
-          <t-icon name="layers" />
-        </template>
-        <t-menu-item value="/product-category" class="menu-level-two-item">商品分类管理</t-menu-item>
-        <t-menu-item value="/product-attribute" class="menu-level-two-item">属性库管理</t-menu-item>
-        <t-menu-item value="/product-attribute-value" class="menu-level-two-item">属性值管理</t-menu-item>
-        <t-menu-item value="/category-attribute-template" class="menu-level-two-item">类目属性模板</t-menu-item>
-        <t-menu-item value="/slab-variety" class="menu-level-two-item">大板品种管理</t-menu-item>
-        <t-menu-item value="/finished-stock-craft" class="menu-level-two-item">成品现货工艺管理</t-menu-item>
-      </t-submenu>
-      <t-submenu value="permission-management" title="权限管理" class="menu-level-one">
-        <template #icon>
-          <t-icon name="secured" />
-        </template>
-        <t-menu-item value="/employee-management" class="menu-level-two-item">员工管理</t-menu-item>
-        <t-menu-item value="/role-management" class="menu-level-two-item">角色管理</t-menu-item>
-        <t-menu-item value="/terminal-function-allocation" class="menu-level-two-item">终端功能分配</t-menu-item>
-      </t-submenu>
+      <template v-for="entry in visibleMenuEntries" :key="'path' in entry ? entry.path : entry.value">
+        <t-menu-item
+          v-if="'path' in entry"
+          :value="entry.path"
+          :data-menu-path="entry.path"
+          class="menu-level-one-item"
+        >
+          <template #icon>
+            <t-icon :name="entry.icon" />
+          </template>
+          {{ entry.label }}
+        </t-menu-item>
+        <t-submenu v-else :value="entry.value" :title="entry.label" class="menu-level-one">
+          <template #icon>
+            <t-icon :name="entry.icon" />
+          </template>
+          <t-menu-item
+            v-for="child in entry.children"
+            :key="child.path"
+            :value="child.path"
+            :data-menu-path="child.path"
+            class="menu-level-two-item"
+          >
+            {{ child.label }}
+          </t-menu-item>
+        </t-submenu>
+      </template>
     </t-menu>
   </aside>
 </template>
@@ -77,12 +44,26 @@ import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useSideMenuState } from '@/composables/useSideMenuState';
+import { getLoginUser } from '@/services/auth';
+import { adminMenuEntries, hasMenuPermission, type AdminMenuEntry } from '@/services/adminPermissions';
 
 const route = useRoute();
 const router = useRouter();
 const { expandedMenus, handleMenuExpand } = useSideMenuState();
 
 const activeMenu = computed(() => route.path);
+const loginUser = computed(() => getLoginUser());
+const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
+  adminMenuEntries
+    .map((entry) => {
+      if (!('children' in entry)) {
+        return hasMenuPermission(loginUser.value, entry.permissionPrefix) ? entry : null;
+      }
+      const children = entry.children.filter((child) => hasMenuPermission(loginUser.value, child.permissionPrefix));
+      return children.length ? { ...entry, children } : null;
+    })
+    .filter((entry): entry is AdminMenuEntry => Boolean(entry)),
+);
 
 const baseInfoPaths = new Set([
   '/product-category',

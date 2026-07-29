@@ -35,13 +35,12 @@ public class RoleController {
 
   @PutMapping("/{id}")
   public ApiResponse<Role> update(@PathVariable Long id, @Valid @RequestBody Role role) {
-    role.setId(id);
-    roleService.updateById(role);
+    roleService.updateRole(id, role);
     return ApiResponse.ok(roleService.getById(id));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    return ApiResponse.ok(roleService.removeById(id));
+    return ApiResponse.ok(roleService.deleteRole(id));
   }
 }

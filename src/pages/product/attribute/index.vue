@@ -1,15 +1,6 @@
 <template>
   <div class="admin-layout">
-    <header class="top-nav">
-      <div class="brand">
-        <div class="brand-logo">装</div>
-        <div>
-          <div class="brand-title">装点猫</div>
-          <div class="brand-subtitle">管理后台</div>
-        </div>
-      </div>
-      <div class="top-actions"><t-avatar size="small">超</t-avatar><span>超级管理员</span></div>
-    </header>
+    <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
@@ -120,6 +111,7 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
 import {
   createProductAttribute,

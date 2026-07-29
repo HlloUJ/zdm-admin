@@ -1,24 +1,6 @@
 <template>
   <div class="admin-layout">
-    <header class="top-nav">
-      <div class="brand">
-        <div class="brand-logo">装</div>
-        <div>
-          <div class="brand-title">装点猫</div>
-          <div class="brand-subtitle">管理后台</div>
-        </div>
-      </div>
-
-      <div class="top-actions">
-        <t-button shape="square" variant="text" aria-label="消息通知">
-          <t-icon name="notification" />
-        </t-button>
-        <div class="user-entry">
-          <t-avatar size="small">超</t-avatar>
-          <span>超级管理员</span>
-        </div>
-      </div>
-    </header>
+    <AdminTopNav />
 
     <div class="admin-shell">
       <AdminSideMenu />
@@ -118,6 +100,9 @@
               <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
                 {{ row.status === 'normal' ? '正常' : '停用' }}
               </t-tag>
+            </template>
+            <template #createdBy="{ row }">
+              {{ row.createdBy || '-' }}
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
@@ -270,6 +255,7 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import AdminTopNav from '@/components/AdminTopNav.vue';
 import {
   createStore,
   deleteStore,
@@ -303,6 +289,7 @@ interface StoreItem {
   tenantName: string;
   status: StoreStatus;
   createdAt: string;
+  createdBy: string;
   remark?: string;
 }
 
@@ -425,6 +412,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'address', title: '门店地址', minWidth: 260, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', width: 120, align: 'center' },
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
+  { colKey: 'createdBy', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 170, align: 'center' },
   { colKey: 'operation', title: '操作', width: 190, align: 'left', fixed: 'right' },
 ];
@@ -565,6 +553,7 @@ const toStoreItem = (record: StoreRecord): StoreItem => {
     tenantName: tenant?.name ?? `租户#${record.tenantId}`,
     status: normalizeStatus(record.status),
     createdAt: formatDateTime(record.createdAt),
+    createdBy: record.createdBy ?? '',
     remark: record.remark ?? '',
   };
 };
@@ -607,6 +596,7 @@ const toStorePayloadFromItem = (item: StoreItem): StorePayload => {
     address: item.address,
     status: toBackendStatus(item.status),
     remark: item.remark ?? '',
+    createdBy: item.createdBy,
   };
 };
 

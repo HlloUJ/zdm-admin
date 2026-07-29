@@ -24,6 +24,10 @@ export function setAuthToken(token: string) {
   window.localStorage.setItem('zdm-admin-token', token);
 }
 
+export function clearAuthToken() {
+  window.localStorage.removeItem('zdm-admin-token');
+}
+
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');

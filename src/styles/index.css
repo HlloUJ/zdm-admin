@@ -197,6 +197,21 @@ body {
   width: 100%;
 }
 
+.admin-layout .t-table th:not(.t-table__th-row-select),
+.admin-layout .t-table td:not(.t-table__cell-check, [key='row-select']) {
+  text-align: left;
+}
+
+.admin-layout .t-table th:not(.t-table__th-row-select) .t-table__cell--title,
+.admin-layout .t-table th:not(.t-table__th-row-select) .t-table__th-cell-inner {
+  justify-content: flex-start;
+}
+
+.admin-layout .t-table .t-align-center .t-table__cell--sortable,
+.admin-layout .t-table .t-align-center .t-table__cell--filterable {
+  justify-content: flex-start;
+}
+
 .admin-layout .side-nav .menu {
   width: 224px;
   margin: 0 auto;

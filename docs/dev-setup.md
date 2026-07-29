@@ -1,5 +1,7 @@
 # 本地启动与验收指南
 
+本文件是开发环境、启动、验收、备份和回滚的唯一操作手册；其他工程文档只引用本文件，不复制命令。
+
 ## 环境要求
 
 - Node.js 22
@@ -27,27 +29,27 @@ npm run test:e2e:chrome
 
 ## 启动服务
 
-### Docker 方式
+### 推荐方式
 
 ```bash
-docker compose up backend
+npm run dev:all
 ```
 
-该命令会启动 MySQL 和 Spring Boot 后端。
-
-另开一个终端启动前端：
+该命令优先复用已有 MySQL 和后端容器，等待后端端口就绪后在当前终端启动前端。查看服务状态和手机可访问的局域网地址：
 
 ```bash
-npm run dev
+npm run dev:status
 ```
 
-### 本机 Maven 方式
+### 分开启动
 
 ```bash
 docker compose up -d mysql
-npm run backend:dev
+npm run backend:dev:docker
 npm run dev
 ```
+
+本机已安装 JDK 21 和 Maven 时，可将后端命令替换为 `npm run backend:dev`。
 
 ## 访问地址
 
@@ -67,7 +69,7 @@ npm run dev
 
 ```bash
 npm run quality
-npm run build
+npm run build:app
 npm run test:e2e:chrome
 npm run backend:quality:docker
 ```
@@ -84,7 +86,7 @@ CI 完整验收：
 npm run verify
 ```
 
-说明：`backend:quality:docker` 会在 Maven 容器内执行编译、普通单测、Checkstyle、SpotBugs 和 JaCoCo。本机 Maven 容器无法访问 Docker Desktop daemon 时，Testcontainers 集成测试会跳过；GitHub Actions 后端任务在宿主机 Maven 环境运行，会真实执行 Testcontainers 测试。
+说明：`backend:quality:docker` 会在 Maven 容器内执行测试、Checkstyle、SpotBugs 和 JaCoCo。本机 Maven 容器无法访问 Docker Desktop daemon 时，Testcontainers 集成测试会跳过；GitHub Actions 后端任务不限制测试类，会在宿主机 Maven 环境执行完整测试。
 
 ## 数据库位置
 

@@ -23,13 +23,13 @@ public class StoreController {
 
   @GetMapping
   public ApiResponse<List<Store>> list() {
-    return ApiResponse.ok(storeService.list());
+    return ApiResponse.ok(storeService.listForCurrentAdmin());
   }
 
   @PostMapping
   public ApiResponse<Store> create(@Valid @RequestBody Store store) {
     store.setId(null);
-    storeService.save(store);
+    storeService.createStore(store);
     return ApiResponse.ok(store);
   }
 

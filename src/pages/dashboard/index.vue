@@ -1,23 +1,6 @@
 <template>
   <div class="admin-layout">
-    <header class="top-nav">
-      <div class="brand">
-        <div class="brand-logo">装</div>
-        <div>
-          <div class="brand-title">装点猫</div>
-          <div class="brand-subtitle">管理后台</div>
-        </div>
-      </div>
-      <div class="top-actions">
-        <t-button shape="square" variant="text" aria-label="消息通知">
-          <t-icon name="notification" />
-        </t-button>
-        <div class="user-entry">
-          <t-avatar size="small">超</t-avatar>
-          <span>超级管理员</span>
-        </div>
-      </div>
-    </header>
+    <AdminTopNav />
 
     <div class="admin-shell">
       <AdminSideMenu />
@@ -61,6 +44,7 @@
 import type { PrimaryTableCol } from 'tdesign-vue-next';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import AdminTopNav from '@/components/AdminTopNav.vue';
 
 const metrics = [
   { label: '租户总数', value: '128', trend: '直营、合伙人、供应商统一管理' },

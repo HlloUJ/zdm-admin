@@ -1,24 +1,6 @@
 <template>
   <div class="admin-layout">
-    <header class="top-nav">
-      <div class="brand">
-        <div class="brand-logo">装</div>
-        <div>
-          <div class="brand-title">装点猫</div>
-          <div class="brand-subtitle">管理后台</div>
-        </div>
-      </div>
-
-      <div class="top-actions">
-        <t-button shape="square" variant="text" aria-label="消息通知">
-          <t-icon name="notification" />
-        </t-button>
-        <div class="user-entry">
-          <t-avatar size="small">超</t-avatar>
-          <span>超级管理员</span>
-        </div>
-      </div>
-    </header>
+    <AdminTopNav />
 
     <div class="admin-shell">
       <AdminSideMenu />
@@ -81,8 +63,8 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
-            <t-button theme="primary" @click="openInviteDialog">
+          <div v-if="canCreateEmployee" class="table-toolbar">
+            <t-button theme="primary" :loading="inviteCreating" @click="openInviteDialog">
               <template #icon><t-icon name="add" /></template>
               邀请员工
             </t-button>
@@ -103,17 +85,50 @@
                 {{ row.status === 'normal' ? '正常' : '停用' }}
               </t-tag>
             </template>
+            <template #remark="{ row }">
+              <t-tooltip :content="row.remark" :disabled="!row.remark" placement="top-left">
+                <span class="remark-cell">{{ row.remark || '-' }}</span>
+              </t-tooltip>
+            </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canEditEmployee" theme="primary" hover="color" @click="openProfileDialog(row)">
+                  编辑资料
+                </t-link>
                 <t-link
+                  v-if="canEditEmployee && !isSuperAdminEmployee(row)"
+                  theme="primary"
+                  hover="color"
+                  @click="openPermissionDialog(row)"
+                >
+                  配置权限
+                </t-link>
+                <t-link
+                  v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row)"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link
+                  v-if="canDeleteEmployee && !isSuperAdminEmployee(row)"
+                  theme="danger"
+                  hover="color"
+                  @click="openDeleteConfirm(row)"
+                >
+                  删除
+                </t-link>
+                <span
+                  v-if="
+                    !canEditEmployee &&
+                    !(canToggleEmployeeStatus && !isSuperAdminEmployee(row)) &&
+                    !(canDeleteEmployee && !isSuperAdminEmployee(row))
+                  "
+                  class="table-action-placeholder"
+                >
+                  -
+                </span>
               </div>
             </template>
           </t-table>
@@ -177,29 +192,29 @@
     </t-dialog>
 
     <t-dialog
-      v-model:visible="editDialogVisible"
-      header="编辑员工"
+      v-model:visible="profileDialogVisible"
+      header="编辑资料"
       width="560px"
       placement="center"
       confirm-btn="提交"
       cancel-btn="取消"
-      @confirm="handleEmployeeSubmit"
-      @cancel="closeEditDialog"
-      @close="closeEditDialog"
+      @confirm="handleProfileSubmit"
+      @cancel="closeProfileDialog"
+      @close="closeProfileDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form ref="profileFormRef" :data="profileFormData" :rules="profileFormRules" label-width="96px" colon>
         <t-form-item label="姓名" name="name" required-mark>
-          <t-input v-model="formData.name" clearable placeholder="请输入" />
+          <t-input v-model="profileFormData.name" clearable placeholder="请输入" />
         </t-form-item>
         <t-form-item label="性别" name="gender" required-mark>
-          <t-select v-model="formData.gender" clearable placeholder="请选择">
+          <t-select v-model="profileFormData.gender" clearable placeholder="请选择">
             <t-option label="男" value="male" />
             <t-option label="女" value="female" />
           </t-select>
         </t-form-item>
         <t-form-item label="手机号码" name="phone" required-mark>
           <t-input
-            :model-value="formData.phone"
+            :model-value="profileFormData.phone"
             class="phone-disabled-input"
             disabled
             readonly
@@ -207,24 +222,39 @@
             placeholder="请输入手机号"
           />
         </t-form-item>
-        <t-form-item label="角色" name="roleIds" required-mark>
-          <t-select v-model="formData.roleIds" multiple clearable placeholder="请选择运营管理平台角色">
-            <t-option v-for="role in operationRoleOptions" :key="role.value" :label="role.label" :value="role.value" />
-          </t-select>
-        </t-form-item>
-        <t-form-item label="数据权限" name="dataPermission" required-mark>
-          <t-radio-group v-model="formData.dataPermission">
-            <t-radio value="self">查看自己</t-radio>
-            <t-radio value="all">查看全部</t-radio>
-          </t-radio-group>
-        </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
-            v-model="formData.remark"
+            v-model="profileFormData.remark"
             placeholder="请输入"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
+        </t-form-item>
+      </t-form>
+    </t-dialog>
+
+    <t-dialog
+      v-model:visible="permissionDialogVisible"
+      header="配置权限"
+      width="560px"
+      placement="center"
+      confirm-btn="提交"
+      cancel-btn="取消"
+      @confirm="handlePermissionSubmit"
+      @cancel="closePermissionDialog"
+      @close="closePermissionDialog"
+    >
+      <t-form ref="permissionFormRef" :data="permissionFormData" :rules="permissionFormRules" label-width="96px" colon>
+        <t-form-item label="角色" name="roleIds" required-mark>
+          <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择运营管理平台角色">
+            <t-option v-for="role in operationRoleOptions" :key="role.value" :label="role.label" :value="role.value" />
+          </t-select>
+        </t-form-item>
+        <t-form-item label="数据权限" name="dataPermission" required-mark>
+          <t-radio-group v-model="permissionFormData.dataPermission">
+            <t-radio value="self">查看自己</t-radio>
+            <t-radio value="all">查看全部</t-radio>
+          </t-radio-group>
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -251,6 +281,9 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import AdminTopNav from '@/components/AdminTopNav.vue';
+import { getLoginUser } from '@/services/auth';
+import { hasPermission } from '@/services/adminPermissions';
 import {
   deleteEmployee,
   listEmployees,
@@ -258,6 +291,7 @@ import {
   type EmployeePayload,
   type EmployeeRecord,
 } from '@/services/employees';
+import { createEmployeeInvite } from '@/services/employeeInvites';
 import { listRoles, type RoleRecord } from '@/services/roles';
 
 type EmployeeStatus = 'normal' | 'disabled';
@@ -273,17 +307,22 @@ interface EmployeeItem {
   roleIds: string[];
   status: EmployeeStatus;
   remark: string;
+  inviterName: string;
+  registeredAt: string;
   functionPermissions: string[];
-  dataPermission: DataPermission;
+  dataPermission: '' | DataPermission;
 }
 
-interface EmployeeForm {
+interface EmployeeProfileForm {
   name: string;
   gender: Gender;
   phone: string;
+  remark: string;
+}
+
+interface EmployeePermissionForm {
   roleIds: string[];
   dataPermission: '' | DataPermission;
-  remark: string;
 }
 
 interface EmployeeFilter {
@@ -311,6 +350,19 @@ interface PermissionModule {
 }
 
 const operationRoles = ref<RoleRecord[]>([]);
+const loginUser = computed(() => getLoginUser());
+const canCreateEmployee = computed(() =>
+  hasPermission(loginUser.value, 'admin.permission-management.employee-management.create'),
+);
+const canEditEmployee = computed(() =>
+  hasPermission(loginUser.value, 'admin.permission-management.employee-management.edit'),
+);
+const canToggleEmployeeStatus = computed(() =>
+  hasPermission(loginUser.value, 'admin.permission-management.employee-management.toggle-status'),
+);
+const canDeleteEmployee = computed(() =>
+  hasPermission(loginUser.value, 'admin.permission-management.employee-management.delete'),
+);
 const operationRoleOptions = computed(() =>
   operationRoles.value.map((role) => ({
     label: role.name,
@@ -604,14 +656,16 @@ const pagination = reactive({
 const pageSizeOptions = [10, 20, 50];
 
 const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'index', title: '序号', width: '7%', align: 'left' },
-  { colKey: 'name', title: '姓名', width: '11%', align: 'left' },
-  { colKey: 'gender', title: '性别', width: '8%', align: 'left' },
-  { colKey: 'phone', title: '手机号码', width: '15%', align: 'left' },
-  { colKey: 'roles', title: '角色', width: '17%', align: 'left' },
-  { colKey: 'status', title: '状态', width: '9%', align: 'left' },
-  { colKey: 'remark', title: '备注', width: '18%', ellipsis: true, align: 'left' },
-  { colKey: 'operation', title: '操作', width: '15%', align: 'left' },
+  { colKey: 'index', title: '序号', width: 72, align: 'left' },
+  { colKey: 'name', title: '姓名', width: 112, align: 'left' },
+  { colKey: 'gender', title: '性别', width: 80, align: 'left' },
+  { colKey: 'phone', title: '手机号码', width: 140, align: 'left' },
+  { colKey: 'roles', title: '角色', width: 160, align: 'left' },
+  { colKey: 'status', title: '状态', width: 88, align: 'left' },
+  { colKey: 'inviterName', title: '邀请人', width: 112, align: 'left' },
+  { colKey: 'registeredAt', title: '注册时间', width: 160, align: 'left' },
+  { colKey: 'remark', title: '备注', width: 150, align: 'left' },
+  { colKey: 'operation', title: '操作', width: 200, align: 'left', fixed: 'right' },
 ];
 
 const filteredEmployees = computed(() => {
@@ -642,30 +696,44 @@ watch(pageCount, (count) => {
   if (pagination.current > count) pagination.current = count;
 });
 
-const formRef = ref<FormInstanceFunctions>();
+const profileFormRef = ref<FormInstanceFunctions>();
+const permissionFormRef = ref<FormInstanceFunctions>();
 const inviteDialogVisible = ref(false);
+const inviteCreating = ref(false);
 const inviteLink = ref('');
-const editDialogVisible = ref(false);
+const profileDialogVisible = ref(false);
+const permissionDialogVisible = ref(false);
 const activeEmployee = ref<EmployeeItem | null>(null);
-const formData = reactive<EmployeeForm>({
+const profileFormData = reactive<EmployeeProfileForm>({
   name: '',
   gender: '',
   phone: '',
-  roleIds: [],
-  dataPermission: '',
   remark: '',
 });
+const permissionFormData = reactive<EmployeePermissionForm>({
+  roleIds: [],
+  dataPermission: '',
+});
 
-const formRules: Record<string, FormRule[]> = {
+const validateRemarkLength: FormRule['validator'] = (value) => {
+  const remark = typeof value === 'string' ? value : String(value ?? '');
+  if (remark.length <= 100) return true;
+  return { result: false, message: '备注最多输入100个字符', type: 'error' };
+};
+
+const profileFormRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入姓名', type: 'error' }],
   gender: [{ required: true, message: '请选择性别', type: 'error' }],
   phone: [
     { required: true, message: '请输入手机号', type: 'error' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', type: 'error' },
   ],
+  remark: [{ validator: validateRemarkLength }],
+};
+
+const permissionFormRules: Record<string, FormRule[]> = {
   roleIds: [{ required: true, message: '请选择角色', type: 'error' }],
   dataPermission: [{ required: true, message: '请选择数据权限', type: 'error' }],
-  remark: [{ max: 100, message: '备注最多输入100个字符', type: 'error' }],
 };
 
 const confirmDialogVisible = ref(false);
@@ -684,6 +752,11 @@ const roleNames = (roleIds: string[]) =>
     .filter(Boolean)
     .join('、') || '-';
 
+const isSuperAdminEmployee = (employee: EmployeeItem) =>
+  employee.roleIds.some(
+    (roleId) => operationRoles.value.find((role) => String(role.id) === roleId)?.code === 'SUPER_ADMIN',
+  );
+
 const normalizeStatus = (status: EmployeeRecord['status']): EmployeeStatus =>
   status === 'disabled' ? 'disabled' : 'normal';
 
@@ -691,6 +764,21 @@ const toBackendStatus = (status: EmployeeStatus): EmployeePayload['status'] =>
   status === 'disabled' ? 'disabled' : 'enabled';
 
 const parseRoleIds = (value?: string) => value?.split(',').filter(Boolean) ?? [];
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const resolveInviterName = (record: EmployeeRecord) => {
+  const candidates = [record.inviterName, record.invitedByName, record.createdByName, record.inviter, record.createdBy];
+  const inviter = candidates.map((value) => String(value ?? '').trim()).find(Boolean);
+  return inviter ?? '-';
+};
 
 const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
   const roleIds = parseRoleIds(record.roleIds);
@@ -702,8 +790,10 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
     roleIds,
     status: normalizeStatus(record.status),
     remark: record.remark ?? '',
+    inviterName: resolveInviterName(record),
+    registeredAt: formatDateTime(record.createdAt),
     functionPermissions: expandRolePermissions(roleIds),
-    dataPermission: record.dataPermission ?? 'self',
+    dataPermission: record.dataPermission ?? '',
   };
 };
 
@@ -713,7 +803,7 @@ const toEmployeePayload = (employee: EmployeeItem): EmployeePayload => ({
   phone: employee.phone,
   status: toBackendStatus(employee.status),
   roleIds: employee.roleIds.join(','),
-  dataPermission: employee.dataPermission,
+  dataPermission: employee.dataPermission || undefined,
   remark: employee.remark,
 });
 
@@ -739,15 +829,23 @@ const handleFilterPhoneChange = (value: unknown) => {
   filterDraft.phone = normalizePhone(value);
 };
 
-const generateInviteLink = () => {
-  const origin = window.location.origin;
-  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+const generateInviteLink = (token: string) => {
+  const origin = import.meta.env.VITE_PUBLIC_APP_ORIGIN || window.location.origin;
   return `${origin}/employee-invite?token=${token}`;
 };
 
-const openInviteDialog = () => {
-  inviteLink.value = generateInviteLink();
-  inviteDialogVisible.value = true;
+const openInviteDialog = async () => {
+  if (inviteCreating.value) return;
+  inviteCreating.value = true;
+  try {
+    const invite = await createEmployeeInvite();
+    inviteLink.value = generateInviteLink(invite.token);
+    inviteDialogVisible.value = true;
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '邀请链接生成失败');
+  } finally {
+    inviteCreating.value = false;
+  }
 };
 
 const closeInviteDialog = () => {
@@ -777,33 +875,38 @@ const copyInviteLink = async () => {
   MessagePlugin.success({ content: '复制成功', duration: 3000 });
 };
 
-const openEditDialog = (row: EmployeeItem) => {
+const openProfileDialog = (row: EmployeeItem) => {
   activeEmployee.value = row;
-  formData.name = row.name;
-  formData.gender = row.gender;
-  formData.phone = row.phone;
-  formData.roleIds = [...row.roleIds];
-  formData.dataPermission = row.dataPermission;
-  formData.remark = row.remark;
-  editDialogVisible.value = true;
+  profileFormData.name = row.name;
+  profileFormData.gender = row.gender;
+  profileFormData.phone = row.phone;
+  profileFormData.remark = row.remark;
+  profileDialogVisible.value = true;
 };
 
-const closeEditDialog = () => {
-  editDialogVisible.value = false;
-  formRef.value?.clearValidate();
+const closeProfileDialog = () => {
+  profileDialogVisible.value = false;
+  profileFormRef.value?.clearValidate();
 };
 
-const handleEmployeeSubmit = async () => {
-  if ((await formRef.value?.validate()) !== true) return;
-  if (!formData.roleIds.length) {
-    MessagePlugin.warning('请选择角色');
+const openPermissionDialog = (row: EmployeeItem) => {
+  if (isSuperAdminEmployee(row)) {
+    MessagePlugin.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
-  if (!formData.dataPermission) {
-    MessagePlugin.warning('请选择数据权限');
-    return;
-  }
-  const rolePermissionValues = expandRolePermissions(formData.roleIds);
+  activeEmployee.value = row;
+  permissionFormData.roleIds = [...row.roleIds];
+  permissionFormData.dataPermission = row.dataPermission;
+  permissionDialogVisible.value = true;
+};
+
+const closePermissionDialog = () => {
+  permissionDialogVisible.value = false;
+  permissionFormRef.value?.clearValidate();
+};
+
+const handleProfileSubmit = async () => {
+  if ((await profileFormRef.value?.validate()) !== true) return;
 
   if (activeEmployee.value) {
     try {
@@ -811,12 +914,46 @@ const handleEmployeeSubmit = async () => {
         activeEmployee.value.id,
         toEmployeePayload({
           ...activeEmployee.value,
-          name: formData.name.trim(),
-          gender: formData.gender as Exclude<Gender, ''>,
-          phone: formData.phone.trim(),
-          roleIds: [...formData.roleIds],
-          dataPermission: formData.dataPermission,
-          remark: formData.remark.trim(),
+          name: profileFormData.name.trim(),
+          gender: profileFormData.gender as Exclude<Gender, ''>,
+          phone: profileFormData.phone.trim(),
+          remark: profileFormData.remark.trim(),
+        }),
+      );
+      const targetIndex = employees.value.findIndex((employee) => employee.id === activeEmployee.value?.id);
+      if (targetIndex !== -1) {
+        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
+      }
+      MessagePlugin.success('资料更新成功');
+    } catch (error) {
+      MessagePlugin.error(error instanceof Error ? error.message : '更新失败');
+      return;
+    }
+  }
+
+  closeProfileDialog();
+};
+
+const handlePermissionSubmit = async () => {
+  if ((await permissionFormRef.value?.validate()) !== true) return;
+  if (!permissionFormData.roleIds.length) {
+    MessagePlugin.warning('请选择角色');
+    return;
+  }
+  if (!permissionFormData.dataPermission) {
+    MessagePlugin.warning('请选择数据权限');
+    return;
+  }
+  const rolePermissionValues = expandRolePermissions(permissionFormData.roleIds);
+
+  if (activeEmployee.value) {
+    try {
+      const updated = await updateEmployee(
+        activeEmployee.value.id,
+        toEmployeePayload({
+          ...activeEmployee.value,
+          roleIds: [...permissionFormData.roleIds],
+          dataPermission: permissionFormData.dataPermission,
           functionPermissions: Array.from(
             new Set([...rolePermissionValues, ...activeEmployee.value.functionPermissions]),
           ),
@@ -826,14 +963,14 @@ const handleEmployeeSubmit = async () => {
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
       }
-      MessagePlugin.success('更新成功');
+      MessagePlugin.success('权限配置成功');
     } catch (error) {
       MessagePlugin.error(error instanceof Error ? error.message : '更新失败');
       return;
     }
   }
 
-  closeEditDialog();
+  closePermissionDialog();
 };
 
 const handleSearch = () => {
@@ -864,13 +1001,42 @@ const goNextPage = () => {
   pagination.current = Math.min(pagination.current + 1, pageCount.value);
 };
 
+const validateEmployeeBeforeEnable = (row: EmployeeItem) => {
+  const missingRole = row.roleIds.length === 0;
+  const missingDataPermission = !row.dataPermission;
+  if (missingRole && missingDataPermission) {
+    MessagePlugin.warning('请先为员工配置角色和数据权限后再启用');
+    return false;
+  }
+  if (missingRole) {
+    MessagePlugin.warning('请先为员工配置角色后再启用');
+    return false;
+  }
+  if (missingDataPermission) {
+    MessagePlugin.warning('请先为员工配置数据权限后再启用');
+    return false;
+  }
+  return true;
+};
+
 const openStatusConfirm = (row: EmployeeItem) => {
+  if (isSuperAdminEmployee(row)) {
+    MessagePlugin.warning('超级管理员不可停用或启用');
+    return;
+  }
+  const nextType = row.status === 'normal' ? 'disable' : 'enable';
+  if (nextType === 'enable' && !validateEmployeeBeforeEnable(row)) return;
+
   confirmEmployee.value = row;
-  confirmType.value = row.status === 'normal' ? 'disable' : 'enable';
+  confirmType.value = nextType;
   confirmDialogVisible.value = true;
 };
 
 const openDeleteConfirm = (row: EmployeeItem) => {
+  if (isSuperAdminEmployee(row)) {
+    MessagePlugin.warning('超级管理员不可删除');
+    return;
+  }
   confirmEmployee.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;
@@ -988,6 +1154,18 @@ onMounted(loadPermissionCenter);
   display: flex;
   align-items: center;
   gap: var(--td-comp-margin-s);
+  white-space: nowrap;
+}
+
+.table-action-placeholder {
+  color: var(--td-text-color-placeholder);
+}
+
+.remark-cell {
+  display: block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

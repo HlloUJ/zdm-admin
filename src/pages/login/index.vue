@@ -59,6 +59,7 @@ import { onBeforeUnmount, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { login } from '@/services/auth';
+import { getFirstAccessiblePath } from '@/services/adminPermissions';
 
 const router = useRouter();
 const countDown = ref(0);
@@ -124,11 +125,11 @@ const onSubmit = async (ctx: SubmitContext) => {
 
   submitting.value = true;
   try {
-    await login({
+    const result = await login({
       phone: formData.phone,
       verifyCode: formData.verifyCode,
     });
-    await router.push('/dashboard');
+    await router.push(getFirstAccessiblePath(result.user) || '/dashboard');
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '登录失败，请稍后重试');
   } finally {

@@ -1,5 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
+import { getLoginUser } from '@/services/auth';
+import { getAuthToken } from '@/services/http';
+import { getFirstAccessiblePath, hasMenuPermission, routePermissionPrefixMap } from '@/services/adminPermissions';
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -11,6 +15,11 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/pages/login/index.vue'),
+    },
+    {
+      path: '/employee-invite',
+      name: 'employeeInvite',
+      component: () => import('@/pages/employee-invite/index.vue'),
     },
     {
       path: '/dashboard',
@@ -103,6 +112,27 @@ const router = createRouter({
     { path: '/finished-stock-attribute', redirect: '/product-attribute' },
     { path: '/accessory-attribute', redirect: '/product-attribute-value' },
   ],
+});
+
+const publicPaths = new Set(['/login', '/employee-invite']);
+
+router.beforeEach((to) => {
+  if (publicPaths.has(to.path)) return true;
+
+  const token = getAuthToken();
+  if (!token) {
+    return { path: '/login' };
+  }
+
+  const loginUser = getLoginUser();
+  const permissionPrefix = routePermissionPrefixMap[to.path];
+  if (!hasMenuPermission(loginUser, permissionPrefix)) {
+    const nextPath = getFirstAccessiblePath(loginUser);
+    if (!nextPath && to.path !== '/dashboard') return { path: '/dashboard' };
+    if (nextPath && nextPath !== to.path) return { path: nextPath };
+  }
+
+  return true;
 });
 
 export default router;

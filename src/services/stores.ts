@@ -13,6 +13,7 @@ export interface StoreRecord {
   status: 'enabled' | 'disabled';
   remark?: string;
   createdAt?: string;
+  createdBy?: string;
   updatedAt?: string;
 }
 
@@ -27,6 +28,7 @@ export interface StorePayload {
   address?: string;
   status: 'enabled' | 'disabled';
   remark?: string;
+  createdBy?: string;
 }
 
 export function listStores() {

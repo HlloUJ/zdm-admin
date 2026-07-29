@@ -5,6 +5,10 @@ public class AuthAccount {
   private String phone;
   private String displayName;
   private String status;
+  private Long employeeId;
+  private Long tenantId;
+  private Long storeId;
+  private String dataPermission;
 
   public Long getId() {
     return id;
@@ -36,5 +40,37 @@ public class AuthAccount {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public Long getEmployeeId() {
+    return employeeId;
+  }
+
+  public void setEmployeeId(Long employeeId) {
+    this.employeeId = employeeId;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long tenantId) {
+    this.tenantId = tenantId;
+  }
+
+  public Long getStoreId() {
+    return storeId;
+  }
+
+  public void setStoreId(Long storeId) {
+    this.storeId = storeId;
+  }
+
+  public String getDataPermission() {
+    return dataPermission;
+  }
+
+  public void setDataPermission(String dataPermission) {
+    this.dataPermission = dataPermission;
   }
 }

@@ -23,25 +23,22 @@ public class EmployeeController {
 
   @GetMapping
   public ApiResponse<List<Employee>> list() {
-    return ApiResponse.ok(employeeService.list());
+    return ApiResponse.ok(employeeService.listForCurrentAdmin());
   }
 
   @PostMapping
   public ApiResponse<Employee> create(@Valid @RequestBody Employee employee) {
     employee.setId(null);
-    employeeService.save(employee);
-    return ApiResponse.ok(employee);
+    return ApiResponse.ok(employeeService.createEmployee(employee));
   }
 
   @PutMapping("/{id}")
   public ApiResponse<Employee> update(@PathVariable Long id, @Valid @RequestBody Employee employee) {
-    employee.setId(id);
-    employeeService.updateById(employee);
-    return ApiResponse.ok(employeeService.getById(id));
+    return ApiResponse.ok(employeeService.updateEmployee(id, employee));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    return ApiResponse.ok(employeeService.removeById(id));
+    return ApiResponse.ok(employeeService.deleteEmployee(id));
   }
 }

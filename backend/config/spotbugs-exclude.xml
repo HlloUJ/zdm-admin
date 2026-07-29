@@ -4,4 +4,8 @@
     <Class name="~com\.zdm\.platform\..*Controller"/>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
+  <Match>
+    <Class name="~com\.zdm\.platform\..*Service"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
 </FindBugsFilter>

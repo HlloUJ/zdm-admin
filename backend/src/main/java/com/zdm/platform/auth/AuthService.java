@@ -1,8 +1,10 @@
 package com.zdm.platform.auth;
 
 import com.zdm.platform.security.TokenAuthenticationFilter;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 public class AuthService {
@@ -26,13 +28,31 @@ public class AuthService {
       throw new IllegalArgumentException("账号未开通管理后台权限");
     }
 
-    List<String> permissions = authAccountMapper.findAdminPermissionCodes(account.getId());
+    List<String> permissions = expandPermissionValues(authAccountMapper.findAdminPermissionValues(account.getId()));
+    List<String> roleNames = authAccountMapper.findAdminRoleNames(account.getId());
     var user = new LoginResponse.LoginUser(
         account.getId(),
         account.getDisplayName(),
         account.getPhone(),
         roles,
-        permissions);
-    return new LoginResponse(TokenAuthenticationFilter.DEV_TOKEN, user);
+        roleNames,
+        permissions,
+        account.getEmployeeId(),
+        account.getTenantId(),
+        account.getStoreId(),
+        account.getDataPermission());
+    return new LoginResponse(TokenAuthenticationFilter.createAccountToken(account.getId()), user);
+  }
+
+  private List<String> expandPermissionValues(List<String> permissionValues) {
+    if (permissionValues.contains("all")) {
+      return List.of("all");
+    }
+    return permissionValues.stream()
+        .flatMap(value -> Arrays.stream(value.split(",")))
+        .map(String::trim)
+        .filter(StringUtils::hasText)
+        .distinct()
+        .toList();
   }
 }

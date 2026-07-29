@@ -12,6 +12,7 @@ public class Employee {
   @TableId(type = IdType.AUTO)
   private Long id;
 
+  private Long accountId;
   private Long tenantId;
   private Long storeId;
 
@@ -30,6 +31,7 @@ public class Employee {
   private String roleIds;
   private String dataPermission;
   private String remark;
+  private String createdByName;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -39,6 +41,14 @@ public class Employee {
 
   public void setId(Long id) {
     this.id = id;
+  }
+
+  public Long getAccountId() {
+    return accountId;
+  }
+
+  public void setAccountId(Long accountId) {
+    this.accountId = accountId;
   }
 
   public Long getTenantId() {
@@ -111,6 +121,14 @@ public class Employee {
 
   public void setRemark(String remark) {
     this.remark = remark;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 
   public LocalDateTime getCreatedAt() {

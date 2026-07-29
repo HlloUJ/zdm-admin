@@ -54,7 +54,7 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM accounts WHERE phone = '15926626945' AND status = 'enabled'",
         Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(14);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(18);
     assertThat(superAdminCount).isEqualTo(1);
   }
 
@@ -76,7 +76,7 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
-        .andExpect(jsonPath("$.data.token").value(TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(jsonPath("$.data.token").value(TokenAuthenticationFilter.createAccountToken(1L)))
         .andExpect(jsonPath("$.data.user.phone").value("15926626945"));
 
     mockMvc.perform(get("/api/admin/tenants")
@@ -84,6 +84,120 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
         .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(1)));
+  }
+
+  @Test
+  void employeeInviteRegistrationRequiresAdminActivation() throws Exception {
+    MvcResult inviteResult = mockMvc.perform(post("/api/admin/employee-invites")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.data.token").isString())
+        .andReturn();
+
+    String token = com.jayway.jsonpath.JsonPath.read(
+        inviteResult.getResponse().getContentAsString(),
+        "$.data.token");
+
+    mockMvc.perform(post("/api/open/employee-invites/{token}/verify-code", token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "phone": "15926629999",
+                  "verifyCode": "123456"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("验证码错误"));
+
+    MvcResult registerResult = mockMvc.perform(post("/api/open/employee-invites/{token}/register", token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "phone": "15926629999",
+                  "verifyCode": "888888",
+                  "name": "待审核员工",
+                  "gender": "male"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"))
+        .andReturn();
+
+    String employeeId = com.jayway.jsonpath.JsonPath.read(
+        registerResult.getResponse().getContentAsString(),
+        "$.data.employeeId")
+        .toString();
+
+    mockMvc.perform(get("/api/admin/employees")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.phone == '15926629999')][0].inviterName").value("韩健"));
+
+    String inviterName = jdbcTemplate.queryForObject(
+        "SELECT inviter_name FROM employees WHERE id = ?",
+        String.class,
+        Long.valueOf(employeeId));
+    assertThat(inviterName).isEqualTo("韩健");
+
+    mockMvc.perform(get("/api/open/employee-invites/{token}", token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("邀请链接已使用"));
+
+    mockMvc.perform(post("/api/admin/auth/login")
+            .contentType("application/json")
+            .content("""
+                {
+                  "phone": "15926629999",
+                  "verifyCode": "888888"
+                }
+                """))
+        .andExpect(status().isBadRequest());
+
+    mockMvc.perform(put("/api/admin/employees/{id}", employeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "待审核员工",
+                  "gender": "male",
+                  "phone": "15926629999",
+                  "status": "enabled",
+                  "roleIds": "",
+                  "dataPermission": "",
+                  "remark": ""
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先为员工配置角色后再启用"));
+
+    mockMvc.perform(put("/api/admin/employees/{id}", employeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "待审核员工",
+                  "gender": "male",
+                  "phone": "15926629999",
+                  "status": "enabled",
+                  "roleIds": "1",
+                  "dataPermission": "all",
+                  "remark": ""
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("enabled"));
+
+    mockMvc.perform(post("/api/admin/auth/login")
+            .contentType("application/json")
+            .content("""
+                {
+                  "phone": "15926629999",
+                  "verifyCode": "888888"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.user.phone").value("15926629999"));
   }
 
   @Test

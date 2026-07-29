@@ -1,24 +1,6 @@
 <template>
   <div class="admin-layout">
-    <header class="top-nav">
-      <div class="brand">
-        <div class="brand-logo">装</div>
-        <div>
-          <div class="brand-title">装点猫</div>
-          <div class="brand-subtitle">管理后台</div>
-        </div>
-      </div>
-
-      <div class="top-actions">
-        <t-button shape="square" variant="text" aria-label="消息通知">
-          <t-icon name="notification" />
-        </t-button>
-        <div class="user-entry">
-          <t-avatar size="small">超</t-avatar>
-          <span>超级管理员</span>
-        </div>
-      </div>
-    </header>
+    <AdminTopNav />
 
     <div class="admin-shell">
       <AdminSideMenu />
@@ -36,7 +18,7 @@
         <section class="table-card">
           <t-tabs v-model="activeCategory" class="role-tabs" :list="roleTabs" @change="handleTabChange" />
 
-          <div class="table-toolbar">
+          <div v-if="canCreateRole" class="table-toolbar">
             <t-button theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
@@ -57,11 +39,33 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="isOperationPlatformTab" theme="primary" hover="color" @click="openPermissionDialog(row)">
+                <t-link
+                  v-if="isOperationPlatformTab && canManageRolePermission && !isSuperAdminRole(row)"
+                  theme="primary"
+                  hover="color"
+                  @click="openPermissionDialog(row)"
+                >
                   权限管理
                 </t-link>
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link
+                  v-if="canDeleteRole && !isSuperAdminRole(row)"
+                  theme="danger"
+                  hover="color"
+                  @click="openDeleteConfirm(row)"
+                >
+                  删除
+                </t-link>
+                <span
+                  v-if="
+                    !canEditRole &&
+                    !(canDeleteRole && !isSuperAdminRole(row)) &&
+                    !(isOperationPlatformTab && canManageRolePermission && !isSuperAdminRole(row))
+                  "
+                  class="table-action-placeholder"
+                >
+                  -
+                </span>
               </div>
             </template>
           </t-table>
@@ -251,6 +255,9 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import AdminTopNav from '@/components/AdminTopNav.vue';
+import { getLoginUser } from '@/services/auth';
+import { hasAnyPermission } from '@/services/adminPermissions';
 import { createRole, deleteRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
 
 type RoleCategory = 'partner-store' | 'supplier-store' | 'operation-platform';
@@ -316,10 +323,53 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'operation', title: '操作', width: '24%', align: 'left' },
 ];
 
+const actionValueMap: Record<string, string> = {
+  查询: 'query',
+  重置: 'reset',
+  新增: 'create',
+  新建: 'create',
+  业务开通: 'business-open',
+  编辑: 'edit',
+  停用: 'disable',
+  启用: 'enable',
+  '停用/启用': 'toggle-status',
+  删除: 'delete',
+  快速编辑店铺级别: 'quick-edit-shop-level',
+  添加手工分类: 'create-manual-category',
+  添加子分类: 'create-child-category',
+  '上移/下移': 'move',
+  发布商品: 'publish-product',
+  批量上架: 'batch-on-shelf',
+  查看价格: 'view-price',
+  上架: 'on-shelf',
+  驳回: 'reject',
+  批量下架: 'batch-off-shelf',
+  下架: 'off-shelf',
+  批量放回到仓库: 'batch-restore',
+  放回到仓库: 'restore',
+  批量彻底删除: 'batch-delete-permanently',
+  清空回收站: 'clear-recycle-bin',
+  彻底删除: 'delete-permanently',
+  新增子类目: 'create-child-category',
+  关联标准属性: 'link-standard-attribute',
+  关联选项: 'link-option',
+  发布: 'publish',
+  移除: 'remove',
+  设置必填: 'set-required',
+  预览工艺图片: 'preview-image',
+  邀请员工: 'create',
+  编辑员工: 'edit',
+  权限管理: 'permission',
+  查看: 'view',
+  全选: 'select-all',
+  清空: 'clear',
+  保存: 'save',
+};
+
 const buildActionNodes = (scope: string, actions: string[]) =>
   actions.map((action) => ({
     label: action,
-    value: `${scope}.${action}`,
+    value: `${scope}.${actionValueMap[action] ?? action}`,
   }));
 
 const permissionTreeData: PermissionTreeNode[] = [
@@ -678,6 +728,7 @@ const permissionModules: PermissionModule[] =
 
 const pageSizeOptions = [10, 20, 50];
 const activeCategory = ref<RoleCategory>('partner-store');
+const loginUser = computed(() => getLoginUser());
 const activePermissionModuleValue = ref(permissionModules[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
@@ -706,6 +757,30 @@ const formRules: Record<string, FormRule[]> = {
 
 const currentRoles = computed(() => roles.value.filter((item) => item.category === activeCategory.value));
 const isOperationPlatformTab = computed(() => activeCategory.value === 'operation-platform');
+const currentRolePermissionScope = computed(
+  () => `admin.permission-management.role-management.${activeCategory.value}`,
+);
+const getRoleActionPermissions = (action: 'create' | 'permission' | 'edit' | 'delete') => {
+  const legacyActionMap = {
+    create: '新建',
+    permission: '权限管理',
+    edit: '编辑',
+    delete: '删除',
+  };
+
+  return [
+    `admin.permission-management.role-management.${action}`,
+    `admin.permission-management.role-management.${legacyActionMap[action]}`,
+    `${currentRolePermissionScope.value}.${action}`,
+    `${currentRolePermissionScope.value}.${legacyActionMap[action]}`,
+  ];
+};
+const canCreateRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('create')));
+const canManageRolePermission = computed(() =>
+  hasAnyPermission(loginUser.value, getRoleActionPermissions('permission')),
+);
+const canEditRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('edit')));
+const canDeleteRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('delete')));
 const paginationTotal = computed(() => currentRoles.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / pagination.pageSize), 1));
 const pageNumbers = computed(() => Array.from({ length: pageCount.value }, (_, index) => index + 1));
@@ -767,6 +842,8 @@ const toRolePayload = (role: RoleItem): RolePayload => ({
   remark: role.remark,
   functionPermissions: role.functionPermissions.join(','),
 });
+
+const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 
 const loadRoles = async () => {
   loading.value = true;
@@ -925,6 +1002,10 @@ const handleSubmit = async () => {
 };
 
 const openDeleteConfirm = (row: RoleItem) => {
+  if (isSuperAdminRole(row)) {
+    MessagePlugin.warning('超级管理员角色不可删除');
+    return;
+  }
   deletingRole.value = row;
   deleteDialogVisible.value = true;
 };
@@ -949,6 +1030,10 @@ const handleDeleteConfirm = async () => {
 };
 
 const openPermissionDialog = (row: RoleItem) => {
+  if (isSuperAdminRole(row)) {
+    MessagePlugin.warning('超级管理员天然拥有全量权限，无需配置权限');
+    return;
+  }
   permissionRole.value = row;
   permissionDraft.functionPermissions = row.functionPermissions.includes('all')
     ? [...allPermissionValues]
@@ -1051,6 +1136,10 @@ onMounted(loadRoles);
   align-items: center;
   gap: var(--td-comp-margin-s);
   flex-wrap: wrap;
+}
+
+.table-action-placeholder {
+  color: var(--td-text-color-placeholder);
 }
 
 .permission-dialog {

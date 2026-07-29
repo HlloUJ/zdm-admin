@@ -20,21 +20,60 @@ class AuthServiceTest {
   }
 
   @Test
-  void loginReturnsDevTokenForSeedSuperAdmin() {
+  void loginReturnsAccountBoundTokenForSeedSuperAdmin() {
     AuthAccount account = new AuthAccount();
     account.setId(1L);
     account.setDisplayName("超级管理员");
     account.setPhone("15926626945");
     account.setStatus("enabled");
+    account.setEmployeeId(1L);
+    account.setTenantId(1L);
+    account.setStoreId(1L);
+    account.setDataPermission("all");
     when(authAccountMapper.findByPhone("15926626945")).thenReturn(account);
     when(authAccountMapper.findAdminRoleCodes(1L)).thenReturn(List.of("SUPER_ADMIN"));
-    when(authAccountMapper.findAdminPermissionCodes(1L)).thenReturn(List.of("admin:tenant:manage"));
+    when(authAccountMapper.findAdminRoleNames(1L)).thenReturn(List.of("超级管理员"));
+    when(authAccountMapper.findAdminPermissionValues(1L)).thenReturn(List.of("all"));
 
     LoginResponse response = authService.login(new LoginRequest("15926626945", "888888"));
 
-    assertThat(response.token()).isEqualTo("dev-token");
+    assertThat(response.token()).isEqualTo("dev-token:1");
     assertThat(response.user().phone()).isEqualTo("15926626945");
     assertThat(response.user().roles()).contains("SUPER_ADMIN");
+    assertThat(response.user().roleNames()).containsExactly("超级管理员");
+    assertThat(response.user().permissions()).containsExactly("all");
+    assertThat(response.user().dataPermission()).isEqualTo("all");
+  }
+
+  @Test
+  void loginExpandsRoleFunctionPermissions() {
+    AuthAccount account = new AuthAccount();
+    account.setId(2L);
+    account.setDisplayName("测试员工");
+    account.setPhone("15900000001");
+    account.setStatus("enabled");
+    account.setEmployeeId(3L);
+    account.setTenantId(1L);
+    account.setStoreId(1L);
+    account.setDataPermission("self");
+    when(authAccountMapper.findByPhone("15900000001")).thenReturn(account);
+    when(authAccountMapper.findAdminRoleCodes(2L)).thenReturn(List.of("ADMIN_MANAGER"));
+    when(authAccountMapper.findAdminRoleNames(2L)).thenReturn(List.of("管理员"));
+    when(authAccountMapper.findAdminPermissionValues(2L))
+        .thenReturn(List.of(
+            "admin.permission-management.employee-management.query,"
+                + "admin.permission-management.employee-management.edit"));
+
+    LoginResponse response = authService.login(new LoginRequest("15900000001", "888888"));
+
+    assertThat(response.token()).isEqualTo("dev-token:2");
+    assertThat(response.user().name()).isEqualTo("测试员工");
+    assertThat(response.user().roleNames()).containsExactly("管理员");
+    assertThat(response.user().permissions())
+        .containsExactly(
+            "admin.permission-management.employee-management.query",
+            "admin.permission-management.employee-management.edit");
+    assertThat(response.user().employeeId()).isEqualTo(3L);
   }
 
   @Test

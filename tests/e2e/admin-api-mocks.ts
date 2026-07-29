@@ -40,6 +40,7 @@ const stores = [
     status: 'enabled',
     remark: '系统内置门店',
     createdAt: '2026-07-27T09:00:00',
+    createdBy: '韩健',
   },
 ];
 
@@ -107,7 +108,22 @@ const employees = [
     status: 'enabled',
     roleIds: '1,2',
     dataPermission: 'all',
-    remark: '系统内置超管',
+    remark: '系统内置超管，负责平台权限、员工账号、租户门店等后台核心管理事项',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 2,
+    tenantId: 1,
+    storeId: 1,
+    name: '待启用员工',
+    gender: 'female',
+    phone: '15926628888',
+    status: 'disabled',
+    roleIds: '',
+    dataPermission: '',
+    remark: '待超级管理员补齐权限',
+    createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
 ];
@@ -165,6 +181,7 @@ const inventoryMovements = [
 ];
 
 export async function installAdminApiMocks(page: Page) {
+  await mockEmployeeInvites(page);
   await mockCollection(page, '**/api/admin/tenants', tenants);
   await mockCollection(page, '**/api/admin/stores', stores);
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
@@ -173,6 +190,47 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
+}
+
+async function mockEmployeeInvites(page: Page) {
+  await page.route('**/api/admin/employee-invites', async (route) => {
+    await fulfillJson(route, {
+      token: 'e2e-invite-token',
+      expiresAt: '2026-08-04T09:00:00',
+    });
+  });
+
+  await page.route('**/api/open/employee-invites/e2e-invite-token', async (route) => {
+    await fulfillJson(route, {
+      token: 'e2e-invite-token',
+      expiresAt: '2026-08-04T09:00:00',
+    });
+  });
+
+  await page.route('**/api/open/employee-invites/e2e-invite-token/verify-code', async (route) => {
+    let payload: { verifyCode?: string };
+    try {
+      payload = route.request().postDataJSON() as { verifyCode?: string };
+    } catch {
+      payload = {};
+    }
+    if (payload.verifyCode !== '888888') {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 400, message: '验证码错误', data: null }),
+      });
+      return;
+    }
+    await fulfillJson(route, true);
+  });
+
+  await page.route('**/api/open/employee-invites/e2e-invite-token/register', async (route) => {
+    await fulfillJson(route, {
+      employeeId: 2,
+      status: 'disabled',
+    });
+  });
 }
 
 async function mockCollection(page: Page, pattern: string, records: unknown[]) {
@@ -188,6 +246,19 @@ async function mockCollection(page: Page, pattern: string, records: unknown[]) {
     if (route.request().method() === 'DELETE') {
       await fulfillJson(route, true);
       return;
+    }
+    if (route.request().method() === 'PUT' || route.request().method() === 'PATCH') {
+      const id = Number(new URL(route.request().url()).pathname.split('/').pop());
+      const targetIndex = records.findIndex((record) => {
+        if (!record || typeof record !== 'object' || !('id' in record)) return false;
+        return Number(record.id) === id;
+      });
+      if (targetIndex !== -1) {
+        const payload = route.request().postDataJSON() as Record<string, unknown>;
+        records[targetIndex] = { ...(records[targetIndex] as Record<string, unknown>), ...payload };
+        await fulfillJson(route, records[targetIndex]);
+        return;
+      }
     }
     await fulfillJson(route, records[0] ?? {});
   });

@@ -47,6 +47,10 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
 
   await expect(main.getByText('门店管理').first()).toBeVisible();
   await expect(main.getByText('杭州体验门店')).toBeVisible();
+  const tableHeaders = main.locator('thead th');
+  await expect(tableHeaders.nth(8)).toContainText('创建人');
+  await expect(tableHeaders.nth(9)).toContainText('创建时间');
+  await expect(page.locator('tbody tr').filter({ hasText: '杭州体验门店' }).first()).toContainText('韩健');
 
   await main.getByRole('button', { name: /新增/ }).click();
   const createDialog = page.locator('.t-dialog').filter({ hasText: '新增' });

@@ -1,0 +1,165 @@
+import type { LoginUser } from './auth';
+
+export interface AdminMenuItem {
+  label: string;
+  path: string;
+  icon?: string;
+  permissionPrefix?: string;
+}
+
+export interface AdminMenuGroup {
+  label: string;
+  value: string;
+  icon: string;
+  children: AdminMenuItem[];
+}
+
+export type AdminMenuEntry = AdminMenuItem | AdminMenuGroup;
+
+export const adminMenuEntries: AdminMenuEntry[] = [
+  { label: '工作台', path: '/dashboard', icon: 'dashboard' },
+  {
+    label: '租户与门店',
+    value: 'tenant-management',
+    icon: 'usergroup',
+    children: [
+      { label: '租户管理', path: '/tenant-management', permissionPrefix: 'admin.tenant.tenant-management' },
+      { label: '门店管理', path: '/tenant-store-management', permissionPrefix: 'admin.tenant.tenant-store-management' },
+    ],
+  },
+  {
+    label: '成品现货管理',
+    path: '/finished-stock-management',
+    icon: 'shop',
+    permissionPrefix: 'admin.finished-stock-management',
+  },
+  {
+    label: '大板管理',
+    path: '/slab-management',
+    icon: 'image',
+    permissionPrefix: 'admin.slab-management',
+  },
+  {
+    label: '供应商管理',
+    path: '/supplier-management',
+    icon: 'usergroup',
+    permissionPrefix: 'admin.supplier-management',
+  },
+  {
+    label: '门店分类管理',
+    path: '/store-category-management',
+    icon: 'folder',
+    permissionPrefix: 'admin.tenant.store-category-management',
+  },
+  {
+    label: '商品基础数据中心',
+    value: 'product-data-center',
+    icon: 'layers',
+    children: [
+      { label: '商品分类管理', path: '/product-category', permissionPrefix: 'admin.product-data-center.category' },
+      { label: '属性库管理', path: '/product-attribute', permissionPrefix: 'admin.product-data-center.attribute' },
+      {
+        label: '属性值管理',
+        path: '/product-attribute-value',
+        permissionPrefix: 'admin.product-data-center.attribute-value',
+      },
+      {
+        label: '类目属性模板',
+        path: '/category-attribute-template',
+        permissionPrefix: 'admin.product-data-center.category-attribute-template',
+      },
+      { label: '大板品种管理', path: '/slab-variety', permissionPrefix: 'admin.product-data-center.slab-variety' },
+      {
+        label: '成品现货工艺管理',
+        path: '/finished-stock-craft',
+        permissionPrefix: 'admin.product-data-center.finished-stock-craft',
+      },
+    ],
+  },
+  {
+    label: '权限管理',
+    value: 'permission-management',
+    icon: 'secured',
+    children: [
+      {
+        label: '员工管理',
+        path: '/employee-management',
+        permissionPrefix: 'admin.permission-management.employee-management',
+      },
+      {
+        label: '角色管理',
+        path: '/role-management',
+        permissionPrefix: 'admin.permission-management.role-management',
+      },
+      {
+        label: '终端功能分配',
+        path: '/terminal-function-allocation',
+        permissionPrefix: 'admin.permission-management.terminal-function-allocation',
+      },
+    ],
+  },
+];
+
+export const routePermissionPrefixMap = Object.fromEntries(
+  adminMenuEntries.flatMap((entry) => {
+    if ('children' in entry) return entry.children.map((item) => [item.path, item.permissionPrefix]);
+    return [[entry.path, entry.permissionPrefix]];
+  }),
+);
+
+export function isSuperAdmin(user: LoginUser) {
+  return user.roles.includes('SUPER_ADMIN') || user.permissions.includes('all');
+}
+
+export function hasPermission(user: LoginUser, permission: string) {
+  return (
+    isSuperAdmin(user) || getPermissionCandidates(permission).some((candidate) => user.permissions.includes(candidate))
+  );
+}
+
+export function hasAnyPermission(user: LoginUser, permissions: string[]) {
+  return isSuperAdmin(user) || permissions.some((permission) => hasPermission(user, permission));
+}
+
+export function hasPermissionPrefix(user: LoginUser, prefix?: string) {
+  if (!prefix || isSuperAdmin(user)) return true;
+  return user.permissions.some((permission) => permission === prefix || permission.startsWith(`${prefix}.`));
+}
+
+export function hasMenuPermission(user: LoginUser, prefix?: string) {
+  if (isSuperAdmin(user)) return true;
+  if (!prefix) return false;
+
+  return user.permissions.some((permission) => {
+    if (permission === prefix) return true;
+    if (!permission.startsWith(`${prefix}.`)) return false;
+    return ['query', 'view', '查询', '查看'].some((action) => permission.endsWith(`.${action}`));
+  });
+}
+
+export function getFirstAccessiblePath(user: LoginUser) {
+  for (const entry of adminMenuEntries) {
+    if ('children' in entry) {
+      const firstChild = entry.children.find((item) => hasMenuPermission(user, item.permissionPrefix));
+      if (firstChild) return firstChild.path;
+    } else if (hasMenuPermission(user, entry.permissionPrefix)) {
+      return entry.path;
+    }
+  }
+  return '';
+}
+
+const permissionAliases: Record<string, string[]> = {
+  'admin.permission-management.employee-management.create': [
+    'admin.permission-management.employee-management.邀请员工',
+  ],
+  'admin.permission-management.employee-management.edit': ['admin.permission-management.employee-management.编辑员工'],
+  'admin.permission-management.employee-management.toggle-status': [
+    'admin.permission-management.employee-management.停用/启用',
+  ],
+  'admin.permission-management.employee-management.delete': ['admin.permission-management.employee-management.删除'],
+};
+
+function getPermissionCandidates(permission: string) {
+  return [permission, ...(permissionAliases[permission] ?? [])];
+}

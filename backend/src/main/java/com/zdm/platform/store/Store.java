@@ -32,6 +32,7 @@ public class Store {
 
   private String remark;
   private LocalDateTime createdAt;
+  private String createdBy;
   private LocalDateTime updatedAt;
 
   public Long getId() {
@@ -128,6 +129,14 @@ public class Store {
 
   public void setCreatedAt(LocalDateTime createdAt) {
     this.createdAt = createdAt;
+  }
+
+  public String getCreatedBy() {
+    return createdBy;
+  }
+
+  public void setCreatedBy(String createdBy) {
+    this.createdBy = createdBy;
   }
 
   public LocalDateTime getUpdatedAt() {
