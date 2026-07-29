@@ -2,6 +2,7 @@ package com.zdm.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -132,7 +133,7 @@ class PlatformApiSmokeTest {
     mockMvc.perform(get("/api/admin/employees")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.phone == '15926629999')][0].createdByName").value("韩健"));
+        .andExpect(jsonPath("$.data[?(@.phone == '15926629999')].createdByName").value(hasItem("韩健")));
 
     String createdByName = jdbcTemplate.queryForObject(
         "SELECT created_by_name FROM employees WHERE id = ?",
