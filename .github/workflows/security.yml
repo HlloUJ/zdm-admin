@@ -1,0 +1,21 @@
+name: Dependency Security
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
+
+jobs:
+  dependency-check:
+    name: Backend dependency vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - working-directory: backend
+        run: mvn -B org.owasp:dependency-check-maven:check
