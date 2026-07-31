@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -15,13 +16,15 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class TokenAuthenticationFilter extends OncePerRequestFilter {
   public static final String DEV_TOKEN = "dev-token";
-  public static final String ACCOUNT_TOKEN_PREFIX = DEV_TOKEN + ":";
+
+  private final SessionTokenService sessionTokenService;
+
+  public TokenAuthenticationFilter(SessionTokenService sessionTokenService) {
+    this.sessionTokenService = sessionTokenService;
+  }
 
   public static String createAccountToken(Long accountId) {
-    if (accountId == null) {
-      return DEV_TOKEN;
-    }
-    return ACCOUNT_TOKEN_PREFIX + accountId;
+    return SessionTokenService.createDevelopmentAccountToken(accountId);
   }
 
   @Override
@@ -29,28 +32,14 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     String authorization = request.getHeader("Authorization");
     String token = authorization == null || !authorization.startsWith("Bearer ") ? "" : authorization.substring(7);
-    String principal = resolvePrincipal(token);
-    if (principal != null) {
-      var authentication = new UsernamePasswordAuthenticationToken(
-          principal,
-          null,
-          List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+    CurrentIdentity identity = sessionTokenService.authenticate(token);
+    if (identity != null) {
+      List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+      identity.roles().forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
+      identity.permissions().forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
+      var authentication = new UsernamePasswordAuthenticationToken(identity, null, authorities);
       SecurityContextHolder.getContext().setAuthentication(authentication);
     }
     filterChain.doFilter(request, response);
-  }
-
-  private String resolvePrincipal(String token) {
-    if (DEV_TOKEN.equals(token)) {
-      return "admin";
-    }
-    if (!token.startsWith(ACCOUNT_TOKEN_PREFIX)) {
-      return null;
-    }
-    String accountId = token.substring(ACCOUNT_TOKEN_PREFIX.length());
-    if (accountId.isBlank() || !accountId.chars().allMatch(Character::isDigit)) {
-      return null;
-    }
-    return "account:" + accountId;
   }
 }

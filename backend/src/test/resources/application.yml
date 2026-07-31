@@ -1,0 +1,5 @@
+zdm:
+  security:
+    dev-tokens-enabled: true
+    verification-code: '888888'
+    session-duration: PT12H
