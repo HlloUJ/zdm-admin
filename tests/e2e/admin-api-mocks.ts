@@ -191,6 +191,20 @@ const inventoryMovements = [
   },
 ];
 
+const crafts = [
+  {
+    id: 1,
+    name: 'E2E 边工艺',
+    type: '边工艺',
+    width: '12',
+    imageUrl: '',
+    remark: '按钮权限测试数据',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-31T09:00:00',
+  },
+];
+
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
   await mockCollection(page, '**/api/admin/tenants', tenants);
@@ -201,6 +215,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
+  await mockCollection(page, '**/api/admin/crafts', crafts);
 }
 
 async function mockEmployeeInvites(page: Page) {

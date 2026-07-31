@@ -99,7 +99,12 @@ const verifiedFunctionCatalog: FunctionModule[] = [
           {
             label: '成品现货工艺管理页',
             value: 'admin.product-data-center.finished-stock-craft',
-            actions: [],
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.finished-stock-craft.create' },
+              { label: '编辑', value: 'admin.product-data-center.finished-stock-craft.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.finished-stock-craft.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.finished-stock-craft.delete' },
+            ],
             tabs: [],
           },
         ],

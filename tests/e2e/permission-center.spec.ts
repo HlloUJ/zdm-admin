@@ -9,6 +9,35 @@ test.beforeEach(async ({ page }) => {
   await installAdminApiMocks(page);
 });
 
+test('shows only granted craft operation buttons for a restricted account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 9,
+        name: '受限工艺管理员',
+        phone: '15926620009',
+        roles: ['CRAFT_EDITOR'],
+        permissions: [
+          'admin.product-data-center.finished-stock-craft.view',
+          'admin.product-data-center.finished-stock-craft.edit',
+        ],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/finished-stock-craft');
+  const main = page.getByRole('main');
+  const craftRow = main.locator('tbody tr').filter({ hasText: 'E2E 边工艺' });
+
+  await expect(craftRow).toBeVisible();
+  await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
+  await expect(craftRow.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(craftRow.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(craftRow.getByText('删除', { exact: true })).toHaveCount(0);
+});
+
 test('opens employee invite and edit dialogs', async ({ page }) => {
   await page.goto('/employee-management');
   const main = page.getByRole('main');
@@ -301,7 +330,13 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('tbody tr')).toHaveCount(1);
   await expect(roleMatrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
-  await expect(roleMatrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['查看']);
+  await expect(roleMatrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
   await roleModuleList.getByText('权限管理', { exact: true }).click();
   await expect(roleMatrix.locator('tbody tr')).toHaveCount(4);
   await expect(roleMatrix.getByText('员工管理', { exact: true })).toBeVisible();
@@ -368,7 +403,7 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*1/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*5/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -380,7 +415,13 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(matrix.locator('tbody tr')).toHaveCount(1);
   await expect(matrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['查看']);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*19/);
   await expect(matrix.locator('tbody tr')).toHaveCount(4);
@@ -409,7 +450,7 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(moduleList.locator('.permission-module-item')).toHaveCount(2);
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(1);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();

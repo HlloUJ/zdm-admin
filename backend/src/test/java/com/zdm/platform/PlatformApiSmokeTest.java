@@ -257,6 +257,77 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void craftManagementEnforcesViewAndOperationPermissions() throws Exception {
+    long accountId = 9001L;
+    long roleId = 9001L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629001",
+        "工艺查看员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '工艺查看角色', 'CRAFT_VIEWER_TEST', 'operation-platform', 'admin', 'all', 'enabled', ?, '集成测试')
+        """,
+        roleId,
+        "admin.product-data-center.finished-stock-craft.view");
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    Long craftId = jdbcTemplate.queryForObject("SELECT id FROM crafts ORDER BY id LIMIT 1", Long.class);
+
+    mockMvc.perform(get("/api/admin/crafts").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "无权新增工艺",
+                  "type": "边工艺",
+                  "status": "enabled"
+                }
+                """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(403));
+    mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "无权编辑工艺",
+                  "type": "边工艺",
+                  "status": "enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(patch("/api/admin/crafts/{id}/status", craftId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void roleManagementUsesRealRolesAndCreatedByName() throws Exception {
     mockMvc.perform(get("/api/admin/roles")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))

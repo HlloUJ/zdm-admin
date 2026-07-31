@@ -83,6 +83,10 @@ describe('full function catalog', () => {
     });
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.finished-stock-craft.view',
+      'admin.product-data-center.finished-stock-craft.create',
+      'admin.product-data-center.finished-stock-craft.edit',
+      'admin.product-data-center.finished-stock-craft.toggle-status',
+      'admin.product-data-center.finished-stock-craft.delete',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.create',
       'admin.permission-management.employee-management.edit',
@@ -117,12 +121,14 @@ describe('full function catalog', () => {
         'admin.product-data-center.finished-stock-craft.query',
         'admin.product-data-center.finished-stock-craft.reset',
         'admin.product-data-center.finished-stock-craft.create',
+        'admin.product-data-center.finished-stock-craft.preview',
         'admin.permission-management.employee-management.query',
         'admin.permission-management.employee-management.reset',
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
       'admin.product-data-center.finished-stock-craft.view',
+      'admin.product-data-center.finished-stock-craft.create',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.permission',
     ]);

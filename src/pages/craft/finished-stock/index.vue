@@ -76,7 +76,7 @@
 
         <section class="table-card">
           <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
+            <t-button v-if="canCreateCraft" theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
             </t-button>
@@ -99,15 +99,17 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canEditCraft" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
+                  v-if="canToggleCraftStatus"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link v-if="canDeleteCraft" theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <span v-if="!canEditCraft && !canToggleCraftStatus && !canDeleteCraft">-</span>
               </div>
             </template>
           </t-table>
@@ -235,6 +237,8 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, Up
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
   createCraft,
   deleteCraft,
@@ -275,9 +279,15 @@ const craftTypeOptions = [
   { label: '拼接工艺', value: '拼接工艺' },
 ];
 const pageSizeOptions = [10, 20, 50];
+const craftPermissionPrefix = 'admin.product-data-center.finished-stock-craft';
 
 const tableData = ref<CraftItem[]>([]);
 const loading = ref(false);
+const loginUser = computed(() => getLoginUser());
+const canCreateCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.create`));
+const canEditCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.edit`));
+const canToggleCraftStatus = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.toggle-status`));
+const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.delete`));
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 72, align: 'left' },
