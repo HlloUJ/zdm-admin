@@ -1,10 +1,9 @@
 package com.zdm.platform.craft;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.List;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -13,28 +12,24 @@ import org.springframework.util.StringUtils;
 public class CraftService extends ServiceImpl<CraftMapper, Craft> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
 
-  private final JdbcTemplate jdbcTemplate;
+  private final CurrentIdentityProvider identityProvider;
 
-  public CraftService(JdbcTemplate jdbcTemplate) {
-    this.jdbcTemplate = jdbcTemplate;
+  public CraftService(CurrentIdentityProvider identityProvider) {
+    this.identityProvider = identityProvider;
   }
 
   public List<Craft> listForCurrentAdmin() {
-    Long accountId = currentAccountId();
-    if (accountId == null) {
-      return list();
-    }
-    AdminEmployee currentEmployee = currentAdminEmployee(accountId);
-    if (currentEmployee == null) {
+    CurrentIdentity identity = identityProvider.current().orElse(null);
+    if (identity == null) {
       return List.of();
     }
-    if ("all".equals(currentEmployee.dataPermission())) {
+    if (identity.isSuperAdmin() || "all".equals(identity.dataPermission())) {
       return list();
     }
-    if (!StringUtils.hasText(currentEmployee.name())) {
+    if (!StringUtils.hasText(identity.displayName())) {
       return List.of();
     }
-    return lambdaQuery().eq(Craft::getCreatedByName, currentEmployee.name()).list();
+    return lambdaQuery().eq(Craft::getCreatedByName, identity.displayName()).list();
   }
 
   @Transactional
@@ -59,48 +54,9 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
   }
 
   private String resolveCreatedByName() {
-    Long accountId = currentAccountId();
-    if (accountId == null) {
-      return DEFAULT_CREATED_BY_NAME;
-    }
-    AdminEmployee currentEmployee = currentAdminEmployee(accountId);
-    return currentEmployee != null && StringUtils.hasText(currentEmployee.name())
-        ? currentEmployee.name()
+    CurrentIdentity identity = identityProvider.current().orElse(null);
+    return identity != null && StringUtils.hasText(identity.displayName())
+        ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
   }
-
-  private AdminEmployee currentAdminEmployee(Long accountId) {
-    return jdbcTemplate.query(
-        """
-        SELECT name, data_permission
-        FROM employees
-        WHERE account_id = ?
-          AND status = 'enabled'
-        ORDER BY id DESC
-        LIMIT 1
-        """,
-        (rs, rowNum) -> new AdminEmployee(rs.getString("name"), rs.getString("data_permission")),
-        accountId)
-        .stream()
-        .findFirst()
-        .orElse(null);
-  }
-
-  private Long currentAccountId() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getPrincipal() == null) {
-      return null;
-    }
-    String principal = String.valueOf(authentication.getPrincipal());
-    if (!principal.startsWith("account:")) {
-      return null;
-    }
-    try {
-      return Long.parseLong(principal.substring("account:".length()));
-    } catch (NumberFormatException ex) {
-      return null;
-    }
-  }
-
-  private record AdminEmployee(String name, String dataPermission) {}
 }

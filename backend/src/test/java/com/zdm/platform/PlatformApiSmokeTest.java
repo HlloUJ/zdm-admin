@@ -157,19 +157,19 @@ class PlatformApiSmokeTest {
 
   @Test
   void ordinaryRoleWithoutPermissionCannotAccessTenantApi() throws Exception {
-    long accountId = 9003L;
-    long employeeId = 9003L;
+    long accountId = 9010L;
+    long employeeId = 9010L;
     jdbcTemplate.update(
         """
         INSERT INTO accounts (id, phone, display_name, account_type, status)
-        VALUES (?, '15900009003', '无租户权限员工', 'person', 'enabled')
+        VALUES (?, '15900009010', '无租户权限员工', 'person', 'enabled')
         """,
         accountId);
     jdbcTemplate.update(
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '无租户权限员工', '15900009003', 'enabled', 'all', '韩健')
+        VALUES (?, ?, 1, 1, '无租户权限员工', '15900009010', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -348,6 +348,14 @@ class PlatformApiSmokeTest {
         accountId,
         "15926629001",
         "工艺查看员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '工艺查看员', '15926629001', 'enabled', 'all', '韩健')
+        """,
+        accountId,
+        accountId);
     jdbcTemplate.update(
         """
         INSERT INTO account_identities
