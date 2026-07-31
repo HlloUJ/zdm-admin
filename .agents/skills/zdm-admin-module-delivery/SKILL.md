@@ -11,6 +11,7 @@ description: 为装点猫管理后台新增、重构或补齐业务功能模块�
 2. 涉及页面结构或新增页面时，同时使用 `zdm-admin-ui-conventions`；涉及账号、身份、角色或权限模型调整时，同时使用 `account-permission-rules`。
 3. 涉及代码修改时，同时使用 `efficient-code-delivery`，按项目 `AGENTS.md` 的风险等级验证。
 4. 开始设计和交付前读取 [模块交付清单](references/module-delivery-checklist.md)，只填写与当前模块有关的部分。
+5. 同一模块任务后续对话在业务边界、规则和代码基线未变化时复用已读取原则、PRD、UI 约定和交付清单；只补读发生变化或当前阶段新增的部分。
 
 ## 工作流
 
