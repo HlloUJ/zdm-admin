@@ -6,6 +6,8 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,6 +23,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockMultipartFile;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -46,6 +49,9 @@ class PlatformApiSmokeTest {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
+    registry.add(
+        "zdm.craft-image.storage-path",
+        () -> System.getProperty("java.io.tmpdir") + "/zdm-craft-images-smoke");
   }
 
   @Test
@@ -75,11 +81,15 @@ class PlatformApiSmokeTest {
     String adminManagerPermissions = jdbcTemplate.queryForObject(
         "SELECT function_permissions FROM roles WHERE code = 'ADMIN_MANAGER'",
         String.class);
+    Integer craftWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM crafts WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(24);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(26);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
+    assertThat(craftWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -93,7 +103,7 @@ class PlatformApiSmokeTest {
 
   @Test
   void superAdminCanLoginAndAccessTenantApi() throws Exception {
-    mockMvc.perform(post("/api/admin/auth/login")
+    MvcResult loginResult = mockMvc.perform(post("/api/admin/auth/login")
             .contentType("application/json")
             .content("""
                 {
@@ -103,14 +113,378 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
-        .andExpect(jsonPath("$.data.token").value(TokenAuthenticationFilter.createAccountToken(1L)))
-        .andExpect(jsonPath("$.data.user.phone").value("15926626945"));
+        .andExpect(jsonPath("$.data.token").isString())
+        .andExpect(jsonPath("$.data.user.phone").value("15926626945"))
+        .andReturn();
+
+    String sessionToken = com.jayway.jsonpath.JsonPath.read(
+        loginResult.getResponse().getContentAsString(),
+        "$.data.token");
+    assertThat(sessionToken).doesNotStartWith("dev-token");
+    Integer storedSessionCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM auth_sessions WHERE token_hash <> ? AND CHAR_LENGTH(token_hash) = 64",
+        Integer.class,
+        sessionToken);
+    assertThat(storedSessionCount).isGreaterThanOrEqualTo(1);
 
     mockMvc.perform(get("/api/admin/tenants")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+            .header("Authorization", "Bearer " + sessionToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
         .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(1)));
+
+    mockMvc.perform(post("/api/admin/auth/logout")
+            .header("Authorization", "Bearer " + sessionToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+
+    mockMvc.perform(get("/api/admin/tenants")
+            .header("Authorization", "Bearer " + sessionToken))
+        .andExpect(status().isUnauthorized());
+
+    Integer logoutAuditCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM security_audit_logs
+        WHERE account_id = 1
+          AND request_method = 'POST'
+          AND request_path = '/api/admin/auth/logout'
+          AND result = 'success'
+        """,
+        Integer.class);
+    assertThat(logoutAuditCount).isGreaterThanOrEqualTo(1);
+  }
+
+  @Test
+  void ordinaryRoleWithoutPermissionCannotAccessTenantApi() throws Exception {
+    long accountId = 9010L;
+    long employeeId = 9010L;
+    jdbcTemplate.update(
+        """
+        INSERT INTO accounts (id, phone, display_name, account_type, status)
+        VALUES (?, '15900009010', '无租户权限员工', 'person', 'enabled')
+        """,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '无租户权限员工', '15900009010', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES ('无租户权限角色', 'NO_TENANT_PERMISSION_ROLE', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.permission-management.employee-management.view', '韩健')
+        """);
+    Long roleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'NO_TENANT_PERMISSION_ROLE'",
+        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    mockMvc.perform(get("/api/admin/tenants")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(403));
+  }
+
+  @Test
+  void craftManagementPersistsUploadedImageAndHandlesBusinessErrors() throws Exception {
+    String craftName = "集成测试工艺-" + System.nanoTime();
+    String creatorName = jdbcTemplate.queryForObject(
+        """
+        SELECT name
+        FROM employees
+        WHERE account_id = 1
+          AND status = 'enabled'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        String.class);
+    MockMultipartFile image = new MockMultipartFile(
+        "file",
+        "craft.png",
+        "image/png",
+        new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47});
+
+    MvcResult uploadResult = mockMvc.perform(multipart("/api/admin/crafts/images")
+            .file(image)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.data.url").isNotEmpty())
+        .andReturn();
+    String imageUrl = com.jayway.jsonpath.JsonPath.read(
+        uploadResult.getResponse().getContentAsString(),
+        "$.data.url");
+
+    mockMvc.perform(get(imageUrl))
+        .andExpect(status().isOk())
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+            .content().contentType("image/png"));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "边工艺",
+                  "width": "12",
+                  "imageUrl": "%s",
+                  "remark": "新增备注",
+                  "status": "enabled",
+                  "createdByName": "不应覆盖"
+                }
+                """.formatted(craftName, imageUrl)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andReturn();
+    String craftId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "边工艺",
+                  "status": "enabled"
+                }
+                """.formatted(craftName)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("工艺名称已存在"));
+
+    mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s-非法宽度",
+                  "type": "边工艺",
+                  "width": "12mm",
+                  "status": "enabled"
+                }
+                """.formatted(craftName)))
+        .andExpect(status().isBadRequest());
+
+    mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "面工艺",
+                  "width": "18",
+                  "imageUrl": "%s",
+                  "remark": "编辑备注",
+                  "status": "enabled",
+                  "createdByName": "不应覆盖"
+                }
+                """.formatted(craftName, imageUrl)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+        .andExpect(jsonPath("$.data.remark").value("编辑备注"))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
+
+    mockMvc.perform(patch("/api/admin/crafts/{id}/status", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {"status": "disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"))
+        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
+
+    mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "面工艺",
+                  "remark": "%s",
+                  "status": "disabled"
+                }
+                """.formatted(craftName, "测".repeat(101))))
+        .andExpect(status().isBadRequest());
+
+    mockMvc.perform(delete("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void craftManagementEnforcesViewAndOperationPermissions() throws Exception {
+    long accountId = 9001L;
+    long roleId = 9001L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629001",
+        "工艺查看员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '工艺查看员', '15926629001', 'enabled', 'all', '韩健')
+        """,
+        accountId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '工艺查看角色', 'CRAFT_VIEWER_TEST', 'operation-platform', 'admin', 'all', 'enabled', ?, '集成测试')
+        """,
+        roleId,
+        "admin.product-data-center.finished-stock-craft.view");
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    Long craftId = jdbcTemplate.queryForObject("SELECT id FROM crafts ORDER BY id LIMIT 1", Long.class);
+
+    mockMvc.perform(get("/api/admin/crafts").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "无权新增工艺",
+                  "type": "边工艺",
+                  "status": "enabled"
+                }
+                """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(403));
+    mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "无权编辑工艺",
+                  "type": "边工艺",
+                  "status": "enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(patch("/api/admin/crafts/{id}/status", craftId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void craftManagementAppliesCurrentEmployeeDataPermission() throws Exception {
+    long accountId = 9003L;
+    long employeeId = 9003L;
+    long roleId = 9003L;
+    String employeeName = "工艺范围测试员工";
+    String ownCraftName = "本人创建的范围工艺-" + System.nanoTime();
+    String otherCraftName = "他人创建的范围工艺-" + System.nanoTime();
+
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, account_type, status) VALUES (?, '15900009003', ?, 'person', 'enabled')",
+        accountId,
+        employeeName);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, ?, '15900009003', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId,
+        employeeName);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'operation-platform', 'admin', 'all', 'enabled', ?, '集成测试')
+        """,
+        roleId,
+        "admin.product-data-center.finished-stock-craft.view");
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        "INSERT INTO crafts (name, type, status, created_by_name) VALUES (?, '边工艺', 'enabled', ?)",
+        ownCraftName,
+        employeeName);
+    jdbcTemplate.update(
+        "INSERT INTO crafts (name, type, status, created_by_name) VALUES (?, '边工艺', 'enabled', '韩健')",
+        otherCraftName);
+
+    mockMvc.perform(get("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(ownCraftName))
+            .value(hasItem(employeeName)))
+        .andExpect(jsonPath("$.data[?(@.name == '%s')]".formatted(otherCraftName)).isEmpty());
+
+    mockMvc.perform(get("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(ownCraftName))
+            .value(hasItem(employeeName)))
+        .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(otherCraftName))
+            .value(hasItem("韩健")));
   }
 
   @Test
@@ -302,7 +676,7 @@ class PlatformApiSmokeTest {
                 }
                 """))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.createdByName").value("韩健"));
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
   }
 
   @Test
@@ -335,6 +709,16 @@ class PlatformApiSmokeTest {
         """,
         accountId,
         employeeId);
+    Long adminManagerRoleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'ADMIN_MANAGER'",
+        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        adminManagerRoleId);
     jdbcTemplate.update(
         """
         INSERT INTO roles

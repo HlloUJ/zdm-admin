@@ -82,6 +82,14 @@ function readLoginUser() {
 
 const loginUserState = shallowRef<LoginUser>(readLoginUser());
 
+function clearLocalLoginSession() {
+  clearAuthToken();
+  window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+  loginUserState.value = defaultLoginUser;
+}
+
+window.addEventListener('zdm-auth-session-cleared', clearLocalLoginSession);
+
 export function getLoginUser() {
   return loginUserState.value;
 }
@@ -95,10 +103,14 @@ export function setLoginUser(user: LoginUser) {
   loginUserState.value = normalizedUser;
 }
 
-export function logout() {
-  clearAuthToken();
-  window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
-  loginUserState.value = defaultLoginUser;
+export async function logout() {
+  try {
+    await request<boolean>('/admin/auth/logout', { method: 'POST' });
+  } catch {
+    // A stale or unreachable session must not prevent local logout.
+  } finally {
+    clearLocalLoginSession();
+  }
 }
 
 export async function login(payload: LoginPayload) {

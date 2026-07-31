@@ -2,6 +2,7 @@ package com.zdm.platform.common;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -24,6 +25,11 @@ public class GlobalExceptionHandler {
         .map(error -> error.getField() + error.getDefaultMessage())
         .orElse("请求参数错误");
     return ResponseEntity.badRequest().body(ApiResponse.fail(message));
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse<>(403, ex.getMessage(), null));
   }
 
   @ExceptionHandler(Exception.class)

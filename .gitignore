@@ -7,5 +7,6 @@ coverage
 playwright-report
 test-results
 backend/target
+backend/data
 backups
 .env
