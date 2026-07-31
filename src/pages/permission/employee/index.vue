@@ -134,36 +134,12 @@
             </template>
           </t-table>
 
-          <div class="custom-pagination">
-            <div class="pagination-total">共 {{ paginationTotal }} 条数据</div>
-            <div class="pagination-controls">
-              <t-select
-                :model-value="pagination.pageSize"
-                class="page-size-select"
-                size="small"
-                @change="handlePageSizeChange"
-              >
-                <t-option v-for="item in pageSizeOptions" :key="item" :label="`${item}条/页`" :value="item" />
-              </t-select>
-              <t-button size="small" variant="outline" :disabled="pagination.current === 1" @click="goPrevPage">
-                上一页
-              </t-button>
-              <t-button
-                v-for="pageNumber in pageNumbers"
-                :key="pageNumber"
-                size="small"
-                :theme="pageNumber === pagination.current ? 'primary' : 'default'"
-                :variant="pageNumber === pagination.current ? 'base' : 'outline'"
-                class="page-number"
-                @click="goPage(pageNumber)"
-              >
-                {{ pageNumber }}
-              </t-button>
-              <t-button size="small" variant="outline" :disabled="pagination.current === pageCount" @click="goNextPage">
-                下一页
-              </t-button>
-            </div>
-          </div>
+          <AdminPagination
+            v-model:current="pagination.current"
+            v-model:page-size="pagination.pageSize"
+            :total="paginationTotal"
+            :page-size-options="pageSizeOptions"
+          />
         </section>
       </main>
     </div>
@@ -278,6 +254,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { AdminPagination } from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
@@ -428,11 +405,6 @@ const filteredEmployees = computed(() => {
 
 const paginationTotal = computed(() => filteredEmployees.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / pagination.pageSize), 1));
-const pageNumbers = computed(() => {
-  const start = Math.max(Math.min(pagination.current - 2, pageCount.value - 4), 1);
-  const end = Math.min(start + 4, pageCount.value);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-});
 const pageData = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize;
   return filteredEmployees.value.slice(start, start + pagination.pageSize);
@@ -723,23 +695,6 @@ const handleReset = () => {
   handleSearch();
 };
 
-const handlePageSizeChange = (value: unknown) => {
-  pagination.pageSize = Number(value);
-  pagination.current = 1;
-};
-
-const goPage = (pageNumber: number) => {
-  pagination.current = pageNumber;
-};
-
-const goPrevPage = () => {
-  pagination.current = Math.max(pagination.current - 1, 1);
-};
-
-const goNextPage = () => {
-  pagination.current = Math.min(pagination.current + 1, pageCount.value);
-};
-
 const validateEmployeeBeforeEnable = (row: EmployeeItem) => {
   const missingRole = row.roleIds.length === 0;
   const missingDataPermission = !row.dataPermission;
@@ -932,42 +887,13 @@ onMounted(loadPermissionCenter);
   white-space: nowrap;
 }
 
-.custom-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-top: var(--td-comp-margin-l);
-}
-
-.pagination-total {
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.page-size-select {
-  width: 112px;
-}
-
-.page-number {
-  min-width: 32px;
-}
-
 @media (max-width: 1120px) {
-  .filter-row,
-  .custom-pagination {
+  .filter-row {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .filter-actions,
-  .pagination-controls {
+  .filter-actions {
     flex-wrap: wrap;
   }
 }

@@ -9,6 +9,60 @@ test.beforeEach(async ({ page }) => {
   await installAdminApiMocks(page);
 });
 
+test('keeps foundation pagination spacing consistent inside list layouts', async ({ page }) => {
+  await page.goto('/category-attribute-template');
+
+  const styles = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
+    const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');
+    if (!pagination) return null;
+
+    const hostStyle = getComputedStyle(host);
+    const paginationStyle = getComputedStyle(pagination);
+    return {
+      hostMarginTop: hostStyle.marginTop,
+      paginationDisplay: paginationStyle.display,
+      paginationJustifyContent: paginationStyle.justifyContent,
+      paginationMarginTop: paginationStyle.marginTop,
+      paginationWidth: paginationStyle.width,
+      hostWidth: getComputedStyle(host).width,
+    };
+  });
+
+  expect(styles).toEqual({
+    hostMarginTop: '16px',
+    paginationDisplay: 'flex',
+    paginationJustifyContent: 'flex-end',
+    paginationMarginTop: '0px',
+    paginationWidth: styles?.hostWidth,
+    hostWidth: styles?.hostWidth,
+  });
+});
+
+test('uses the official TDesign pagination controls on routed list pages', async ({ page }) => {
+  const routes = [
+    '/finished-stock-management',
+    '/finished-stock-craft',
+    '/employee-management',
+    '/role-management',
+    '/slab-management',
+    '/supplier-management',
+    '/tenant-management',
+    '/tenant-store-management',
+  ];
+
+  for (const route of routes) {
+    await page.goto(route);
+    const pagination = page.locator('.zdm-admin-pagination .t-pagination');
+    await expect(pagination).toBeVisible();
+    await expect(page.locator('.custom-pagination')).toHaveCount(0);
+
+    const controlHeight = await pagination
+      .locator('.t-pagination__btn-next')
+      .evaluate((control) => Math.round(control.getBoundingClientRect().height));
+    expect(controlHeight).toBe(32);
+  }
+});
+
 test('opens tenant create, business and edit dialogs', async ({ page }) => {
   await page.goto('/tenant-management');
   const main = page.getByRole('main');

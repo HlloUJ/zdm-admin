@@ -1,8 +1,14 @@
 <template>
   <t-dialog
-    v-model:visible="innerVisible"
-    class="admin-dialog"
-    v-bind="$attrs"
+    :visible="visible"
+    :header="header"
+    :width="width"
+    :dialog-class-name="dialogClassName"
+    placement="center"
+    :prevent-scroll-through="false"
+    :confirm-btn="confirmBtn"
+    :cancel-btn="cancelBtn"
+    @update:visible="emit('update:visible', $event)"
     @confirm="emit('confirm')"
     @cancel="emit('cancel')"
     @close="emit('close')"
@@ -14,13 +20,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-
-defineOptions({ inheritAttrs: false });
-
-const props = defineProps<{
-  visible: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    visible: boolean;
+    header: string;
+    width?: string;
+    dialogClassName?: string;
+    confirmBtn?: string;
+    cancelBtn?: string | null;
+  }>(),
+  {
+    width: '520px',
+    dialogClassName: '',
+    confirmBtn: '提交',
+    cancelBtn: '取消',
+  },
+);
 
 const emit = defineEmits<{
   'update:visible': [value: boolean];
@@ -30,9 +45,4 @@ const emit = defineEmits<{
   opened: [];
   closed: [];
 }>();
-
-const innerVisible = computed({
-  get: () => props.visible,
-  set: (value: boolean) => emit('update:visible', value),
-});
 </script>

@@ -102,46 +102,12 @@
               </template>
             </t-table>
 
-            <div class="custom-pagination">
-              <div class="pagination-total">共 {{ paginationTotal }} 条数据</div>
-              <div class="pagination-controls">
-                <t-select
-                  :model-value="currentState.pagination.pageSize"
-                  class="page-size-select"
-                  size="small"
-                  @change="handlePageSizeChange"
-                >
-                  <t-option v-for="item in pageSizeOptions" :key="item" :label="`${item}条/页`" :value="item" />
-                </t-select>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :disabled="currentState.pagination.current === 1"
-                  @click="goPrevPage"
-                >
-                  上一页
-                </t-button>
-                <t-button
-                  v-for="page in pageNumbers"
-                  :key="page"
-                  size="small"
-                  :theme="page === currentState.pagination.current ? 'primary' : 'default'"
-                  :variant="page === currentState.pagination.current ? 'base' : 'outline'"
-                  class="page-number"
-                  @click="goPage(page)"
-                >
-                  {{ page }}
-                </t-button>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :disabled="currentState.pagination.current === pageCount"
-                  @click="goNextPage"
-                >
-                  下一页
-                </t-button>
-              </div>
-            </div>
+            <AdminPagination
+              v-model:current="currentState.pagination.current"
+              v-model:page-size="currentState.pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
           </section>
         </section>
       </main>
@@ -220,28 +186,12 @@
           </template>
         </t-table>
 
-        <div class="option-pagination">
-          <t-select
-            :model-value="optionPagination.pageSize"
-            class="page-size-select"
-            size="small"
-            @change="handleOptionPageSizeChange"
-          >
-            <t-option v-for="item in optionPageSizeOptions" :key="item" :label="`${item}条/页`" :value="item" />
-          </t-select>
-          <t-button size="small" variant="outline" :disabled="optionPagination.current === 1" @click="goOptionPrevPage">
-            上一页
-          </t-button>
-          <span class="option-page-text">{{ optionPagination.current }} / {{ optionPageCount }}</span>
-          <t-button
-            size="small"
-            variant="outline"
-            :disabled="optionPagination.current === optionPageCount"
-            @click="goOptionNextPage"
-          >
-            下一页
-          </t-button>
-        </div>
+        <AdminPagination
+          v-model:current="optionPagination.current"
+          v-model:page-size="optionPagination.pageSize"
+          :total="currentOptions.length"
+          :page-size-options="optionPageSizeOptions"
+        />
       </div>
     </t-dialog>
 
@@ -266,6 +216,7 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref } from 'vue';
 type TabKey = 'goods' | 'sales';
 type AttributeStatus = 'normal' | 'disabled';
@@ -476,13 +427,6 @@ const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() =>
   Math.max(Math.ceil(paginationTotal.value / currentState.value.pagination.pageSize), 1),
 );
-const pageNumbers = computed(() => {
-  const current = currentState.value.pagination.current;
-  const total = pageCount.value;
-  const start = Math.max(Math.min(current - 2, total - 4), 1);
-  const end = Math.min(start + 4, total);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-});
 const pageData = computed(() => {
   const start = (currentState.value.pagination.current - 1) * currentState.value.pagination.pageSize;
   return filteredData.value.slice(start, start + currentState.value.pagination.pageSize);
@@ -513,7 +457,6 @@ const optionPagination = reactive({
   pageSize: 20,
 });
 const currentOptions = computed(() => optionTarget.value?.options ?? []);
-const optionPageCount = computed(() => Math.max(Math.ceil(currentOptions.value.length / optionPagination.pageSize), 1));
 const optionPageData = computed(() => {
   const start = (optionPagination.current - 1) * optionPagination.pageSize;
   return currentOptions.value.slice(start, start + optionPagination.pageSize);
@@ -544,23 +487,6 @@ const handleReset = () => {
   currentState.value.searchForm.status = '';
   currentState.value.pagination.pageSize = 10;
   handleSearch();
-};
-
-const handlePageSizeChange = (value: unknown) => {
-  currentState.value.pagination.pageSize = Number(value);
-  currentState.value.pagination.current = 1;
-};
-
-const goPage = (page: number) => {
-  currentState.value.pagination.current = page;
-};
-
-const goPrevPage = () => {
-  currentState.value.pagination.current = Math.max(currentState.value.pagination.current - 1, 1);
-};
-
-const goNextPage = () => {
-  currentState.value.pagination.current = Math.min(currentState.value.pagination.current + 1, pageCount.value);
 };
 
 const resetFormData = () => {
@@ -620,19 +546,6 @@ const closeOptionDialog = () => {
   optionTarget.value = null;
   optionInput.value = '';
   optionCodeInput.value = '';
-};
-
-const handleOptionPageSizeChange = (value: unknown) => {
-  optionPagination.pageSize = Number(value);
-  optionPagination.current = 1;
-};
-
-const goOptionPrevPage = () => {
-  optionPagination.current = Math.max(optionPagination.current - 1, 1);
-};
-
-const goOptionNextPage = () => {
-  optionPagination.current = Math.min(optionPagination.current + 1, optionPageCount.value);
 };
 
 const handleAddOption = () => {
@@ -888,36 +801,6 @@ const handleConfirm = () => {
   gap: var(--td-comp-margin-m);
 }
 
-.custom-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-top: var(--td-comp-margin-l);
-}
-
-.pagination-total {
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
-}
-
-.pagination-controls,
-.option-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
-.page-size-select {
-  width: 112px;
-}
-
-.page-number {
-  min-width: 32px;
-}
-
 .option-panel {
   display: flex;
   flex-direction: column;
@@ -928,13 +811,6 @@ const handleConfirm = () => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--td-comp-margin-s);
-}
-
-.option-page-text {
-  min-width: 56px;
-  text-align: center;
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
 }
 
 @media (max-width: 960px) {
@@ -972,24 +848,15 @@ const handleConfirm = () => {
   }
 
   .page-header,
-  .filter-row,
-  .custom-pagination {
+  .filter-row {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .filter-fields,
   .filter-fields :deep(.t-form__item),
-  .filter-actions,
-  .pagination-controls,
-  .option-pagination {
+  .filter-actions {
     width: 100%;
-  }
-
-  .pagination-controls,
-  .option-pagination {
-    flex-wrap: wrap;
-    justify-content: flex-start;
   }
 
   .filter-actions {

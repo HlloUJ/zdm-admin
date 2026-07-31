@@ -166,43 +166,12 @@
               </template>
             </t-table>
 
-            <div class="custom-pagination">
-              <div class="pagination-total">共 {{ paginationTotal }} 条数据</div>
-              <div class="pagination-controls">
-                <t-select
-                  :model-value="currentState.pagination.pageSize"
-                  class="page-size-select"
-                  size="small"
-                  @change="handlePageSizeChange"
-                >
-                  <t-option v-for="item in pageSizeOptions" :key="item" :label="`${item}条/页`" :value="item" />
-                </t-select>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :disabled="currentState.pagination.current === 1"
-                  @click="goPrevPage"
-                  >上一页</t-button
-                >
-                <t-button
-                  v-for="pageNumber in pageNumbers"
-                  :key="pageNumber"
-                  size="small"
-                  :theme="pageNumber === currentState.pagination.current ? 'primary' : 'default'"
-                  :variant="pageNumber === currentState.pagination.current ? 'base' : 'outline'"
-                  @click="goPage(pageNumber)"
-                >
-                  {{ pageNumber }}
-                </t-button>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :disabled="currentState.pagination.current === pageCount"
-                  @click="goNextPage"
-                  >下一页</t-button
-                >
-              </div>
-            </div>
+            <AdminPagination
+              v-model:current="currentState.pagination.current"
+              v-model:page-size="currentState.pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
           </section>
         </section>
       </main>
@@ -340,6 +309,7 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref } from 'vue';
 type TabKey = 'goods' | 'sales';
 type ControlType = 'input' | 'select';
@@ -725,13 +695,6 @@ const paginationTotal = computed(() => filteredAttributes.value.length);
 const pageCount = computed(() =>
   Math.max(Math.ceil(paginationTotal.value / currentState.value.pagination.pageSize), 1),
 );
-const pageNumbers = computed(() => {
-  const current = currentState.value.pagination.current;
-  const total = pageCount.value;
-  const start = Math.max(Math.min(current - 2, total - 4), 1);
-  const end = Math.min(start + 4, total);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-});
 const pageData = computed(() => {
   const start = (currentState.value.pagination.current - 1) * currentState.value.pagination.pageSize;
   return filteredAttributes.value.slice(start, start + currentState.value.pagination.pageSize);
@@ -1067,23 +1030,6 @@ const handleConfirm = () => {
   closeConfirmDialog();
   MessagePlugin.success('操作成功');
 };
-
-const handlePageSizeChange = (value: unknown) => {
-  currentState.value.pagination.pageSize = Number(value);
-  currentState.value.pagination.current = 1;
-};
-
-const goPage = (pageNumber: number) => {
-  currentState.value.pagination.current = pageNumber;
-};
-
-const goPrevPage = () => {
-  if (currentState.value.pagination.current > 1) currentState.value.pagination.current -= 1;
-};
-
-const goNextPage = () => {
-  if (currentState.value.pagination.current < pageCount.value) currentState.value.pagination.current += 1;
-};
 </script>
 
 <style scoped>
@@ -1342,28 +1288,6 @@ const goNextPage = () => {
 
 .status-tag.unpublished {
   background: #f27b7b;
-}
-
-.custom-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl) 0;
-}
-
-.pagination-total {
-  color: var(--td-text-color-secondary);
-  font-size: 14px;
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.page-size-select {
-  width: 112px;
 }
 
 .transfer-box {
