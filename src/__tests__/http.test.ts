@@ -32,4 +32,19 @@ describe('request', () => {
 
     await expect(request('/auth/login')).rejects.toBeInstanceOf(ApiError);
   });
+
+  it('lets the browser set multipart boundaries for form data', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ code: 0, message: 'ok', data: { url: '/image.png' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const body = new FormData();
+    body.append('file', new File(['image'], 'craft.png', { type: 'image/png' }));
+
+    await request('/admin/crafts/images', { method: 'POST', body });
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.has('Content-Type')).toBe(false);
+  });
 });

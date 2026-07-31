@@ -1,6 +1,7 @@
 package com.zdm.platform.store;
 
 import com.zdm.platform.common.ApiResponse;
+import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,19 +16,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/stores")
 public class StoreController {
-  private final StoreService storeService;
+  private static final String PERMISSION_PREFIX = "admin.tenant.tenant-store-management";
 
-  public StoreController(StoreService storeService) {
+  private final StoreService storeService;
+  private final PermissionGuard permissionGuard;
+
+  public StoreController(StoreService storeService, PermissionGuard permissionGuard) {
     this.storeService = storeService;
+    this.permissionGuard = permissionGuard;
   }
 
   @GetMapping
   public ApiResponse<List<Store>> list() {
+    permissionGuard.requireView(PERMISSION_PREFIX);
     return ApiResponse.ok(storeService.listForCurrentAdmin());
   }
 
   @PostMapping
   public ApiResponse<Store> create(@Valid @RequestBody Store store) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
     store.setId(null);
     storeService.createStore(store);
     return ApiResponse.ok(store);
@@ -35,13 +42,13 @@ public class StoreController {
 
   @PutMapping("/{id}")
   public ApiResponse<Store> update(@PathVariable Long id, @Valid @RequestBody Store store) {
-    store.setId(id);
-    storeService.updateById(store);
-    return ApiResponse.ok(storeService.getById(id));
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
+    return ApiResponse.ok(storeService.updateStore(id, store));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    return ApiResponse.ok(storeService.removeById(id));
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    return ApiResponse.ok(storeService.deleteStore(id));
   }
 }

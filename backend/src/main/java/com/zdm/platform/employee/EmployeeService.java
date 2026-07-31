@@ -1,6 +1,9 @@
 package com.zdm.platform.employee;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.PermissionGuard;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -9,8 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -19,12 +21,20 @@ import org.springframework.util.StringUtils;
 public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   private static final Long DEFAULT_TENANT_ID = 1L;
   private static final Long DEFAULT_STORE_ID = 1L;
+  private static final String PERMISSION_PREFIX = "admin.permission-management.employee-management";
 
   private final JdbcTemplate jdbcTemplate;
   private final SimpleJdbcInsert accountInsert;
+  private final CurrentIdentityProvider identityProvider;
+  private final PermissionGuard permissionGuard;
 
-  public EmployeeService(JdbcTemplate jdbcTemplate) {
+  public EmployeeService(
+      JdbcTemplate jdbcTemplate,
+      CurrentIdentityProvider identityProvider,
+      PermissionGuard permissionGuard) {
     this.jdbcTemplate = jdbcTemplate;
+    this.identityProvider = identityProvider;
+    this.permissionGuard = permissionGuard;
     this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
         .withTableName("accounts")
         .usingColumns("phone", "display_name", "account_type", "status")
@@ -32,36 +42,23 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   public List<Employee> listForCurrentAdmin() {
-    Long accountId = currentAccountId();
-    if (accountId == null) {
+    CurrentIdentity identity = identityProvider.require();
+    if (identity.isSuperAdmin() || "all".equals(identity.dataPermission())) {
       return list();
     }
-    Employee currentEmployee = lambdaQuery()
-        .eq(Employee::getAccountId, accountId)
-        .eq(Employee::getStatus, "enabled")
-        .orderByDesc(Employee::getId)
-        .last("LIMIT 1")
-        .one();
-    if (currentEmployee == null) {
+    if (!StringUtils.hasText(identity.displayName())) {
       return List.of();
     }
-    if ("all".equals(currentEmployee.getDataPermission())) {
-      return list();
-    }
-    if (!StringUtils.hasText(currentEmployee.getName())) {
-      return List.of();
-    }
-    return lambdaQuery().eq(Employee::getCreatedByName, currentEmployee.getName()).list();
+    return lambdaQuery().eq(Employee::getCreatedByName, identity.displayName()).list();
   }
 
   @Transactional
   public Employee createEmployee(Employee employee) {
+    authorizeCreate(employee);
     normalizeScope(employee);
     Long accountId = findOrCreateAccount(employee.getPhone(), employee.getName());
     employee.setAccountId(accountId);
-    if (!StringUtils.hasText(employee.getCreatedByName())) {
-      employee.setCreatedByName(currentEmployeeName());
-    }
+    employee.setCreatedByName(currentEmployeeName());
     validateBeforeEnabled(employee);
     save(employee);
     syncAdminIdentity(employee);
@@ -75,6 +72,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       throw new IllegalArgumentException("员工不存在");
     }
+    requireAccessibleEmployee(existing);
 
     payload.setId(id);
     payload.setAccountId(existing.getAccountId());
@@ -91,6 +89,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
       payload.setCreatedByName(existing.getCreatedByName());
     }
     normalizeScope(payload);
+    authorizeUpdate(existing, payload);
 
     if (payload.getAccountId() == null) {
       payload.setAccountId(findOrCreateAccount(payload.getPhone(), payload.getName()));
@@ -110,6 +109,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       return false;
     }
+    requireAccessibleEmployee(existing);
     removeAdminRoles(existing);
     jdbcTemplate.update(
         """
@@ -282,37 +282,48 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         .toList();
   }
 
-  private Long currentAccountId() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getPrincipal() == null) {
-      return null;
+  private void authorizeCreate(Employee employee) {
+    if (StringUtils.hasText(employee.getRoleIds())
+        || StringUtils.hasText(employee.getDataPermission())) {
+      permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
     }
-    String principal = String.valueOf(authentication.getPrincipal());
-    if (!principal.startsWith("account:")) {
-      return null;
+    if ("enabled".equals(employee.getStatus())) {
+      permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
     }
-    try {
-      return Long.parseLong(principal.substring("account:".length()));
-    } catch (NumberFormatException ex) {
-      return null;
+  }
+
+  private void authorizeUpdate(Employee existing, Employee payload) {
+    boolean profileChanged = !Objects.equals(existing.getTenantId(), payload.getTenantId())
+        || !Objects.equals(existing.getStoreId(), payload.getStoreId())
+        || !Objects.equals(existing.getName(), payload.getName())
+        || !Objects.equals(existing.getGender(), payload.getGender())
+        || !Objects.equals(existing.getPhone(), payload.getPhone())
+        || !Objects.equals(existing.getRemark(), payload.getRemark());
+    boolean permissionChanged = !Objects.equals(existing.getRoleIds(), payload.getRoleIds())
+        || !Objects.equals(existing.getDataPermission(), payload.getDataPermission());
+    boolean statusChanged = !Objects.equals(existing.getStatus(), payload.getStatus());
+
+    if (profileChanged || (!permissionChanged && !statusChanged)) {
+      permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
+    }
+    if (permissionChanged) {
+      permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
+    }
+    if (statusChanged) {
+      permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+    }
+  }
+
+  private void requireAccessibleEmployee(Employee employee) {
+    CurrentIdentity identity = identityProvider.require();
+    if (!identity.isSuperAdmin()
+        && !"all".equals(identity.dataPermission())
+        && !Objects.equals(employee.getCreatedByName(), identity.displayName())) {
+      throw new AccessDeniedException("当前数据权限不允许操作该员工");
     }
   }
 
   private String currentEmployeeName() {
-    Long accountId = currentAccountId();
-    if (accountId == null) {
-      return null;
-    }
-    return lambdaQuery()
-        .eq(Employee::getAccountId, accountId)
-        .eq(Employee::getStatus, "enabled")
-        .orderByDesc(Employee::getId)
-        .last("LIMIT 1")
-        .list()
-        .stream()
-        .map(Employee::getName)
-        .filter(StringUtils::hasText)
-        .findFirst()
-        .orElse(null);
+    return identityProvider.current().map(CurrentIdentity::displayName).orElse(null);
   }
 }

@@ -158,39 +158,12 @@
               </template>
             </t-table>
 
-            <div class="custom-pagination">
-              <div class="pagination-total">共 {{ paginationTotal }} 条数据</div>
-              <div class="pagination-controls">
-                <t-select
-                  :model-value="pagination.pageSize"
-                  class="page-size-select"
-                  size="small"
-                  @change="handlePageSizeChange"
-                >
-                  <t-option v-for="item in pageSizeOptions" :key="item" :label="`${item}条/页`" :value="item" />
-                </t-select>
-                <t-button size="small" variant="outline" :disabled="pagination.current === 1" @click="goPrevPage"
-                  >上一页</t-button
-                >
-                <t-button
-                  v-for="pageNumber in pageNumbers"
-                  :key="pageNumber"
-                  size="small"
-                  :theme="pageNumber === pagination.current ? 'primary' : 'default'"
-                  :variant="pageNumber === pagination.current ? 'base' : 'outline'"
-                  @click="goPage(pageNumber)"
-                >
-                  {{ pageNumber }}
-                </t-button>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :disabled="pagination.current === pageCount"
-                  @click="goNextPage"
-                  >下一页</t-button
-                >
-              </div>
-            </div>
+            <AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
           </section>
         </section>
       </main>
@@ -336,6 +309,7 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 type ValueType = 'select' | 'number' | 'text';
@@ -596,7 +570,6 @@ const filteredAttributes = computed(() => {
 
 const paginationTotal = computed(() => filteredAttributes.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / pagination.pageSize), 1));
-const pageNumbers = computed(() => Array.from({ length: Math.min(pageCount.value, 5) }, (_, index) => index + 1));
 const pageData = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize;
   return filteredAttributes.value.slice(start, start + pagination.pageSize);
@@ -917,23 +890,6 @@ const handleConfirm = () => {
   closeConfirmDialog();
   MessagePlugin.success('操作成功');
 };
-
-const handlePageSizeChange = (value: unknown) => {
-  pagination.pageSize = Number(value);
-  pagination.current = 1;
-};
-
-const goPage = (pageNumber: number) => {
-  pagination.current = pageNumber;
-};
-
-const goPrevPage = () => {
-  if (pagination.current > 1) pagination.current -= 1;
-};
-
-const goNextPage = () => {
-  if (pagination.current < pageCount.value) pagination.current += 1;
-};
 </script>
 
 <style scoped>
@@ -1225,28 +1181,6 @@ const goNextPage = () => {
   background: #f27b7b;
 }
 
-.custom-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl) 0;
-}
-
-.pagination-total {
-  color: var(--td-text-color-secondary);
-  font-size: 14px;
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.page-size-select {
-  width: 112px;
-}
-
 .attribute-source-tabs {
   margin-bottom: var(--td-comp-margin-s);
 }
@@ -1302,8 +1236,7 @@ const goNextPage = () => {
 
   .panel-toolbar,
   .category-search,
-  .attribute-search,
-  .custom-pagination {
+  .attribute-search {
     padding-right: var(--td-comp-paddingLR-l);
     padding-left: var(--td-comp-paddingLR-l);
   }

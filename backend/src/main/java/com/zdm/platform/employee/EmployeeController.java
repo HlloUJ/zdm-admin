@@ -1,6 +1,7 @@
 package com.zdm.platform.employee;
 
 import com.zdm.platform.common.ApiResponse;
+import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,19 +16,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/employees")
 public class EmployeeController {
-  private final EmployeeService employeeService;
+  private static final String PERMISSION_PREFIX = "admin.permission-management.employee-management";
 
-  public EmployeeController(EmployeeService employeeService) {
+  private final EmployeeService employeeService;
+  private final PermissionGuard permissionGuard;
+
+  public EmployeeController(EmployeeService employeeService, PermissionGuard permissionGuard) {
     this.employeeService = employeeService;
+    this.permissionGuard = permissionGuard;
   }
 
   @GetMapping
   public ApiResponse<List<Employee>> list() {
+    permissionGuard.requireView(PERMISSION_PREFIX);
     return ApiResponse.ok(employeeService.listForCurrentAdmin());
   }
 
   @PostMapping
   public ApiResponse<Employee> create(@Valid @RequestBody Employee employee) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
     employee.setId(null);
     return ApiResponse.ok(employeeService.createEmployee(employee));
   }
@@ -39,6 +46,7 @@ public class EmployeeController {
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
     return ApiResponse.ok(employeeService.deleteEmployee(id));
   }
 }

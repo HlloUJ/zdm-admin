@@ -595,7 +595,7 @@ onMounted(loadAllocation);
 
 .permission-menu-column,
 .permission-menu-cell {
-  width: 13.25%;
+  width: 14.5363%;
   border-right: 1px solid var(--td-component-border);
 }
 
@@ -607,7 +607,7 @@ onMounted(loadAllocation);
 
 .permission-tab-column,
 .permission-tab-cell {
-  width: 12.8625%;
+  width: 11.5762%;
   border-right: 1px solid var(--td-component-border);
 }
 

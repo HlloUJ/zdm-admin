@@ -157,41 +157,12 @@
             </template>
           </t-table>
 
-          <div class="custom-pagination">
-            <div class="pagination-total">共 {{ paginationTotal }} 条数据</div>
-            <div class="pagination-controls">
-              <t-select
-                :model-value="currentPagination.pageSize"
-                class="page-size-select"
-                size="small"
-                @change="handlePageSizeChange"
-              >
-                <t-option v-for="item in pageSizeOptions" :key="item" :label="`${item}条/页`" :value="item" />
-              </t-select>
-              <t-button size="small" variant="outline" :disabled="currentPagination.current === 1" @click="goPrevPage">
-                上一页
-              </t-button>
-              <t-button
-                v-for="pageNumber in pageNumbers"
-                :key="pageNumber"
-                size="small"
-                :theme="pageNumber === currentPagination.current ? 'primary' : 'default'"
-                :variant="pageNumber === currentPagination.current ? 'base' : 'outline'"
-                class="page-number"
-                @click="goPage(pageNumber)"
-              >
-                {{ pageNumber }}
-              </t-button>
-              <t-button
-                size="small"
-                variant="outline"
-                :disabled="currentPagination.current === pageCount"
-                @click="goNextPage"
-              >
-                下一页
-              </t-button>
-            </div>
-          </div>
+          <AdminPagination
+            v-model:current="currentPagination.current"
+            v-model:page-size="currentPagination.pageSize"
+            :total="paginationTotal"
+            :page-size-options="pageSizeOptions"
+          />
         </section>
       </main>
     </div>
@@ -434,6 +405,7 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, Up
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref } from 'vue';
 type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 type PublisherType = '租户发布' | '平台发布';
@@ -822,14 +794,6 @@ const pageData = computed(() => {
 
 const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
-const pageNumbers = computed(() => {
-  const current = currentPagination.value.current;
-  const total = pageCount.value;
-  const start = Math.max(Math.min(current - 2, total - 4), 1);
-  const end = Math.min(start + 4, total);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-});
-
 const batchButtons = computed(() => {
   const map: Record<
     SlabStatus,
@@ -934,27 +898,6 @@ const handleSearch = () => {
 const handleReset = () => {
   Object.assign(currentFilter.value, makeFilterState());
   handleSearch();
-};
-
-const handlePageSizeChange = (value: unknown) => {
-  currentPagination.value.pageSize = Number(value);
-  currentPagination.value.current = 1;
-};
-
-const goPage = (page: number) => {
-  currentPagination.value.current = page;
-};
-
-const goPrevPage = () => {
-  if (currentPagination.value.current > 1) {
-    currentPagination.value.current -= 1;
-  }
-};
-
-const goNextPage = () => {
-  if (currentPagination.value.current < pageCount.value) {
-    currentPagination.value.current += 1;
-  }
 };
 
 const ensureCurrentPage = () => {
@@ -1582,34 +1525,6 @@ const saveBatchPrice = () => {
   gap: var(--td-comp-margin-s);
 }
 
-.custom-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-top: var(--td-comp-margin-l);
-}
-
-.pagination-total {
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-xs);
-}
-
-.page-size-select {
-  width: 108px;
-  margin-right: var(--td-comp-margin-xs);
-}
-
-.page-number {
-  min-width: 32px;
-}
-
 .product-tabs {
   min-height: 460px;
 }
@@ -1753,8 +1668,7 @@ const saveBatchPrice = () => {
 
   .page-header,
   .filter-row,
-  .table-toolbar,
-  .custom-pagination {
+  .table-toolbar {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1770,10 +1684,6 @@ const saveBatchPrice = () => {
 
   .filter-fields :deep(.t-form__item) {
     width: calc(50% - var(--td-comp-margin-s) / 2);
-  }
-
-  .pagination-controls {
-    flex-wrap: wrap;
   }
 
   .filter-actions {

@@ -3,6 +3,8 @@ package com.zdm.platform.craft;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 @TableName("crafts")
 public class Craft extends BaseEntity {
@@ -12,10 +14,14 @@ public class Craft extends BaseEntity {
   @NotBlank
   private String type;
 
+  @Pattern(regexp = "\\d*", message = "工艺宽度仅支持数字")
   private String width;
   private String description;
   private String imageUrl;
   private String pricingMethod;
+  private String createdByName;
+
+  @Size(max = 100, message = "备注最多输入100个字符")
   private String remark;
 
   public String getName() {
@@ -64,6 +70,14 @@ public class Craft extends BaseEntity {
 
   public void setPricingMethod(String pricingMethod) {
     this.pricingMethod = pricingMethod;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 
   public String getRemark() {

@@ -161,46 +161,12 @@
               </template>
             </t-table>
 
-            <div class="custom-pagination">
-              <div class="pagination-total">共 {{ paginationTotal }} 条数据</div>
-              <div class="pagination-controls">
-                <t-select
-                  :model-value="currentPagination.pageSize"
-                  class="page-size-select"
-                  size="small"
-                  @change="handlePageSizeChange"
-                >
-                  <t-option v-for="item in pageSizeOptions" :key="item" :label="`${item}条/页`" :value="item" />
-                </t-select>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :disabled="currentPagination.current === 1"
-                  @click="goPrevPage"
-                >
-                  上一页
-                </t-button>
-                <t-button
-                  v-for="pageNumber in pageNumbers"
-                  :key="pageNumber"
-                  size="small"
-                  :theme="pageNumber === currentPagination.current ? 'primary' : 'default'"
-                  :variant="pageNumber === currentPagination.current ? 'base' : 'outline'"
-                  class="page-number"
-                  @click="goPage(pageNumber)"
-                >
-                  {{ pageNumber }}
-                </t-button>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :disabled="currentPagination.current === pageCount"
-                  @click="goNextPage"
-                >
-                  下一页
-                </t-button>
-              </div>
-            </div>
+            <AdminPagination
+              v-model:current="currentPagination.current"
+              v-model:page-size="currentPagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
           </section>
         </template>
 
@@ -1006,6 +972,7 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
+import { AdminPagination } from '@/components/foundation';
 import {
   createFinishedProduct,
   deleteFinishedProduct,
@@ -1694,12 +1661,10 @@ const filteredData = computed(() => {
 });
 
 const paginationTotal = computed(() => filteredData.value.length);
-const pageCount = computed(() => Math.max(1, Math.ceil(paginationTotal.value / currentPagination.value.pageSize)));
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
   return filteredData.value.slice(start, start + currentPagination.value.pageSize);
 });
-const pageNumbers = computed(() => Array.from({ length: Math.min(pageCount.value, 5) }, (_, index) => index + 1));
 const pageAllSelected = computed(
   () => pageData.value.length > 0 && pageData.value.every((item) => selectedKeySet.value.has(item.id)),
 );
@@ -1949,23 +1914,6 @@ const toggleCurrentPage = (checked: boolean) => {
     const currentIds = new Set(pageData.value.map((item) => item.id));
     selectedKeys.value = selectedKeys.value.filter((id) => !currentIds.has(id));
   }
-};
-
-const handlePageSizeChange = (value: unknown) => {
-  currentPagination.value.pageSize = Number(value);
-  currentPagination.value.current = 1;
-};
-
-const goPage = (page: number) => {
-  currentPagination.value.current = page;
-};
-
-const goPrevPage = () => {
-  currentPagination.value.current = Math.max(1, currentPagination.value.current - 1);
-};
-
-const goNextPage = () => {
-  currentPagination.value.current = Math.min(pageCount.value, currentPagination.value.current + 1);
 };
 
 const handleBatchAction = (action: BatchAction) => {
@@ -2904,7 +2852,6 @@ const handleConfirm = async () => {
 .filter-row,
 .table-toolbar,
 .toolbar-buttons,
-.pagination-controls,
 .form-title-row,
 .selected-category,
 .spec-toolbar,
@@ -3169,26 +3116,6 @@ const handleConfirm = async () => {
   justify-content: flex-start;
   flex-wrap: wrap;
   gap: 10px;
-}
-
-.custom-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 16px;
-  color: #6b7280;
-}
-
-.pagination-controls {
-  gap: 6px;
-}
-
-.page-size-select {
-  width: 104px;
-}
-
-.page-number {
-  min-width: 32px;
 }
 
 .form-shell {
@@ -3729,7 +3656,6 @@ const handleConfirm = async () => {
 
 @media (max-width: 860px) {
   .filter-row,
-  .custom-pagination,
   .form-title-row {
     display: block;
   }
@@ -3742,8 +3668,7 @@ const handleConfirm = async () => {
     grid-template-columns: 1fr;
   }
 
-  .filter-actions,
-  .pagination-controls {
+  .filter-actions {
     margin-top: 12px;
   }
 }

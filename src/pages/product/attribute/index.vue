@@ -440,8 +440,4 @@ onMounted(loadAttributes);
   padding-left: 24px;
   padding-right: 24px;
 }
-:deep(.zdm-admin-list-layout__pagination .zdm-admin-pagination) {
-  width: 100%;
-  margin-top: 0;
-}
 </style>
