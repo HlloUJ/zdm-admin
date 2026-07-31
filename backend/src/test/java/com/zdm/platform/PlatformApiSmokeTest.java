@@ -81,11 +81,15 @@ class PlatformApiSmokeTest {
     String adminManagerPermissions = jdbcTemplate.queryForObject(
         "SELECT function_permissions FROM roles WHERE code = 'ADMIN_MANAGER'",
         String.class);
+    Integer craftWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM crafts WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(24);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(25);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
+    assertThat(craftWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -122,6 +126,16 @@ class PlatformApiSmokeTest {
   @Test
   void craftManagementPersistsUploadedImageAndHandlesBusinessErrors() throws Exception {
     String craftName = "集成测试工艺-" + System.nanoTime();
+    String creatorName = jdbcTemplate.queryForObject(
+        """
+        SELECT name
+        FROM employees
+        WHERE account_id = 1
+          AND status = 'enabled'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        String.class);
     MockMultipartFile image = new MockMultipartFile(
         "file",
         "craft.png",
@@ -145,7 +159,7 @@ class PlatformApiSmokeTest {
             .content().contentType("image/png"));
 
     MvcResult createdResult = mockMvc.perform(post("/api/admin/crafts")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
             .contentType("application/json")
             .content("""
                 {
@@ -154,11 +168,13 @@ class PlatformApiSmokeTest {
                   "width": "12",
                   "imageUrl": "%s",
                   "remark": "新增备注",
-                  "status": "enabled"
+                  "status": "enabled",
+                  "createdByName": "不应覆盖"
                 }
                 """.formatted(craftName, imageUrl)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
         .andReturn();
     String craftId = com.jayway.jsonpath.JsonPath.read(
         createdResult.getResponse().getContentAsString(),
@@ -201,12 +217,14 @@ class PlatformApiSmokeTest {
                   "width": "18",
                   "imageUrl": "%s",
                   "remark": "编辑备注",
-                  "status": "enabled"
+                  "status": "enabled",
+                  "createdByName": "不应覆盖"
                 }
                 """.formatted(craftName, imageUrl)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
-        .andExpect(jsonPath("$.data.remark").value("编辑备注"));
+        .andExpect(jsonPath("$.data.remark").value("编辑备注"))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
 
     mockMvc.perform(patch("/api/admin/crafts/{id}/status", craftId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -216,7 +234,8 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("disabled"))
-        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl));
+        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
 
     mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)

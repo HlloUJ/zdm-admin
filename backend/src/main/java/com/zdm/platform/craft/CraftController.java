@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +26,22 @@ public class CraftController extends AdminCrudController<Craft> {
     super(service);
     this.service = service;
     this.imageStorageService = imageStorageService;
+  }
+
+  @Override
+  @PostMapping
+  public ApiResponse<Craft> create(@Valid @RequestBody Craft craft) {
+    return ApiResponse.ok(service.createCraft(craft));
+  }
+
+  @Override
+  @PutMapping("/{id}")
+  public ApiResponse<Craft> update(@PathVariable Long id, @Valid @RequestBody Craft craft) {
+    Craft updated = service.updateCraft(id, craft);
+    if (updated == null) {
+      throw new IllegalArgumentException("工艺不存在");
+    }
+    return ApiResponse.ok(updated);
   }
 
   @PostMapping("/images")

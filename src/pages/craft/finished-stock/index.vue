@@ -256,6 +256,7 @@ interface CraftItem {
   type: string;
   width: string;
   status: CraftStatus;
+  createdByName: string;
   createdAt: string;
   remark?: string;
 }
@@ -285,6 +286,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'type', title: '工艺类型', width: 120 },
   { colKey: 'width', title: '工艺宽度（mm）', width: 150, ellipsisTitle: true },
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
 ];
@@ -388,6 +390,7 @@ const toCraftItem = (record: CraftRecord): CraftItem => ({
   type: record.type,
   width: record.width ?? '',
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName || '-',
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });

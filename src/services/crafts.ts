@@ -10,6 +10,7 @@ export interface CraftRecord {
   pricingMethod?: string;
   remark?: string;
   status?: 'enabled' | 'disabled';
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
