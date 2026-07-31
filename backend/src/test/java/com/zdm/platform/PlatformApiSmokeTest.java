@@ -85,7 +85,7 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM crafts WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(25);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(26);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
