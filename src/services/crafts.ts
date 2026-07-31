@@ -25,6 +25,10 @@ export interface CraftPayload {
   status: 'enabled' | 'disabled';
 }
 
+export interface CraftImageUploadResponse {
+  url: string;
+}
+
 export function listCrafts() {
   return request<CraftRecord[]>('/admin/crafts');
 }
@@ -40,6 +44,22 @@ export function updateCraft(id: number, payload: CraftPayload) {
   return request<CraftRecord>(`/admin/crafts/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateCraftStatus(id: number, status: CraftPayload['status']) {
+  return request<CraftRecord>(`/admin/crafts/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function uploadCraftImage(file: File) {
+  const body = new FormData();
+  body.append('file', file);
+  return request<CraftImageUploadResponse>('/admin/crafts/images', {
+    method: 'POST',
+    body,
   });
 }
 

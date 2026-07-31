@@ -3,6 +3,7 @@ package com.zdm.platform.craft;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 @TableName("crafts")
 public class Craft extends BaseEntity {
@@ -16,6 +17,8 @@ public class Craft extends BaseEntity {
   private String description;
   private String imageUrl;
   private String pricingMethod;
+
+  @Size(max = 100, message = "备注最多输入100个字符")
   private String remark;
 
   public String getName() {

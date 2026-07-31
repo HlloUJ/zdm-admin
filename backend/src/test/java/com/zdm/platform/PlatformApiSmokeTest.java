@@ -6,6 +6,8 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,6 +23,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockMultipartFile;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -46,6 +49,9 @@ class PlatformApiSmokeTest {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
+    registry.add(
+        "zdm.craft-image.storage-path",
+        () -> System.getProperty("java.io.tmpdir") + "/zdm-craft-images-smoke");
   }
 
   @Test
@@ -111,6 +117,111 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
         .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(1)));
+  }
+
+  @Test
+  void craftManagementPersistsUploadedImageAndHandlesBusinessErrors() throws Exception {
+    String craftName = "集成测试工艺-" + System.nanoTime();
+    MockMultipartFile image = new MockMultipartFile(
+        "file",
+        "craft.png",
+        "image/png",
+        new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47});
+
+    MvcResult uploadResult = mockMvc.perform(multipart("/api/admin/crafts/images")
+            .file(image)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.data.url").isNotEmpty())
+        .andReturn();
+    String imageUrl = com.jayway.jsonpath.JsonPath.read(
+        uploadResult.getResponse().getContentAsString(),
+        "$.data.url");
+
+    mockMvc.perform(get(imageUrl))
+        .andExpect(status().isOk())
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+            .content().contentType("image/png"));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "边工艺",
+                  "width": "12",
+                  "imageUrl": "%s",
+                  "remark": "新增备注",
+                  "status": "enabled"
+                }
+                """.formatted(craftName, imageUrl)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+        .andReturn();
+    String craftId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "边工艺",
+                  "status": "enabled"
+                }
+                """.formatted(craftName)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("工艺名称已存在"));
+
+    mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "面工艺",
+                  "width": "18",
+                  "imageUrl": "%s",
+                  "remark": "编辑备注",
+                  "status": "enabled"
+                }
+                """.formatted(craftName, imageUrl)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
+        .andExpect(jsonPath("$.data.remark").value("编辑备注"));
+
+    mockMvc.perform(patch("/api/admin/crafts/{id}/status", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {"status": "disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"))
+        .andExpect(jsonPath("$.data.imageUrl").value(imageUrl));
+
+    mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s",
+                  "type": "面工艺",
+                  "remark": "%s",
+                  "status": "disabled"
+                }
+                """.formatted(craftName, "测".repeat(101))))
+        .andExpect(status().isBadRequest());
+
+    mockMvc.perform(delete("/api/admin/crafts/{id}", craftId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
   }
 
   @Test
