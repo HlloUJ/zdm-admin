@@ -36,6 +36,26 @@ const defaultLoginUser: LoginUser = {
   dataPermission: 'all',
 };
 
+const normalizeFunctionPermissions = (permissions: string[]) => {
+  if (permissions.includes('all')) return ['all'];
+
+  const normalized = new Set<string>();
+  permissions.forEach((permission) => {
+    const separatorIndex = permission.lastIndexOf('.');
+    const suffix = permission.slice(separatorIndex + 1);
+    if (suffix === 'reset' || suffix === '重置') return;
+
+    const viewPermission = separatorIndex < 0 ? permission : `${permission.slice(0, separatorIndex)}.view`;
+    if (suffix === 'query' || suffix === '查询') {
+      normalized.add(viewPermission);
+      return;
+    }
+    if (suffix !== 'view' && separatorIndex >= 0) normalized.add(viewPermission);
+    normalized.add(permission);
+  });
+  return Array.from(normalized);
+};
+
 function readLoginUser() {
   const rawUser = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
   if (!rawUser) return defaultLoginUser;
@@ -49,7 +69,7 @@ function readLoginUser() {
       phone: user.phone ?? '',
       roles: user.roles ?? [],
       roleNames: user.roleNames ?? [],
-      permissions: user.permissions ?? [],
+      permissions: normalizeFunctionPermissions(user.permissions ?? []),
       employeeId: user.employeeId,
       tenantId: user.tenantId,
       storeId: user.storeId,
@@ -67,8 +87,12 @@ export function getLoginUser() {
 }
 
 export function setLoginUser(user: LoginUser) {
-  window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
-  loginUserState.value = user;
+  const normalizedUser = {
+    ...user,
+    permissions: normalizeFunctionPermissions(user.permissions),
+  };
+  window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(normalizedUser));
+  loginUserState.value = normalizedUser;
 }
 
 export function logout() {

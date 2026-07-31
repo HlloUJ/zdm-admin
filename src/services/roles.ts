@@ -10,6 +10,7 @@ export interface RoleRecord {
   status: 'enabled' | 'disabled';
   remark?: string;
   functionPermissions?: string;
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -28,6 +28,7 @@ public class Role {
 
   private String remark;
   private String functionPermissions;
+  private String createdByName;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -101,6 +102,14 @@ public class Role {
 
   public void setFunctionPermissions(String functionPermissions) {
     this.functionPermissions = functionPermissions;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 
   public LocalDateTime getCreatedAt() {

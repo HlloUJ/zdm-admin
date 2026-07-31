@@ -3,6 +3,8 @@ package com.zdm.platform;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -54,9 +56,33 @@ class PlatformApiSmokeTest {
     Integer superAdminCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM accounts WHERE phone = '15926626945' AND status = 'enabled'",
         Integer.class);
+    Integer emptyTerminalPolicyCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM roles
+        WHERE category = 'terminal-policy'
+          AND code IN ('TERMINAL_STORE_POLICY', 'TERMINAL_SUPPLIER_POLICY')
+          AND COALESCE(function_permissions, '') = ''
+        """,
+        Integer.class);
+    Integer legacyReadPermissionCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM roles
+        WHERE COALESCE(function_permissions, '') REGEXP '\\\\.(query|reset|查询|重置)(,|$)'
+        """,
+        Integer.class);
+    String adminManagerPermissions = jdbcTemplate.queryForObject(
+        "SELECT function_permissions FROM roles WHERE code = 'ADMIN_MANAGER'",
+        String.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(18);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(24);
     assertThat(superAdminCount).isEqualTo(1);
+    assertThat(emptyTerminalPolicyCount).isEqualTo(2);
+    assertThat(legacyReadPermissionCount).isZero();
+    assertThat(adminManagerPermissions)
+        .contains("admin.permission-management.employee-management.view")
+        .contains("admin.permission-management.role-management.view");
   }
 
   @Test
@@ -88,6 +114,309 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void roleManagementUsesRealRolesAndCreatedByName() throws Exception {
+    mockMvc.perform(get("/api/admin/roles")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.code == 'SUPER_ADMIN')].createdByName").value(hasItem("韩健")))
+        .andExpect(jsonPath("$.data[?(@.code == 'ADMIN_MANAGER')].createdByName").value(hasItem("韩健")))
+        .andExpect(jsonPath("$.data[?(@.code == 'OPERATOR')].createdByName").value(hasItem("韩健")))
+        .andExpect(jsonPath("$.data[?(@.status == 'enabled')].code").value(not(hasItem("CUSTOMER_SERVICE"))));
+
+    String creatorName = jdbcTemplate.queryForObject(
+        """
+        SELECT name
+        FROM employees
+        WHERE account_id = 1
+          AND status = 'enabled'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        String.class);
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/roles")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "集成测试角色",
+                  "code": "INTEGRATION_TEST_ROLE",
+                  "category": "operation-platform",
+                  "clientCode": "admin",
+                  "dataScope": "all",
+                  "status": "enabled",
+                  "remark": "API smoke",
+                  "functionPermissions": ""
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andReturn();
+
+    String roleId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/roles/{id}", roleId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "集成测试角色-已更新",
+                  "code": "INTEGRATION_TEST_ROLE",
+                  "category": "operation-platform",
+                  "clientCode": "admin",
+                  "dataScope": "all",
+                  "status": "enabled",
+                  "remark": "API smoke updated",
+                  "functionPermissions": "",
+                  "createdByName": "不应覆盖"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
+
+    jdbcTemplate.update(
+        "INSERT INTO role_permissions (role_id, permission_code) VALUES (?, 'admin:role:manage')",
+        Long.valueOf(roleId));
+    long affectedAccountId = 9101L;
+    long affectedEmployeeId = 9101L;
+    Long companionRoleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'ADMIN_MANAGER'",
+        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO accounts (id, phone, display_name, account_type, status)
+        VALUES (?, '15900009101', '待停用角色用户', 'person', 'enabled')
+        """,
+        affectedAccountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, role_ids, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '待停用角色用户', '15900009101', 'enabled', ?, 'all', '韩健')
+        """,
+        affectedEmployeeId,
+        affectedAccountId,
+        roleId + "," + companionRoleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        affectedAccountId,
+        affectedEmployeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES
+          (?, ?, 'admin', 1, 1),
+          (?, ?, 'admin', 1, 1)
+        """,
+        affectedAccountId,
+        Long.valueOf(roleId),
+        affectedAccountId,
+        companionRoleId);
+
+    mockMvc.perform(delete("/api/admin/roles/{id}", roleId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+
+    Integer deletedRoleCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM roles WHERE id = ?",
+        Integer.class,
+        Long.valueOf(roleId));
+    Integer deletedRolePermissionCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM role_permissions WHERE role_id = ?",
+        Integer.class,
+        Long.valueOf(roleId));
+    Integer affectedAccountRoleCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM account_roles WHERE account_id = ? AND client_code = 'admin'",
+        Integer.class,
+        affectedAccountId);
+    String affectedEmployeeStatus = jdbcTemplate.queryForObject(
+        "SELECT status FROM employees WHERE id = ?",
+        String.class,
+        affectedEmployeeId);
+    String affectedEmployeeRoleIds = jdbcTemplate.queryForObject(
+        "SELECT role_ids FROM employees WHERE id = ?",
+        String.class,
+        affectedEmployeeId);
+    String affectedIdentityStatus = jdbcTemplate.queryForObject(
+        """
+        SELECT status
+        FROM account_identities
+        WHERE account_id = ?
+          AND client_code = 'admin'
+          AND identity_type = 'employee'
+          AND subject_id = ?
+        """,
+        String.class,
+        affectedAccountId,
+        affectedEmployeeId);
+    String unifiedAccountStatus = jdbcTemplate.queryForObject(
+        "SELECT status FROM accounts WHERE id = ?",
+        String.class,
+        affectedAccountId);
+
+    assertThat(deletedRoleCount).isZero();
+    assertThat(deletedRolePermissionCount).isZero();
+    assertThat(affectedAccountRoleCount).isZero();
+    assertThat(affectedEmployeeStatus).isEqualTo("disabled");
+    assertThat(affectedEmployeeRoleIds).isNull();
+    assertThat(affectedIdentityStatus).isEqualTo("disabled");
+    assertThat(unifiedAccountStatus).isEqualTo("enabled");
+
+    mockMvc.perform(post("/api/admin/auth/login")
+            .contentType("application/json")
+            .content("""
+                {
+                  "phone": "15900009101",
+                  "verifyCode": "888888"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("账号不存在或已停用"));
+
+    Integer companionRoleCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM roles WHERE id = ?",
+        Integer.class,
+        companionRoleId);
+    assertThat(companionRoleCount).isEqualTo(1);
+
+    mockMvc.perform(post("/api/admin/roles")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "集成测试回退角色",
+                  "code": "INTEGRATION_TEST_FALLBACK_ROLE",
+                  "category": "operation-platform",
+                  "clientCode": "admin",
+                  "dataScope": "all",
+                  "status": "enabled",
+                  "remark": "API smoke fallback",
+                  "functionPermissions": ""
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value("韩健"));
+  }
+
+  @Test
+  void roleManagementAppliesCurrentEmployeeDataPermission() throws Exception {
+    long accountId = 9002L;
+    long employeeId = 9002L;
+    String employeeName = "角色范围测试员工";
+
+    jdbcTemplate.update(
+        """
+        INSERT INTO accounts (id, phone, display_name, account_type, status)
+        VALUES (?, '15900009002', ?, 'person', 'enabled')
+        """,
+        accountId,
+        employeeName);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, ?, '15900009002', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId,
+        employeeName);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES
+          ('本人创建的范围角色', 'SELF_SCOPE_ROLE', 'operation-platform', 'admin', 'all', 'enabled', '', ?),
+          ('他人创建的范围角色', 'OTHER_SCOPE_ROLE', 'operation-platform', 'admin', 'all', 'enabled', '', '韩健')
+        """,
+        employeeName);
+
+    mockMvc.perform(get("/api/admin/roles")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.code == 'SELF_SCOPE_ROLE')].name").value(hasItem("本人创建的范围角色")))
+        .andExpect(jsonPath("$.data[?(@.code == 'OTHER_SCOPE_ROLE')]").isEmpty())
+        .andExpect(jsonPath("$.data[?(@.code == 'SUPER_ADMIN')]").isEmpty());
+
+    mockMvc.perform(get("/api/admin/roles")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.code == 'SELF_SCOPE_ROLE')].name").value(hasItem("本人创建的范围角色")))
+        .andExpect(jsonPath("$.data[?(@.code == 'OTHER_SCOPE_ROLE')].name").value(hasItem("他人创建的范围角色")));
+  }
+
+  @Test
+  void roleNameMustBeUniqueWithinItsCategory() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (name, code, category, client_code, data_scope, status, remark, function_permissions)
+        VALUES
+          ('同名角色', 'DUPLICATE_NAME_OPERATION', 'operation-platform', 'admin', 'all', 'enabled', '', ''),
+          ('同名角色', 'DUPLICATE_NAME_PARTNER', 'partner-store', 'store', 'store', 'enabled', '', ''),
+          ('待重命名角色', 'ROLE_TO_RENAME', 'operation-platform', 'admin', 'all', 'enabled', '', '')
+        """);
+
+    mockMvc.perform(post("/api/admin/roles")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": " 同名角色 ",
+                  "code": "DUPLICATE_NAME_CREATE",
+                  "category": "operation-platform",
+                  "clientCode": "admin",
+                  "dataScope": "all",
+                  "status": "enabled",
+                  "remark": "",
+                  "functionPermissions": ""
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("当前用户端已存在同名角色"));
+
+    Long roleToRenameId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'ROLE_TO_RENAME'",
+        Long.class);
+    mockMvc.perform(put("/api/admin/roles/{id}", roleToRenameId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "同名角色",
+                  "code": "ROLE_TO_RENAME",
+                  "category": "operation-platform",
+                  "clientCode": "admin",
+                  "dataScope": "all",
+                  "status": "enabled",
+                  "remark": "",
+                  "functionPermissions": ""
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("当前用户端已存在同名角色"));
+
+    Integer crossCategoryCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM roles WHERE name = '同名角色'",
+        Integer.class);
+    assertThat(crossCategoryCount).isEqualTo(2);
+  }
+
+  @Test
   void employeeInviteRegistrationRequiresAdminActivation() throws Exception {
     MvcResult inviteResult = mockMvc.perform(post("/api/admin/employee-invites")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -99,6 +428,26 @@ class PlatformApiSmokeTest {
     String token = com.jayway.jsonpath.JsonPath.read(
         inviteResult.getResponse().getContentAsString(),
         "$.data.token");
+
+    mockMvc.perform(post("/api/open/employee-invites/{token}/request-code", token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "phone": "15926626945"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该手机号已是当前组织员工"));
+
+    mockMvc.perform(post("/api/open/employee-invites/{token}/request-code", token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "phone": "15926629999"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
 
     mockMvc.perform(post("/api/open/employee-invites/{token}/verify-code", token)
             .contentType("application/json")

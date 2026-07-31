@@ -16,7 +16,13 @@
         </header>
 
         <section class="table-card">
-          <t-tabs v-model="activeCategory" class="role-tabs" :list="roleTabs" @change="handleTabChange" />
+          <t-tabs
+            v-if="roleTabs.length > 1"
+            v-model="activeCategory"
+            class="role-tabs"
+            :list="roleTabs"
+            @change="handleTabChange"
+          />
 
           <div v-if="canCreateRole" class="table-toolbar">
             <t-button theme="primary" @click="openCreateDialog">
@@ -39,15 +45,15 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
+                <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
                   v-if="isOperationPlatformTab && canManageRolePermission && !isSuperAdminRole(row)"
                   theme="primary"
                   hover="color"
                   @click="openPermissionDialog(row)"
                 >
-                  权限管理
+                  权限
                 </t-link>
-                <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
                   v-if="canDeleteRole && !isSuperAdminRole(row)"
                   theme="danger"
@@ -149,7 +155,7 @@
     <t-dialog
       v-model:visible="permissionDialogVisible"
       header="权限配置"
-      width="1040px"
+      width="min(1560px, calc(100vw - 48px))"
       placement="center"
       :close-on-overlay-click="true"
       confirm-btn="保存"
@@ -163,8 +169,23 @@
           <div class="permission-section__header">
             <h3>功能权限</h3>
             <div class="permission-shortcuts">
-              <t-button size="small" variant="outline" theme="primary" @click="selectAllPermissions">全选全部</t-button>
-              <t-button size="small" variant="outline" @click="clearAllPermissions">清空全部</t-button>
+              <t-button
+                size="small"
+                variant="outline"
+                theme="primary"
+                :disabled="!permissionModules.length"
+                @click="selectAllPermissions"
+              >
+                全选全部
+              </t-button>
+              <t-button
+                size="small"
+                variant="outline"
+                :disabled="!permissionModules.length"
+                @click="clearAllPermissions"
+              >
+                清空全部
+              </t-button>
             </div>
           </div>
           <div class="permission-layout">
@@ -184,57 +205,86 @@
                   }}</span
                 >
               </button>
+              <div v-if="!permissionModules.length" class="permission-module-empty">
+                <span>暂无功能模块</span>
+                <small>模块梳理并验证通过后，将显示在这里</small>
+              </div>
             </aside>
 
-            <div v-if="activePermissionModule" class="permission-matrix">
+            <div class="permission-matrix">
               <div class="permission-matrix__toolbar">
-                <div>
-                  <h4>{{ activePermissionModule.label }}</h4>
-                  <p>
-                    已选择 {{ getSelectedCount(getModuleActionValues(activePermissionModule)) }} /
+                <div class="matrix-toolbar-right">
+                  <t-checkbox
+                    :checked="isModuleAllSelected(activePermissionModule)"
+                    :indeterminate="isModuleIndeterminate(activePermissionModule)"
+                    :disabled="!activePermissionModule"
+                    @change="toggleModulePermissions(activePermissionModule, $event)"
+                  >
+                    全选当前模块
+                  </t-checkbox>
+                  <span v-if="activePermissionModule" class="module-selection-count">
+                    已下放 {{ getSelectedCount(getModuleActionValues(activePermissionModule)) }} /
                     {{ getModuleActionValues(activePermissionModule).length }}
-                  </p>
+                  </span>
+                  <span v-else class="module-selection-count">暂无功能模块</span>
                 </div>
-                <t-checkbox
-                  :checked="isModuleAllSelected(activePermissionModule)"
-                  :indeterminate="isModuleIndeterminate(activePermissionModule)"
-                  @change="toggleModulePermissions(activePermissionModule, $event)"
-                >
-                  全选当前模块
-                </t-checkbox>
               </div>
 
               <div class="permission-matrix__table-wrap">
                 <table class="permission-matrix__table">
                   <thead>
                     <tr>
-                      <th>页面/功能点</th>
-                      <th>操作权限</th>
+                      <th class="permission-menu-column">二级菜单</th>
+                      <th class="permission-page-column">页面</th>
+                      <th class="permission-tab-column">页面 Tab</th>
+                      <th class="permission-action-column">操作权限</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="page in activePermissionModule.pages" :key="page.value">
-                      <td>
-                        <div class="permission-page-name">{{ page.label }}</div>
-                        <t-checkbox
-                          size="small"
-                          :checked="isPageAllSelected(page)"
-                          :indeterminate="isPageIndeterminate(page)"
-                          @change="togglePagePermissions(page, $event)"
-                        >
-                          整页权限
-                        </t-checkbox>
+                    <tr v-for="row in activePermissionRows" :key="row.key">
+                      <td v-if="row.showMenu" class="permission-menu-cell" :rowspan="row.menuRowspan">
+                        <t-tag v-if="row.direct" class="permission-level-tag" variant="light">一级菜单直达</t-tag>
+                        <span v-else class="permission-menu-name">{{ row.menuLabel }}</span>
                       </td>
-                      <td>
-                        <div class="permission-action-grid">
+                      <td v-if="row.showPage" class="permission-page-cell" :rowspan="row.pageRowspan">
+                        <div class="permission-page-name">{{ row.pageLabel }}</div>
+                        <div v-if="row.pageNote" class="permission-page-note">{{ row.pageNote }}</div>
+                      </td>
+                      <td class="permission-tab-cell">
+                        <span v-if="row.tabLabels.length" class="permission-tab-text">
+                          {{ row.tabLabels.join('、') }}
+                        </span>
+                        <span v-else class="permission-empty-value">—</span>
+                      </td>
+                      <td class="permission-action-cell">
+                        <t-checkbox
+                          v-if="row.actions.length"
+                          class="permission-row-toggle"
+                          size="small"
+                          :checked="isRowAllSelected(row)"
+                          :indeterminate="isRowIndeterminate(row)"
+                          @change="toggleRowPermissions(row, $event)"
+                        >
+                          {{ row.selectionLabel }}
+                        </t-checkbox>
+                        <div v-if="row.actions.length" class="permission-action-grid">
                           <t-checkbox
-                            v-for="action in page.actions"
+                            v-for="action in row.actions"
                             :key="action.value"
                             :checked="isPermissionSelected(action.value)"
-                            @change="togglePermission(action.value, $event)"
+                            @change="togglePermission(row, action.value, $event)"
                           >
                             {{ action.label }}
                           </t-checkbox>
+                        </div>
+                        <span v-else class="permission-empty-action">暂无独立权限项</span>
+                      </td>
+                    </tr>
+                    <tr v-if="!activePermissionRows.length" class="permission-matrix-empty-row">
+                      <td colspan="4">
+                        <div class="permission-matrix-empty">
+                          <strong>暂无功能目录数据</strong>
+                          <span>完成一个业务模块的梳理、实现和验证后，再将该模块加入全量功能目录</span>
                         </div>
                       </td>
                     </tr>
@@ -252,12 +302,22 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import {
+  collectFunctionCatalogRows,
+  fullFunctionCatalog,
+  getFunctionCatalogPermissionValues,
+  getFunctionModulePermissionValues,
+  getRowViewPermissionValue,
+  normalizeFunctionCatalogPermissions,
+  type FunctionCatalogRow,
+  type FunctionModule,
+} from '@/services/functionCatalog';
 import { getLoginUser } from '@/services/auth';
-import { hasAnyPermission } from '@/services/adminPermissions';
+import { hasAnyPermission, hasPermissionPrefix } from '@/services/adminPermissions';
 import { createRole, deleteRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
 
 type RoleCategory = 'partner-store' | 'supplier-store' | 'operation-platform';
@@ -270,6 +330,7 @@ interface RoleItem {
   dataScope: string;
   status: 'enabled' | 'disabled';
   name: string;
+  createdByName: string;
   createdAt: string;
   remark: string;
   functionPermissions: string[];
@@ -280,460 +341,63 @@ interface RoleForm {
   remark: string;
 }
 
-interface PermissionTreeNode {
-  label: string;
-  value: string;
-  children?: PermissionTreeNode[];
-}
-
-interface PermissionAction {
-  label: string;
-  value: string;
-}
-
-interface PermissionPage {
-  label: string;
-  value: string;
-  actions: PermissionAction[];
-}
-
-interface PermissionModule {
-  label: string;
-  value: string;
-  pages: PermissionPage[];
-}
-
 interface RolePermissionConfig {
   functionPermissions: string[];
 }
 
-const roleTabs = [
+const allRoleTabs: Array<{ label: string; value: RoleCategory }> = [
+  { label: '运营管理平台角色', value: 'operation-platform' },
   { label: '城市合伙人门店角色', value: 'partner-store' },
   { label: '大板供应商门店角色', value: 'supplier-store' },
-  { label: '运营管理平台角色', value: 'operation-platform' },
 ];
 
 const roles = ref<RoleItem[]>([]);
 const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'index', title: '序号', width: '22%', align: 'left' },
-  { colKey: 'name', title: '角色名称', width: '28%', align: 'left' },
-  { colKey: 'createdAt', title: '创建时间', width: '26%', align: 'left' },
-  { colKey: 'operation', title: '操作', width: '24%', align: 'left' },
+  { colKey: 'index', title: '序号', width: '14%', align: 'left' },
+  { colKey: 'name', title: '角色名称', width: '24%', align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: '16%', align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: '24%', align: 'left' },
+  { colKey: 'operation', title: '操作', width: '22%', align: 'left' },
 ];
 
-const actionValueMap: Record<string, string> = {
-  查询: 'query',
-  重置: 'reset',
-  新增: 'create',
-  新建: 'create',
-  业务开通: 'business-open',
-  编辑: 'edit',
-  停用: 'disable',
-  启用: 'enable',
-  '停用/启用': 'toggle-status',
-  删除: 'delete',
-  快速编辑店铺级别: 'quick-edit-shop-level',
-  添加手工分类: 'create-manual-category',
-  添加子分类: 'create-child-category',
-  '上移/下移': 'move',
-  发布商品: 'publish-product',
-  批量上架: 'batch-on-shelf',
-  查看价格: 'view-price',
-  上架: 'on-shelf',
-  驳回: 'reject',
-  批量下架: 'batch-off-shelf',
-  下架: 'off-shelf',
-  批量放回到仓库: 'batch-restore',
-  放回到仓库: 'restore',
-  批量彻底删除: 'batch-delete-permanently',
-  清空回收站: 'clear-recycle-bin',
-  彻底删除: 'delete-permanently',
-  新增子类目: 'create-child-category',
-  关联标准属性: 'link-standard-attribute',
-  关联选项: 'link-option',
-  发布: 'publish',
-  移除: 'remove',
-  设置必填: 'set-required',
-  预览工艺图片: 'preview-image',
-  邀请员工: 'create',
-  编辑员工: 'edit',
-  权限管理: 'permission',
-  查看: 'view',
-  全选: 'select-all',
-  清空: 'clear',
-  保存: 'save',
-};
-
-const buildActionNodes = (scope: string, actions: string[]) =>
-  actions.map((action) => ({
-    label: action,
-    value: `${scope}.${actionValueMap[action] ?? action}`,
-  }));
-
-const permissionTreeData: PermissionTreeNode[] = [
-  {
-    label: '装点猫管理后台',
-    value: 'admin',
-    children: [
-      {
-        label: '租户与门店',
-        value: 'admin.tenant',
-        children: [
-          {
-            label: '租户管理',
-            value: 'admin.tenant.tenant-management',
-            children: buildActionNodes('admin.tenant.tenant-management', [
-              '查询',
-              '重置',
-              '新增',
-              '业务开通',
-              '编辑',
-              '停用/启用',
-              '删除',
-            ]),
-          },
-          {
-            label: '门店管理',
-            value: 'admin.tenant.tenant-store-management',
-            children: buildActionNodes('admin.tenant.tenant-store-management', [
-              '查询',
-              '重置',
-              '新增',
-              '快速编辑店铺级别',
-              '编辑',
-              '停用/启用',
-              '删除',
-            ]),
-          },
-          {
-            label: '门店分类管理',
-            value: 'admin.tenant.store-category-management',
-            children: buildActionNodes('admin.tenant.store-category-management', [
-              '查询',
-              '重置',
-              '添加手工分类',
-              '添加子分类',
-              '编辑',
-              '上移/下移',
-              '停用/启用',
-              '删除',
-            ]),
-          },
-        ],
-      },
-      {
-        label: '成品现货管理',
-        value: 'admin.finished-stock-management',
-        children: [
-          {
-            label: '仓库中',
-            value: 'admin.finished-stock-management.warehouse',
-            children: buildActionNodes('admin.finished-stock-management.warehouse', [
-              '查询',
-              '重置',
-              '发布商品',
-              '批量上架',
-              '查看价格',
-              '上架',
-              '编辑',
-              '驳回',
-              '删除',
-            ]),
-          },
-          {
-            label: '出售中',
-            value: 'admin.finished-stock-management.selling',
-            children: buildActionNodes('admin.finished-stock-management.selling', [
-              '查询',
-              '重置',
-              '发布商品',
-              '批量下架',
-              '查看价格',
-              '下架',
-              '编辑',
-              '驳回',
-              '删除',
-            ]),
-          },
-          {
-            label: '已下架',
-            value: 'admin.finished-stock-management.off-shelf',
-            children: buildActionNodes('admin.finished-stock-management.off-shelf', [
-              '查询',
-              '重置',
-              '批量放回到仓库',
-              '查看价格',
-              '放回到仓库',
-              '编辑',
-              '删除',
-            ]),
-          },
-          {
-            label: '已售完',
-            value: 'admin.finished-stock-management.sold-out',
-            children: buildActionNodes('admin.finished-stock-management.sold-out', ['查询', '重置', '查看价格']),
-          },
-          {
-            label: '回收站',
-            value: 'admin.finished-stock-management.recycle',
-            children: buildActionNodes('admin.finished-stock-management.recycle', [
-              '查询',
-              '重置',
-              '批量放回到仓库',
-              '批量彻底删除',
-              '清空回收站',
-              '查看价格',
-              '放回到仓库',
-              '彻底删除',
-            ]),
-          },
-        ],
-      },
-      {
-        label: '大板管理',
-        value: 'admin.slab-management',
-        children: [
-          {
-            label: '仓库中',
-            value: 'admin.slab-management.warehouse',
-            children: buildActionNodes('admin.slab-management.warehouse', [
-              '查询',
-              '重置',
-              '发布商品',
-              '批量上架',
-              '上架',
-              '编辑',
-              '驳回',
-              '删除',
-            ]),
-          },
-          {
-            label: '出售中',
-            value: 'admin.slab-management.selling',
-            children: buildActionNodes('admin.slab-management.selling', [
-              '查询',
-              '重置',
-              '发布商品',
-              '批量下架',
-              '下架',
-              '编辑',
-              '驳回',
-              '删除',
-            ]),
-          },
-          {
-            label: '已下架',
-            value: 'admin.slab-management.off-shelf',
-            children: buildActionNodes('admin.slab-management.off-shelf', [
-              '查询',
-              '重置',
-              '批量放回到仓库',
-              '放回到仓库',
-              '编辑',
-              '删除',
-            ]),
-          },
-          {
-            label: '已售完',
-            value: 'admin.slab-management.sold-out',
-            children: buildActionNodes('admin.slab-management.sold-out', ['查询', '重置']),
-          },
-          {
-            label: '回收站',
-            value: 'admin.slab-management.recycle',
-            children: buildActionNodes('admin.slab-management.recycle', [
-              '查询',
-              '重置',
-              '批量放回到仓库',
-              '批量彻底删除',
-              '清空回收站',
-              '放回到仓库',
-              '彻底删除',
-            ]),
-          },
-        ],
-      },
-      {
-        label: '供应商管理',
-        value: 'admin.supplier-management',
-        children: buildActionNodes('admin.supplier-management', ['查询', '重置', '新增', '编辑', '停用/启用', '删除']),
-      },
-      {
-        label: '商品基础数据中心',
-        value: 'admin.product-data-center',
-        children: [
-          {
-            label: '商品类目管理',
-            value: 'admin.product-data-center.category',
-            children: buildActionNodes('admin.product-data-center.category', [
-              '查询',
-              '重置',
-              '新增',
-              '新增子类目',
-              '编辑',
-              '停用/启用',
-            ]),
-          },
-          {
-            label: '属性库管理',
-            value: 'admin.product-data-center.attribute',
-            children: buildActionNodes('admin.product-data-center.attribute', ['查询', '重置', '新增', '停用/启用']),
-          },
-          {
-            label: '属性值管理',
-            value: 'admin.product-data-center.attribute-value',
-            children: buildActionNodes('admin.product-data-center.attribute-value', [
-              '查询',
-              '重置',
-              '新增',
-              '停用/启用',
-              '删除',
-            ]),
-          },
-          {
-            label: '类目属性模板',
-            value: 'admin.product-data-center.category-attribute-template',
-            children: buildActionNodes('admin.product-data-center.category-attribute-template', [
-              '查询',
-              '重置',
-              '关联标准属性',
-              '关联选项',
-              '发布',
-              '移除',
-              '设置必填',
-            ]),
-          },
-          {
-            label: '大板品种管理',
-            value: 'admin.product-data-center.slab-variety',
-            children: buildActionNodes('admin.product-data-center.slab-variety', [
-              '查询',
-              '重置',
-              '新增',
-              '编辑',
-              '停用/启用',
-              '删除',
-            ]),
-          },
-          {
-            label: '成品现货工艺管理',
-            value: 'admin.product-data-center.finished-stock-craft',
-            children: buildActionNodes('admin.product-data-center.finished-stock-craft', [
-              '查询',
-              '重置',
-              '新增',
-              '预览工艺图片',
-              '编辑',
-              '停用/启用',
-              '删除',
-            ]),
-          },
-        ],
-      },
-      {
-        label: '权限管理',
-        value: 'admin.permission-management',
-        children: [
-          {
-            label: '员工管理',
-            value: 'admin.permission-management.employee-management',
-            children: buildActionNodes('admin.permission-management.employee-management', [
-              '查询',
-              '重置',
-              '邀请员工',
-              '编辑员工',
-              '停用/启用',
-              '删除',
-            ]),
-          },
-          {
-            label: '角色管理',
-            value: 'admin.permission-management.role-management',
-            children: [
-              {
-                label: '城市合伙人门店角色',
-                value: 'admin.permission-management.role-management.partner-store',
-                children: buildActionNodes('admin.permission-management.role-management.partner-store', [
-                  '新建',
-                  '编辑',
-                  '删除',
-                ]),
-              },
-              {
-                label: '大板供应商门店角色',
-                value: 'admin.permission-management.role-management.supplier-store',
-                children: buildActionNodes('admin.permission-management.role-management.supplier-store', [
-                  '新建',
-                  '编辑',
-                  '删除',
-                ]),
-              },
-              {
-                label: '运营管理平台角色',
-                value: 'admin.permission-management.role-management.operation-platform',
-                children: buildActionNodes('admin.permission-management.role-management.operation-platform', [
-                  '新建',
-                  '权限管理',
-                  '编辑',
-                  '删除',
-                ]),
-              },
-            ],
-          },
-          {
-            label: '终端功能分配',
-            value: 'admin.permission-management.terminal-function-allocation',
-            children: buildActionNodes('admin.permission-management.terminal-function-allocation', [
-              '查看',
-              '全选',
-              '清空',
-              '保存',
-              '重置',
-            ]),
-          },
-        ],
-      },
-    ],
-  },
-];
-
-const isActionGroup = (node: PermissionTreeNode) => {
-  const children = node.children ?? [];
-  return children.length > 0 && children.every((child) => !child.children?.length);
-};
-
-const collectPermissionPages = (nodes: PermissionTreeNode[]): PermissionPage[] =>
-  nodes.flatMap((node) => {
-    if (isActionGroup(node)) {
-      return [
-        {
-          label: node.label,
-          value: node.value,
-          actions: node.children?.map(({ label, value }) => ({ label, value })) ?? [],
-        },
-      ];
-    }
-
-    return node.children?.length ? collectPermissionPages(node.children) : [];
-  });
-
-const permissionModules: PermissionModule[] =
-  permissionTreeData[0]?.children?.map((module) => ({
-    label: module.label,
-    value: module.value,
-    pages: collectPermissionPages([module]),
-  })) ?? [];
+const permissionModules = fullFunctionCatalog;
 
 const pageSizeOptions = [10, 20, 50];
-const activeCategory = ref<RoleCategory>('partner-store');
+const activeCategory = ref<RoleCategory>('operation-platform');
 const loginUser = computed(() => getLoginUser());
+const rolePagePermissionPrefix = 'admin.permission-management.role-management';
+const hasLegacyRolePagePermission = computed(() =>
+  loginUser.value.permissions.some((permission) => {
+    if (!permission.startsWith(`${rolePagePermissionPrefix}.`)) return permission === rolePagePermissionPrefix;
+    return !permission.slice(rolePagePermissionPrefix.length + 1).includes('.');
+  }),
+);
+const roleTabs = computed(() =>
+  allRoleTabs.filter(
+    (tab) =>
+      hasLegacyRolePagePermission.value ||
+      hasPermissionPrefix(loginUser.value, `${rolePagePermissionPrefix}.${tab.value}`),
+  ),
+);
 const activePermissionModuleValue = ref(permissionModules[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
   pageSize: 10,
 });
+
+watch(
+  roleTabs,
+  (tabs) => {
+    const firstTab = tabs[0];
+    if (firstTab && !tabs.some((tab) => tab.value === activeCategory.value)) {
+      activeCategory.value = firstTab.value;
+      pagination.current = 1;
+    }
+  },
+  { immediate: true },
+);
 
 const formRef = ref<FormInstanceFunctions>();
 const formDialogVisible = ref(false);
@@ -755,7 +419,10 @@ const formRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入角色名称', type: 'error' }],
 };
 
-const currentRoles = computed(() => roles.value.filter((item) => item.category === activeCategory.value));
+const currentRoles = computed(() => {
+  if (!roleTabs.value.some((tab) => tab.value === activeCategory.value)) return [];
+  return roles.value.filter((item) => item.category === activeCategory.value);
+});
 const isOperationPlatformTab = computed(() => activeCategory.value === 'operation-platform');
 const currentRolePermissionScope = computed(
   () => `admin.permission-management.role-management.${activeCategory.value}`,
@@ -788,10 +455,14 @@ const pageData = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize;
   return currentRoles.value.slice(start, start + pagination.pageSize);
 });
-const deleteConfirmText = computed(() => `是否删除角色【${deletingRole.value?.name ?? ''}】？`);
+const deleteConfirmText = computed(
+  () =>
+    `是否删除角色【${deletingRole.value?.name ?? ''}】？删除后，使用该角色的用户将被清空角色并自动停用账号，无法继续登录。请及时为相关用户重新分配角色。`,
+);
 const activePermissionModule = computed(
   () => permissionModules.find((module) => module.value === activePermissionModuleValue.value) ?? permissionModules[0],
 );
+const activePermissionRows = computed(() => collectFunctionCatalogRows(activePermissionModule.value));
 
 const normalizeCategory = (value?: string): RoleCategory =>
   value === 'partner-store' || value === 'supplier-store' || value === 'operation-platform'
@@ -816,6 +487,7 @@ const toRoleItem = (record: RoleRecord): RoleItem => ({
   dataScope: record.dataScope,
   status: record.status,
   name: record.name,
+  createdByName: record.createdByName || '-',
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
   functionPermissions: parsePermissions(record.functionPermissions),
@@ -849,7 +521,9 @@ const loadRoles = async () => {
   loading.value = true;
   try {
     const records = await listRoles();
-    roles.value = records.filter((record) => record.category !== 'terminal-policy').map(toRoleItem);
+    roles.value = records
+      .filter((record) => record.category !== 'terminal-policy' && record.status === 'enabled')
+      .map(toRoleItem);
     ensureCurrentPage();
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '角色列表加载失败');
@@ -858,10 +532,9 @@ const loadRoles = async () => {
   }
 };
 
-const getModuleActionValues = (module?: PermissionModule) =>
-  module?.pages.flatMap((page) => page.actions.map((action) => action.value)) ?? [];
-const getPageActionValues = (page: PermissionPage) => page.actions.map((action) => action.value);
-const allPermissionValues = permissionModules.flatMap((module) => getModuleActionValues(module));
+const getModuleActionValues = (module?: FunctionModule) => getFunctionModulePermissionValues(module);
+const getRowActionValues = (row: FunctionCatalogRow) => row.actions.map((action) => action.value);
+const allPermissionValues = getFunctionCatalogPermissionValues(permissionModules);
 const getSelectedCount = (values: string[]) =>
   values.filter((value) => permissionDraft.functionPermissions.includes(value)).length;
 const getCheckedValue = (checked: unknown) => {
@@ -892,14 +565,22 @@ const isIndeterminate = (values: string[]) => {
   const selectedCount = getSelectedCount(values);
   return selectedCount > 0 && selectedCount < values.length;
 };
-const isPageAllSelected = (page: PermissionPage) => isAllSelected(getPageActionValues(page));
-const isPageIndeterminate = (page: PermissionPage) => isIndeterminate(getPageActionValues(page));
-const isModuleAllSelected = (module?: PermissionModule) => isAllSelected(getModuleActionValues(module));
-const isModuleIndeterminate = (module?: PermissionModule) => isIndeterminate(getModuleActionValues(module));
-const togglePermission = (value: string, checked: unknown) => setPermissionRange([value], checked);
-const togglePagePermissions = (page: PermissionPage, checked: unknown) =>
-  setPermissionRange(getPageActionValues(page), checked);
-const toggleModulePermissions = (module: PermissionModule | undefined, checked: unknown) =>
+const isRowAllSelected = (row: FunctionCatalogRow) => isAllSelected(getRowActionValues(row));
+const isRowIndeterminate = (row: FunctionCatalogRow) => isIndeterminate(getRowActionValues(row));
+const isModuleAllSelected = (module?: FunctionModule) => isAllSelected(getModuleActionValues(module));
+const isModuleIndeterminate = (module?: FunctionModule) => isIndeterminate(getModuleActionValues(module));
+const togglePermission = (row: FunctionCatalogRow, value: string, checked: unknown) => {
+  const isChecked = getCheckedValue(checked);
+  const viewPermission = getRowViewPermissionValue(row);
+  if (!isChecked && value === viewPermission) {
+    setPermissionRange(getRowActionValues(row), false);
+    return;
+  }
+  setPermissionRange(isChecked && viewPermission ? [viewPermission, value] : [value], isChecked);
+};
+const toggleRowPermissions = (row: FunctionCatalogRow, checked: unknown) =>
+  setPermissionRange(getRowActionValues(row), checked);
+const toggleModulePermissions = (module: FunctionModule | undefined, checked: unknown) =>
   setPermissionRange(getModuleActionValues(module), checked);
 
 const resetFormData = () => {
@@ -1035,9 +716,10 @@ const openPermissionDialog = (row: RoleItem) => {
     return;
   }
   permissionRole.value = row;
+  activePermissionModuleValue.value = permissionModules[0]?.value ?? '';
   permissionDraft.functionPermissions = row.functionPermissions.includes('all')
     ? [...allPermissionValues]
-    : [...row.functionPermissions];
+    : normalizeFunctionCatalogPermissions(permissionModules, row.functionPermissions);
   permissionDialogVisible.value = true;
 };
 
@@ -1057,6 +739,10 @@ const clearAllPermissions = () => {
 
 const handlePermissionSave = async () => {
   if (!permissionRole.value) return;
+  if (!permissionModules.length) {
+    MessagePlugin.warning('全量功能目录暂未发布，无法保存功能权限');
+    return;
+  }
 
   try {
     const updated = await updateRole(
@@ -1197,7 +883,7 @@ onMounted(loadRoles);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-l);
   width: 100%;
   min-height: 38px;
   padding: 0 var(--td-comp-paddingLR-s);
@@ -1236,6 +922,24 @@ onMounted(loadRoles);
   color: var(--td-brand-color);
 }
 
+.permission-module-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--td-comp-margin-xs);
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-m);
+  color: var(--td-text-color-secondary);
+  text-align: center;
+}
+
+.permission-module-empty small {
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
+  line-height: 20px;
+}
+
 .permission-matrix {
   min-width: 0;
   display: flex;
@@ -1246,27 +950,29 @@ onMounted(loadRoles);
 .permission-matrix__toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--td-comp-margin-l);
-  min-height: 72px;
-  padding: var(--td-comp-paddingTB-m) var(--td-comp-paddingLR-l);
+  min-height: 48px;
+  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-l);
   border-bottom: 1px solid var(--td-component-border);
 }
 
-.permission-matrix__toolbar h4 {
-  margin: 0;
-  color: var(--td-text-color-primary);
-  font: var(--td-font-title-small);
+.matrix-toolbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-l);
+  flex-wrap: nowrap;
 }
 
-.permission-matrix__toolbar p {
-  margin: var(--td-comp-margin-xxs) 0 0;
+.module-selection-count {
   color: var(--td-text-color-secondary);
   font: var(--td-font-body-small);
+  white-space: nowrap;
 }
 
 .permission-matrix__table-wrap {
-  max-height: 448px;
+  max-height: 472px;
   overflow: auto;
 }
 
@@ -1293,25 +999,71 @@ onMounted(loadRoles);
   background: var(--td-bg-color-secondarycontainer);
 }
 
-.permission-matrix__table th:first-child,
-.permission-matrix__table td:first-child {
-  width: 180px;
+.permission-menu-column,
+.permission-menu-cell {
+  width: 13.25%;
+  border-right: 1px solid var(--td-component-border);
+}
+
+.permission-page-column,
+.permission-page-cell {
+  width: 18.375%;
+  border-right: 1px solid var(--td-component-border);
+}
+
+.permission-tab-column,
+.permission-tab-cell {
+  width: 12.8625%;
+  border-right: 1px solid var(--td-component-border);
+}
+
+.permission-action-column,
+.permission-action-cell {
+  width: 55.5125%;
+}
+
+.permission-menu-name,
+.permission-tab-text {
+  color: var(--td-text-color-primary);
+  font: var(--td-font-body-medium);
+}
+
+.permission-level-tag {
+  white-space: nowrap;
 }
 
 .permission-page-name {
-  margin-bottom: var(--td-comp-margin-xs);
   color: var(--td-text-color-primary);
-  font: var(--td-font-title-small);
+  font: var(--td-font-body-medium);
+  font-weight: 400;
+}
+
+.permission-page-note {
+  margin-top: var(--td-comp-margin-xs);
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
+  line-height: 20px;
+}
+
+.permission-row-toggle {
+  margin-bottom: var(--td-comp-margin-s);
+}
+
+.permission-empty-value,
+.permission-empty-action {
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
 }
 
 .permission-action-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
   align-items: start;
 }
 
 .permission-action-grid :deep(.t-checkbox) {
+  flex: 0 0 auto;
   min-width: 0;
 }
 
@@ -1319,6 +1071,27 @@ onMounted(loadRoles);
   white-space: normal;
   word-break: break-word;
   line-height: 20px;
+}
+
+.permission-matrix-empty-row td {
+  height: 416px;
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
+  vertical-align: middle;
+}
+
+.permission-matrix-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--td-comp-margin-xs);
+  color: var(--td-text-color-secondary);
+  text-align: center;
+}
+
+.permission-matrix-empty strong {
+  color: var(--td-text-color-primary);
+  font: var(--td-font-title-small);
 }
 
 .custom-pagination {

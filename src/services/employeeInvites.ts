@@ -10,6 +10,10 @@ export interface VerifyInviteCodePayload {
   verifyCode: string;
 }
 
+export interface RequestInviteCodePayload {
+  phone: string;
+}
+
 export interface EmployeeInviteRegisterPayload extends VerifyInviteCodePayload {
   name: string;
   gender: 'male' | 'female';
@@ -28,6 +32,13 @@ export function createEmployeeInvite() {
 
 export function inspectEmployeeInvite(token: string) {
   return request<EmployeeInviteResponse>(`/open/employee-invites/${encodeURIComponent(token)}`);
+}
+
+export function requestEmployeeInviteCode(token: string, payload: RequestInviteCodePayload) {
+  return request<boolean>(`/open/employee-invites/${encodeURIComponent(token)}/request-code`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export function verifyEmployeeInviteCode(token: string, payload: VerifyInviteCodePayload) {

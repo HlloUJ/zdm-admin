@@ -1,10 +1,9 @@
 package com.zdm.platform.auth;
 
+import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.security.TokenAuthenticationFilter;
-import java.util.Arrays;
 import java.util.List;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 @Service
 public class AuthService {
@@ -45,14 +44,6 @@ public class AuthService {
   }
 
   private List<String> expandPermissionValues(List<String> permissionValues) {
-    if (permissionValues.contains("all")) {
-      return List.of("all");
-    }
-    return permissionValues.stream()
-        .flatMap(value -> Arrays.stream(value.split(",")))
-        .map(String::trim)
-        .filter(StringUtils::hasText)
-        .distinct()
-        .toList();
+    return FunctionPermissionNormalizer.normalize(permissionValues);
   }
 }

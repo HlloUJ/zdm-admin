@@ -24,7 +24,11 @@ describe('auth service', () => {
                 name: '测试员工',
                 phone: '15900000001',
                 roles: ['OPERATION_MANAGER'],
-                permissions: ['admin.permission.employee-management.view'],
+                permissions: [
+                  'admin.permission-management.employee-management.query',
+                  'admin.permission-management.employee-management.reset',
+                  'admin.permission-management.employee-management.edit',
+                ],
               },
             },
           }),
@@ -38,6 +42,10 @@ describe('auth service', () => {
       id: 2,
       name: '测试员工',
       phone: '15900000001',
+      permissions: [
+        'admin.permission-management.employee-management.view',
+        'admin.permission-management.employee-management.edit',
+      ],
     });
   });
 

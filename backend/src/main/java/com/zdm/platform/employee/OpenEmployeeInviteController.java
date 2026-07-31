@@ -23,6 +23,13 @@ public class OpenEmployeeInviteController {
     return ApiResponse.ok(inviteService.inspectInvite(token));
   }
 
+  @PostMapping("/{token}/request-code")
+  public ApiResponse<Boolean> requestCode(
+      @PathVariable String token,
+      @Valid @RequestBody RequestInviteCodeRequest request) {
+    return ApiResponse.ok(inviteService.requestCode(token, request));
+  }
+
   @PostMapping("/{token}/verify-code")
   public ApiResponse<Boolean> verifyCode(
       @PathVariable String token,

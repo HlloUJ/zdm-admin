@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.security.core.Authentication;
@@ -129,17 +130,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
       EmployeeInvite invite,
       EmployeeInviteRegisterRequest request) {
     Long accountId = findOrCreateAccount(request.phone(), request.name().trim());
-    Employee duplicate = lambdaQuery()
-        .eq(Employee::getAccountId, accountId)
-        .eq(Employee::getTenantId, invite.getTenantId())
-        .eq(Employee::getStoreId, invite.getStoreId())
-        .one();
-    if (duplicate != null) {
-      throw new IllegalArgumentException(
-          "enabled".equals(duplicate.getStatus())
-              ? "该手机号已是当前组织员工"
-              : "该手机号已提交员工注册，请等待超级管理员审核");
-    }
+    requireNoExistingEmployee(invite, accountId);
 
     Employee employee = new Employee();
     employee.setAccountId(accountId);
@@ -153,6 +144,25 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     save(employee);
     syncAdminIdentity(employee);
     return new EmployeeInviteRegisterResponse(employee.getId(), employee.getStatus());
+  }
+
+  public void validateInvitedEmployeePhone(EmployeeInvite invite, String phone) {
+    findAccountId(phone).ifPresent(accountId -> requireNoExistingEmployee(invite, accountId));
+  }
+
+  private void requireNoExistingEmployee(EmployeeInvite invite, Long accountId) {
+    Employee duplicate = lambdaQuery()
+        .eq(Employee::getAccountId, accountId)
+        .eq(Employee::getTenantId, invite.getTenantId())
+        .eq(Employee::getStoreId, invite.getStoreId())
+        .last("LIMIT 1")
+        .one();
+    if (duplicate != null) {
+      throw new IllegalArgumentException(
+          "enabled".equals(duplicate.getStatus())
+              ? "该手机号已是当前组织员工"
+              : "该手机号已提交员工注册，请等待超级管理员审核");
+    }
   }
 
   private void normalizeScope(Employee employee) {
@@ -177,12 +187,9 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   private Long findOrCreateAccount(String phone, String displayName) {
-    List<Long> ids = jdbcTemplate.query(
-        "SELECT id FROM accounts WHERE phone = ? LIMIT 1",
-        (rs, rowNum) -> rs.getLong("id"),
-        phone);
-    if (!ids.isEmpty()) {
-      return ids.get(0);
+    Optional<Long> existingAccountId = findAccountId(phone);
+    if (existingAccountId.isPresent()) {
+      return existingAccountId.get();
     }
 
     Map<String, Object> values = new HashMap<>();
@@ -191,6 +198,14 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     values.put("account_type", "person");
     values.put("status", "enabled");
     return accountInsert.executeAndReturnKey(values).longValue();
+  }
+
+  private Optional<Long> findAccountId(String phone) {
+    List<Long> ids = jdbcTemplate.query(
+        "SELECT id FROM accounts WHERE phone = ? LIMIT 1",
+        (rs, rowNum) -> rs.getLong("id"),
+        phone);
+    return ids.stream().findFirst();
   }
 
   private void updateAccountDisplayName(Employee employee) {

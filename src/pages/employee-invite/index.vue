@@ -55,7 +55,13 @@
               placeholder="请输入验证码"
               @update:model-value="normalizeVerifyCode"
             />
-            <t-button size="large" variant="outline" :disabled="countDown > 0" @click="sendCode">
+            <t-button
+              size="large"
+              variant="outline"
+              :disabled="countDown > 0 || requestingCode"
+              :loading="requestingCode"
+              @click="sendCode"
+            >
               {{ countDown > 0 ? `${countDown}s` : '获取验证码' }}
             </t-button>
           </t-form-item>
@@ -103,11 +109,17 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
-import { inspectEmployeeInvite, registerEmployeeInvite, verifyEmployeeInviteCode } from '@/services/employeeInvites';
+import {
+  inspectEmployeeInvite,
+  registerEmployeeInvite,
+  requestEmployeeInviteCode,
+  verifyEmployeeInviteCode,
+} from '@/services/employeeInvites';
 
 const route = useRoute();
 const token = computed(() => String(route.query.token ?? ''));
 const loading = ref(true);
+const requestingCode = ref(false);
 const submitting = ref(false);
 const submitted = ref(false);
 const pageError = ref('');
@@ -179,11 +191,19 @@ const normalizeVerifyCode = (value: unknown) => {
 };
 
 const sendCode = async () => {
-  if (countDown.value > 0 || submitting.value) return;
+  if (countDown.value > 0 || requestingCode.value || submitting.value) return;
   const validateResult = await phoneFormRef.value?.validate({ fields: ['phone'] });
-  if (validateResult === true) {
+  if (validateResult !== true) return;
+
+  requestingCode.value = true;
+  try {
+    await requestEmployeeInviteCode(token.value, { phone: phoneForm.phone });
     startCounter();
     MessagePlugin.success('验证码已发送');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '验证码获取失败');
+  } finally {
+    requestingCode.value = false;
   }
 };
 

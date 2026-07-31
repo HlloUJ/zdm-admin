@@ -86,22 +86,22 @@
               </t-tag>
             </template>
             <template #remark="{ row }">
-              <t-tooltip :content="row.remark" :disabled="!row.remark" placement="top-left">
+              <t-tooltip :content="row.remark" :disabled="!row.remark" placement="bottom-left">
                 <span class="remark-cell">{{ row.remark || '-' }}</span>
               </t-tooltip>
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
                 <t-link v-if="canEditEmployee" theme="primary" hover="color" @click="openProfileDialog(row)">
-                  编辑资料
+                  编辑
                 </t-link>
                 <t-link
-                  v-if="canEditEmployee && !isSuperAdminEmployee(row)"
+                  v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row)"
                   theme="primary"
                   hover="color"
                   @click="openPermissionDialog(row)"
                 >
-                  配置权限
+                  角色
                 </t-link>
                 <t-link
                   v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row)"
@@ -122,6 +122,7 @@
                 <span
                   v-if="
                     !canEditEmployee &&
+                    !(canConfigureEmployeePermission && !isSuperAdminEmployee(row)) &&
                     !(canToggleEmployeeStatus && !isSuperAdminEmployee(row)) &&
                     !(canDeleteEmployee && !isSuperAdminEmployee(row))
                   "
@@ -212,16 +213,6 @@
             <t-option label="女" value="female" />
           </t-select>
         </t-form-item>
-        <t-form-item label="手机号码" name="phone" required-mark>
-          <t-input
-            :model-value="profileFormData.phone"
-            class="phone-disabled-input"
-            disabled
-            readonly
-            :maxlength="11"
-            placeholder="请输入手机号"
-          />
-        </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="profileFormData.remark"
@@ -247,7 +238,12 @@
       <t-form ref="permissionFormRef" :data="permissionFormData" :rules="permissionFormRules" label-width="96px" colon>
         <t-form-item label="角色" name="roleIds" required-mark>
           <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择运营管理平台角色">
-            <t-option v-for="role in operationRoleOptions" :key="role.value" :label="role.label" :value="role.value" />
+            <t-option
+              v-for="role in configurableOperationRoleOptions"
+              :key="role.value"
+              :label="role.label"
+              :value="role.value"
+            />
           </t-select>
         </t-form-item>
         <t-form-item label="数据权限" name="dataPermission" required-mark>
@@ -285,6 +281,11 @@ import AdminTopNav from '@/components/AdminTopNav.vue';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
+  fullFunctionCatalog,
+  getFunctionCatalogPermissionValues,
+  normalizeFunctionCatalogPermissions,
+} from '@/services/functionCatalog';
+import {
   deleteEmployee,
   listEmployees,
   updateEmployee,
@@ -316,7 +317,6 @@ interface EmployeeItem {
 interface EmployeeProfileForm {
   name: string;
   gender: Gender;
-  phone: string;
   remark: string;
 }
 
@@ -332,23 +332,6 @@ interface EmployeeFilter {
   status: '' | EmployeeStatus;
 }
 
-interface PermissionAction {
-  label: string;
-  value: string;
-}
-
-interface PermissionPage {
-  label: string;
-  value: string;
-  actions: PermissionAction[];
-}
-
-interface PermissionModule {
-  label: string;
-  value: string;
-  pages: PermissionPage[];
-}
-
 const operationRoles = ref<RoleRecord[]>([]);
 const loginUser = computed(() => getLoginUser());
 const canCreateEmployee = computed(() =>
@@ -356,6 +339,9 @@ const canCreateEmployee = computed(() =>
 );
 const canEditEmployee = computed(() =>
   hasPermission(loginUser.value, 'admin.permission-management.employee-management.edit'),
+);
+const canConfigureEmployeePermission = computed(() =>
+  hasPermission(loginUser.value, 'admin.permission-management.employee-management.permission'),
 );
 const canToggleEmployeeStatus = computed(() =>
   hasPermission(loginUser.value, 'admin.permission-management.employee-management.toggle-status'),
@@ -369,6 +355,14 @@ const operationRoleOptions = computed(() =>
     value: String(role.id),
   })),
 );
+const configurableOperationRoleOptions = computed(() =>
+  operationRoles.value
+    .filter((role) => role.functionPermissions?.split(',').some((permission) => permission.trim()))
+    .map((role) => ({
+      label: role.name,
+      value: String(role.id),
+    })),
+);
 
 const rolePermissionMap = computed<Record<string, string[]>>(() =>
   Object.fromEntries(
@@ -379,260 +373,12 @@ const rolePermissionMap = computed<Record<string, string[]>>(() =>
   ),
 );
 
-const buildActionNodes = (scope: string, actions: Array<{ label: string; value: string }>): PermissionAction[] =>
-  actions.map((action) => ({
-    label: action.label,
-    value: `${scope}.${action.value}`,
-  }));
-
-const permissionModules: PermissionModule[] = [
-  {
-    label: '租户与门店',
-    value: 'admin.tenant',
-    pages: [
-      {
-        label: '租户管理',
-        value: 'admin.tenant.tenant-management',
-        actions: buildActionNodes('admin.tenant.tenant-management', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '业务开通', value: 'open-business' },
-          { label: '编辑', value: 'edit' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '门店管理',
-        value: 'admin.tenant.tenant-store-management',
-        actions: buildActionNodes('admin.tenant.tenant-store-management', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '编辑', value: 'edit' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '门店分类管理',
-        value: 'admin.tenant.store-category-management',
-        actions: buildActionNodes('admin.tenant.store-category-management', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '添加手工分类', value: 'create' },
-          { label: '添加子分类', value: 'create-child' },
-          { label: '编辑', value: 'edit' },
-          { label: '上移/下移', value: 'sort' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-    ],
-  },
-  {
-    label: '成品现货管理',
-    value: 'admin.finished-stock-management',
-    pages: [
-      {
-        label: '仓库中',
-        value: 'admin.finished-stock-management.warehouse',
-        actions: buildActionNodes('admin.finished-stock-management.warehouse', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '发布商品', value: 'publish' },
-          { label: '批量上架', value: 'batch-on-shelf' },
-          { label: '编辑', value: 'edit' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '出售中',
-        value: 'admin.finished-stock-management.selling',
-        actions: buildActionNodes('admin.finished-stock-management.selling', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '下架', value: 'off-shelf' },
-          { label: '编辑', value: 'edit' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-    ],
-  },
-  {
-    label: '大板管理',
-    value: 'admin.slab-management',
-    pages: [
-      {
-        label: '仓库中',
-        value: 'admin.slab-management.warehouse',
-        actions: buildActionNodes('admin.slab-management.warehouse', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '发布商品', value: 'publish' },
-          { label: '上架', value: 'on-shelf' },
-          { label: '编辑', value: 'edit' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '出售中',
-        value: 'admin.slab-management.selling',
-        actions: buildActionNodes('admin.slab-management.selling', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '下架', value: 'off-shelf' },
-          { label: '编辑', value: 'edit' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-    ],
-  },
-  {
-    label: '供应商管理',
-    value: 'admin.supplier-management',
-    pages: [
-      {
-        label: '供应商管理',
-        value: 'admin.supplier-management',
-        actions: buildActionNodes('admin.supplier-management', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '编辑', value: 'edit' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-    ],
-  },
-  {
-    label: '商品基础数据中心',
-    value: 'admin.product-data-center',
-    pages: [
-      {
-        label: '商品类目管理',
-        value: 'admin.product-data-center.category',
-        actions: buildActionNodes('admin.product-data-center.category', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '新增子类目', value: 'create-child' },
-          { label: '编辑', value: 'edit' },
-          { label: '停用/启用', value: 'toggle-status' },
-        ]),
-      },
-      {
-        label: '属性库管理',
-        value: 'admin.product-data-center.attribute',
-        actions: buildActionNodes('admin.product-data-center.attribute', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '停用/启用', value: 'toggle-status' },
-        ]),
-      },
-      {
-        label: '属性值管理',
-        value: 'admin.product-data-center.attribute-value',
-        actions: buildActionNodes('admin.product-data-center.attribute-value', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '类目属性模板',
-        value: 'admin.product-data-center.category-attribute-template',
-        actions: buildActionNodes('admin.product-data-center.category-attribute-template', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '关联标准属性', value: 'bind-attribute' },
-          { label: '关联选项', value: 'bind-option' },
-          { label: '发布', value: 'publish' },
-          { label: '移除', value: 'remove' },
-          { label: '设置必填', value: 'set-required' },
-        ]),
-      },
-      {
-        label: '大板品种管理',
-        value: 'admin.product-data-center.slab-variety',
-        actions: buildActionNodes('admin.product-data-center.slab-variety', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '编辑', value: 'edit' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '成品现货工艺管理',
-        value: 'admin.product-data-center.finished-stock-craft',
-        actions: buildActionNodes('admin.product-data-center.finished-stock-craft', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '新增', value: 'create' },
-          { label: '预览工艺图片', value: 'preview-image' },
-          { label: '编辑', value: 'edit' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-    ],
-  },
-  {
-    label: '权限管理',
-    value: 'admin.permission-management',
-    pages: [
-      {
-        label: '员工管理',
-        value: 'admin.permission-management.employee-management',
-        actions: buildActionNodes('admin.permission-management.employee-management', [
-          { label: '查询', value: 'query' },
-          { label: '重置', value: 'reset' },
-          { label: '邀请员工', value: 'create' },
-          { label: '编辑员工', value: 'edit' },
-          { label: '停用/启用', value: 'toggle-status' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '角色管理',
-        value: 'admin.permission-management.role-management',
-        actions: buildActionNodes('admin.permission-management.role-management', [
-          { label: '新建', value: 'create' },
-          { label: '权限管理', value: 'permission' },
-          { label: '编辑', value: 'edit' },
-          { label: '删除', value: 'delete' },
-        ]),
-      },
-      {
-        label: '终端功能分配',
-        value: 'admin.permission-management.terminal-function-allocation',
-        actions: buildActionNodes('admin.permission-management.terminal-function-allocation', [
-          { label: '查看', value: 'view' },
-          { label: '全选', value: 'select-all' },
-          { label: '清空', value: 'clear' },
-          { label: '保存', value: 'save' },
-          { label: '重置', value: 'reset' },
-        ]),
-      },
-    ],
-  },
-];
-
-const allPermissionValues = computed(() =>
-  permissionModules.flatMap((module) => module.pages.flatMap((page) => page.actions.map((action) => action.value))),
-);
+const allPermissionValues = computed(() => getFunctionCatalogPermissionValues(fullFunctionCatalog));
 
 const expandRolePermissions = (roleIds: string[]) => {
   const values = roleIds.flatMap((roleId) => rolePermissionMap.value[roleId] ?? []);
-  if (values.includes('all')) return allPermissionValues.value;
-  return Array.from(new Set(values));
+  if (values.includes('all')) return allPermissionValues.value.length ? allPermissionValues.value : ['all'];
+  return normalizeFunctionCatalogPermissions(fullFunctionCatalog, values);
 };
 
 const employees = ref<EmployeeItem[]>([]);
@@ -707,7 +453,6 @@ const activeEmployee = ref<EmployeeItem | null>(null);
 const profileFormData = reactive<EmployeeProfileForm>({
   name: '',
   gender: '',
-  phone: '',
   remark: '',
 });
 const permissionFormData = reactive<EmployeePermissionForm>({
@@ -724,10 +469,6 @@ const validateRemarkLength: FormRule['validator'] = (value) => {
 const profileFormRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入姓名', type: 'error' }],
   gender: [{ required: true, message: '请选择性别', type: 'error' }],
-  phone: [
-    { required: true, message: '请输入手机号', type: 'error' },
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', type: 'error' },
-  ],
   remark: [{ validator: validateRemarkLength }],
 };
 
@@ -879,7 +620,6 @@ const openProfileDialog = (row: EmployeeItem) => {
   activeEmployee.value = row;
   profileFormData.name = row.name;
   profileFormData.gender = row.gender;
-  profileFormData.phone = row.phone;
   profileFormData.remark = row.remark;
   profileDialogVisible.value = true;
 };
@@ -916,7 +656,6 @@ const handleProfileSubmit = async () => {
           ...activeEmployee.value,
           name: profileFormData.name.trim(),
           gender: profileFormData.gender as Exclude<Gender, ''>,
-          phone: profileFormData.phone.trim(),
           remark: profileFormData.remark.trim(),
         }),
       );
@@ -1191,15 +930,6 @@ onMounted(loadPermissionCenter);
 .copy-link {
   padding-top: 7px;
   white-space: nowrap;
-}
-
-.phone-disabled-input :deep(.t-input) {
-  background: var(--td-bg-color-component-disabled);
-  cursor: not-allowed;
-}
-
-.phone-disabled-input :deep(input) {
-  cursor: not-allowed;
 }
 
 .custom-pagination {

@@ -129,12 +129,10 @@ export function hasPermissionPrefix(user: LoginUser, prefix?: string) {
 export function hasMenuPermission(user: LoginUser, prefix?: string) {
   if (isSuperAdmin(user)) return true;
   if (!prefix) return false;
-
-  return user.permissions.some((permission) => {
-    if (permission === prefix) return true;
-    if (!permission.startsWith(`${prefix}.`)) return false;
-    return ['query', 'view', '查询', '查看'].some((action) => permission.endsWith(`.${action}`));
-  });
+  return user.permissions.some(
+    (permission) =>
+      permission === `${prefix}.view` || (permission.startsWith(`${prefix}.`) && permission.endsWith('.view')),
+  );
 }
 
 export function getFirstAccessiblePath(user: LoginUser) {

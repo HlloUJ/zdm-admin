@@ -79,8 +79,7 @@ const roles = [
     dataScope: 'all',
     status: 'enabled',
     remark: '系统内置角色',
-    functionPermissions:
-      'admin.tenant.tenant-management.view,admin.tenant.tenant-store-management.view,admin.permission.employee-management.view',
+    functionPermissions: 'all',
     createdAt: '2026-07-27T09:00:00',
   },
   {
@@ -92,7 +91,19 @@ const roles = [
     dataScope: 'all',
     status: 'enabled',
     remark: 'E2E 运营角色',
-    functionPermissions: 'admin.permission.role-management.view',
+    functionPermissions: 'admin.permission-management.role-management.operation-platform.view',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 3,
+    name: '未配置权限角色',
+    code: 'EMPTY_PERMISSION_ROLE',
+    category: 'operation-platform',
+    clientCode: 'admin',
+    dataScope: 'all',
+    status: 'enabled',
+    remark: 'E2E 未配置权限角色',
+    functionPermissions: '',
     createdAt: '2026-07-27T09:00:00',
   },
 ];
@@ -193,6 +204,19 @@ export async function installAdminApiMocks(page: Page) {
 }
 
 async function mockEmployeeInvites(page: Page) {
+  await page.route('**/api/open/employee-invites/e2e-invite-token/request-code', async (route) => {
+    const payload = route.request().postDataJSON() as { phone?: string };
+    if (payload.phone === '15926626945') {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 400, message: '该手机号已是当前组织员工', data: null }),
+      });
+      return;
+    }
+    await fulfillJson(route, true);
+  });
+
   await page.route('**/api/admin/employee-invites', async (route) => {
     await fulfillJson(route, {
       token: 'e2e-invite-token',

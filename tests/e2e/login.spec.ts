@@ -23,7 +23,7 @@ test('stores and displays the logged-in user', async ({ page }) => {
             phone: '15900000001',
             roles: ['OPERATION_MANAGER'],
             roleNames: ['运营经理'],
-            permissions: ['admin.permission.employee-management.view'],
+            permissions: ['admin.permission-management.employee-management.view'],
           },
         },
       }),
@@ -35,7 +35,7 @@ test('stores and displays the logged-in user', async ({ page }) => {
   await page.getByPlaceholder('请输入验证码').fill('888888');
   await page.getByRole('button', { name: '登录' }).click();
 
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/employee-management$/);
   await expect(page.locator('.top-nav .user-name')).toHaveText('测试员工');
   await expect(page.locator('.top-nav .user-role')).toHaveText('运营经理');
   await expect(page.locator('.top-nav .user-meta')).toHaveCSS('flex-direction', 'row');

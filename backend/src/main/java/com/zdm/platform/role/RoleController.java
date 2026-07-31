@@ -23,13 +23,12 @@ public class RoleController {
 
   @GetMapping
   public ApiResponse<List<Role>> list() {
-    return ApiResponse.ok(roleService.list());
+    return ApiResponse.ok(roleService.listForCurrentAdmin());
   }
 
   @PostMapping
   public ApiResponse<Role> create(@Valid @RequestBody Role role) {
-    role.setId(null);
-    roleService.save(role);
+    roleService.createRole(role);
     return ApiResponse.ok(role);
   }
 

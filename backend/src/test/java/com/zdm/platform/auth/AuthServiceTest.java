@@ -62,6 +62,7 @@ class AuthServiceTest {
     when(authAccountMapper.findAdminPermissionValues(2L))
         .thenReturn(List.of(
             "admin.permission-management.employee-management.query,"
+                + "admin.permission-management.employee-management.reset,"
                 + "admin.permission-management.employee-management.edit"));
 
     LoginResponse response = authService.login(new LoginRequest("15900000001", "888888"));
@@ -71,7 +72,7 @@ class AuthServiceTest {
     assertThat(response.user().roleNames()).containsExactly("管理员");
     assertThat(response.user().permissions())
         .containsExactly(
-            "admin.permission-management.employee-management.query",
+            "admin.permission-management.employee-management.view",
             "admin.permission-management.employee-management.edit");
     assertThat(response.user().employeeId()).isEqualTo(3L);
   }

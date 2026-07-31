@@ -49,6 +49,12 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt());
   }
 
+  public Boolean requestCode(String token, RequestInviteCodeRequest request) {
+    EmployeeInvite invite = requireActiveInvite(token);
+    employeeService.validateInvitedEmployeePhone(invite, request.phone());
+    return true;
+  }
+
   public Boolean verifyCode(String token, VerifyInviteCodeRequest request) {
     requireActiveInvite(token);
     requireDevCode(request.verifyCode());
