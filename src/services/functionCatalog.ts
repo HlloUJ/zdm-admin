@@ -88,6 +88,25 @@ export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionM
 // 终端功能分配和角色管理共同消费此目录，禁止在各页面内维护功能数据副本。
 const verifiedFunctionCatalog: FunctionModule[] = [
   {
+    label: '商品基础数据中心',
+    value: 'admin.product-data-center',
+    menus: [
+      {
+        label: '成品现货工艺管理',
+        value: 'admin.product-data-center.finished-stock-craft.menu',
+        direct: false,
+        pages: [
+          {
+            label: '成品现货工艺管理页',
+            value: 'admin.product-data-center.finished-stock-craft',
+            actions: [],
+            tabs: [],
+          },
+        ],
+      },
+    ],
+  },
+  {
     label: '权限管理',
     value: 'admin.permission-management',
     menus: [

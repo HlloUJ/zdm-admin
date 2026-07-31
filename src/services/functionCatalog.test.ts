@@ -47,11 +47,21 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
-  it('publishes verified employee and role management resources to shared consumers', () => {
+  it('publishes verified craft, employee, and role management resources to shared consumers', () => {
     expect(terminalFunctionTrees.store).toBe(fullFunctionCatalog);
     expect(terminalFunctionTrees.supplier).toBe(fullFunctionCatalog);
-    expect(fullFunctionCatalog).toHaveLength(1);
+    expect(fullFunctionCatalog).toHaveLength(2);
     expect(fullFunctionCatalog[0]).toMatchObject({
+      label: '商品基础数据中心',
+      menus: [
+        {
+          label: '成品现货工艺管理',
+          direct: false,
+          pages: [{ label: '成品现货工艺管理页', tabs: [] }],
+        },
+      ],
+    });
+    expect(fullFunctionCatalog[1]).toMatchObject({
       label: '权限管理',
       menus: [
         {
@@ -72,6 +82,7 @@ describe('full function catalog', () => {
       ],
     });
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
+      'admin.product-data-center.finished-stock-craft.view',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.create',
       'admin.permission-management.employee-management.edit',
@@ -103,11 +114,15 @@ describe('full function catalog', () => {
     expect(
       normalizeTerminalPermissions('store', [
         'store.goods.finished-stock.查询',
+        'admin.product-data-center.finished-stock-craft.query',
+        'admin.product-data-center.finished-stock-craft.reset',
+        'admin.product-data-center.finished-stock-craft.create',
         'admin.permission-management.employee-management.query',
         'admin.permission-management.employee-management.reset',
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
+      'admin.product-data-center.finished-stock-craft.view',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.permission',
     ]);
