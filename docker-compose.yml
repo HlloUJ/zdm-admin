@@ -29,6 +29,8 @@ services:
       ZDM_DB_URL: jdbc:mysql://mysql:3306/zdm_admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
       ZDM_DB_USERNAME: zdm_admin
       ZDM_DB_PASSWORD: zdm_admin_pwd
+      ZDM_SECURITY_DEV_TOKENS_ENABLED: 'true'
+      ZDM_SECURITY_VERIFICATION_CODE: '888888'
       ZDM_CRAFT_IMAGE_DIR: /data/zdm/craft-images
     ports:
       - '8080:8080'
@@ -47,6 +49,8 @@ services:
     environment:
       TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
       TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+      ZDM_SECURITY_DEV_TOKENS_ENABLED: 'true'
+      ZDM_SECURITY_VERIFICATION_CODE: '888888'
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:

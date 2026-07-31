@@ -103,7 +103,7 @@ class PlatformApiSmokeTest {
 
   @Test
   void superAdminCanLoginAndAccessTenantApi() throws Exception {
-    mockMvc.perform(post("/api/admin/auth/login")
+    MvcResult loginResult = mockMvc.perform(post("/api/admin/auth/login")
             .contentType("application/json")
             .content("""
                 {
@@ -113,14 +113,97 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
-        .andExpect(jsonPath("$.data.token").value(TokenAuthenticationFilter.createAccountToken(1L)))
-        .andExpect(jsonPath("$.data.user.phone").value("15926626945"));
+        .andExpect(jsonPath("$.data.token").isString())
+        .andExpect(jsonPath("$.data.user.phone").value("15926626945"))
+        .andReturn();
+
+    String sessionToken = com.jayway.jsonpath.JsonPath.read(
+        loginResult.getResponse().getContentAsString(),
+        "$.data.token");
+    assertThat(sessionToken).doesNotStartWith("dev-token");
+    Integer storedSessionCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM auth_sessions WHERE token_hash <> ? AND CHAR_LENGTH(token_hash) = 64",
+        Integer.class,
+        sessionToken);
+    assertThat(storedSessionCount).isGreaterThanOrEqualTo(1);
 
     mockMvc.perform(get("/api/admin/tenants")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+            .header("Authorization", "Bearer " + sessionToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
         .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(1)));
+
+    mockMvc.perform(post("/api/admin/auth/logout")
+            .header("Authorization", "Bearer " + sessionToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+
+    mockMvc.perform(get("/api/admin/tenants")
+            .header("Authorization", "Bearer " + sessionToken))
+        .andExpect(status().isUnauthorized());
+
+    Integer logoutAuditCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM security_audit_logs
+        WHERE account_id = 1
+          AND request_method = 'POST'
+          AND request_path = '/api/admin/auth/logout'
+          AND result = 'success'
+        """,
+        Integer.class);
+    assertThat(logoutAuditCount).isGreaterThanOrEqualTo(1);
+  }
+
+  @Test
+  void ordinaryRoleWithoutPermissionCannotAccessTenantApi() throws Exception {
+    long accountId = 9003L;
+    long employeeId = 9003L;
+    jdbcTemplate.update(
+        """
+        INSERT INTO accounts (id, phone, display_name, account_type, status)
+        VALUES (?, '15900009003', '无租户权限员工', 'person', 'enabled')
+        """,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '无租户权限员工', '15900009003', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES ('无租户权限角色', 'NO_TENANT_PERMISSION_ROLE', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.permission-management.employee-management.view', '韩健')
+        """);
+    Long roleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'NO_TENANT_PERMISSION_ROLE'",
+        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    mockMvc.perform(get("/api/admin/tenants")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(403));
   }
 
   @Test
@@ -585,7 +668,7 @@ class PlatformApiSmokeTest {
                 }
                 """))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.createdByName").value("韩健"));
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
   }
 
   @Test
@@ -618,6 +701,16 @@ class PlatformApiSmokeTest {
         """,
         accountId,
         employeeId);
+    Long adminManagerRoleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'ADMIN_MANAGER'",
+        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        adminManagerRoleId);
     jdbcTemplate.update(
         """
         INSERT INTO roles

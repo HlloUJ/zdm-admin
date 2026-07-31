@@ -33,5 +33,9 @@ springdoc:
     path: /swagger-ui.html
 
 zdm:
+  security:
+    dev-tokens-enabled: ${ZDM_SECURITY_DEV_TOKENS_ENABLED:false}
+    verification-code: ${ZDM_SECURITY_VERIFICATION_CODE:}
+    session-duration: ${ZDM_SECURITY_SESSION_DURATION:PT12H}
   craft-image:
     storage-path: ${ZDM_CRAFT_IMAGE_DIR:./data/craft-images}

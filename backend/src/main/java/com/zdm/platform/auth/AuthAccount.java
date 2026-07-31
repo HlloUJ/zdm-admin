@@ -2,6 +2,8 @@ package com.zdm.platform.auth;
 
 public class AuthAccount {
   private Long id;
+  private Long identityId;
+  private String clientCode;
   private String phone;
   private String displayName;
   private String status;
@@ -16,6 +18,22 @@ public class AuthAccount {
 
   public void setId(Long id) {
     this.id = id;
+  }
+
+  public Long getIdentityId() {
+    return identityId;
+  }
+
+  public void setIdentityId(Long identityId) {
+    this.identityId = identityId;
+  }
+
+  public String getClientCode() {
+    return clientCode;
+  }
+
+  public void setClientCode(String clientCode) {
+    this.clientCode = clientCode;
   }
 
   public String getPhone() {

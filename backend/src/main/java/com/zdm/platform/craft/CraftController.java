@@ -2,6 +2,7 @@ package com.zdm.platform.craft;
 
 import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
+import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
@@ -31,8 +32,9 @@ public class CraftController extends AdminCrudController<Craft> {
   public CraftController(
       CraftService service,
       CraftImageStorageService imageStorageService,
-      CraftPermissionGuard permissionGuard) {
-    super(service);
+      CraftPermissionGuard permissionGuard,
+      PermissionGuard securityPermissionGuard) {
+    super(service, securityPermissionGuard, CraftPermissionGuard.PREFIX);
     this.service = service;
     this.imageStorageService = imageStorageService;
     this.permissionGuard = permissionGuard;
