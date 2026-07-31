@@ -180,7 +180,14 @@
           </t-select>
         </t-form-item>
         <t-form-item label="工艺宽度" name="width">
-          <t-input v-model="formData.width" clearable placeholder="请输入" />
+          <t-input
+            :model-value="formData.width"
+            clearable
+            inputmode="numeric"
+            placeholder="请输入"
+            suffix="mm"
+            @update:model-value="handleFormWidthInput"
+          />
         </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
@@ -421,7 +428,7 @@ const fillFormData = (row: CraftItem) => {
   formData.image = [...row.image];
   formData.name = row.name;
   formData.type = row.type;
-  formData.width = row.width;
+  formData.width = row.width.replace(/\D/g, '');
   formData.remark = row.remark ?? '';
 };
 
@@ -432,6 +439,10 @@ const handleSearch = () => {
 
 const handleWidthSearchInput = (field: 'widthStart' | 'widthEnd', value: string) => {
   searchForm[field] = value.replace(/\D/g, '');
+};
+
+const handleFormWidthInput = (value: string) => {
+  formData.width = value.replace(/\D/g, '');
 };
 
 const handleReset = () => {

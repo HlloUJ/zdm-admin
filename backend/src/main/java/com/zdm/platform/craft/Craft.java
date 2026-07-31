@@ -3,6 +3,7 @@ package com.zdm.platform.craft;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 @TableName("crafts")
@@ -13,6 +14,7 @@ public class Craft extends BaseEntity {
   @NotBlank
   private String type;
 
+  @Pattern(regexp = "\\d*", message = "工艺宽度仅支持数字")
   private String width;
   private String description;
   private String imageUrl;

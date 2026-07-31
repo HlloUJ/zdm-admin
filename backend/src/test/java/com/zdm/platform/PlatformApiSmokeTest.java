@@ -178,6 +178,19 @@ class PlatformApiSmokeTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("工艺名称已存在"));
 
+    mockMvc.perform(post("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "%s-非法宽度",
+                  "type": "边工艺",
+                  "width": "12mm",
+                  "status": "enabled"
+                }
+                """.formatted(craftName)))
+        .andExpect(status().isBadRequest());
+
     mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
