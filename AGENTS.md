@@ -14,8 +14,16 @@
 
 ## 验证分级
 
+- 后端启动和验证统一使用 `npm run backend:*` 命令，默认由 Docker 提供 JDK/Maven；不得因本机未安装 `mvn` 跳过后端验证。
 - 纯文案、规则或脚本别名：检查 diff 和文件格式。
 - 低风险样式、小交互：`npm run check:changed -- <本次文件>`。
 - 中风险页面、表单、路由、服务层：变更文件检查加受影响单测或 E2E。
 - 高风险登录、权限、API、后端、数据状态：相关前后端测试；边界不明时运行 `npm run check:full`。
 - 发布、合并或高风险回归前：运行 `npm run verify` 或 `npm run verify:local`。
+
+## Git 交付
+
+- 稳定主分支为 `main`，任务分支默认使用 `codex/<task-slug>`。
+- 任务分支验收前同步最新 `origin/main`；多个未合并任务联合验收时使用临时验收分支。
+- 稳定阶段成果通过对应分级验证后方可提交和推送；合并 `main` 前运行 `npm run verify` 或 `npm run verify:local`。
+- 未经用户明确表示验收通过并允许合并，不合并 `main`；合并授权不等于生产发布授权。

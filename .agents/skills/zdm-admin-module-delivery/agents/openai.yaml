@@ -1,0 +1,4 @@
+interface:
+  display_name: '装点猫后台模块闭环交付'
+  short_description: '按业务模块完成设计、实现、权限登记、终端分配与验证闭环'
+  default_prompt: '使用 $zdm-admin-module-delivery 按模块完成后台功能设计、实现、权限登记和验证闭环。'
