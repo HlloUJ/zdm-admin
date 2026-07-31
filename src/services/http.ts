@@ -36,7 +36,9 @@ function clearExpiredLoginSession() {
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  headers.set('Content-Type', 'application/json');
+  if (!(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   const token = getAuthToken();
   if (token) {

@@ -31,11 +31,13 @@ services:
       ZDM_DB_PASSWORD: zdm_admin_pwd
       ZDM_SECURITY_DEV_TOKENS_ENABLED: 'true'
       ZDM_SECURITY_VERIFICATION_CODE: '888888'
+      ZDM_CRAFT_IMAGE_DIR: /data/zdm/craft-images
     ports:
       - '8080:8080'
     volumes:
       - .:/workspace
       - zdm_maven_repo:/root/.m2
+      - zdm_craft_images:/data/zdm/craft-images
     depends_on:
       mysql:
         condition: service_healthy
@@ -59,3 +61,4 @@ services:
 volumes:
   zdm_platform_mysql:
   zdm_maven_repo:
+  zdm_craft_images:

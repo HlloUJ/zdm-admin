@@ -35,9 +35,21 @@
                 </t-form-item>
                 <t-form-item label="工艺宽度">
                   <div class="width-range">
-                    <t-input v-model="searchForm.widthStart" clearable placeholder="长" />
+                    <t-input
+                      :model-value="searchForm.widthStart"
+                      clearable
+                      inputmode="numeric"
+                      placeholder="长"
+                      @update:model-value="handleWidthSearchInput('widthStart', $event)"
+                    />
                     <span>-</span>
-                    <t-input v-model="searchForm.widthEnd" clearable placeholder="宽" />
+                    <t-input
+                      :model-value="searchForm.widthEnd"
+                      clearable
+                      inputmode="numeric"
+                      placeholder="宽"
+                      @update:model-value="handleWidthSearchInput('widthEnd', $event)"
+                    />
                   </div>
                 </t-form-item>
                 <t-form-item label="状态">
@@ -64,7 +76,7 @@
 
         <section class="table-card">
           <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
+            <t-button v-if="canCreateCraft" theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
             </t-button>
@@ -87,15 +99,17 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canEditCraft" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
+                  v-if="canToggleCraftStatus"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link v-if="canDeleteCraft" theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <span v-if="!canEditCraft && !canToggleCraftStatus && !canDeleteCraft">-</span>
               </div>
             </template>
           </t-table>
@@ -155,6 +169,7 @@
             :auto-upload="false"
             :multiple="false"
             :max="1"
+            :size-limit="{ size: 5, unit: 'MB' }"
             tips="点击上传图片"
           />
         </t-form-item>
@@ -167,10 +182,22 @@
           </t-select>
         </t-form-item>
         <t-form-item label="工艺宽度" name="width">
-          <t-input v-model="formData.width" clearable placeholder="请输入" />
+          <t-input
+            :model-value="formData.width"
+            clearable
+            inputmode="numeric"
+            placeholder="请输入"
+            suffix="mm"
+            @update:model-value="handleFormWidthInput"
+          />
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea v-model="formData.remark" placeholder="请输入" :autosize="{ minRows: 4, maxRows: 6 }" />
+          <t-textarea
+            v-model="formData.remark"
+            placeholder="请输入"
+            :maxlength="100"
+            :autosize="{ minRows: 4, maxRows: 6 }"
+          />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -210,11 +237,15 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, Up
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
   createCraft,
   deleteCraft,
   listCrafts,
   updateCraft,
+  updateCraftStatus,
+  uploadCraftImage,
   type CraftPayload,
   type CraftRecord,
 } from '@/services/crafts';
@@ -229,6 +260,7 @@ interface CraftItem {
   type: string;
   width: string;
   status: CraftStatus;
+  createdByName: string;
   createdAt: string;
   remark?: string;
 }
@@ -247,50 +279,24 @@ const craftTypeOptions = [
   { label: '拼接工艺', value: '拼接工艺' },
 ];
 const pageSizeOptions = [10, 20, 50];
-
-const createDemoImage = (name: string): UploadFile[] => [
-  {
-    name,
-    status: 'success',
-    url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="360" height="260" viewBox="0 0 360 260">
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#eef2f7"/>
-            <stop offset="0.46" stop-color="#b4bfce"/>
-            <stop offset="1" stop-color="#6f7f95"/>
-          </linearGradient>
-          <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#ffffff"/>
-            <stop offset="0.52" stop-color="#aebbd0"/>
-            <stop offset="1" stop-color="#71849e"/>
-          </linearGradient>
-        </defs>
-        <rect width="360" height="260" rx="20" fill="url(#bg)"/>
-        <path d="M0 44 C80 16 132 88 215 52 C270 28 312 44 360 20" fill="none" stroke="#ffffff" stroke-opacity="0.42" stroke-width="10"/>
-        <path d="M0 180 C70 132 134 214 220 160 C274 126 318 140 360 112" fill="none" stroke="#ffffff" stroke-opacity="0.26" stroke-width="8"/>
-        <g transform="translate(106 86) skewX(-15) rotate(-8 74 48)">
-          <rect width="148" height="96" rx="8" fill="url(#stone)"/>
-          <rect x="22" y="18" width="108" height="10" rx="5" fill="#ffffff" opacity="0.34"/>
-          <rect x="28" y="42" width="92" height="8" rx="4" fill="#ffffff" opacity="0.2"/>
-          <path d="M10 78 C45 52 64 96 106 68 C128 54 142 60 148 55" fill="none" stroke="#46556c" stroke-opacity="0.22" stroke-width="5"/>
-        </g>
-        <text x="304" y="224" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#172033" fill-opacity="0.72">3D</text>
-      </svg>
-    `)}`,
-  },
-];
+const craftPermissionPrefix = 'admin.product-data-center.finished-stock-craft';
 
 const tableData = ref<CraftItem[]>([]);
 const loading = ref(false);
+const loginUser = computed(() => getLoginUser());
+const canCreateCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.create`));
+const canEditCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.edit`));
+const canToggleCraftStatus = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.toggle-status`));
+const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.delete`));
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 72, align: 'left' },
   { colKey: 'image', title: '工艺图片', width: 112, align: 'center' },
   { colKey: 'name', title: '工艺名称', minWidth: 160 },
   { colKey: 'type', title: '工艺类型', width: 120 },
-  { colKey: 'width', title: '工艺宽度', width: 120 },
+  { colKey: 'width', title: '工艺宽度（mm）', width: 150, ellipsisTitle: true },
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
 ];
@@ -384,11 +390,7 @@ const formatDateTime = (value?: string) => {
 };
 
 const toUploadFiles = (record: CraftRecord): UploadFile[] => {
-  if (record.imageUrl) {
-    return [{ name: `${record.name || 'craft'}.png`, status: 'success', url: record.imageUrl }];
-  }
-
-  return createDemoImage(`craft-${record.id}.png`);
+  return record.imageUrl ? [{ name: `${record.name || 'craft'}.png`, status: 'success', url: record.imageUrl }] : [];
 };
 
 const toCraftItem = (record: CraftRecord): CraftItem => ({
@@ -398,30 +400,20 @@ const toCraftItem = (record: CraftRecord): CraftItem => ({
   type: record.type,
   width: record.width ?? '',
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName || '-',
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
 
-const toCraftPayload = (status: CraftStatus): CraftPayload => ({
+const toCraftPayload = (status: CraftStatus, imageUrl?: string): CraftPayload => ({
   name: formData.name.trim(),
   type: formData.type,
   width: formData.width,
-  imageUrl: formData.image[0]?.url,
+  imageUrl,
   description: formData.remark.trim(),
   pricingMethod: formData.width ? 'width' : undefined,
   remark: formData.remark.trim(),
   status: toBackendStatus(status),
-});
-
-const toCraftPayloadFromItem = (item: CraftItem): CraftPayload => ({
-  name: item.name,
-  type: item.type,
-  width: item.width,
-  imageUrl: item.image[0]?.url,
-  description: item.remark ?? '',
-  pricingMethod: item.width ? 'width' : undefined,
-  remark: item.remark ?? '',
-  status: toBackendStatus(item.status),
 });
 
 const loadCrafts = async () => {
@@ -449,13 +441,21 @@ const fillFormData = (row: CraftItem) => {
   formData.image = [...row.image];
   formData.name = row.name;
   formData.type = row.type;
-  formData.width = row.width;
+  formData.width = row.width.replace(/\D/g, '');
   formData.remark = row.remark ?? '';
 };
 
 const handleSearch = () => {
   Object.assign(appliedSearchForm, searchForm);
   pagination.current = 1;
+};
+
+const handleWidthSearchInput = (field: 'widthStart' | 'widthEnd', value: string) => {
+  searchForm[field] = value.replace(/\D/g, '');
+};
+
+const handleFormWidthInput = (value: string) => {
+  formData.width = value.replace(/\D/g, '');
 };
 
 const handleReset = () => {
@@ -507,18 +507,39 @@ const closeFormDialog = () => {
   formRef.value?.clearValidate();
 };
 
+const resolveFormImageUrl = async () => {
+  const image = formData.image[0];
+  if (!image) return undefined;
+  if (!image.raw) return image.url;
+
+  const uploaded = await uploadCraftImage(image.raw);
+  image.url = uploaded.url;
+  image.status = 'success';
+  return uploaded.url;
+};
+
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
 
+  const normalizedName = formData.name.trim();
+  const duplicateName = tableData.value.some(
+    (item) => item.id !== editingId.value && item.name.trim() === normalizedName,
+  );
+  if (duplicateName) {
+    MessagePlugin.warning('工艺名称已存在');
+    return;
+  }
+
   try {
+    const imageUrl = await resolveFormImageUrl();
     if (dialogMode.value === 'create') {
-      await createCraft(toCraftPayload('normal'));
+      await createCraft(toCraftPayload('normal', imageUrl));
       await loadCrafts();
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
-      await updateCraft(editingId.value, toCraftPayload(current?.status ?? 'normal'));
+      await updateCraft(editingId.value, toCraftPayload(current?.status ?? 'normal', imageUrl));
       await loadCrafts();
     }
 
@@ -571,12 +592,9 @@ const handleConfirm = async () => {
       tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
       ensureCurrentPage();
     } else {
-      const updated = await updateCraft(
+      const updated = await updateCraftStatus(
         confirmState.row.id,
-        toCraftPayloadFromItem({
-          ...confirmState.row,
-          status: confirmState.type === 'enable' ? 'normal' : 'disabled',
-        }),
+        toBackendStatus(confirmState.type === 'enable' ? 'normal' : 'disabled'),
       );
       const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
       if (targetIndex !== -1) {
