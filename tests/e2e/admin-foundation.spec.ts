@@ -9,6 +9,35 @@ test.beforeEach(async ({ page }) => {
   await installAdminApiMocks(page);
 });
 
+test('keeps foundation pagination spacing consistent inside list layouts', async ({ page }) => {
+  await page.goto('/category-attribute-template');
+
+  const styles = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
+    const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');
+    if (!pagination) return null;
+
+    const hostStyle = getComputedStyle(host);
+    const paginationStyle = getComputedStyle(pagination);
+    return {
+      hostMarginTop: hostStyle.marginTop,
+      paginationDisplay: paginationStyle.display,
+      paginationJustifyContent: paginationStyle.justifyContent,
+      paginationMarginTop: paginationStyle.marginTop,
+      paginationWidth: paginationStyle.width,
+      hostWidth: getComputedStyle(host).width,
+    };
+  });
+
+  expect(styles).toEqual({
+    hostMarginTop: '16px',
+    paginationDisplay: 'flex',
+    paginationJustifyContent: 'flex-end',
+    paginationMarginTop: '0px',
+    paginationWidth: styles?.hostWidth,
+    hostWidth: styles?.hostWidth,
+  });
+});
+
 test('opens tenant create, business and edit dialogs', async ({ page }) => {
   await page.goto('/tenant-management');
   const main = page.getByRole('main');

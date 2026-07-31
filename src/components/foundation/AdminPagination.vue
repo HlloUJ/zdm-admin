@@ -1,23 +1,27 @@
 <template>
-  <t-pagination
-    v-model:current="innerCurrent"
-    v-model:page-size="innerPageSize"
-    v-bind="$attrs"
-    class="admin-pagination"
-    @change="handleChange"
-  />
+  <div class="zdm-admin-pagination">
+    <t-pagination
+      :current="current"
+      :page-size="pageSize"
+      :total="total"
+      :page-size-options="pageSizeOptions"
+      @change="handleChange"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
 import type { PageInfo } from 'tdesign-vue-next';
-import { computed } from 'vue';
 
-defineOptions({ inheritAttrs: false });
-
-const props = defineProps<{
-  current: number;
-  pageSize: number;
-}>();
+withDefaults(
+  defineProps<{
+    current: number;
+    pageSize: number;
+    total: number;
+    pageSizeOptions?: number[];
+  }>(),
+  { pageSizeOptions: () => [10, 20, 50] },
+);
 
 const emit = defineEmits<{
   'update:current': [value: number];
@@ -25,17 +29,9 @@ const emit = defineEmits<{
   change: [pageInfo: PageInfo];
 }>();
 
-const innerCurrent = computed({
-  get: () => props.current,
-  set: (value: number) => emit('update:current', value),
-});
-
-const innerPageSize = computed({
-  get: () => props.pageSize,
-  set: (value: number) => emit('update:pageSize', value),
-});
-
 const handleChange = (pageInfo: PageInfo) => {
+  emit('update:current', pageInfo.current);
+  emit('update:pageSize', pageInfo.pageSize);
   emit('change', pageInfo);
 };
 </script>
