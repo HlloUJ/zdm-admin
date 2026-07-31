@@ -42,7 +42,7 @@ public class CraftController extends AdminCrudController<Craft> {
   @GetMapping
   public ApiResponse<List<Craft>> list() {
     permissionGuard.requireView();
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(service.listForCurrentAdmin());
   }
 
   @Override

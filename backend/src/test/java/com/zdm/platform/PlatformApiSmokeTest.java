@@ -328,6 +328,75 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void craftManagementAppliesCurrentEmployeeDataPermission() throws Exception {
+    long accountId = 9003L;
+    long employeeId = 9003L;
+    long roleId = 9003L;
+    String employeeName = "工艺范围测试员工";
+    String ownCraftName = "本人创建的范围工艺-" + System.nanoTime();
+    String otherCraftName = "他人创建的范围工艺-" + System.nanoTime();
+
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, account_type, status) VALUES (?, '15900009003', ?, 'person', 'enabled')",
+        accountId,
+        employeeName);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, ?, '15900009003', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId,
+        employeeName);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'operation-platform', 'admin', 'all', 'enabled', ?, '集成测试')
+        """,
+        roleId,
+        "admin.product-data-center.finished-stock-craft.view");
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        "INSERT INTO crafts (name, type, status, created_by_name) VALUES (?, '边工艺', 'enabled', ?)",
+        ownCraftName,
+        employeeName);
+    jdbcTemplate.update(
+        "INSERT INTO crafts (name, type, status, created_by_name) VALUES (?, '边工艺', 'enabled', '韩健')",
+        otherCraftName);
+
+    mockMvc.perform(get("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(ownCraftName))
+            .value(hasItem(employeeName)))
+        .andExpect(jsonPath("$.data[?(@.name == '%s')]".formatted(otherCraftName)).isEmpty());
+
+    mockMvc.perform(get("/api/admin/crafts")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(ownCraftName))
+            .value(hasItem(employeeName)))
+        .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(otherCraftName))
+            .value(hasItem("韩健")));
+  }
+
+  @Test
   void roleManagementUsesRealRolesAndCreatedByName() throws Exception {
     mockMvc.perform(get("/api/admin/roles")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))

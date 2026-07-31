@@ -1,6 +1,7 @@
 package com.zdm.platform.craft;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +17,24 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
 
   public CraftService(JdbcTemplate jdbcTemplate) {
     this.jdbcTemplate = jdbcTemplate;
+  }
+
+  public List<Craft> listForCurrentAdmin() {
+    Long accountId = currentAccountId();
+    if (accountId == null) {
+      return list();
+    }
+    AdminEmployee currentEmployee = currentAdminEmployee(accountId);
+    if (currentEmployee == null) {
+      return List.of();
+    }
+    if ("all".equals(currentEmployee.dataPermission())) {
+      return list();
+    }
+    if (!StringUtils.hasText(currentEmployee.name())) {
+      return List.of();
+    }
+    return lambdaQuery().eq(Craft::getCreatedByName, currentEmployee.name()).list();
   }
 
   @Transactional
@@ -44,21 +63,27 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
     if (accountId == null) {
       return DEFAULT_CREATED_BY_NAME;
     }
+    AdminEmployee currentEmployee = currentAdminEmployee(accountId);
+    return currentEmployee != null && StringUtils.hasText(currentEmployee.name())
+        ? currentEmployee.name()
+        : DEFAULT_CREATED_BY_NAME;
+  }
+
+  private AdminEmployee currentAdminEmployee(Long accountId) {
     return jdbcTemplate.query(
         """
-        SELECT name
+        SELECT name, data_permission
         FROM employees
         WHERE account_id = ?
           AND status = 'enabled'
         ORDER BY id DESC
         LIMIT 1
         """,
-        (rs, rowNum) -> rs.getString("name"),
+        (rs, rowNum) -> new AdminEmployee(rs.getString("name"), rs.getString("data_permission")),
         accountId)
         .stream()
-        .filter(StringUtils::hasText)
         .findFirst()
-        .orElse(DEFAULT_CREATED_BY_NAME);
+        .orElse(null);
   }
 
   private Long currentAccountId() {
@@ -76,4 +101,6 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
       return null;
     }
   }
+
+  private record AdminEmployee(String name, String dataPermission) {}
 }
