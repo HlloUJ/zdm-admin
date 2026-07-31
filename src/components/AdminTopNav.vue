@@ -45,7 +45,7 @@ const roleText = computed(() => {
 });
 
 const handleLogout = async () => {
-  logout();
+  await logout();
   MessagePlugin.success('已退出登录');
   await router.replace('/login');
 };

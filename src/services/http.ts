@@ -28,6 +28,12 @@ export function clearAuthToken() {
   window.localStorage.removeItem('zdm-admin-token');
 }
 
+function clearExpiredLoginSession() {
+  clearAuthToken();
+  window.localStorage.removeItem('zdm-admin-user');
+  window.dispatchEvent(new Event('zdm-auth-session-cleared'));
+}
+
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
@@ -44,6 +50,9 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
   const body = (await response.json().catch(() => null)) as ApiResponse<T> | null;
   if (!response.ok || !body || body.code !== 0) {
+    if (response.status === 401) {
+      clearExpiredLoginSession();
+    }
     throw new ApiError(body?.message ?? '请求失败', response.status, body);
   }
 

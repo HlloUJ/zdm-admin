@@ -12,14 +12,17 @@
 }
 ```
 
-业务错误使用非 0 `code`，HTTP 参数错误返回 400，未登录返回 401。
+业务错误使用非 0 `code`，HTTP 参数错误返回 400，未登录或会话失效返回 401，已登录但无权限返回 403。
 
 ## 鉴权
 
 - 管理后台登录：`POST /api/admin/auth/login`
+- 管理后台退出：`POST /api/admin/auth/logout`
 - 请求：`{ "phone": "15926626945", "verifyCode": "888888" }`
 - 响应：`token`、用户信息、角色、权限。
 - 后续请求使用 `Authorization: Bearer <token>`。
+- 登录令牌是服务端生成的随机会话令牌，数据库只保存 SHA-256 摘要；退出、身份停用、账号停用或会话过期后不可继续使用。
+- 开发令牌仅在 `ZDM_SECURITY_DEV_TOKENS_ENABLED=true` 时可用，生产环境默认关闭。
 
 ## 多端 API 边界
 
@@ -64,6 +67,8 @@
 - `permissions`：按端区分的权限码，例如 `admin:tenant:manage`。
 - `role_permissions`：角色与权限关系。
 - `account_roles`：账号在某个端和数据范围内拥有的角色。
+- `auth_sessions`：服务端登录会话，只保存令牌摘要、身份和有效期。
+- `security_audit_logs`：管理端新增、修改、删除、退出等写操作的安全审计。
 
 完整字段以 Swagger UI 和 Flyway 迁移文件为准。
 
@@ -75,6 +80,8 @@
 - 新增、编辑、删除、导入、导出及敏感查看等操作必须同时具备同一页面或 Tab 的 `.view`。
 - 角色与终端策略保存时会统一补齐操作依赖的 `.view`；历史 `.query` 迁移为 `.view`，`.reset` 被移除。
 - “查看价格”等敏感数据能力仍使用独立操作编码，同时依赖基础 `.view`。
+- 后端根据当前 `account_identity` 的角色、功能权限和数据权限执行最终校验；前端显隐只用于交互提示。
+- 暂未定义所有权字段的通用 CRUD，仅向超级管理员或 `data_permission=all` 的身份开放，避免错误放大“本人数据”范围。
 
 ## 后续接口演进
 

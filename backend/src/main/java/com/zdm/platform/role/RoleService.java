@@ -2,12 +2,13 @@ package com.zdm.platform.role;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.common.FunctionPermissionNormalizer;
-import com.zdm.platform.employee.Employee;
-import com.zdm.platform.employee.EmployeeService;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.PermissionGuard;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -16,42 +17,49 @@ import org.springframework.util.StringUtils;
 public class RoleService extends ServiceImpl<RoleMapper, Role> {
   private static final String SUPER_ADMIN_CODE = "SUPER_ADMIN";
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+  private static final String ROLE_PERMISSION_PREFIX = "admin.permission-management.role-management";
+  private static final String EMPLOYEE_ASSIGN_PERMISSION =
+      "admin.permission-management.employee-management.permission";
 
   private record AffectedEmployee(Long id, Long accountId, Long tenantId, Long storeId) {}
 
-  private final EmployeeService employeeService;
   private final JdbcTemplate jdbcTemplate;
+  private final CurrentIdentityProvider identityProvider;
+  private final PermissionGuard permissionGuard;
 
-  public RoleService(EmployeeService employeeService, JdbcTemplate jdbcTemplate) {
-    this.employeeService = employeeService;
+  public RoleService(
+      JdbcTemplate jdbcTemplate,
+      CurrentIdentityProvider identityProvider,
+      PermissionGuard permissionGuard) {
     this.jdbcTemplate = jdbcTemplate;
+    this.identityProvider = identityProvider;
+    this.permissionGuard = permissionGuard;
   }
 
   public List<Role> listForCurrentAdmin() {
-    Long accountId = currentAccountId();
-    if (accountId == null) {
-      return list();
+    CurrentIdentity identity = identityProvider.require();
+    boolean canAssignEmployeeRole = permissionGuard.hasPermission(EMPLOYEE_ASSIGN_PERMISSION);
+    boolean canViewLegacyRolePage = permissionGuard.hasPermission(ROLE_PERMISSION_PREFIX + ".view");
+    boolean canViewAnyRoleCategory = canViewLegacyRolePage
+        || List.of("operation-platform", "partner-store", "supplier-store")
+        .stream()
+        .anyMatch(category -> permissionGuard.hasView(rolePermissionPrefix(category)));
+    if (!identity.isSuperAdmin() && !canAssignEmployeeRole && !canViewAnyRoleCategory) {
+      throw new AccessDeniedException("无权访问角色数据");
     }
-    Employee currentEmployee = employeeService.lambdaQuery()
-        .eq(Employee::getAccountId, accountId)
-        .eq(Employee::getStatus, "enabled")
-        .orderByDesc(Employee::getId)
-        .last("LIMIT 1")
-        .one();
-    if (currentEmployee == null) {
-      return List.of();
-    }
-    if ("all".equals(currentEmployee.getDataPermission())) {
-      return list();
-    }
-    if (!StringUtils.hasText(currentEmployee.getName())) {
-      return List.of();
-    }
-    return lambdaQuery().eq(Role::getCreatedByName, currentEmployee.getName()).list();
+
+    List<Role> scopedRoles = identity.isSuperAdmin() || "all".equals(identity.dataPermission())
+        ? list()
+        : lambdaQuery().eq(Role::getCreatedByName, identity.displayName()).list();
+    return scopedRoles.stream()
+        .filter(role -> visibleRole(role, identity, canAssignEmployeeRole, canViewLegacyRolePage))
+        .toList();
   }
 
   @Transactional
   public boolean createRole(Role role) {
+    requireCategory(role.getCategory());
+    requireRoleAction(role.getCategory(), "create");
     role.setId(null);
     normalizeAndValidateRoleName(role, null);
     role.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(role.getFunctionPermissions()));
@@ -65,6 +73,8 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     if (existing == null) {
       return false;
     }
+    requireAccessibleRole(existing);
+    authorizeUpdate(existing, payload);
 
     payload.setId(id);
     payload.setCode(existing.getCode());
@@ -89,6 +99,8 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     if (existing == null) {
       return false;
     }
+    requireAccessibleRole(existing);
+    requireRoleAction(existing.getCategory(), "delete");
     if (isSuperAdminRole(existing)) {
       throw new IllegalArgumentException("超级管理员角色不可删除");
     }
@@ -101,10 +113,66 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     return SUPER_ADMIN_CODE.equals(role.getCode());
   }
 
-  private void normalizeAndValidateRoleName(Role role, Long excludedRoleId) {
-    if (!StringUtils.hasText(role.getCategory())) {
-      throw new IllegalArgumentException("角色所属用户端不能为空");
+  private boolean visibleRole(
+      Role role,
+      CurrentIdentity identity,
+      boolean canAssignEmployeeRole,
+      boolean canViewLegacyRolePage) {
+    if ("terminal-policy".equals(role.getCategory())) {
+      return identity.isSuperAdmin();
     }
+    return canAssignEmployeeRole
+        || canViewLegacyRolePage
+        || permissionGuard.hasView(rolePermissionPrefix(role.getCategory()));
+  }
+
+  private void authorizeUpdate(Role existing, Role payload) {
+    if ("terminal-policy".equals(existing.getCategory())) {
+      permissionGuard.requireSuperAdmin();
+      return;
+    }
+
+    boolean profileChanged = !Objects.equals(existing.getName(), payload.getName())
+        || !Objects.equals(existing.getDataScope(), payload.getDataScope())
+        || !Objects.equals(existing.getStatus(), payload.getStatus())
+        || !Objects.equals(existing.getRemark(), payload.getRemark());
+    boolean permissionChanged = !Objects.equals(
+        FunctionPermissionNormalizer.normalizeCsv(existing.getFunctionPermissions()),
+        FunctionPermissionNormalizer.normalizeCsv(payload.getFunctionPermissions()));
+
+    if (profileChanged || !permissionChanged) {
+      requireRoleAction(existing.getCategory(), "edit");
+    }
+    if (permissionChanged) {
+      requireRoleAction(existing.getCategory(), "permission");
+    }
+  }
+
+  private void requireRoleAction(String category, String action) {
+    if ("terminal-policy".equals(category)) {
+      permissionGuard.requireSuperAdmin();
+      return;
+    }
+    permissionGuard.requireAnyPermission(
+        rolePermissionPrefix(category) + "." + action,
+        ROLE_PERMISSION_PREFIX + "." + action);
+  }
+
+  private String rolePermissionPrefix(String category) {
+    return ROLE_PERMISSION_PREFIX + "." + category;
+  }
+
+  private void requireAccessibleRole(Role role) {
+    CurrentIdentity identity = identityProvider.require();
+    if (!identity.isSuperAdmin()
+        && !"all".equals(identity.dataPermission())
+        && !Objects.equals(role.getCreatedByName(), identity.displayName())) {
+      throw new AccessDeniedException("当前数据权限不允许操作该角色");
+    }
+  }
+
+  private void normalizeAndValidateRoleName(Role role, Long excludedRoleId) {
+    requireCategory(role.getCategory());
 
     String roleName = role.getName().trim();
     role.setName(roleName);
@@ -116,6 +184,12 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     }
     if (duplicateQuery.count() > 0) {
       throw new IllegalArgumentException("当前用户端已存在同名角色");
+    }
+  }
+
+  private void requireCategory(String category) {
+    if (!StringUtils.hasText(category)) {
+      throw new IllegalArgumentException("角色所属用户端不能为空");
     }
   }
 
@@ -181,36 +255,9 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private String resolveCreatedByName() {
-    Long accountId = currentAccountId();
-    if (accountId == null) {
-      return DEFAULT_CREATED_BY_NAME;
-    }
-    return employeeService.lambdaQuery()
-        .eq(Employee::getAccountId, accountId)
-        .eq(Employee::getStatus, "enabled")
-        .orderByDesc(Employee::getId)
-        .last("LIMIT 1")
-        .list()
-        .stream()
-        .map(Employee::getName)
+    return identityProvider.current()
+        .map(CurrentIdentity::displayName)
         .filter(StringUtils::hasText)
-        .findFirst()
         .orElse(DEFAULT_CREATED_BY_NAME);
-  }
-
-  private Long currentAccountId() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getPrincipal() == null) {
-      return null;
-    }
-    String principal = String.valueOf(authentication.getPrincipal());
-    if (!principal.startsWith("account:")) {
-      return null;
-    }
-    try {
-      return Long.parseLong(principal.substring("account:".length()));
-    } catch (NumberFormatException ex) {
-      return null;
-    }
   }
 }
