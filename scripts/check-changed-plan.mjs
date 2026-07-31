@@ -31,7 +31,7 @@ export function createValidationPlan(files, fileExists = () => true) {
       tasks: [
         { name: 'frontend quality', args: ['run', 'quality'] },
         { name: 'frontend build', args: ['run', 'build:app'] },
-        ...(backendFiles.length > 0 ? [{ name: 'backend tests', args: ['run', 'backend:test:docker'] }] : []),
+        ...(backendFiles.length > 0 ? [{ name: 'backend tests', args: ['run', 'backend:test'] }] : []),
       ],
       e2eFiles,
     };
@@ -69,7 +69,7 @@ export function createValidationPlan(files, fileExists = () => true) {
     tasks.push({ name: 'related unit tests', args: ['run', 'test:related', '--', ...relatedSourceFiles] });
   }
   if (backendFiles.length > 0) {
-    tasks.push({ name: 'backend tests', args: ['run', 'backend:test:docker'] });
+    tasks.push({ name: 'backend tests', args: ['run', 'backend:test'] });
   }
 
   return { tasks, e2eFiles };

@@ -21,6 +21,14 @@ test('backend changes execute Docker backend tests', () => {
   const plan = createValidationPlan(['backend/src/main/java/example/Service.java']);
 
   assert.deepEqual(names(plan), ['backend tests']);
+  assert.deepEqual(plan.tasks[0].args, ['run', 'backend:test']);
+});
+
+test('deleted backend files still execute backend tests', () => {
+  const plan = createValidationPlan(['backend/src/main/java/example/RemovedService.java'], () => false);
+
+  assert.deepEqual(names(plan), ['backend tests']);
+  assert.deepEqual(plan.tasks[0].args, ['run', 'backend:test']);
 });
 
 test('Vue source changes select incremental frontend checks', () => {

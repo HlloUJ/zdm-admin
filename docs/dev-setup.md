@@ -7,7 +7,8 @@
 - Node.js 22
 - Docker Desktop
 - Google Chrome，用于本机 E2E 测试
-- 可选：JDK 21、Maven。本机未安装时，后端可使用 Docker 运行。
+- 后端开发与验证默认使用 Docker 中的 JDK 21、Maven，不要求本机安装。
+- 可选：本机 JDK 21、Maven，仅在显式执行 `:local` 命令时使用。
 
 ## 首次准备
 
@@ -45,11 +46,11 @@ npm run dev:status
 
 ```bash
 docker compose up -d mysql
-npm run backend:dev:docker
+npm run backend:dev
 npm run dev
 ```
 
-本机已安装 JDK 21 和 Maven 时，可将后端命令替换为 `npm run backend:dev`。
+本机已安装 JDK 21 和 Maven 时，可将后端命令替换为 `npm run backend:dev:local`。
 
 ## 访问地址
 
@@ -71,7 +72,7 @@ npm run dev
 npm run quality
 npm run build:app
 npm run test:e2e:chrome
-npm run backend:quality:docker
+npm run backend:quality
 ```
 
 本机完整验收：
@@ -86,7 +87,23 @@ CI 完整验收：
 npm run verify
 ```
 
-说明：`backend:quality:docker` 会在 Maven 容器内执行测试、Checkstyle、SpotBugs 和 JaCoCo。本机 Maven 容器无法访问 Docker Desktop daemon 时，Testcontainers 集成测试会跳过；GitHub Actions 后端任务不限制测试类，会在宿主机 Maven 环境执行完整测试。
+说明：`backend:test` 和 `backend:quality` 会在独立 Maven 工具容器内运行，并复用 `zdm_maven_repo` 依赖缓存。工具容器挂载 Docker Socket，Testcontainers 集成测试会在本地真实执行。只有 Docker Desktop 不可用时，后端验证才无法运行。
+
+## 后端命令
+
+```bash
+npm run backend:compile
+npm run backend:logs
+npm run backend:restart
+npm run backend:test
+npm run backend:quality
+```
+
+- 后端代码或 Flyway 迁移调整后，使用 `backend:restart` 让现有开发服务重新编译并应用迁移。
+- 日常后端改动使用 `backend:test`。
+- 发布、合并或高风险回归使用 `backend:quality`。
+- 本机已安装 JDK 21、Maven 时，可显式使用 `backend:test:local` 或 `backend:quality:local`。
+- Agent 和项目脚本不得直接调用本机 `mvn`，统一通过上述 npm 命令执行。
 
 ## 数据库位置
 

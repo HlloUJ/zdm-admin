@@ -38,6 +38,20 @@ services:
       mysql:
         condition: service_healthy
 
+  backend-tools:
+    image: maven:3.9.9-eclipse-temurin-21
+    working_dir: /workspace/backend
+    profiles: ['tools']
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - .:/workspace
+      - zdm_maven_repo:/root/.m2
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   zdm_platform_mysql:
   zdm_maven_repo:

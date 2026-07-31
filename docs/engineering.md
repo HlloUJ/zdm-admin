@@ -3,6 +3,7 @@
 ## 权威入口
 
 - 开发运行、验收、备份与回滚：`docs/dev-setup.md`。
+- 当前项目工程效率与质量门禁基线：`docs/project-optimization-baseline.md`。
 - 技术分层和模块边界：`docs/platform-architecture.md`。
 - HTTP 接口事实：Swagger、Flyway 迁移及 `docs/api-contract.md`。
 - 产品语义、系统边界、模块职责和权限规则：Notion 中状态为“有效”的对应文档。
