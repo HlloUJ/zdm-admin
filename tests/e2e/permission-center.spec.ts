@@ -157,7 +157,11 @@ test('opens enable confirmation after employee permissions are configured', asyn
   await employeePermissionDialog.locator('.t-select').click();
   await page.getByRole('listitem', { name: '运营管理平台角色' }).click();
   await employeePermissionDialog.locator('.t-dialog__header').click();
+  const permissionUpdateRequest = page.waitForRequest(
+    (request) => request.method() === 'PATCH' && request.url().endsWith('/api/admin/employees/2/permissions'),
+  );
   await employeePermissionDialog.getByRole('button', { name: '提交' }).click();
+  await expect((await permissionUpdateRequest).postDataJSON()).toEqual({ roleIds: '2', dataPermission: 'self' });
   await expect(employeePermissionDialog).toBeHidden();
 
   await pendingEmployeeRow.getByText('启用', { exact: true }).click();

@@ -287,7 +287,8 @@ async function mockCollection(page: Page, pattern: string, records: unknown[]) {
       return;
     }
     if (route.request().method() === 'PUT' || route.request().method() === 'PATCH') {
-      const id = Number(new URL(route.request().url()).pathname.split('/').pop());
+      const pathParts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
+      const id = Number(pathParts.at(-1) === 'permissions' ? pathParts.at(-2) : pathParts.at(-1));
       const targetIndex = records.findIndex((record) => {
         if (!record || typeof record !== 'object' || !('id' in record)) return false;
         return Number(record.id) === id;

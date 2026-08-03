@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -42,6 +43,13 @@ public class EmployeeController {
   @PutMapping("/{id}")
   public ApiResponse<Employee> update(@PathVariable Long id, @Valid @RequestBody Employee employee) {
     return ApiResponse.ok(employeeService.updateEmployee(id, employee));
+  }
+
+  @PatchMapping("/{id}/permissions")
+  public ApiResponse<Employee> updatePermissions(
+      @PathVariable Long id,
+      @Valid @RequestBody EmployeePermissionUpdateRequest request) {
+    return ApiResponse.ok(employeeService.updatePermissions(id, request));
   }
 
   @DeleteMapping("/{id}")
