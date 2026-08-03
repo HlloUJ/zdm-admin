@@ -17,23 +17,28 @@
         <t-tabs v-if="!lockedScope && showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="74px" colon>
+          <t-form :data="searchForm" label-width="84px" colon>
             <div class="filter-row">
               <div class="filter-fields">
-                <t-form-item label="分类名称"
-                  ><t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称"
-                /></t-form-item>
-                <t-form-item label="分类状态"
-                  ><t-select v-model="searchForm.status" clearable placeholder="全部"
-                    ><t-option label="启用" value="enabled" /><t-option label="停用" value="disabled" /></t-select
-                ></t-form-item>
+                <t-form-item label="分类名称" name="keyword">
+                  <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
+                </t-form-item>
+                <t-form-item label="分类状态" name="status">
+                  <t-select v-model="searchForm.status" clearable placeholder="全部">
+                    <t-option label="启用" value="enabled" />
+                    <t-option label="停用" value="disabled" />
+                  </t-select>
+                </t-form-item>
               </div>
               <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch"
-                  ><template #icon><t-icon name="search" /></template>查询</t-button
-                ><t-button variant="base" @click="handleReset"
-                  ><template #icon><t-icon name="refresh" /></template>重置</t-button
-                >
+                <t-button theme="primary" @click="handleSearch">
+                  <template #icon><t-icon name="search" /></template>
+                  查询
+                </t-button>
+                <t-button theme="default" variant="base" @click="handleReset">
+                  <template #icon><t-icon name="refresh" /></template>
+                  重置
+                </t-button>
               </div>
             </div>
           </t-form>
@@ -744,7 +749,33 @@ onMounted(loadCategories);
 .filter-card {
   margin-bottom: var(--td-comp-margin-l);
 }
-.filter-card,
+.filter-card {
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: 6px;
+}
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
+}
+.filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--td-comp-margin-l);
+}
+.filter-fields :deep(.t-form__item) {
+  width: 260px;
+  margin-bottom: 0;
+}
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
 .category-card {
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
   background: var(--td-bg-color-container);
@@ -754,34 +785,11 @@ onMounted(loadCategories);
 .category-card {
   overflow-anchor: none;
 }
-.filter-row,
-.filter-fields,
-.filter-actions,
 .category-toolbar,
 .table-actions,
 .category-name-cell {
   display: flex;
   align-items: center;
-}
-.filter-row {
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-}
-.filter-fields {
-  flex: 1;
-  gap: var(--td-comp-margin-xl);
-}
-.filter-fields :deep(.t-form__item) {
-  width: 280px;
-  margin-bottom: 0;
-}
-.filter-fields :deep(.t-input),
-.filter-fields :deep(.t-select) {
-  width: 100%;
-}
-.filter-actions {
-  flex: 0 0 auto;
-  gap: var(--td-comp-margin-s);
 }
 .category-toolbar {
   justify-content: space-between;
@@ -858,17 +866,18 @@ onMounted(loadCategories);
     flex-direction: column;
   }
 }
-@media (max-width: 860px) {
+@media (max-width: 1120px) {
   .filter-row {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
   }
-  .filter-fields {
-    flex-wrap: wrap;
-    width: 100%;
-  }
   .filter-actions {
-    align-self: flex-end;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 720px) {
+  .filter-fields :deep(.t-form__item) {
+    width: 100%;
   }
 }
 </style>
