@@ -185,7 +185,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '成品分类操作员', '15926629021', 'enabled', 'all', '韩健')
+        VALUES (?, ?, 1, 1, '成品分类操作员', '15926629021', 'enabled', 'self', '韩健')
         """,
         employeeId,
         accountId);
@@ -221,7 +221,8 @@ class PlatformApiSmokeTest {
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
     mockMvc.perform(get("/api/admin/product-categories").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[*].scope", not(hasItem("accessory"))));
+        .andExpect(jsonPath("$.data[*].scope", not(hasItem("accessory"))))
+        .andExpect(jsonPath("$.data[*].createdByName", hasItem("韩健")));
 
     MvcResult createdResult = mockMvc.perform(post("/api/admin/product-categories")
             .header("Authorization", "Bearer " + token)
@@ -290,6 +291,40 @@ class PlatformApiSmokeTest {
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void productCategoryRejectsDuplicateSiblingNamesAndCrossScopeParents() throws Exception {
+    mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":" 家具 ",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("同级分类名称不能重复"));
+
+    mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":4,
+                  "scope":"finished",
+                  "name":"错误跨类型分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("上级分类与当前分类类型不一致"));
   }
 
   @Test

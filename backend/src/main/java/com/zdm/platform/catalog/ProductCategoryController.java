@@ -34,7 +34,6 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
   @GetMapping
   public ApiResponse<List<ProductCategory>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    permissionGuard.requireAllData();
     List<String> visibleScopes = new ArrayList<>();
     for (String scope : List.of("finished", "accessory")) {
       if (permissionGuard.hasPermission(scopePermissionPrefix(scope) + ".view")) {
@@ -49,7 +48,6 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
   public ApiResponse<ProductCategory> create(@Valid @RequestBody ProductCategory category) {
     String operation = category.getParentId() == null ? "create-root" : "create-child";
     requireCategoryPermission(category.getScope(), operation);
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.createCategory(category));
   }
 
@@ -81,7 +79,6 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
     if (!operationDetected) {
       requireCategoryPermission(existing.getScope(), "edit");
     }
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.updateCategory(id, category));
   }
 
@@ -90,7 +87,6 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     ProductCategory category = requireCategory(id);
     requireCategoryPermission(category.getScope(), "delete");
-    permissionGuard.requireAllData();
     service.deleteCategory(id);
     return ApiResponse.ok(true);
   }

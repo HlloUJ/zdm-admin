@@ -7,6 +7,7 @@ import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -14,6 +15,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, ProductCategory> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+  private static final String DUPLICATE_NAME_MESSAGE = "同级分类名称不能重复";
 
   private final CurrentIdentityProvider identityProvider;
   private final JdbcTemplate jdbcTemplate;
@@ -49,8 +51,13 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
   @Transactional
   public ProductCategory createCategory(ProductCategory category) {
     category.setId(null);
+    normalizeAndValidateCategory(category, null);
     category.setCreatedByName(resolveCreatedByName());
-    save(category);
+    try {
+      save(category);
+    } catch (DuplicateKeyException exception) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
+    }
     return category;
   }
 
@@ -63,7 +70,12 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     payload.setId(id);
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedAt(existing.getCreatedAt());
-    updateById(payload);
+    normalizeAndValidateCategory(payload, id);
+    try {
+      updateById(payload);
+    } catch (DuplicateKeyException exception) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
+    }
     return getById(id);
   }
 
@@ -97,5 +109,37 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
+  }
+
+  private void normalizeAndValidateCategory(ProductCategory category, Long excludedCategoryId) {
+    category.setName(category.getName().trim());
+    validateParentScope(category);
+    var duplicateQuery = lambdaQuery()
+        .eq(ProductCategory::getScope, category.getScope())
+        .eq(ProductCategory::getName, category.getName());
+    if (category.getParentId() == null) {
+      duplicateQuery.isNull(ProductCategory::getParentId);
+    } else {
+      duplicateQuery.eq(ProductCategory::getParentId, category.getParentId());
+    }
+    if (excludedCategoryId != null) {
+      duplicateQuery.ne(ProductCategory::getId, excludedCategoryId);
+    }
+    if (duplicateQuery.count() > 0) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
+    }
+  }
+
+  private void validateParentScope(ProductCategory category) {
+    if (category.getParentId() == null) {
+      return;
+    }
+    ProductCategory parent = getById(category.getParentId());
+    if (parent == null) {
+      throw new IllegalArgumentException("上级分类不存在");
+    }
+    if (!parent.getScope().equals(category.getScope())) {
+      throw new IllegalArgumentException("上级分类与当前分类类型不一致");
+    }
   }
 }
