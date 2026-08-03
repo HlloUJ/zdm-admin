@@ -205,6 +205,17 @@ const crafts = [
   },
 ];
 
+const slabVarieties = [
+  {
+    id: 1,
+    name: '潘多拉',
+    code: 'pandora',
+    remark: '按钮权限测试数据',
+    status: 'enabled',
+    createdAt: '2026-07-27T09:00:00',
+  },
+];
+
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
   await mockCollection(page, '**/api/admin/tenants', tenants);
@@ -216,6 +227,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);
+  await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
 }
 
 async function mockEmployeeInvites(page: Page) {

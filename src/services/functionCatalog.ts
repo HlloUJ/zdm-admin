@@ -92,6 +92,23 @@ const verifiedFunctionCatalog: FunctionModule[] = [
     value: 'admin.product-data-center',
     menus: [
       {
+        label: '大板品种管理',
+        value: 'admin.product-data-center.slab-variety.menu',
+        direct: false,
+        pages: [
+          {
+            label: '大板品种管理页',
+            value: 'admin.product-data-center.slab-variety',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-variety.create' },
+              { label: '编辑/停用/启用', value: 'admin.product-data-center.slab-variety.edit' },
+              { label: '删除', value: 'admin.product-data-center.slab-variety.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+      {
         label: '成品现货工艺管理',
         value: 'admin.product-data-center.finished-stock-craft.menu',
         direct: false,

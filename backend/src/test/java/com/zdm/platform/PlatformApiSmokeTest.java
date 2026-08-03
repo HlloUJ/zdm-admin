@@ -117,6 +117,70 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabVarietyManagementEnforcesViewAndOperationPermissions() throws Exception {
+    long accountId = 9011L;
+    long employeeId = 9011L;
+    long roleId = 9011L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629011",
+        "品种查看员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '品种查看员', '15926629011', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '品种查看角色', 'SLAB_VARIETY_VIEWER_TEST', 'operation-platform',
+          'admin', 'all', 'enabled', 'admin.product-data-center.slab-variety.view', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"无权新增品种","code":"forbidden-create","status":"enabled"}
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(put("/api/admin/slab-varieties/1")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"无权编辑品种","code":"pandora","status":"enabled"}
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/slab-varieties/1")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void superAdminCanLoginAndAccessTenantApi() throws Exception {
     MvcResult loginResult = mockMvc.perform(post("/api/admin/auth/login")
             .contentType("application/json")

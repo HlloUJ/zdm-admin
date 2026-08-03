@@ -47,13 +47,18 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
-  it('publishes verified craft, employee, and role management resources to shared consumers', () => {
+  it('publishes verified product-data and permission-management resources to shared consumers', () => {
     expect(terminalFunctionTrees.store).toBe(fullFunctionCatalog);
     expect(terminalFunctionTrees.supplier).toBe(fullFunctionCatalog);
     expect(fullFunctionCatalog).toHaveLength(2);
     expect(fullFunctionCatalog[0]).toMatchObject({
       label: '商品基础数据中心',
       menus: [
+        {
+          label: '大板品种管理',
+          direct: false,
+          pages: [{ label: '大板品种管理页', tabs: [] }],
+        },
         {
           label: '成品现货工艺管理',
           direct: false,
@@ -82,6 +87,10 @@ describe('full function catalog', () => {
       ],
     });
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
+      'admin.product-data-center.slab-variety.view',
+      'admin.product-data-center.slab-variety.create',
+      'admin.product-data-center.slab-variety.edit',
+      'admin.product-data-center.slab-variety.delete',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
       'admin.product-data-center.finished-stock-craft.edit',
