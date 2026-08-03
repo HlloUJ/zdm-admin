@@ -89,6 +89,7 @@
               }}</t-tag></template
             >
             <template #sort="{ row }">{{ row.sort }}</template>
+            <template #createdAt="{ row }">{{ row.createdAt }}</template>
             <template #operation="{ row }">
               <div class="table-actions">
                 <t-link v-if="row.level < maxCategoryLevel" theme="primary" @click="openCreateDialog(row)"
@@ -210,6 +211,8 @@ interface CategoryNode {
   status: Status;
   productCount: number;
   sortOrder: number;
+  createdByName: string;
+  createdAt: string;
   children: CategoryNode[];
 }
 interface CategoryRow {
@@ -221,6 +224,8 @@ interface CategoryRow {
   status: Status;
   productCount: number;
   sort: number;
+  createdByName: string;
+  createdAt: string;
 }
 interface CategoryForm {
   id: number | null;
@@ -264,12 +269,14 @@ const formRules: Record<string, FormRule[]> = {
 };
 
 const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '分类名称', minWidth: 210, align: 'left' },
-  { colKey: 'level', title: '分类级别', width: 110, align: 'left' },
+  { colKey: 'name', title: '分类名称', width: 155, align: 'left' },
+  { colKey: 'level', title: '分类级别', width: 90, align: 'left' },
   { colKey: 'productCount', title: '关联商品', width: 90, align: 'center' },
-  { colKey: 'status', title: '状态', width: 75, align: 'center' },
+  { colKey: 'status', title: '状态', width: 60, align: 'center' },
   { colKey: 'sort', title: '排序', width: 60, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 368, align: 'left', fixed: 'right' },
+  { colKey: 'createdByName', title: '创建人', width: 90, align: 'center' },
+  { colKey: 'createdAt', title: '创建时间', width: 150, align: 'center' },
+  { colKey: 'operation', title: '操作', width: 240, align: 'left', fixed: 'right' },
 ];
 
 const activeNodes = computed(() => categoryData.value[activeScope.value]);
@@ -339,6 +346,8 @@ function collectRows(
       status: node.status,
       productCount: node.productCount,
       sort: index + 1,
+      createdByName: node.createdByName,
+      createdAt: formatDateTime(node.createdAt),
     });
     if (node.children.length && (hasSearch.value || isExpanded(node))) {
       collectRows(node.children, level + 1, node, rows, forceVisible || selfMatches);
@@ -375,14 +384,20 @@ function toNode(record: ProductCategoryRecord): CategoryNode {
     status: record.status ?? 'enabled',
     productCount: record.productCount ?? 0,
     sortOrder: record.sortOrder ?? 0,
+    createdByName: record.createdByName || '-',
+    createdAt: record.createdAt ?? '',
     children: [],
   };
+}
+function createdAtTimestamp(node: CategoryNode) {
+  const timestamp = new Date(node.createdAt).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 function buildCategoryTree(records: ProductCategoryRecord[], scope: Scope) {
   const nodes = records
     .filter((record) => record.scope === scope)
     .map(toNode)
-    .sort((first, second) => first.sortOrder - second.sortOrder || first.id - second.id);
+    .sort((first, second) => createdAtTimestamp(second) - createdAtTimestamp(first) || second.id - first.id);
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const roots: CategoryNode[] = [];
   nodes.forEach((node) => {
@@ -393,6 +408,13 @@ function buildCategoryTree(records: ProductCategoryRecord[], scope: Scope) {
     }
   });
   return roots;
+}
+function formatDateTime(value?: string) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+  const pad = (number: number) => number.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 function toCategoryPayload(node: CategoryNode, parentId = node.parentId): ProductCategoryPayload {
   return {
@@ -581,7 +603,8 @@ async function handleDeleteConfirm() {
     return;
   }
   try {
-    await deleteProductCategory(node.id);
+    const deleted = await deleteProductCategory(node.id);
+    if (!deleted) throw new Error('分类删除失败，请刷新后重试');
     removeNode(activeNodes.value, node.id);
     MessagePlugin.success('删除成功');
     closeDeleteDialog();
@@ -773,7 +796,7 @@ onMounted(loadCategories);
 }
 .table-actions {
   flex-wrap: nowrap;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-xs);
 }
 .table-actions :deep(.t-link) {
   white-space: nowrap;

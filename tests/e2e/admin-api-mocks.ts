@@ -147,6 +147,7 @@ const productCategories = [
     sortOrder: 1,
     productCount: 1,
     status: 'enabled',
+    createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
   {
@@ -157,6 +158,7 @@ const productCategories = [
     sortOrder: 1,
     productCount: 1,
     status: 'enabled',
+    createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
 ];
