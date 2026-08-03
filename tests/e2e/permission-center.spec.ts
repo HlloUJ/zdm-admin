@@ -79,6 +79,27 @@ test('shows only granted category operation buttons for a restricted account', a
   await expect(categoryRow.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
+test('shows only the granted product category tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 12,
+        name: '成品现货分类查看员',
+        phone: '15926620012',
+        roles: ['FINISHED_CATEGORY_VIEWER'],
+        permissions: ['admin.product-data-center.category.finished.view'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-tabs').getByText('成品现货分类', { exact: true })).toBeVisible();
+  await expect(main.getByText('配件分类', { exact: true })).toHaveCount(0);
+});
 test('opens employee invite and edit dialogs', async ({ page }) => {
   await page.goto('/employee-management');
   const main = page.getByRole('main');

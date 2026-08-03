@@ -258,13 +258,22 @@ const loginUser = computed(() => getLoginUser());
 const canCreateCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.create`));
 const canEditCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.edit`));
 const canDeleteCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.delete`));
-const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
-const activeScope = ref<Scope>(resolveScope(route.query.scope));
-const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');
-const scopeTabs = [
+const canViewAllCategoryScopes = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.view`));
+const categoryScopeTabs: { label: string; value: Scope }[] = [
   { label: '成品现货分类', value: 'finished' },
   { label: '配件分类', value: 'accessory' },
 ];
+const scopeTabs = computed(() =>
+  categoryScopeTabs.filter(
+    (tab) =>
+      canViewAllCategoryScopes.value || hasPermission(loginUser.value, `${categoryPermissionPrefix}.${tab.value}.view`),
+  ),
+);
+const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
+const resolveAccessibleScope = (scope: Scope): Scope =>
+  scopeTabs.value.some((tab) => tab.value === scope) ? scope : (scopeTabs.value[0]?.value ?? scope);
+const activeScope = ref<Scope>(resolveAccessibleScope(resolveScope(route.query.scope)));
+const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');
 
 const categoryData = ref<Record<Scope, CategoryNode[]>>({ finished: [], accessory: [] });
 const loading = ref(false);
@@ -647,7 +656,7 @@ function handleReset() {
 watch(
   () => route.query.scope,
   (scope) => {
-    activeScope.value = resolveScope(scope);
+    activeScope.value = resolveAccessibleScope(resolveScope(scope));
     handleReset();
   },
 );
