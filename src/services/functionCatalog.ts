@@ -67,8 +67,6 @@ const withDefaultViewAction = (scope: string, actions: FunctionAction[]) => [
 ];
 
 const productCategoryTabActions = (scope: string): FunctionAction[] => [
-  { label: '查询', value: `${scope}.search` },
-  { label: '重置', value: `${scope}.reset-filters` },
   { label: '新增一级分类', value: `${scope}.create-root` },
   { label: '新增下级', value: `${scope}.create-child` },
   { label: '编辑', value: `${scope}.edit` },

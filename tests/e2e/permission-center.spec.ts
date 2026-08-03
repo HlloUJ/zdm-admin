@@ -4,8 +4,6 @@ import { installAdminApiMocks } from './admin-api-mocks';
 
 const categoryCatalogActionLabels = [
   '查看',
-  '查询',
-  '重置',
   '新增一级分类',
   '新增下级',
   '编辑',

@@ -98,8 +98,6 @@ describe('full function catalog', () => {
         value: 'admin.product-data-center.category.finished',
         actions: [
           { label: '查看', value: 'admin.product-data-center.category.finished.view' },
-          { label: '查询', value: 'admin.product-data-center.category.finished.search' },
-          { label: '重置', value: 'admin.product-data-center.category.finished.reset-filters' },
           { label: '新增一级分类', value: 'admin.product-data-center.category.finished.create-root' },
           { label: '新增下级', value: 'admin.product-data-center.category.finished.create-child' },
           { label: '编辑', value: 'admin.product-data-center.category.finished.edit' },
@@ -115,8 +113,6 @@ describe('full function catalog', () => {
         value: 'admin.product-data-center.category.accessory',
         actions: [
           { label: '查看', value: 'admin.product-data-center.category.accessory.view' },
-          { label: '查询', value: 'admin.product-data-center.category.accessory.search' },
-          { label: '重置', value: 'admin.product-data-center.category.accessory.reset-filters' },
           { label: '新增一级分类', value: 'admin.product-data-center.category.accessory.create-root' },
           { label: '新增下级', value: 'admin.product-data-center.category.accessory.create-child' },
           { label: '编辑', value: 'admin.product-data-center.category.accessory.edit' },
@@ -130,8 +126,6 @@ describe('full function catalog', () => {
     ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.category.finished.view',
-      'admin.product-data-center.category.finished.search',
-      'admin.product-data-center.category.finished.reset-filters',
       'admin.product-data-center.category.finished.create-root',
       'admin.product-data-center.category.finished.create-child',
       'admin.product-data-center.category.finished.edit',
@@ -141,8 +135,6 @@ describe('full function catalog', () => {
       'admin.product-data-center.category.finished.enable',
       'admin.product-data-center.category.finished.delete',
       'admin.product-data-center.category.accessory.view',
-      'admin.product-data-center.category.accessory.search',
-      'admin.product-data-center.category.accessory.reset-filters',
       'admin.product-data-center.category.accessory.create-root',
       'admin.product-data-center.category.accessory.create-child',
       'admin.product-data-center.category.accessory.edit',
@@ -186,8 +178,6 @@ describe('full function catalog', () => {
     ]);
     expect(
       normalizeTerminalPermissions('store', [
-        'admin.product-data-center.category.finished.search',
-        'admin.product-data-center.category.finished.reset-filters',
         'admin.product-data-center.category.finished.edit',
         'store.goods.finished-stock.查询',
         'admin.product-data-center.finished-stock-craft.query',
@@ -200,8 +190,6 @@ describe('full function catalog', () => {
       ]),
     ).toEqual([
       'admin.product-data-center.category.finished.view',
-      'admin.product-data-center.category.finished.search',
-      'admin.product-data-center.category.finished.reset-filters',
       'admin.product-data-center.category.finished.edit',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
