@@ -97,7 +97,8 @@ test('shows only the granted product category tab', async ({ page }) => {
   await page.goto('/product-category');
   const main = page.getByRole('main');
 
-  await expect(main.locator('.scope-tabs').getByText('成品现货分类', { exact: true })).toBeVisible();
+  await expect(main.locator('.scope-tabs')).toHaveCount(0);
+  await expect(main.locator('.category-toolbar h2')).toHaveText('成品现货分类');
   await expect(main.getByText('配件分类', { exact: true })).toHaveCount(0);
 });
 test('opens employee invite and edit dialogs', async ({ page }) => {

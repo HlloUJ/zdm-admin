@@ -14,7 +14,12 @@
           <t-tag theme="primary" variant="light">最多支持 4 级分类</t-tag>
         </header>
 
-        <t-tabs v-if="!lockedScope" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
+        <t-tabs
+          v-if="!lockedScope && scopeTabs.length > 1"
+          v-model="activeScope"
+          :list="scopeTabs"
+          class="scope-tabs"
+        />
 
         <section class="filter-card">
           <t-form :data="searchForm" label-width="74px" colon>
