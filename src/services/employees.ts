@@ -32,6 +32,11 @@ export interface EmployeePayload {
   remark?: string;
 }
 
+export interface EmployeePermissionPayload {
+  roleIds: string;
+  dataPermission: 'self' | 'all';
+}
+
 export function listEmployees() {
   return request<EmployeeRecord[]>('/admin/employees');
 }
@@ -46,6 +51,13 @@ export function createEmployee(payload: EmployeePayload) {
 export function updateEmployee(id: number, payload: EmployeePayload) {
   return request<EmployeeRecord>(`/admin/employees/${id}`, {
     method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateEmployeePermissions(id: number, payload: EmployeePermissionPayload) {
+  return request<EmployeeRecord>(`/admin/employees/${id}/permissions`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }

@@ -104,6 +104,23 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   @Transactional
+  public Employee updatePermissions(Long id, EmployeePermissionUpdateRequest request) {
+    Employee existing = getById(id);
+    if (existing == null) {
+      throw new IllegalArgumentException("员工不存在");
+    }
+    requireAccessibleEmployee(existing);
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
+
+    existing.setRoleIds(request.roleIds());
+    existing.setDataPermission(request.dataPermission());
+    validateBeforeEnabled(existing);
+    updateById(existing);
+    syncAdminRoles(existing);
+    return getById(id);
+  }
+
+  @Transactional
   public boolean deleteEmployee(Long id) {
     Employee existing = getById(id);
     if (existing == null) {

@@ -1400,6 +1400,85 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void employeePermissionUpdateDoesNotRequireProfileEditPermission() throws Exception {
+    long managerAccountId = 9041L;
+    long managerEmployeeId = 9041L;
+    long targetAccountId = 9042L;
+    long targetEmployeeId = 9042L;
+    long managerRoleId = 9041L;
+
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        managerAccountId,
+        "15926629041",
+        "权限配置员");
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        targetAccountId,
+        "15926629042",
+        "待配置员工");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
+           data_permission, created_by_name)
+        VALUES
+          (?, ?, 1, 1, '权限配置员', '15926629041', 'enabled', ?, 'self', '韩健'),
+          (?, ?, 1, 1, '待配置员工', '15926629042', 'enabled', '2', 'all', '权限配置员')
+        """,
+        managerEmployeeId,
+        managerAccountId,
+        String.valueOf(managerRoleId),
+        targetEmployeeId,
+        targetAccountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES
+          (?, 'admin', 'employee', ?, 1, 1, 'enabled'),
+          (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        managerAccountId,
+        managerEmployeeId,
+        targetAccountId,
+        targetEmployeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.permission-management.employee-management.view,'
+          'admin.permission-management.employee-management.permission', '集成测试')
+        """,
+        managerRoleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1), (?, 2, 'admin', 1, 1)
+        """,
+        managerAccountId,
+        managerRoleId,
+        targetAccountId);
+
+    mockMvc.perform(patch("/api/admin/employees/{id}/permissions", targetEmployeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "roleIds": "2",
+                  "dataPermission": "self"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.roleIds").value("2"))
+        .andExpect(jsonPath("$.data.dataPermission").value("self"))
+        .andExpect(jsonPath("$.data.gender").doesNotExist())
+        .andExpect(jsonPath("$.data.remark").doesNotExist());
+  }
+
+  @Test
   void employeeInviteRegistrationRequiresAdminActivation() throws Exception {
     MvcResult inviteResult = mockMvc.perform(post("/api/admin/employee-invites")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
