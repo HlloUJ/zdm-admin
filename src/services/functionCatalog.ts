@@ -92,6 +92,24 @@ const verifiedFunctionCatalog: FunctionModule[] = [
     value: 'admin.product-data-center',
     menus: [
       {
+        label: '商品分类管理',
+        value: 'admin.product-data-center.category.menu',
+        direct: false,
+        pages: [
+          {
+            label: '商品分类管理页',
+            value: 'admin.product-data-center.category',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.category.create' },
+              { label: '编辑', value: 'admin.product-data-center.category.edit' },
+              { label: '删除', value: 'admin.product-data-center.category.delete' },
+            ],
+            tabs: [],
+            note: '成品现货分类与配件分类共用页面权限；排序、停用/启用随编辑权限开放。',
+          },
+        ],
+      },
+      {
         label: '成品现货工艺管理',
         value: 'admin.product-data-center.finished-stock-craft.menu',
         direct: false,

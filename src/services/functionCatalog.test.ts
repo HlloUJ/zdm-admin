@@ -47,13 +47,18 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
-  it('publishes verified craft, employee, and role management resources to shared consumers', () => {
+  it('publishes verified category, craft, employee, and role management resources to shared consumers', () => {
     expect(terminalFunctionTrees.store).toBe(fullFunctionCatalog);
     expect(terminalFunctionTrees.supplier).toBe(fullFunctionCatalog);
     expect(fullFunctionCatalog).toHaveLength(2);
     expect(fullFunctionCatalog[0]).toMatchObject({
       label: '商品基础数据中心',
       menus: [
+        {
+          label: '商品分类管理',
+          direct: false,
+          pages: [{ label: '商品分类管理页', tabs: [] }],
+        },
         {
           label: '成品现货工艺管理',
           direct: false,
@@ -82,6 +87,10 @@ describe('full function catalog', () => {
       ],
     });
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
+      'admin.product-data-center.category.view',
+      'admin.product-data-center.category.create',
+      'admin.product-data-center.category.edit',
+      'admin.product-data-center.category.delete',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
       'admin.product-data-center.finished-stock-craft.edit',
@@ -117,6 +126,9 @@ describe('full function catalog', () => {
     ]);
     expect(
       normalizeTerminalPermissions('store', [
+        'admin.product-data-center.category.query',
+        'admin.product-data-center.category.reset',
+        'admin.product-data-center.category.edit',
         'store.goods.finished-stock.查询',
         'admin.product-data-center.finished-stock-craft.query',
         'admin.product-data-center.finished-stock-craft.reset',
@@ -127,6 +139,8 @@ describe('full function catalog', () => {
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
+      'admin.product-data-center.category.view',
+      'admin.product-data-center.category.edit',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
       'admin.permission-management.employee-management.view',

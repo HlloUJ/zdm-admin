@@ -45,7 +45,7 @@
               <h2>{{ activeScope === 'finished' ? '成品现货分类' : '配件分类' }}</h2>
               <p>通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</p>
             </div>
-            <t-button theme="primary" @click="openCreateDialog()"
+            <t-button v-if="canCreateCategory" theme="primary" @click="openCreateDialog()"
               ><template #icon><t-icon name="add" /></template>新增一级分类</t-button
             >
           </div>
@@ -92,23 +92,38 @@
             <template #createdAt="{ row }">{{ row.createdAt }}</template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="row.level < maxCategoryLevel" theme="primary" @click="openCreateDialog(row)"
+                <t-link
+                  v-if="canCreateCategory && row.level < maxCategoryLevel"
+                  theme="primary"
+                  @click="openCreateDialog(row)"
                   >新增下级</t-link
                 >
-                <t-link theme="primary" @click="openEditDialog(row)">编辑</t-link>
-                <t-link theme="primary" :disabled="siblingIndex(row) === 0" @click="moveCategory(row, -1)">上移</t-link>
+                <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
+                  v-if="canEditCategory"
+                  theme="primary"
+                  :disabled="siblingIndex(row) === 0"
+                  @click="moveCategory(row, -1)"
+                  >上移</t-link
+                >
+                <t-link
+                  v-if="canEditCategory"
                   theme="primary"
                   :disabled="siblingIndex(row) === siblingNodes(row).length - 1"
                   @click="moveCategory(row, 1)"
                   >下移</t-link
                 >
                 <t-link
+                  v-if="canEditCategory"
                   :theme="row.status === 'enabled' ? 'warning' : 'success'"
                   @click="openStatusConfirm(row.node)"
                   >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
                 >
-                <t-link theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+                <t-link v-if="canDeleteCategory" theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+                <span
+                  v-if="!canEditCategory && !canDeleteCategory && (!canCreateCategory || row.level >= maxCategoryLevel)"
+                  >-</span
+                >
               </div>
             </template>
           </t-table>
@@ -191,6 +206,8 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
   createProductCategory,
   deleteProductCategory,
@@ -235,7 +252,12 @@ interface CategoryForm {
 }
 
 const maxCategoryLevel = 4;
+const categoryPermissionPrefix = 'admin.product-data-center.category';
 const route = useRoute();
+const loginUser = computed(() => getLoginUser());
+const canCreateCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.create`));
+const canEditCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.edit`));
+const canDeleteCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.delete`));
 const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
 const activeScope = ref<Scope>(resolveScope(route.query.scope));
 const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');

@@ -38,6 +38,35 @@ test('shows only granted craft operation buttons for a restricted account', asyn
   await expect(craftRow.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
+test('shows only granted category operation buttons for a restricted account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 10,
+        name: '受限分类管理员',
+        phone: '15926620010',
+        roles: ['CATEGORY_EDITOR'],
+        permissions: ['admin.product-data-center.category.view', 'admin.product-data-center.category.edit'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+  const categoryRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
+
+  await expect(categoryRow).toBeVisible();
+  await expect(main.getByRole('button', { name: '新增一级分类' })).toHaveCount(0);
+  await expect(categoryRow.getByText('新增下级', { exact: true })).toHaveCount(0);
+  await expect(categoryRow.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('上移', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('下移', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('停用', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('删除', { exact: true })).toHaveCount(0);
+});
+
 test('opens employee invite and edit dialogs', async ({ page }) => {
   await page.goto('/employee-management');
   const main = page.getByRole('main');
@@ -327,10 +356,20 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('页面');
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(1);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(2);
+  await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
+  await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
+  const categoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '商品分类管理页' });
+  await expect(categoryPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '删除',
+  ]);
   await expect(roleMatrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
-  await expect(roleMatrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+  const craftPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货工艺管理页' });
+  await expect(craftPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
     '编辑',
@@ -403,7 +442,7 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*5/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*9/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -412,10 +451,20 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(matrix.locator('thead')).toContainText('页面');
   await expect(matrix.locator('th.permission-tab-column')).toHaveText('Tab');
   await expect(matrix.locator('thead')).toContainText('操作权限');
-  await expect(matrix.locator('tbody tr')).toHaveCount(1);
+  await expect(matrix.locator('tbody tr')).toHaveCount(2);
+  await expect(matrix.getByText('商品分类管理', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
+  const categoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '商品分类管理页' });
+  await expect(categoryAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '删除',
+  ]);
   await expect(matrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+  const craftAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货工艺管理页' });
+  await expect(craftAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
     '编辑',
@@ -449,8 +498,9 @@ test('shows verified craft, employee, and role management resources in both term
   await main.locator('.terminal-tabs').getByText('大板供应商门店管理后台', { exact: true }).click();
   await expect(moduleList.locator('.permission-module-item')).toHaveCount(2);
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(9);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
