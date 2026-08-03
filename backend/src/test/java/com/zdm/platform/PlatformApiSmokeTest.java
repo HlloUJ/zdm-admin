@@ -240,6 +240,111 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabVarietyManagementAppliesSelfDataScopeToListsAndOperations() throws Exception {
+    long accountId = 9031L;
+    long employeeId = 9031L;
+    long roleId = 9031L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629031",
+        "大板品种自有操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '大板品种自有操作员', '15926629031', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.product-data-center.slab-variety.view,'
+          'admin.product-data-center.slab-variety.create,'
+          'admin.product-data-center.slab-variety.edit,'
+          'admin.product-data-center.slab-variety.toggle-status,'
+          'admin.product-data-center.slab-variety.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_varieties (id, name, code, status, created_by_name)
+        VALUES
+          (9031, '本人创建的大板品种', 'self-owned-variety', 'enabled', '大板品种自有操作员'),
+          (9032, '他人创建的大板品种', 'other-owned-variety', 'enabled', '韩健')
+        """);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].name", hasItem("本人创建的大板品种")))
+        .andExpect(jsonPath("$.data[*].name", not(hasItem("他人创建的大板品种"))));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"本人新增的大板品种",
+                  "code":"self-created-variety",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value("大板品种自有操作员"))
+        .andReturn();
+    String createdVarietyId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/slab-varieties/9032")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"越权编辑的大板品种",
+                  "code":"other-owned-variety",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(patch("/api/admin/slab-varieties/9032/status")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/slab-varieties/9032")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/slab-varieties/{id}", createdVarietyId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
   void slabVarietyManagementSeparatesEditAndStatusPermissions() throws Exception {
     long accountId = 9011L;
     long employeeId = 9011L;

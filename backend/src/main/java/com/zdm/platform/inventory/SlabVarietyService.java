@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import java.util.List;
+import java.util.Objects;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,6 +29,17 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     this.identityProvider = identityProvider;
   }
 
+  public List<SlabVariety> listForCurrentAdmin() {
+    CurrentIdentity identity = identityProvider.require();
+    if (identity.isSuperAdmin() || "all".equals(identity.dataPermission())) {
+      return list();
+    }
+    if (!StringUtils.hasText(identity.displayName())) {
+      return List.of();
+    }
+    return lambdaQuery().eq(SlabVariety::getCreatedByName, identity.displayName()).list();
+  }
+
   @Transactional
   public SlabVariety createVariety(SlabVariety variety) {
     variety.setId(null);
@@ -41,6 +55,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     if (existing == null) {
       return null;
     }
+    requireAccessibleVariety(existing);
 
     payload.setId(id);
     payload.setStatus(existing.getStatus());
@@ -56,6 +71,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     if (existing == null) {
       return null;
     }
+    requireAccessibleVariety(existing);
 
     existing.setStatus(status);
     updateById(existing);
@@ -64,6 +80,11 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
 
   @Transactional
   public boolean deleteVariety(Long id) {
+    SlabVariety existing = getById(id);
+    if (existing == null) {
+      return false;
+    }
+    requireAccessibleVariety(existing);
     Long referenceCount = slabInventoryMapper.selectCount(
         Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getVarietyId, id));
     if (referenceCount > 0) {
@@ -82,6 +103,15 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
+  }
+
+  private void requireAccessibleVariety(SlabVariety variety) {
+    CurrentIdentity identity = identityProvider.require();
+    if (!identity.isSuperAdmin()
+        && !"all".equals(identity.dataPermission())
+        && !Objects.equals(variety.getCreatedByName(), identity.displayName())) {
+      throw new AccessDeniedException("当前数据权限不允许操作该品种");
+    }
   }
 
   private void normalizeAndValidateName(SlabVariety variety, Long excludedVarietyId) {

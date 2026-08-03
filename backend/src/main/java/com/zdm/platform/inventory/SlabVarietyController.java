@@ -4,7 +4,9 @@ import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,10 +30,16 @@ public class SlabVarietyController extends AdminCrudController<SlabVariety> {
   }
 
   @Override
+  @GetMapping
+  public ApiResponse<List<SlabVariety>> list() {
+    permissionGuard.requireView(PERMISSION_PREFIX);
+    return ApiResponse.ok(service.listForCurrentAdmin());
+  }
+
+  @Override
   @PostMapping
   public ApiResponse<SlabVariety> create(@Valid @RequestBody SlabVariety variety) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.createVariety(variety));
   }
 
@@ -41,7 +49,6 @@ public class SlabVarietyController extends AdminCrudController<SlabVariety> {
       @PathVariable Long id,
       @Valid @RequestBody SlabVariety payload) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
     SlabVariety updated = service.updateVariety(id, payload);
     if (updated == null) {
       throw new IllegalArgumentException("品种不存在");
@@ -54,7 +61,6 @@ public class SlabVarietyController extends AdminCrudController<SlabVariety> {
       @PathVariable Long id,
       @Valid @RequestBody SlabVarietyStatusRequest request) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
-    permissionGuard.requireAllData();
     SlabVariety updated = service.updateStatus(id, request.status());
     if (updated == null) {
       throw new IllegalArgumentException("品种不存在");
@@ -66,7 +72,6 @@ public class SlabVarietyController extends AdminCrudController<SlabVariety> {
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.deleteVariety(id));
   }
 }
