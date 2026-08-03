@@ -33,13 +33,22 @@ npm run test:e2e:chrome
 ### 推荐方式
 
 ```bash
-npm run dev:all
+npm run integration:dev
 ```
 
-该命令优先复用已有 MySQL 和后端容器，等待后端端口就绪后在当前终端启动前端。查看服务状态和手机可访问的局域网地址：
+该命令始终从 `codex/integration-current` 对应的固定 Worktree 启动完整项目，与当前正在开发的任务分支无关。集成 Worktree 由 Agent 统一创建和更新，不在其中直接开发。
+macOS 自启服务也固定从该集成 Worktree 启动。E2E 独立使用 `5174` 端口，不会误用 `5173` 上的日常浏览器服务。
+
+查看服务状态和手机可访问的局域网地址：
 
 ```bash
-npm run dev:status
+npm run integration:status
+```
+
+仅需要隔离调试当前任务分支时，才在当前 Worktree 使用 `npm run dev:all`。查看 Git、远程和集成状态：
+
+```bash
+npm run git:state
 ```
 
 ### 分开启动
@@ -95,6 +104,7 @@ npm run verify
 
 ```bash
 npm run backend:compile
+npm run backend:ensure
 npm run backend:logs
 npm run backend:restart
 npm run backend:test
@@ -102,6 +112,7 @@ npm run backend:quality
 ```
 
 - 后端代码或 Flyway 迁移调整后，使用 `backend:restart` 让现有开发服务重新编译并应用迁移。
+- `backend:ensure` 会校验后端容器实际挂载的 Worktree；目录不匹配时自动从当前目录重建后端，完整验收会在 E2E 前自动执行。
 - 日常后端改动使用 `backend:test`。
 - 发布、合并或高风险回归使用 `backend:quality`。
 - 本机已安装 JDK 21、Maven 时，可显式使用 `backend:test:local` 或 `backend:quality:local`。
@@ -160,48 +171,3 @@ scripts/rollback-code.sh v0.7.4-backend-api-smoke-gate
 ```
 
 该脚本会进入 detached HEAD。需要继续修复时，先基于该版本创建分支。
-
-## GitHub 首次推送
-
-当前本地仓库已经初始化并持续打 tag，`origin` 已绑定到：
-
-```text
-git@github.com:HlloUJ/zdm-admin.git
-```
-
-`main` 和所有 tags 已完成首次推送。后续正常提交后可直接执行：
-
-```bash
-git push
-git push origin --tags
-```
-
-如果需要重新绑定到新的空仓库，可使用以下流程。
-
-推荐仓库名：
-
-```text
-zdm-admin
-```
-
-创建空仓库后执行：
-
-```bash
-npm run github:publish -- git@github.com:<owner>/zdm-admin.git
-```
-
-或使用 HTTPS：
-
-```bash
-npm run github:publish -- https://github.com/<owner>/zdm-admin.git
-```
-
-脚本会完成：
-
-- 检查当前工作区必须干净。
-- 如果没有 `origin`，自动绑定远程仓库。
-- 如果已有 `origin`，要求它必须和传入 URL 一致。
-- 推送 `main` 分支。
-- 推送所有 Git tags。
-
-首次推送完成后，GitHub Actions 会按 `.github/workflows/quality.yml` 自动执行前后端质量门禁。

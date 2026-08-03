@@ -24,6 +24,11 @@
 ## Git 交付
 
 - 稳定主分支为 `main`，任务分支默认使用 `codex/<task-slug>`。
-- 任务分支验收前同步最新 `origin/main`；多个未合并任务联合验收时使用临时验收分支。
-- 稳定阶段成果通过对应分级验证后方可提交和推送；合并 `main` 前运行 `npm run verify` 或 `npm run verify:local`。
+- 每轮明确改动完成并通过对应验证后，在所属任务分支提交并推送；交付时必须证明本地任务分支与同名远程分支一致。
+- `codex/integration-current` 是持续汇总已推送任务分支的完整项目分支，固定 Worktree 用于日常运行和组合调试；禁止在该分支直接开发或提交普通业务改动。
+- 任务分支推送后通过 `npm run git:integration:sync -- --task <branch>` 汇入集成分支；冲突、验证失败或远程分叉时停止自动同步。
+- 单人开发且验收期间能暂停集成汇入时，可固定准确集成 SHA 和候选清单直接验收；合并 `main` 时仍按清单分别合并任务分支，不直接合并滚动集成分支。
+- 多人协作、验收期间持续汇入或需要稳定快照时，使用从准确候选清单创建的临时 `codex/acceptance-*`；验收缺陷从验收使用的准确提交创建修复分支，不带入同模块后续未验收功能。
+- `main`、`codex/integration-current` 和 `codex/acceptance-*` 禁止直接提交普通改动，pre-commit 会拦截；仅联合冲突修复可在验收分支使用 `ZDM_ALLOW_ACCEPTANCE_INTEGRATION_COMMIT=1` 放行并记录原因。
+- 任务分支验收前同步最新 `origin/main`；正式验收、合并或高风险回归运行 `npm run verify` 或 `npm run verify:local`。
 - 未经用户明确表示验收通过并允许合并，不合并 `main`；合并授权不等于生产发布授权。
