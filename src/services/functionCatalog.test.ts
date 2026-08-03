@@ -55,6 +55,16 @@ describe('full function catalog', () => {
       label: '商品基础数据中心',
       menus: [
         {
+          label: '商品分类管理',
+          direct: false,
+          pages: [
+            {
+              label: '商品分类管理页',
+              tabs: [{ label: '成品现货分类' }, { label: '配件分类' }],
+            },
+          ],
+        },
+        {
           label: '大板品种管理',
           direct: false,
           pages: [{ label: '大板品种管理页', tabs: [] }],
@@ -86,7 +96,58 @@ describe('full function catalog', () => {
         },
       ],
     });
+    const categoryPage = fullFunctionCatalog[0].menus[0].pages[0];
+    expect(categoryPage.tabs).toEqual([
+      {
+        label: '成品现货分类',
+        value: 'admin.product-data-center.category.finished',
+        actions: [
+          { label: '查看', value: 'admin.product-data-center.category.finished.view' },
+          { label: '新增一级分类', value: 'admin.product-data-center.category.finished.create-root' },
+          { label: '新增下级', value: 'admin.product-data-center.category.finished.create-child' },
+          { label: '编辑', value: 'admin.product-data-center.category.finished.edit' },
+          { label: '上移', value: 'admin.product-data-center.category.finished.move-up' },
+          { label: '下移', value: 'admin.product-data-center.category.finished.move-down' },
+          { label: '停用', value: 'admin.product-data-center.category.finished.disable' },
+          { label: '启用', value: 'admin.product-data-center.category.finished.enable' },
+          { label: '删除', value: 'admin.product-data-center.category.finished.delete' },
+        ],
+      },
+      {
+        label: '配件分类',
+        value: 'admin.product-data-center.category.accessory',
+        actions: [
+          { label: '查看', value: 'admin.product-data-center.category.accessory.view' },
+          { label: '新增一级分类', value: 'admin.product-data-center.category.accessory.create-root' },
+          { label: '新增下级', value: 'admin.product-data-center.category.accessory.create-child' },
+          { label: '编辑', value: 'admin.product-data-center.category.accessory.edit' },
+          { label: '上移', value: 'admin.product-data-center.category.accessory.move-up' },
+          { label: '下移', value: 'admin.product-data-center.category.accessory.move-down' },
+          { label: '停用', value: 'admin.product-data-center.category.accessory.disable' },
+          { label: '启用', value: 'admin.product-data-center.category.accessory.enable' },
+          { label: '删除', value: 'admin.product-data-center.category.accessory.delete' },
+        ],
+      },
+    ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
+      'admin.product-data-center.category.finished.view',
+      'admin.product-data-center.category.finished.create-root',
+      'admin.product-data-center.category.finished.create-child',
+      'admin.product-data-center.category.finished.edit',
+      'admin.product-data-center.category.finished.move-up',
+      'admin.product-data-center.category.finished.move-down',
+      'admin.product-data-center.category.finished.disable',
+      'admin.product-data-center.category.finished.enable',
+      'admin.product-data-center.category.finished.delete',
+      'admin.product-data-center.category.accessory.view',
+      'admin.product-data-center.category.accessory.create-root',
+      'admin.product-data-center.category.accessory.create-child',
+      'admin.product-data-center.category.accessory.edit',
+      'admin.product-data-center.category.accessory.move-up',
+      'admin.product-data-center.category.accessory.move-down',
+      'admin.product-data-center.category.accessory.disable',
+      'admin.product-data-center.category.accessory.enable',
+      'admin.product-data-center.category.accessory.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',
@@ -127,6 +188,7 @@ describe('full function catalog', () => {
     ]);
     expect(
       normalizeTerminalPermissions('store', [
+        'admin.product-data-center.category.finished.edit',
         'store.goods.finished-stock.查询',
         'admin.product-data-center.finished-stock-craft.query',
         'admin.product-data-center.finished-stock-craft.reset',
@@ -137,6 +199,8 @@ describe('full function catalog', () => {
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
+      'admin.product-data-center.category.finished.view',
+      'admin.product-data-center.category.finished.edit',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
       'admin.permission-management.employee-management.view',

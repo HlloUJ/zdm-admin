@@ -17,6 +17,7 @@ public class ProductCategory extends BaseEntity {
 
   private Integer sortOrder;
   private Integer productCount;
+  private String createdByName;
 
   public Long getTenantId() {
     return tenantId;
@@ -64,5 +65,13 @@ public class ProductCategory extends BaseEntity {
 
   public void setProductCount(Integer productCount) {
     this.productCount = productCount;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 }

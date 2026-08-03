@@ -2,6 +2,18 @@ import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
 
+const categoryCatalogActionLabels = [
+  '查看',
+  '新增一级分类',
+  '新增下级',
+  '编辑',
+  '上移',
+  '下移',
+  '停用',
+  '启用',
+  '删除',
+];
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
@@ -38,14 +50,137 @@ test('shows only granted craft operation buttons for a restricted account', asyn
   await expect(craftRow.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
-test('shows slab variety edit without status operation for an edit-only account', async ({ page }) => {
+test('shows only granted category operation buttons for a restricted account', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
       JSON.stringify({
         id: 10,
-        name: '受限品种管理员',
+        name: '受限分类管理员',
         phone: '15926620010',
+        roles: ['CATEGORY_EDITOR'],
+        permissions: [
+          'admin.product-data-center.category.finished.view',
+          'admin.product-data-center.category.finished.edit',
+          'admin.product-data-center.category.finished.move-up',
+          'admin.product-data-center.category.finished.move-down',
+          'admin.product-data-center.category.finished.disable',
+          'admin.product-data-center.category.accessory.view',
+        ],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+  const categoryRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
+
+  await expect(categoryRow).toBeVisible();
+  await expect(main.getByRole('button', { name: '新增一级分类' })).toHaveCount(0);
+  await expect(categoryRow.getByText('新增下级', { exact: true })).toHaveCount(0);
+  await expect(categoryRow.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('上移', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('下移', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('停用', { exact: true })).toBeVisible();
+  await expect(categoryRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(main.locator('.scope-tabs')).toContainText('成品现货分类');
+  await expect(main.locator('.scope-tabs')).toContainText('配件分类');
+});
+
+test('shows the finished category buttons granted to account 15900000001', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 3,
+        name: '张飞',
+        phone: '15900000001',
+        roles: ['CATEGORY_OPERATOR'],
+        permissions: [
+          'admin.product-data-center.category.finished.view',
+          'admin.product-data-center.category.finished.create-root',
+          'admin.product-data-center.category.finished.disable',
+          'admin.product-data-center.category.finished.enable',
+          'admin.product-data-center.category.finished.delete',
+        ],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+  const rootRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
+
+  await expect(main.locator('.scope-tabs')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '新增一级分类' })).toBeVisible();
+  await expect(rootRow.getByText('新增下级', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('上移', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('下移', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('停用', { exact: true })).toBeVisible();
+  await expect(rootRow.getByText('删除', { exact: true })).toBeVisible();
+
+  await rootRow.getByRole('button', { name: '展开下级分类' }).click();
+  const childRow = main.locator('tbody tr').filter({ hasText: '岩板餐桌' });
+  await expect(childRow.getByText('启用', { exact: true })).toBeVisible();
+});
+
+test('shows only the granted product category tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 12,
+        name: '成品现货分类查看员',
+        phone: '15926620012',
+        roles: ['FINISHED_CATEGORY_VIEWER'],
+        permissions: ['admin.product-data-center.category.finished.view'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-tabs')).toHaveCount(0);
+  await expect(main.locator('.category-toolbar h2')).toHaveText('成品现货分类');
+  await expect(main.getByText('配件分类', { exact: true })).toHaveCount(0);
+});
+
+test('falls back to the only granted product category tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 13,
+        name: '配件分类查看员',
+        phone: '15926620013',
+        roles: ['ACCESSORY_CATEGORY_VIEWER'],
+        permissions: ['admin.product-data-center.category.accessory.view'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-tabs')).toHaveCount(0);
+  await expect(main.locator('.category-toolbar h2')).toHaveText('配件分类');
+  await expect(main.getByText('成品现货分类', { exact: true })).toHaveCount(0);
+});
+
+test('shows slab variety edit without status operation for an edit-only account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 11,
+        name: '受限品种管理员',
+        phone: '15926620011',
         roles: ['SLAB_VARIETY_EDITOR'],
         permissions: ['admin.product-data-center.slab-variety.view', 'admin.product-data-center.slab-variety.edit'],
         dataPermission: 'all',
@@ -71,9 +206,9 @@ test('shows slab variety status without edit operation for a status-only account
     window.localStorage.setItem(
       'zdm-admin-user',
       JSON.stringify({
-        id: 10,
+        id: 12,
         name: '受限品种管理员',
-        phone: '15926620010',
+        phone: '15926620012',
         roles: ['SLAB_VARIETY_STATUS_MANAGER'],
         permissions: [
           'admin.product-data-center.slab-variety.view',
@@ -252,6 +387,7 @@ test('filters menu and employee actions by logged-in permissions', async ({ page
   await expect(sideNav.getByText('工作台')).toHaveCount(0);
   await expect(sideNav.getByText('员工管理')).toBeVisible();
   await expect(sideNav.getByText('角色管理')).toHaveCount(0);
+  await expect(sideNav.getByText('商品分类管理')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /邀请员工/ })).toHaveCount(0);
   await expect(firstEmployeeRow.getByText('编辑', { exact: true })).toBeVisible();
   await expect(firstEmployeeRow.getByText('角色', { exact: true })).toHaveCount(0);
@@ -384,7 +520,17 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('页面');
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(2);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(4);
+  await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
+  await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
+  const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
+  const accessoryCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件分类' });
+  await expect(finishedCategoryPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    categoryCatalogActionLabels,
+  );
+  await expect(accessoryCategoryPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    categoryCatalogActionLabels,
+  );
   const slabVarietyPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
   await expect(slabVarietyPermissionRow.getByText('大板品种管理', { exact: true })).toBeVisible();
   await expect(slabVarietyPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -457,7 +603,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await deleteDialog.getByRole('button', { name: '取消' }).click();
 });
 
-test('shows verified craft, employee, and role management resources in both terminal allocations', async ({ page }) => {
+test('shows verified product-data and permission-management resources in both terminal allocations', async ({
+  page,
+}) => {
   await page.goto('/terminal-function-allocation');
   const main = page.getByRole('main');
   const moduleList = main.locator('.permission-module-list');
@@ -470,7 +618,7 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*10/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*28/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -479,7 +627,17 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(matrix.locator('thead')).toContainText('页面');
   await expect(matrix.locator('th.permission-tab-column')).toHaveText('Tab');
   await expect(matrix.locator('thead')).toContainText('操作权限');
-  await expect(matrix.locator('tbody tr')).toHaveCount(2);
+  await expect(matrix.locator('tbody tr')).toHaveCount(4);
+  await expect(matrix.getByText('商品分类管理', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
+  const finishedCategoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
+  const accessoryCategoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '配件分类' });
+  await expect(finishedCategoryAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    categoryCatalogActionLabels,
+  );
+  await expect(accessoryCategoryAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    categoryCatalogActionLabels,
+  );
   const slabVarietyAllocationRow = matrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
   await expect(slabVarietyAllocationRow.getByText('大板品种管理', { exact: true })).toBeVisible();
   await expect(slabVarietyAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -526,9 +684,10 @@ test('shows verified craft, employee, and role management resources in both term
   await main.locator('.terminal-tabs').getByText('大板供应商门店管理后台', { exact: true }).click();
   await expect(moduleList.locator('.permission-module-item')).toHaveCount(2);
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('大板品种管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(10);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(28);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
