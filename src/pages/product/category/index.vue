@@ -17,23 +17,36 @@
         <t-tabs v-if="!lockedScope && showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
 
         <AdminSectionCard variant="filter">
-          <t-form :data="searchForm" label-width="72px" colon>
-            <div class="filter-row">
-              <div class="filter-fields">
-                <t-form-item label="分类名称"
-                  ><t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称"
-                /></t-form-item>
-                <t-form-item label="分类状态"
-                  ><t-select v-model="searchForm.status" clearable placeholder="全部"
-                    ><t-option label="启用" value="enabled" /><t-option label="停用" value="disabled" /></t-select
-                ></t-form-item>
-              </div>
-              <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch"
-                  ><template #icon><t-icon name="search" /></template>查询</t-button
-                ><t-button variant="base" @click="handleReset">重置</t-button>
-              </div>
-            </div>
+          <t-form :data="searchForm" :label-width="80" colon @reset="handleReset" @submit="handleSearch">
+            <t-row>
+              <t-col :span="10">
+                <t-row :gutter="[24, 24]">
+                  <t-col :span="4">
+                    <t-form-item label="分类名称" name="keyword">
+                      <t-input
+                        v-model="searchForm.keyword"
+                        class="form-item-content"
+                        type="search"
+                        clearable
+                        placeholder="请输入分类名称"
+                      />
+                    </t-form-item>
+                  </t-col>
+                  <t-col :span="4">
+                    <t-form-item label="分类状态" name="status">
+                      <t-select v-model="searchForm.status" class="form-item-content" clearable placeholder="全部">
+                        <t-option label="启用" value="enabled" />
+                        <t-option label="停用" value="disabled" />
+                      </t-select>
+                    </t-form-item>
+                  </t-col>
+                </t-row>
+              </t-col>
+              <t-col :span="2" class="operation-container">
+                <t-button theme="primary" type="submit">查询</t-button>
+                <t-button type="reset" variant="base" theme="default">重置</t-button>
+              </t-col>
+            </t-row>
           </t-form>
         </AdminSectionCard>
 
@@ -751,34 +764,24 @@ onMounted(loadCategories);
 .category-card {
   overflow-anchor: none;
 }
-.filter-row,
-.filter-fields,
-.filter-actions,
 .category-toolbar,
 .table-actions,
 .category-name-cell {
   display: flex;
   align-items: center;
 }
-.filter-row {
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-}
-.filter-fields {
-  flex: 1;
-  gap: var(--td-comp-margin-l);
-}
-.filter-fields :deep(.t-form__item) {
-  width: 280px;
-  margin-bottom: 0;
-}
-.filter-fields :deep(.t-input),
-.filter-fields :deep(.t-select) {
+.form-item-content {
   width: 100%;
+  min-width: 134px;
 }
-.filter-actions {
-  flex: 0 0 auto;
-  gap: var(--td-comp-margin-l);
+.operation-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
+.operation-container :deep(.t-button:first-child) {
+  margin-left: var(--td-comp-margin-s);
 }
 .category-toolbar {
   justify-content: space-between;
@@ -853,19 +856,6 @@ onMounted(loadCategories);
   .category-toolbar {
     align-items: flex-start;
     flex-direction: column;
-  }
-}
-@media (max-width: 860px) {
-  .filter-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .filter-fields {
-    flex-wrap: wrap;
-    width: 100%;
-  }
-  .filter-actions {
-    align-self: flex-end;
   }
 }
 </style>
