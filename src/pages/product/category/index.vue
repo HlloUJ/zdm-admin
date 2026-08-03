@@ -16,7 +16,7 @@
 
         <t-tabs v-if="!lockedScope && showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
 
-        <AdminSectionCard variant="filter">
+        <section class="filter-card">
           <t-form :data="searchForm" :label-width="80" colon @reset="handleReset" @submit="handleSearch">
             <t-row>
               <t-col :span="10">
@@ -48,7 +48,7 @@
               </t-col>
             </t-row>
           </t-form>
-        </AdminSectionCard>
+        </section>
 
         <section class="category-card">
           <div class="category-toolbar">
@@ -214,7 +214,6 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminSectionCard } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -752,8 +751,14 @@ onMounted(loadCategories);
   align-items: center;
   margin-bottom: var(--td-comp-margin-l);
 }
-.scope-tabs {
+.scope-tabs,
+.filter-card {
   margin-bottom: var(--td-comp-margin-l);
+}
+.filter-card {
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  background: var(--td-bg-color-container);
+  border-radius: var(--td-radius-medium);
 }
 .category-card {
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
