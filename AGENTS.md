@@ -25,5 +25,6 @@
 
 - 稳定主分支为 `main`，任务分支默认使用 `codex/<task-slug>`。
 - 任务分支验收前同步最新 `origin/main`；多个未合并任务联合验收时使用临时验收分支。
+- `codex/acceptance-*` 仅用于合入任务分支和联合验收，禁止直接提交普通业务改动；pre-commit 会拦截。仅联合冲突修复可显式使用 `ZDM_ALLOW_ACCEPTANCE_INTEGRATION_COMMIT=1` 放行，并须在交付说明中记录原因。
 - 稳定阶段成果通过对应分级验证后方可提交和推送；合并 `main` 前运行 `npm run verify` 或 `npm run verify:local`。
 - 未经用户明确表示验收通过并允许合并，不合并 `main`；合并授权不等于生产发布授权。

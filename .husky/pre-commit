@@ -1,1 +1,2 @@
+node scripts/check-acceptance-branch-commit.mjs
 npx lint-staged
