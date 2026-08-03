@@ -14,12 +14,7 @@
           <t-tag theme="primary" variant="light">最多支持 4 级分类</t-tag>
         </header>
 
-        <t-tabs
-          v-if="!lockedScope && scopeTabs.length > 1"
-          v-model="activeScope"
-          :list="scopeTabs"
-          class="scope-tabs"
-        />
+        <t-tabs v-if="!lockedScope && showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
 
         <section class="filter-card">
           <t-form :data="searchForm" label-width="74px" colon>
@@ -211,6 +206,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
@@ -268,16 +264,18 @@ const categoryScopeTabs: { label: string; value: Scope }[] = [
   { label: '成品现货分类', value: 'finished' },
   { label: '配件分类', value: 'accessory' },
 ];
-const scopeTabs = computed(() =>
-  categoryScopeTabs.filter(
-    (tab) =>
-      canViewAllCategoryScopes.value || hasPermission(loginUser.value, `${categoryPermissionPrefix}.${tab.value}.view`),
-  ),
-);
 const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
-const resolveAccessibleScope = (scope: Scope): Scope =>
-  scopeTabs.value.some((tab) => tab.value === scope) ? scope : (scopeTabs.value[0]?.value ?? scope);
-const activeScope = ref<Scope>(resolveAccessibleScope(resolveScope(route.query.scope)));
+const activeScope = ref<Scope>(resolveScope(route.query.scope));
+const {
+  visibleTabs: scopeTabs,
+  showTabRail: showScopeTabRail,
+  resolveAccessibleTab: resolveAccessibleScope,
+} = usePermissionTabs({
+  tabs: categoryScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) =>
+    canViewAllCategoryScopes.value || hasPermission(loginUser.value, `${categoryPermissionPrefix}.${tab.value}.view`),
+});
 const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');
 
 const categoryData = ref<Record<Scope, CategoryNode[]>>({ finished: [], accessory: [] });
@@ -661,7 +659,7 @@ function handleReset() {
 watch(
   () => route.query.scope,
   (scope) => {
-    activeScope.value = resolveAccessibleScope(resolveScope(scope));
+    activeScope.value = resolveAccessibleScope(resolveScope(scope)) ?? activeScope.value;
     handleReset();
   },
 );

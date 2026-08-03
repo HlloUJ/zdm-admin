@@ -17,7 +17,7 @@
 
         <section class="table-card">
           <t-tabs
-            v-if="roleTabs.length > 1"
+            v-if="showRoleTabRail"
             v-model="activeCategory"
             class="role-tabs"
             :list="roleTabs"
@@ -283,6 +283,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminPagination } from '@/components/foundation';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   collectFunctionCatalogRows,
   fullFunctionCatalog,
@@ -351,30 +352,22 @@ const hasLegacyRolePagePermission = computed(() =>
     return !permission.slice(rolePagePermissionPrefix.length + 1).includes('.');
   }),
 );
-const roleTabs = computed(() =>
-  allRoleTabs.filter(
-    (tab) =>
-      hasLegacyRolePagePermission.value ||
-      hasPermissionPrefix(loginUser.value, `${rolePagePermissionPrefix}.${tab.value}`),
-  ),
-);
+const { visibleTabs: roleTabs, showTabRail: showRoleTabRail } = usePermissionTabs({
+  tabs: allRoleTabs,
+  activeTab: activeCategory,
+  canAccess: (tab) =>
+    hasLegacyRolePagePermission.value ||
+    hasPermissionPrefix(loginUser.value, `${rolePagePermissionPrefix}.${tab.value}`),
+});
 const activePermissionModuleValue = ref(permissionModules[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
   pageSize: 10,
 });
 
-watch(
-  roleTabs,
-  (tabs) => {
-    const firstTab = tabs[0];
-    if (firstTab && !tabs.some((tab) => tab.value === activeCategory.value)) {
-      activeCategory.value = firstTab.value;
-      pagination.current = 1;
-    }
-  },
-  { immediate: true },
-);
+watch(activeCategory, () => {
+  pagination.current = 1;
+});
 
 const formRef = ref<FormInstanceFunctions>();
 const formDialogVisible = ref(false);

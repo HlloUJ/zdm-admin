@@ -77,6 +77,8 @@ test('shows only granted category operation buttons for a restricted account', a
   await expect(categoryRow.getByText('下移', { exact: true })).toBeVisible();
   await expect(categoryRow.getByText('停用', { exact: true })).toBeVisible();
   await expect(categoryRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(main.locator('.scope-tabs')).toContainText('成品现货分类');
+  await expect(main.locator('.scope-tabs')).toContainText('配件分类');
 });
 
 test('shows only the granted product category tab', async ({ page }) => {
@@ -100,6 +102,28 @@ test('shows only the granted product category tab', async ({ page }) => {
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
   await expect(main.locator('.category-toolbar h2')).toHaveText('成品现货分类');
   await expect(main.getByText('配件分类', { exact: true })).toHaveCount(0);
+});
+test('falls back to the only granted product category tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 13,
+        name: '配件分类查看员',
+        phone: '15926620013',
+        roles: ['ACCESSORY_CATEGORY_VIEWER'],
+        permissions: ['admin.product-data-center.category.accessory.view'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-tabs')).toHaveCount(0);
+  await expect(main.locator('.category-toolbar h2')).toHaveText('配件分类');
+  await expect(main.getByText('成品现货分类', { exact: true })).toHaveCount(0);
 });
 test('opens employee invite and edit dialogs', async ({ page }) => {
   await page.goto('/employee-management');
@@ -258,6 +282,7 @@ test('filters menu and employee actions by logged-in permissions', async ({ page
   await expect(sideNav.getByText('工作台')).toHaveCount(0);
   await expect(sideNav.getByText('员工管理')).toBeVisible();
   await expect(sideNav.getByText('角色管理')).toHaveCount(0);
+  await expect(sideNav.getByText('商品分类管理')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /邀请员工/ })).toHaveCount(0);
   await expect(firstEmployeeRow.getByText('编辑', { exact: true })).toBeVisible();
   await expect(firstEmployeeRow.getByText('角色', { exact: true })).toHaveCount(0);
