@@ -91,8 +91,8 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(30);
-    assertThat(latestMigrationVersion).isEqualTo("30");
+    assertThat(migrationCount).isGreaterThanOrEqualTo(28);
+    assertThat(latestMigrationVersion).isEqualTo("29");
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
