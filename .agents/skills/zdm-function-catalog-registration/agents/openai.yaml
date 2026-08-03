@@ -1,0 +1,4 @@
+interface:
+  display_name: '装点猫全量功能目录登记'
+  short_description: '按真实页面一比一登记菜单、页面、Tab 与操作权限'
+  default_prompt: '使用 $zdm-function-catalog-registration 按真实页面一比一登记全量功能目录。'
