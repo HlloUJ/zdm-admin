@@ -266,6 +266,7 @@ import {
   deleteEmployee,
   listEmployees,
   updateEmployee,
+  updateEmployeePermissions,
   type EmployeePayload,
   type EmployeeRecord,
 } from '@/services/employees';
@@ -655,21 +656,12 @@ const handlePermissionSubmit = async () => {
     MessagePlugin.warning('请选择数据权限');
     return;
   }
-  const rolePermissionValues = expandRolePermissions(permissionFormData.roleIds);
-
   if (activeEmployee.value) {
     try {
-      const updated = await updateEmployee(
-        activeEmployee.value.id,
-        toEmployeePayload({
-          ...activeEmployee.value,
-          roleIds: [...permissionFormData.roleIds],
-          dataPermission: permissionFormData.dataPermission,
-          functionPermissions: Array.from(
-            new Set([...rolePermissionValues, ...activeEmployee.value.functionPermissions]),
-          ),
-        }),
-      );
+      const updated = await updateEmployeePermissions(activeEmployee.value.id, {
+        roleIds: permissionFormData.roleIds.join(','),
+        dataPermission: permissionFormData.dataPermission,
+      });
       const targetIndex = employees.value.findIndex((employee) => employee.id === activeEmployee.value?.id);
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
