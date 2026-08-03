@@ -59,6 +59,9 @@ class PlatformApiSmokeTest {
     Integer migrationCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1",
         Integer.class);
+    String latestMigrationVersion = jdbcTemplate.queryForObject(
+        "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank DESC LIMIT 1",
+        String.class);
     Integer superAdminCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM accounts WHERE phone = '15926626945' AND status = 'enabled'",
         Integer.class);
@@ -84,12 +87,17 @@ class PlatformApiSmokeTest {
     Integer craftWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM crafts WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
+    Integer slabVarietyWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(26);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(28);
+    assertThat(latestMigrationVersion).isEqualTo("29");
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
     assertThat(craftWithoutCreatorCount).isZero();
+    assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -99,6 +107,344 @@ class PlatformApiSmokeTest {
   void protectedAdminApiRequiresAuthentication() throws Exception {
     mockMvc.perform(get("/api/admin/tenants"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void slabVarietyDeleteReturnsBusinessErrorWhenReferencedByInventory() throws Exception {
+    mockMvc.perform(delete("/api/admin/slab-varieties/1")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(400))
+        .andExpect(jsonPath("$.message")
+            .value("该品种已被大板库存引用，不能删除，请先停用该品种"));
+
+    Integer pandoraCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_varieties WHERE id = 1 AND name = '潘多拉'",
+        Integer.class);
+    assertThat(pandoraCount).isEqualTo(1);
+  }
+
+  @Test
+  void slabVarietyNameMustBeUniqueWhenCreatingAndEditing() throws Exception {
+    mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":" 潘多拉 ",
+                  "code":"duplicate-pandora",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("品种名称已存在"));
+
+    String varietyName = "重名编辑测试品种-" + System.nanoTime();
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s",
+                  "code":"duplicate-edit-test-%d",
+                  "status":"enabled"
+                }
+                """.formatted(varietyName, System.nanoTime())))
+        .andExpect(status().isOk())
+        .andReturn();
+    String varietyId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"潘多拉",
+                  "code":"duplicate-edit-test-%d",
+                  "status":"enabled"
+                }
+                """.formatted(System.nanoTime())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("品种名称已存在"));
+
+    mockMvc.perform(delete("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void slabVarietyManagementPersistsCreatedByName() throws Exception {
+    String varietyName = "创建人集成测试品种-" + System.nanoTime();
+    String creatorName = jdbcTemplate.queryForObject(
+        """
+        SELECT name
+        FROM employees
+        WHERE account_id = 1
+          AND status = 'enabled'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        String.class);
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s",
+                  "code":"creator-test-%d",
+                  "status":"enabled",
+                  "createdByName":"不应覆盖"
+                }
+                """.formatted(varietyName, System.nanoTime())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andReturn();
+    String varietyId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s-已编辑",
+                  "code":"creator-test-updated-%d",
+                  "status":"disabled",
+                  "createdByName":"不应覆盖"
+                }
+                """.formatted(varietyName, System.nanoTime())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.status").value("enabled"));
+
+    mockMvc.perform(patch("/api/admin/slab-varieties/{id}/status", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(delete("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void slabVarietyManagementAppliesSelfDataScopeToListsAndOperations() throws Exception {
+    long accountId = 9031L;
+    long employeeId = 9031L;
+    long roleId = 9031L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629031",
+        "大板品种自有操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '大板品种自有操作员', '15926629031', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.product-data-center.slab-variety.view,'
+          'admin.product-data-center.slab-variety.create,'
+          'admin.product-data-center.slab-variety.edit,'
+          'admin.product-data-center.slab-variety.toggle-status,'
+          'admin.product-data-center.slab-variety.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_varieties (id, name, code, status, created_by_name)
+        VALUES
+          (9031, '本人创建的大板品种', 'self-owned-variety', 'enabled', '大板品种自有操作员'),
+          (9032, '他人创建的大板品种', 'other-owned-variety', 'enabled', '韩健')
+        """);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].name", hasItem("本人创建的大板品种")))
+        .andExpect(jsonPath("$.data[*].name", not(hasItem("他人创建的大板品种"))));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"本人新增的大板品种",
+                  "code":"self-created-variety",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value("大板品种自有操作员"))
+        .andReturn();
+    String createdVarietyId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/slab-varieties/9032")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"越权编辑的大板品种",
+                  "code":"other-owned-variety",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(patch("/api/admin/slab-varieties/9032/status")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/slab-varieties/9032")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/slab-varieties/{id}", createdVarietyId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void slabVarietyManagementSeparatesEditAndStatusPermissions() throws Exception {
+    long accountId = 9011L;
+    long employeeId = 9011L;
+    long roleId = 9011L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629011",
+        "品种查看员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '品种查看员', '15926629011', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '品种编辑角色', 'SLAB_VARIETY_EDITOR_TEST', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.product-data-center.slab-variety.view,admin.product-data-center.slab-variety.edit', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_varieties (id, name, code, status, created_by_name)
+        VALUES (9011, '权限集成测试品种', 'permission-test-variety', 'enabled', '集成测试')
+        """);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"无权新增品种","code":"forbidden-create","status":"enabled"}
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(put("/api/admin/slab-varieties/9011")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"权限集成测试品种-已编辑","code":"permission-test-variety","status":"disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("权限集成测试品种-已编辑"))
+        .andExpect(jsonPath("$.data.status").value("enabled"));
+    mockMvc.perform(patch("/api/admin/slab-varieties/9011/status")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isForbidden());
+
+    jdbcTemplate.update(
+        """
+        UPDATE roles
+        SET function_permissions = ?
+        WHERE id = ?
+        """,
+        "admin.product-data-center.slab-variety.view,admin.product-data-center.slab-variety.toggle-status",
+        roleId);
+    mockMvc.perform(put("/api/admin/slab-varieties/9011")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"无权编辑品种","code":"pandora","status":"enabled"}
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(patch("/api/admin/slab-varieties/9011/status")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+    mockMvc.perform(delete("/api/admin/slab-varieties/9011")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
   }
 
   @Test

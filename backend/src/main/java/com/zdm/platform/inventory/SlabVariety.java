@@ -14,6 +14,7 @@ public class SlabVariety extends BaseEntity {
 
   private String origin;
   private String color;
+  private String createdByName;
   private String remark;
 
   public String getName() {
@@ -46,6 +47,14 @@ public class SlabVariety extends BaseEntity {
 
   public void setColor(String color) {
     this.color = color;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 
   public String getRemark() {

@@ -6,6 +6,7 @@ export interface SlabVarietyRecord {
   code: string;
   origin?: string;
   color?: string;
+  createdByName?: string;
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdAt?: string;
@@ -36,6 +37,13 @@ export function updateSlabVariety(id: number, payload: SlabVarietyPayload) {
   return request<SlabVarietyRecord>(`/admin/slab-varieties/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateSlabVarietyStatus(id: number, status: SlabVarietyPayload['status']) {
+  return request<SlabVarietyRecord>(`/admin/slab-varieties/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
 }
 

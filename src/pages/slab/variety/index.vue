@@ -47,7 +47,7 @@
 
         <section class="table-card">
           <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
+            <t-button v-if="canCreateVariety" theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
             </t-button>
@@ -64,15 +64,18 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canEditVariety" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
+                  v-if="canToggleVarietyStatus"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link v-if="canDeleteVariety" theme="danger" hover="color" @click="openDeleteConfirm(row)">
+                  删除
+                </t-link>
               </div>
             </template>
           </t-table>
@@ -137,11 +140,14 @@ import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableR
 import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { getLoginUser } from '@/services/auth';
+import { hasPermission } from '@/services/adminPermissions';
 import {
   createSlabVariety,
   deleteSlabVariety,
   listSlabVarieties,
   updateSlabVariety,
+  updateSlabVarietyStatus,
   type SlabVarietyPayload,
   type SlabVarietyRecord,
 } from '@/services/slabVarieties';
@@ -154,6 +160,7 @@ interface VarietyItem {
   code: string;
   name: string;
   status: VarietyStatus;
+  createdByName: string;
   createdAt: string;
   remark?: string;
 }
@@ -165,11 +172,20 @@ interface VarietyForm {
 
 const tableData = ref<VarietyItem[]>([]);
 const loading = ref(false);
+const varietyPermissionPrefix = 'admin.product-data-center.slab-variety';
+const loginUser = computed(() => getLoginUser());
+const canCreateVariety = computed(() => hasPermission(loginUser.value, `${varietyPermissionPrefix}.create`));
+const canEditVariety = computed(() => hasPermission(loginUser.value, `${varietyPermissionPrefix}.edit`));
+const canToggleVarietyStatus = computed(() =>
+  hasPermission(loginUser.value, `${varietyPermissionPrefix}.toggle-status`),
+);
+const canDeleteVariety = computed(() => hasPermission(loginUser.value, `${varietyPermissionPrefix}.delete`));
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '品种名称', minWidth: 220, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
 ];
@@ -255,6 +271,7 @@ const toVarietyItem = (record: SlabVarietyRecord): VarietyItem => ({
   code: record.code,
   name: record.name,
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName ?? '-',
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
@@ -264,13 +281,6 @@ const toVarietyPayload = (status: VarietyStatus, code?: string): SlabVarietyPayl
   code: code ?? createCode(formData.name),
   status: toBackendStatus(status),
   remark: formData.remark.trim(),
-});
-
-const toVarietyPayloadFromItem = (item: VarietyItem): SlabVarietyPayload => ({
-  name: item.name,
-  code: item.code,
-  status: toBackendStatus(item.status),
-  remark: item.remark ?? '',
 });
 
 const loadVarieties = async () => {
@@ -392,12 +402,9 @@ const handleConfirm = async () => {
       tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
       ensureCurrentPage();
     } else {
-      const updated = await updateSlabVariety(
+      const updated = await updateSlabVarietyStatus(
         confirmState.row.id,
-        toVarietyPayloadFromItem({
-          ...confirmState.row,
-          status: confirmState.type === 'enable' ? 'normal' : 'disabled',
-        }),
+        toBackendStatus(confirmState.type === 'enable' ? 'normal' : 'disabled'),
       );
       const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
       if (targetIndex !== -1) {
