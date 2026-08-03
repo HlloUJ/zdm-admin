@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { installAdminApiMocks } from './admin-api-mocks';
+
 test('shows the login page', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '欢迎登录' })).toBeVisible();
@@ -8,6 +10,7 @@ test('shows the login page', async ({ page }) => {
 });
 
 test('stores and displays the logged-in user', async ({ page }) => {
+  await installAdminApiMocks(page);
   await page.route('**/api/admin/auth/login', async (route) => {
     await route.fulfill({
       status: 200,
