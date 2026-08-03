@@ -2,6 +2,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 
+import { ensureBackend } from '../backend-runtime.mjs';
+
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 const docker = '/usr/local/bin/docker';
 const open = '/usr/bin/open';
@@ -32,15 +34,6 @@ function isPortOpen(port) {
   });
 }
 
-async function waitForPort(port, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await isPortOpen(port)) return true;
-    await wait(1_000);
-  }
-  return false;
-}
-
 async function ensureDocker() {
   if (run(docker, ['info', '--format', '{{.ServerVersion}}'])) return true;
 
@@ -60,12 +53,7 @@ async function ensureDocker() {
 async function main() {
   if (!(await ensureDocker())) process.exit(1);
 
-  if (!run(docker, ['compose', 'up', '-d', 'mysql', 'backend'])) process.exit(1);
-  if (!(await waitForPort(8080, 120_000))) {
-    console.error('Backend did not become ready within 2 minutes.');
-    run(docker, ['compose', 'logs', '--tail', '80', 'backend']);
-    process.exit(1);
-  }
+  await ensureBackend(projectRoot);
 
   if (await isPortOpen(5173)) {
     console.log('Frontend is already running at http://127.0.0.1:5173');
