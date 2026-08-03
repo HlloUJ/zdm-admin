@@ -58,6 +58,8 @@ test('shows slab variety edit without status operation for an edit-only account'
   const varietyRow = main.locator('tbody tr').filter({ hasText: '潘多拉' });
 
   await expect(varietyRow).toBeVisible();
+  await expect(main.locator('thead')).toContainText('创建人');
+  await expect(varietyRow).toContainText('韩健');
   await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
   await expect(varietyRow.getByText('编辑', { exact: true })).toBeVisible();
   await expect(varietyRow.getByText('停用', { exact: true })).toHaveCount(0);

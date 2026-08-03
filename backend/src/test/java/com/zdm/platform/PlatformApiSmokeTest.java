@@ -84,12 +84,16 @@ class PlatformApiSmokeTest {
     Integer craftWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM crafts WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
+    Integer slabVarietyWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(26);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(27);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
     assertThat(craftWithoutCreatorCount).isZero();
+    assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -114,6 +118,70 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM slab_varieties WHERE id = 1 AND name = '潘多拉'",
         Integer.class);
     assertThat(pandoraCount).isEqualTo(1);
+  }
+
+  @Test
+  void slabVarietyManagementPersistsCreatedByName() throws Exception {
+    String varietyName = "创建人集成测试品种-" + System.nanoTime();
+    String creatorName = jdbcTemplate.queryForObject(
+        """
+        SELECT name
+        FROM employees
+        WHERE account_id = 1
+          AND status = 'enabled'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        String.class);
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s",
+                  "code":"creator-test-%d",
+                  "status":"enabled",
+                  "createdByName":"不应覆盖"
+                }
+                """.formatted(varietyName, System.nanoTime())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andReturn();
+    String varietyId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s-已编辑",
+                  "code":"creator-test-updated-%d",
+                  "status":"disabled",
+                  "createdByName":"不应覆盖"
+                }
+                """.formatted(varietyName, System.nanoTime())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.status").value("enabled"));
+
+    mockMvc.perform(patch("/api/admin/slab-varieties/{id}/status", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(delete("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
   }
 
   @Test
@@ -160,8 +228,8 @@ class PlatformApiSmokeTest {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO slab_varieties (id, name, code, status)
-        VALUES (9011, '权限集成测试品种', 'permission-test-variety', 'enabled')
+        INSERT INTO slab_varieties (id, name, code, status, created_by_name)
+        VALUES (9011, '权限集成测试品种', 'permission-test-variety', 'enabled', '集成测试')
         """);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);

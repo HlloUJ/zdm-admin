@@ -6,6 +6,7 @@ export interface SlabVarietyRecord {
   code: string;
   origin?: string;
   color?: string;
+  createdByName?: string;
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdAt?: string;

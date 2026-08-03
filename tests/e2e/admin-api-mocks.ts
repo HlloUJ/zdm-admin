@@ -212,6 +212,7 @@ const slabVarieties = [
     code: 'pandora',
     remark: '按钮权限测试数据',
     status: 'enabled',
+    createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
 ];
