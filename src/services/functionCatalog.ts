@@ -66,6 +66,17 @@ const withDefaultViewAction = (scope: string, actions: FunctionAction[]) => [
   ...actions.filter((action) => !isViewPermission(action.value) && !isLegacyReadAction(action)),
 ];
 
+const productCategoryTabActions = (scope: string): FunctionAction[] => [
+  { label: '新增一级分类', value: `${scope}.create-root` },
+  { label: '新增下级', value: `${scope}.create-child` },
+  { label: '编辑', value: `${scope}.edit` },
+  { label: '上移', value: `${scope}.move-up` },
+  { label: '下移', value: `${scope}.move-down` },
+  { label: '停用', value: `${scope}.disable` },
+  { label: '启用', value: `${scope}.enable` },
+  { label: '删除', value: `${scope}.delete` },
+];
+
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
   modules.map((module) => ({
     ...module,
@@ -91,6 +102,30 @@ const verifiedFunctionCatalog: FunctionModule[] = [
     label: '商品基础数据中心',
     value: 'admin.product-data-center',
     menus: [
+      {
+        label: '商品分类管理',
+        value: 'admin.product-data-center.category.menu',
+        direct: false,
+        pages: [
+          {
+            label: '商品分类管理页',
+            value: 'admin.product-data-center.category',
+            actions: [],
+            tabs: [
+              {
+                label: '成品现货分类',
+                value: 'admin.product-data-center.category.finished',
+                actions: productCategoryTabActions('admin.product-data-center.category.finished'),
+              },
+              {
+                label: '配件分类',
+                value: 'admin.product-data-center.category.accessory',
+                actions: productCategoryTabActions('admin.product-data-center.category.accessory'),
+              },
+            ],
+          },
+        ],
+      },
       {
         label: '大板品种管理',
         value: 'admin.product-data-center.slab-variety.menu',

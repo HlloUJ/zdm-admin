@@ -14,26 +14,31 @@
           <t-tag theme="primary" variant="light">最多支持 4 级分类</t-tag>
         </header>
 
-        <t-tabs v-if="!lockedScope" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
+        <t-tabs v-if="!lockedScope && showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="74px" colon>
+          <t-form :data="searchForm" label-width="84px" colon>
             <div class="filter-row">
               <div class="filter-fields">
-                <t-form-item label="分类名称"
-                  ><t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称"
-                /></t-form-item>
-                <t-form-item label="分类状态"
-                  ><t-select v-model="searchForm.status" clearable placeholder="全部"
-                    ><t-option label="启用" value="enabled" /><t-option label="停用" value="disabled" /></t-select
-                ></t-form-item>
+                <t-form-item label="分类名称" name="keyword">
+                  <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
+                </t-form-item>
+                <t-form-item label="分类状态" name="status">
+                  <t-select v-model="searchForm.status" clearable placeholder="全部">
+                    <t-option label="启用" value="enabled" />
+                    <t-option label="停用" value="disabled" />
+                  </t-select>
+                </t-form-item>
               </div>
               <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch"
-                  ><template #icon><t-icon name="search" /></template>查询</t-button
-                ><t-button variant="base" @click="handleReset"
-                  ><template #icon><t-icon name="refresh" /></template>重置</t-button
-                >
+                <t-button theme="primary" @click="handleSearch">
+                  <template #icon><t-icon name="search" /></template>
+                  查询
+                </t-button>
+                <t-button theme="default" variant="base" @click="handleReset">
+                  <template #icon><t-icon name="refresh" /></template>
+                  重置
+                </t-button>
               </div>
             </div>
           </t-form>
@@ -45,7 +50,7 @@
               <h2>{{ activeScope === 'finished' ? '成品现货分类' : '配件分类' }}</h2>
               <p>通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</p>
             </div>
-            <t-button theme="primary" @click="openCreateDialog()"
+            <t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()"
               ><template #icon><t-icon name="add" /></template>新增一级分类</t-button
             >
           </div>
@@ -89,25 +94,38 @@
               }}</t-tag></template
             >
             <template #sort="{ row }">{{ row.sort }}</template>
+            <template #createdAt="{ row }">{{ row.createdAt }}</template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="row.level < maxCategoryLevel" theme="primary" @click="openCreateDialog(row)"
+                <t-link
+                  v-if="canCreateChildCategory && row.level < maxCategoryLevel"
+                  theme="primary"
+                  @click="openCreateDialog(row)"
                   >新增下级</t-link
                 >
-                <t-link theme="primary" @click="openEditDialog(row)">编辑</t-link>
-                <t-link theme="primary" :disabled="siblingIndex(row) === 0" @click="moveCategory(row, -1)">上移</t-link>
+                <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
+                  v-if="canMoveUpCategory"
+                  theme="primary"
+                  :disabled="siblingIndex(row) === 0"
+                  @click="moveCategory(row, -1)"
+                  >上移</t-link
+                >
+                <t-link
+                  v-if="canMoveDownCategory"
                   theme="primary"
                   :disabled="siblingIndex(row) === siblingNodes(row).length - 1"
                   @click="moveCategory(row, 1)"
                   >下移</t-link
                 >
                 <t-link
+                  v-if="row.status === 'enabled' ? canDisableCategory : canEnableCategory"
                   :theme="row.status === 'enabled' ? 'warning' : 'success'"
                   @click="openStatusConfirm(row.node)"
                   >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
                 >
-                <t-link theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+                <t-link v-if="canDeleteCategory" theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+                <span v-if="!hasVisibleRowAction(row)">-</span>
               </div>
             </template>
           </t-table>
@@ -190,6 +208,9 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
   createProductCategory,
   deleteProductCategory,
@@ -210,6 +231,8 @@ interface CategoryNode {
   status: Status;
   productCount: number;
   sortOrder: number;
+  createdByName: string;
+  createdAt: string;
   children: CategoryNode[];
 }
 interface CategoryRow {
@@ -221,6 +244,8 @@ interface CategoryRow {
   status: Status;
   productCount: number;
   sort: number;
+  createdByName: string;
+  createdAt: string;
 }
 interface CategoryForm {
   id: number | null;
@@ -230,14 +255,35 @@ interface CategoryForm {
 }
 
 const maxCategoryLevel = 4;
+const categoryPermissionPrefix = 'admin.product-data-center.category';
 const route = useRoute();
-const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
-const activeScope = ref<Scope>(resolveScope(route.query.scope));
-const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');
-const scopeTabs = [
+const loginUser = computed(() => getLoginUser());
+const categoryScopeTabs: { label: string; value: Scope }[] = [
   { label: '成品现货分类', value: 'finished' },
   { label: '配件分类', value: 'accessory' },
 ];
+const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
+const activeScope = ref<Scope>(resolveScope(route.query.scope));
+const {
+  visibleTabs: scopeTabs,
+  showTabRail: showScopeTabRail,
+  resolveAccessibleTab: resolveAccessibleScope,
+} = usePermissionTabs({
+  tabs: categoryScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) => hasPermission(loginUser.value, `${categoryPermissionPrefix}.${tab.value}.view`),
+});
+const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');
+const hasCategoryAction = (action: string) =>
+  hasPermission(loginUser.value, `${categoryPermissionPrefix}.${activeScope.value}.${action}`);
+const canCreateRootCategory = computed(() => hasCategoryAction('create-root'));
+const canCreateChildCategory = computed(() => hasCategoryAction('create-child'));
+const canEditCategory = computed(() => hasCategoryAction('edit'));
+const canMoveUpCategory = computed(() => hasCategoryAction('move-up'));
+const canMoveDownCategory = computed(() => hasCategoryAction('move-down'));
+const canDisableCategory = computed(() => hasCategoryAction('disable'));
+const canEnableCategory = computed(() => hasCategoryAction('enable'));
+const canDeleteCategory = computed(() => hasCategoryAction('delete'));
 
 const categoryData = ref<Record<Scope, CategoryNode[]>>({ finished: [], accessory: [] });
 const loading = ref(false);
@@ -264,12 +310,14 @@ const formRules: Record<string, FormRule[]> = {
 };
 
 const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '分类名称', minWidth: 210, align: 'left' },
-  { colKey: 'level', title: '分类级别', width: 110, align: 'left' },
+  { colKey: 'name', title: '分类名称', width: 155, align: 'left' },
+  { colKey: 'level', title: '分类级别', width: 90, align: 'left' },
   { colKey: 'productCount', title: '关联商品', width: 90, align: 'center' },
-  { colKey: 'status', title: '状态', width: 75, align: 'center' },
+  { colKey: 'status', title: '状态', width: 60, align: 'center' },
   { colKey: 'sort', title: '排序', width: 60, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 368, align: 'left', fixed: 'right' },
+  { colKey: 'createdByName', title: '创建人', width: 90, align: 'center' },
+  { colKey: 'createdAt', title: '创建时间', width: 150, align: 'center' },
+  { colKey: 'operation', title: '操作', width: 240, align: 'left', fixed: 'right' },
 ];
 
 const activeNodes = computed(() => categoryData.value[activeScope.value]);
@@ -294,6 +342,16 @@ const displayRows = computed<CategoryRow[]>(() => {
 
 function levelLabel(level: number) {
   return `${['一', '二', '三', '四'][level - 1]}级分类`;
+}
+function hasVisibleRowAction(row: CategoryRow) {
+  return (
+    (canCreateChildCategory.value && row.level < maxCategoryLevel) ||
+    canEditCategory.value ||
+    canMoveUpCategory.value ||
+    canMoveDownCategory.value ||
+    (row.status === 'enabled' ? canDisableCategory.value : canEnableCategory.value) ||
+    canDeleteCategory.value
+  );
 }
 function nodeKey(node: CategoryNode) {
   return `${activeScope.value}-${node.id}`;
@@ -339,6 +397,8 @@ function collectRows(
       status: node.status,
       productCount: node.productCount,
       sort: index + 1,
+      createdByName: node.createdByName,
+      createdAt: formatDateTime(node.createdAt),
     });
     if (node.children.length && (hasSearch.value || isExpanded(node))) {
       collectRows(node.children, level + 1, node, rows, forceVisible || selfMatches);
@@ -375,14 +435,20 @@ function toNode(record: ProductCategoryRecord): CategoryNode {
     status: record.status ?? 'enabled',
     productCount: record.productCount ?? 0,
     sortOrder: record.sortOrder ?? 0,
+    createdByName: record.createdByName || '-',
+    createdAt: record.createdAt ?? '',
     children: [],
   };
+}
+function createdAtTimestamp(node: CategoryNode) {
+  const timestamp = new Date(node.createdAt).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 function buildCategoryTree(records: ProductCategoryRecord[], scope: Scope) {
   const nodes = records
     .filter((record) => record.scope === scope)
     .map(toNode)
-    .sort((first, second) => first.sortOrder - second.sortOrder || first.id - second.id);
+    .sort((first, second) => createdAtTimestamp(second) - createdAtTimestamp(first) || second.id - first.id);
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const roots: CategoryNode[] = [];
   nodes.forEach((node) => {
@@ -393,6 +459,13 @@ function buildCategoryTree(records: ProductCategoryRecord[], scope: Scope) {
     }
   });
   return roots;
+}
+function formatDateTime(value?: string) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+  const pad = (number: number) => number.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 function toCategoryPayload(node: CategoryNode, parentId = node.parentId): ProductCategoryPayload {
   return {
@@ -581,7 +654,8 @@ async function handleDeleteConfirm() {
     return;
   }
   try {
-    await deleteProductCategory(node.id);
+    const deleted = await deleteProductCategory(node.id);
+    if (!deleted) throw new Error('分类删除失败，请刷新后重试');
     removeNode(activeNodes.value, node.id);
     MessagePlugin.success('删除成功');
     closeDeleteDialog();
@@ -602,7 +676,7 @@ function handleReset() {
 watch(
   () => route.query.scope,
   (scope) => {
-    activeScope.value = resolveScope(scope);
+    activeScope.value = resolveAccessibleScope(resolveScope(scope)) ?? activeScope.value;
     handleReset();
   },
 );
@@ -675,7 +749,33 @@ onMounted(loadCategories);
 .filter-card {
   margin-bottom: var(--td-comp-margin-l);
 }
-.filter-card,
+.filter-card {
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: 6px;
+}
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
+}
+.filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--td-comp-margin-l);
+}
+.filter-fields :deep(.t-form__item) {
+  width: 260px;
+  margin-bottom: 0;
+}
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
 .category-card {
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
   background: var(--td-bg-color-container);
@@ -685,34 +785,11 @@ onMounted(loadCategories);
 .category-card {
   overflow-anchor: none;
 }
-.filter-row,
-.filter-fields,
-.filter-actions,
 .category-toolbar,
 .table-actions,
 .category-name-cell {
   display: flex;
   align-items: center;
-}
-.filter-row {
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-}
-.filter-fields {
-  flex: 1;
-  gap: var(--td-comp-margin-xl);
-}
-.filter-fields :deep(.t-form__item) {
-  width: 280px;
-  margin-bottom: 0;
-}
-.filter-fields :deep(.t-input),
-.filter-fields :deep(.t-select) {
-  width: 100%;
-}
-.filter-actions {
-  flex: 0 0 auto;
-  gap: var(--td-comp-margin-s);
 }
 .category-toolbar {
   justify-content: space-between;
@@ -773,7 +850,7 @@ onMounted(loadCategories);
 }
 .table-actions {
   flex-wrap: nowrap;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-xs);
 }
 .table-actions :deep(.t-link) {
   white-space: nowrap;
@@ -789,17 +866,18 @@ onMounted(loadCategories);
     flex-direction: column;
   }
 }
-@media (max-width: 860px) {
+@media (max-width: 1120px) {
   .filter-row {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
   }
-  .filter-fields {
-    flex-wrap: wrap;
-    width: 100%;
-  }
   .filter-actions {
-    align-self: flex-end;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 720px) {
+  .filter-fields :deep(.t-form__item) {
+    width: 100%;
   }
 }
 </style>

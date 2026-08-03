@@ -9,6 +9,7 @@ export interface ProductCategoryRecord {
   sortOrder?: number;
   productCount?: number;
   status?: 'enabled' | 'disabled';
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
 }

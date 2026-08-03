@@ -59,9 +59,6 @@ class PlatformApiSmokeTest {
     Integer migrationCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1",
         Integer.class);
-    String latestMigrationVersion = jdbcTemplate.queryForObject(
-        "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank DESC LIMIT 1",
-        String.class);
     Integer superAdminCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM accounts WHERE phone = '15926626945' AND status = 'enabled'",
         Integer.class);
@@ -87,16 +84,19 @@ class PlatformApiSmokeTest {
     Integer craftWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM crafts WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
+    Integer categoryWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_categories WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
     Integer slabVarietyWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(28);
-    assertThat(latestMigrationVersion).isEqualTo("29");
+    assertThat(migrationCount).isGreaterThanOrEqualTo(30);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
     assertThat(craftWithoutCreatorCount).isZero();
+    assertThat(categoryWithoutCreatorCount).isZero();
     assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
@@ -107,6 +107,259 @@ class PlatformApiSmokeTest {
   void protectedAdminApiRequiresAuthentication() throws Exception {
     mockMvc.perform(get("/api/admin/tenants"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void productCategoryListIsNewestFirstAndPersistsCreator() throws Exception {
+    String creatorName = jdbcTemplate.queryForObject(
+        "SELECT display_name FROM accounts WHERE id = 1",
+        String.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_categories
+          (id, scope, name, sort_order, product_count, status, created_by_name, created_at)
+        VALUES
+          (9201, 'accessory', '排序测试旧分类', 1, 0, 'enabled', '韩健', '2026-01-01 09:00:00'),
+          (9202, 'accessory', '排序测试新分类', 2, 0, 'enabled', '韩健', '2026-01-02 09:00:00')
+        """);
+
+    MvcResult listResult = mockMvc.perform(get("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andReturn();
+    java.util.List<Integer> categoryIds = com.jayway.jsonpath.JsonPath.read(
+        listResult.getResponse().getContentAsString(),
+        "$.data[*].id");
+    assertThat(categoryIds.indexOf(9202)).isLessThan(categoryIds.indexOf(9201));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"accessory",
+                  "name":"创建人集成测试分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled",
+                  "createdByName":"不应覆盖"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andReturn();
+    String categoryId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"accessory",
+                  "name":"创建人集成测试分类-已编辑",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled",
+                  "createdByName":"不应覆盖"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
+
+    mockMvc.perform(delete("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void productCategoryManagementConsumesScopedTabActionPermissions() throws Exception {
+    long accountId = 9021L;
+    long employeeId = 9021L;
+    long roleId = 9021L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629021",
+        "成品分类操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '成品分类操作员', '15926629021', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '成品分类操作角色', 'FINISHED_CATEGORY_OPERATOR_TEST', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.product-data-center.category.finished.view,'
+          'admin.product-data-center.category.finished.create-root,'
+          'admin.product-data-center.category.finished.disable,'
+          'admin.product-data-center.category.finished.enable,'
+          'admin.product-data-center.category.finished.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/product-categories").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].scope", not(hasItem("accessory"))))
+        .andExpect(jsonPath("$.data[*].createdByName", hasItem("韩健")));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":"权限范围测试分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andReturn();
+    String categoryId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":1,
+                  "scope":"finished",
+                  "name":"无权新增下级分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+
+    mockMvc.perform(put("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":"权限范围测试分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"disabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(put("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":"无权编辑分类名称",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"disabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+
+    mockMvc.perform(delete("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void productCategoryRejectsDuplicateSiblingNamesAndCrossScopeParents() throws Exception {
+    mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":" 家具 ",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("同级分类名称不能重复"));
+
+    mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":4,
+                  "scope":"finished",
+                  "name":"错误跨类型分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("上级分类与当前分类类型不一致"));
+  }
+
+  @Test
+  void productCategoryDeleteReturnsClearBusinessErrors() throws Exception {
+    mockMvc.perform(delete("/api/admin/product-categories/1")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该分类包含下级分类，请先删除或转移下级分类"));
+
+    mockMvc.perform(delete("/api/admin/product-categories/3")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该分类已关联商品，不能删除，请先停用该分类"));
+
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_categories
+          (id, scope, name, sort_order, product_count, status, created_by_name)
+        VALUES (9203, 'finished', '模板引用删除测试分类', 1, 0, 'enabled', '韩健')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO category_attributes
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
+        VALUES (9203, 1, 0, 0, 1, 'enabled')
+        """);
+
+    mockMvc.perform(delete("/api/admin/product-categories/9203")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该分类已配置发布属性模板，不能删除，请先移除模板配置"));
   }
 
   @Test
