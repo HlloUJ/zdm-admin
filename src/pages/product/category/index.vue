@@ -16,8 +16,8 @@
 
         <t-tabs v-if="!lockedScope && showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
 
-        <section class="filter-card">
-          <t-form :data="searchForm" label-width="74px" colon>
+        <AdminSectionCard variant="filter">
+          <t-form :data="searchForm" label-width="72px" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="分类名称"
@@ -31,13 +31,11 @@
               <div class="filter-actions">
                 <t-button theme="primary" @click="handleSearch"
                   ><template #icon><t-icon name="search" /></template>查询</t-button
-                ><t-button variant="base" @click="handleReset"
-                  ><template #icon><t-icon name="refresh" /></template>重置</t-button
-                >
+                ><t-button variant="base" @click="handleReset">重置</t-button>
               </div>
             </div>
           </t-form>
-        </section>
+        </AdminSectionCard>
 
         <section class="category-card">
           <div class="category-toolbar">
@@ -203,6 +201,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { AdminSectionCard } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -740,11 +739,9 @@ onMounted(loadCategories);
   align-items: center;
   margin-bottom: var(--td-comp-margin-l);
 }
-.scope-tabs,
-.filter-card {
+.scope-tabs {
   margin-bottom: var(--td-comp-margin-l);
 }
-.filter-card,
 .category-card {
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
   background: var(--td-bg-color-container);
@@ -769,7 +766,7 @@ onMounted(loadCategories);
 }
 .filter-fields {
   flex: 1;
-  gap: var(--td-comp-margin-xl);
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields :deep(.t-form__item) {
   width: 280px;
@@ -781,7 +778,7 @@ onMounted(loadCategories);
 }
 .filter-actions {
   flex: 0 0 auto;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-l);
 }
 .category-toolbar {
   justify-content: space-between;
