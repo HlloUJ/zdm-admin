@@ -108,7 +108,7 @@ class PlatformApiSmokeTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value(400))
         .andExpect(jsonPath("$.message")
-            .value("该品种已被大板【潘多拉精选大板 A001（SLAB-A001）】引用，不能删除，请先停用该品种"));
+            .value("该品种已被大板库存引用，不能删除，请先停用该品种"));
 
     Integer pandoraCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_varieties WHERE id = 1 AND name = '潘多拉'",
