@@ -9,6 +9,7 @@ import {
   parseAheadBehind,
   parseWorktreePorcelain,
 } from './git-workflow-core.mjs';
+import { normalizeDockerMountPath } from './backend-runtime.mjs';
 
 test('classifies task, integration, acceptance, and main branches', () => {
   assert.equal(branchKind('codex/fix-product-category'), 'task');
@@ -75,4 +76,10 @@ test('detects changes that require an integration backend reload', () => {
   assert.equal(needsBackendReload(['src/pages/product/category/index.vue']), false);
   assert.equal(needsBackendReload(['backend/src/main/java/example/Service.java']), true);
   assert.equal(needsBackendReload(['docker-compose.yml']), true);
+});
+
+test('normalizes Docker Desktop bind mount paths before comparing worktrees', () => {
+  const mountPath = '/host_mnt/Users/example/project';
+  const expected = process.platform === 'darwin' ? '/Users/example/project' : mountPath;
+  assert.equal(normalizeDockerMountPath(mountPath), expected);
 });

@@ -103,6 +103,7 @@ npm run verify
 
 ```bash
 npm run backend:compile
+npm run backend:ensure
 npm run backend:logs
 npm run backend:restart
 npm run backend:test
@@ -110,6 +111,7 @@ npm run backend:quality
 ```
 
 - 后端代码或 Flyway 迁移调整后，使用 `backend:restart` 让现有开发服务重新编译并应用迁移。
+- `backend:ensure` 会校验后端容器实际挂载的 Worktree；目录不匹配时自动从当前目录重建后端，完整验收会在 E2E 前自动执行。
 - 日常后端改动使用 `backend:test`。
 - 发布、合并或高风险回归使用 `backend:quality`。
 - 本机已安装 JDK 21、Maven 时，可显式使用 `backend:test:local` 或 `backend:quality:local`。
