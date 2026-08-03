@@ -102,6 +102,21 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabVarietyDeleteReturnsBusinessErrorWhenReferencedByInventory() throws Exception {
+    mockMvc.perform(delete("/api/admin/slab-varieties/1")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(400))
+        .andExpect(jsonPath("$.message")
+            .value("该品种已被大板库存引用，不能删除，请先停用该品种"));
+
+    Integer pandoraCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_varieties WHERE id = 1 AND name = '潘多拉'",
+        Integer.class);
+    assertThat(pandoraCount).isEqualTo(1);
+  }
+
+  @Test
   void superAdminCanLoginAndAccessTenantApi() throws Exception {
     MvcResult loginResult = mockMvc.perform(post("/api/admin/auth/login")
             .contentType("application/json")
