@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import net from 'node:net';
+import path from 'node:path';
 
 const root = process.cwd();
 
@@ -45,13 +46,22 @@ if (!capture('docker', ['info', '--format', '{{.ServerVersion}}'])) {
 }
 
 const services = new Set(capture('docker', ['compose', 'ps', '-a', '--services']).split(/\r?\n/).filter(Boolean));
+const backendWorkspace = capture('docker', [
+  'inspect',
+  '--format',
+  '{{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Source}}{{end}}{{end}}',
+  'zdm-platform-backend',
+]);
+const backendUsesCurrentWorktree = backendWorkspace && path.resolve(backendWorkspace) === path.resolve(root);
 
-if (services.has('mysql') && services.has('backend')) {
+if (services.has('mysql') && services.has('backend') && backendUsesCurrentWorktree) {
   run('docker', ['compose', 'start', 'mysql']);
   await waitForPort(3306);
   run('docker', ['compose', 'start', 'backend']);
 } else {
-  run('docker', ['compose', 'up', '-d', 'mysql', 'backend']);
+  run('docker', ['compose', 'up', '-d', 'mysql']);
+  await waitForPort(3306);
+  run('docker', ['compose', 'up', '-d', '--force-recreate', 'backend']);
 }
 
 try {
