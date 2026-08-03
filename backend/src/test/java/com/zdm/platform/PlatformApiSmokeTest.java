@@ -172,6 +172,127 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void productCategoryManagementConsumesScopedTabActionPermissions() throws Exception {
+    long accountId = 9021L;
+    long employeeId = 9021L;
+    long roleId = 9021L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629021",
+        "成品分类操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '成品分类操作员', '15926629021', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '成品分类操作角色', 'FINISHED_CATEGORY_OPERATOR_TEST', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.product-data-center.category.finished.view,'
+          'admin.product-data-center.category.finished.create-root,'
+          'admin.product-data-center.category.finished.disable,'
+          'admin.product-data-center.category.finished.enable,'
+          'admin.product-data-center.category.finished.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/product-categories").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].scope", not(hasItem("accessory"))));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":"权限范围测试分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andReturn();
+    String categoryId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(post("/api/admin/product-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":1,
+                  "scope":"finished",
+                  "name":"无权新增下级分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+
+    mockMvc.perform(put("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":"权限范围测试分类",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"disabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(put("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"finished",
+                  "name":"无权编辑分类名称",
+                  "sortOrder":1,
+                  "productCount":0,
+                  "status":"disabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+
+    mockMvc.perform(delete("/api/admin/product-categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
   void productCategoryDeleteReturnsClearBusinessErrors() throws Exception {
     mockMvc.perform(delete("/api/admin/product-categories/1")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))

@@ -45,7 +45,7 @@
               <h2>{{ activeScope === 'finished' ? '成品现货分类' : '配件分类' }}</h2>
               <p>通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</p>
             </div>
-            <t-button v-if="canCreateCategory" theme="primary" @click="openCreateDialog()"
+            <t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()"
               ><template #icon><t-icon name="add" /></template>新增一级分类</t-button
             >
           </div>
@@ -93,37 +93,34 @@
             <template #operation="{ row }">
               <div class="table-actions">
                 <t-link
-                  v-if="canCreateCategory && row.level < maxCategoryLevel"
+                  v-if="canCreateChildCategory && row.level < maxCategoryLevel"
                   theme="primary"
                   @click="openCreateDialog(row)"
                   >新增下级</t-link
                 >
                 <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
-                  v-if="canEditCategory"
+                  v-if="canMoveUpCategory"
                   theme="primary"
                   :disabled="siblingIndex(row) === 0"
                   @click="moveCategory(row, -1)"
                   >上移</t-link
                 >
                 <t-link
-                  v-if="canEditCategory"
+                  v-if="canMoveDownCategory"
                   theme="primary"
                   :disabled="siblingIndex(row) === siblingNodes(row).length - 1"
                   @click="moveCategory(row, 1)"
                   >下移</t-link
                 >
                 <t-link
-                  v-if="canEditCategory"
+                  v-if="row.status === 'enabled' ? canDisableCategory : canEnableCategory"
                   :theme="row.status === 'enabled' ? 'warning' : 'success'"
                   @click="openStatusConfirm(row.node)"
                   >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
                 >
                 <t-link v-if="canDeleteCategory" theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
-                <span
-                  v-if="!canEditCategory && !canDeleteCategory && (!canCreateCategory || row.level >= maxCategoryLevel)"
-                  >-</span
-                >
+                <span v-if="!hasVisibleRowAction(row)">-</span>
               </div>
             </template>
           </t-table>
@@ -256,10 +253,6 @@ const maxCategoryLevel = 4;
 const categoryPermissionPrefix = 'admin.product-data-center.category';
 const route = useRoute();
 const loginUser = computed(() => getLoginUser());
-const canCreateCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.create`));
-const canEditCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.edit`));
-const canDeleteCategory = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.delete`));
-const canViewAllCategoryScopes = computed(() => hasPermission(loginUser.value, `${categoryPermissionPrefix}.view`));
 const categoryScopeTabs: { label: string; value: Scope }[] = [
   { label: '成品现货分类', value: 'finished' },
   { label: '配件分类', value: 'accessory' },
@@ -273,10 +266,19 @@ const {
 } = usePermissionTabs({
   tabs: categoryScopeTabs,
   activeTab: activeScope,
-  canAccess: (tab) =>
-    canViewAllCategoryScopes.value || hasPermission(loginUser.value, `${categoryPermissionPrefix}.${tab.value}.view`),
+  canAccess: (tab) => hasPermission(loginUser.value, `${categoryPermissionPrefix}.${tab.value}.view`),
 });
 const lockedScope = computed(() => route.query.scope === 'finished' || route.query.scope === 'accessory');
+const hasCategoryAction = (action: string) =>
+  hasPermission(loginUser.value, `${categoryPermissionPrefix}.${activeScope.value}.${action}`);
+const canCreateRootCategory = computed(() => hasCategoryAction('create-root'));
+const canCreateChildCategory = computed(() => hasCategoryAction('create-child'));
+const canEditCategory = computed(() => hasCategoryAction('edit'));
+const canMoveUpCategory = computed(() => hasCategoryAction('move-up'));
+const canMoveDownCategory = computed(() => hasCategoryAction('move-down'));
+const canDisableCategory = computed(() => hasCategoryAction('disable'));
+const canEnableCategory = computed(() => hasCategoryAction('enable'));
+const canDeleteCategory = computed(() => hasCategoryAction('delete'));
 
 const categoryData = ref<Record<Scope, CategoryNode[]>>({ finished: [], accessory: [] });
 const loading = ref(false);
@@ -335,6 +337,16 @@ const displayRows = computed<CategoryRow[]>(() => {
 
 function levelLabel(level: number) {
   return `${['一', '二', '三', '四'][level - 1]}级分类`;
+}
+function hasVisibleRowAction(row: CategoryRow) {
+  return (
+    (canCreateChildCategory.value && row.level < maxCategoryLevel) ||
+    canEditCategory.value ||
+    canMoveUpCategory.value ||
+    canMoveDownCategory.value ||
+    (row.status === 'enabled' ? canDisableCategory.value : canEnableCategory.value) ||
+    canDeleteCategory.value
+  );
 }
 function nodeKey(node: CategoryNode) {
   return `${activeScope.value}-${node.id}`;

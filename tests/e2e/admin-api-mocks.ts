@@ -157,7 +157,7 @@ const productCategories = [
     name: '岩板餐桌',
     sortOrder: 1,
     productCount: 1,
-    status: 'enabled',
+    status: 'disabled',
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,17 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
 
   public List<ProductCategory> listNewestFirst() {
     return lambdaQuery()
+        .orderByDesc(ProductCategory::getCreatedAt)
+        .orderByDesc(ProductCategory::getId)
+        .list();
+  }
+
+  public List<ProductCategory> listNewestFirst(Collection<String> scopes) {
+    if (scopes.isEmpty()) {
+      return List.of();
+    }
+    return lambdaQuery()
+        .in(ProductCategory::getScope, scopes)
         .orderByDesc(ProductCategory::getCreatedAt)
         .orderByDesc(ProductCategory::getId)
         .list();

@@ -59,7 +59,14 @@ test('shows only granted category operation buttons for a restricted account', a
         name: '受限分类管理员',
         phone: '15926620010',
         roles: ['CATEGORY_EDITOR'],
-        permissions: ['admin.product-data-center.category.view', 'admin.product-data-center.category.edit'],
+        permissions: [
+          'admin.product-data-center.category.finished.view',
+          'admin.product-data-center.category.finished.edit',
+          'admin.product-data-center.category.finished.move-up',
+          'admin.product-data-center.category.finished.move-down',
+          'admin.product-data-center.category.finished.disable',
+          'admin.product-data-center.category.accessory.view',
+        ],
         dataPermission: 'all',
       }),
     );
@@ -79,6 +86,45 @@ test('shows only granted category operation buttons for a restricted account', a
   await expect(categoryRow.getByText('删除', { exact: true })).toHaveCount(0);
   await expect(main.locator('.scope-tabs')).toContainText('成品现货分类');
   await expect(main.locator('.scope-tabs')).toContainText('配件分类');
+});
+
+test('shows the finished category buttons granted to account 15900000001', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 3,
+        name: '张飞',
+        phone: '15900000001',
+        roles: ['CATEGORY_OPERATOR'],
+        permissions: [
+          'admin.product-data-center.category.finished.view',
+          'admin.product-data-center.category.finished.create-root',
+          'admin.product-data-center.category.finished.disable',
+          'admin.product-data-center.category.finished.enable',
+          'admin.product-data-center.category.finished.delete',
+        ],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/product-category');
+  const main = page.getByRole('main');
+  const rootRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
+
+  await expect(main.locator('.scope-tabs')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '新增一级分类' })).toBeVisible();
+  await expect(rootRow.getByText('新增下级', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('上移', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('下移', { exact: true })).toHaveCount(0);
+  await expect(rootRow.getByText('停用', { exact: true })).toBeVisible();
+  await expect(rootRow.getByText('删除', { exact: true })).toBeVisible();
+
+  await rootRow.getByRole('button', { name: '展开下级分类' }).click();
+  const childRow = main.locator('tbody tr').filter({ hasText: '岩板餐桌' });
+  await expect(childRow.getByText('启用', { exact: true })).toBeVisible();
 });
 
 test('shows only the granted product category tab', async ({ page }) => {
