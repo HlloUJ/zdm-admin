@@ -59,6 +59,9 @@ class PlatformApiSmokeTest {
     Integer migrationCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1",
         Integer.class);
+    String latestMigrationVersion = jdbcTemplate.queryForObject(
+        "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank DESC LIMIT 1",
+        String.class);
     Integer superAdminCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM accounts WHERE phone = '15926626945' AND status = 'enabled'",
         Integer.class);
@@ -88,7 +91,8 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(27);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(28);
+    assertThat(latestMigrationVersion).isEqualTo("29");
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
@@ -118,6 +122,57 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM slab_varieties WHERE id = 1 AND name = '潘多拉'",
         Integer.class);
     assertThat(pandoraCount).isEqualTo(1);
+  }
+
+  @Test
+  void slabVarietyNameMustBeUniqueWhenCreatingAndEditing() throws Exception {
+    mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":" 潘多拉 ",
+                  "code":"duplicate-pandora",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("品种名称已存在"));
+
+    String varietyName = "重名编辑测试品种-" + System.nanoTime();
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-varieties")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s",
+                  "code":"duplicate-edit-test-%d",
+                  "status":"enabled"
+                }
+                """.formatted(varietyName, System.nanoTime())))
+        .andExpect(status().isOk())
+        .andReturn();
+    String varietyId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    mockMvc.perform(put("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"潘多拉",
+                  "code":"duplicate-edit-test-%d",
+                  "status":"enabled"
+                }
+                """.formatted(System.nanoTime())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("品种名称已存在"));
+
+    mockMvc.perform(delete("/api/admin/slab-varieties/{id}", varietyId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk());
   }
 
   @Test

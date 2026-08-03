@@ -12,6 +12,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVariety> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+  private static final String DUPLICATE_NAME_MESSAGE = "品种名称已存在";
   private static final String REFERENCED_MESSAGE =
       "该品种已被大板库存引用，不能删除，请先停用该品种";
 
@@ -28,6 +29,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
   @Transactional
   public SlabVariety createVariety(SlabVariety variety) {
     variety.setId(null);
+    normalizeAndValidateName(variety, null);
     variety.setCreatedByName(resolveCreatedByName());
     save(variety);
     return variety;
@@ -43,6 +45,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    normalizeAndValidateName(payload, id);
     updateById(payload);
     return getById(id);
   }
@@ -79,5 +82,17 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
+  }
+
+  private void normalizeAndValidateName(SlabVariety variety, Long excludedVarietyId) {
+    String varietyName = variety.getName().trim();
+    variety.setName(varietyName);
+    var duplicateQuery = lambdaQuery().eq(SlabVariety::getName, varietyName);
+    if (excludedVarietyId != null) {
+      duplicateQuery.ne(SlabVariety::getId, excludedVarietyId);
+    }
+    if (duplicateQuery.count() > 0) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
+    }
   }
 }
