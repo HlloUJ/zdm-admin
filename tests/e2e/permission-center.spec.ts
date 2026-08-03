@@ -38,7 +38,7 @@ test('shows only granted craft operation buttons for a restricted account', asyn
   await expect(craftRow.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
-test('shows only granted slab variety operation buttons for a restricted account', async ({ page }) => {
+test('shows slab variety edit without status operation for an edit-only account', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
@@ -60,6 +60,35 @@ test('shows only granted slab variety operation buttons for a restricted account
   await expect(varietyRow).toBeVisible();
   await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
   await expect(varietyRow.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(varietyRow.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(varietyRow.getByText('删除', { exact: true })).toHaveCount(0);
+});
+
+test('shows slab variety status without edit operation for a status-only account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 10,
+        name: '受限品种管理员',
+        phone: '15926620010',
+        roles: ['SLAB_VARIETY_STATUS_MANAGER'],
+        permissions: [
+          'admin.product-data-center.slab-variety.view',
+          'admin.product-data-center.slab-variety.toggle-status',
+        ],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/slab-variety');
+  const main = page.getByRole('main');
+  const varietyRow = main.locator('tbody tr').filter({ hasText: '潘多拉' });
+
+  await expect(varietyRow).toBeVisible();
+  await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
+  await expect(varietyRow.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(varietyRow.getByText('停用', { exact: true })).toBeVisible();
   await expect(varietyRow.getByText('删除', { exact: true })).toHaveCount(0);
 });
@@ -359,7 +388,8 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(slabVarietyPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
-    '编辑/停用/启用',
+    '编辑',
+    '停用/启用',
     '删除',
   ]);
   await expect(roleMatrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
@@ -438,7 +468,7 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*9/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*10/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -453,7 +483,8 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(slabVarietyAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
-    '编辑/停用/启用',
+    '编辑',
+    '停用/启用',
     '删除',
   ]);
   await expect(matrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
@@ -495,7 +526,7 @@ test('shows verified craft, employee, and role management resources in both term
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('大板品种管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(9);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(10);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();

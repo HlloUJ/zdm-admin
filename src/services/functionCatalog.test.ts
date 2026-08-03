@@ -90,6 +90,7 @@ describe('full function catalog', () => {
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',
+      'admin.product-data-center.slab-variety.toggle-status',
       'admin.product-data-center.slab-variety.delete',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',

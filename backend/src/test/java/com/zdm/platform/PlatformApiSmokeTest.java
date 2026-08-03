@@ -117,7 +117,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void slabVarietyManagementEnforcesViewAndOperationPermissions() throws Exception {
+  void slabVarietyManagementSeparatesEditAndStatusPermissions() throws Exception {
     long accountId = 9011L;
     long employeeId = 9011L;
     long roleId = 9011L;
@@ -146,8 +146,9 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO roles
           (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '品种查看角色', 'SLAB_VARIETY_VIEWER_TEST', 'operation-platform',
-          'admin', 'all', 'enabled', 'admin.product-data-center.slab-variety.view', '集成测试')
+        VALUES (?, '品种编辑角色', 'SLAB_VARIETY_EDITOR_TEST', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.product-data-center.slab-variety.view,admin.product-data-center.slab-variety.edit', '集成测试')
         """,
         roleId);
     jdbcTemplate.update(
@@ -157,6 +158,11 @@ class PlatformApiSmokeTest {
         """,
         accountId,
         roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_varieties (id, name, code, status)
+        VALUES (9011, '权限集成测试品种', 'permission-test-variety', 'enabled')
+        """);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
     mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
@@ -168,14 +174,47 @@ class PlatformApiSmokeTest {
                 {"name":"无权新增品种","code":"forbidden-create","status":"enabled"}
                 """))
         .andExpect(status().isForbidden());
-    mockMvc.perform(put("/api/admin/slab-varieties/1")
+    mockMvc.perform(put("/api/admin/slab-varieties/9011")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"权限集成测试品种-已编辑","code":"permission-test-variety","status":"disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("权限集成测试品种-已编辑"))
+        .andExpect(jsonPath("$.data.status").value("enabled"));
+    mockMvc.perform(patch("/api/admin/slab-varieties/9011/status")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isForbidden());
+
+    jdbcTemplate.update(
+        """
+        UPDATE roles
+        SET function_permissions = ?
+        WHERE id = ?
+        """,
+        "admin.product-data-center.slab-variety.view,admin.product-data-center.slab-variety.toggle-status",
+        roleId);
+    mockMvc.perform(put("/api/admin/slab-varieties/9011")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("""
                 {"name":"无权编辑品种","code":"pandora","status":"enabled"}
                 """))
         .andExpect(status().isForbidden());
-    mockMvc.perform(delete("/api/admin/slab-varieties/1")
+    mockMvc.perform(patch("/api/admin/slab-varieties/9011/status")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+    mockMvc.perform(delete("/api/admin/slab-varieties/9011")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isForbidden());
   }

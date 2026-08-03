@@ -3,8 +3,12 @@ package com.zdm.platform.inventory;
 import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.PermissionGuard;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,6 +24,33 @@ public class SlabVarietyController extends AdminCrudController<SlabVariety> {
     super(service, permissionGuard, PERMISSION_PREFIX);
     this.service = service;
     this.permissionGuard = permissionGuard;
+  }
+
+  @Override
+  @PutMapping("/{id}")
+  public ApiResponse<SlabVariety> update(
+      @PathVariable Long id,
+      @Valid @RequestBody SlabVariety payload) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
+    permissionGuard.requireAllData();
+    SlabVariety updated = service.updateVariety(id, payload);
+    if (updated == null) {
+      throw new IllegalArgumentException("品种不存在");
+    }
+    return ApiResponse.ok(updated);
+  }
+
+  @PatchMapping("/{id}/status")
+  public ApiResponse<SlabVariety> updateStatus(
+      @PathVariable Long id,
+      @Valid @RequestBody SlabVarietyStatusRequest request) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+    permissionGuard.requireAllData();
+    SlabVariety updated = service.updateStatus(id, request.status());
+    if (updated == null) {
+      throw new IllegalArgumentException("品种不存在");
+    }
+    return ApiResponse.ok(updated);
   }
 
   @Override

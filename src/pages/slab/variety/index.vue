@@ -66,7 +66,7 @@
               <div class="table-actions">
                 <t-link v-if="canEditVariety" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
-                  v-if="canEditVariety"
+                  v-if="canToggleVarietyStatus"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
@@ -147,6 +147,7 @@ import {
   deleteSlabVariety,
   listSlabVarieties,
   updateSlabVariety,
+  updateSlabVarietyStatus,
   type SlabVarietyPayload,
   type SlabVarietyRecord,
 } from '@/services/slabVarieties';
@@ -174,6 +175,9 @@ const varietyPermissionPrefix = 'admin.product-data-center.slab-variety';
 const loginUser = computed(() => getLoginUser());
 const canCreateVariety = computed(() => hasPermission(loginUser.value, `${varietyPermissionPrefix}.create`));
 const canEditVariety = computed(() => hasPermission(loginUser.value, `${varietyPermissionPrefix}.edit`));
+const canToggleVarietyStatus = computed(() =>
+  hasPermission(loginUser.value, `${varietyPermissionPrefix}.toggle-status`),
+);
 const canDeleteVariety = computed(() => hasPermission(loginUser.value, `${varietyPermissionPrefix}.delete`));
 
 const columns: PrimaryTableCol<TableRowData>[] = [
@@ -274,13 +278,6 @@ const toVarietyPayload = (status: VarietyStatus, code?: string): SlabVarietyPayl
   code: code ?? createCode(formData.name),
   status: toBackendStatus(status),
   remark: formData.remark.trim(),
-});
-
-const toVarietyPayloadFromItem = (item: VarietyItem): SlabVarietyPayload => ({
-  name: item.name,
-  code: item.code,
-  status: toBackendStatus(item.status),
-  remark: item.remark ?? '',
 });
 
 const loadVarieties = async () => {
@@ -402,12 +399,9 @@ const handleConfirm = async () => {
       tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
       ensureCurrentPage();
     } else {
-      const updated = await updateSlabVariety(
+      const updated = await updateSlabVarietyStatus(
         confirmState.row.id,
-        toVarietyPayloadFromItem({
-          ...confirmState.row,
-          status: confirmState.type === 'enable' ? 'normal' : 'disabled',
-        }),
+        toBackendStatus(confirmState.type === 'enable' ? 'normal' : 'disabled'),
       );
       const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
       if (targetIndex !== -1) {

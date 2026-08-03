@@ -101,7 +101,8 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             value: 'admin.product-data-center.slab-variety',
             actions: [
               { label: '新增', value: 'admin.product-data-center.slab-variety.create' },
-              { label: '编辑/停用/启用', value: 'admin.product-data-center.slab-variety.edit' },
+              { label: '编辑', value: 'admin.product-data-center.slab-variety.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-variety.toggle-status' },
               { label: '删除', value: 'admin.product-data-center.slab-variety.delete' },
             ],
             tabs: [],

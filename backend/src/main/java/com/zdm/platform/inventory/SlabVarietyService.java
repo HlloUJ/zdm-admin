@@ -18,6 +18,31 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
   }
 
   @Transactional
+  public SlabVariety updateVariety(Long id, SlabVariety payload) {
+    SlabVariety existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+
+    payload.setId(id);
+    payload.setStatus(existing.getStatus());
+    updateById(payload);
+    return getById(id);
+  }
+
+  @Transactional
+  public SlabVariety updateStatus(Long id, String status) {
+    SlabVariety existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+
+    existing.setStatus(status);
+    updateById(existing);
+    return getById(id);
+  }
+
+  @Transactional
   public boolean deleteVariety(Long id) {
     Long referenceCount = slabInventoryMapper.selectCount(
         Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getVarietyId, id));

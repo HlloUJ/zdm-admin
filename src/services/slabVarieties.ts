@@ -39,6 +39,13 @@ export function updateSlabVariety(id: number, payload: SlabVarietyPayload) {
   });
 }
 
+export function updateSlabVarietyStatus(id: number, status: SlabVarietyPayload['status']) {
+  return request<SlabVarietyRecord>(`/admin/slab-varieties/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function deleteSlabVariety(id: number) {
   return request<boolean>(`/admin/slab-varieties/${id}`, {
     method: 'DELETE',
