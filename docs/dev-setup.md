@@ -37,6 +37,7 @@ npm run integration:dev
 ```
 
 该命令始终从 `codex/integration-current` 对应的固定 Worktree 启动完整项目，与当前正在开发的任务分支无关。集成 Worktree 由 Agent 统一创建和更新，不在其中直接开发。
+macOS 自启服务也固定从该集成 Worktree 启动。E2E 独立使用 `5174` 端口，不会误用 `5173` 上的日常浏览器服务。
 
 查看服务状态和手机可访问的局域网地址：
 

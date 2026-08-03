@@ -7,10 +7,10 @@
   <key>ProgramArguments</key>
   <array>
     <string>/Users/uj/.local/node-v24.18.0-darwin-arm64/bin/node</string>
-    <string>/Users/uj/Documents/Codex/装点猫/管理后台/scripts/macos/launchd-dev.mjs</string>
+    <string>/Users/uj/Documents/Codex/装点猫/管理后台-worktrees/integration-current/scripts/macos/launchd-dev.mjs</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/uj/Documents/Codex/装点猫/管理后台</string>
+  <string>/Users/uj/Documents/Codex/装点猫/管理后台-worktrees/integration-current</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
