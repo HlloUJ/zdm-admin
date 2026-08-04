@@ -137,7 +137,7 @@
                     </t-tag>
                   </template>
                   <template #publishStatus="{ row }">
-                    <t-tag :theme="row.publishStatus === 'published' ? 'success' : 'default'" variant="light">
+                    <t-tag :theme="row.publishStatus === 'published' ? 'success' : 'danger'" variant="light">
                       {{ row.publishStatus === 'published' ? '已发布' : '未发布' }}
                     </t-tag>
                   </template>
@@ -146,6 +146,7 @@
                       <t-link
                         v-if="canTogglePublish"
                         :theme="row.publishStatus === 'published' ? 'warning' : 'primary'"
+                        hover="color"
                         :disabled="savingId !== null"
                         @click="togglePublish(row)"
                       >
