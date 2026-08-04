@@ -76,6 +76,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
       throw new IllegalArgumentException("类目属性模板不存在");
     }
     payload.setId(id);
+    payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedAt(existing.getCreatedAt());
     updateById(payload);

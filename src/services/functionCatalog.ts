@@ -203,7 +203,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             actions: [
               { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
               { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
-              { label: '删除', value: 'admin.product-data-center.category-attribute-template.delete' },
+              { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
             ],
             tabs: [],
           },

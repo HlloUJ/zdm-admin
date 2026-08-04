@@ -107,7 +107,7 @@
                   <template #requiredFlag="{ row }">
                     <t-switch
                       :model-value="row.requiredFlag"
-                      :loading="savingId === row.id"
+                      :loading="savingId === row.id && savingField === 'requiredFlag'"
                       :disabled="!canEditBinding"
                       @change="changeFlag(row, 'requiredFlag', $event)"
                     />
@@ -115,21 +115,29 @@
                   <template #skuFlag="{ row }">
                     <t-switch
                       :model-value="row.skuFlag"
-                      :loading="savingId === row.id"
+                      :loading="savingId === row.id && savingField === 'skuFlag'"
                       :disabled="!canEditBinding"
                       @change="changeFlag(row, 'skuFlag', $event)"
                     />
                   </template>
                   <template #sortOrder="{ row }">
-                    <t-input-number
-                      :model-value="row.sortOrder"
-                      theme="column"
-                      size="small"
-                      :min="0"
-                      :max="999"
-                      :disabled="!canEditBinding"
-                      @change="changeSort(row, $event)"
-                    />
+                    <div v-if="canEditBinding" class="table-actions">
+                      <t-link
+                        theme="primary"
+                        :disabled="savingId !== null || bindingIndex(row) === 0"
+                        @click="moveBinding(row, -1)"
+                      >
+                        上移
+                      </t-link>
+                      <t-link
+                        theme="primary"
+                        :disabled="savingId !== null || bindingIndex(row) === allBindingRows.length - 1"
+                        @click="moveBinding(row, 1)"
+                      >
+                        下移
+                      </t-link>
+                    </div>
+                    <span v-else>-</span>
                   </template>
                   <template #status="{ row }">
                     <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
@@ -138,15 +146,8 @@
                   </template>
                   <template #operation="{ row }">
                     <div class="table-actions">
-                      <t-link
-                        v-if="canEditBinding"
-                        :theme="row.status === 'enabled' ? 'warning' : 'success'"
-                        @click="toggleStatus(row)"
-                      >
-                        {{ row.status === 'enabled' ? '停用' : '启用' }}
-                      </t-link>
-                      <t-link v-if="canDeleteBinding" theme="danger" @click="openDeleteConfirm(row)">删除</t-link>
-                      <span v-if="!canEditBinding && !canDeleteBinding">-</span>
+                      <t-link v-if="canRemoveBinding" theme="danger" @click="openDeleteConfirm(row)">移除</t-link>
+                      <span v-else>-</span>
                     </div>
                   </template>
                 </t-table>
@@ -180,9 +181,9 @@
       <t-transfer
         v-model="bindForm.attributeIds"
         class="bind-transfer"
-        :data="availableAttributeOptions"
-        :empty="['暂无可绑定属性', '暂未选择属性']"
-        :title="['待绑定属性', '已选择属性']"
+        :data="bindAttributeOptions"
+        :empty="['暂无可绑定属性', '暂无已绑定属性']"
+        :title="['待绑定属性', '已绑定属性']"
         search
         show-check-all
         target-sort="original"
@@ -199,7 +200,7 @@
       @confirm="handleDelete"
       @close="closeDeleteConfirm"
     >
-      是否删除属性【{{ deleteTarget?.name }}】？
+      是否移除属性【{{ deleteTarget?.name }}】？
     </t-dialog>
   </div>
 </template>
@@ -257,7 +258,7 @@ const permissionPrefix = 'admin.product-data-center.category-attribute-template'
 const loginUser = computed(() => getLoginUser());
 const canBindAttribute = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.create`));
 const canEditBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.edit`));
-const canDeleteBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
+const canRemoveBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
 const scopeTabs = [
   { label: '成品现货模板', value: 'finished' },
   { label: '配件模板', value: 'accessory' },
@@ -265,6 +266,7 @@ const scopeTabs = [
 const pageTitle = computed(() => (activeScope.value === 'finished' ? '成品现货发布模板' : '配件发布模板'));
 const loading = ref(false);
 const savingId = ref<number | null>(null);
+const savingField = ref<'requiredFlag' | 'skuFlag' | null>(null);
 const categories = ref<ProductCategoryRecord[]>([]);
 const attributes = ref<ProductAttributeRecord[]>([]);
 const bindings = ref<CategoryAttributeRecord[]>([]);
@@ -320,7 +322,7 @@ const visibleCategoryRows = computed(() => {
   return rows;
 });
 
-const bindingRows = computed<BindingRow[]>(() => {
+const allBindingRows = computed<BindingRow[]>(() => {
   if (!selectedCategoryId.value) return [];
 
   const attributeMap = new Map(attributes.value.map((item) => [item.id, item]));
@@ -338,20 +340,23 @@ const bindingRows = computed<BindingRow[]>(() => {
         requiredFlag: Boolean(item.requiredFlag),
         skuFlag: Boolean(item.skuFlag),
         sortOrder: item.sortOrder ?? 0,
-        status: item.status ?? 'enabled',
+        status: (attribute?.status === 'disabled' ? 'disabled' : 'enabled') as Status,
         createdByName: item.createdByName || '-',
         createdAt: formatDateTime(item.createdAt),
       };
     })
-    .filter((item) => {
-      const keyword = appliedSearch.keyword.trim().toLowerCase();
-      return (
-        (!keyword || item.name.toLowerCase().includes(keyword)) &&
-        (!appliedSearch.status || item.status === appliedSearch.status)
-      );
-    })
     .sort((first, second) => first.sortOrder - second.sortOrder || first.id - second.id);
 });
+
+const bindingRows = computed(() =>
+  allBindingRows.value.filter((item) => {
+    const keyword = appliedSearch.keyword.trim().toLowerCase();
+    return (
+      (!keyword || item.name.toLowerCase().includes(keyword)) &&
+      (!appliedSearch.status || item.status === appliedSearch.status)
+    );
+  }),
+);
 
 const totalCount = computed(() => bindingRows.value.length);
 const pageData = computed(() => {
@@ -366,13 +371,17 @@ const boundAttributeIds = computed(
     ),
 );
 
-const availableAttributeOptions = computed(() =>
+const bindAttributeOptions = computed(() =>
   attributes.value
-    .filter((item) => (item.scope === 'shared' || item.scope === activeScope.value) && item.status !== 'disabled')
-    .filter((item) => !boundAttributeIds.value.has(item.id))
+    .filter(
+      (item) =>
+        (item.scope === 'shared' || item.scope === activeScope.value) &&
+        (item.status !== 'disabled' || boundAttributeIds.value.has(item.id)),
+    )
     .map((item) => ({
       label: `${item.name} / ${valueTypeLabel(item.valueType)}`,
       value: item.id,
+      disabled: boundAttributeIds.value.has(item.id),
     })),
 );
 
@@ -431,6 +440,15 @@ function selectLeafCategory(category: CategoryTreeNode) {
   reset();
 }
 
+function findFirstLeaf(nodes: CategoryTreeNode[]): CategoryTreeNode | undefined {
+  for (const node of nodes) {
+    if (!node.children.length) return node;
+    const leaf = findFirstLeaf(node.children);
+    if (leaf) return leaf;
+  }
+  return undefined;
+}
+
 function searchCategory() {
   appliedCategoryKeyword.value = categoryKeyword.value;
 }
@@ -467,7 +485,7 @@ function toPayload(row: BindingRow): CategoryAttributePayload {
 function syncSelectedCategory() {
   const selectedCategory = scopedCategories.value.find((item) => item.id === selectedCategoryId.value);
   const stillAvailable = Boolean(selectedCategory && !hasCategoryChildren(selectedCategory.id));
-  if (!stillAvailable) selectedCategoryId.value = undefined;
+  if (!stillAvailable) selectedCategoryId.value = findFirstLeaf(buildCategoryTree(undefined))?.id;
   pagination.current = 1;
 }
 
@@ -513,7 +531,7 @@ function openBindDialog() {
     MessagePlugin.warning('请选择分类');
     return;
   }
-  bindForm.attributeIds = [];
+  bindForm.attributeIds = [...boundAttributeIds.value];
   bindDialogVisible.value = true;
 }
 
@@ -524,14 +542,15 @@ function closeBindDialog() {
 
 async function submitBind() {
   if (!canBindAttribute.value) return;
-  if (!selectedCategoryId.value || !bindForm.attributeIds.length) {
+  const newAttributeIds = bindForm.attributeIds.filter((id) => !boundAttributeIds.value.has(id));
+  if (!selectedCategoryId.value || !newAttributeIds.length) {
     MessagePlugin.warning('请选择需要绑定的属性');
     return;
   }
   try {
     const created = await createCategoryAttributes({
       categoryId: selectedCategoryId.value,
-      attributeIds: bindForm.attributeIds,
+      attributeIds: newAttributeIds,
     });
     bindings.value.push(...created);
     closeBindDialog();
@@ -541,9 +560,14 @@ async function submitBind() {
   }
 }
 
-async function persistRow(row: BindingRow, patch: Partial<BindingRow>) {
+async function persistRow(
+  row: BindingRow,
+  patch: Partial<BindingRow>,
+  field: 'requiredFlag' | 'skuFlag' | null = null,
+) {
   if (!canEditBinding.value) return;
   savingId.value = row.id;
+  savingField.value = field;
   const nextRow = { ...row, ...patch };
   try {
     const updated = await updateCategoryAttribute(row.id, toPayload(nextRow));
@@ -554,6 +578,7 @@ async function persistRow(row: BindingRow, patch: Partial<BindingRow>) {
     MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
   } finally {
     savingId.value = null;
+    savingField.value = null;
   }
 }
 
@@ -564,21 +589,41 @@ function getSwitchValue(value: unknown) {
 }
 
 function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: unknown) {
-  persistRow(row, { [field]: getSwitchValue(value) });
+  persistRow(row, { [field]: getSwitchValue(value) }, field);
 }
 
-function changeSort(row: BindingRow, value: unknown) {
-  const nextValue = typeof value === 'number' ? value : Number((value as { value?: number })?.value ?? row.sortOrder);
-  if (Number.isNaN(nextValue) || nextValue === row.sortOrder) return;
-  persistRow(row, { sortOrder: nextValue });
+function bindingIndex(row: BindingRow) {
+  return allBindingRows.value.findIndex((item) => item.id === row.id);
 }
 
-function toggleStatus(row: BindingRow) {
-  persistRow(row, { status: row.status === 'enabled' ? 'disabled' : 'enabled' });
+async function moveBinding(row: BindingRow, offset: number) {
+  if (!canEditBinding.value || savingId.value !== null) return;
+  const orderedRows = allBindingRows.value.map((item) => ({ ...item }));
+  const index = orderedRows.findIndex((item) => item.id === row.id);
+  const targetIndex = index + offset;
+  if (index < 0 || targetIndex < 0 || targetIndex >= orderedRows.length) return;
+
+  [orderedRows[index], orderedRows[targetIndex]] = [orderedRows[targetIndex], orderedRows[index]];
+  orderedRows.forEach((item, itemIndex) => {
+    item.sortOrder = itemIndex + 1;
+  });
+  savingId.value = row.id;
+  savingField.value = null;
+  try {
+    const updatedRows = await Promise.all(orderedRows.map((item) => updateCategoryAttribute(item.id, toPayload(item))));
+    const updatedMap = new Map(updatedRows.map((item) => [item.id, item]));
+    bindings.value = bindings.value.map((item) => updatedMap.get(item.id) ?? item);
+    MessagePlugin.success('排序已更新');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '排序保存失败');
+    await loadData();
+  } finally {
+    savingId.value = null;
+  }
 }
 
 function openDeleteConfirm(row: BindingRow) {
-  if (!canDeleteBinding.value) return;
+  if (!canRemoveBinding.value) return;
   deleteTarget.value = row;
   deleteConfirmVisible.value = true;
 }
@@ -589,15 +634,15 @@ function closeDeleteConfirm() {
 }
 
 async function handleDelete() {
-  if (!canDeleteBinding.value) return;
+  if (!canRemoveBinding.value) return;
   if (!deleteTarget.value) return;
   try {
     await deleteCategoryAttribute(deleteTarget.value.id);
     bindings.value = bindings.value.filter((item) => item.id !== deleteTarget.value?.id);
     closeDeleteConfirm();
-    MessagePlugin.success('删除成功');
+    MessagePlugin.success('移除成功');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '删除失败');
+    MessagePlugin.error(error instanceof Error ? error.message : '移除失败');
   }
 }
 
@@ -605,6 +650,7 @@ watch(activeScope, () => {
   selectedCategoryId.value = undefined;
   categoryKeyword.value = '';
   appliedCategoryKeyword.value = '';
+  syncSelectedCategory();
   expandAllCategories();
   reset();
 });
