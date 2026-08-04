@@ -65,6 +65,11 @@ describe('full function catalog', () => {
           ],
         },
         {
+          label: '属性库管理',
+          direct: false,
+          pages: [{ label: '属性库管理页', tabs: [] }],
+        },
+        {
           label: '大板品种管理',
           direct: false,
           pages: [{ label: '大板品种管理页', tabs: [] }],
@@ -129,6 +134,18 @@ describe('full function catalog', () => {
         ],
       },
     ]);
+    const attributePage = fullFunctionCatalog[0].menus[1].pages[0];
+    expect(attributePage).toEqual({
+      label: '属性库管理页',
+      value: 'admin.product-data-center.attribute',
+      actions: [
+        { label: '查看', value: 'admin.product-data-center.attribute.view' },
+        { label: '新增', value: 'admin.product-data-center.attribute.create' },
+        { label: '停用/启用', value: 'admin.product-data-center.attribute.toggle-status' },
+        { label: '删除', value: 'admin.product-data-center.attribute.delete' },
+      ],
+      tabs: [],
+    });
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
@@ -148,6 +165,10 @@ describe('full function catalog', () => {
       'admin.product-data-center.category.accessory.disable',
       'admin.product-data-center.category.accessory.enable',
       'admin.product-data-center.category.accessory.delete',
+      'admin.product-data-center.attribute.view',
+      'admin.product-data-center.attribute.create',
+      'admin.product-data-center.attribute.toggle-status',
+      'admin.product-data-center.attribute.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',

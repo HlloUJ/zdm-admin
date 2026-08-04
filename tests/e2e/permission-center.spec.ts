@@ -21,6 +21,32 @@ test.beforeEach(async ({ page }) => {
   await installAdminApiMocks(page);
 });
 
+test('shows global attribute data and only granted attribute operation buttons', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 11,
+        name: '受限属性库管理员',
+        phone: '15926620011',
+        roles: ['ATTRIBUTE_STATUS_OPERATOR'],
+        permissions: ['admin.product-data-center.attribute.view', 'admin.product-data-center.attribute.toggle-status'],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/product-attribute');
+  const main = page.getByRole('main');
+  const attributeRow = main.locator('tbody tr').filter({ hasText: 'E2E 全局共享属性' });
+
+  await expect(attributeRow).toContainText('其他管理员');
+  await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
+  await expect(attributeRow.getByText('停用', { exact: true })).toBeVisible();
+  await expect(attributeRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(main.locator('.t-tabs__nav-item')).toHaveText(['共享基础属性', '成品现货专属属性', '配件专属属性']);
+});
+
 test('shows only granted craft operation buttons for a restricted account', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -524,7 +550,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('页面');
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(4);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(5);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -535,6 +561,14 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(accessoryCategoryPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     categoryCatalogActionLabels,
   );
+  const attributePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '属性库管理页' });
+  await expect(attributePermissionRow.getByText('属性库管理', { exact: true })).toBeVisible();
+  await expect(attributePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '停用/启用',
+    '删除',
+  ]);
   const slabVarietyPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
   await expect(slabVarietyPermissionRow.getByText('大板品种管理', { exact: true })).toBeVisible();
   await expect(slabVarietyPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -622,7 +656,7 @@ test('shows verified product-data and permission-management resources in both te
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*28/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*32/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -631,7 +665,7 @@ test('shows verified product-data and permission-management resources in both te
   await expect(matrix.locator('thead')).toContainText('页面');
   await expect(matrix.locator('th.permission-tab-column')).toHaveText('Tab');
   await expect(matrix.locator('thead')).toContainText('操作权限');
-  await expect(matrix.locator('tbody tr')).toHaveCount(4);
+  await expect(matrix.locator('tbody tr')).toHaveCount(5);
   await expect(matrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -642,6 +676,14 @@ test('shows verified product-data and permission-management resources in both te
   await expect(accessoryCategoryAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     categoryCatalogActionLabels,
   );
+  const attributeAllocationRow = matrix.locator('tbody tr').filter({ hasText: '属性库管理页' });
+  await expect(attributeAllocationRow.getByText('属性库管理', { exact: true })).toBeVisible();
+  await expect(attributeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '停用/启用',
+    '删除',
+  ]);
   const slabVarietyAllocationRow = matrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
   await expect(slabVarietyAllocationRow.getByText('大板品种管理', { exact: true })).toBeVisible();
   await expect(slabVarietyAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -689,9 +731,10 @@ test('shows verified product-data and permission-management resources in both te
   await expect(moduleList.locator('.permission-module-item')).toHaveCount(2);
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('属性库管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('大板品种管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(28);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(32);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();

@@ -35,7 +35,7 @@
                 </div>
               </t-form>
               <div class="table-toolbar">
-                <t-button theme="primary" @click="openCreate">
+                <t-button v-if="canCreateAttribute" theme="primary" @click="openCreate">
                   <template #icon><t-icon name="add" /></template>
                   新增
                 </t-button>
@@ -53,11 +53,16 @@
               <template #operation="{ row }"
                 ><div class="table-actions">
                   <t-link
+                    v-if="canToggleAttributeStatus"
                     :theme="row.status === 'enabled' ? 'warning' : 'success'"
                     hover="color"
                     @click="openStatusConfirm(row)"
                     >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
-                  ><t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                  ><t-link v-if="canDeleteAttribute" theme="danger" hover="color" @click="openDeleteConfirm(row)"
+                    >删除</t-link
+                  ><span v-if="!canToggleAttributeStatus && !canDeleteAttribute" class="table-action-placeholder"
+                    >-</span
+                  >
                 </div></template
               >
             </t-table>
@@ -121,12 +126,13 @@ import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
   createProductAttribute,
   deleteProductAttribute,
   listProductAttributes,
-  updateProductAttribute,
-  type ProductAttributePayload,
+  updateProductAttributeStatus,
   type ProductAttributeRecord,
 } from '@/services/productAttributes';
 
@@ -147,6 +153,13 @@ interface Attribute {
 }
 
 const route = useRoute();
+const attributePermissionPrefix = 'admin.product-data-center.attribute';
+const loginUser = computed(() => getLoginUser());
+const canCreateAttribute = computed(() => hasPermission(loginUser.value, `${attributePermissionPrefix}.create`));
+const canToggleAttributeStatus = computed(() =>
+  hasPermission(loginUser.value, `${attributePermissionPrefix}.toggle-status`),
+);
+const canDeleteAttribute = computed(() => hasPermission(loginUser.value, `${attributePermissionPrefix}.delete`));
 const resolveScope = (value: unknown): Scope =>
   value === 'finished' || value === 'accessory' || value === 'shared' ? value : 'shared';
 const activeScope = ref<Scope>(resolveScope(route.query.scope));
@@ -225,13 +238,6 @@ const toAttribute = (record: ProductAttributeRecord): Attribute => ({
   status: normalizeStatus(record.status),
   createdByName: record.createdByName || '-',
   createdAt: formatDateTime(record.createdAt),
-});
-const toAttributePayload = (item: Attribute): ProductAttributePayload => ({
-  scope: item.scope,
-  name: item.name,
-  valueType: item.valueType,
-  attributeRole: 'basic',
-  status: item.status,
 });
 const loadAttributes = async () => {
   loading.value = true;
@@ -331,12 +337,9 @@ const handleConfirm = async () => {
       ensureCurrentPage();
       MessagePlugin.success('删除成功');
     } else {
-      const updated = await updateProductAttribute(
+      const updated = await updateProductAttributeStatus(
         confirmTarget.value.id,
-        toAttributePayload({
-          ...confirmTarget.value,
-          status: confirmType.value === 'enable' ? 'enabled' : 'disabled',
-        }),
+        confirmType.value === 'enable' ? 'enabled' : 'disabled',
       );
       const targetIndex = data.value.findIndex((item) => item.id === confirmTarget.value?.id);
       if (targetIndex !== -1) {
@@ -467,6 +470,9 @@ onMounted(loadAttributes);
   align-items: center;
   gap: var(--td-comp-margin-s);
   white-space: nowrap;
+}
+.table-action-placeholder {
+  color: var(--td-text-color-placeholder);
 }
 :global(.attribute-create-dialog .t-dialog__body) {
   max-height: none;

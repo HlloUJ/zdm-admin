@@ -31,15 +31,13 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   }
 
   @Transactional
-  public ProductAttribute updateAttribute(Long id, ProductAttribute payload) {
+  public ProductAttribute updateStatus(Long id, String status) {
     ProductAttribute existing = getById(id);
     if (existing == null) {
       throw new IllegalArgumentException("属性不存在或已被删除");
     }
-    payload.setId(id);
-    payload.setCreatedByName(existing.getCreatedByName());
-    payload.setCreatedAt(existing.getCreatedAt());
-    updateById(payload);
+    existing.setStatus(status);
+    updateById(existing);
     return getById(id);
   }
 
