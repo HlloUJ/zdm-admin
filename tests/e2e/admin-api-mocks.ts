@@ -199,6 +199,39 @@ const productAttributes = [
   },
 ];
 
+const productAttributeValues = [
+  {
+    id: 1,
+    attributeId: 1,
+    scope: 'shared',
+    value: 'E2E 全局共享属性值',
+    code: 'e2e-shared-value',
+    status: 'enabled',
+    createdByName: '其他管理员',
+    createdAt: '2026-08-04T10:00:00',
+  },
+  {
+    id: 2,
+    attributeId: 1,
+    scope: 'finished',
+    value: 'E2E 成品现货专属值',
+    code: 'e2e-finished-value',
+    status: 'enabled',
+    createdByName: '其他管理员',
+    createdAt: '2026-08-04T10:10:00',
+  },
+  {
+    id: 3,
+    attributeId: 1,
+    scope: 'accessory',
+    value: 'E2E 配件专属值',
+    code: 'e2e-accessory-value',
+    status: 'enabled',
+    createdByName: '其他管理员',
+    createdAt: '2026-08-04T10:20:00',
+  },
+];
+
 const finishedProducts = [
   {
     id: 1,
@@ -264,6 +297,13 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/employees', employees);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
   await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
+  await mockCollection(page, '**/api/admin/product-attribute-values', productAttributeValues);
+  await page.route('**/api/admin/product-attribute-values/attribute-options', async (route) => {
+    await fulfillJson(
+      route,
+      productAttributes.filter((attribute) => attribute.valueType === 'select'),
+    );
+  });
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);

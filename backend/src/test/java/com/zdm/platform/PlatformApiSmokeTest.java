@@ -273,10 +273,10 @@ class PlatformApiSmokeTest {
           (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
         VALUES (?, '属性值全局操作测试角色', 'ATTRIBUTE_VALUE_GLOBAL_OPERATOR_TEST', 'operation-platform',
           'admin', 'self', 'enabled',
-          'admin.product-data-center.attribute-value.view,'
-          'admin.product-data-center.attribute-value.create,'
-          'admin.product-data-center.attribute-value.edit,'
-          'admin.product-data-center.attribute-value.delete', '集成测试')
+          'admin.product-data-center.attribute-value.shared.view,'
+          'admin.product-data-center.attribute-value.shared.create,'
+          'admin.product-data-center.attribute-value.shared.toggle-status,'
+          'admin.product-data-center.attribute-value.shared.delete', '集成测试')
         """,
         roleId);
     jdbcTemplate.update(
@@ -310,6 +310,13 @@ class PlatformApiSmokeTest {
             "$.data[?(@.id == %d)].createdByName".formatted(otherValueId),
             hasItem("其他管理员")));
 
+    mockMvc.perform(get("/api/admin/product-attribute-values/attribute-options")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == %d)].name".formatted(attributeId),
+            hasItem("属性值全量查询测试属性")));
+
     MvcResult createdResult = mockMvc.perform(post("/api/admin/product-attribute-values")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
@@ -335,19 +342,14 @@ class PlatformApiSmokeTest {
         createdValueId);
     assertThat(persistedCreatorName).isEqualTo("属性值操作员");
 
-    mockMvc.perform(put("/api/admin/product-attribute-values/{id}", createdValueId)
+    mockMvc.perform(patch("/api/admin/product-attribute-values/{id}/status", createdValueId)
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("""
                 {
-                  "attributeId":%d,
-                  "scope":"shared",
-                  "value":"当前账号维护的属性值",
-                  "code":"current-admin-value",
-                  "status":"disabled",
-                  "createdByName":"伪造创建人"
+                  "status":"disabled"
                 }
-                """.formatted(attributeId)))
+                """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("disabled"))
         .andExpect(jsonPath("$.data.createdByName").value("属性值操作员"));

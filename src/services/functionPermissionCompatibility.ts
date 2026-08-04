@@ -1,4 +1,7 @@
-const legacyAttributePermissionPrefix = 'admin.product-data-center.attribute';
+const legacyScopedPermissionPrefixes = [
+  'admin.product-data-center.attribute',
+  'admin.product-data-center.attribute-value',
+] as const;
 const attributeScopes = ['shared', 'finished', 'accessory'] as const;
 
 const legacyAttributeActionMap: Record<string, string> = {
@@ -11,13 +14,15 @@ const legacyAttributeActionMap: Record<string, string> = {
   delete: 'delete',
 };
 
-export const expandLegacyAttributePermission = (permission: string) => {
-  const prefix = `${legacyAttributePermissionPrefix}.`;
-  if (!permission.startsWith(prefix)) return [permission];
+export const expandLegacyScopedPermission = (permission: string) => {
+  const legacyPermissionPrefix = legacyScopedPermissionPrefixes.find((candidate) =>
+    permission.startsWith(`${candidate}.`),
+  );
+  if (!legacyPermissionPrefix) return [permission];
 
-  const suffix = permission.slice(prefix.length);
+  const suffix = permission.slice(legacyPermissionPrefix.length + 1);
   const action = legacyAttributeActionMap[suffix];
   if (!action) return [permission];
 
-  return attributeScopes.map((scope) => `${legacyAttributePermissionPrefix}.${scope}.${action}`);
+  return attributeScopes.map((scope) => `${legacyPermissionPrefix}.${scope}.${action}`);
 };

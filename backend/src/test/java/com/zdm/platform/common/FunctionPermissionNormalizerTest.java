@@ -55,4 +55,26 @@ class FunctionPermissionNormalizerTest {
             "admin.product-data-center.attribute.finished.delete",
             "admin.product-data-center.attribute.accessory.delete");
   }
+
+  @Test
+  void expandsLegacyAttributeValuePagePermissionsAcrossAllTabs() {
+    assertThat(FunctionPermissionNormalizer.normalize(List.of(
+        "admin.product-data-center.attribute-value.query",
+        "admin.product-data-center.attribute-value.create",
+        "admin.product-data-center.attribute-value.edit",
+        "admin.product-data-center.attribute-value.delete")))
+        .containsExactly(
+            "admin.product-data-center.attribute-value.shared.view",
+            "admin.product-data-center.attribute-value.finished.view",
+            "admin.product-data-center.attribute-value.accessory.view",
+            "admin.product-data-center.attribute-value.shared.create",
+            "admin.product-data-center.attribute-value.finished.create",
+            "admin.product-data-center.attribute-value.accessory.create",
+            "admin.product-data-center.attribute-value.shared.toggle-status",
+            "admin.product-data-center.attribute-value.finished.toggle-status",
+            "admin.product-data-center.attribute-value.accessory.toggle-status",
+            "admin.product-data-center.attribute-value.shared.delete",
+            "admin.product-data-center.attribute-value.finished.delete",
+            "admin.product-data-center.attribute-value.accessory.delete");
+  }
 }
