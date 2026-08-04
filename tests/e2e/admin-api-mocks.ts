@@ -163,6 +163,42 @@ const productCategories = [
   },
 ];
 
+const productAttributes = [
+  {
+    id: 1,
+    scope: 'shared',
+    name: 'E2E 全局共享属性',
+    valueType: 'select',
+    attributeRole: 'basic',
+    templateCount: 1,
+    status: 'enabled',
+    createdByName: '其他管理员',
+    createdAt: '2026-08-04T09:00:00',
+  },
+  {
+    id: 2,
+    scope: 'finished',
+    name: 'E2E 成品现货专属属性',
+    valueType: 'number',
+    attributeRole: 'basic',
+    templateCount: 0,
+    status: 'enabled',
+    createdByName: '其他管理员',
+    createdAt: '2026-08-04T09:10:00',
+  },
+  {
+    id: 3,
+    scope: 'accessory',
+    name: 'E2E 配件专属属性',
+    valueType: 'text',
+    attributeRole: 'basic',
+    templateCount: 0,
+    status: 'enabled',
+    createdByName: '其他管理员',
+    createdAt: '2026-08-04T09:20:00',
+  },
+];
+
 const finishedProducts = [
   {
     id: 1,
@@ -227,6 +263,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/roles', roles);
   await mockCollection(page, '**/api/admin/employees', employees);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
+  await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);

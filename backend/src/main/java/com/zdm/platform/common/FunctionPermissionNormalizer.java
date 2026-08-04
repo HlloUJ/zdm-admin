@@ -10,6 +10,9 @@ import org.springframework.util.StringUtils;
 
 public final class FunctionPermissionNormalizer {
   private static final String ALL_PERMISSION = "all";
+  private static final String LEGACY_ATTRIBUTE_PERMISSION_PREFIX =
+      "admin.product-data-center.attribute.";
+  private static final List<String> ATTRIBUTE_SCOPES = List.of("shared", "finished", "accessory");
   private static final Set<String> QUERY_SUFFIXES = Set.of("query", "查询");
   private static final Set<String> RESET_SUFFIXES = Set.of("reset", "重置");
 
@@ -35,7 +38,10 @@ public final class FunctionPermissionNormalizer {
     }
 
     LinkedHashSet<String> normalizedValues = new LinkedHashSet<>();
-    for (String permission : expandedValues) {
+    List<String> compatibleValues = expandedValues.stream()
+        .flatMap(FunctionPermissionNormalizer::expandLegacyAttributePermission)
+        .toList();
+    for (String permission : compatibleValues) {
       String suffix = suffix(permission);
       if (RESET_SUFFIXES.contains(suffix)) {
         continue;
@@ -55,6 +61,26 @@ public final class FunctionPermissionNormalizer {
 
   private static String suffix(String permission) {
     return permission.substring(permission.lastIndexOf('.') + 1);
+  }
+
+  private static Stream<String> expandLegacyAttributePermission(String permission) {
+    if (!permission.startsWith(LEGACY_ATTRIBUTE_PERMISSION_PREFIX)) {
+      return Stream.of(permission);
+    }
+
+    String legacyAction = permission.substring(LEGACY_ATTRIBUTE_PERMISSION_PREFIX.length());
+    String action = switch (legacyAction) {
+      case "view", "query", "查询" -> "view";
+      case "create" -> "create";
+      case "edit", "toggle-status" -> "toggle-status";
+      case "delete" -> "delete";
+      default -> null;
+    };
+    if (action == null) {
+      return Stream.of(permission);
+    }
+    return ATTRIBUTE_SCOPES.stream()
+        .map(scope -> LEGACY_ATTRIBUTE_PERMISSION_PREFIX + scope + "." + action);
   }
 
   private static String viewPermission(String permission) {

@@ -1,3 +1,5 @@
+import { expandLegacyAttributePermission } from './functionPermissionCompatibility';
+
 export type TerminalType = 'store' | 'supplier';
 
 export interface FunctionAction {
@@ -77,6 +79,12 @@ const productCategoryTabActions = (scope: string): FunctionAction[] => [
   { label: '删除', value: `${scope}.delete` },
 ];
 
+const productAttributeTabActions = (scope: string): FunctionAction[] => [
+  { label: '新增', value: `${scope}.create` },
+  { label: '停用/启用', value: `${scope}.toggle-status` },
+  { label: '删除', value: `${scope}.delete` },
+];
+
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
   modules.map((module) => ({
     ...module,
@@ -121,6 +129,35 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '配件分类',
                 value: 'admin.product-data-center.category.accessory',
                 actions: productCategoryTabActions('admin.product-data-center.category.accessory'),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        label: '属性库管理',
+        value: 'admin.product-data-center.attribute.menu',
+        direct: false,
+        pages: [
+          {
+            label: '属性库管理页',
+            value: 'admin.product-data-center.attribute',
+            actions: [],
+            tabs: [
+              {
+                label: '共享基础属性',
+                value: 'admin.product-data-center.attribute.shared',
+                actions: productAttributeTabActions('admin.product-data-center.attribute.shared'),
+              },
+              {
+                label: '成品现货专属属性',
+                value: 'admin.product-data-center.attribute.finished',
+                actions: productAttributeTabActions('admin.product-data-center.attribute.finished'),
+              },
+              {
+                label: '配件专属属性',
+                value: 'admin.product-data-center.attribute.accessory',
+                actions: productAttributeTabActions('admin.product-data-center.attribute.accessory'),
               },
             ],
           },
@@ -350,7 +387,10 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
   const catalogValues = getFunctionCatalogPermissionValues(modules);
   const allowedValues = new Set(catalogValues);
   const selectedValues = new Set(
-    permissions.map(toCanonicalPermission).filter((permission) => permission && allowedValues.has(permission)),
+    permissions
+      .flatMap(expandLegacyAttributePermission)
+      .map(toCanonicalPermission)
+      .filter((permission) => permission && allowedValues.has(permission)),
   );
 
   modules.flatMap(collectFunctionCatalogRows).forEach((row) => {
