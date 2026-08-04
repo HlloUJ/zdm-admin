@@ -19,7 +19,13 @@
             <div class="category-template-layout">
               <aside class="category-panel">
                 <div class="category-search">
-                  <t-input v-model="categoryKeyword" clearable placeholder="请输入分类名称" @enter="searchCategory" />
+                  <t-input
+                    v-model="categoryKeyword"
+                    clearable
+                    placeholder="请输入分类名称"
+                    @clear="clearCategorySearch"
+                    @enter="searchCategory"
+                  />
                   <t-button theme="default" variant="base" @click="searchCategory">搜索</t-button>
                 </div>
 
@@ -414,6 +420,11 @@ function selectLeafCategory(category: CategoryTreeNode) {
 
 function searchCategory() {
   appliedCategoryKeyword.value = categoryKeyword.value;
+}
+
+function clearCategorySearch() {
+  categoryKeyword.value = '';
+  appliedCategoryKeyword.value = '';
 }
 
 function valueTypeLabel(value: ProductAttributeRecord['valueType']) {
