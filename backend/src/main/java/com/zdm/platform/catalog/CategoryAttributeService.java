@@ -6,6 +6,7 @@ import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -13,6 +14,8 @@ import org.springframework.util.StringUtils;
 @Service
 public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMapper, CategoryAttribute> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+  private static final String PRODUCT_ATTRIBUTE_ROLE = "product";
+  private static final String SALES_ATTRIBUTE_ROLE = "sales";
   private static final int MAX_SKU_ATTRIBUTE_COUNT = 4;
   private static final String SKU_ATTRIBUTE_LIMIT_MESSAGE = "参与SKU组合的属性最多只能开启4个";
 
@@ -24,6 +27,8 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
 
   @Transactional
   public CategoryAttribute createCategoryAttribute(CategoryAttribute categoryAttribute) {
+    categoryAttribute.setAttributeRole(normalizeAttributeRole(categoryAttribute.getAttributeRole()));
+    validateAttributeRoleAndSku(categoryAttribute.getAttributeRole(), categoryAttribute.getSkuFlag());
     validateSkuAttributeLimit(categoryAttribute.getCategoryId(), null, categoryAttribute.getSkuFlag());
     categoryAttribute.setId(null);
     categoryAttribute.setStatus("disabled");
@@ -58,6 +63,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
       CategoryAttribute binding = new CategoryAttribute();
       binding.setCategoryId(request.categoryId());
       binding.setAttributeId(attributeId);
+      binding.setAttributeRole(null);
       binding.setRequiredFlag(false);
       binding.setSkuFlag(false);
       binding.setSortOrder(nextSortOrder++);
@@ -80,6 +86,11 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     if (existing == null) {
       throw new IllegalArgumentException("类目属性模板不存在");
     }
+    payload.setAttributeRole(normalizeAttributeRole(payload.getAttributeRole()));
+    validateAttributeRoleAndSku(payload.getAttributeRole(), payload.getSkuFlag());
+    if ("published".equals(existing.getPublishStatus()) && hasConfigurationChanged(existing, payload)) {
+      throw new IllegalArgumentException("请先取消发布后再修改属性配置");
+    }
     validateSkuAttributeLimit(payload.getCategoryId(), id, payload.getSkuFlag());
     payload.setId(id);
     payload.setStatus(existing.getStatus());
@@ -96,9 +107,36 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     if (existing == null) {
       throw new IllegalArgumentException("类目属性模板不存在");
     }
+    if ("published".equals(publishStatus)) {
+      validateAttributeRoleAndSku(existing.getAttributeRole(), existing.getSkuFlag());
+      if (!StringUtils.hasText(existing.getAttributeRole())) {
+        throw new IllegalArgumentException("请先选择属性角色");
+      }
+    }
     existing.setPublishStatus(publishStatus);
     updateById(existing);
     return getById(id);
+  }
+
+  private String normalizeAttributeRole(String attributeRole) {
+    return StringUtils.hasText(attributeRole) ? attributeRole : null;
+  }
+
+  private void validateAttributeRoleAndSku(String attributeRole, Boolean skuFlag) {
+    if (StringUtils.hasText(attributeRole)
+        && !PRODUCT_ATTRIBUTE_ROLE.equals(attributeRole)
+        && !SALES_ATTRIBUTE_ROLE.equals(attributeRole)) {
+      throw new IllegalArgumentException("属性角色无效");
+    }
+    if (Boolean.TRUE.equals(skuFlag) && !SALES_ATTRIBUTE_ROLE.equals(attributeRole)) {
+      throw new IllegalArgumentException("只有销售属性才能参与SKU组合");
+    }
+  }
+
+  private boolean hasConfigurationChanged(CategoryAttribute existing, CategoryAttribute payload) {
+    return !Objects.equals(existing.getAttributeRole(), payload.getAttributeRole())
+        || Boolean.TRUE.equals(existing.getRequiredFlag()) != Boolean.TRUE.equals(payload.getRequiredFlag())
+        || Boolean.TRUE.equals(existing.getSkuFlag()) != Boolean.TRUE.equals(payload.getSkuFlag());
   }
 
   private void validateSkuAttributeLimit(Long categoryId, Long excludedId, Boolean skuFlag) {

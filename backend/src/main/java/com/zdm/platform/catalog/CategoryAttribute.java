@@ -12,6 +12,7 @@ public class CategoryAttribute extends BaseEntity {
   @NotNull
   private Long attributeId;
 
+  private String attributeRole;
   private Boolean requiredFlag;
   private Boolean skuFlag;
   private Integer sortOrder;
@@ -32,6 +33,14 @@ public class CategoryAttribute extends BaseEntity {
 
   public void setAttributeId(Long attributeId) {
     this.attributeId = attributeId;
+  }
+
+  public String getAttributeRole() {
+    return attributeRole;
+  }
+
+  public void setAttributeRole(String attributeRole) {
+    this.attributeRole = attributeRole;
   }
 
   public Boolean getRequiredFlag() {

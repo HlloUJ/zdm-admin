@@ -16,6 +16,7 @@ async function installCategoryAttributeMocks(page: Page) {
       id: 1,
       categoryId: 3,
       attributeId: 1,
+      attributeRole: 'product' as string | null,
       requiredFlag: true,
       skuFlag: false,
       sortOrder: 1,
@@ -121,6 +122,7 @@ async function installCategoryAttributeMocks(page: Page) {
       id: categoryAttributes.length + index + 1,
       categoryId: payload.categoryId,
       attributeId,
+      attributeRole: null,
       requiredFlag: false,
       skuFlag: false,
       sortOrder: categoryAttributes.length + index + 1,
@@ -314,8 +316,9 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(bindButton).toBeEnabled();
 
   const headers = main.getByRole('columnheader');
-  await expect(headers.nth(4)).toContainText('参与SKU组合');
-  const skuHeaderLayout = await headers.nth(4).evaluate((header) => {
+  await expect(headers.nth(3)).toContainText('属性角色');
+  await expect(headers.nth(5)).toContainText('参与SKU组合');
+  const skuHeaderLayout = await headers.nth(5).evaluate((header) => {
     const content = header.querySelector<HTMLElement>('.t-table__th-cell-inner') ?? header;
     const style = getComputedStyle(content);
     return {
@@ -326,15 +329,17 @@ test('selects the first leaf and manages bindings from the template list', async
   });
   expect(skuHeaderLayout.width).toBeGreaterThanOrEqual(156);
   expect(skuHeaderLayout.height).toBeLessThanOrEqual(skuHeaderLayout.lineHeight + 2);
-  await expect(headers.nth(5)).toContainText('状态');
-  await expect(headers.nth(6)).toContainText('发布');
-  await expect(headers.nth(7)).toContainText('绑定人');
-  await expect(headers.nth(8)).toContainText('绑定时间');
+  await expect(headers.nth(6)).toContainText('状态');
+  await expect(headers.nth(7)).toContainText('发布');
+  await expect(headers.nth(8)).toContainText('绑定人');
+  await expect(headers.nth(9)).toContainText('绑定时间');
   await expect(headers.getByText('排序', { exact: true })).toHaveCount(0);
-  const operationColumnWidth = await headers.nth(9).evaluate((header) => header.getBoundingClientRect().width);
+  const operationColumnWidth = await headers.nth(10).evaluate((header) => header.getBoundingClientRect().width);
   expect(operationColumnWidth).toBeGreaterThanOrEqual(136);
   expect(operationColumnWidth).toBeLessThanOrEqual(144);
   await expect(materialRow).toContainText('韩健');
+  const materialRoleInput = materialRow.locator('.attribute-role-select').getByRole('textbox');
+  await expect(materialRoleInput).toHaveValue('商品属性');
 
   let publishRequestCount = 0;
   await page.route('**/api/admin/category-attributes/1/publish', async (route) => {
@@ -353,6 +358,9 @@ test('selects the first leaf and manages bindings from the template list', async
   expect(publishRequestCount).toBe(1);
   await expect(materialRow.getByText('已发布', { exact: true })).toHaveCount(1);
   await expect(materialRow.locator('.t-tag').filter({ hasText: '已发布' })).toHaveClass(/t-tag--success/);
+  await expect(materialRoleInput).toBeDisabled();
+  await expect(materialRow.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
+  await expect(materialRow.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
   const unpublishButton = materialRow.getByText('取消发布', { exact: true });
   await expect(unpublishButton).toBeVisible();
   await expect(unpublishButton).toHaveClass(/t-link--theme-warning/);
@@ -411,6 +419,65 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(sizeRow).toContainText('当前操作员');
   await expect(sizeRow.getByText('启用', { exact: true })).toHaveCount(1);
   await expect(sizeRow.getByText('未发布', { exact: true })).toHaveCount(1);
+  const colorRoleSelect = colorRow.locator('.attribute-role-select');
+  const sizeRoleSelect = sizeRow.locator('.attribute-role-select');
+  const colorRoleInput = colorRoleSelect.getByRole('textbox');
+  const sizeRoleInput = sizeRoleSelect.getByRole('textbox');
+  const sizeSkuSwitch = sizeRow.locator('.t-switch').nth(1);
+  await expect(colorRoleInput).toHaveValue('');
+  await expect(sizeRoleInput).toHaveValue('');
+  await expect(sizeSkuSwitch).toHaveClass(/t-is-disabled/);
+
+  await colorRow.getByText('发布', { exact: true }).click();
+  await expect(page.locator('.t-message').filter({ hasText: '请先选择属性角色' })).toBeVisible();
+
+  const salesRoleResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/admin/category-attributes/2') &&
+      response.request().method() === 'PUT' &&
+      response.request().postDataJSON().attributeRole === 'sales',
+  );
+  await sizeRoleSelect.click();
+  await page.getByRole('listitem', { name: '销售属性', exact: true }).click();
+  const salesRoleResponse = await salesRoleResponsePromise;
+  expect(salesRoleResponse.request().postDataJSON()).toMatchObject({ attributeRole: 'sales', skuFlag: false });
+  await expect(sizeRoleInput).toHaveValue('销售属性');
+  await expect(sizeRoleSelect.locator('.t-loading')).toHaveCount(0);
+  await expect(sizeSkuSwitch).not.toHaveClass(/t-is-disabled/);
+
+  const skuRequestPromise = page.waitForRequest(
+    (request) =>
+      request.url().endsWith('/api/admin/category-attributes/2') &&
+      request.method() === 'PUT' &&
+      request.postDataJSON().skuFlag === true,
+  );
+  await sizeSkuSwitch.click();
+  await skuRequestPromise;
+  await expect(sizeSkuSwitch).toHaveClass(/t-is-checked/);
+
+  let roleChangeRequestCount = 0;
+  await page.route('**/api/admin/category-attributes/2', async (route) => {
+    if (route.request().method() === 'PUT') roleChangeRequestCount += 1;
+    await route.fallback();
+  });
+  const productRoleRequestPromise = page.waitForRequest(
+    (request) =>
+      request.url().endsWith('/api/admin/category-attributes/2') &&
+      request.method() === 'PUT' &&
+      request.postDataJSON().attributeRole === 'product',
+  );
+  await sizeRoleSelect.click();
+  await page.getByRole('listitem', { name: '商品属性', exact: true }).click();
+  const roleChangeDialog = page.locator('.t-dialog').filter({ hasText: '切换为商品属性后将关闭“参与SKU组合”' });
+  await expect(roleChangeDialog).toBeVisible();
+  expect(roleChangeRequestCount).toBe(0);
+  await roleChangeDialog.getByRole('button', { name: '确认', exact: true }).click();
+  const productRoleRequest = await productRoleRequestPromise;
+  expect(productRoleRequest.postDataJSON()).toMatchObject({ attributeRole: 'product', skuFlag: false });
+  expect(roleChangeRequestCount).toBe(1);
+  await expect(sizeRoleInput).toHaveValue('商品属性');
+  await expect(sizeSkuSwitch).not.toHaveClass(/t-is-checked/);
+  await expect(sizeSkuSwitch).toHaveClass(/t-is-disabled/);
 
   const tableRows = main.locator('tbody tr');
   await expect(tableRows.nth(0)).toContainText('材质');
@@ -459,6 +526,7 @@ test('每个类目最多只能开启4个SKU组合属性', async ({ page }) => {
     id: index + 1,
     categoryId: 3,
     attributeId: attribute.id,
+    attributeRole: 'sales',
     requiredFlag: false,
     skuFlag: index < 4,
     sortOrder: index + 1,
@@ -510,6 +578,7 @@ test('keeps template data visible while hiding ungranted binding operations', as
   await expect(row.locator('.t-switch')).toHaveCount(2);
   await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
   await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
+  await expect(row.locator('.attribute-role-select').getByRole('textbox')).toBeDisabled();
   await expect(row.locator('.t-table__handle-draggable')).toHaveCount(0);
   await expect(row.getByText('启用', { exact: true })).toHaveCount(0);
   await expect(row.getByText('停用', { exact: true })).toHaveCount(1);
