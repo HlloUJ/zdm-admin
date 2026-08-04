@@ -75,6 +75,16 @@ describe('full function catalog', () => {
           ],
         },
         {
+          label: '属性值管理',
+          direct: false,
+          pages: [
+            {
+              label: '属性值管理页',
+              tabs: [{ label: '共享基础属性值' }, { label: '成品现货专属值' }, { label: '配件专属值' }],
+            },
+          ],
+        },
+        {
           label: '大板品种管理',
           direct: false,
           pages: [{ label: '大板品种管理页', tabs: [] }],
@@ -177,6 +187,44 @@ describe('full function catalog', () => {
         },
       ],
     });
+    const attributeValuePage = fullFunctionCatalog[0].menus[2].pages[0];
+    expect(attributeValuePage).toEqual({
+      label: '属性值管理页',
+      value: 'admin.product-data-center.attribute-value',
+      actions: [],
+      tabs: [
+        {
+          label: '共享基础属性值',
+          value: 'admin.product-data-center.attribute-value.shared',
+          actions: [
+            { label: '查看', value: 'admin.product-data-center.attribute-value.shared.view' },
+            { label: '新增', value: 'admin.product-data-center.attribute-value.shared.create' },
+            { label: '停用/启用', value: 'admin.product-data-center.attribute-value.shared.toggle-status' },
+            { label: '删除', value: 'admin.product-data-center.attribute-value.shared.delete' },
+          ],
+        },
+        {
+          label: '成品现货专属值',
+          value: 'admin.product-data-center.attribute-value.finished',
+          actions: [
+            { label: '查看', value: 'admin.product-data-center.attribute-value.finished.view' },
+            { label: '新增', value: 'admin.product-data-center.attribute-value.finished.create' },
+            { label: '停用/启用', value: 'admin.product-data-center.attribute-value.finished.toggle-status' },
+            { label: '删除', value: 'admin.product-data-center.attribute-value.finished.delete' },
+          ],
+        },
+        {
+          label: '配件专属值',
+          value: 'admin.product-data-center.attribute-value.accessory',
+          actions: [
+            { label: '查看', value: 'admin.product-data-center.attribute-value.accessory.view' },
+            { label: '新增', value: 'admin.product-data-center.attribute-value.accessory.create' },
+            { label: '停用/启用', value: 'admin.product-data-center.attribute-value.accessory.toggle-status' },
+            { label: '删除', value: 'admin.product-data-center.attribute-value.accessory.delete' },
+          ],
+        },
+      ],
+    });
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
@@ -208,6 +256,18 @@ describe('full function catalog', () => {
       'admin.product-data-center.attribute.accessory.create',
       'admin.product-data-center.attribute.accessory.toggle-status',
       'admin.product-data-center.attribute.accessory.delete',
+      'admin.product-data-center.attribute-value.shared.view',
+      'admin.product-data-center.attribute-value.shared.create',
+      'admin.product-data-center.attribute-value.shared.toggle-status',
+      'admin.product-data-center.attribute-value.shared.delete',
+      'admin.product-data-center.attribute-value.finished.view',
+      'admin.product-data-center.attribute-value.finished.create',
+      'admin.product-data-center.attribute-value.finished.toggle-status',
+      'admin.product-data-center.attribute-value.finished.delete',
+      'admin.product-data-center.attribute-value.accessory.view',
+      'admin.product-data-center.attribute-value.accessory.create',
+      'admin.product-data-center.attribute-value.accessory.toggle-status',
+      'admin.product-data-center.attribute-value.accessory.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',
@@ -287,6 +347,27 @@ describe('full function catalog', () => {
       'admin.product-data-center.attribute.accessory.create',
       'admin.product-data-center.attribute.accessory.toggle-status',
       'admin.product-data-center.attribute.accessory.delete',
+    ]);
+    expect(
+      normalizeTerminalPermissions('store', [
+        'admin.product-data-center.attribute-value.query',
+        'admin.product-data-center.attribute-value.create',
+        'admin.product-data-center.attribute-value.edit',
+        'admin.product-data-center.attribute-value.delete',
+      ]),
+    ).toEqual([
+      'admin.product-data-center.attribute-value.shared.view',
+      'admin.product-data-center.attribute-value.shared.create',
+      'admin.product-data-center.attribute-value.shared.toggle-status',
+      'admin.product-data-center.attribute-value.shared.delete',
+      'admin.product-data-center.attribute-value.finished.view',
+      'admin.product-data-center.attribute-value.finished.create',
+      'admin.product-data-center.attribute-value.finished.toggle-status',
+      'admin.product-data-center.attribute-value.finished.delete',
+      'admin.product-data-center.attribute-value.accessory.view',
+      'admin.product-data-center.attribute-value.accessory.create',
+      'admin.product-data-center.attribute-value.accessory.toggle-status',
+      'admin.product-data-center.attribute-value.accessory.delete',
     ]);
   });
 

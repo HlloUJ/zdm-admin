@@ -1,4 +1,4 @@
-import { expandLegacyAttributePermission } from './functionPermissionCompatibility';
+import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 
 export type TerminalType = 'store' | 'supplier';
 
@@ -158,6 +158,35 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '配件专属属性',
                 value: 'admin.product-data-center.attribute.accessory',
                 actions: productAttributeTabActions('admin.product-data-center.attribute.accessory'),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        label: '属性值管理',
+        value: 'admin.product-data-center.attribute-value.menu',
+        direct: false,
+        pages: [
+          {
+            label: '属性值管理页',
+            value: 'admin.product-data-center.attribute-value',
+            actions: [],
+            tabs: [
+              {
+                label: '共享基础属性值',
+                value: 'admin.product-data-center.attribute-value.shared',
+                actions: productAttributeTabActions('admin.product-data-center.attribute-value.shared'),
+              },
+              {
+                label: '成品现货专属值',
+                value: 'admin.product-data-center.attribute-value.finished',
+                actions: productAttributeTabActions('admin.product-data-center.attribute-value.finished'),
+              },
+              {
+                label: '配件专属值',
+                value: 'admin.product-data-center.attribute-value.accessory',
+                actions: productAttributeTabActions('admin.product-data-center.attribute-value.accessory'),
               },
             ],
           },
@@ -388,7 +417,7 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
   const allowedValues = new Set(catalogValues);
   const selectedValues = new Set(
     permissions
-      .flatMap(expandLegacyAttributePermission)
+      .flatMap(expandLegacyScopedPermission)
       .map(toCanonicalPermission)
       .filter((permission) => permission && allowedValues.has(permission)),
   );

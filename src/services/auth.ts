@@ -1,5 +1,5 @@
 import { shallowRef } from 'vue';
-import { expandLegacyAttributePermission } from './functionPermissionCompatibility';
+import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 import { clearAuthToken, request, setAuthToken } from './http';
 
 const AUTH_USER_STORAGE_KEY = 'zdm-admin-user';
@@ -41,7 +41,7 @@ const normalizeFunctionPermissions = (permissions: string[]) => {
   if (permissions.includes('all')) return ['all'];
 
   const normalized = new Set<string>();
-  permissions.flatMap(expandLegacyAttributePermission).forEach((permission) => {
+  permissions.flatMap(expandLegacyScopedPermission).forEach((permission) => {
     const separatorIndex = permission.lastIndexOf('.');
     const suffix = permission.slice(separatorIndex + 1);
     if (suffix === 'reset' || suffix === '重置') return;

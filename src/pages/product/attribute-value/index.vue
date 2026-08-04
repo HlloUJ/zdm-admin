@@ -12,7 +12,7 @@
           <template #toolbar>
             <div class="list-controls">
               <div v-if="!lockedScope" class="scope-controls">
-                <t-tabs v-model="activeScope" :list="scopeTabs" />
+                <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
                 <div class="source-caption">{{ sourceDescription }}</div>
               </div>
               <t-form :data="searchForm" label-width="88px" colon>
@@ -51,7 +51,7 @@
                 </div>
               </t-form>
               <div class="table-toolbar">
-                <t-button theme="primary" @click="openCreate">
+                <t-button v-if="canCreateValue" theme="primary" @click="openCreate">
                   <template #icon><t-icon name="add" /></template>
                   新增
                 </t-button>
@@ -69,11 +69,14 @@
               <template #operation="{ row }"
                 ><div class="table-actions">
                   <t-link
+                    v-if="canToggleValueStatus"
                     :theme="row.status === 'enabled' ? 'warning' : 'success'"
                     hover="color"
                     @click="openStatusConfirm(row)"
                     >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
-                  ><t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                  ><t-link v-if="canDeleteValue" theme="danger" hover="color" @click="openDeleteConfirm(row)"
+                    >删除</t-link
+                  ><span v-if="!canToggleValueStatus && !canDeleteValue" class="table-action-placeholder">-</span>
                 </div></template
               >
             </t-table>
@@ -132,13 +135,16 @@ import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
-import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
+import type { ProductAttributeRecord } from '@/services/productAttributes';
 import {
   createProductAttributeValue,
   deleteProductAttributeValue,
+  listProductAttributeValueOptions,
   listProductAttributeValues,
-  updateProductAttributeValue,
-  type ProductAttributeValuePayload,
+  updateProductAttributeValueStatus,
   type ProductAttributeValueRecord,
 } from '@/services/productAttributeValues';
 
@@ -165,6 +171,8 @@ interface Value {
 }
 
 const route = useRoute();
+const attributeValuePermissionPrefix = 'admin.product-data-center.attribute-value';
+const loginUser = computed(() => getLoginUser());
 const attributeOptions = ref<AttributeOption[]>([]);
 const attributeName = computed(() => Object.fromEntries(attributeOptions.value.map((item) => [item.code, item.name])));
 const initialAttribute = typeof route.query.attribute === 'string' ? route.query.attribute : '';
@@ -177,11 +185,25 @@ const activeScope = ref<Scope>(initialScope);
 const lockedScope = computed(
   () => route.query.scope === 'finished' || route.query.scope === 'accessory' || route.query.scope === 'shared',
 );
-const scopeTabs = [
+const attributeValueScopeTabs: { label: string; value: Scope }[] = [
   { label: '共享基础属性值', value: 'shared' },
   { label: '成品现货专属值', value: 'finished' },
   { label: '配件专属值', value: 'accessory' },
 ];
+const {
+  visibleTabs: scopeTabs,
+  showTabRail: showScopeTabRail,
+  resolveAccessibleTab: resolveAccessibleScope,
+} = usePermissionTabs({
+  tabs: attributeValueScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) => hasPermission(loginUser.value, `${attributeValuePermissionPrefix}.${tab.value}.view`),
+});
+const hasValueAction = (action: string) =>
+  hasPermission(loginUser.value, `${attributeValuePermissionPrefix}.${activeScope.value}.${action}`);
+const canCreateValue = computed(() => hasValueAction('create'));
+const canToggleValueStatus = computed(() => hasValueAction('toggle-status'));
+const canDeleteValue = computed(() => hasValueAction('delete'));
 const sourceDescription = computed(
   () =>
     ({
@@ -270,17 +292,10 @@ const toValue = (record: ProductAttributeValueRecord): Value => ({
 });
 const createValueCode = (attributeId: string, name: string) =>
   `attr-value-${attributeId}-${name.trim().length}-${Date.now()}`;
-const toValuePayload = (item: Value): ProductAttributeValuePayload => ({
-  attributeId: Number(item.attribute),
-  scope: item.scope,
-  value: item.name,
-  code: item.code,
-  status: item.status,
-});
 const loadValues = async () => {
   loading.value = true;
   try {
-    const [attributes, values] = await Promise.all([listProductAttributes(), listProductAttributeValues()]);
+    const [attributes, values] = await Promise.all([listProductAttributeValueOptions(), listProductAttributeValues()]);
     attributeOptions.value = attributes.map(toAttributeOption);
     data.value = values.map(toValue);
     if (searchForm.attribute && !attributesInScope.value.some((item) => item.code === searchForm.attribute)) {
@@ -380,12 +395,9 @@ const handleConfirm = async () => {
       ensureCurrentPage();
       MessagePlugin.success('删除成功');
     } else {
-      const updated = await updateProductAttributeValue(
+      const updated = await updateProductAttributeValueStatus(
         confirmTarget.value.id,
-        toValuePayload({
-          ...confirmTarget.value,
-          status: confirmType.value === 'enable' ? 'enabled' : 'disabled',
-        }),
+        confirmType.value === 'enable' ? 'enabled' : 'disabled',
       );
       const targetIndex = data.value.findIndex((item) => item.id === confirmTarget.value?.id);
       if (targetIndex !== -1) {
@@ -401,7 +413,7 @@ const handleConfirm = async () => {
 watch(
   () => route.query.scope,
   (scope) => {
-    activeScope.value = resolveScope(scope);
+    activeScope.value = resolveAccessibleScope(resolveScope(scope)) ?? activeScope.value;
     searchForm.attribute = '';
     applied.attribute = '';
     pagination.current = 1;
@@ -520,6 +532,9 @@ onMounted(loadValues);
   align-items: center;
   gap: var(--td-comp-margin-s);
   white-space: nowrap;
+}
+.table-action-placeholder {
+  color: var(--td-text-color-placeholder);
 }
 :deep(.t-table th),
 :deep(.t-table td) {
