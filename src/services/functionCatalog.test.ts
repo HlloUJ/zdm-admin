@@ -67,7 +67,12 @@ describe('full function catalog', () => {
         {
           label: '属性库管理',
           direct: false,
-          pages: [{ label: '属性库管理页', tabs: [] }],
+          pages: [
+            {
+              label: '属性库管理页',
+              tabs: [{ label: '共享基础属性' }, { label: '成品现货专属属性' }, { label: '配件专属属性' }],
+            },
+          ],
         },
         {
           label: '大板品种管理',
@@ -138,13 +143,39 @@ describe('full function catalog', () => {
     expect(attributePage).toEqual({
       label: '属性库管理页',
       value: 'admin.product-data-center.attribute',
-      actions: [
-        { label: '查看', value: 'admin.product-data-center.attribute.view' },
-        { label: '新增', value: 'admin.product-data-center.attribute.create' },
-        { label: '停用/启用', value: 'admin.product-data-center.attribute.toggle-status' },
-        { label: '删除', value: 'admin.product-data-center.attribute.delete' },
+      actions: [],
+      tabs: [
+        {
+          label: '共享基础属性',
+          value: 'admin.product-data-center.attribute.shared',
+          actions: [
+            { label: '查看', value: 'admin.product-data-center.attribute.shared.view' },
+            { label: '新增', value: 'admin.product-data-center.attribute.shared.create' },
+            { label: '停用/启用', value: 'admin.product-data-center.attribute.shared.toggle-status' },
+            { label: '删除', value: 'admin.product-data-center.attribute.shared.delete' },
+          ],
+        },
+        {
+          label: '成品现货专属属性',
+          value: 'admin.product-data-center.attribute.finished',
+          actions: [
+            { label: '查看', value: 'admin.product-data-center.attribute.finished.view' },
+            { label: '新增', value: 'admin.product-data-center.attribute.finished.create' },
+            { label: '停用/启用', value: 'admin.product-data-center.attribute.finished.toggle-status' },
+            { label: '删除', value: 'admin.product-data-center.attribute.finished.delete' },
+          ],
+        },
+        {
+          label: '配件专属属性',
+          value: 'admin.product-data-center.attribute.accessory',
+          actions: [
+            { label: '查看', value: 'admin.product-data-center.attribute.accessory.view' },
+            { label: '新增', value: 'admin.product-data-center.attribute.accessory.create' },
+            { label: '停用/启用', value: 'admin.product-data-center.attribute.accessory.toggle-status' },
+            { label: '删除', value: 'admin.product-data-center.attribute.accessory.delete' },
+          ],
+        },
       ],
-      tabs: [],
     });
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.category.finished.view',
@@ -165,10 +196,18 @@ describe('full function catalog', () => {
       'admin.product-data-center.category.accessory.disable',
       'admin.product-data-center.category.accessory.enable',
       'admin.product-data-center.category.accessory.delete',
-      'admin.product-data-center.attribute.view',
-      'admin.product-data-center.attribute.create',
-      'admin.product-data-center.attribute.toggle-status',
-      'admin.product-data-center.attribute.delete',
+      'admin.product-data-center.attribute.shared.view',
+      'admin.product-data-center.attribute.shared.create',
+      'admin.product-data-center.attribute.shared.toggle-status',
+      'admin.product-data-center.attribute.shared.delete',
+      'admin.product-data-center.attribute.finished.view',
+      'admin.product-data-center.attribute.finished.create',
+      'admin.product-data-center.attribute.finished.toggle-status',
+      'admin.product-data-center.attribute.finished.delete',
+      'admin.product-data-center.attribute.accessory.view',
+      'admin.product-data-center.attribute.accessory.create',
+      'admin.product-data-center.attribute.accessory.toggle-status',
+      'admin.product-data-center.attribute.accessory.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',
@@ -228,6 +267,27 @@ describe('full function catalog', () => {
       'admin.permission-management.employee-management.permission',
     ]);
     expect(normalizeTerminalPermissions('supplier', ['admin.slab-management.warehouse.view-price'])).toEqual([]);
+    expect(
+      normalizeTerminalPermissions('store', [
+        'admin.product-data-center.attribute.view',
+        'admin.product-data-center.attribute.create',
+        'admin.product-data-center.attribute.toggle-status',
+        'admin.product-data-center.attribute.delete',
+      ]),
+    ).toEqual([
+      'admin.product-data-center.attribute.shared.view',
+      'admin.product-data-center.attribute.shared.create',
+      'admin.product-data-center.attribute.shared.toggle-status',
+      'admin.product-data-center.attribute.shared.delete',
+      'admin.product-data-center.attribute.finished.view',
+      'admin.product-data-center.attribute.finished.create',
+      'admin.product-data-center.attribute.finished.toggle-status',
+      'admin.product-data-center.attribute.finished.delete',
+      'admin.product-data-center.attribute.accessory.view',
+      'admin.product-data-center.attribute.accessory.create',
+      'admin.product-data-center.attribute.accessory.toggle-status',
+      'admin.product-data-center.attribute.accessory.delete',
+    ]);
   });
 
   it('generates view permissions and enforces operation dependencies for every future page or tab', () => {

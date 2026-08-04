@@ -3,6 +3,7 @@ package com.zdm.platform.catalog;
 import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,12 +30,18 @@ public class ProductAttributeController {
   @GetMapping
   public ApiResponse<List<ProductAttribute>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listWithTemplateCounts());
+    List<String> visibleScopes = new ArrayList<>();
+    for (String scope : List.of("shared", "finished", "accessory")) {
+      if (permissionGuard.hasPermission(scopePermissionPrefix(scope) + ".view")) {
+        visibleScopes.add(scope);
+      }
+    }
+    return ApiResponse.ok(service.listWithTemplateCounts(visibleScopes));
   }
 
   @PostMapping
   public ApiResponse<ProductAttribute> create(@Valid @RequestBody ProductAttribute attribute) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
+    requireAttributePermission(attribute.getScope(), "create");
     return ApiResponse.ok(service.createAttribute(attribute));
   }
 
@@ -42,13 +49,34 @@ public class ProductAttributeController {
   public ApiResponse<ProductAttribute> updateStatus(
       @PathVariable Long id,
       @Valid @RequestBody ProductAttributeStatusRequest request) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+    ProductAttribute existing = requireAttribute(id);
+    requireAttributePermission(existing.getScope(), "toggle-status");
     return ApiResponse.ok(service.updateStatus(id, request.status()));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    ProductAttribute existing = requireAttribute(id);
+    requireAttributePermission(existing.getScope(), "delete");
     return ApiResponse.ok(service.removeById(id));
+  }
+
+  private ProductAttribute requireAttribute(Long id) {
+    ProductAttribute attribute = service.getById(id);
+    if (attribute == null) {
+      throw new IllegalArgumentException("属性不存在或已被删除");
+    }
+    return attribute;
+  }
+
+  private void requireAttributePermission(String scope, String operation) {
+    permissionGuard.requirePermission(scopePermissionPrefix(scope) + "." + operation);
+  }
+
+  private String scopePermissionPrefix(String scope) {
+    if (!List.of("shared", "finished", "accessory").contains(scope)) {
+      throw new IllegalArgumentException("属性类型无效");
+    }
+    return PERMISSION_PREFIX + "." + scope;
   }
 }

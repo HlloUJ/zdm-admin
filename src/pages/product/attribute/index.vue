@@ -12,7 +12,7 @@
           <template #toolbar>
             <div class="list-controls">
               <div v-if="!lockedScope" class="scope-controls">
-                <t-tabs v-model="activeScope" :list="scopeTabs" />
+                <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
                 <div class="source-caption">{{ sourceDescription }}</div>
               </div>
               <t-form :data="searchForm" label-width="84px" colon>
@@ -126,6 +126,7 @@ import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
@@ -155,25 +156,34 @@ interface Attribute {
 const route = useRoute();
 const attributePermissionPrefix = 'admin.product-data-center.attribute';
 const loginUser = computed(() => getLoginUser());
-const canCreateAttribute = computed(() => hasPermission(loginUser.value, `${attributePermissionPrefix}.create`));
-const canToggleAttributeStatus = computed(() =>
-  hasPermission(loginUser.value, `${attributePermissionPrefix}.toggle-status`),
-);
-const canDeleteAttribute = computed(() => hasPermission(loginUser.value, `${attributePermissionPrefix}.delete`));
-const resolveScope = (value: unknown): Scope =>
-  value === 'finished' || value === 'accessory' || value === 'shared' ? value : 'shared';
-const activeScope = ref<Scope>(resolveScope(route.query.scope));
-const lockedScope = computed(
-  () => route.query.scope === 'finished' || route.query.scope === 'accessory' || route.query.scope === 'shared',
-);
-const pageTitle = computed(
-  () => ({ shared: '共享基础属性库', finished: '成品现货属性库', accessory: '配件属性库' })[activeScope.value],
-);
-const scopeTabs = [
+const attributeScopeTabs: { label: string; value: Scope }[] = [
   { label: '共享基础属性', value: 'shared' },
   { label: '成品现货专属属性', value: 'finished' },
   { label: '配件专属属性', value: 'accessory' },
 ];
+const resolveScope = (value: unknown): Scope =>
+  value === 'finished' || value === 'accessory' || value === 'shared' ? value : 'shared';
+const activeScope = ref<Scope>(resolveScope(route.query.scope));
+const {
+  visibleTabs: scopeTabs,
+  showTabRail: showScopeTabRail,
+  resolveAccessibleTab: resolveAccessibleScope,
+} = usePermissionTabs({
+  tabs: attributeScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) => hasPermission(loginUser.value, `${attributePermissionPrefix}.${tab.value}.view`),
+});
+const lockedScope = computed(
+  () => route.query.scope === 'finished' || route.query.scope === 'accessory' || route.query.scope === 'shared',
+);
+const hasAttributeAction = (action: string) =>
+  hasPermission(loginUser.value, `${attributePermissionPrefix}.${activeScope.value}.${action}`);
+const canCreateAttribute = computed(() => hasAttributeAction('create'));
+const canToggleAttributeStatus = computed(() => hasAttributeAction('toggle-status'));
+const canDeleteAttribute = computed(() => hasAttributeAction('delete'));
+const pageTitle = computed(
+  () => ({ shared: '共享基础属性库', finished: '成品现货属性库', accessory: '配件属性库' })[activeScope.value],
+);
 const sourceDescription = computed(
   () =>
     ({
@@ -355,7 +365,7 @@ const handleConfirm = async () => {
 watch(
   () => route.query.scope,
   (scope) => {
-    activeScope.value = resolveScope(scope);
+    activeScope.value = resolveAccessibleScope(resolveScope(scope)) ?? activeScope.value;
     pagination.current = 1;
   },
 );

@@ -3,7 +3,9 @@ package com.zdm.platform.catalog;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +22,14 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
     this.identityProvider = identityProvider;
   }
 
-  public List<ProductAttribute> listWithTemplateCounts() {
-    return baseMapper.selectWithTemplateCounts();
+  public List<ProductAttribute> listWithTemplateCounts(Collection<String> scopes) {
+    if (scopes.isEmpty()) {
+      return List.of();
+    }
+    Set<String> visibleScopes = Set.copyOf(scopes);
+    return baseMapper.selectWithTemplateCounts().stream()
+        .filter(attribute -> visibleScopes.contains(attribute.getScope()))
+        .toList();
   }
 
   @Transactional
