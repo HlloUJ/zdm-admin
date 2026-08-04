@@ -30,6 +30,7 @@
                     <div
                       v-if="row.node.children.length"
                       class="category-node category-node-parent"
+                      :class="{ 'category-node-stopped': row.node.status === 'disabled' }"
                       :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
                     >
                       <t-button
@@ -43,18 +44,27 @@
                         <t-icon :name="isCategoryExpanded(row.node.id) ? 'chevron-down' : 'chevron-right'" />
                       </t-button>
                       <span class="category-name">{{ row.node.name }}</span>
+                      <t-tag v-if="row.node.status === 'disabled'" class="category-status" size="small" variant="light">
+                        停用
+                      </t-tag>
                     </div>
                     <button
                       v-else
                       type="button"
                       class="category-node category-node-leaf"
-                      :class="{ active: row.node.id === selectedCategoryId }"
-                      :disabled="row.node.status === 'disabled'"
+                      :aria-label="row.node.name"
+                      :class="{
+                        active: row.node.id === selectedCategoryId,
+                        'category-node-stopped': row.node.status === 'disabled',
+                      }"
                       :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
                       @click="selectLeafCategory(row.node)"
                     >
                       <span class="expand-placeholder"></span>
                       <span class="category-name">{{ row.node.name }}</span>
+                      <t-tag v-if="row.node.status === 'disabled'" class="category-status" size="small" variant="light">
+                        停用
+                      </t-tag>
                     </button>
                   </template>
                   <div v-if="!visibleCategoryRows.length && !loading" class="category-empty">暂无分类</div>
@@ -67,7 +77,7 @@
                     <h2>{{ selectedCategoryId ? `${selectedCategoryName}属性模板` : '属性模板' }}</h2>
                     <p>{{ selectedCategoryId ? selectedCategoryPath : '请在左侧选择末级分类' }}</p>
                   </div>
-                  <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
+                  <t-button theme="primary" :disabled="!canBindAttribute" @click="openBindDialog">
                     <template #icon><t-icon name="add" /></template>绑定属性
                   </t-button>
                 </div>
@@ -279,10 +289,11 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
 ];
 
-const selectedCategoryName = computed(() => {
-  const category = categories.value.find((item) => item.id === selectedCategoryId.value);
-  return category?.name ?? '未选择分类';
-});
+const selectedCategory = computed(() => categories.value.find((item) => item.id === selectedCategoryId.value));
+const selectedCategoryName = computed(() => selectedCategory.value?.name ?? '未选择分类');
+const canBindAttribute = computed(
+  () => Boolean(selectedCategory.value) && selectedCategory.value?.status !== 'disabled',
+);
 
 const selectedCategoryPath = computed(() => {
   if (!selectedCategoryId.value) return '未选择分类';
@@ -300,7 +311,7 @@ const selectedCategoryPath = computed(() => {
 const scopedCategories = computed(() =>
   categories.value
     .filter((item) => item.scope === activeScope.value)
-    .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id),
+    .sort((first, second) => categoryCreatedAtTime(second) - categoryCreatedAtTime(first) || second.id - first.id),
 );
 
 const categoryTree = computed(() => buildCategoryTree(undefined));
@@ -371,6 +382,12 @@ function hasCategoryChildren(categoryId: number) {
   return scopedCategories.value.some((item) => item.parentId === categoryId);
 }
 
+function categoryCreatedAtTime(category: ProductCategoryRecord) {
+  if (!category.createdAt) return 0;
+  const timestamp = new Date(category.createdAt).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
 function buildCategoryTree(parentId: number | undefined): CategoryTreeNode[] {
   return scopedCategories.value
     .filter((item) => (item.parentId ?? undefined) === parentId)
@@ -400,7 +417,7 @@ function toggleCategory(categoryId: number) {
 }
 
 function selectLeafCategory(category: CategoryTreeNode) {
-  if (category.children.length || category.status === 'disabled') return;
+  if (category.children.length) return;
   selectedCategoryId.value = category.id;
   reset();
 }
@@ -431,9 +448,7 @@ function toPayload(row: BindingRow): CategoryAttributePayload {
 
 function syncSelectedCategory() {
   const selectedCategory = scopedCategories.value.find((item) => item.id === selectedCategoryId.value);
-  const stillAvailable = Boolean(
-    selectedCategory && selectedCategory.status !== 'disabled' && !hasCategoryChildren(selectedCategory.id),
-  );
+  const stillAvailable = Boolean(selectedCategory && !hasCategoryChildren(selectedCategory.id));
   if (!stillAvailable) selectedCategoryId.value = undefined;
   pagination.current = 1;
 }
@@ -477,6 +492,10 @@ function handlePaginationChange(pageInfo: PageInfo) {
 function openBindDialog() {
   if (!selectedCategoryId.value) {
     MessagePlugin.warning('请选择分类');
+    return;
+  }
+  if (!canBindAttribute.value) {
+    MessagePlugin.warning('已停用分类不可绑定属性');
     return;
   }
   bindForm.attributeId = undefined;
@@ -636,6 +655,10 @@ onMounted(loadData);
   gap: var(--td-comp-margin-xs);
   padding-right: var(--td-comp-paddingLR-s);
   color: var(--td-text-color-primary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
   background: transparent;
   border: 0;
   text-align: left;
@@ -645,15 +668,16 @@ onMounted(loadData);
   cursor: pointer;
 }
 
-.category-node-leaf:hover:not(:disabled),
+.category-node-leaf:hover,
 .category-node-leaf.active {
   color: var(--td-brand-color);
   background: var(--td-brand-color-light);
 }
 
-.category-node-leaf:disabled {
+.category-node-stopped,
+.category-node-stopped:hover,
+.category-node-stopped.active {
   color: var(--td-text-color-disabled);
-  cursor: not-allowed;
 }
 
 .expand-button,
@@ -669,6 +693,12 @@ onMounted(loadData);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.category-status {
+  flex-shrink: 0;
+  margin-left: var(--td-comp-margin-xs);
+  color: var(--td-text-color-disabled);
 }
 
 .category-empty {
