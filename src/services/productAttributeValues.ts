@@ -7,6 +7,7 @@ export interface ProductAttributeValueRecord {
   value: string;
   code: string;
   status?: 'enabled' | 'disabled';
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
 }

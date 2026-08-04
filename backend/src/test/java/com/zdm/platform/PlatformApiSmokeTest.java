@@ -102,6 +102,9 @@ class PlatformApiSmokeTest {
     Integer productAttributeWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM product_attributes WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
+    Integer productAttributeValueWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attribute_values WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
     Integer productAttributeGlobalUniqueIndexCount = jdbcTemplate.queryForObject(
         """
         SELECT COUNT(*)
@@ -123,7 +126,7 @@ class PlatformApiSmokeTest {
         """,
         Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(33);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(34);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
@@ -132,6 +135,7 @@ class PlatformApiSmokeTest {
     assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(sampleProductAttributeCount).isZero();
     assertThat(productAttributeWithoutCreatorCount).isZero();
+    assertThat(productAttributeValueWithoutCreatorCount).isZero();
     assertThat(productAttributeGlobalUniqueIndexCount).isEqualTo(1);
     assertThat(legacyProductAttributeUniqueIndexCount).isZero();
     assertThat(adminManagerPermissions)
@@ -233,6 +237,125 @@ class PlatformApiSmokeTest {
         Integer.class,
         attributeId);
     assertThat(deletedCount).isZero();
+  }
+
+  @Test
+  void productAttributeValueCrudIgnoresDataScopeAndTracksCreator() throws Exception {
+    long accountId = 9071L;
+    long employeeId = 9071L;
+    long roleId = 9071L;
+    long attributeId = 9071L;
+    long otherValueId = 9071L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629071",
+        "属性值操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '属性值操作员', '15926629071', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '属性值全局操作测试角色', 'ATTRIBUTE_VALUE_GLOBAL_OPERATOR_TEST', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.product-data-center.attribute-value.view,'
+          'admin.product-data-center.attribute-value.create,'
+          'admin.product-data-center.attribute-value.edit,'
+          'admin.product-data-center.attribute-value.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attributes
+          (id, scope, name, value_type, attribute_role, status, created_by_name)
+        VALUES (?, 'shared', '属性值全量查询测试属性', 'select', 'basic', 'enabled', '其他管理员')
+        """,
+        attributeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attribute_values
+          (id, attribute_id, scope, value, code, status, created_by_name)
+        VALUES (?, ?, 'shared', '其他管理员维护的属性值', 'other-admin-value', 'enabled', '其他管理员')
+        """,
+        otherValueId,
+        attributeId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/product-attribute-values")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == %d)].createdByName".formatted(otherValueId),
+            hasItem("其他管理员")));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/product-attribute-values")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "attributeId":%d,
+                  "scope":"shared",
+                  "value":"当前账号维护的属性值",
+                  "code":"current-admin-value",
+                  "status":"enabled"
+                }
+                """.formatted(attributeId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value("属性值操作员"))
+        .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
+        .andReturn();
+    Integer createdValueId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id");
+    String persistedCreatorName = jdbcTemplate.queryForObject(
+        "SELECT created_by_name FROM product_attribute_values WHERE id = ?",
+        String.class,
+        createdValueId);
+    assertThat(persistedCreatorName).isEqualTo("属性值操作员");
+
+    mockMvc.perform(put("/api/admin/product-attribute-values/{id}", createdValueId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "attributeId":%d,
+                  "scope":"shared",
+                  "value":"当前账号维护的属性值",
+                  "code":"current-admin-value",
+                  "status":"disabled",
+                  "createdByName":"伪造创建人"
+                }
+                """.formatted(attributeId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"))
+        .andExpect(jsonPath("$.data.createdByName").value("属性值操作员"));
+
+    mockMvc.perform(delete("/api/admin/product-attribute-values/{id}", createdValueId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
   }
 
   @Test

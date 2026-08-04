@@ -19,6 +19,8 @@ public class ProductAttributeValue extends BaseEntity {
   @NotBlank
   private String code;
 
+  private String createdByName;
+
   public Long getAttributeId() {
     return attributeId;
   }
@@ -49,5 +51,13 @@ public class ProductAttributeValue extends BaseEntity {
 
   public void setCode(String code) {
     this.code = code;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 }
