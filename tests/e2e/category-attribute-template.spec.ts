@@ -268,6 +268,7 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(bindButton).toBeEnabled();
 
   const headers = main.getByRole('columnheader');
+  await expect(headers.nth(4)).toContainText('参与SKU组合');
   await expect(headers.nth(5)).toContainText('状态');
   await expect(headers.nth(6)).toContainText('发布');
   await expect(headers.nth(7)).toContainText('绑定人');

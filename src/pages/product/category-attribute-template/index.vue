@@ -319,7 +319,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 120 },
   { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
-  { colKey: 'skuFlag', title: 'SKU', width: 90, align: 'center' },
+  { colKey: 'skuFlag', title: '参与SKU组合', width: 130, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
   { colKey: 'publishStatus', title: '发布', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
