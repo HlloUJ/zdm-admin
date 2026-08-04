@@ -154,7 +154,7 @@
                         :theme="row.publishStatus === 'published' ? 'warning' : 'success'"
                         hover="color"
                         :disabled="savingId !== null"
-                        @click="row.publishStatus === 'published' ? togglePublish(row) : openPublishConfirm(row)"
+                        @click="openPublishConfirm(row)"
                       >
                         {{ row.publishStatus === 'published' ? '取消发布' : '发布' }}
                       </t-link>
@@ -225,7 +225,9 @@
       @confirm="handlePublishConfirm"
       @close="closePublishConfirm"
     >
-      是否发布属性【{{ publishTarget?.name }}】？
+      {{ publishTarget?.publishStatus === 'published' ? '是否取消发布' : '是否发布' }}属性【{{
+        publishTarget?.name
+      }}】？
     </t-dialog>
 
     <t-dialog
@@ -750,7 +752,7 @@ async function togglePublish(row: BindingRow) {
 }
 
 function openPublishConfirm(row: BindingRow) {
-  if (!canTogglePublish.value || savingId.value !== null || row.publishStatus === 'published') return;
+  if (!canTogglePublish.value || savingId.value !== null) return;
   publishTarget.value = row;
   publishConfirmVisible.value = true;
 }

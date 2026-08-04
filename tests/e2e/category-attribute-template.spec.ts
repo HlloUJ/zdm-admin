@@ -364,11 +364,21 @@ test('selects the first leaf and manages bindings from the template list', async
   expect(operationButtonTops).toHaveLength(2);
   expect(Math.max(...operationButtonTops) - Math.min(...operationButtonTops)).toBeLessThanOrEqual(1);
 
+  let unpublishRequestCount = 0;
+  await page.route('**/api/admin/category-attributes/1/unpublish', async (route) => {
+    unpublishRequestCount += 1;
+    await route.fallback();
+  });
   const unpublishRequestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/api/admin/category-attributes/1/unpublish') && request.method() === 'PUT',
   );
   await materialRow.getByText('取消发布', { exact: true }).click();
+  const unpublishDialog = page.locator('.t-dialog').filter({ hasText: '是否取消发布属性【材质】？' });
+  await expect(unpublishDialog).toBeVisible();
+  expect(unpublishRequestCount).toBe(0);
+  await unpublishDialog.getByRole('button', { name: '确认', exact: true }).click();
   await unpublishRequestPromise;
+  expect(unpublishRequestCount).toBe(1);
   await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
   await expect(materialRow.getByText('发布', { exact: true })).toBeVisible();
 
