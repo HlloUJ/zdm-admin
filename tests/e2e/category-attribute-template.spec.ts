@@ -228,9 +228,14 @@ test('selects the first leaf and manages bindings from the template list', async
   const statusFilter = templatePanel.locator('.t-form__item').filter({ hasText: '状态' });
   const statusFilterWidth = await statusFilter.evaluate((item) => item.getBoundingClientRect().width);
   const publishFilterWidth = await publishFilter.evaluate((item) => item.getBoundingClientRect().width);
-  expect(statusFilterWidth).toBeGreaterThanOrEqual(116);
-  expect(statusFilterWidth).toBeLessThanOrEqual(124);
+  expect(statusFilterWidth).toBeGreaterThanOrEqual(156);
+  expect(statusFilterWidth).toBeLessThanOrEqual(164);
   expect(publishFilterWidth).toBe(statusFilterWidth);
+  const toolbarButtonTops = await templatePanel
+    .locator('.template-toolbar .t-button')
+    .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
+  expect(toolbarButtonTops).toHaveLength(3);
+  expect(Math.max(...toolbarButtonTops) - Math.min(...toolbarButtonTops)).toBeLessThanOrEqual(1);
   await publishFilter.locator('.t-select').click();
   await page.getByRole('listitem', { name: '已发布' }).click();
   await templatePanel.getByRole('button', { name: '查询', exact: true }).click();

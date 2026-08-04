@@ -86,14 +86,6 @@
                           </t-select>
                         </t-form-item>
                       </div>
-                      <div class="filter-actions">
-                        <t-button theme="primary" @click="search">
-                          <template #icon><t-icon name="search" /></template>查询
-                        </t-button>
-                        <t-button theme="default" variant="base" @click="reset">
-                          <template #icon><t-icon name="refresh" /></template>重置
-                        </t-button>
-                      </div>
                     </div>
                   </t-form>
                   <div class="template-toolbar">
@@ -105,6 +97,14 @@
                     >
                       <template #icon><t-icon name="add" /></template>绑定属性
                     </t-button>
+                    <div class="filter-actions">
+                      <t-button theme="primary" @click="search">
+                        <template #icon><t-icon name="search" /></template>查询
+                      </t-button>
+                      <t-button theme="default" variant="base" @click="reset">
+                        <template #icon><t-icon name="refresh" /></template>重置
+                      </t-button>
+                    </div>
                   </div>
                 </div>
 
@@ -925,8 +925,8 @@ onMounted(loadData);
 
 .filter-fields :deep(.status-filter-item),
 .filter-fields :deep(.publish-filter-item) {
-  flex: 0 0 120px;
-  width: 120px;
+  flex: 0 0 160px;
+  width: 160px;
 }
 
 .filter-fields :deep(.t-input),
@@ -936,6 +936,7 @@ onMounted(loadData);
 
 .filter-actions {
   display: flex;
+  margin-left: auto;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
 }
