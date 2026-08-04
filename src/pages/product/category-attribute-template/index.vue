@@ -121,21 +121,49 @@
                 >
                   <template #drag><t-icon name="move" class="binding-drag-icon" title="拖拽排序" /></template>
                   <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
+                  <template #attributeRole="{ row }">
+                    <t-select
+                      class="attribute-role-select"
+                      :model-value="row.attributeRole || undefined"
+                      :loading="savingId === row.id && savingField === 'attributeRole'"
+                      :disabled="!canEditBinding || row.publishStatus === 'published'"
+                      clearable
+                      placeholder="请选择"
+                      size="small"
+                      @change="changeAttributeRole(row, $event)"
+                    >
+                      <t-option label="商品属性" value="product" />
+                      <t-option label="销售属性" value="sales" />
+                    </t-select>
+                  </template>
                   <template #requiredFlag="{ row }">
                     <t-switch
                       :model-value="row.requiredFlag"
                       :loading="savingId === row.id && savingField === 'requiredFlag'"
-                      :disabled="!canEditBinding"
+                      :disabled="!canEditBinding || row.publishStatus === 'published'"
                       @change="changeFlag(row, 'requiredFlag', $event)"
                     />
                   </template>
                   <template #skuFlag="{ row }">
-                    <t-switch
-                      :model-value="row.skuFlag"
-                      :loading="savingId === row.id && savingField === 'skuFlag'"
-                      :disabled="!canEditBinding"
-                      @change="changeFlag(row, 'skuFlag', $event)"
-                    />
+                    <span
+                      class="sku-switch-cell"
+                      :title="
+                        row.attributeRole !== 'sales'
+                          ? '只有销售属性才能参与SKU组合'
+                          : row.publishStatus === 'published'
+                            ? '请先取消发布后再修改属性配置'
+                            : ''
+                      "
+                    >
+                      <t-switch
+                        :model-value="row.skuFlag"
+                        :loading="savingId === row.id && savingField === 'skuFlag'"
+                        :disabled="
+                          !canEditBinding || row.attributeRole !== 'sales' || row.publishStatus === 'published'
+                        "
+                        @change="changeFlag(row, 'skuFlag', $event)"
+                      />
+                    </span>
                   </template>
                   <template #status="{ row }">
                     <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
@@ -216,6 +244,19 @@
     </AdminDialog>
 
     <t-dialog
+      v-model:visible="roleChangeConfirmVisible"
+      header="系统提示"
+      width="420px"
+      placement="center"
+      confirm-btn="确认"
+      cancel-btn="取消"
+      @confirm="handleRoleChangeConfirm"
+      @close="closeRoleChangeConfirm"
+    >
+      {{ roleChangeConfirmText }}
+    </t-dialog>
+
+    <t-dialog
       v-model:visible="publishConfirmVisible"
       header="系统提示"
       width="420px"
@@ -271,6 +312,7 @@ import { listProductCategories, type ProductCategoryRecord } from '@/services/pr
 type Scope = 'finished' | 'accessory';
 type Status = 'enabled' | 'disabled';
 type PublishStatus = 'published' | 'unpublished';
+type AttributeRole = '' | 'product' | 'sales';
 
 const MAX_SKU_ATTRIBUTE_COUNT = 4;
 const SKU_ATTRIBUTE_LIMIT_MESSAGE = '参与SKU组合的属性最多只能开启4个';
@@ -282,6 +324,7 @@ interface BindingRow {
   name: string;
   scope: ProductAttributeRecord['scope'];
   valueType: ProductAttributeRecord['valueType'];
+  attributeRole: AttributeRole;
   requiredFlag: boolean;
   skuFlag: boolean;
   sortOrder: number;
@@ -321,7 +364,7 @@ const scopeTabs = [
 const pageTitle = computed(() => (activeScope.value === 'finished' ? '成品现货发布模板' : '配件发布模板'));
 const loading = ref(false);
 const savingId = ref<number | null>(null);
-const savingField = ref<'requiredFlag' | 'skuFlag' | null>(null);
+const savingField = ref<'attributeRole' | 'requiredFlag' | 'skuFlag' | null>(null);
 const categories = ref<ProductCategoryRecord[]>([]);
 const attributes = ref<ProductAttributeRecord[]>([]);
 const bindings = ref<CategoryAttributeRecord[]>([]);
@@ -331,6 +374,9 @@ const categoryKeyword = ref('');
 const appliedCategoryKeyword = ref('');
 const bindDialogVisible = ref(false);
 const bindSearchKeyword = ref('');
+const roleChangeConfirmVisible = ref(false);
+const roleChangeTarget = ref<BindingRow | null>(null);
+const roleChangeNextRole = ref<AttributeRole>('');
 const publishConfirmVisible = ref(false);
 const publishTarget = ref<BindingRow | null>(null);
 const deleteConfirmVisible = ref(false);
@@ -345,6 +391,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...(canEditBinding.value ? [{ colKey: 'drag', title: '', width: 44, align: 'center' as const }] : []),
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 120 },
+  { colKey: 'attributeRole', title: '属性角色', width: 140, align: 'center' },
   { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
   { colKey: 'skuFlag', title: '参与SKU组合', width: 160, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
@@ -408,6 +455,9 @@ const allBindingRows = computed<BindingRow[]>(() => {
         name: attribute?.name ?? `属性 #${item.attributeId}`,
         scope: attribute?.scope ?? 'shared',
         valueType: attribute?.valueType ?? 'text',
+        attributeRole: (item.attributeRole === 'product' || item.attributeRole === 'sales'
+          ? item.attributeRole
+          : '') as AttributeRole,
         requiredFlag: Boolean(item.requiredFlag),
         skuFlag: Boolean(item.skuFlag),
         sortOrder: item.sortOrder ?? 0,
@@ -558,6 +608,7 @@ function toPayload(row: BindingRow): CategoryAttributePayload {
   return {
     categoryId: row.categoryId,
     attributeId: row.attributeId,
+    attributeRole: row.attributeRole || null,
     requiredFlag: row.requiredFlag,
     skuFlag: row.skuFlag,
     sortOrder: row.sortOrder,
@@ -666,7 +717,7 @@ async function submitBind() {
 async function persistRow(
   row: BindingRow,
   patch: Partial<BindingRow>,
-  field: 'requiredFlag' | 'skuFlag' | null = null,
+  field: 'attributeRole' | 'requiredFlag' | 'skuFlag' | null = null,
 ) {
   if (!canEditBinding.value) return;
   savingId.value = row.id;
@@ -691,18 +742,70 @@ function getSwitchValue(value: unknown) {
   return Boolean(value);
 }
 
+function getAttributeRoleValue(value: unknown): AttributeRole {
+  if (value === 'product' || value === 'sales') return value;
+  if (value && typeof value === 'object' && 'value' in value) {
+    return getAttributeRoleValue((value as { value?: unknown }).value);
+  }
+  return '';
+}
+
+function getCurrentBindingRow(row: BindingRow) {
+  return allBindingRows.value.find((item) => item.id === row.id) ?? row;
+}
+
+function changeAttributeRole(row: BindingRow, value: unknown) {
+  const currentRow = getCurrentBindingRow(row);
+  if (!canEditBinding.value || currentRow.publishStatus === 'published') return;
+  const nextRole = getAttributeRoleValue(value);
+  if (nextRole === currentRow.attributeRole) return;
+  if (currentRow.skuFlag && nextRole !== 'sales') {
+    roleChangeTarget.value = currentRow;
+    roleChangeNextRole.value = nextRole;
+    roleChangeConfirmVisible.value = true;
+    return;
+  }
+  persistRow(currentRow, { attributeRole: nextRole }, 'attributeRole');
+}
+
+const roleChangeConfirmText = computed(() => {
+  const nextRoleLabel = roleChangeNextRole.value === 'product' ? '商品属性' : '未选择角色';
+  return `切换为${nextRoleLabel}后将关闭“参与SKU组合”，是否继续？`;
+});
+
+function closeRoleChangeConfirm() {
+  roleChangeConfirmVisible.value = false;
+  roleChangeTarget.value = null;
+  roleChangeNextRole.value = '';
+}
+
+async function handleRoleChangeConfirm() {
+  if (!roleChangeTarget.value) return;
+  await persistRow(
+    roleChangeTarget.value,
+    { attributeRole: roleChangeNextRole.value, skuFlag: false },
+    'attributeRole',
+  );
+  closeRoleChangeConfirm();
+}
+
 function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: unknown) {
+  const currentRow = getCurrentBindingRow(row);
   const nextValue = getSwitchValue(value);
+  if (field === 'skuFlag' && nextValue && currentRow.attributeRole !== 'sales') {
+    MessagePlugin.error('只有销售属性才能参与SKU组合');
+    return;
+  }
   if (
     field === 'skuFlag' &&
     nextValue &&
-    !row.skuFlag &&
+    !currentRow.skuFlag &&
     allBindingRows.value.filter((item) => item.skuFlag).length >= MAX_SKU_ATTRIBUTE_COUNT
   ) {
     MessagePlugin.error(SKU_ATTRIBUTE_LIMIT_MESSAGE);
     return;
   }
-  persistRow(row, { [field]: nextValue }, field);
+  persistRow(currentRow, { [field]: nextValue }, field);
 }
 
 async function handleDragSort(context: { current: BindingRow; target: BindingRow }) {
@@ -753,6 +856,10 @@ async function togglePublish(row: BindingRow) {
 
 function openPublishConfirm(row: BindingRow) {
   if (!canTogglePublish.value || savingId.value !== null) return;
+  if (row.publishStatus === 'unpublished' && !row.attributeRole) {
+    MessagePlugin.error('请先选择属性角色');
+    return;
+  }
   publishTarget.value = row;
   publishConfirmVisible.value = true;
 }
@@ -943,6 +1050,15 @@ onMounted(loadData);
 
 .bind-attribute-table {
   width: 100%;
+}
+
+.attribute-role-select {
+  width: 120px;
+}
+
+.sku-switch-cell {
+  display: inline-flex;
+  align-items: center;
 }
 
 .filter-row {

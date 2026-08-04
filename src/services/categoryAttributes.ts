@@ -4,6 +4,7 @@ export interface CategoryAttributeRecord {
   id: number;
   categoryId: number;
   attributeId: number;
+  attributeRole?: 'product' | 'sales' | null;
   requiredFlag?: boolean;
   skuFlag?: boolean;
   sortOrder?: number;
@@ -17,6 +18,7 @@ export interface CategoryAttributeRecord {
 export interface CategoryAttributePayload {
   categoryId: number;
   attributeId: number;
+  attributeRole?: 'product' | 'sales' | null;
   requiredFlag?: boolean;
   skuFlag?: boolean;
   sortOrder?: number;

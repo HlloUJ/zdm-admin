@@ -113,6 +113,7 @@ class CategoryAttributeApiTest {
                 {
                   "categoryId":9901,
                   "attributeId":9901,
+                  "attributeRole":"sales",
                   "requiredFlag":false,
                   "skuFlag":true,
                   "sortOrder":2,
@@ -122,6 +123,7 @@ class CategoryAttributeApiTest {
                 }
                 """))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.attributeRole").value("sales"))
         .andExpect(jsonPath("$.data.createdByName").value(creatorName))
         .andExpect(jsonPath("$.data.status").value("disabled"))
         .andExpect(jsonPath("$.data.publishStatus").value("unpublished"));
@@ -130,6 +132,23 @@ class CategoryAttributeApiTest {
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.publishStatus").value("published"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9901,
+                  "attributeId":9901,
+                  "attributeRole":"product",
+                  "requiredFlag":false,
+                  "skuFlag":false,
+                  "sortOrder":2,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先取消发布后再修改属性配置"));
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}/unpublish", categoryAttributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
@@ -176,12 +195,12 @@ class CategoryAttributeApiTest {
     jdbcTemplate.update(
         """
         INSERT INTO category_attributes
-          (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
+          (category_id, attribute_id, attribute_role, required_flag, sku_flag, sort_order, status, created_by_name)
         VALUES
-          (9930, 9930, 0, 1, 1, 'enabled', '韩健'),
-          (9930, 9931, 0, 1, 2, 'enabled', '韩健'),
-          (9930, 9932, 0, 1, 3, 'enabled', '韩健'),
-          (9930, 9933, 0, 1, 4, 'enabled', '韩健')
+          (9930, 9930, 'sales', 0, 1, 1, 'enabled', '韩健'),
+          (9930, 9931, 'sales', 0, 1, 2, 'enabled', '韩健'),
+          (9930, 9932, 'sales', 0, 1, 3, 'enabled', '韩健'),
+          (9930, 9933, 'sales', 0, 1, 4, 'enabled', '韩健')
         """);
     String token = TokenAuthenticationFilter.createAccountToken(1L);
 
@@ -192,6 +211,24 @@ class CategoryAttributeApiTest {
                 {
                   "categoryId":9930,
                   "attributeId":9934,
+                  "attributeRole":"product",
+                  "requiredFlag":false,
+                  "skuFlag":true,
+                  "sortOrder":5,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("只有销售属性才能参与SKU组合"));
+
+    mockMvc.perform(post("/api/admin/category-attributes")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9930,
+                  "attributeId":9934,
+                  "attributeRole":"sales",
                   "requiredFlag":false,
                   "skuFlag":true,
                   "sortOrder":5,
@@ -218,6 +255,7 @@ class CategoryAttributeApiTest {
                 {
                   "categoryId":9930,
                   "attributeId":9934,
+                  "attributeRole":"sales",
                   "requiredFlag":false,
                   "skuFlag":true,
                   "sortOrder":5,
@@ -351,6 +389,28 @@ class CategoryAttributeApiTest {
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", batchBindingId)
             .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先选择属性角色"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", batchBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9920,
+                  "attributeId":9921,
+                  "attributeRole":"product",
+                  "requiredFlag":false,
+                  "skuFlag":false,
+                  "sortOrder":2,
+                  "status":"disabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.attributeRole").value("product"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", batchBindingId)
+            .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.publishStatus").value("published"));
     assertThat(jdbcTemplate.queryForObject(
@@ -370,6 +430,7 @@ class CategoryAttributeApiTest {
                 {
                   "categoryId":9920,
                   "attributeId":9920,
+                  "attributeRole":"sales",
                   "requiredFlag":false,
                   "skuFlag":true,
                   "sortOrder":1,
