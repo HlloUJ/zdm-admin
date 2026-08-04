@@ -79,6 +79,12 @@
                             <t-option label="停用" value="disabled" />
                           </t-select>
                         </t-form-item>
+                        <t-form-item label="发布">
+                          <t-select v-model="searchForm.publishStatus" clearable placeholder="全部">
+                            <t-option label="已发布" value="published" />
+                            <t-option label="未发布" value="unpublished" />
+                          </t-select>
+                        </t-form-item>
                       </div>
                       <div class="filter-actions">
                         <t-button theme="primary" @click="search">
@@ -249,6 +255,7 @@ import { listProductCategories, type ProductCategoryRecord } from '@/services/pr
 
 type Scope = 'finished' | 'accessory';
 type Status = 'enabled' | 'disabled';
+type PublishStatus = 'published' | 'unpublished';
 
 interface BindingRow {
   id: number;
@@ -261,7 +268,7 @@ interface BindingRow {
   skuFlag: boolean;
   sortOrder: number;
   status: Status;
-  publishStatus: 'published' | 'unpublished';
+  publishStatus: PublishStatus;
   createdByName: string;
   createdAt: string;
 }
@@ -308,8 +315,8 @@ const bindDialogVisible = ref(false);
 const bindSearchKeyword = ref('');
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
-const searchForm = reactive({ keyword: '', status: '' as Status | '' });
-const appliedSearch = reactive({ keyword: '', status: '' as Status | '' });
+const searchForm = reactive({ keyword: '', status: '' as Status | '', publishStatus: '' as PublishStatus | '' });
+const appliedSearch = reactive({ keyword: '', status: '' as Status | '', publishStatus: '' as PublishStatus | '' });
 const pagination = reactive({ current: 1, pageSize: 10 });
 const pageSizeOptions = [10, 20, 50];
 const bindForm = reactive({ attributeIds: [] as number[] });
@@ -319,7 +326,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 120 },
   { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
-  { colKey: 'skuFlag', title: '参与SKU组合', width: 130, align: 'center' },
+  { colKey: 'skuFlag', title: '参与SKU组合', width: 160, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
   { colKey: 'publishStatus', title: '发布', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
@@ -400,7 +407,8 @@ const bindingRows = computed(() =>
     const keyword = appliedSearch.keyword.trim().toLowerCase();
     return (
       (!keyword || item.name.toLowerCase().includes(keyword)) &&
-      (!appliedSearch.status || item.status === appliedSearch.status)
+      (!appliedSearch.status || item.status === appliedSearch.status) &&
+      (!appliedSearch.publishStatus || item.publishStatus === appliedSearch.publishStatus)
     );
   }),
 );
@@ -572,6 +580,7 @@ function search() {
 function reset() {
   searchForm.keyword = '';
   searchForm.status = '';
+  searchForm.publishStatus = '';
   search();
 }
 
