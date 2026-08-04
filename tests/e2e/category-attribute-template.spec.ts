@@ -207,7 +207,11 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(materialRow).toContainText('韩健');
   await expect(materialRow.getByText('停用', { exact: true })).toHaveCount(1);
   await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
-  await expect(materialRow.getByText('发布', { exact: true })).toBeVisible();
+  await expect(materialRow.locator('.t-tag').filter({ hasText: '未发布' })).toHaveClass(/t-tag--danger/);
+  const publishButton = materialRow.getByText('发布', { exact: true });
+  await expect(publishButton).toBeVisible();
+  await expect(publishButton).toHaveClass(/t-link--hover-color/);
+  await expect(publishButton).not.toHaveClass(/t-link--hover-underline/);
   await expect(materialRow.getByText('移除', { exact: true })).toBeVisible();
   await expect(materialRow.getByText('启用', { exact: true })).toHaveCount(0);
   await expect(materialRow.getByText('删除', { exact: true })).toHaveCount(0);
@@ -279,7 +283,11 @@ test('selects the first leaf and manages bindings from the template list', async
   await materialRow.getByText('发布', { exact: true }).click();
   await publishRequestPromise;
   await expect(materialRow.getByText('已发布', { exact: true })).toHaveCount(1);
-  await expect(materialRow.getByText('取消发布', { exact: true })).toBeVisible();
+  await expect(materialRow.locator('.t-tag').filter({ hasText: '已发布' })).toHaveClass(/t-tag--success/);
+  const unpublishButton = materialRow.getByText('取消发布', { exact: true });
+  await expect(unpublishButton).toBeVisible();
+  await expect(unpublishButton).toHaveClass(/t-link--hover-color/);
+  await expect(unpublishButton).not.toHaveClass(/t-link--hover-underline/);
   const operationButtonTops = await materialRow
     .locator('.table-actions .t-link')
     .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().top));
