@@ -160,6 +160,8 @@ interface Value {
   name: string;
   useCount: number;
   status: Status;
+  createdByName: string;
+  createdAt: string;
 }
 
 const route = useRoute();
@@ -221,6 +223,8 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'attribute', title: '所属属性', width: 160, align: 'left' },
   { colKey: 'useCount', title: '被引用次数', width: 150, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
 ];
 const filteredData = computed(() =>
@@ -238,6 +242,14 @@ const pageData = computed(() =>
 const totalCount = computed(() => filteredData.value.length);
 const normalizeStatus = (status?: ProductAttributeValueRecord['status']): Status =>
   status === 'disabled' ? 'disabled' : 'enabled';
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 const toAttributeOption = (record: ProductAttributeRecord): AttributeOption => ({
   code: String(record.id),
   name: record.name,
@@ -253,6 +265,8 @@ const toValue = (record: ProductAttributeValueRecord): Value => ({
   name: record.value,
   useCount: 0,
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName || '-',
+  createdAt: formatDateTime(record.createdAt),
 });
 const createValueCode = (attributeId: string, name: string) =>
   `attr-value-${attributeId}-${name.trim().length}-${Date.now()}`;
