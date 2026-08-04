@@ -102,8 +102,28 @@ class PlatformApiSmokeTest {
     Integer productAttributeWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM product_attributes WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
+    Integer productAttributeGlobalUniqueIndexCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = 'product_attributes'
+          AND index_name = 'uk_product_attributes_name'
+          AND non_unique = 0
+          AND column_name = 'name'
+        """,
+        Integer.class);
+    Integer legacyProductAttributeUniqueIndexCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = 'product_attributes'
+          AND index_name = 'uk_product_attributes_scope_name'
+        """,
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(32);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(33);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
@@ -112,6 +132,8 @@ class PlatformApiSmokeTest {
     assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(sampleProductAttributeCount).isZero();
     assertThat(productAttributeWithoutCreatorCount).isZero();
+    assertThat(productAttributeGlobalUniqueIndexCount).isEqualTo(1);
+    assertThat(legacyProductAttributeUniqueIndexCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -128,7 +150,7 @@ class PlatformApiSmokeTest {
             .contentType("application/json")
             .content("""
                 {
-                  "scope":"shared",
+                  "scope":"accessory",
                   "name":"%s",
                   "valueType":"select",
                   "attributeRole":"basic",
@@ -168,7 +190,7 @@ class PlatformApiSmokeTest {
                 }
                 """.formatted(attributeName)))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("当前属性库已存在同名属性"));
+        .andExpect(jsonPath("$.message").value("属性名称已存在"));
 
     jdbcTemplate.update(
         """

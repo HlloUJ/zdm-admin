@@ -12,7 +12,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper, ProductAttribute> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
-  private static final String DUPLICATE_NAME_MESSAGE = "当前属性库已存在同名属性";
+  private static final String DUPLICATE_NAME_MESSAGE = "属性名称已存在";
 
   private final CurrentIdentityProvider identityProvider;
 
@@ -28,6 +28,9 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   public ProductAttribute createAttribute(ProductAttribute attribute) {
     attribute.setId(null);
     attribute.setName(attribute.getName().trim());
+    if (lambdaQuery().eq(ProductAttribute::getName, attribute.getName()).count() > 0) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
+    }
     attribute.setCreatedByName(resolveCreatedByName());
     try {
       save(attribute);
