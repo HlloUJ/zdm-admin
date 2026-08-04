@@ -99,8 +99,11 @@ class PlatformApiSmokeTest {
           OR (id = 3 AND scope = 'accessory' AND name = '颜色')
         """,
         Integer.class);
+    Integer productAttributeWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attributes WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(31);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(32);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
@@ -108,6 +111,7 @@ class PlatformApiSmokeTest {
     assertThat(categoryWithoutCreatorCount).isZero();
     assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(sampleProductAttributeCount).isZero();
+    assertThat(productAttributeWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -116,6 +120,9 @@ class PlatformApiSmokeTest {
   @Test
   void productAttributeCrudPersistsToDatabaseAndReturnsTemplateCount() throws Exception {
     String attributeName = "数据库直连属性-" + System.nanoTime();
+    String creatorName = jdbcTemplate.queryForObject(
+        "SELECT display_name FROM accounts WHERE id = 1",
+        String.class);
     MvcResult createdResult = mockMvc.perform(post("/api/admin/product-attributes")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
@@ -129,6 +136,8 @@ class PlatformApiSmokeTest {
                 }
                 """.formatted(attributeName)))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
         .andReturn();
     Integer attributeId = com.jayway.jsonpath.JsonPath.read(
         createdResult.getResponse().getContentAsString(),
@@ -140,6 +149,11 @@ class PlatformApiSmokeTest {
         attributeId,
         attributeName);
     assertThat(persistedCount).isEqualTo(1);
+    String persistedCreatorName = jdbcTemplate.queryForObject(
+        "SELECT created_by_name FROM product_attributes WHERE id = ?",
+        String.class,
+        attributeId);
+    assertThat(persistedCreatorName).isEqualTo(creatorName);
 
     jdbcTemplate.update(
         """
@@ -165,11 +179,13 @@ class PlatformApiSmokeTest {
                   "name":"%s",
                   "valueType":"select",
                   "attributeRole":"basic",
-                  "status":"disabled"
+                  "status":"disabled",
+                  "createdByName":"不应覆盖"
                 }
                 """.formatted(updatedName)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value("disabled"));
+        .andExpect(jsonPath("$.data.status").value("disabled"))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName));
     String persistedName = jdbcTemplate.queryForObject(
         "SELECT name FROM product_attributes WHERE id = ?",
         String.class,
@@ -437,8 +453,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO product_attributes
-          (id, scope, name, value_type, attribute_role, status)
-        VALUES (9204, 'finished', '模板引用删除测试属性', 'select', 'basic', 'enabled')
+          (id, scope, name, value_type, attribute_role, status, created_by_name)
+        VALUES (9204, 'finished', '模板引用删除测试属性', 'select', 'basic', 'enabled', '韩健')
         """);
     jdbcTemplate.update(
         """

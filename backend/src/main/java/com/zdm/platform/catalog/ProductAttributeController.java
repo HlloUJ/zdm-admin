@@ -3,8 +3,13 @@ package com.zdm.platform.catalog;
 import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.PermissionGuard;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,5 +33,23 @@ public class ProductAttributeController extends AdminCrudController<ProductAttri
     permissionGuard.requireView(PERMISSION_PREFIX);
     permissionGuard.requireAllData();
     return ApiResponse.ok(service.listWithTemplateCounts());
+  }
+
+  @Override
+  @PostMapping
+  public ApiResponse<ProductAttribute> create(@Valid @RequestBody ProductAttribute attribute) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
+    permissionGuard.requireAllData();
+    return ApiResponse.ok(service.createAttribute(attribute));
+  }
+
+  @Override
+  @PutMapping("/{id}")
+  public ApiResponse<ProductAttribute> update(
+      @PathVariable Long id,
+      @Valid @RequestBody ProductAttribute attribute) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
+    permissionGuard.requireAllData();
+    return ApiResponse.ok(service.updateAttribute(id, attribute));
   }
 }

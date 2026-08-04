@@ -14,17 +14,22 @@
         </section>
         <AdminListLayout>
           <template #filters>
-            <t-form :data="searchForm" label-width="72px" colon>
+            <t-form :data="searchForm" label-width="84px" colon>
               <div class="filter-row">
                 <div class="filter-fields">
-                  <t-form-item label="属性名称"
-                    ><t-input v-model="searchForm.keyword" clearable placeholder="请输入"
-                  /></t-form-item>
+                  <t-form-item label="属性名称" name="keyword">
+                    <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
+                  </t-form-item>
                 </div>
                 <div class="filter-actions">
-                  <t-button theme="primary" @click="search"
-                    ><template #icon><t-icon name="search" /></template>查询</t-button
-                  ><t-button variant="base" @click="reset">重置</t-button>
+                  <t-button theme="primary" @click="search">
+                    <template #icon><t-icon name="search" /></template>
+                    查询
+                  </t-button>
+                  <t-button theme="default" variant="base" @click="reset">
+                    <template #icon><t-icon name="refresh" /></template>
+                    重置
+                  </t-button>
                 </div>
               </div>
             </t-form>
@@ -134,6 +139,8 @@ interface Attribute {
   valueType: ValueType;
   templateCount: number;
   status: Status;
+  createdByName: string;
+  createdAt: string;
 }
 
 const route = useRoute();
@@ -180,6 +187,8 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'valueType', title: '值类型', width: 220, align: 'left' },
   { colKey: 'templateCount', title: '引用类目模板', width: 190, align: 'left' },
   { colKey: 'status', title: '状态', width: 150, align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 160, align: 'left', fixed: 'right' },
 ];
 const filteredData = computed(() =>
@@ -194,6 +203,14 @@ const totalCount = computed(() => filteredData.value.length);
 const valueTypeLabel = (type: ValueType) => ({ select: '标准选项', number: '数值 + 单位', text: '文本输入' })[type];
 const normalizeStatus = (status?: ProductAttributeRecord['status']): Status =>
   status === 'disabled' ? 'disabled' : 'enabled';
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 const createAttributeCode = (record: ProductAttributeRecord) => `attribute-${record.id}`;
 const toAttribute = (record: ProductAttributeRecord): Attribute => ({
   id: record.id,
@@ -203,6 +220,8 @@ const toAttribute = (record: ProductAttributeRecord): Attribute => ({
   valueType: record.valueType,
   templateCount: record.templateCount ?? 0,
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName || '-',
+  createdAt: formatDateTime(record.createdAt),
 });
 const toAttributePayload = (item: Attribute): ProductAttributePayload => ({
   scope: item.scope,
@@ -406,30 +425,40 @@ onMounted(loadAttributes);
   color: var(--td-text-color-secondary);
   font-size: 13px;
 }
-.filter-row,
-.filter-fields,
-.filter-actions,
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+:deep(.zdm-admin-list-layout__filters) {
+  border: 1px solid var(--td-component-border);
+  box-shadow: none;
 }
 .filter-row {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields {
-  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 280px;
+  width: 260px;
   margin-bottom: 0;
 }
 .filter-fields :deep(.t-input),
 .filter-fields :deep(.t-select) {
   width: 100%;
 }
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
 .table-actions {
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+  white-space: nowrap;
 }
 :global(.attribute-create-dialog .t-dialog__body) {
   max-height: none;
@@ -439,5 +468,20 @@ onMounted(loadAttributes);
 :deep(.t-table td) {
   padding-left: 24px;
   padding-right: 24px;
+}
+@media (max-width: 1120px) {
+  .filter-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filter-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 720px) {
+  .filter-fields :deep(.t-form__item) {
+    width: 100%;
+  }
 }
 </style>
