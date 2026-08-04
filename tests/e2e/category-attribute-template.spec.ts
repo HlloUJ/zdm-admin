@@ -232,11 +232,30 @@ test('selects the first leaf and manages bindings from the template list', async
   const publishFilterWidth = await publishFilter.evaluate((item) => item.getBoundingClientRect().width);
   expect(keywordFilterWidth / statusFilterWidth).toBeCloseTo(1.6, 1);
   expect(publishFilterWidth).toBeCloseTo(statusFilterWidth, 0);
-  const toolbarButtonTops = await templatePanel
-    .locator('.template-toolbar .t-button')
-    .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
-  expect(toolbarButtonTops).toHaveLength(3);
-  expect(Math.max(...toolbarButtonTops) - Math.min(...toolbarButtonTops)).toBeLessThanOrEqual(1);
+  const filterControlTops = await templatePanel
+    .locator('.filter-row .t-form__item, .filter-row .t-button')
+    .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
+  expect(filterControlTops).toHaveLength(5);
+  expect(Math.max(...filterControlTops) - Math.min(...filterControlTops)).toBeLessThanOrEqual(1);
+  const filterSpacing = await templatePanel.locator('.filter-row').evaluate((row) => {
+    const keywordLabel = row.querySelector<HTMLElement>('.t-form__item:nth-child(1) .t-form__label');
+    const keywordInput = row.querySelector<HTMLElement>('.t-form__item:nth-child(1) .t-input');
+    const publishItem = row.querySelector<HTMLElement>('.t-form__item:nth-child(3)');
+    const queryButton = row.querySelector<HTMLElement>('.filter-actions .t-button');
+    return keywordLabel && keywordInput && publishItem && queryButton
+      ? {
+          labelWidth: keywordLabel.getBoundingClientRect().width,
+          labelRight: keywordLabel.getBoundingClientRect().right,
+          inputLeft: keywordInput.getBoundingClientRect().left,
+          publishRight: publishItem.getBoundingClientRect().right,
+          queryLeft: queryButton.getBoundingClientRect().left,
+        }
+      : null;
+  });
+  expect(filterSpacing).not.toBeNull();
+  expect(filterSpacing!.labelWidth).toBeGreaterThanOrEqual(72);
+  expect(filterSpacing!.inputLeft).toBeGreaterThanOrEqual(filterSpacing!.labelRight);
+  expect(filterSpacing!.queryLeft).toBeGreaterThan(filterSpacing!.publishRight);
   await publishFilter.locator('.t-select').click();
   await page.getByRole('listitem', { name: '已发布' }).click();
   await templatePanel.getByRole('button', { name: '查询', exact: true }).click();

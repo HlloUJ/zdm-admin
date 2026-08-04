@@ -70,7 +70,7 @@
                   <t-form :data="searchForm" label-width="56px" colon>
                     <div class="filter-row">
                       <div class="filter-fields">
-                        <t-form-item label="属性名称">
+                        <t-form-item label="属性名称" label-width="72px">
                           <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
                         </t-form-item>
                         <t-form-item label="状态">
@@ -86,6 +86,14 @@
                           </t-select>
                         </t-form-item>
                       </div>
+                      <div class="filter-actions">
+                        <t-button theme="primary" @click="search">
+                          <template #icon><t-icon name="search" /></template>查询
+                        </t-button>
+                        <t-button theme="default" variant="base" @click="reset">
+                          <template #icon><t-icon name="refresh" /></template>重置
+                        </t-button>
+                      </div>
                     </div>
                   </t-form>
                   <div class="template-toolbar">
@@ -97,14 +105,6 @@
                     >
                       <template #icon><t-icon name="add" /></template>绑定属性
                     </t-button>
-                    <div class="filter-actions">
-                      <t-button theme="primary" @click="search">
-                        <template #icon><t-icon name="search" /></template>查询
-                      </t-button>
-                      <t-button theme="default" variant="base" @click="reset">
-                        <template #icon><t-icon name="refresh" /></template>重置
-                      </t-button>
-                    </div>
                   </div>
                 </div>
 
@@ -899,6 +899,7 @@ onMounted(loadData);
 }
 
 .filter-row {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -935,8 +936,10 @@ onMounted(loadData);
 }
 
 .filter-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
-  margin-left: auto;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
 }
@@ -1002,11 +1005,6 @@ onMounted(loadData);
 @media (max-width: 1120px) {
   .category-template-layout {
     grid-template-columns: 240px minmax(0, 1fr);
-  }
-
-  .filter-row {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .filter-actions {
