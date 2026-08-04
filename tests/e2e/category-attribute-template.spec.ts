@@ -230,10 +230,8 @@ test('selects the first leaf and manages bindings from the template list', async
   const keywordFilterWidth = await keywordFilter.evaluate((item) => item.getBoundingClientRect().width);
   const statusFilterWidth = await statusFilter.evaluate((item) => item.getBoundingClientRect().width);
   const publishFilterWidth = await publishFilter.evaluate((item) => item.getBoundingClientRect().width);
-  expect(statusFilterWidth).toBeGreaterThanOrEqual(180);
-  expect(statusFilterWidth).toBeLessThanOrEqual(190);
-  expect(Math.abs(keywordFilterWidth - statusFilterWidth)).toBeLessThanOrEqual(1);
-  expect(publishFilterWidth).toBe(statusFilterWidth);
+  expect(keywordFilterWidth / statusFilterWidth).toBeCloseTo(1.6, 1);
+  expect(publishFilterWidth).toBeCloseTo(statusFilterWidth, 0);
   const toolbarButtonTops = await templatePanel
     .locator('.template-toolbar .t-button')
     .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));

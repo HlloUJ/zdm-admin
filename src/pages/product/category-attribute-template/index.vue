@@ -915,9 +915,18 @@ onMounted(loadData);
 }
 
 .filter-fields :deep(.t-form__item) {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-width: 0;
   margin-bottom: 0;
+}
+
+.filter-fields :deep(.t-form__item:nth-child(1)) {
+  width: 26.6667%;
+}
+
+.filter-fields :deep(.t-form__item:nth-child(2)),
+.filter-fields :deep(.t-form__item:nth-child(3)) {
+  width: 16.6667%;
 }
 
 .filter-fields :deep(.t-input),
@@ -1020,6 +1029,7 @@ onMounted(loadData);
   }
 
   .filter-fields :deep(.t-form__item) {
+    flex-basis: 100%;
     width: 100%;
   }
 }
