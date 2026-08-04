@@ -15,6 +15,7 @@ public class CategoryAttribute extends BaseEntity {
   private Boolean requiredFlag;
   private Boolean skuFlag;
   private Integer sortOrder;
+  private String createdByName;
 
   public Long getCategoryId() {
     return categoryId;
@@ -54,5 +55,13 @@ public class CategoryAttribute extends BaseEntity {
 
   public void setSortOrder(Integer sortOrder) {
     this.sortOrder = sortOrder;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 }
