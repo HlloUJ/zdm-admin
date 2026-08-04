@@ -163,6 +163,8 @@ const productCategories = [
   },
 ];
 
+const productAttributes: unknown[] = [];
+
 const finishedProducts = [
   {
     id: 1,
@@ -227,6 +229,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/roles', roles);
   await mockCollection(page, '**/api/admin/employees', employees);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
+  await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);
