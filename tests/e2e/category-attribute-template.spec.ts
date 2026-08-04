@@ -225,11 +225,14 @@ test('selects the first leaf and manages bindings from the template list', async
     .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
   expect(filterItemTops).toHaveLength(3);
   expect(Math.max(...filterItemTops) - Math.min(...filterItemTops)).toBeLessThanOrEqual(1);
+  const keywordFilter = templatePanel.locator('.t-form__item').filter({ hasText: '属性名称' });
   const statusFilter = templatePanel.locator('.t-form__item').filter({ hasText: '状态' });
+  const keywordFilterWidth = await keywordFilter.evaluate((item) => item.getBoundingClientRect().width);
   const statusFilterWidth = await statusFilter.evaluate((item) => item.getBoundingClientRect().width);
   const publishFilterWidth = await publishFilter.evaluate((item) => item.getBoundingClientRect().width);
-  expect(statusFilterWidth).toBeGreaterThanOrEqual(156);
-  expect(statusFilterWidth).toBeLessThanOrEqual(164);
+  expect(statusFilterWidth).toBeGreaterThanOrEqual(180);
+  expect(statusFilterWidth).toBeLessThanOrEqual(190);
+  expect(Math.abs(keywordFilterWidth - statusFilterWidth)).toBeLessThanOrEqual(1);
   expect(publishFilterWidth).toBe(statusFilterWidth);
   const toolbarButtonTops = await templatePanel
     .locator('.template-toolbar .t-button')
