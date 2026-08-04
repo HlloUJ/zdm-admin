@@ -170,15 +170,21 @@
         <span class="bind-category-label">商品分类：</span>
         <span>{{ selectedCategoryPath }}</span>
       </div>
-      <t-transfer
-        v-model="bindForm.attributeIds"
-        class="bind-transfer"
-        :data="bindAttributeOptions"
-        :empty="['暂无可绑定属性', '暂无已绑定属性']"
-        :title="['待绑定属性', '已绑定属性']"
-        search
-        show-check-all
-        target-sort="original"
+      <div class="bind-list-toolbar">
+        <t-input v-model="bindSearchKeyword" clearable placeholder="请输入属性名称" />
+        <span class="bind-list-count">已选择 {{ bindForm.attributeIds.length }} 项</span>
+      </div>
+      <t-table
+        v-model:selected-row-keys="bindForm.attributeIds"
+        class="bind-attribute-table"
+        row-key="id"
+        :columns="bindColumns"
+        :data="bindAttributeRows"
+        :max-height="360"
+        empty="暂无可绑定属性"
+        hover
+        select-on-row-click
+        table-layout="fixed"
       />
     </AdminDialog>
 
@@ -245,6 +251,13 @@ interface CategoryTreeRow {
   level: number;
 }
 
+interface BindAttributeRow {
+  id: number;
+  name: string;
+  valueType: string;
+  createdAt: string;
+}
+
 const activeScope = ref<Scope>('finished');
 const permissionPrefix = 'admin.product-data-center.category-attribute-template';
 const loginUser = computed(() => getLoginUser());
@@ -267,6 +280,7 @@ const expandedCategoryIds = ref<number[]>([]);
 const categoryKeyword = ref('');
 const appliedCategoryKeyword = ref('');
 const bindDialogVisible = ref(false);
+const bindSearchKeyword = ref('');
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
 const searchForm = reactive({ keyword: '', status: '' as Status | '' });
@@ -285,6 +299,18 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 77, fixed: 'right' },
+]);
+
+const bindColumns = computed<PrimaryTableCol<BindAttributeRow>[]>(() => [
+  {
+    colKey: 'row-select',
+    type: 'multiple',
+    width: 52,
+    disabled: ({ row }) => boundAttributeIds.value.has(row.id) && !canRemoveBinding.value,
+  },
+  { colKey: 'name', title: '属性名称', minWidth: 180, ellipsis: true },
+  { colKey: 'valueType', title: '值类型', width: 140 },
+  { colKey: 'createdAt', title: '创建时间', width: 180 },
 ]);
 
 const selectedCategoryPath = computed(() => {
@@ -372,14 +398,16 @@ const bindableAttributeIds = computed(
     ),
 );
 
-const bindAttributeOptions = computed(() =>
+const bindAttributeRows = computed<BindAttributeRow[]>(() =>
   attributes.value
     .filter((item) => bindableAttributeIds.value.has(item.id))
+    .filter((item) => !bindSearchKeyword.value.trim() || item.name.includes(bindSearchKeyword.value.trim()))
     .sort((first, second) => createdAtTime(second) - createdAtTime(first) || second.id - first.id)
     .map((item) => ({
-      label: `${item.name} / ${valueTypeLabel(item.valueType)}`,
-      value: item.id,
-      disabled: boundAttributeIds.value.has(item.id) && !canRemoveBinding.value,
+      id: item.id,
+      name: item.name,
+      valueType: valueTypeLabel(item.valueType),
+      createdAt: formatDateTime(item.createdAt),
     })),
 );
 
@@ -529,12 +557,14 @@ function openBindDialog() {
     MessagePlugin.warning('请选择分类');
     return;
   }
+  bindSearchKeyword.value = '';
   bindForm.attributeIds = [...boundAttributeIds.value].filter((id) => bindableAttributeIds.value.has(id));
   bindDialogVisible.value = true;
 }
 
 function closeBindDialog() {
   bindDialogVisible.value = false;
+  bindSearchKeyword.value = '';
   bindForm.attributeIds = [];
 }
 
@@ -789,18 +819,26 @@ onMounted(loadData);
   color: var(--td-text-color-secondary);
 }
 
-.bind-transfer {
+.bind-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-l);
+}
+
+.bind-list-toolbar :deep(.t-input) {
+  width: 320px;
+}
+
+.bind-list-count {
+  flex-shrink: 0;
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+}
+
+.bind-attribute-table {
   width: 100%;
-}
-
-.bind-transfer :deep(.t-transfer__list) {
-  flex: 1;
-  min-width: 0;
-  height: 320px;
-}
-
-.bind-transfer :deep(.t-transfer__list-header) {
-  width: calc(100% - var(--td-comp-margin-s) * 2);
 }
 
 .filter-row {

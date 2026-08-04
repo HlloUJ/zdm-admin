@@ -260,24 +260,17 @@ test('selects the first leaf and manages bindings from the template list', async
   await bindButton.click();
   const bindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
   await expect(bindDialog).toBeVisible();
-  const transferSource = bindDialog.locator('.t-transfer__list-source');
-  const transferTarget = bindDialog.locator('.t-transfer__list-target');
-  await expect(transferSource.locator('.t-transfer__list-header')).toContainText('待绑定属性');
-  await expect(transferTarget.locator('.t-transfer__list-header')).toContainText('已绑定属性');
-  await expect(transferSource.getByRole('checkbox', { name: '颜色 / 标准选项' })).toBeVisible();
-  await expect(transferSource.getByRole('checkbox', { name: '尺寸 / 数值' })).toBeVisible();
-  await expect(transferSource.locator('.t-transfer__list-content .t-transfer__list-item')).toHaveText([
-    '尺寸 / 数值',
-    '颜色 / 标准选项',
-  ]);
-  await expect(transferSource.getByRole('checkbox', { name: '材质 / 标准选项' })).toHaveCount(0);
-  await expect(transferTarget.getByRole('checkbox', { name: '材质 / 标准选项' })).toHaveCount(0);
-  await expect(transferSource.getByRole('checkbox', { name: '停用属性 / 文本' })).toHaveCount(0);
-  await expect(transferTarget.getByRole('checkbox', { name: '停用属性 / 文本' })).toHaveCount(0);
-
-  await transferSource.locator('.t-checkbox').filter({ hasText: '颜色 / 标准选项' }).click();
-  await transferSource.locator('.t-checkbox').filter({ hasText: '尺寸 / 数值' }).click();
-  await bindDialog.locator('.t-transfer__operations button').first().click();
+  const bindTable = bindDialog.locator('.bind-attribute-table');
+  const bindRows = bindTable.locator('tbody tr');
+  await expect(bindDialog.getByText('已选择 0 项', { exact: true })).toBeVisible();
+  await expect(bindRows).toHaveCount(2);
+  await expect(bindRows.nth(0)).toContainText('尺寸');
+  await expect(bindRows.nth(1)).toContainText('颜色');
+  await expect(bindRows.filter({ hasText: '材质' })).toHaveCount(0);
+  await expect(bindRows.filter({ hasText: '停用属性' })).toHaveCount(0);
+  await bindRows.nth(0).locator('.t-checkbox').click();
+  await bindRows.nth(1).locator('.t-checkbox').click();
+  await expect(bindDialog.getByText('已选择 2 项', { exact: true })).toBeVisible();
   const batchRequestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/api/admin/category-attributes/batch') && request.method() === 'POST',
   );
@@ -303,9 +296,9 @@ test('selects the first leaf and manages bindings from the template list', async
 
   await bindButton.click();
   const updatedBindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
-  const updatedTransferTarget = updatedBindDialog.locator('.t-transfer__list-target');
-  await updatedTransferTarget.locator('.t-checkbox').filter({ hasText: '尺寸 / 数值' }).click();
-  await updatedBindDialog.locator('.t-transfer__operations button').nth(1).click();
+  const updatedSizeRow = updatedBindDialog.locator('tbody tr').filter({ hasText: '尺寸' });
+  await expect(updatedSizeRow.getByRole('checkbox')).toBeChecked();
+  await updatedSizeRow.locator('.t-checkbox').click();
   const unbindRequestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/api/admin/category-attributes/2') && request.method() === 'DELETE',
   );
