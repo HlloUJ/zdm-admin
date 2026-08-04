@@ -149,6 +149,7 @@ interface AttributeOption {
   code: string;
   name: string;
   scope: Scope;
+  valueType: ProductAttributeRecord['valueType'];
 }
 interface Value {
   id: number;
@@ -188,7 +189,11 @@ const sourceDescription = computed(
 );
 const data = ref<Value[]>([]);
 const loading = ref(false);
-const attributesInScope = computed(() => attributeOptions.value.filter((item) => item.scope === activeScope.value));
+const isStandardOptionAttribute = (item: AttributeOption, scope: Scope) =>
+  item.scope === scope && item.valueType === 'select';
+const attributesInScope = computed(() =>
+  attributeOptions.value.filter((item) => isStandardOptionAttribute(item, activeScope.value)),
+);
 const searchForm = reactive({ attribute: initialAttribute, keyword: '', status: '' as '' | Status });
 const applied = reactive({ ...searchForm });
 const pageSizeOptions = [10, 20, 50];
@@ -203,7 +208,9 @@ const form = reactive({
   attribute: initialAttribute,
   name: '',
 });
-const formAttributes = computed(() => attributeOptions.value.filter((item) => item.scope === form.scope));
+const formAttributes = computed(() =>
+  attributeOptions.value.filter((item) => isStandardOptionAttribute(item, form.scope)),
+);
 const formRules: Record<string, FormRule[]> = {
   attribute: [{ required: true, message: '请选择所属属性', type: 'error' }],
   name: [{ required: true, message: '请输入值名称', type: 'error' }],
@@ -234,6 +241,7 @@ const toAttributeOption = (record: ProductAttributeRecord): AttributeOption => (
   code: String(record.id),
   name: record.name,
   scope: record.scope,
+  valueType: record.valueType,
 });
 const toValue = (record: ProductAttributeValueRecord): Value => ({
   id: record.id,
@@ -259,7 +267,11 @@ const loadValues = async () => {
     const [attributes, values] = await Promise.all([listProductAttributes(), listProductAttributeValues()]);
     attributeOptions.value = attributes.map(toAttributeOption);
     data.value = values.map(toValue);
-    if (!form.attribute) syncFormAttribute();
+    if (searchForm.attribute && !attributesInScope.value.some((item) => item.code === searchForm.attribute)) {
+      searchForm.attribute = '';
+      applied.attribute = '';
+    }
+    if (!formAttributes.value.some((item) => item.code === form.attribute)) syncFormAttribute();
     ensureCurrentPage();
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '属性值列表加载失败');
