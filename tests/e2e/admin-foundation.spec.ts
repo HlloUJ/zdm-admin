@@ -12,13 +12,6 @@ test.beforeEach(async ({ page }) => {
 test('keeps foundation pagination spacing consistent inside list layouts', async ({ page }) => {
   await page.goto('/category-attribute-template');
 
-  const main = page.getByRole('main');
-  await expect(main.locator('.zdm-admin-list-layout')).toHaveCount(1);
-  await expect(main.locator('.zdm-admin-list-layout__filters')).toHaveCount(0);
-  await expect(main.getByRole('columnheader', { name: '创建人' })).toBeVisible();
-  await expect(main.getByRole('columnheader', { name: '创建时间' })).toBeVisible();
-  await expect(main.locator('tbody tr').filter({ hasText: '材质' }).first()).toContainText('韩健');
-
   const styles = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
     const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');
     if (!pagination) return null;

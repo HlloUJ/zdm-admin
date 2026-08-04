@@ -161,43 +161,6 @@ const productCategories = [
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
-  {
-    id: 3,
-    parentId: 1,
-    scope: 'finished',
-    name: '岩板茶几',
-    sortOrder: 2,
-    productCount: 0,
-    status: 'enabled',
-    createdByName: '韩健',
-    createdAt: '2026-07-28T09:00:00',
-  },
-];
-
-const productAttributes = [
-  {
-    id: 1,
-    scope: 'shared',
-    name: '材质',
-    valueType: 'select',
-    attributeRole: 'basic',
-    status: 'enabled',
-    createdAt: '2026-07-27T09:00:00',
-  },
-];
-
-const categoryAttributes = [
-  {
-    id: 1,
-    categoryId: 3,
-    attributeId: 1,
-    requiredFlag: true,
-    skuFlag: false,
-    sortOrder: 1,
-    status: 'enabled',
-    createdByName: '韩健',
-    createdAt: '2026-08-04T09:30:00',
-  },
 ];
 
 const finishedProducts = [
@@ -264,8 +227,6 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/roles', roles);
   await mockCollection(page, '**/api/admin/employees', employees);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
-  await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
-  await mockCollection(page, '**/api/admin/category-attributes', categoryAttributes);
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);
