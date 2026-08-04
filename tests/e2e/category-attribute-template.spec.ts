@@ -160,9 +160,11 @@ test('hides inactive categories and selects an enabled leaf beside the template 
   await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toHaveCount(0);
   await expect(categoryPanel.locator('.category-node-parent')).toHaveCount(2);
 
-  await categorySearchInput.fill('');
-  await categoryPanel.getByRole('button', { name: '搜索', exact: true }).click();
+  await categorySearchInput.hover();
+  await categoryPanel.locator('.t-input__suffix-clear').click();
   await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toBeVisible();
+  await expect(categoryPanel.getByRole('button', { name: '实木茶几', exact: true })).toBeVisible();
+  await expect(categoryPanel.getByText('停用茶几', { exact: true })).toHaveCount(0);
 
   await categoryPanel.getByRole('button', { name: '岩板茶几', exact: true }).click();
 
