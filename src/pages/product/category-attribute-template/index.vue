@@ -102,7 +102,18 @@
                   </div>
                 </div>
 
-                <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+                <t-table
+                  row-key="id"
+                  :data="pageData"
+                  :columns="columns"
+                  :loading="loading"
+                  :drag-sort="canEditBinding ? 'row-handler' : undefined"
+                  :drag-sort-options="{ animation: 200 }"
+                  hover
+                  table-layout="fixed"
+                  @drag-sort="handleDragSort"
+                >
+                  <template #drag><t-icon name="move" class="binding-drag-icon" title="拖拽排序" /></template>
                   <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
                   <template #requiredFlag="{ row }">
                     <t-switch
@@ -119,25 +130,6 @@
                       :disabled="!canEditBinding"
                       @change="changeFlag(row, 'skuFlag', $event)"
                     />
-                  </template>
-                  <template #sortOrder="{ row }">
-                    <div v-if="canEditBinding" class="table-actions">
-                      <t-link
-                        theme="primary"
-                        :disabled="savingId !== null || bindingIndex(row) === 0"
-                        @click="moveBinding(row, -1)"
-                      >
-                        上移
-                      </t-link>
-                      <t-link
-                        theme="primary"
-                        :disabled="savingId !== null || bindingIndex(row) === allBindingRows.length - 1"
-                        @click="moveBinding(row, 1)"
-                      >
-                        下移
-                      </t-link>
-                    </div>
-                    <span v-else>-</span>
                   </template>
                   <template #status="{ row }">
                     <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
@@ -283,17 +275,17 @@ const pagination = reactive({ current: 1, pageSize: 10 });
 const pageSizeOptions = [10, 20, 50];
 const bindForm = reactive({ attributeIds: [] as number[] });
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  ...(canEditBinding.value ? [{ colKey: 'drag', title: '', width: 44, align: 'center' as const }] : []),
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 120 },
   { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
   { colKey: 'skuFlag', title: 'SKU', width: 90, align: 'center' },
-  { colKey: 'sortOrder', title: '排序', width: 120, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 77, fixed: 'right' },
-];
+]);
 
 const selectedCategoryPath = computed(() => {
   if (!selectedCategoryId.value) return '未选择分类';
@@ -311,7 +303,7 @@ const selectedCategoryPath = computed(() => {
 const scopedCategories = computed(() =>
   categories.value
     .filter((item) => item.scope === activeScope.value && item.status === 'enabled')
-    .sort((first, second) => categoryCreatedAtTime(second) - categoryCreatedAtTime(first) || second.id - first.id),
+    .sort((first, second) => createdAtTime(second) - createdAtTime(first) || second.id - first.id),
 );
 
 const categoryTree = computed(() => filterCategoryTree(buildCategoryTree(undefined)));
@@ -383,6 +375,7 @@ const bindableAttributeIds = computed(
 const bindAttributeOptions = computed(() =>
   attributes.value
     .filter((item) => bindableAttributeIds.value.has(item.id))
+    .sort((first, second) => createdAtTime(second) - createdAtTime(first) || second.id - first.id)
     .map((item) => ({
       label: `${item.name} / ${valueTypeLabel(item.valueType)}`,
       value: item.id,
@@ -394,9 +387,9 @@ function hasCategoryChildren(categoryId: number) {
   return scopedCategories.value.some((item) => item.parentId === categoryId);
 }
 
-function categoryCreatedAtTime(category: ProductCategoryRecord) {
-  if (!category.createdAt) return 0;
-  const timestamp = new Date(category.createdAt).getTime();
+function createdAtTime(record: { createdAt?: string }) {
+  if (!record.createdAt) return 0;
+  const timestamp = new Date(record.createdAt).getTime();
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
@@ -614,22 +607,19 @@ function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: u
   persistRow(row, { [field]: getSwitchValue(value) }, field);
 }
 
-function bindingIndex(row: BindingRow) {
-  return allBindingRows.value.findIndex((item) => item.id === row.id);
-}
-
-async function moveBinding(row: BindingRow, offset: number) {
+async function handleDragSort(context: { current: BindingRow; target: BindingRow }) {
   if (!canEditBinding.value || savingId.value !== null) return;
   const orderedRows = allBindingRows.value.map((item) => ({ ...item }));
-  const index = orderedRows.findIndex((item) => item.id === row.id);
-  const targetIndex = index + offset;
-  if (index < 0 || targetIndex < 0 || targetIndex >= orderedRows.length) return;
+  const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
+  const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
+  if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
 
-  [orderedRows[index], orderedRows[targetIndex]] = [orderedRows[targetIndex], orderedRows[index]];
+  const [currentRow] = orderedRows.splice(currentIndex, 1);
+  orderedRows.splice(targetIndex, 0, currentRow);
   orderedRows.forEach((item, itemIndex) => {
     item.sortOrder = itemIndex + 1;
   });
-  savingId.value = row.id;
+  savingId.value = context.current.id;
   savingField.value = null;
   try {
     const updatedRows = await Promise.all(orderedRows.map((item) => updateCategoryAttribute(item.id, toPayload(item))));
@@ -856,6 +846,38 @@ onMounted(loadData);
   align-items: center;
   gap: var(--td-comp-margin-s);
   white-space: nowrap;
+}
+
+.binding-drag-icon {
+  color: var(--td-text-color-secondary);
+  cursor: grab;
+  transition: color 0.2s ease;
+}
+
+:deep(.t-table__handle-draggable) {
+  cursor: grab;
+}
+
+:deep(.t-table__handle-draggable:hover .binding-drag-icon) {
+  color: var(--td-brand-color);
+}
+
+:deep(tr.t-table__ele--draggable-chosen td) {
+  background: var(--td-brand-color-light);
+  box-shadow:
+    inset 0 1px 0 var(--td-brand-color),
+    inset 0 -1px 0 var(--td-brand-color);
+}
+
+:deep(tr.t-table__ele--draggable-ghost td) {
+  background: var(--td-brand-color-light);
+  border-top: 2px solid var(--td-brand-color);
+  opacity: 0.75;
+}
+
+:deep(tr.t-table__ele--draggable-dragging) {
+  cursor: grabbing;
+  opacity: 0.9;
 }
 
 :deep(.t-table th),
