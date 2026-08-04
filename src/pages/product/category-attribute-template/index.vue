@@ -10,133 +10,148 @@
 
         <AdminListLayout>
           <template #toolbar>
-            <div class="list-controls">
-              <div class="scope-controls">
-                <t-tabs v-model="activeScope" :list="scopeTabs" />
-              </div>
-
-              <div class="selected-category">
-                <span>当前分类：</span>
-                <span class="selected-category-path">{{ selectedCategoryPath }}</span>
-                <t-button size="small" variant="outline" @click="openCategoryDialog">切换分类</t-button>
-              </div>
-
-              <t-form :data="searchForm" label-width="72px" colon>
-                <div class="filter-row">
-                  <div class="filter-fields">
-                    <t-form-item label="属性名称">
-                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
-                    </t-form-item>
-                    <t-form-item label="状态">
-                      <t-select v-model="searchForm.status" clearable placeholder="全部">
-                        <t-option label="启用" value="enabled" />
-                        <t-option label="停用" value="disabled" />
-                      </t-select>
-                    </t-form-item>
-                  </div>
-                  <div class="filter-actions">
-                    <t-button theme="primary" @click="search">
-                      <template #icon><t-icon name="search" /></template>查询
-                    </t-button>
-                    <t-button theme="default" variant="base" @click="reset">
-                      <template #icon><t-icon name="refresh" /></template>重置
-                    </t-button>
-                  </div>
-                </div>
-              </t-form>
-
-              <div class="table-toolbar">
-                <span class="toolbar-title">{{ selectedCategoryName }}</span>
-                <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
-                  <template #icon><t-icon name="add" /></template>绑定属性
-                </t-button>
-              </div>
+            <div class="scope-controls">
+              <t-tabs v-model="activeScope" :list="scopeTabs" />
             </div>
           </template>
 
           <template #table>
-            <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
-              <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
-              <template #requiredFlag="{ row }">
-                <t-switch
-                  :model-value="row.requiredFlag"
-                  :loading="savingId === row.id"
-                  @change="changeFlag(row, 'requiredFlag', $event)"
-                />
-              </template>
-              <template #skuFlag="{ row }">
-                <t-switch
-                  :model-value="row.skuFlag"
-                  :loading="savingId === row.id"
-                  @change="changeFlag(row, 'skuFlag', $event)"
-                />
-              </template>
-              <template #sortOrder="{ row }">
-                <t-input-number
-                  :model-value="row.sortOrder"
-                  theme="column"
-                  size="small"
-                  :min="0"
-                  :max="999"
-                  @change="changeSort(row, $event)"
-                />
-              </template>
-              <template #status="{ row }">
-                <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
-                  {{ row.status === 'enabled' ? '启用' : '停用' }}
-                </t-tag>
-              </template>
-              <template #operation="{ row }">
-                <div class="table-actions">
-                  <t-link :theme="row.status === 'enabled' ? 'warning' : 'success'" @click="toggleStatus(row)">
-                    {{ row.status === 'enabled' ? '停用' : '启用' }}
-                  </t-link>
-                  <t-link theme="danger" @click="openDeleteConfirm(row)">删除</t-link>
+            <div class="category-template-layout">
+              <aside class="category-panel">
+                <div class="panel-toolbar">
+                  <div>
+                    <h2>商品分类</h2>
+                    <p>仅末级分类可查看属性模板</p>
+                  </div>
                 </div>
-              </template>
-            </t-table>
-          </template>
 
-          <template #pagination>
-            <AdminPagination
-              v-model:current="pagination.current"
-              v-model:page-size="pagination.pageSize"
-              :total="totalCount"
-              :page-size-options="pageSizeOptions"
-              @change="handlePaginationChange"
-            />
+                <div class="category-tree">
+                  <template v-for="row in visibleCategoryRows" :key="row.node.id">
+                    <div
+                      v-if="row.node.children.length"
+                      class="category-node category-node-parent"
+                      :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
+                    >
+                      <t-button
+                        class="expand-button"
+                        shape="square"
+                        size="small"
+                        variant="text"
+                        :aria-label="`${isCategoryExpanded(row.node.id) ? '收起' : '展开'}${row.node.name}`"
+                        @click="toggleCategory(row.node.id)"
+                      >
+                        <t-icon :name="isCategoryExpanded(row.node.id) ? 'chevron-down' : 'chevron-right'" />
+                      </t-button>
+                      <span class="category-name">{{ row.node.name }}</span>
+                    </div>
+                    <button
+                      v-else
+                      type="button"
+                      class="category-node category-node-leaf"
+                      :class="{ active: row.node.id === selectedCategoryId }"
+                      :disabled="row.node.status === 'disabled'"
+                      :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
+                      @click="selectLeafCategory(row.node)"
+                    >
+                      <span class="expand-placeholder"></span>
+                      <span class="category-name">{{ row.node.name }}</span>
+                    </button>
+                  </template>
+                  <div v-if="!visibleCategoryRows.length && !loading" class="category-empty">暂无分类</div>
+                </div>
+              </aside>
+
+              <section class="template-panel">
+                <div class="panel-toolbar">
+                  <div>
+                    <h2>{{ selectedCategoryId ? `${selectedCategoryName}属性模板` : '属性模板' }}</h2>
+                    <p>{{ selectedCategoryId ? selectedCategoryPath : '请在左侧选择末级分类' }}</p>
+                  </div>
+                  <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
+                    <template #icon><t-icon name="add" /></template>绑定属性
+                  </t-button>
+                </div>
+
+                <div class="template-search">
+                  <t-form :data="searchForm" label-width="72px" colon>
+                    <div class="filter-row">
+                      <div class="filter-fields">
+                        <t-form-item label="属性名称">
+                          <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
+                        </t-form-item>
+                        <t-form-item label="状态">
+                          <t-select v-model="searchForm.status" clearable placeholder="全部">
+                            <t-option label="启用" value="enabled" />
+                            <t-option label="停用" value="disabled" />
+                          </t-select>
+                        </t-form-item>
+                      </div>
+                      <div class="filter-actions">
+                        <t-button theme="primary" @click="search">
+                          <template #icon><t-icon name="search" /></template>查询
+                        </t-button>
+                        <t-button theme="default" variant="base" @click="reset">
+                          <template #icon><t-icon name="refresh" /></template>重置
+                        </t-button>
+                      </div>
+                    </div>
+                  </t-form>
+                </div>
+
+                <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+                  <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
+                  <template #requiredFlag="{ row }">
+                    <t-switch
+                      :model-value="row.requiredFlag"
+                      :loading="savingId === row.id"
+                      @change="changeFlag(row, 'requiredFlag', $event)"
+                    />
+                  </template>
+                  <template #skuFlag="{ row }">
+                    <t-switch
+                      :model-value="row.skuFlag"
+                      :loading="savingId === row.id"
+                      @change="changeFlag(row, 'skuFlag', $event)"
+                    />
+                  </template>
+                  <template #sortOrder="{ row }">
+                    <t-input-number
+                      :model-value="row.sortOrder"
+                      theme="column"
+                      size="small"
+                      :min="0"
+                      :max="999"
+                      @change="changeSort(row, $event)"
+                    />
+                  </template>
+                  <template #status="{ row }">
+                    <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
+                      {{ row.status === 'enabled' ? '启用' : '停用' }}
+                    </t-tag>
+                  </template>
+                  <template #operation="{ row }">
+                    <div class="table-actions">
+                      <t-link :theme="row.status === 'enabled' ? 'warning' : 'success'" @click="toggleStatus(row)">
+                        {{ row.status === 'enabled' ? '停用' : '启用' }}
+                      </t-link>
+                      <t-link theme="danger" @click="openDeleteConfirm(row)">删除</t-link>
+                    </div>
+                  </template>
+                </t-table>
+
+                <AdminPagination
+                  v-model:current="pagination.current"
+                  v-model:page-size="pagination.pageSize"
+                  :total="totalCount"
+                  :page-size-options="pageSizeOptions"
+                  @change="handlePaginationChange"
+                />
+              </section>
+            </div>
           </template>
         </AdminListLayout>
       </main>
     </div>
-
-    <AdminDialog
-      v-model:visible="categoryDialogVisible"
-      header="选择商品分类"
-      width="760px"
-      placement="center"
-      :prevent-scroll-through="false"
-      confirm-btn="确认"
-      cancel-btn="取消"
-      @confirm="confirmCategorySelection"
-      @close="closeCategoryDialog"
-    >
-      <div class="category-picker">
-        <div v-for="(column, columnIndex) in categoryColumns" :key="columnIndex" class="category-column">
-          <button
-            v-for="item in column"
-            :key="item.id"
-            type="button"
-            :disabled="item.status === 'disabled'"
-            :class="['category-option', pendingCategoryPathIds[columnIndex] === item.id && 'active']"
-            @click="selectCategory(columnIndex, item)"
-          >
-            <span>{{ item.name }}</span>
-            <t-icon v-if="hasCategoryChildren(item.id)" name="chevron-right" />
-          </button>
-        </div>
-      </div>
-    </AdminDialog>
 
     <AdminDialog
       v-model:visible="bindDialogVisible"
@@ -221,6 +236,15 @@ interface BindingRow {
   createdAt: string;
 }
 
+interface CategoryTreeNode extends ProductCategoryRecord {
+  children: CategoryTreeNode[];
+}
+
+interface CategoryTreeRow {
+  node: CategoryTreeNode;
+  level: number;
+}
+
 const activeScope = ref<Scope>('finished');
 const scopeTabs = [
   { label: '成品现货模板', value: 'finished' },
@@ -233,9 +257,7 @@ const categories = ref<ProductCategoryRecord[]>([]);
 const attributes = ref<ProductAttributeRecord[]>([]);
 const bindings = ref<CategoryAttributeRecord[]>([]);
 const selectedCategoryId = ref<number | undefined>();
-const pendingCategoryId = ref<number | undefined>();
-const pendingCategoryPathIds = ref<number[]>([]);
-const categoryDialogVisible = ref(false);
+const expandedCategoryIds = ref<number[]>([]);
 const bindDialogVisible = ref(false);
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
@@ -281,15 +303,12 @@ const scopedCategories = computed(() =>
     .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id),
 );
 
-const categoryColumns = computed(() => {
-  const columns: ProductCategoryRecord[][] = [
-    scopedCategories.value.filter((item) => (item.parentId ?? undefined) === undefined),
-  ];
-  pendingCategoryPathIds.value.forEach((categoryId) => {
-    const children = scopedCategories.value.filter((item) => item.parentId === categoryId);
-    if (children.length) columns.push(children);
-  });
-  return columns;
+const categoryTree = computed(() => buildCategoryTree(undefined));
+
+const visibleCategoryRows = computed(() => {
+  const rows: CategoryTreeRow[] = [];
+  categoryTree.value.forEach((node) => collectVisibleCategoryRows(node, 0, rows));
+  return rows;
 });
 
 const bindingRows = computed<BindingRow[]>(() => {
@@ -352,17 +371,38 @@ function hasCategoryChildren(categoryId: number) {
   return scopedCategories.value.some((item) => item.parentId === categoryId);
 }
 
-function getCategoryPathIds(categoryId?: number) {
-  if (!categoryId) return [];
+function buildCategoryTree(parentId: number | undefined): CategoryTreeNode[] {
+  return scopedCategories.value
+    .filter((item) => (item.parentId ?? undefined) === parentId)
+    .map((item) => ({ ...item, children: buildCategoryTree(item.id) }));
+}
 
-  const categoryMap = new Map(scopedCategories.value.map((item) => [item.id, item]));
-  const pathIds: number[] = [];
-  let current = categoryMap.get(categoryId);
-  while (current) {
-    pathIds.unshift(current.id);
-    current = current.parentId ? categoryMap.get(current.parentId) : undefined;
-  }
-  return pathIds;
+function collectVisibleCategoryRows(node: CategoryTreeNode, level: number, rows: CategoryTreeRow[]) {
+  rows.push({ node, level });
+  if (!isCategoryExpanded(node.id)) return;
+  node.children.forEach((child) => collectVisibleCategoryRows(child, level + 1, rows));
+}
+
+function isCategoryExpanded(categoryId: number) {
+  return expandedCategoryIds.value.includes(categoryId);
+}
+
+function expandAllCategories() {
+  expandedCategoryIds.value = scopedCategories.value
+    .filter((item) => hasCategoryChildren(item.id))
+    .map((item) => item.id);
+}
+
+function toggleCategory(categoryId: number) {
+  expandedCategoryIds.value = isCategoryExpanded(categoryId)
+    ? expandedCategoryIds.value.filter((id) => id !== categoryId)
+    : [...expandedCategoryIds.value, categoryId];
+}
+
+function selectLeafCategory(category: CategoryTreeNode) {
+  if (category.children.length || category.status === 'disabled') return;
+  selectedCategoryId.value = category.id;
+  reset();
 }
 
 function valueTypeLabel(value: ProductAttributeRecord['valueType']) {
@@ -395,8 +435,6 @@ function syncSelectedCategory() {
     selectedCategory && selectedCategory.status !== 'disabled' && !hasCategoryChildren(selectedCategory.id),
   );
   if (!stillAvailable) selectedCategoryId.value = undefined;
-  pendingCategoryId.value = selectedCategoryId.value;
-  pendingCategoryPathIds.value = getCategoryPathIds(selectedCategoryId.value);
   pagination.current = 1;
 }
 
@@ -412,6 +450,7 @@ async function loadData() {
     attributes.value = attributeRecords;
     bindings.value = bindingRecords;
     syncSelectedCategory();
+    expandAllCategories();
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '类目属性模板加载失败');
   } finally {
@@ -433,33 +472,6 @@ function reset() {
 function handlePaginationChange(pageInfo: PageInfo) {
   pagination.current = pageInfo.current;
   pagination.pageSize = pageInfo.pageSize;
-}
-
-function openCategoryDialog() {
-  pendingCategoryId.value = selectedCategoryId.value;
-  pendingCategoryPathIds.value = getCategoryPathIds(selectedCategoryId.value);
-  categoryDialogVisible.value = true;
-}
-
-function closeCategoryDialog() {
-  categoryDialogVisible.value = false;
-  pendingCategoryId.value = selectedCategoryId.value;
-  pendingCategoryPathIds.value = getCategoryPathIds(selectedCategoryId.value);
-}
-
-function selectCategory(columnIndex: number, category: ProductCategoryRecord) {
-  pendingCategoryPathIds.value = [...pendingCategoryPathIds.value.slice(0, columnIndex), category.id];
-  pendingCategoryId.value = hasCategoryChildren(category.id) ? undefined : category.id;
-}
-
-function confirmCategorySelection() {
-  if (!pendingCategoryId.value) {
-    MessagePlugin.warning('请选择末级分类');
-    return;
-  }
-  selectedCategoryId.value = pendingCategoryId.value;
-  reset();
-  closeCategoryDialog();
 }
 
 function openBindDialog() {
@@ -558,8 +570,7 @@ async function handleDelete() {
 
 watch(activeScope, () => {
   selectedCategoryId.value = undefined;
-  pendingCategoryId.value = undefined;
-  pendingCategoryPathIds.value = [];
+  expandAllCategories();
   reset();
 });
 
@@ -567,83 +578,108 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-.list-controls {
-  display: grid;
-  width: 100%;
-  gap: var(--td-comp-margin-l);
-}
-
 .scope-controls {
   min-width: 0;
 }
 
-:deep(.zdm-admin-list-layout__toolbar) {
-  display: block;
-  min-height: 0;
-}
-
-.selected-category {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
-}
-
-.selected-category-path {
-  color: var(--td-text-color-primary);
-  font-weight: 500;
-}
-
-.category-picker {
+.category-template-layout {
   display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  gap: var(--td-comp-margin-s);
-  min-height: 280px;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  gap: var(--td-comp-margin-l);
 }
 
-.category-column {
+.category-panel,
+.template-panel {
   min-width: 0;
-  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-s);
-  overflow-y: auto;
-  background: var(--td-bg-color-secondarycontainer);
+  min-height: 600px;
+  overflow: hidden;
+  background: var(--td-bg-color-container);
   border: 1px solid var(--td-component-border);
   border-radius: var(--td-radius-medium);
 }
 
-.category-option {
+.panel-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  height: 38px;
-  padding: 0 var(--td-comp-paddingLR-s);
-  color: var(--td-text-color-primary);
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  border-radius: var(--td-radius-default);
+  min-height: 72px;
+  gap: var(--td-comp-margin-m);
+  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl);
+  border-bottom: 1px solid var(--td-component-border);
 }
 
-.category-option:hover:not(:disabled),
-.category-option.active {
+.panel-toolbar h2 {
+  margin: 0;
+  color: var(--td-text-color-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.panel-toolbar p {
+  margin: 2px 0 0;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+}
+
+.category-tree {
+  max-height: 640px;
+  padding: var(--td-comp-paddingTB-s) 0;
+  overflow-y: auto;
+}
+
+.category-node {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 40px;
+  gap: var(--td-comp-margin-xs);
+  padding-right: var(--td-comp-paddingLR-s);
+  color: var(--td-text-color-primary);
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+
+.category-node-leaf {
+  cursor: pointer;
+}
+
+.category-node-leaf:hover:not(:disabled),
+.category-node-leaf.active {
   color: var(--td-brand-color);
   background: var(--td-brand-color-light);
 }
 
-.category-option.active {
-  font-weight: 700;
-}
-
-.category-option:disabled {
+.category-node-leaf:disabled {
   color: var(--td-text-color-disabled);
   cursor: not-allowed;
 }
 
-.toolbar-title {
+.expand-button,
+.expand-placeholder {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.category-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-empty {
+  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-l);
   color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
+  text-align: center;
+}
+
+.template-search {
+  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl);
+  border-bottom: 1px solid var(--td-component-border);
 }
 
 .filter-row {
@@ -676,10 +712,12 @@ onMounted(loadData);
   gap: var(--td-comp-margin-s);
 }
 
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.template-panel :deep(.t-table) {
+  border-radius: 0;
+}
+
+.template-panel :deep(.zdm-admin-pagination) {
+  padding: 0 var(--td-comp-paddingLR-xl) var(--td-comp-paddingTB-l);
 }
 
 .table-actions {
@@ -696,6 +734,10 @@ onMounted(loadData);
 }
 
 @media (max-width: 1120px) {
+  .category-template-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
   .filter-row {
     align-items: stretch;
     flex-direction: column;
@@ -707,14 +749,17 @@ onMounted(loadData);
 }
 
 @media (max-width: 720px) {
-  .selected-category {
-    align-items: flex-start;
-    flex-wrap: wrap;
+  .category-template-layout {
+    grid-template-columns: 1fr;
   }
 
-  .category-picker {
-    grid-auto-flow: row;
-    grid-template-columns: 1fr;
+  .category-panel,
+  .template-panel {
+    min-height: auto;
+  }
+
+  .category-tree {
+    max-height: 360px;
   }
 
   .filter-fields :deep(.t-form__item) {
