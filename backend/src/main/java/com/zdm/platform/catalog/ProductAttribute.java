@@ -17,6 +17,7 @@ public class ProductAttribute extends BaseEntity {
   private String valueType;
 
   private String attributeRole;
+  private String createdByName;
 
   @TableField(exist = false)
   private Long templateCount;
@@ -51,6 +52,14 @@ public class ProductAttribute extends BaseEntity {
 
   public void setAttributeRole(String attributeRole) {
     this.attributeRole = attributeRole;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 
   public Long getTemplateCount() {

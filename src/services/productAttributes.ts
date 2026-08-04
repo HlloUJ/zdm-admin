@@ -8,6 +8,7 @@ export interface ProductAttributeRecord {
   attributeRole?: string;
   templateCount?: number;
   status?: 'enabled' | 'disabled';
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
