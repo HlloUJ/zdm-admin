@@ -3,6 +3,9 @@ package com.zdm.platform.catalog;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,9 +23,50 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
   @Transactional
   public CategoryAttribute createCategoryAttribute(CategoryAttribute categoryAttribute) {
     categoryAttribute.setId(null);
+    categoryAttribute.setStatus("disabled");
     categoryAttribute.setCreatedByName(resolveCreatedByName());
     save(categoryAttribute);
     return getById(categoryAttribute.getId());
+  }
+
+  @Transactional
+  public List<CategoryAttribute> createCategoryAttributes(CategoryAttributeBatchRequest request) {
+    List<Long> attributeIds = new ArrayList<>(new LinkedHashSet<>(request.attributeIds()));
+    boolean alreadyBound = lambdaQuery()
+        .eq(CategoryAttribute::getCategoryId, request.categoryId())
+        .in(CategoryAttribute::getAttributeId, attributeIds)
+        .count() > 0;
+    if (alreadyBound) {
+      throw new IllegalArgumentException("部分属性已绑定，请刷新后重试");
+    }
+
+    CategoryAttribute lastBinding = lambdaQuery()
+        .eq(CategoryAttribute::getCategoryId, request.categoryId())
+        .orderByDesc(CategoryAttribute::getSortOrder)
+        .last("LIMIT 1")
+        .one();
+    int nextSortOrder = lastBinding == null || lastBinding.getSortOrder() == null
+        ? 1
+        : lastBinding.getSortOrder() + 1;
+    String createdByName = resolveCreatedByName();
+    List<CategoryAttribute> createdBindings = new ArrayList<>();
+    for (Long attributeId : attributeIds) {
+      CategoryAttribute binding = new CategoryAttribute();
+      binding.setCategoryId(request.categoryId());
+      binding.setAttributeId(attributeId);
+      binding.setRequiredFlag(false);
+      binding.setSkuFlag(false);
+      binding.setSortOrder(nextSortOrder++);
+      binding.setStatus("disabled");
+      binding.setCreatedByName(createdByName);
+      createdBindings.add(binding);
+    }
+    saveBatch(createdBindings);
+    return lambdaQuery()
+        .eq(CategoryAttribute::getCategoryId, request.categoryId())
+        .in(CategoryAttribute::getAttributeId, attributeIds)
+        .orderByAsc(CategoryAttribute::getSortOrder)
+        .list();
   }
 
   @Transactional

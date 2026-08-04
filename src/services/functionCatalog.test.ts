@@ -65,6 +65,11 @@ describe('full function catalog', () => {
           ],
         },
         {
+          label: '类目属性模板',
+          direct: false,
+          pages: [{ label: '类目属性模板页', tabs: [] }],
+        },
+        {
           label: '大板品种管理',
           direct: false,
           pages: [{ label: '大板品种管理页', tabs: [] }],
@@ -148,6 +153,10 @@ describe('full function catalog', () => {
       'admin.product-data-center.category.accessory.disable',
       'admin.product-data-center.category.accessory.enable',
       'admin.product-data-center.category.accessory.delete',
+      'admin.product-data-center.category-attribute-template.view',
+      'admin.product-data-center.category-attribute-template.create',
+      'admin.product-data-center.category-attribute-template.edit',
+      'admin.product-data-center.category-attribute-template.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',

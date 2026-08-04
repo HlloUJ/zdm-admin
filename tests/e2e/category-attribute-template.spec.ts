@@ -11,6 +11,20 @@ const fulfillJson = (route: Route, data: unknown) =>
   });
 
 async function installCategoryAttributeMocks(page: Page) {
+  const categoryAttributes = [
+    {
+      id: 1,
+      categoryId: 3,
+      attributeId: 1,
+      requiredFlag: true,
+      skuFlag: false,
+      sortOrder: 1,
+      status: 'enabled',
+      createdByName: '韩健',
+      createdAt: '2026-08-04T09:30:00',
+    },
+  ];
+
   await page.route('**/api/admin/product-categories', (route) =>
     fulfillJson(route, [
       { id: 1, scope: 'finished', name: '成品现货', status: 'enabled', createdAt: '2026-08-01T09:00:00' },
@@ -65,23 +79,30 @@ async function installCategoryAttributeMocks(page: Page) {
     ]),
   );
   await page.route('**/api/admin/product-attributes', (route) =>
-    fulfillJson(route, [{ id: 1, scope: 'shared', name: '材质', valueType: 'select', status: 'enabled' }]),
-  );
-  await page.route('**/api/admin/category-attributes', (route) =>
     fulfillJson(route, [
-      {
-        id: 1,
-        categoryId: 3,
-        attributeId: 1,
-        requiredFlag: true,
-        skuFlag: false,
-        sortOrder: 1,
-        status: 'enabled',
-        createdByName: '韩健',
-        createdAt: '2026-08-04T09:30:00',
-      },
+      { id: 1, scope: 'shared', name: '材质', valueType: 'select', status: 'enabled' },
+      { id: 2, scope: 'shared', name: '颜色', valueType: 'select', status: 'enabled' },
+      { id: 3, scope: 'finished', name: '尺寸', valueType: 'number', status: 'enabled' },
+      { id: 4, scope: 'shared', name: '停用属性', valueType: 'text', status: 'disabled' },
     ]),
   );
+  await page.route('**/api/admin/category-attributes/batch', async (route) => {
+    const payload = route.request().postDataJSON() as { categoryId: number; attributeIds: number[] };
+    const created = payload.attributeIds.map((attributeId, index) => ({
+      id: categoryAttributes.length + index + 1,
+      categoryId: payload.categoryId,
+      attributeId,
+      requiredFlag: false,
+      skuFlag: false,
+      sortOrder: categoryAttributes.length + index + 1,
+      status: 'disabled',
+      createdByName: '当前操作员',
+      createdAt: '2026-08-04T10:00:00',
+    }));
+    categoryAttributes.push(...created);
+    await fulfillJson(route, created);
+  });
+  await page.route('**/api/admin/category-attributes', (route) => fulfillJson(route, categoryAttributes));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -177,5 +198,64 @@ test('hides inactive categories and selects an enabled leaf beside the template 
   await expect(headers.nth(7)).toContainText('绑定时间');
   await expect(main.locator('tbody tr').filter({ hasText: '材质' }).first()).toContainText('韩健');
 
+  await bindButton.click();
+  const bindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
+  await expect(bindDialog).toBeVisible();
+  const transferSource = bindDialog.locator('.t-transfer__list-source');
+  const transferTarget = bindDialog.locator('.t-transfer__list-target');
+  await expect(transferSource.locator('.t-transfer__list-header')).toContainText('待绑定属性');
+  await expect(transferTarget.locator('.t-transfer__list-header')).toContainText('已选择属性');
+  await expect(transferSource.getByRole('checkbox', { name: '颜色 / 标准选项' })).toBeVisible();
+  await expect(transferSource.getByRole('checkbox', { name: '尺寸 / 数值' })).toBeVisible();
+  await expect(transferSource.getByRole('checkbox', { name: '材质 / 标准选项' })).toHaveCount(0);
+  await expect(transferSource.getByRole('checkbox', { name: '停用属性 / 文本' })).toHaveCount(0);
+
+  await transferSource.locator('.t-checkbox').filter({ hasText: '颜色 / 标准选项' }).click();
+  await transferSource.locator('.t-checkbox').filter({ hasText: '尺寸 / 数值' }).click();
+  await bindDialog.locator('.t-transfer__operations button').first().click();
+  const batchRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith('/api/admin/category-attributes/batch') && request.method() === 'POST',
+  );
+  await bindDialog.getByRole('button', { name: '提交', exact: true }).click();
+  const batchRequest = await batchRequestPromise;
+  expect(batchRequest.postDataJSON()).toEqual({ categoryId: 3, attributeIds: [2, 3] });
+  await expect(bindDialog).toBeHidden();
+  await expect(main.locator('tbody tr').filter({ hasText: '颜色' })).toContainText('当前操作员');
+  await expect(main.locator('tbody tr').filter({ hasText: '颜色' })).toContainText('停用');
+  await expect(main.locator('tbody tr').filter({ hasText: '尺寸' })).toContainText('当前操作员');
+  await expect(main.locator('tbody tr').filter({ hasText: '尺寸' })).toContainText('停用');
+
   await expect(templatePanel.locator('.zdm-admin-pagination')).toBeVisible();
+});
+
+test('keeps template data visible while hiding ungranted binding operations', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 20,
+        name: '模板查看员',
+        phone: '15926620020',
+        roles: ['CATEGORY_ATTRIBUTE_VIEWER'],
+        permissions: ['admin.product-data-center.category-attribute-template.view'],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/category-attribute-template');
+  const main = page.getByRole('main');
+  await main.getByRole('button', { name: '岩板茶几', exact: true }).click();
+
+  const row = main.locator('tbody tr').filter({ hasText: '材质' }).first();
+  await expect(row).toContainText('韩健');
+  await expect(main.getByRole('button', { name: '绑定属性' })).toHaveCount(0);
+  await expect(row.locator('.t-switch')).toHaveCount(2);
+  await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
+  await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
+  await expect(row.locator('.t-input-number input')).toBeDisabled();
+  await expect(row.getByText('启用', { exact: true })).toHaveCount(1);
+  await expect(row.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(row.locator('.table-actions')).toHaveText('-');
 });

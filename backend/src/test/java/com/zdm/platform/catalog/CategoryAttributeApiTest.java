@@ -87,6 +87,7 @@ class CategoryAttributeApiTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.status").value("disabled"))
         .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
         .andReturn();
     String categoryAttributeId = com.jayway.jsonpath.JsonPath.read(
@@ -133,5 +134,126 @@ class CategoryAttributeApiTest {
         "SELECT COUNT(*) FROM category_attributes WHERE id = ?",
         Integer.class,
         categoryAttributeId)).isZero();
+  }
+
+  @Test
+  void categoryAttributeModuleIgnoresSelfDataScopeAndSupportsBatchBinding() throws Exception {
+    long accountId = 9920L;
+    long employeeId = 9920L;
+    long roleId = 9920L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629920",
+        "模板绑定操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '模板绑定操作员', '15926629920', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '类目属性模板操作角色', 'CATEGORY_ATTRIBUTE_OPERATOR_TEST', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.product-data-center.category-attribute-template.view,'
+          'admin.product-data-center.category-attribute-template.create,'
+          'admin.product-data-center.category-attribute-template.edit,'
+          'admin.product-data-center.category-attribute-template.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_categories
+          (id, scope, name, sort_order, product_count, status, created_by_name)
+        VALUES (9920, 'finished', '数据权限豁免测试分类', 1, 0, 'enabled', '其他创建人')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attributes
+          (id, scope, name, value_type, attribute_role, status)
+        VALUES
+          (9920, 'shared', '已绑定测试属性', 'select', 'basic', 'enabled'),
+          (9921, 'shared', '批量绑定属性一', 'select', 'basic', 'enabled'),
+          (9922, 'finished', '批量绑定属性二', 'number', 'basic', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO category_attributes
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
+        VALUES (9920, 9920, 1, 0, 1, 'enabled', '其他绑定人')
+        """);
+    Long otherCreatorBindingId = jdbcTemplate.queryForObject(
+        "SELECT id FROM category_attributes WHERE category_id = 9920 AND attribute_id = 9920",
+        Long.class);
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+
+    mockMvc.perform(get("/api/admin/category-attributes")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == %s)].createdByName".formatted(otherCreatorBindingId))
+            .value(hasItem("其他绑定人")));
+
+    mockMvc.perform(post("/api/admin/category-attributes/batch")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9920,
+                  "attributeIds":[9921,9922]
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[*].createdByName").value(hasItem("模板绑定操作员")))
+        .andExpect(jsonPath("$.data[*].requiredFlag").value(hasItem(false)))
+        .andExpect(jsonPath("$.data[*].skuFlag").value(hasItem(false)))
+        .andExpect(jsonPath("$.data[0].status").value("disabled"))
+        .andExpect(jsonPath("$.data[1].status").value("disabled"));
+
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM category_attributes WHERE category_id = 9920",
+        Integer.class)).isEqualTo(3);
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", otherCreatorBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9920,
+                  "attributeId":9920,
+                  "requiredFlag":false,
+                  "skuFlag":true,
+                  "sortOrder":1,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value("其他绑定人"))
+        .andExpect(jsonPath("$.data.skuFlag").value(true));
+
+    mockMvc.perform(delete("/api/admin/category-attributes/{id}", otherCreatorBindingId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
   }
 }

@@ -91,7 +91,12 @@
                     </div>
                   </t-form>
                   <div class="template-toolbar">
-                    <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
+                    <t-button
+                      v-if="canBindAttribute"
+                      theme="primary"
+                      :disabled="!selectedCategoryId"
+                      @click="openBindDialog"
+                    >
                       <template #icon><t-icon name="add" /></template>绑定属性
                     </t-button>
                   </div>
@@ -103,6 +108,7 @@
                     <t-switch
                       :model-value="row.requiredFlag"
                       :loading="savingId === row.id"
+                      :disabled="!canEditBinding"
                       @change="changeFlag(row, 'requiredFlag', $event)"
                     />
                   </template>
@@ -110,6 +116,7 @@
                     <t-switch
                       :model-value="row.skuFlag"
                       :loading="savingId === row.id"
+                      :disabled="!canEditBinding"
                       @change="changeFlag(row, 'skuFlag', $event)"
                     />
                   </template>
@@ -120,6 +127,7 @@
                       size="small"
                       :min="0"
                       :max="999"
+                      :disabled="!canEditBinding"
                       @change="changeSort(row, $event)"
                     />
                   </template>
@@ -130,10 +138,15 @@
                   </template>
                   <template #operation="{ row }">
                     <div class="table-actions">
-                      <t-link :theme="row.status === 'enabled' ? 'warning' : 'success'" @click="toggleStatus(row)">
+                      <t-link
+                        v-if="canEditBinding"
+                        :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                        @click="toggleStatus(row)"
+                      >
                         {{ row.status === 'enabled' ? '停用' : '启用' }}
                       </t-link>
-                      <t-link theme="danger" @click="openDeleteConfirm(row)">删除</t-link>
+                      <t-link v-if="canDeleteBinding" theme="danger" @click="openDeleteConfirm(row)">删除</t-link>
+                      <span v-if="!canEditBinding && !canDeleteBinding">-</span>
                     </div>
                   </template>
                 </t-table>
@@ -155,32 +168,25 @@
     <AdminDialog
       v-model:visible="bindDialogVisible"
       header="绑定属性"
-      width="560px"
-      placement="center"
-      :prevent-scroll-through="false"
+      width="760px"
       confirm-btn="提交"
       @confirm="submitBind"
       @close="closeBindDialog"
     >
-      <t-form :data="bindForm" label-width="96px" colon>
-        <t-form-item label="商品分类">
-          <t-input :value="selectedCategoryPath" disabled />
-        </t-form-item>
-        <t-form-item label="标准属性" required-mark>
-          <t-select v-model="bindForm.attributeId" filterable placeholder="请选择属性">
-            <t-option
-              v-for="item in availableAttributeOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </t-select>
-        </t-form-item>
-        <t-form-item label="发布规则">
-          <t-checkbox v-model="bindForm.requiredFlag">必填</t-checkbox>
-          <t-checkbox v-model="bindForm.skuFlag">SKU</t-checkbox>
-        </t-form-item>
-      </t-form>
+      <div class="bind-category-context">
+        <span class="bind-category-label">商品分类：</span>
+        <span>{{ selectedCategoryPath }}</span>
+      </div>
+      <t-transfer
+        v-model="bindForm.attributeIds"
+        class="bind-transfer"
+        :data="availableAttributeOptions"
+        :empty="['暂无可绑定属性', '暂未选择属性']"
+        :title="['待绑定属性', '已选择属性']"
+        search
+        show-check-all
+        target-sort="original"
+      />
     </AdminDialog>
 
     <t-dialog
@@ -206,8 +212,10 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
-  createCategoryAttribute,
+  createCategoryAttributes,
   deleteCategoryAttribute,
   listCategoryAttributes,
   updateCategoryAttribute,
@@ -245,6 +253,11 @@ interface CategoryTreeRow {
 }
 
 const activeScope = ref<Scope>('finished');
+const permissionPrefix = 'admin.product-data-center.category-attribute-template';
+const loginUser = computed(() => getLoginUser());
+const canBindAttribute = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.create`));
+const canEditBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.edit`));
+const canDeleteBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
 const scopeTabs = [
   { label: '成品现货模板', value: 'finished' },
   { label: '配件模板', value: 'accessory' },
@@ -266,7 +279,7 @@ const searchForm = reactive({ keyword: '', status: '' as Status | '' });
 const appliedSearch = reactive({ keyword: '', status: '' as Status | '' });
 const pagination = reactive({ current: 1, pageSize: 10 });
 const pageSizeOptions = [10, 20, 50];
-const bindForm = reactive({ attributeId: undefined as number | undefined, requiredFlag: true, skuFlag: false });
+const bindForm = reactive({ attributeIds: [] as number[] });
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
@@ -495,43 +508,41 @@ function handlePaginationChange(pageInfo: PageInfo) {
 }
 
 function openBindDialog() {
+  if (!canBindAttribute.value) return;
   if (!selectedCategoryId.value) {
     MessagePlugin.warning('请选择分类');
     return;
   }
-  bindForm.attributeId = undefined;
-  bindForm.requiredFlag = true;
-  bindForm.skuFlag = false;
+  bindForm.attributeIds = [];
   bindDialogVisible.value = true;
 }
 
 function closeBindDialog() {
   bindDialogVisible.value = false;
+  bindForm.attributeIds = [];
 }
 
 async function submitBind() {
-  if (!selectedCategoryId.value || !bindForm.attributeId) {
-    MessagePlugin.warning('请选择属性');
+  if (!canBindAttribute.value) return;
+  if (!selectedCategoryId.value || !bindForm.attributeIds.length) {
+    MessagePlugin.warning('请选择需要绑定的属性');
     return;
   }
   try {
-    const created = await createCategoryAttribute({
+    const created = await createCategoryAttributes({
       categoryId: selectedCategoryId.value,
-      attributeId: bindForm.attributeId,
-      requiredFlag: bindForm.requiredFlag,
-      skuFlag: bindForm.skuFlag,
-      sortOrder: bindings.value.filter((item) => item.categoryId === selectedCategoryId.value).length + 1,
-      status: 'enabled',
+      attributeIds: bindForm.attributeIds,
     });
-    bindings.value.push(created);
+    bindings.value.push(...created);
     closeBindDialog();
-    MessagePlugin.success('绑定成功');
+    MessagePlugin.success(`成功绑定 ${created.length} 个属性`);
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '绑定失败');
   }
 }
 
 async function persistRow(row: BindingRow, patch: Partial<BindingRow>) {
+  if (!canEditBinding.value) return;
   savingId.value = row.id;
   const nextRow = { ...row, ...patch };
   try {
@@ -567,6 +578,7 @@ function toggleStatus(row: BindingRow) {
 }
 
 function openDeleteConfirm(row: BindingRow) {
+  if (!canDeleteBinding.value) return;
   deleteTarget.value = row;
   deleteConfirmVisible.value = true;
 }
@@ -577,6 +589,7 @@ function closeDeleteConfirm() {
 }
 
 async function handleDelete() {
+  if (!canDeleteBinding.value) return;
   if (!deleteTarget.value) return;
   try {
     await deleteCategoryAttribute(deleteTarget.value.id);
@@ -702,6 +715,34 @@ onMounted(loadData);
   display: flex;
   align-items: center;
   margin-top: var(--td-comp-margin-l);
+}
+
+.bind-category-context {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--td-comp-margin-l);
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.bind-category-label {
+  flex-shrink: 0;
+  color: var(--td-text-color-secondary);
+}
+
+.bind-transfer {
+  width: 100%;
+}
+
+.bind-transfer :deep(.t-transfer__list) {
+  flex: 1;
+  min-width: 0;
+  height: 320px;
+}
+
+.bind-transfer :deep(.t-transfer__list-header) {
+  width: calc(100% - var(--td-comp-margin-s) * 2);
 }
 
 .filter-row {
