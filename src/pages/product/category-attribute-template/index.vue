@@ -25,6 +25,11 @@
                   </div>
                 </div>
 
+                <div class="category-search">
+                  <t-input v-model="categoryKeyword" clearable placeholder="请输入分类名称" @enter="searchCategory" />
+                  <t-button theme="default" variant="base" @click="searchCategory">搜索</t-button>
+                </div>
+
                 <div class="category-tree">
                   <template v-for="row in visibleCategoryRows" :key="row.node.id">
                     <div
@@ -258,6 +263,8 @@ const attributes = ref<ProductAttributeRecord[]>([]);
 const bindings = ref<CategoryAttributeRecord[]>([]);
 const selectedCategoryId = ref<number | undefined>();
 const expandedCategoryIds = ref<number[]>([]);
+const categoryKeyword = ref('');
+const appliedCategoryKeyword = ref('');
 const bindDialogVisible = ref(false);
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
@@ -301,7 +308,7 @@ const scopedCategories = computed(() =>
     .sort((first, second) => categoryCreatedAtTime(second) - categoryCreatedAtTime(first) || second.id - first.id),
 );
 
-const categoryTree = computed(() => buildCategoryTree(undefined));
+const categoryTree = computed(() => filterCategoryTree(buildCategoryTree(undefined)));
 
 const visibleCategoryRows = computed(() => {
   const rows: CategoryTreeRow[] = [];
@@ -381,9 +388,20 @@ function buildCategoryTree(parentId: number | undefined): CategoryTreeNode[] {
     .map((item) => ({ ...item, children: buildCategoryTree(item.id) }));
 }
 
+function filterCategoryTree(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
+  const keyword = appliedCategoryKeyword.value.trim();
+  if (!keyword) return nodes;
+
+  return nodes.flatMap((node) => {
+    if (node.name.includes(keyword)) return [node];
+    const children = filterCategoryTree(node.children);
+    return children.length ? [{ ...node, children }] : [];
+  });
+}
+
 function collectVisibleCategoryRows(node: CategoryTreeNode, level: number, rows: CategoryTreeRow[]) {
   rows.push({ node, level });
-  if (!isCategoryExpanded(node.id)) return;
+  if (!appliedCategoryKeyword.value.trim() && !isCategoryExpanded(node.id)) return;
   node.children.forEach((child) => collectVisibleCategoryRows(child, level + 1, rows));
 }
 
@@ -407,6 +425,10 @@ function selectLeafCategory(category: CategoryTreeNode) {
   if (category.children.length) return;
   selectedCategoryId.value = category.id;
   reset();
+}
+
+function searchCategory() {
+  appliedCategoryKeyword.value = categoryKeyword.value;
 }
 
 function valueTypeLabel(value: ProductAttributeRecord['valueType']) {
@@ -572,6 +594,8 @@ async function handleDelete() {
 
 watch(activeScope, () => {
   selectedCategoryId.value = undefined;
+  categoryKeyword.value = '';
+  appliedCategoryKeyword.value = '';
   expandAllCategories();
   reset();
 });
@@ -628,6 +652,19 @@ onMounted(loadData);
   max-height: 640px;
   padding: var(--td-comp-paddingTB-s) 0;
   overflow-y: auto;
+}
+
+.category-search {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
+  border-bottom: 1px solid var(--td-component-border);
+}
+
+.category-search :deep(.t-input) {
+  flex: 1;
+  min-width: 0;
 }
 
 .category-node {
