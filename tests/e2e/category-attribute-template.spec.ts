@@ -45,12 +45,27 @@ test.beforeEach(async ({ page }) => {
   await installCategoryAttributeMocks(page);
 });
 
-test('aligns the template list layout and shows creator metadata after status', async ({ page }) => {
+test('selects a category before showing its template data', async ({ page }) => {
   await page.goto('/category-attribute-template');
 
   const main = page.getByRole('main');
   await expect(main.locator('.zdm-admin-list-layout')).toHaveCount(1);
   await expect(main.locator('.zdm-admin-list-layout__filters')).toHaveCount(0);
+  await expect(main.getByText('当前分类：')).toBeVisible();
+  await expect(main.locator('.selected-category-path')).toHaveText('未选择分类');
+  await expect(main.locator('tbody tr').filter({ hasText: '材质' })).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '绑定属性' })).toBeDisabled();
+
+  await main.getByRole('button', { name: '切换分类' }).click();
+  const categoryDialog = page.locator('.t-dialog').filter({ hasText: '选择商品分类' });
+  await expect(categoryDialog).toBeVisible();
+  await categoryDialog.getByRole('button', { name: '成品现货' }).click();
+  await categoryDialog.getByRole('button', { name: '岩板茶几' }).click();
+  await categoryDialog.getByRole('button', { name: '确认' }).click();
+
+  await expect(categoryDialog).toBeHidden();
+  await expect(main.getByText('成品现货 > 岩板茶几', { exact: true })).toBeVisible();
+  await expect(main.getByRole('button', { name: '绑定属性' })).toBeEnabled();
 
   const headers = main.getByRole('columnheader');
   await expect(headers.nth(5)).toContainText('状态');

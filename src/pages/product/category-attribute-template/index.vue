@@ -15,22 +15,10 @@
                 <t-tabs v-model="activeScope" :list="scopeTabs" />
               </div>
 
-              <div class="selector-row">
-                <t-select
-                  v-model="selectedCategoryId"
-                  class="category-select"
-                  filterable
-                  placeholder="请选择分类"
-                  :loading="loading"
-                >
-                  <t-option
-                    v-for="item in categoryOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                    :disabled="item.disabled"
-                  />
-                </t-select>
+              <div class="selected-category">
+                <span>当前分类：</span>
+                <span class="selected-category-path">{{ selectedCategoryPath }}</span>
+                <t-button size="small" variant="outline" @click="openCategoryDialog">切换分类</t-button>
               </div>
 
               <t-form :data="searchForm" label-width="72px" colon>
@@ -123,6 +111,34 @@
     </div>
 
     <AdminDialog
+      v-model:visible="categoryDialogVisible"
+      header="选择商品分类"
+      width="760px"
+      placement="center"
+      :prevent-scroll-through="false"
+      confirm-btn="确认"
+      cancel-btn="取消"
+      @confirm="confirmCategorySelection"
+      @close="closeCategoryDialog"
+    >
+      <div class="category-picker">
+        <div v-for="(column, columnIndex) in categoryColumns" :key="columnIndex" class="category-column">
+          <button
+            v-for="item in column"
+            :key="item.id"
+            type="button"
+            :disabled="item.status === 'disabled'"
+            :class="['category-option', pendingCategoryPathIds[columnIndex] === item.id && 'active']"
+            @click="selectCategory(columnIndex, item)"
+          >
+            <span>{{ item.name }}</span>
+            <t-icon v-if="hasCategoryChildren(item.id)" name="chevron-right" />
+          </button>
+        </div>
+      </div>
+    </AdminDialog>
+
+    <AdminDialog
       v-model:visible="bindDialogVisible"
       header="绑定属性"
       width="560px"
@@ -134,7 +150,7 @@
     >
       <t-form :data="bindForm" label-width="96px" colon>
         <t-form-item label="商品分类">
-          <t-input :value="selectedCategoryName" disabled />
+          <t-input :value="selectedCategoryPath" disabled />
         </t-form-item>
         <t-form-item label="标准属性" required-mark>
           <t-select v-model="bindForm.attributeId" filterable placeholder="请选择属性">
@@ -190,12 +206,6 @@ import { listProductCategories, type ProductCategoryRecord } from '@/services/pr
 type Scope = 'finished' | 'accessory';
 type Status = 'enabled' | 'disabled';
 
-interface CategoryOption {
-  label: string;
-  value: number;
-  disabled: boolean;
-}
-
 interface BindingRow {
   id: number;
   categoryId: number;
@@ -223,6 +233,9 @@ const categories = ref<ProductCategoryRecord[]>([]);
 const attributes = ref<ProductAttributeRecord[]>([]);
 const bindings = ref<CategoryAttributeRecord[]>([]);
 const selectedCategoryId = ref<number | undefined>();
+const pendingCategoryId = ref<number | undefined>();
+const pendingCategoryPathIds = ref<number[]>([]);
+const categoryDialogVisible = ref(false);
 const bindDialogVisible = ref(false);
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
@@ -249,16 +262,39 @@ const selectedCategoryName = computed(() => {
   return category?.name ?? '未选择分类';
 });
 
-const categoryOptions = computed(() => {
-  const scopedCategories = categories.value
+const selectedCategoryPath = computed(() => {
+  if (!selectedCategoryId.value) return '未选择分类';
+
+  const categoryMap = new Map(categories.value.map((item) => [item.id, item]));
+  const names: string[] = [];
+  let current = categoryMap.get(selectedCategoryId.value);
+  while (current) {
+    names.unshift(current.name);
+    current = current.parentId ? categoryMap.get(current.parentId) : undefined;
+  }
+  return names.join(' > ') || '未选择分类';
+});
+
+const scopedCategories = computed(() =>
+  categories.value
     .filter((item) => item.scope === activeScope.value)
-    .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id);
-  const rows: CategoryOption[] = [];
-  collectCategoryOptions(scopedCategories, undefined, 0, rows);
-  return rows;
+    .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id),
+);
+
+const categoryColumns = computed(() => {
+  const columns: ProductCategoryRecord[][] = [
+    scopedCategories.value.filter((item) => (item.parentId ?? undefined) === undefined),
+  ];
+  pendingCategoryPathIds.value.forEach((categoryId) => {
+    const children = scopedCategories.value.filter((item) => item.parentId === categoryId);
+    if (children.length) columns.push(children);
+  });
+  return columns;
 });
 
 const bindingRows = computed<BindingRow[]>(() => {
+  if (!selectedCategoryId.value) return [];
+
   const attributeMap = new Map(attributes.value.map((item) => [item.id, item]));
   return bindings.value
     .filter((item) => item.categoryId === selectedCategoryId.value)
@@ -312,23 +348,21 @@ const availableAttributeOptions = computed(() =>
     })),
 );
 
-function collectCategoryOptions(
-  records: ProductCategoryRecord[],
-  parentId: number | undefined,
-  level: number,
-  rows: CategoryOption[],
-) {
-  records
-    .filter((item) => (item.parentId ?? undefined) === parentId)
-    .forEach((item) => {
-      const hasChildren = records.some((child) => child.parentId === item.id);
-      rows.push({
-        label: `${'　'.repeat(level)}${item.name}`,
-        value: item.id,
-        disabled: hasChildren || item.status === 'disabled',
-      });
-      collectCategoryOptions(records, item.id, level + 1, rows);
-    });
+function hasCategoryChildren(categoryId: number) {
+  return scopedCategories.value.some((item) => item.parentId === categoryId);
+}
+
+function getCategoryPathIds(categoryId?: number) {
+  if (!categoryId) return [];
+
+  const categoryMap = new Map(scopedCategories.value.map((item) => [item.id, item]));
+  const pathIds: number[] = [];
+  let current = categoryMap.get(categoryId);
+  while (current) {
+    pathIds.unshift(current.id);
+    current = current.parentId ? categoryMap.get(current.parentId) : undefined;
+  }
+  return pathIds;
 }
 
 function valueTypeLabel(value: ProductAttributeRecord['valueType']) {
@@ -356,11 +390,13 @@ function toPayload(row: BindingRow): CategoryAttributePayload {
 }
 
 function syncSelectedCategory() {
-  const firstAvailable = categoryOptions.value.find((item) => !item.disabled);
-  const stillAvailable = categoryOptions.value.some(
-    (item) => item.value === selectedCategoryId.value && !item.disabled,
+  const selectedCategory = scopedCategories.value.find((item) => item.id === selectedCategoryId.value);
+  const stillAvailable = Boolean(
+    selectedCategory && selectedCategory.status !== 'disabled' && !hasCategoryChildren(selectedCategory.id),
   );
-  selectedCategoryId.value = stillAvailable ? selectedCategoryId.value : firstAvailable?.value;
+  if (!stillAvailable) selectedCategoryId.value = undefined;
+  pendingCategoryId.value = selectedCategoryId.value;
+  pendingCategoryPathIds.value = getCategoryPathIds(selectedCategoryId.value);
   pagination.current = 1;
 }
 
@@ -397,6 +433,33 @@ function reset() {
 function handlePaginationChange(pageInfo: PageInfo) {
   pagination.current = pageInfo.current;
   pagination.pageSize = pageInfo.pageSize;
+}
+
+function openCategoryDialog() {
+  pendingCategoryId.value = selectedCategoryId.value;
+  pendingCategoryPathIds.value = getCategoryPathIds(selectedCategoryId.value);
+  categoryDialogVisible.value = true;
+}
+
+function closeCategoryDialog() {
+  categoryDialogVisible.value = false;
+  pendingCategoryId.value = selectedCategoryId.value;
+  pendingCategoryPathIds.value = getCategoryPathIds(selectedCategoryId.value);
+}
+
+function selectCategory(columnIndex: number, category: ProductCategoryRecord) {
+  pendingCategoryPathIds.value = [...pendingCategoryPathIds.value.slice(0, columnIndex), category.id];
+  pendingCategoryId.value = hasCategoryChildren(category.id) ? undefined : category.id;
+}
+
+function confirmCategorySelection() {
+  if (!pendingCategoryId.value) {
+    MessagePlugin.warning('请选择末级分类');
+    return;
+  }
+  selectedCategoryId.value = pendingCategoryId.value;
+  reset();
+  closeCategoryDialog();
 }
 
 function openBindDialog() {
@@ -493,7 +556,12 @@ async function handleDelete() {
   }
 }
 
-watch(activeScope, syncSelectedCategory);
+watch(activeScope, () => {
+  selectedCategoryId.value = undefined;
+  pendingCategoryId.value = undefined;
+  pendingCategoryPathIds.value = [];
+  reset();
+});
 
 onMounted(loadData);
 </script>
@@ -514,13 +582,63 @@ onMounted(loadData);
   min-height: 0;
 }
 
-.selector-row {
+.selected-category {
   display: flex;
   align-items: center;
+  gap: var(--td-comp-margin-s);
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-medium);
 }
 
-.category-select {
-  width: min(520px, 100%);
+.selected-category-path {
+  color: var(--td-text-color-primary);
+  font-weight: 500;
+}
+
+.category-picker {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--td-comp-margin-s);
+  min-height: 280px;
+}
+
+.category-column {
+  min-width: 0;
+  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-s);
+  overflow-y: auto;
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
+}
+
+.category-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 38px;
+  padding: 0 var(--td-comp-paddingLR-s);
+  color: var(--td-text-color-primary);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: var(--td-radius-default);
+}
+
+.category-option:hover:not(:disabled),
+.category-option.active {
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+}
+
+.category-option.active {
+  font-weight: 700;
+}
+
+.category-option:disabled {
+  color: var(--td-text-color-disabled);
+  cursor: not-allowed;
 }
 
 .toolbar-title {
@@ -589,8 +707,14 @@ onMounted(loadData);
 }
 
 @media (max-width: 720px) {
-  .category-select {
-    width: 100%;
+  .selected-category {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .category-picker {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr;
   }
 
   .filter-fields :deep(.t-form__item) {
