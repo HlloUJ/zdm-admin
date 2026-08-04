@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.List;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -11,6 +12,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper, ProductAttribute> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+  private static final String DUPLICATE_NAME_MESSAGE = "当前属性库已存在同名属性";
 
   private final CurrentIdentityProvider identityProvider;
 
@@ -25,8 +27,13 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   @Transactional
   public ProductAttribute createAttribute(ProductAttribute attribute) {
     attribute.setId(null);
+    attribute.setName(attribute.getName().trim());
     attribute.setCreatedByName(resolveCreatedByName());
-    save(attribute);
+    try {
+      save(attribute);
+    } catch (DuplicateKeyException exception) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
+    }
     return getById(attribute.getId());
   }
 

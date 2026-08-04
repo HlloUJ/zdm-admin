@@ -155,6 +155,21 @@ class PlatformApiSmokeTest {
         attributeId);
     assertThat(persistedCreatorName).isEqualTo(creatorName);
 
+    mockMvc.perform(post("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"shared",
+                  "name":"  %s  ",
+                  "valueType":"text",
+                  "attributeRole":"basic",
+                  "status":"enabled"
+                }
+                """.formatted(attributeName)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("当前属性库已存在同名属性"));
+
     jdbcTemplate.update(
         """
         INSERT INTO category_attributes
