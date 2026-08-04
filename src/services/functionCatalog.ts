@@ -137,6 +137,10 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             actions: [
               { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
               { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
+              {
+                label: '发布/取消发布',
+                value: 'admin.product-data-center.category-attribute-template.toggle-publish',
+              },
               { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
             ],
             tabs: [],

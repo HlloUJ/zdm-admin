@@ -82,12 +82,14 @@ class CategoryAttributeApiTest {
                   "skuFlag":false,
                   "sortOrder":1,
                   "status":"enabled",
+                  "publishStatus":"published",
                   "createdByName":"不应覆盖"
                 }
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.createdByName").value(creatorName))
         .andExpect(jsonPath("$.data.status").value("disabled"))
+        .andExpect(jsonPath("$.data.publishStatus").value("unpublished"))
         .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
         .andReturn();
     String categoryAttributeId = com.jayway.jsonpath.JsonPath.read(
@@ -99,6 +101,10 @@ class CategoryAttributeApiTest {
         "SELECT created_by_name FROM category_attributes WHERE id = ?",
         String.class,
         categoryAttributeId)).isEqualTo(creatorName);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT publish_status FROM category_attributes WHERE id = ?",
+        String.class,
+        categoryAttributeId)).isEqualTo("unpublished");
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}", categoryAttributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
@@ -111,12 +117,24 @@ class CategoryAttributeApiTest {
                   "skuFlag":true,
                   "sortOrder":2,
                   "status":"enabled",
+                  "publishStatus":"published",
                   "createdByName":"不应覆盖"
                 }
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.createdByName").value(creatorName))
-        .andExpect(jsonPath("$.data.status").value("disabled"));
+        .andExpect(jsonPath("$.data.status").value("disabled"))
+        .andExpect(jsonPath("$.data.publishStatus").value("unpublished"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.publishStatus").value("published"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/unpublish", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.publishStatus").value("unpublished"));
 
     mockMvc.perform(get("/api/admin/category-attributes")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
@@ -228,11 +246,43 @@ class CategoryAttributeApiTest {
         .andExpect(jsonPath("$.data[*].requiredFlag").value(hasItem(false)))
         .andExpect(jsonPath("$.data[*].skuFlag").value(hasItem(false)))
         .andExpect(jsonPath("$.data[0].status").value("disabled"))
-        .andExpect(jsonPath("$.data[1].status").value("disabled"));
+        .andExpect(jsonPath("$.data[1].status").value("disabled"))
+        .andExpect(jsonPath("$.data[0].publishStatus").value("unpublished"))
+        .andExpect(jsonPath("$.data[1].publishStatus").value("unpublished"));
 
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM category_attributes WHERE category_id = 9920",
         Integer.class)).isEqualTo(3);
+
+    Long batchBindingId = jdbcTemplate.queryForObject(
+        "SELECT id FROM category_attributes WHERE category_id = 9920 AND attribute_id = 9921",
+        Long.class);
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", batchBindingId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+
+    jdbcTemplate.update(
+        """
+        UPDATE roles
+        SET function_permissions = CONCAT(function_permissions,
+          ',admin.product-data-center.category-attribute-template.toggle-publish')
+        WHERE id = ?
+        """,
+        roleId);
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", batchBindingId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.publishStatus").value("published"));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT publish_status FROM category_attributes WHERE id = ?",
+        String.class,
+        batchBindingId)).isEqualTo("published");
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/unpublish", batchBindingId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.publishStatus").value("unpublished"));
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}", otherCreatorBindingId)
             .header("Authorization", "Bearer " + token)

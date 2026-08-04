@@ -141,6 +141,10 @@ describe('full function catalog', () => {
       { label: '查看', value: 'admin.product-data-center.category-attribute-template.view' },
       { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
       { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
+      {
+        label: '发布/取消发布',
+        value: 'admin.product-data-center.category-attribute-template.toggle-publish',
+      },
       { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
     ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
@@ -165,6 +169,7 @@ describe('full function catalog', () => {
       'admin.product-data-center.category-attribute-template.view',
       'admin.product-data-center.category-attribute-template.create',
       'admin.product-data-center.category-attribute-template.edit',
+      'admin.product-data-center.category-attribute-template.toggle-publish',
       'admin.product-data-center.category-attribute-template.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',

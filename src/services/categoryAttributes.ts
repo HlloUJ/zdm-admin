@@ -8,6 +8,7 @@ export interface CategoryAttributeRecord {
   skuFlag?: boolean;
   sortOrder?: number;
   status?: 'enabled' | 'disabled';
+  publishStatus?: 'published' | 'unpublished';
   createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -50,6 +51,14 @@ export function updateCategoryAttribute(id: number, payload: CategoryAttributePa
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+}
+
+export function publishCategoryAttribute(id: number) {
+  return request<CategoryAttributeRecord>(`/admin/category-attributes/${id}/publish`, { method: 'PUT' });
+}
+
+export function unpublishCategoryAttribute(id: number) {
+  return request<CategoryAttributeRecord>(`/admin/category-attributes/${id}/unpublish`, { method: 'PUT' });
 }
 
 export function deleteCategoryAttribute(id: number) {

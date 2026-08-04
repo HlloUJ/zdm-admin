@@ -58,6 +58,18 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
     return ApiResponse.ok(service.updateCategoryAttribute(id, categoryAttribute));
   }
 
+  @PutMapping("/{id}/publish")
+  public ApiResponse<CategoryAttribute> publish(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-publish");
+    return ApiResponse.ok(service.updatePublishStatus(id, "published"));
+  }
+
+  @PutMapping("/{id}/unpublish")
+  public ApiResponse<CategoryAttribute> unpublish(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-publish");
+    return ApiResponse.ok(service.updatePublishStatus(id, "unpublished"));
+  }
+
   @Override
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
