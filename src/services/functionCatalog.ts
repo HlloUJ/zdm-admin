@@ -127,6 +127,23 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
+        label: '属性库管理',
+        value: 'admin.product-data-center.attribute.menu',
+        direct: false,
+        pages: [
+          {
+            label: '属性库管理页',
+            value: 'admin.product-data-center.attribute',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.attribute.create' },
+              { label: '停用/启用', value: 'admin.product-data-center.attribute.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.attribute.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+      {
         label: '大板品种管理',
         value: 'admin.product-data-center.slab-variety.menu',
         direct: false,

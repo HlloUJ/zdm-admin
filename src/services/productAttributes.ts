@@ -32,10 +32,10 @@ export function createProductAttribute(payload: ProductAttributePayload) {
   });
 }
 
-export function updateProductAttribute(id: number, payload: ProductAttributePayload) {
-  return request<ProductAttributeRecord>(`/admin/product-attributes/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
+export function updateProductAttributeStatus(id: number, status: ProductAttributePayload['status']) {
+  return request<ProductAttributeRecord>(`/admin/product-attributes/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
 }
 

@@ -169,20 +169,14 @@ class PlatformApiSmokeTest {
             "$.data[?(@.id == %d)].templateCount".formatted(attributeId),
             hasItem(1)));
 
-    String updatedName = attributeName + "-已编辑";
-    mockMvc.perform(put("/api/admin/product-attributes/{id}", attributeId)
+    mockMvc.perform(patch("/api/admin/product-attributes/{id}/status", attributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
             .content("""
                 {
-                  "scope":"shared",
-                  "name":"%s",
-                  "valueType":"select",
-                  "attributeRole":"basic",
-                  "status":"disabled",
-                  "createdByName":"不应覆盖"
+                  "status":"disabled"
                 }
-                """.formatted(updatedName)))
+                """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("disabled"))
         .andExpect(jsonPath("$.data.createdByName").value(creatorName));
@@ -190,7 +184,7 @@ class PlatformApiSmokeTest {
         "SELECT name FROM product_attributes WHERE id = ?",
         String.class,
         attributeId);
-    assertThat(persistedName).isEqualTo(updatedName);
+    assertThat(persistedName).isEqualTo(attributeName);
 
     jdbcTemplate.update("DELETE FROM category_attributes WHERE attribute_id = ?", attributeId);
     mockMvc.perform(delete("/api/admin/product-attributes/{id}", attributeId)
@@ -202,6 +196,134 @@ class PlatformApiSmokeTest {
         Integer.class,
         attributeId);
     assertThat(deletedCount).isZero();
+  }
+
+  @Test
+  void productAttributeIgnoresDataScopeAndEnforcesOnlyFunctionPermissions() throws Exception {
+    long accountId = 9061L;
+    long employeeId = 9061L;
+    long roleId = 9061L;
+    long globalAttributeId = 9061L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629061",
+        "属性库操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '属性库操作员', '15926629061', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '属性库全局操作测试角色', 'ATTRIBUTE_GLOBAL_OPERATOR_TEST', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.product-data-center.attribute.view,'
+          'admin.product-data-center.attribute.create,'
+          'admin.product-data-center.attribute.toggle-status,'
+          'admin.product-data-center.attribute.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attributes
+          (id, scope, name, value_type, attribute_role, status, created_by_name)
+        VALUES (?, 'accessory', '其他管理员创建的全局属性', 'text', 'basic', 'enabled', '其他管理员')
+        """,
+        globalAttributeId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == %d)].createdByName".formatted(globalAttributeId),
+            hasItem("其他管理员")));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"shared",
+                  "name":"全局权限新增属性",
+                  "valueType":"select",
+                  "attributeRole":"basic",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andReturn();
+    Integer createdAttributeId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id");
+
+    mockMvc.perform(patch("/api/admin/product-attributes/{id}/status", createdAttributeId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", createdAttributeId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+
+    jdbcTemplate.update(
+        "UPDATE roles SET function_permissions = ? WHERE id = ?",
+        "admin.product-data-center.attribute.view",
+        roleId);
+    mockMvc.perform(get("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == %d)].id".formatted(globalAttributeId),
+            hasItem((int) globalAttributeId)));
+    mockMvc.perform(post("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"shared",
+                  "name":"无新增权限属性",
+                  "valueType":"text",
+                  "attributeRole":"basic",
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(patch("/api/admin/product-attributes/{id}/status", globalAttributeId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"status":"disabled"}
+                """))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", globalAttributeId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
   }
 
   @Test
