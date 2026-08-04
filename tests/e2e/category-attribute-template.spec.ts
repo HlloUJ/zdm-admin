@@ -141,8 +141,8 @@ test('hides inactive categories and selects an enabled leaf beside the template 
 
   const headers = main.getByRole('columnheader');
   await expect(headers.nth(5)).toContainText('状态');
-  await expect(headers.nth(6)).toContainText('创建人');
-  await expect(headers.nth(7)).toContainText('创建时间');
+  await expect(headers.nth(6)).toContainText('绑定人');
+  await expect(headers.nth(7)).toContainText('绑定时间');
   await expect(main.locator('tbody tr').filter({ hasText: '材质' }).first()).toContainText('韩健');
 
   await expect(templatePanel.locator('.zdm-admin-pagination')).toBeVisible();

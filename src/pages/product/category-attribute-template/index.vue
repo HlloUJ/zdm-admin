@@ -274,8 +274,8 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'skuFlag', title: 'SKU', width: 90, align: 'center' },
   { colKey: 'sortOrder', title: '排序', width: 120, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
+  { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
+  { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
 ];
 
