@@ -90,17 +90,102 @@ class PlatformApiSmokeTest {
     Integer slabVarietyWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
+    Integer sampleProductAttributeCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM product_attributes
+        WHERE (id = 1 AND scope = 'shared' AND name = '材质')
+          OR (id = 2 AND scope = 'finished' AND name = '尺寸')
+          OR (id = 3 AND scope = 'accessory' AND name = '颜色')
+        """,
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(30);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(31);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
     assertThat(craftWithoutCreatorCount).isZero();
     assertThat(categoryWithoutCreatorCount).isZero();
     assertThat(slabVarietyWithoutCreatorCount).isZero();
+    assertThat(sampleProductAttributeCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
+  }
+
+  @Test
+  void productAttributeCrudPersistsToDatabaseAndReturnsTemplateCount() throws Exception {
+    String attributeName = "数据库直连属性-" + System.nanoTime();
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"shared",
+                  "name":"%s",
+                  "valueType":"select",
+                  "attributeRole":"basic",
+                  "status":"enabled"
+                }
+                """.formatted(attributeName)))
+        .andExpect(status().isOk())
+        .andReturn();
+    Integer attributeId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id");
+
+    Integer persistedCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attributes WHERE id = ? AND name = ?",
+        Integer.class,
+        attributeId,
+        attributeName);
+    assertThat(persistedCount).isEqualTo(1);
+
+    jdbcTemplate.update(
+        """
+        INSERT INTO category_attributes
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
+        VALUES (4, ?, 0, 0, 1, 'enabled')
+        """,
+        attributeId);
+    mockMvc.perform(get("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == %d)].templateCount".formatted(attributeId),
+            hasItem(1)));
+
+    String updatedName = attributeName + "-已编辑";
+    mockMvc.perform(put("/api/admin/product-attributes/{id}", attributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"shared",
+                  "name":"%s",
+                  "valueType":"select",
+                  "attributeRole":"basic",
+                  "status":"disabled"
+                }
+                """.formatted(updatedName)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+    String persistedName = jdbcTemplate.queryForObject(
+        "SELECT name FROM product_attributes WHERE id = ?",
+        String.class,
+        attributeId);
+    assertThat(persistedName).isEqualTo(updatedName);
+
+    jdbcTemplate.update("DELETE FROM category_attributes WHERE attribute_id = ?", attributeId);
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", attributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+    Integer deletedCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attributes WHERE id = ?",
+        Integer.class,
+        attributeId);
+    assertThat(deletedCount).isZero();
   }
 
   @Test
@@ -351,9 +436,15 @@ class PlatformApiSmokeTest {
         """);
     jdbcTemplate.update(
         """
+        INSERT INTO product_attributes
+          (id, scope, name, value_type, attribute_role, status)
+        VALUES (9204, 'finished', '模板引用删除测试属性', 'select', 'basic', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
         INSERT INTO category_attributes
           (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
-        VALUES (9203, 1, 0, 0, 1, 'enabled')
+        VALUES (9203, 9204, 0, 0, 1, 'enabled')
         """);
 
     mockMvc.perform(delete("/api/admin/product-categories/9203")
