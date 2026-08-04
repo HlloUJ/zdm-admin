@@ -70,16 +70,16 @@
                   <t-form :data="searchForm" label-width="56px" colon>
                     <div class="filter-row">
                       <div class="filter-fields">
-                        <t-form-item label="属性名称" class="keyword-filter-item">
+                        <t-form-item label="属性名称">
                           <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
                         </t-form-item>
-                        <t-form-item label="状态" class="status-filter-item">
+                        <t-form-item label="状态">
                           <t-select v-model="searchForm.status" clearable placeholder="全部">
                             <t-option label="启用" value="enabled" />
                             <t-option label="停用" value="disabled" />
                           </t-select>
                         </t-form-item>
-                        <t-form-item label="发布" class="publish-filter-item">
+                        <t-form-item label="发布">
                           <t-select v-model="searchForm.publishStatus" clearable placeholder="全部">
                             <t-option label="已发布" value="published" />
                             <t-option label="未发布" value="unpublished" />
@@ -915,18 +915,9 @@ onMounted(loadData);
 }
 
 .filter-fields :deep(.t-form__item) {
+  flex: 1 1 0;
+  min-width: 0;
   margin-bottom: 0;
-}
-
-.filter-fields :deep(.keyword-filter-item) {
-  flex: 1 1 auto;
-  min-width: 140px;
-}
-
-.filter-fields :deep(.status-filter-item),
-.filter-fields :deep(.publish-filter-item) {
-  flex: 0 0 160px;
-  width: 160px;
 }
 
 .filter-fields :deep(.t-input),
