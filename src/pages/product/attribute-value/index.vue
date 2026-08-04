@@ -206,7 +206,7 @@ const confirmTarget = ref<Value | null>(null);
 const formRef = ref<FormInstanceFunctions>();
 const form = reactive({
   scope: initialScope,
-  attribute: initialAttribute,
+  attribute: '',
   name: '',
 });
 const formAttributes = computed(() =>
@@ -273,7 +273,6 @@ const loadValues = async () => {
       searchForm.attribute = '';
       applied.attribute = '';
     }
-    if (!formAttributes.value.some((item) => item.code === form.attribute)) syncFormAttribute();
     ensureCurrentPage();
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '属性值列表加载失败');
@@ -300,12 +299,9 @@ const ensureCurrentPage = () => {
   const maxPage = Math.max(Math.ceil(totalCount.value / pagination.pageSize), 1);
   if (pagination.current > maxPage) pagination.current = maxPage;
 };
-const syncFormAttribute = () => {
-  form.attribute = formAttributes.value[0]?.code ?? '';
-};
 const openCreate = () => {
   form.scope = activeScope.value;
-  syncFormAttribute();
+  form.attribute = '';
   form.name = '';
   formRef.value?.clearValidate();
   dialogVisible.value = true;
