@@ -110,7 +110,7 @@ class CategoryAttributeApiTest {
                   "requiredFlag":false,
                   "skuFlag":true,
                   "sortOrder":2,
-                  "status":"disabled",
+                  "status":"enabled",
                   "createdByName":"不应覆盖"
                 }
                 """))

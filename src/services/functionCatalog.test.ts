@@ -134,6 +134,15 @@ describe('full function catalog', () => {
         ],
       },
     ]);
+    const categoryAttributePage = fullFunctionCatalog[0].menus.find(
+      (menu) => menu.value === 'admin.product-data-center.category-attribute-template.menu',
+    )?.pages[0];
+    expect(categoryAttributePage?.actions).toEqual([
+      { label: '查看', value: 'admin.product-data-center.category-attribute-template.view' },
+      { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
+      { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
+      { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
+    ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
