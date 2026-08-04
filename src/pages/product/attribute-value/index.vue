@@ -150,6 +150,7 @@ interface AttributeOption {
   name: string;
   scope: Scope;
   valueType: ProductAttributeRecord['valueType'];
+  status: Status;
 }
 interface Value {
   id: number;
@@ -209,7 +210,7 @@ const form = reactive({
   name: '',
 });
 const formAttributes = computed(() =>
-  attributeOptions.value.filter((item) => isStandardOptionAttribute(item, form.scope)),
+  attributeOptions.value.filter((item) => isStandardOptionAttribute(item, form.scope) && item.status === 'enabled'),
 );
 const formRules: Record<string, FormRule[]> = {
   attribute: [{ required: true, message: '请选择所属属性', type: 'error' }],
@@ -242,6 +243,7 @@ const toAttributeOption = (record: ProductAttributeRecord): AttributeOption => (
   name: record.name,
   scope: record.scope,
   valueType: record.valueType,
+  status: record.status === 'disabled' ? 'disabled' : 'enabled',
 });
 const toValue = (record: ProductAttributeValueRecord): Value => ({
   id: record.id,
