@@ -101,9 +101,20 @@ test('hides inactive categories and selects an enabled leaf beside the template 
   await expect(main.getByText('当前分类：')).toHaveCount(0);
   await expect(main.getByRole('button', { name: '切换分类' })).toHaveCount(0);
 
+  const tabsWidth = await main.locator('.zdm-admin-list-layout__toolbar').evaluate((toolbar) => {
+    const scope = toolbar.querySelector<HTMLElement>('.scope-controls')?.getBoundingClientRect();
+    const tabs = toolbar.querySelector<HTMLElement>('.t-tabs')?.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    return scope && tabs ? { toolbar: toolbarRect.width, scope: scope.width, tabs: tabs.width } : null;
+  });
+  expect(tabsWidth).not.toBeNull();
+  expect(tabsWidth!.scope).toBeGreaterThanOrEqual(tabsWidth!.toolbar - 1);
+  expect(tabsWidth!.tabs).toBeGreaterThanOrEqual(tabsWidth!.scope - 1);
+
   const categoryPanel = main.locator('.category-panel');
   const templatePanel = main.locator('.template-panel');
-  await expect(categoryPanel.getByText('商品分类', { exact: true })).toBeVisible();
+  await expect(categoryPanel.locator('.panel-toolbar')).toHaveCount(0);
+  await expect(templatePanel.locator('.panel-toolbar')).toHaveCount(0);
   await expect(categoryPanel.locator('.category-node-parent')).toHaveCount(2);
   await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toBeVisible();
   await expect(categoryPanel.getByText('停用茶几', { exact: true })).toHaveCount(0);
@@ -115,7 +126,16 @@ test('hides inactive categories and selects an enabled leaf beside the template 
   await expect(leafNodes.nth(1)).toHaveText('实木茶几');
   await expect(categoryPanel.locator('.category-node-leaf.active')).toHaveCount(0);
   await expect(main.locator('tbody tr').filter({ hasText: '材质' })).toHaveCount(0);
-  await expect(main.getByRole('button', { name: '绑定属性' })).toBeDisabled();
+  const bindButton = templatePanel.locator('.template-toolbar').getByRole('button', { name: '绑定属性' });
+  await expect(bindButton).toBeDisabled();
+
+  const toolbarPosition = await templatePanel.evaluate((panel) => {
+    const filters = panel.querySelector<HTMLElement>('.filter-row')?.getBoundingClientRect();
+    const toolbar = panel.querySelector<HTMLElement>('.template-toolbar')?.getBoundingClientRect();
+    return filters && toolbar ? { filterBottom: filters.bottom, toolbarTop: toolbar.top } : null;
+  });
+  expect(toolbarPosition).not.toBeNull();
+  expect(toolbarPosition!.toolbarTop).toBeGreaterThanOrEqual(toolbarPosition!.filterBottom);
 
   const positions = await main.locator('.category-template-layout').evaluate((layout) => {
     const category = layout.querySelector<HTMLElement>('.category-panel')?.getBoundingClientRect();
@@ -147,8 +167,7 @@ test('hides inactive categories and selects an enabled leaf beside the template 
   await categoryPanel.getByRole('button', { name: '岩板茶几', exact: true }).click();
 
   await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toHaveClass(/active/);
-  await expect(templatePanel.getByText('成品现货 > 茶几 > 岩板茶几', { exact: true })).toBeVisible();
-  await expect(main.getByRole('button', { name: '绑定属性' })).toBeEnabled();
+  await expect(bindButton).toBeEnabled();
 
   const headers = main.getByRole('columnheader');
   await expect(headers.nth(5)).toContainText('状态');

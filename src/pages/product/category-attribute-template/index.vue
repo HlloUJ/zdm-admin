@@ -18,13 +18,6 @@
           <template #table>
             <div class="category-template-layout">
               <aside class="category-panel">
-                <div class="panel-toolbar">
-                  <div>
-                    <h2>商品分类</h2>
-                    <p>仅末级分类可查看属性模板</p>
-                  </div>
-                </div>
-
                 <div class="category-search">
                   <t-input v-model="categoryKeyword" clearable placeholder="请输入分类名称" @enter="searchCategory" />
                   <t-button theme="default" variant="base" @click="searchCategory">搜索</t-button>
@@ -67,16 +60,6 @@
               </aside>
 
               <section class="template-panel">
-                <div class="panel-toolbar">
-                  <div>
-                    <h2>{{ selectedCategoryId ? `${selectedCategoryName}属性模板` : '属性模板' }}</h2>
-                    <p>{{ selectedCategoryId ? selectedCategoryPath : '请在左侧选择末级分类' }}</p>
-                  </div>
-                  <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
-                    <template #icon><t-icon name="add" /></template>绑定属性
-                  </t-button>
-                </div>
-
                 <div class="template-search">
                   <t-form :data="searchForm" label-width="72px" colon>
                     <div class="filter-row">
@@ -101,6 +84,11 @@
                       </div>
                     </div>
                   </t-form>
+                  <div class="template-toolbar">
+                    <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
+                      <template #icon><t-icon name="add" /></template>绑定属性
+                    </t-button>
+                  </div>
                 </div>
 
                 <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
@@ -285,9 +273,6 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
 ];
-
-const selectedCategory = computed(() => categories.value.find((item) => item.id === selectedCategoryId.value));
-const selectedCategoryName = computed(() => selectedCategory.value?.name ?? '未选择分类');
 
 const selectedCategoryPath = computed(() => {
   if (!selectedCategoryId.value) return '未选择分类';
@@ -605,7 +590,13 @@ onMounted(loadData);
 
 <style scoped>
 .scope-controls {
+  flex: 1;
+  width: 100%;
   min-width: 0;
+}
+
+.scope-controls :deep(.t-tabs) {
+  width: 100%;
 }
 
 .category-template-layout {
@@ -622,30 +613,6 @@ onMounted(loadData);
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-component-border);
   border-radius: var(--td-radius-medium);
-}
-
-.panel-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 72px;
-  gap: var(--td-comp-margin-m);
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-.panel-toolbar h2 {
-  margin: 0;
-  color: var(--td-text-color-primary);
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.panel-toolbar p {
-  margin: 2px 0 0;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
 }
 
 .category-tree {
@@ -718,6 +685,12 @@ onMounted(loadData);
 .template-search {
   padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl);
   border-bottom: 1px solid var(--td-component-border);
+}
+
+.template-toolbar {
+  display: flex;
+  align-items: center;
+  margin-top: var(--td-comp-margin-l);
 }
 
 .filter-row {
