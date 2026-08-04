@@ -292,7 +292,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 70, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 77, fixed: 'right' },
 ];
 
 const selectedCategoryPath = computed(() => {

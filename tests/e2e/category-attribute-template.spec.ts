@@ -223,9 +223,9 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(headers.nth(5)).toContainText('状态');
   await expect(headers.nth(6)).toContainText('绑定人');
   await expect(headers.nth(7)).toContainText('绑定时间');
-  await expect
-    .poll(() => headers.nth(8).evaluate((header) => header.getBoundingClientRect().width))
-    .toBeLessThanOrEqual(75);
+  const operationColumnWidth = await headers.nth(8).evaluate((header) => header.getBoundingClientRect().width);
+  expect(operationColumnWidth).toBeGreaterThanOrEqual(76);
+  expect(operationColumnWidth).toBeLessThanOrEqual(82);
   await expect(materialRow).toContainText('韩健');
 
   await bindButton.click();
