@@ -219,6 +219,16 @@ test('selects the first leaf and manages bindings from the template list', async
   const bindButton = templatePanel.locator('.template-toolbar').getByRole('button', { name: '绑定属性' });
   await expect(bindButton).toBeEnabled();
 
+  const publishFilter = templatePanel.locator('.t-form__item').filter({ hasText: '发布' });
+  await publishFilter.locator('.t-select').click();
+  await page.getByRole('listitem', { name: '已发布' }).click();
+  await templatePanel.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(materialRow).toHaveCount(0);
+  await publishFilter.locator('.t-select').click();
+  await page.getByRole('listitem', { name: '未发布' }).click();
+  await templatePanel.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(materialRow).toBeVisible();
+
   const materialSwitches = materialRow.locator('.t-switch');
   await materialSwitches.nth(0).click();
   await expect(materialSwitches.nth(0)).toHaveClass(/t-is-loading/);
@@ -269,6 +279,17 @@ test('selects the first leaf and manages bindings from the template list', async
 
   const headers = main.getByRole('columnheader');
   await expect(headers.nth(4)).toContainText('参与SKU组合');
+  const skuHeaderLayout = await headers.nth(4).evaluate((header) => {
+    const content = header.querySelector<HTMLElement>('.t-table__th-cell-inner') ?? header;
+    const style = getComputedStyle(content);
+    return {
+      width: header.getBoundingClientRect().width,
+      height: content.getBoundingClientRect().height,
+      lineHeight: Number.parseFloat(style.lineHeight),
+    };
+  });
+  expect(skuHeaderLayout.width).toBeGreaterThanOrEqual(156);
+  expect(skuHeaderLayout.height).toBeLessThanOrEqual(skuHeaderLayout.lineHeight + 2);
   await expect(headers.nth(5)).toContainText('状态');
   await expect(headers.nth(6)).toContainText('发布');
   await expect(headers.nth(7)).toContainText('绑定人');
