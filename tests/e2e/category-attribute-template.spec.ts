@@ -210,6 +210,7 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(materialRow.locator('.t-tag').filter({ hasText: '未发布' })).toHaveClass(/t-tag--danger/);
   const publishButton = materialRow.getByText('发布', { exact: true });
   await expect(publishButton).toBeVisible();
+  await expect(publishButton).toHaveClass(/t-link--theme-success/);
   await expect(publishButton).toHaveClass(/t-link--hover-color/);
   await expect(publishButton).not.toHaveClass(/t-link--hover-underline/);
   await expect(materialRow.getByText('移除', { exact: true })).toBeVisible();
@@ -286,6 +287,7 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(materialRow.locator('.t-tag').filter({ hasText: '已发布' })).toHaveClass(/t-tag--success/);
   const unpublishButton = materialRow.getByText('取消发布', { exact: true });
   await expect(unpublishButton).toBeVisible();
+  await expect(unpublishButton).toHaveClass(/t-link--theme-warning/);
   await expect(unpublishButton).toHaveClass(/t-link--hover-color/);
   await expect(unpublishButton).not.toHaveClass(/t-link--hover-underline/);
   const operationButtonTops = await materialRow
