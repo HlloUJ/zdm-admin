@@ -38,6 +38,30 @@ async function installCategoryAttributeMocks(page: Page) {
         status: 'disabled',
         createdAt: '2026-08-04T09:00:00',
       },
+      {
+        id: 5,
+        parentId: 2,
+        scope: 'finished',
+        name: '实木茶几',
+        status: 'enabled',
+        createdAt: '2026-08-02T10:00:00',
+      },
+      {
+        id: 6,
+        parentId: 1,
+        scope: 'finished',
+        name: '停用父级',
+        status: 'disabled',
+        createdAt: '2026-08-05T09:00:00',
+      },
+      {
+        id: 7,
+        parentId: 6,
+        scope: 'finished',
+        name: '隐藏子类',
+        status: 'enabled',
+        createdAt: '2026-08-06T09:00:00',
+      },
     ]),
   );
   await page.route('**/api/admin/product-attributes', (route) =>
@@ -56,17 +80,6 @@ async function installCategoryAttributeMocks(page: Page) {
         createdByName: '韩健',
         createdAt: '2026-08-04T09:30:00',
       },
-      {
-        id: 2,
-        categoryId: 4,
-        attributeId: 1,
-        requiredFlag: false,
-        skuFlag: false,
-        sortOrder: 1,
-        status: 'enabled',
-        createdByName: '韩健',
-        createdAt: '2026-08-04T10:30:00',
-      },
     ]),
   );
 }
@@ -79,7 +92,7 @@ test.beforeEach(async ({ page }) => {
   await installCategoryAttributeMocks(page);
 });
 
-test('shows the category tree beside the template list and only selects a leaf category', async ({ page }) => {
+test('hides inactive categories and selects an enabled leaf beside the template list', async ({ page }) => {
   await page.goto('/category-attribute-template');
 
   const main = page.getByRole('main');
@@ -93,17 +106,13 @@ test('shows the category tree beside the template list and only selects a leaf c
   await expect(categoryPanel.getByText('商品分类', { exact: true })).toBeVisible();
   await expect(categoryPanel.locator('.category-node-parent')).toHaveCount(2);
   await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toBeVisible();
-  await expect(categoryPanel.getByRole('button', { name: '停用茶几', exact: true })).toBeVisible();
+  await expect(categoryPanel.getByText('停用茶几', { exact: true })).toHaveCount(0);
+  await expect(categoryPanel.getByText('停用父级', { exact: true })).toHaveCount(0);
+  await expect(categoryPanel.getByText('隐藏子类', { exact: true })).toHaveCount(0);
   const leafNodes = categoryPanel.locator('.category-node-leaf');
   await expect(leafNodes).toHaveCount(2);
-  await expect(leafNodes.nth(0)).toContainText('停用茶几');
-  await expect(leafNodes.nth(1)).toHaveText('岩板茶几');
-  await expect(categoryPanel.getByRole('button', { name: '停用茶几', exact: true })).toHaveClass(
-    /category-node-stopped/,
-  );
-  await expect(
-    categoryPanel.getByRole('button', { name: '停用茶几', exact: true }).getByText('停用', { exact: true }),
-  ).toBeVisible();
+  await expect(leafNodes.nth(0)).toHaveText('岩板茶几');
+  await expect(leafNodes.nth(1)).toHaveText('实木茶几');
   await expect(categoryPanel.locator('.category-node-leaf.active')).toHaveCount(0);
   await expect(main.locator('tbody tr').filter({ hasText: '材质' })).toHaveCount(0);
   await expect(main.getByRole('button', { name: '绑定属性' })).toBeDisabled();
@@ -123,11 +132,6 @@ test('shows the category tree beside the template list and only selects a leaf c
     }),
   );
   expect(new Set(typography).size).toBe(1);
-
-  await categoryPanel.getByRole('button', { name: '停用茶几', exact: true }).click();
-  await expect(templatePanel.getByText('成品现货 > 茶几 > 停用茶几', { exact: true })).toBeVisible();
-  await expect(main.locator('tbody tr').filter({ hasText: '材质' }).first()).toContainText('韩健');
-  await expect(main.getByRole('button', { name: '绑定属性' })).toBeDisabled();
 
   await categoryPanel.getByRole('button', { name: '岩板茶几', exact: true }).click();
 

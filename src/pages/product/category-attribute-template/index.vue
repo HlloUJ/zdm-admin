@@ -30,7 +30,6 @@
                     <div
                       v-if="row.node.children.length"
                       class="category-node category-node-parent"
-                      :class="{ 'category-node-stopped': row.node.status === 'disabled' }"
                       :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
                     >
                       <t-button
@@ -44,27 +43,18 @@
                         <t-icon :name="isCategoryExpanded(row.node.id) ? 'chevron-down' : 'chevron-right'" />
                       </t-button>
                       <span class="category-name">{{ row.node.name }}</span>
-                      <t-tag v-if="row.node.status === 'disabled'" class="category-status" size="small" variant="light">
-                        停用
-                      </t-tag>
                     </div>
                     <button
                       v-else
                       type="button"
                       class="category-node category-node-leaf"
                       :aria-label="row.node.name"
-                      :class="{
-                        active: row.node.id === selectedCategoryId,
-                        'category-node-stopped': row.node.status === 'disabled',
-                      }"
+                      :class="{ active: row.node.id === selectedCategoryId }"
                       :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
                       @click="selectLeafCategory(row.node)"
                     >
                       <span class="expand-placeholder"></span>
                       <span class="category-name">{{ row.node.name }}</span>
-                      <t-tag v-if="row.node.status === 'disabled'" class="category-status" size="small" variant="light">
-                        停用
-                      </t-tag>
                     </button>
                   </template>
                   <div v-if="!visibleCategoryRows.length && !loading" class="category-empty">暂无分类</div>
@@ -77,7 +67,7 @@
                     <h2>{{ selectedCategoryId ? `${selectedCategoryName}属性模板` : '属性模板' }}</h2>
                     <p>{{ selectedCategoryId ? selectedCategoryPath : '请在左侧选择末级分类' }}</p>
                   </div>
-                  <t-button theme="primary" :disabled="!canBindAttribute" @click="openBindDialog">
+                  <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
                     <template #icon><t-icon name="add" /></template>绑定属性
                   </t-button>
                 </div>
@@ -291,9 +281,6 @@ const columns: PrimaryTableCol<TableRowData>[] = [
 
 const selectedCategory = computed(() => categories.value.find((item) => item.id === selectedCategoryId.value));
 const selectedCategoryName = computed(() => selectedCategory.value?.name ?? '未选择分类');
-const canBindAttribute = computed(
-  () => Boolean(selectedCategory.value) && selectedCategory.value?.status !== 'disabled',
-);
 
 const selectedCategoryPath = computed(() => {
   if (!selectedCategoryId.value) return '未选择分类';
@@ -310,7 +297,7 @@ const selectedCategoryPath = computed(() => {
 
 const scopedCategories = computed(() =>
   categories.value
-    .filter((item) => item.scope === activeScope.value)
+    .filter((item) => item.scope === activeScope.value && item.status === 'enabled')
     .sort((first, second) => categoryCreatedAtTime(second) - categoryCreatedAtTime(first) || second.id - first.id),
 );
 
@@ -494,10 +481,6 @@ function openBindDialog() {
     MessagePlugin.warning('请选择分类');
     return;
   }
-  if (!canBindAttribute.value) {
-    MessagePlugin.warning('已停用分类不可绑定属性');
-    return;
-  }
   bindForm.attributeId = undefined;
   bindForm.requiredFlag = true;
   bindForm.skuFlag = false;
@@ -674,12 +657,6 @@ onMounted(loadData);
   background: var(--td-brand-color-light);
 }
 
-.category-node-stopped,
-.category-node-stopped:hover,
-.category-node-stopped.active {
-  color: var(--td-text-color-disabled);
-}
-
 .expand-button,
 .expand-placeholder {
   flex-shrink: 0;
@@ -693,12 +670,6 @@ onMounted(loadData);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.category-status {
-  flex-shrink: 0;
-  margin-left: var(--td-comp-margin-xs);
-  color: var(--td-text-color-disabled);
 }
 
 .category-empty {
