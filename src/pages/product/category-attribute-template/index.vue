@@ -136,10 +136,30 @@
                       {{ row.status === 'enabled' ? '启用' : '停用' }}
                     </t-tag>
                   </template>
+                  <template #publishStatus="{ row }">
+                    <t-tag :theme="row.publishStatus === 'published' ? 'success' : 'default'" variant="light">
+                      {{ row.publishStatus === 'published' ? '已发布' : '未发布' }}
+                    </t-tag>
+                  </template>
                   <template #operation="{ row }">
                     <div class="table-actions">
-                      <t-link v-if="canRemoveBinding" theme="danger" @click="openDeleteConfirm(row)">移除</t-link>
-                      <span v-else>-</span>
+                      <t-link
+                        v-if="canTogglePublish"
+                        :theme="row.publishStatus === 'published' ? 'warning' : 'primary'"
+                        :disabled="savingId !== null"
+                        @click="togglePublish(row)"
+                      >
+                        {{ row.publishStatus === 'published' ? '取消发布' : '发布' }}
+                      </t-link>
+                      <t-link
+                        v-if="canRemoveBinding"
+                        theme="danger"
+                        :disabled="savingId !== null"
+                        @click="openDeleteConfirm(row)"
+                      >
+                        移除
+                      </t-link>
+                      <span v-if="!canTogglePublish && !canRemoveBinding">-</span>
                     </div>
                   </template>
                 </t-table>
@@ -218,6 +238,8 @@ import {
   deleteCategoryAttribute,
   listCategoryAttributes,
   updateCategoryAttribute,
+  publishCategoryAttribute,
+  unpublishCategoryAttribute,
   type CategoryAttributePayload,
   type CategoryAttributeRecord,
 } from '@/services/categoryAttributes';
@@ -238,6 +260,7 @@ interface BindingRow {
   skuFlag: boolean;
   sortOrder: number;
   status: Status;
+  publishStatus: 'published' | 'unpublished';
   createdByName: string;
   createdAt: string;
 }
@@ -263,6 +286,7 @@ const permissionPrefix = 'admin.product-data-center.category-attribute-template'
 const loginUser = computed(() => getLoginUser());
 const canBindAttribute = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.create`));
 const canEditBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.edit`));
+const canTogglePublish = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.toggle-publish`));
 const canRemoveBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
 const scopeTabs = [
   { label: '成品现货模板', value: 'finished' },
@@ -296,9 +320,10 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
   { colKey: 'skuFlag', title: 'SKU', width: 90, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
+  { colKey: 'publishStatus', title: '发布', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 77, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
 ]);
 
 const bindColumns = computed<PrimaryTableCol<BindAttributeRow>[]>(() => [
@@ -359,6 +384,9 @@ const allBindingRows = computed<BindingRow[]>(() => {
         skuFlag: Boolean(item.skuFlag),
         sortOrder: item.sortOrder ?? 0,
         status: (attribute?.status === 'disabled' ? 'disabled' : 'enabled') as Status,
+        publishStatus: (item.publishStatus === 'published'
+          ? 'published'
+          : 'unpublished') as BindingRow['publishStatus'],
         createdByName: item.createdByName || '-',
         createdAt: formatDateTime(item.createdAt),
       };
@@ -664,6 +692,25 @@ async function handleDragSort(context: { current: BindingRow; target: BindingRow
   }
 }
 
+async function togglePublish(row: BindingRow) {
+  if (!canTogglePublish.value || savingId.value !== null) return;
+  savingId.value = row.id;
+  savingField.value = null;
+  try {
+    const updated =
+      row.publishStatus === 'published'
+        ? await unpublishCategoryAttribute(row.id)
+        : await publishCategoryAttribute(row.id);
+    const index = bindings.value.findIndex((item) => item.id === row.id);
+    if (index >= 0) bindings.value[index] = updated;
+    MessagePlugin.success(row.publishStatus === 'published' ? '已取消发布' : '发布成功');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '发布状态更新失败');
+  } finally {
+    savingId.value = null;
+  }
+}
+
 function openDeleteConfirm(row: BindingRow) {
   if (!canRemoveBinding.value) return;
   deleteTarget.value = row;
@@ -881,9 +928,14 @@ onMounted(loadData);
 
 .table-actions {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--td-comp-margin-s);
   white-space: nowrap;
+}
+
+.table-actions :deep(.t-link) {
+  flex: 0 0 auto;
 }
 
 .binding-drag-icon {

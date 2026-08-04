@@ -24,6 +24,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
   public CategoryAttribute createCategoryAttribute(CategoryAttribute categoryAttribute) {
     categoryAttribute.setId(null);
     categoryAttribute.setStatus("disabled");
+    categoryAttribute.setPublishStatus("unpublished");
     categoryAttribute.setCreatedByName(resolveCreatedByName());
     save(categoryAttribute);
     return getById(categoryAttribute.getId());
@@ -58,6 +59,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
       binding.setSkuFlag(false);
       binding.setSortOrder(nextSortOrder++);
       binding.setStatus("disabled");
+      binding.setPublishStatus("unpublished");
       binding.setCreatedByName(createdByName);
       createdBindings.add(binding);
     }
@@ -77,9 +79,21 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     }
     payload.setId(id);
     payload.setStatus(existing.getStatus());
+    payload.setPublishStatus(existing.getPublishStatus());
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedAt(existing.getCreatedAt());
     updateById(payload);
+    return getById(id);
+  }
+
+  @Transactional
+  public CategoryAttribute updatePublishStatus(Long id, String publishStatus) {
+    CategoryAttribute existing = getById(id);
+    if (existing == null) {
+      throw new IllegalArgumentException("类目属性模板不存在");
+    }
+    existing.setPublishStatus(publishStatus);
+    updateById(existing);
     return getById(id);
   }
 

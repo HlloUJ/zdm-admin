@@ -15,6 +15,7 @@ public class CategoryAttribute extends BaseEntity {
   private Boolean requiredFlag;
   private Boolean skuFlag;
   private Integer sortOrder;
+  private String publishStatus;
   private String createdByName;
 
   public Long getCategoryId() {
@@ -55,6 +56,14 @@ public class CategoryAttribute extends BaseEntity {
 
   public void setSortOrder(Integer sortOrder) {
     this.sortOrder = sortOrder;
+  }
+
+  public String getPublishStatus() {
+    return publishStatus;
+  }
+
+  public void setPublishStatus(String publishStatus) {
+    this.publishStatus = publishStatus;
   }
 
   public String getCreatedByName() {

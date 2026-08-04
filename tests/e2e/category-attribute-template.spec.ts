@@ -20,6 +20,7 @@ async function installCategoryAttributeMocks(page: Page) {
       skuFlag: false,
       sortOrder: 1,
       status: 'enabled',
+      publishStatus: 'unpublished',
       createdByName: '韩健',
       createdAt: '2026-08-04T09:30:00',
     },
@@ -124,6 +125,7 @@ async function installCategoryAttributeMocks(page: Page) {
       skuFlag: false,
       sortOrder: categoryAttributes.length + index + 1,
       status: 'disabled',
+      publishStatus: 'unpublished',
       createdByName: '当前操作员',
       createdAt: '2026-08-04T10:00:00',
     }));
@@ -145,6 +147,17 @@ async function installCategoryAttributeMocks(page: Page) {
       return;
     }
     await route.fallback();
+  });
+  await page.route(/\/api\/admin\/category-attributes\/\d+\/(publish|unpublish)$/, async (route) => {
+    const urlParts = new URL(route.request().url()).pathname.split('/');
+    const id = Number(urlParts.at(-2));
+    const index = categoryAttributes.findIndex((item) => item.id === id);
+    if (route.request().method() !== 'PUT' || index < 0) {
+      await route.fallback();
+      return;
+    }
+    categoryAttributes[index].publishStatus = urlParts.at(-1) === 'publish' ? 'published' : 'unpublished';
+    await fulfillJson(route, categoryAttributes[index]);
   });
   await page.route('**/api/admin/category-attributes', (route) => fulfillJson(route, categoryAttributes));
 }
@@ -193,6 +206,8 @@ test('selects the first leaf and manages bindings from the template list', async
   const materialRow = main.locator('tbody tr').filter({ hasText: '材质' }).first();
   await expect(materialRow).toContainText('韩健');
   await expect(materialRow.getByText('停用', { exact: true })).toHaveCount(1);
+  await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
+  await expect(materialRow.getByText('发布', { exact: true })).toBeVisible();
   await expect(materialRow.getByText('移除', { exact: true })).toBeVisible();
   await expect(materialRow.getByText('启用', { exact: true })).toHaveCount(0);
   await expect(materialRow.getByText('删除', { exact: true })).toHaveCount(0);
@@ -249,13 +264,35 @@ test('selects the first leaf and manages bindings from the template list', async
 
   const headers = main.getByRole('columnheader');
   await expect(headers.nth(5)).toContainText('状态');
-  await expect(headers.nth(6)).toContainText('绑定人');
-  await expect(headers.nth(7)).toContainText('绑定时间');
+  await expect(headers.nth(6)).toContainText('发布');
+  await expect(headers.nth(7)).toContainText('绑定人');
+  await expect(headers.nth(8)).toContainText('绑定时间');
   await expect(headers.getByText('排序', { exact: true })).toHaveCount(0);
-  const operationColumnWidth = await headers.nth(8).evaluate((header) => header.getBoundingClientRect().width);
-  expect(operationColumnWidth).toBeGreaterThanOrEqual(76);
-  expect(operationColumnWidth).toBeLessThanOrEqual(82);
+  const operationColumnWidth = await headers.nth(9).evaluate((header) => header.getBoundingClientRect().width);
+  expect(operationColumnWidth).toBeGreaterThanOrEqual(136);
+  expect(operationColumnWidth).toBeLessThanOrEqual(144);
   await expect(materialRow).toContainText('韩健');
+
+  const publishRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith('/api/admin/category-attributes/1/publish') && request.method() === 'PUT',
+  );
+  await materialRow.getByText('发布', { exact: true }).click();
+  await publishRequestPromise;
+  await expect(materialRow.getByText('已发布', { exact: true })).toHaveCount(1);
+  await expect(materialRow.getByText('取消发布', { exact: true })).toBeVisible();
+  const operationButtonTops = await materialRow
+    .locator('.table-actions .t-link')
+    .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().top));
+  expect(operationButtonTops).toHaveLength(2);
+  expect(Math.max(...operationButtonTops) - Math.min(...operationButtonTops)).toBeLessThanOrEqual(1);
+
+  const unpublishRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith('/api/admin/category-attributes/1/unpublish') && request.method() === 'PUT',
+  );
+  await materialRow.getByText('取消发布', { exact: true }).click();
+  await unpublishRequestPromise;
+  await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
+  await expect(materialRow.getByText('发布', { exact: true })).toBeVisible();
 
   await bindButton.click();
   const bindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
@@ -282,8 +319,10 @@ test('selects the first leaf and manages bindings from the template list', async
   const sizeRow = main.locator('tbody tr').filter({ hasText: '尺寸' });
   await expect(colorRow).toContainText('当前操作员');
   await expect(colorRow.getByText('启用', { exact: true })).toHaveCount(1);
+  await expect(colorRow.getByText('未发布', { exact: true })).toHaveCount(1);
   await expect(sizeRow).toContainText('当前操作员');
   await expect(sizeRow.getByText('启用', { exact: true })).toHaveCount(1);
+  await expect(sizeRow.getByText('未发布', { exact: true })).toHaveCount(1);
 
   const tableRows = main.locator('tbody tr');
   await expect(tableRows.nth(0)).toContainText('材质');
@@ -347,6 +386,9 @@ test('keeps template data visible while hiding ungranted binding operations', as
   await expect(row.locator('.t-table__handle-draggable')).toHaveCount(0);
   await expect(row.getByText('启用', { exact: true })).toHaveCount(0);
   await expect(row.getByText('停用', { exact: true })).toHaveCount(1);
+  await expect(row.getByText('未发布', { exact: true })).toHaveCount(1);
+  await expect(row.getByText('发布', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('取消发布', { exact: true })).toHaveCount(0);
   await expect(row.getByText('移除', { exact: true })).toHaveCount(0);
   await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
   await expect(row.locator('.table-actions')).toHaveText('-');
