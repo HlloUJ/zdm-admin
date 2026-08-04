@@ -14,7 +14,8 @@ async function installCategoryAttributeMocks(page: Page) {
   await page.route('**/api/admin/product-categories', (route) =>
     fulfillJson(route, [
       { id: 1, scope: 'finished', name: '成品现货', sortOrder: 1, status: 'enabled' },
-      { id: 2, parentId: 1, scope: 'finished', name: '岩板茶几', sortOrder: 1, status: 'enabled' },
+      { id: 2, parentId: 1, scope: 'finished', name: '茶几', sortOrder: 1, status: 'enabled' },
+      { id: 3, parentId: 2, scope: 'finished', name: '岩板茶几', sortOrder: 1, status: 'enabled' },
     ]),
   );
   await page.route('**/api/admin/product-attributes', (route) =>
@@ -24,7 +25,7 @@ async function installCategoryAttributeMocks(page: Page) {
     fulfillJson(route, [
       {
         id: 1,
-        categoryId: 2,
+        categoryId: 3,
         attributeId: 1,
         requiredFlag: true,
         skuFlag: false,
@@ -45,26 +46,36 @@ test.beforeEach(async ({ page }) => {
   await installCategoryAttributeMocks(page);
 });
 
-test('selects a category before showing its template data', async ({ page }) => {
+test('shows the category tree beside the template list and only selects a leaf category', async ({ page }) => {
   await page.goto('/category-attribute-template');
 
   const main = page.getByRole('main');
   await expect(main.locator('.zdm-admin-list-layout')).toHaveCount(1);
   await expect(main.locator('.zdm-admin-list-layout__filters')).toHaveCount(0);
-  await expect(main.getByText('当前分类：')).toBeVisible();
-  await expect(main.locator('.selected-category-path')).toHaveText('未选择分类');
+  await expect(main.getByText('当前分类：')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '切换分类' })).toHaveCount(0);
+
+  const categoryPanel = main.locator('.category-panel');
+  const templatePanel = main.locator('.template-panel');
+  await expect(categoryPanel.getByText('商品分类', { exact: true })).toBeVisible();
+  await expect(categoryPanel.locator('.category-node-parent')).toHaveCount(2);
+  await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toBeVisible();
+  await expect(categoryPanel.locator('.category-node-leaf.active')).toHaveCount(0);
   await expect(main.locator('tbody tr').filter({ hasText: '材质' })).toHaveCount(0);
   await expect(main.getByRole('button', { name: '绑定属性' })).toBeDisabled();
 
-  await main.getByRole('button', { name: '切换分类' }).click();
-  const categoryDialog = page.locator('.t-dialog').filter({ hasText: '选择商品分类' });
-  await expect(categoryDialog).toBeVisible();
-  await categoryDialog.getByRole('button', { name: '成品现货' }).click();
-  await categoryDialog.getByRole('button', { name: '岩板茶几' }).click();
-  await categoryDialog.getByRole('button', { name: '确认' }).click();
+  const positions = await main.locator('.category-template-layout').evaluate((layout) => {
+    const category = layout.querySelector<HTMLElement>('.category-panel')?.getBoundingClientRect();
+    const template = layout.querySelector<HTMLElement>('.template-panel')?.getBoundingClientRect();
+    return category && template ? { categoryRight: category.right, templateLeft: template.left } : null;
+  });
+  expect(positions).not.toBeNull();
+  expect(positions!.categoryRight).toBeLessThanOrEqual(positions!.templateLeft);
 
-  await expect(categoryDialog).toBeHidden();
-  await expect(main.getByText('成品现货 > 岩板茶几', { exact: true })).toBeVisible();
+  await categoryPanel.getByRole('button', { name: '岩板茶几', exact: true }).click();
+
+  await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toHaveClass(/active/);
+  await expect(templatePanel.getByText('成品现货 > 茶几 > 岩板茶几', { exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '绑定属性' })).toBeEnabled();
 
   const headers = main.getByRole('columnheader');
@@ -73,13 +84,5 @@ test('selects a category before showing its template data', async ({ page }) => 
   await expect(headers.nth(7)).toContainText('创建时间');
   await expect(main.locator('tbody tr').filter({ hasText: '材质' }).first()).toContainText('韩健');
 
-  const styles = await main.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
-    const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');
-    if (!pagination) return null;
-    return {
-      hostMarginTop: getComputedStyle(host).marginTop,
-      paginationMarginTop: getComputedStyle(pagination).marginTop,
-    };
-  });
-  expect(styles).toEqual({ hostMarginTop: '16px', paginationMarginTop: '0px' });
+  await expect(templatePanel.locator('.zdm-admin-pagination')).toBeVisible();
 });
