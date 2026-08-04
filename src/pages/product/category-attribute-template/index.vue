@@ -127,7 +127,6 @@
                       :model-value="row.attributeRole || undefined"
                       :loading="savingId === row.id && savingField === 'attributeRole'"
                       :disabled="!canEditBinding || row.publishStatus === 'published'"
-                      clearable
                       placeholder="请选择"
                       size="small"
                       @change="changeAttributeRole(row, $event)"
