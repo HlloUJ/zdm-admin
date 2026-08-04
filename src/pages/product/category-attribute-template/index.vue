@@ -25,12 +25,16 @@
                   </div>
                 </div>
 
+                <div class="category-search">
+                  <t-input v-model="categoryKeyword" clearable placeholder="请输入分类名称" @enter="searchCategory" />
+                  <t-button theme="default" variant="base" @click="searchCategory">搜索</t-button>
+                </div>
+
                 <div class="category-tree">
                   <template v-for="row in visibleCategoryRows" :key="row.node.id">
                     <div
                       v-if="row.node.children.length"
                       class="category-node category-node-parent"
-                      :class="{ 'category-node-stopped': row.node.status === 'disabled' }"
                       :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
                     >
                       <t-button
@@ -44,27 +48,18 @@
                         <t-icon :name="isCategoryExpanded(row.node.id) ? 'chevron-down' : 'chevron-right'" />
                       </t-button>
                       <span class="category-name">{{ row.node.name }}</span>
-                      <t-tag v-if="row.node.status === 'disabled'" class="category-status" size="small" variant="light">
-                        停用
-                      </t-tag>
                     </div>
                     <button
                       v-else
                       type="button"
                       class="category-node category-node-leaf"
                       :aria-label="row.node.name"
-                      :class="{
-                        active: row.node.id === selectedCategoryId,
-                        'category-node-stopped': row.node.status === 'disabled',
-                      }"
+                      :class="{ active: row.node.id === selectedCategoryId }"
                       :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
                       @click="selectLeafCategory(row.node)"
                     >
                       <span class="expand-placeholder"></span>
                       <span class="category-name">{{ row.node.name }}</span>
-                      <t-tag v-if="row.node.status === 'disabled'" class="category-status" size="small" variant="light">
-                        停用
-                      </t-tag>
                     </button>
                   </template>
                   <div v-if="!visibleCategoryRows.length && !loading" class="category-empty">暂无分类</div>
@@ -77,7 +72,7 @@
                     <h2>{{ selectedCategoryId ? `${selectedCategoryName}属性模板` : '属性模板' }}</h2>
                     <p>{{ selectedCategoryId ? selectedCategoryPath : '请在左侧选择末级分类' }}</p>
                   </div>
-                  <t-button theme="primary" :disabled="!canBindAttribute" @click="openBindDialog">
+                  <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
                     <template #icon><t-icon name="add" /></template>绑定属性
                   </t-button>
                 </div>
@@ -268,6 +263,8 @@ const attributes = ref<ProductAttributeRecord[]>([]);
 const bindings = ref<CategoryAttributeRecord[]>([]);
 const selectedCategoryId = ref<number | undefined>();
 const expandedCategoryIds = ref<number[]>([]);
+const categoryKeyword = ref('');
+const appliedCategoryKeyword = ref('');
 const bindDialogVisible = ref(false);
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
@@ -284,16 +281,13 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'skuFlag', title: 'SKU', width: 90, align: 'center' },
   { colKey: 'sortOrder', title: '排序', width: 120, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
+  { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
+  { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
 ];
 
 const selectedCategory = computed(() => categories.value.find((item) => item.id === selectedCategoryId.value));
 const selectedCategoryName = computed(() => selectedCategory.value?.name ?? '未选择分类');
-const canBindAttribute = computed(
-  () => Boolean(selectedCategory.value) && selectedCategory.value?.status !== 'disabled',
-);
 
 const selectedCategoryPath = computed(() => {
   if (!selectedCategoryId.value) return '未选择分类';
@@ -310,11 +304,11 @@ const selectedCategoryPath = computed(() => {
 
 const scopedCategories = computed(() =>
   categories.value
-    .filter((item) => item.scope === activeScope.value)
+    .filter((item) => item.scope === activeScope.value && item.status === 'enabled')
     .sort((first, second) => categoryCreatedAtTime(second) - categoryCreatedAtTime(first) || second.id - first.id),
 );
 
-const categoryTree = computed(() => buildCategoryTree(undefined));
+const categoryTree = computed(() => filterCategoryTree(buildCategoryTree(undefined)));
 
 const visibleCategoryRows = computed(() => {
   const rows: CategoryTreeRow[] = [];
@@ -394,9 +388,20 @@ function buildCategoryTree(parentId: number | undefined): CategoryTreeNode[] {
     .map((item) => ({ ...item, children: buildCategoryTree(item.id) }));
 }
 
+function filterCategoryTree(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
+  const keyword = appliedCategoryKeyword.value.trim();
+  if (!keyword) return nodes;
+
+  return nodes.flatMap((node) => {
+    if (node.name.includes(keyword)) return [node];
+    const children = filterCategoryTree(node.children);
+    return children.length ? [{ ...node, children }] : [];
+  });
+}
+
 function collectVisibleCategoryRows(node: CategoryTreeNode, level: number, rows: CategoryTreeRow[]) {
   rows.push({ node, level });
-  if (!isCategoryExpanded(node.id)) return;
+  if (!appliedCategoryKeyword.value.trim() && !isCategoryExpanded(node.id)) return;
   node.children.forEach((child) => collectVisibleCategoryRows(child, level + 1, rows));
 }
 
@@ -420,6 +425,10 @@ function selectLeafCategory(category: CategoryTreeNode) {
   if (category.children.length) return;
   selectedCategoryId.value = category.id;
   reset();
+}
+
+function searchCategory() {
+  appliedCategoryKeyword.value = categoryKeyword.value;
 }
 
 function valueTypeLabel(value: ProductAttributeRecord['valueType']) {
@@ -492,10 +501,6 @@ function handlePaginationChange(pageInfo: PageInfo) {
 function openBindDialog() {
   if (!selectedCategoryId.value) {
     MessagePlugin.warning('请选择分类');
-    return;
-  }
-  if (!canBindAttribute.value) {
-    MessagePlugin.warning('已停用分类不可绑定属性');
     return;
   }
   bindForm.attributeId = undefined;
@@ -589,6 +594,8 @@ async function handleDelete() {
 
 watch(activeScope, () => {
   selectedCategoryId.value = undefined;
+  categoryKeyword.value = '';
+  appliedCategoryKeyword.value = '';
   expandAllCategories();
   reset();
 });
@@ -647,6 +654,19 @@ onMounted(loadData);
   overflow-y: auto;
 }
 
+.category-search {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
+  border-bottom: 1px solid var(--td-component-border);
+}
+
+.category-search :deep(.t-input) {
+  flex: 1;
+  min-width: 0;
+}
+
 .category-node {
   display: flex;
   align-items: center;
@@ -674,12 +694,6 @@ onMounted(loadData);
   background: var(--td-brand-color-light);
 }
 
-.category-node-stopped,
-.category-node-stopped:hover,
-.category-node-stopped.active {
-  color: var(--td-text-color-disabled);
-}
-
 .expand-button,
 .expand-placeholder {
   flex-shrink: 0;
@@ -693,12 +707,6 @@ onMounted(loadData);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.category-status {
-  flex-shrink: 0;
-  margin-left: var(--td-comp-margin-xs);
-  color: var(--td-text-color-disabled);
 }
 
 .category-empty {
