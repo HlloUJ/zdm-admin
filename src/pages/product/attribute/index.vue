@@ -8,37 +8,40 @@
         <t-alert theme="info" class="page-tip"
           >属性库仅维护属性定义和值类型；必填及 SKU 规则统一在类目属性模板中配置。</t-alert
         >
-        <section v-if="!lockedScope" class="table-card source-card">
-          <t-tabs v-model="activeScope" :list="scopeTabs" />
-          <div class="source-caption">{{ sourceDescription }}</div>
-        </section>
         <AdminListLayout>
-          <template #filters>
-            <t-form :data="searchForm" label-width="84px" colon>
-              <div class="filter-row">
-                <div class="filter-fields">
-                  <t-form-item label="属性名称" name="keyword">
-                    <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
-                  </t-form-item>
-                </div>
-                <div class="filter-actions">
-                  <t-button theme="primary" @click="search">
-                    <template #icon><t-icon name="search" /></template>
-                    查询
-                  </t-button>
-                  <t-button theme="default" variant="base" @click="reset">
-                    <template #icon><t-icon name="refresh" /></template>
-                    重置
-                  </t-button>
-                </div>
+          <template #toolbar>
+            <div class="list-controls">
+              <div v-if="!lockedScope" class="scope-controls">
+                <t-tabs v-model="activeScope" :list="scopeTabs" />
+                <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-            </t-form>
+              <t-form :data="searchForm" label-width="84px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="属性名称" name="keyword">
+                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="search">
+                      <template #icon><t-icon name="search" /></template>
+                      查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="reset">
+                      <template #icon><t-icon name="refresh" /></template>
+                      重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div class="table-toolbar">
+                <t-button theme="primary" @click="openCreate">
+                  <template #icon><t-icon name="add" /></template>
+                  新增
+                </t-button>
+              </div>
+            </div>
           </template>
-          <template #toolbar
-            ><t-button theme="primary" @click="openCreate"
-              ><template #icon><t-icon name="add" /></template>新增</t-button
-            ></template
-          >
           <template #table>
             <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
               <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
@@ -410,24 +413,25 @@ onMounted(loadAttributes);
   flex: 1;
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
 }
-.page-tip,
-.source-card {
+.page-tip {
   margin-bottom: 16px;
 }
-.source-card {
-  padding: 24px 24px 14px;
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  box-shadow: var(--td-shadow-1);
+.list-controls {
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
+}
+.scope-controls {
+  min-width: 0;
 }
 .source-caption {
-  margin-top: 12px;
+  margin-top: var(--td-comp-margin-s);
   color: var(--td-text-color-secondary);
   font-size: 13px;
 }
-:deep(.zdm-admin-list-layout__filters) {
-  border: 1px solid var(--td-component-border);
-  box-shadow: none;
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
 }
 .filter-row {
   display: flex;
@@ -453,6 +457,10 @@ onMounted(loadAttributes);
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
+}
+.table-toolbar {
+  display: flex;
+  align-items: center;
 }
 .table-actions {
   display: flex;
