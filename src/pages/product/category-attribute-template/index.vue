@@ -145,7 +145,7 @@
                     <div class="table-actions">
                       <t-link
                         v-if="canTogglePublish"
-                        :theme="row.publishStatus === 'published' ? 'warning' : 'primary'"
+                        :theme="row.publishStatus === 'published' ? 'warning' : 'success'"
                         hover="color"
                         :disabled="savingId !== null"
                         @click="togglePublish(row)"
