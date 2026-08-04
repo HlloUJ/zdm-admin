@@ -65,6 +65,11 @@ describe('full function catalog', () => {
           ],
         },
         {
+          label: '类目属性模板',
+          direct: false,
+          pages: [{ label: '类目属性模板页', tabs: [] }],
+        },
+        {
           label: '大板品种管理',
           direct: false,
           pages: [{ label: '大板品种管理页', tabs: [] }],
@@ -129,6 +134,19 @@ describe('full function catalog', () => {
         ],
       },
     ]);
+    const categoryAttributePage = fullFunctionCatalog[0].menus.find(
+      (menu) => menu.value === 'admin.product-data-center.category-attribute-template.menu',
+    )?.pages[0];
+    expect(categoryAttributePage?.actions).toEqual([
+      { label: '查看', value: 'admin.product-data-center.category-attribute-template.view' },
+      { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
+      { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
+      {
+        label: '发布/取消发布',
+        value: 'admin.product-data-center.category-attribute-template.toggle-publish',
+      },
+      { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
+    ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
@@ -148,6 +166,11 @@ describe('full function catalog', () => {
       'admin.product-data-center.category.accessory.disable',
       'admin.product-data-center.category.accessory.enable',
       'admin.product-data-center.category.accessory.delete',
+      'admin.product-data-center.category-attribute-template.view',
+      'admin.product-data-center.category-attribute-template.create',
+      'admin.product-data-center.category-attribute-template.edit',
+      'admin.product-data-center.category-attribute-template.toggle-publish',
+      'admin.product-data-center.category-attribute-template.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',

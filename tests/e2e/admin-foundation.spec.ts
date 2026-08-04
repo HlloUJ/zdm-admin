@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('keeps foundation pagination spacing consistent inside list layouts', async ({ page }) => {
-  await page.goto('/category-attribute-template');
+  await page.goto('/product-attribute');
 
   const styles = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
     const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');

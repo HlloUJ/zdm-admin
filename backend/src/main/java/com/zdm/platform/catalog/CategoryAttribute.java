@@ -12,9 +12,12 @@ public class CategoryAttribute extends BaseEntity {
   @NotNull
   private Long attributeId;
 
+  private String attributeRole;
   private Boolean requiredFlag;
   private Boolean skuFlag;
   private Integer sortOrder;
+  private String publishStatus;
+  private String createdByName;
 
   public Long getCategoryId() {
     return categoryId;
@@ -30,6 +33,14 @@ public class CategoryAttribute extends BaseEntity {
 
   public void setAttributeId(Long attributeId) {
     this.attributeId = attributeId;
+  }
+
+  public String getAttributeRole() {
+    return attributeRole;
+  }
+
+  public void setAttributeRole(String attributeRole) {
+    this.attributeRole = attributeRole;
   }
 
   public Boolean getRequiredFlag() {
@@ -54,5 +65,21 @@ public class CategoryAttribute extends BaseEntity {
 
   public void setSortOrder(Integer sortOrder) {
     this.sortOrder = sortOrder;
+  }
+
+  public String getPublishStatus() {
+    return publishStatus;
+  }
+
+  public void setPublishStatus(String publishStatus) {
+    this.publishStatus = publishStatus;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 }
