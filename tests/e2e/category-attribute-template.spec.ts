@@ -443,6 +443,8 @@ test('selects the first leaf and manages bindings from the template list', async
   expect(salesRoleResponse.request().postDataJSON()).toMatchObject({ attributeRole: 'sales', skuFlag: false });
   await expect(sizeRoleInput).toHaveValue('销售属性');
   await expect(sizeRoleSelect.locator('.t-loading')).toHaveCount(0);
+  await sizeRoleSelect.hover();
+  await expect(sizeRoleSelect.locator('.t-input__suffix-clear')).toHaveCount(0);
   await expect(sizeSkuSwitch).not.toHaveClass(/t-is-disabled/);
 
   const skuRequestPromise = page.waitForRequest(
