@@ -4,98 +4,111 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <header class="page-header">
-          <t-breadcrumb
-            ><t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item
-            ><t-breadcrumb-item>属性值管理</t-breadcrumb-item></t-breadcrumb
-          ><t-tag theme="primary" variant="light">标准属性值库</t-tag>
-        </header>
+        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '属性值管理']" badge="标准属性值库" />
         <t-alert theme="info" class="page-tip"
           >用于维护各属性的可选值。适用于枚举 / 下拉类型属性；停用后不再允许新商品选择。</t-alert
         >
-        <section v-if="!lockedScope" class="table-card source-card">
-          <t-tabs v-model="activeScope" :list="scopeTabs" />
-          <div class="source-caption">{{ sourceDescription }}</div>
-        </section>
-        <section class="filter-card">
-          <t-form :data="searchForm" label-width="88px" colon
-            ><div class="filter-row">
-              <div class="filter-fields">
-                <t-form-item label="所属属性"
-                  ><t-select v-model="searchForm.attribute" clearable placeholder="全部"
-                    ><t-option
-                      v-for="item in attributesInScope"
-                      :key="item.code"
-                      :label="item.name"
-                      :value="item.code" /></t-select></t-form-item
-                ><t-form-item label="属性值名称"
-                  ><t-input v-model="searchForm.keyword" clearable placeholder="请输入" /></t-form-item
-                ><t-form-item label="状态"
-                  ><t-select v-model="searchForm.status" clearable placeholder="全部"
-                    ><t-option label="启用" value="enabled" /><t-option label="停用" value="disabled" /></t-select
-                ></t-form-item>
+        <AdminListLayout>
+          <template #toolbar>
+            <div class="list-controls">
+              <div v-if="!lockedScope" class="scope-controls">
+                <t-tabs v-model="activeScope" :list="scopeTabs" />
+                <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-              <div class="filter-actions">
-                <t-button theme="primary" @click="search"
-                  ><template #icon><t-icon name="search" /></template>查询</t-button
-                ><t-button variant="base" @click="reset">重置</t-button>
+              <t-form :data="searchForm" label-width="88px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="所属属性" name="attribute">
+                      <t-select v-model="searchForm.attribute" clearable placeholder="全部">
+                        <t-option
+                          v-for="item in attributesInScope"
+                          :key="item.code"
+                          :label="item.name"
+                          :value="item.code"
+                        />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item label="属性值名称" name="keyword">
+                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
+                    </t-form-item>
+                    <t-form-item label="状态" name="status">
+                      <t-select v-model="searchForm.status" clearable placeholder="全部">
+                        <t-option label="启用" value="enabled" />
+                        <t-option label="停用" value="disabled" />
+                      </t-select>
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="search">
+                      <template #icon><t-icon name="search" /></template>
+                      查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="reset">
+                      <template #icon><t-icon name="refresh" /></template>
+                      重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div class="table-toolbar">
+                <t-button theme="primary" @click="openCreate">
+                  <template #icon><t-icon name="add" /></template>
+                  新增
+                </t-button>
               </div>
-            </div></t-form
-          >
-        </section>
-        <section class="table-card">
-          <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreate"
-              ><template #icon><t-icon name="add" /></template>新增</t-button
-            >
-          </div>
-          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed"
-            ><template #attribute="{ row }">{{ attributeName[row.attribute] }}</template
-            ><template #status="{ row }"
-              ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
-                row.status === 'enabled' ? '启用' : '停用'
-              }}</t-tag></template
-            ><template #operation="{ row }"
-              ><div class="table-actions">
-                <t-link
-                  :theme="row.status === 'enabled' ? 'warning' : 'success'"
-                  hover="color"
-                  @click="openStatusConfirm(row)"
-                  >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
-                ><t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
-              </div></template
-            ></t-table
-          ><AdminPagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="totalCount"
-            :page-size-options="pageSizeOptions"
-            @change="handlePaginationChange"
-          />
-        </section>
+            </div>
+          </template>
+          <template #table>
+            <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+              <template #attribute="{ row }">{{ attributeName[row.attribute] }}</template>
+              <template #status="{ row }"
+                ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
+                  row.status === 'enabled' ? '启用' : '停用'
+                }}</t-tag></template
+              >
+              <template #operation="{ row }"
+                ><div class="table-actions">
+                  <t-link
+                    :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                    hover="color"
+                    @click="openStatusConfirm(row)"
+                    >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
+                  ><t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                </div></template
+              >
+            </t-table>
+          </template>
+          <template #pagination
+            ><AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="totalCount"
+              :page-size-options="pageSizeOptions"
+              @change="handlePaginationChange"
+          /></template>
+        </AdminListLayout>
       </main>
     </div>
-    <t-dialog
+    <AdminDialog
       v-model:visible="dialogVisible"
       header="新增"
-      width="520px"
+      width="560px"
       placement="center"
       confirm-btn="提交"
-      cancel-btn="取消"
       @confirm="submit"
-      @cancel="closeFormDialog"
       @close="closeFormDialog"
-      ><t-form ref="formRef" :data="form" :rules="formRules" label-width="96px" colon
-        ><t-form-item label="所属属性" name="attribute" required-mark
-          ><t-select v-model="form.attribute"
-            ><t-option
-              v-for="item in formAttributes"
-              :key="item.code"
-              :label="item.name"
-              :value="item.code" /></t-select></t-form-item
-        ><t-form-item label="值名称" name="name" required-mark
-          ><t-input v-model="form.name" clearable placeholder="请输入" /></t-form-item></t-form
-    ></t-dialog>
+    >
+      <t-form ref="formRef" :data="form" :rules="formRules" label-width="96px" colon>
+        <t-form-item label="所属属性" name="attribute" required-mark>
+          <t-select v-model="form.attribute">
+            <t-option v-for="item in formAttributes" :key="item.code" :label="item.name" :value="item.code" />
+          </t-select>
+        </t-form-item>
+        <t-form-item label="值名称" name="name" required-mark>
+          <t-input v-model="form.name" clearable placeholder="请输入" />
+        </t-form-item>
+      </t-form>
+    </AdminDialog>
     <t-dialog
       v-model:visible="confirmDialogVisible"
       header="系统提示"
@@ -118,7 +131,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
 import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
 import {
   createProductAttributeValue,
@@ -429,67 +442,79 @@ onMounted(loadValues);
   flex: 1;
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
 }
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.page-tip {
   margin-bottom: 16px;
 }
-.page-tip,
-.filter-card,
-.source-card {
-  margin-bottom: 16px;
+.list-controls {
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
-.filter-card,
-.table-card {
-  padding: 24px;
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  box-shadow: var(--td-shadow-1);
-}
-.source-card {
-  padding-bottom: 14px;
+.scope-controls {
+  min-width: 0;
 }
 .source-caption {
-  margin-top: 12px;
+  margin-top: var(--td-comp-margin-s);
   color: var(--td-text-color-secondary);
   font-size: 13px;
 }
-.filter-row,
-.filter-fields,
-.filter-actions,
-.table-toolbar,
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
 }
 .filter-row {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields {
-  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 280px;
+  width: 260px;
   margin-bottom: 0;
 }
 .filter-fields :deep(.t-input),
 .filter-fields :deep(.t-select) {
   width: 100%;
 }
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
 .table-toolbar {
-  justify-content: space-between;
-  margin-bottom: 16px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
+  display: flex;
+  align-items: center;
 }
 .table-actions {
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+  white-space: nowrap;
 }
 :deep(.t-table th),
 :deep(.t-table td) {
   padding-left: 24px;
   padding-right: 24px;
+}
+@media (max-width: 1120px) {
+  .filter-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filter-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 720px) {
+  .filter-fields :deep(.t-form__item) {
+    width: 100%;
+  }
 }
 </style>
