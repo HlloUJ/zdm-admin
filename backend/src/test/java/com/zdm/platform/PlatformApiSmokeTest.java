@@ -87,6 +87,9 @@ class PlatformApiSmokeTest {
     Integer categoryWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM product_categories WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
+    Integer categoryAttributeWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM category_attributes WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
     Integer slabVarietyWithoutCreatorCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
@@ -97,6 +100,7 @@ class PlatformApiSmokeTest {
     assertThat(legacyReadPermissionCount).isZero();
     assertThat(craftWithoutCreatorCount).isZero();
     assertThat(categoryWithoutCreatorCount).isZero();
+    assertThat(categoryAttributeWithoutCreatorCount).isZero();
     assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
@@ -173,6 +177,76 @@ class PlatformApiSmokeTest {
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void categoryAttributeCrudPersistsCreatorMetadataInDatabase() throws Exception {
+    String creatorName = jdbcTemplate.queryForObject(
+        "SELECT display_name FROM accounts WHERE id = 1",
+        String.class);
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/category-attributes")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":4,
+                  "attributeId":3,
+                  "requiredFlag":true,
+                  "skuFlag":false,
+                  "sortOrder":1,
+                  "status":"enabled",
+                  "createdByName":"不应覆盖"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
+        .andReturn();
+    String categoryAttributeId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT created_by_name FROM category_attributes WHERE id = ?",
+        String.class,
+        categoryAttributeId)).isEqualTo(creatorName);
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":4,
+                  "attributeId":3,
+                  "requiredFlag":false,
+                  "skuFlag":true,
+                  "sortOrder":2,
+                  "status":"disabled",
+                  "createdByName":"不应覆盖"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(get("/api/admin/category-attributes")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == %s)].createdByName".formatted(categoryAttributeId))
+            .value(hasItem(creatorName)));
+
+    mockMvc.perform(delete("/api/admin/category-attributes/{id}", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM category_attributes WHERE id = ?",
+        Integer.class,
+        categoryAttributeId)).isZero();
   }
 
   @Test
@@ -352,8 +426,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO category_attributes
-          (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
-        VALUES (9203, 1, 0, 0, 1, 'enabled')
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
+        VALUES (9203, 1, 0, 0, 1, 'enabled', '韩健')
         """);
 
     mockMvc.perform(delete("/api/admin/product-categories/9203")

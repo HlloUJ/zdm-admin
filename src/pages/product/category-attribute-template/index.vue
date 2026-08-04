@@ -8,57 +8,62 @@
       <main class="page">
         <AdminPageHeader :breadcrumbs="['商品基础数据中心', '类目属性模板']" :badge="pageTitle" />
 
-        <section class="table-card source-card">
-          <t-tabs v-model="activeScope" :list="scopeTabs" />
-          <div class="selector-row">
-            <t-select
-              v-model="selectedCategoryId"
-              class="category-select"
-              filterable
-              placeholder="请选择分类"
-              :loading="loading"
-            >
-              <t-option
-                v-for="item in categoryOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-                :disabled="item.disabled"
-              />
-            </t-select>
-            <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
-              <template #icon><t-icon name="add" /></template>绑定属性
-            </t-button>
-          </div>
-        </section>
-
         <AdminListLayout>
-          <template #filters>
-            <t-form :data="searchForm" label-width="72px" colon>
-              <div class="filter-row">
-                <div class="filter-fields">
-                  <t-form-item label="属性名称">
-                    <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
-                  </t-form-item>
-                  <t-form-item label="状态">
-                    <t-select v-model="searchForm.status" clearable placeholder="全部">
-                      <t-option label="启用" value="enabled" />
-                      <t-option label="停用" value="disabled" />
-                    </t-select>
-                  </t-form-item>
-                </div>
-                <div class="filter-actions">
-                  <t-button theme="primary" @click="search">
-                    <template #icon><t-icon name="search" /></template>查询
-                  </t-button>
-                  <t-button variant="base" @click="reset">重置</t-button>
-                </div>
-              </div>
-            </t-form>
-          </template>
-
           <template #toolbar>
-            <span class="toolbar-title">{{ selectedCategoryName }}</span>
+            <div class="list-controls">
+              <div class="scope-controls">
+                <t-tabs v-model="activeScope" :list="scopeTabs" />
+              </div>
+
+              <div class="selector-row">
+                <t-select
+                  v-model="selectedCategoryId"
+                  class="category-select"
+                  filterable
+                  placeholder="请选择分类"
+                  :loading="loading"
+                >
+                  <t-option
+                    v-for="item in categoryOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                    :disabled="item.disabled"
+                  />
+                </t-select>
+              </div>
+
+              <t-form :data="searchForm" label-width="72px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="属性名称">
+                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
+                    </t-form-item>
+                    <t-form-item label="状态">
+                      <t-select v-model="searchForm.status" clearable placeholder="全部">
+                        <t-option label="启用" value="enabled" />
+                        <t-option label="停用" value="disabled" />
+                      </t-select>
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="search">
+                      <template #icon><t-icon name="search" /></template>查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="reset">
+                      <template #icon><t-icon name="refresh" /></template>重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+
+              <div class="table-toolbar">
+                <span class="toolbar-title">{{ selectedCategoryName }}</span>
+                <t-button theme="primary" :disabled="!selectedCategoryId" @click="openBindDialog">
+                  <template #icon><t-icon name="add" /></template>绑定属性
+                </t-button>
+              </div>
+            </div>
           </template>
 
           <template #table>
@@ -202,6 +207,8 @@ interface BindingRow {
   skuFlag: boolean;
   sortOrder: number;
   status: Status;
+  createdByName: string;
+  createdAt: string;
 }
 
 const activeScope = ref<Scope>('finished');
@@ -232,6 +239,8 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'skuFlag', title: 'SKU', width: 90, align: 'center' },
   { colKey: 'sortOrder', title: '排序', width: 120, align: 'center' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
 ];
 
@@ -266,6 +275,8 @@ const bindingRows = computed<BindingRow[]>(() => {
         skuFlag: Boolean(item.skuFlag),
         sortOrder: item.sortOrder ?? 0,
         status: item.status ?? 'enabled',
+        createdByName: item.createdByName || '-',
+        createdAt: formatDateTime(item.createdAt),
       };
     })
     .filter((item) => {
@@ -322,6 +333,15 @@ function collectCategoryOptions(
 
 function valueTypeLabel(value: ProductAttributeRecord['valueType']) {
   return { select: '标准选项', number: '数值', text: '文本' }[value];
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+
+  const pad = (number: number) => number.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function toPayload(row: BindingRow): CategoryAttributePayload {
@@ -479,15 +499,24 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-.source-card {
-  margin-bottom: var(--td-comp-margin-l);
+.list-controls {
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
+}
+
+.scope-controls {
+  min-width: 0;
+}
+
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
 }
 
 .selector-row {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-m);
-  margin-top: var(--td-comp-margin-m);
 }
 
 .category-select {
@@ -499,19 +528,72 @@ onMounted(loadData);
   font: var(--td-font-body-medium);
 }
 
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
+}
+
+.filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--td-comp-margin-l);
+}
+
+.filter-fields :deep(.t-form__item) {
+  width: 260px;
+  margin-bottom: 0;
+}
+
+.filter-fields :deep(.t-input),
+.filter-fields :deep(.t-select) {
+  width: 100%;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-s);
+  white-space: nowrap;
 }
 
-@media (max-width: 900px) {
-  .selector-row {
+:deep(.t-table th),
+:deep(.t-table td) {
+  padding-right: 24px;
+  padding-left: 24px;
+}
+
+@media (max-width: 1120px) {
+  .filter-row {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .filter-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 720px) {
   .category-select {
+    width: 100%;
+  }
+
+  .filter-fields :deep(.t-form__item) {
     width: 100%;
   }
 }

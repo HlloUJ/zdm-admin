@@ -8,6 +8,7 @@ export interface CategoryAttributeRecord {
   skuFlag?: boolean;
   sortOrder?: number;
   status?: 'enabled' | 'disabled';
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
