@@ -80,10 +80,38 @@ async function installCategoryAttributeMocks(page: Page) {
   );
   await page.route('**/api/admin/product-attributes', (route) =>
     fulfillJson(route, [
-      { id: 1, scope: 'shared', name: '材质', valueType: 'select', status: 'disabled' },
-      { id: 2, scope: 'shared', name: '颜色', valueType: 'select', status: 'enabled' },
-      { id: 3, scope: 'finished', name: '尺寸', valueType: 'number', status: 'enabled' },
-      { id: 4, scope: 'shared', name: '停用属性', valueType: 'text', status: 'disabled' },
+      {
+        id: 1,
+        scope: 'shared',
+        name: '材质',
+        valueType: 'select',
+        status: 'disabled',
+        createdAt: '2026-08-04T09:00:00',
+      },
+      {
+        id: 2,
+        scope: 'shared',
+        name: '颜色',
+        valueType: 'select',
+        status: 'enabled',
+        createdAt: '2026-08-04T10:00:00',
+      },
+      {
+        id: 3,
+        scope: 'finished',
+        name: '尺寸',
+        valueType: 'number',
+        status: 'enabled',
+        createdAt: '2026-08-04T11:00:00',
+      },
+      {
+        id: 4,
+        scope: 'shared',
+        name: '停用属性',
+        valueType: 'text',
+        status: 'disabled',
+        createdAt: '2026-08-04T12:00:00',
+      },
     ]),
   );
   await page.route('**/api/admin/category-attributes/batch', async (route) => {
@@ -223,6 +251,7 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(headers.nth(5)).toContainText('状态');
   await expect(headers.nth(6)).toContainText('绑定人');
   await expect(headers.nth(7)).toContainText('绑定时间');
+  await expect(headers.getByText('排序', { exact: true })).toHaveCount(0);
   const operationColumnWidth = await headers.nth(8).evaluate((header) => header.getBoundingClientRect().width);
   expect(operationColumnWidth).toBeGreaterThanOrEqual(76);
   expect(operationColumnWidth).toBeLessThanOrEqual(82);
@@ -237,6 +266,10 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(transferTarget.locator('.t-transfer__list-header')).toContainText('已绑定属性');
   await expect(transferSource.getByRole('checkbox', { name: '颜色 / 标准选项' })).toBeVisible();
   await expect(transferSource.getByRole('checkbox', { name: '尺寸 / 数值' })).toBeVisible();
+  await expect(transferSource.locator('.t-transfer__list-content .t-transfer__list-item')).toHaveText([
+    '尺寸 / 数值',
+    '颜色 / 标准选项',
+  ]);
   await expect(transferSource.getByRole('checkbox', { name: '材质 / 标准选项' })).toHaveCount(0);
   await expect(transferTarget.getByRole('checkbox', { name: '材质 / 标准选项' })).toHaveCount(0);
   await expect(transferSource.getByRole('checkbox', { name: '停用属性 / 文本' })).toHaveCount(0);
@@ -250,7 +283,7 @@ test('selects the first leaf and manages bindings from the template list', async
   );
   await bindDialog.getByRole('button', { name: '提交', exact: true }).click();
   const batchRequest = await batchRequestPromise;
-  expect(batchRequest.postDataJSON()).toEqual({ categoryId: 3, attributeIds: [2, 3] });
+  expect(batchRequest.postDataJSON()).toEqual({ categoryId: 3, attributeIds: [3, 2] });
   await expect(bindDialog).toBeHidden();
   const colorRow = main.locator('tbody tr').filter({ hasText: '颜色' });
   const sizeRow = main.locator('tbody tr').filter({ hasText: '尺寸' });
@@ -261,13 +294,12 @@ test('selects the first leaf and manages bindings from the template list', async
 
   const tableRows = main.locator('tbody tr');
   await expect(tableRows.nth(0)).toContainText('材质');
-  await expect(tableRows.nth(1)).toContainText('颜色');
-  await expect(tableRows.nth(2)).toContainText('尺寸');
-  await expect(materialRow.getByText('上移', { exact: true })).toHaveClass(/t-is-disabled/);
-  await expect(sizeRow.getByText('下移', { exact: true })).toHaveClass(/t-is-disabled/);
-  await sizeRow.getByText('上移', { exact: true }).click();
   await expect(tableRows.nth(1)).toContainText('尺寸');
   await expect(tableRows.nth(2)).toContainText('颜色');
+  await expect(materialRow.locator('.t-table__handle-draggable .binding-drag-icon')).toBeVisible();
+  await colorRow.locator('.t-table__handle-draggable').dragTo(sizeRow.locator('.t-table__handle-draggable'));
+  await expect(tableRows.nth(1)).toContainText('颜色');
+  await expect(tableRows.nth(2)).toContainText('尺寸');
 
   await bindButton.click();
   const updatedBindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
@@ -275,14 +307,14 @@ test('selects the first leaf and manages bindings from the template list', async
   await updatedTransferTarget.locator('.t-checkbox').filter({ hasText: '尺寸 / 数值' }).click();
   await updatedBindDialog.locator('.t-transfer__operations button').nth(1).click();
   const unbindRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/3') && request.method() === 'DELETE',
+    (request) => request.url().endsWith('/api/admin/category-attributes/2') && request.method() === 'DELETE',
   );
   await updatedBindDialog.getByRole('button', { name: '提交', exact: true }).click();
   await unbindRequestPromise;
   await expect(sizeRow).toHaveCount(0);
 
   const removeRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/2') && request.method() === 'DELETE',
+    (request) => request.url().endsWith('/api/admin/category-attributes/3') && request.method() === 'DELETE',
   );
   await colorRow.getByText('移除', { exact: true }).click();
   const removeDialog = page.locator('.t-dialog').filter({ hasText: '是否移除属性【颜色】？' });
@@ -319,9 +351,7 @@ test('keeps template data visible while hiding ungranted binding operations', as
   await expect(row.locator('.t-switch')).toHaveCount(2);
   await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
   await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
-  await expect(row.getByText('上移', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('下移', { exact: true })).toHaveCount(0);
-  await expect(row.locator('td').nth(4)).toHaveText('-');
+  await expect(row.locator('.t-table__handle-draggable')).toHaveCount(0);
   await expect(row.getByText('启用', { exact: true })).toHaveCount(0);
   await expect(row.getByText('停用', { exact: true })).toHaveCount(1);
   await expect(row.getByText('移除', { exact: true })).toHaveCount(0);
