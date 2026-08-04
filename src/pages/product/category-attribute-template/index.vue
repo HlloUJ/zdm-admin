@@ -1053,7 +1053,7 @@ onMounted(loadData);
 }
 
 .attribute-role-select {
-  width: 120px;
+  width: 108px;
 }
 
 .sku-switch-cell {
