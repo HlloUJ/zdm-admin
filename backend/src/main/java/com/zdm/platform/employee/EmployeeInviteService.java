@@ -1,13 +1,11 @@
 package com.zdm.platform.employee;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
-import java.util.List;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +20,11 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private final EmployeeService employeeService;
-  private final JdbcTemplate jdbcTemplate;
+  private final CurrentIdentityProvider identityProvider;
 
-  public EmployeeInviteService(EmployeeService employeeService, JdbcTemplate jdbcTemplate) {
+  public EmployeeInviteService(EmployeeService employeeService, CurrentIdentityProvider identityProvider) {
     this.employeeService = employeeService;
-    this.jdbcTemplate = jdbcTemplate;
+    this.identityProvider = identityProvider;
   }
 
   @Transactional
@@ -35,9 +33,9 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     invite.setToken(generateToken());
     invite.setTenantId(DEFAULT_TENANT_ID);
     invite.setStoreId(DEFAULT_STORE_ID);
-    Long accountId = currentAccountId();
-    invite.setCreatedByAccountId(accountId);
-    invite.setCreatedByName(resolveInviterName(accountId));
+    CurrentIdentity identity = identityProvider.require();
+    invite.setCreatedByAccountId(identity.accountId());
+    invite.setCreatedByName(identity.displayName());
     invite.setStatus(ACTIVE);
     invite.setExpiresAt(LocalDateTime.now().plusDays(7));
     save(invite);
@@ -100,53 +98,5 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     byte[] bytes = new byte[24];
     RANDOM.nextBytes(bytes);
     return HexFormat.of().formatHex(bytes);
-  }
-
-  private String resolveInviterName(Long accountId) {
-    if (accountId == null) {
-      return defaultInviterName();
-    }
-    List<String> names = employeeService.lambdaQuery()
-        .eq(Employee::getAccountId, accountId)
-        .eq(Employee::getStatus, "enabled")
-        .orderByDesc(Employee::getId)
-        .last("LIMIT 1")
-        .list()
-        .stream()
-        .map(Employee::getName)
-        .filter(name -> name != null && !name.isBlank())
-        .toList();
-    return names.isEmpty() ? defaultInviterName() : names.get(0);
-  }
-
-  private String defaultInviterName() {
-    List<String> names = jdbcTemplate.query(
-        """
-        SELECT created_by
-        FROM stores
-        WHERE id = ?
-          AND created_by IS NOT NULL
-          AND created_by <> ''
-        LIMIT 1
-        """,
-        (rs, rowNum) -> rs.getString("created_by"),
-        DEFAULT_STORE_ID);
-    return names.isEmpty() ? null : names.get(0);
-  }
-
-  private Long currentAccountId() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getPrincipal() == null) {
-      return null;
-    }
-    String principal = String.valueOf(authentication.getPrincipal());
-    if (!principal.startsWith("account:")) {
-      return null;
-    }
-    try {
-      return Long.parseLong(principal.substring("account:".length()));
-    } catch (NumberFormatException ex) {
-      return null;
-    }
   }
 }
