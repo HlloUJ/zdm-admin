@@ -201,7 +201,7 @@ const toAttribute = (record: ProductAttributeRecord): Attribute => ({
   name: record.name,
   scope: record.scope,
   valueType: record.valueType,
-  templateCount: 0,
+  templateCount: record.templateCount ?? 0,
   status: normalizeStatus(record.status),
 });
 const toAttributePayload = (item: Attribute): ProductAttributePayload => ({

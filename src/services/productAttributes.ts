@@ -6,6 +6,7 @@ export interface ProductAttributeRecord {
   name: string;
   valueType: 'select' | 'number' | 'text';
   attributeRole?: string;
+  templateCount?: number;
   status?: 'enabled' | 'disabled';
   createdAt?: string;
   updatedAt?: string;
