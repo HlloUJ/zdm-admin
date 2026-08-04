@@ -154,7 +154,7 @@
                         :theme="row.publishStatus === 'published' ? 'warning' : 'success'"
                         hover="color"
                         :disabled="savingId !== null"
-                        @click="togglePublish(row)"
+                        @click="row.publishStatus === 'published' ? togglePublish(row) : openPublishConfirm(row)"
                       >
                         {{ row.publishStatus === 'published' ? '取消发布' : '发布' }}
                       </t-link>
@@ -216,6 +216,19 @@
     </AdminDialog>
 
     <t-dialog
+      v-model:visible="publishConfirmVisible"
+      header="系统提示"
+      width="420px"
+      placement="center"
+      confirm-btn="确认"
+      cancel-btn="取消"
+      @confirm="handlePublishConfirm"
+      @close="closePublishConfirm"
+    >
+      是否发布属性【{{ publishTarget?.name }}】？
+    </t-dialog>
+
+    <t-dialog
       v-model:visible="deleteConfirmVisible"
       header="系统提示"
       width="420px"
@@ -256,6 +269,9 @@ import { listProductCategories, type ProductCategoryRecord } from '@/services/pr
 type Scope = 'finished' | 'accessory';
 type Status = 'enabled' | 'disabled';
 type PublishStatus = 'published' | 'unpublished';
+
+const MAX_SKU_ATTRIBUTE_COUNT = 4;
+const SKU_ATTRIBUTE_LIMIT_MESSAGE = '参与SKU组合的属性最多只能开启4个';
 
 interface BindingRow {
   id: number;
@@ -313,6 +329,8 @@ const categoryKeyword = ref('');
 const appliedCategoryKeyword = ref('');
 const bindDialogVisible = ref(false);
 const bindSearchKeyword = ref('');
+const publishConfirmVisible = ref(false);
+const publishTarget = ref<BindingRow | null>(null);
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
 const searchForm = reactive({ keyword: '', status: '' as Status | '', publishStatus: '' as PublishStatus | '' });
@@ -672,7 +690,17 @@ function getSwitchValue(value: unknown) {
 }
 
 function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: unknown) {
-  persistRow(row, { [field]: getSwitchValue(value) }, field);
+  const nextValue = getSwitchValue(value);
+  if (
+    field === 'skuFlag' &&
+    nextValue &&
+    !row.skuFlag &&
+    allBindingRows.value.filter((item) => item.skuFlag).length >= MAX_SKU_ATTRIBUTE_COUNT
+  ) {
+    MessagePlugin.error(SKU_ATTRIBUTE_LIMIT_MESSAGE);
+    return;
+  }
+  persistRow(row, { [field]: nextValue }, field);
 }
 
 async function handleDragSort(context: { current: BindingRow; target: BindingRow }) {
@@ -719,6 +747,23 @@ async function togglePublish(row: BindingRow) {
   } finally {
     savingId.value = null;
   }
+}
+
+function openPublishConfirm(row: BindingRow) {
+  if (!canTogglePublish.value || savingId.value !== null || row.publishStatus === 'published') return;
+  publishTarget.value = row;
+  publishConfirmVisible.value = true;
+}
+
+function closePublishConfirm() {
+  publishConfirmVisible.value = false;
+  publishTarget.value = null;
+}
+
+async function handlePublishConfirm() {
+  if (!publishTarget.value) return;
+  await togglePublish(publishTarget.value);
+  closePublishConfirm();
 }
 
 function openDeleteConfirm(row: BindingRow) {

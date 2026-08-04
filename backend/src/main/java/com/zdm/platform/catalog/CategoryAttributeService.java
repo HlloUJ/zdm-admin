@@ -13,6 +13,8 @@ import org.springframework.util.StringUtils;
 @Service
 public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMapper, CategoryAttribute> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+  private static final int MAX_SKU_ATTRIBUTE_COUNT = 4;
+  private static final String SKU_ATTRIBUTE_LIMIT_MESSAGE = "参与SKU组合的属性最多只能开启4个";
 
   private final CurrentIdentityProvider identityProvider;
 
@@ -22,6 +24,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
 
   @Transactional
   public CategoryAttribute createCategoryAttribute(CategoryAttribute categoryAttribute) {
+    validateSkuAttributeLimit(categoryAttribute.getCategoryId(), null, categoryAttribute.getSkuFlag());
     categoryAttribute.setId(null);
     categoryAttribute.setStatus("disabled");
     categoryAttribute.setPublishStatus("unpublished");
@@ -77,6 +80,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     if (existing == null) {
       throw new IllegalArgumentException("类目属性模板不存在");
     }
+    validateSkuAttributeLimit(payload.getCategoryId(), id, payload.getSkuFlag());
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setPublishStatus(existing.getPublishStatus());
@@ -95,6 +99,21 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     existing.setPublishStatus(publishStatus);
     updateById(existing);
     return getById(id);
+  }
+
+  private void validateSkuAttributeLimit(Long categoryId, Long excludedId, Boolean skuFlag) {
+    if (!Boolean.TRUE.equals(skuFlag)) {
+      return;
+    }
+    var query = lambdaQuery()
+        .eq(CategoryAttribute::getCategoryId, categoryId)
+        .eq(CategoryAttribute::getSkuFlag, true);
+    if (excludedId != null) {
+      query.ne(CategoryAttribute::getId, excludedId);
+    }
+    if (query.count() >= MAX_SKU_ATTRIBUTE_COUNT) {
+      throw new IllegalArgumentException(SKU_ATTRIBUTE_LIMIT_MESSAGE);
+    }
   }
 
   private String resolveCreatedByName() {

@@ -155,6 +155,85 @@ class CategoryAttributeApiTest {
   }
 
   @Test
+  void categoryAllowsAtMostFourSkuAttributes() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_categories
+          (id, scope, name, sort_order, product_count, status, created_by_name)
+        VALUES (9930, 'finished', 'SKU属性上限测试分类', 1, 0, 'enabled', '韩健')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attributes
+          (id, scope, name, value_type, attribute_role, status)
+        VALUES
+          (9930, 'shared', 'SKU属性一', 'select', 'basic', 'enabled'),
+          (9931, 'shared', 'SKU属性二', 'select', 'basic', 'enabled'),
+          (9932, 'shared', 'SKU属性三', 'select', 'basic', 'enabled'),
+          (9933, 'shared', 'SKU属性四', 'select', 'basic', 'enabled'),
+          (9934, 'shared', 'SKU属性五', 'select', 'basic', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO category_attributes
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
+        VALUES
+          (9930, 9930, 0, 1, 1, 'enabled', '韩健'),
+          (9930, 9931, 0, 1, 2, 'enabled', '韩健'),
+          (9930, 9932, 0, 1, 3, 'enabled', '韩健'),
+          (9930, 9933, 0, 1, 4, 'enabled', '韩健')
+        """);
+    String token = TokenAuthenticationFilter.createAccountToken(1L);
+
+    mockMvc.perform(post("/api/admin/category-attributes")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9930,
+                  "attributeId":9934,
+                  "requiredFlag":false,
+                  "skuFlag":true,
+                  "sortOrder":5,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("参与SKU组合的属性最多只能开启4个"));
+
+    jdbcTemplate.update(
+        """
+        INSERT INTO category_attributes
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
+        VALUES (9930, 9934, 0, 0, 5, 'enabled', '韩健')
+        """);
+    Long fifthBindingId = jdbcTemplate.queryForObject(
+        "SELECT id FROM category_attributes WHERE category_id = 9930 AND attribute_id = 9934",
+        Long.class);
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", fifthBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9930,
+                  "attributeId":9934,
+                  "requiredFlag":false,
+                  "skuFlag":true,
+                  "sortOrder":5,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("参与SKU组合的属性最多只能开启4个"));
+
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT sku_flag FROM category_attributes WHERE id = ?",
+        Boolean.class,
+        fifthBindingId)).isFalse();
+  }
+
+  @Test
   void categoryAttributeModuleIgnoresSelfDataScopeAndSupportsBatchBinding() throws Exception {
     long accountId = 9920L;
     long employeeId = 9920L;

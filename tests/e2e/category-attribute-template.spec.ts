@@ -336,11 +336,21 @@ test('selects the first leaf and manages bindings from the template list', async
   expect(operationColumnWidth).toBeLessThanOrEqual(144);
   await expect(materialRow).toContainText('韩健');
 
+  let publishRequestCount = 0;
+  await page.route('**/api/admin/category-attributes/1/publish', async (route) => {
+    publishRequestCount += 1;
+    await route.fallback();
+  });
   const publishRequestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/api/admin/category-attributes/1/publish') && request.method() === 'PUT',
   );
   await materialRow.getByText('发布', { exact: true }).click();
+  const publishDialog = page.locator('.t-dialog').filter({ hasText: '是否发布属性【材质】？' });
+  await expect(publishDialog).toBeVisible();
+  expect(publishRequestCount).toBe(0);
+  await publishDialog.getByRole('button', { name: '确认', exact: true }).click();
   await publishRequestPromise;
+  expect(publishRequestCount).toBe(1);
   await expect(materialRow.getByText('已发布', { exact: true })).toHaveCount(1);
   await expect(materialRow.locator('.t-tag').filter({ hasText: '已发布' })).toHaveClass(/t-tag--success/);
   const unpublishButton = materialRow.getByText('取消发布', { exact: true });
@@ -424,6 +434,45 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(colorRow).toHaveCount(0);
 
   await expect(templatePanel.locator('.zdm-admin-pagination')).toBeVisible();
+});
+
+test('每个类目最多只能开启4个SKU组合属性', async ({ page }) => {
+  const productAttributes = Array.from({ length: 5 }, (_, index) => ({
+    id: index + 1,
+    scope: 'shared',
+    name: `SKU属性${index + 1}`,
+    valueType: 'select',
+    status: 'enabled',
+    createdAt: `2026-08-04T${String(index + 9).padStart(2, '0')}:00:00`,
+  }));
+  const categoryAttributes = productAttributes.map((attribute, index) => ({
+    id: index + 1,
+    categoryId: 3,
+    attributeId: attribute.id,
+    requiredFlag: false,
+    skuFlag: index < 4,
+    sortOrder: index + 1,
+    status: 'enabled',
+    publishStatus: 'unpublished',
+    createdByName: '韩健',
+    createdAt: '2026-08-04T09:30:00',
+  }));
+  let updateRequestCount = 0;
+
+  await page.route('**/api/admin/product-attributes', (route) => fulfillJson(route, productAttributes));
+  await page.route('**/api/admin/category-attributes', (route) => fulfillJson(route, categoryAttributes));
+  await page.route(/\/api\/admin\/category-attributes\/\d+$/, async (route) => {
+    if (route.request().method() === 'PUT') updateRequestCount += 1;
+    await route.fallback();
+  });
+
+  await page.goto('/category-attribute-template');
+  const fifthRow = page.getByRole('main').locator('tbody tr').filter({ hasText: 'SKU属性5' });
+  await expect(fifthRow.locator('.t-switch').nth(1)).not.toHaveClass(/t-is-checked/);
+  await fifthRow.locator('.t-switch').nth(1).click();
+  await expect(page.locator('.t-message').filter({ hasText: '参与SKU组合的属性最多只能开启4个' })).toBeVisible();
+  await expect(fifthRow.locator('.t-switch').nth(1)).not.toHaveClass(/t-is-checked/);
+  expect(updateRequestCount).toBe(0);
 });
 
 test('keeps template data visible while hiding ungranted binding operations', async ({ page }) => {
