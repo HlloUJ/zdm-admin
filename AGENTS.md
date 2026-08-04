@@ -15,7 +15,7 @@
 ## 验证分级
 
 - 后端启动和验证统一使用 `npm run backend:*` 命令，默认由 Docker 提供 JDK/Maven；不得因本机未安装 `mvn` 跳过后端验证。
-- `check:changed` 的文件参数包含 `backend/**` 时会调用 Docker；首次实际执行必须直接使用已授权的非破坏性 Docker 路径，不先在普通沙箱试跑；仅 `--list` 计划检查可在普通沙箱运行。
+- Docker/本地服务授权按复合命令的实际调用链判断，不按入口命令名判断：`check:changed`、`check:fast` 在变更包含 `backend/**` 时会调用 `backend:test`；`check:full`、`verify`、`verify:local`、`integration:verify` 会调用 Docker 和/或本地监听服务。以上场景首次实际执行即使用当前有效的最小授权通道；允许先用 `check:changed --list` 做只读计划确认，但不得先用普通沙箱运行必然进入受限资源的实际检查。
 - 纯文案、规则或脚本别名：检查 diff 和文件格式。
 - 低风险样式、小交互：`npm run check:changed -- <本次文件>`。
 - 中风险页面、表单、路由、服务层：变更文件检查加受影响单测或 E2E。

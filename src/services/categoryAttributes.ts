@@ -22,12 +22,24 @@ export interface CategoryAttributePayload {
   status: 'enabled' | 'disabled';
 }
 
+export interface CategoryAttributeBatchPayload {
+  categoryId: number;
+  attributeIds: number[];
+}
+
 export function listCategoryAttributes() {
   return request<CategoryAttributeRecord[]>('/admin/category-attributes');
 }
 
 export function createCategoryAttribute(payload: CategoryAttributePayload) {
   return request<CategoryAttributeRecord>('/admin/category-attributes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createCategoryAttributes(payload: CategoryAttributeBatchPayload) {
+  return request<CategoryAttributeRecord[]>('/admin/category-attributes/batch', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

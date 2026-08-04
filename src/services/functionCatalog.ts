@@ -193,6 +193,23 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
+        label: '类目属性模板',
+        value: 'admin.product-data-center.category-attribute-template.menu',
+        direct: false,
+        pages: [
+          {
+            label: '类目属性模板页',
+            value: 'admin.product-data-center.category-attribute-template',
+            actions: [
+              { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
+              { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
+              { label: '删除', value: 'admin.product-data-center.category-attribute-template.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+      {
         label: '大板品种管理',
         value: 'admin.product-data-center.slab-variety.menu',
         direct: false,

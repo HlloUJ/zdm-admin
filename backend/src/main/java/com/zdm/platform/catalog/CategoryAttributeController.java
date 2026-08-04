@@ -4,6 +4,9 @@ import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -26,11 +29,24 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
   }
 
   @Override
+  @GetMapping
+  public ApiResponse<List<CategoryAttribute>> list() {
+    permissionGuard.requireView(PERMISSION_PREFIX);
+    return ApiResponse.ok(service.list());
+  }
+
+  @Override
   @PostMapping
   public ApiResponse<CategoryAttribute> create(@Valid @RequestBody CategoryAttribute categoryAttribute) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.createCategoryAttribute(categoryAttribute));
+  }
+
+  @PostMapping("/batch")
+  public ApiResponse<List<CategoryAttribute>> createBatch(
+      @Valid @RequestBody CategoryAttributeBatchRequest request) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
+    return ApiResponse.ok(service.createCategoryAttributes(request));
   }
 
   @Override
@@ -39,7 +55,13 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
       @PathVariable Long id,
       @Valid @RequestBody CategoryAttribute categoryAttribute) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.updateCategoryAttribute(id, categoryAttribute));
+  }
+
+  @Override
+  @DeleteMapping("/{id}")
+  public ApiResponse<Boolean> delete(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    return ApiResponse.ok(service.removeById(id));
   }
 }
