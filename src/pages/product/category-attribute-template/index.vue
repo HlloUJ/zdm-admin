@@ -292,7 +292,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 70, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 77, fixed: 'right' },
 ];
 
 const selectedCategoryPath = computed(() => {
@@ -371,17 +371,22 @@ const boundAttributeIds = computed(
     ),
 );
 
+const bindableAttributeIds = computed(
+  () =>
+    new Set(
+      attributes.value
+        .filter((item) => (item.scope === 'shared' || item.scope === activeScope.value) && item.status !== 'disabled')
+        .map((item) => item.id),
+    ),
+);
+
 const bindAttributeOptions = computed(() =>
   attributes.value
-    .filter(
-      (item) =>
-        (item.scope === 'shared' || item.scope === activeScope.value) &&
-        (item.status !== 'disabled' || boundAttributeIds.value.has(item.id)),
-    )
+    .filter((item) => bindableAttributeIds.value.has(item.id))
     .map((item) => ({
       label: `${item.name} / ${valueTypeLabel(item.valueType)}`,
       value: item.id,
-      disabled: boundAttributeIds.value.has(item.id),
+      disabled: boundAttributeIds.value.has(item.id) && !canRemoveBinding.value,
     })),
 );
 
@@ -531,7 +536,7 @@ function openBindDialog() {
     MessagePlugin.warning('请选择分类');
     return;
   }
-  bindForm.attributeIds = [...boundAttributeIds.value];
+  bindForm.attributeIds = [...boundAttributeIds.value].filter((id) => bindableAttributeIds.value.has(id));
   bindDialogVisible.value = true;
 }
 
@@ -543,20 +548,37 @@ function closeBindDialog() {
 async function submitBind() {
   if (!canBindAttribute.value) return;
   const newAttributeIds = bindForm.attributeIds.filter((id) => !boundAttributeIds.value.has(id));
-  if (!selectedCategoryId.value || !newAttributeIds.length) {
-    MessagePlugin.warning('请选择需要绑定的属性');
+  const removedBindings = bindings.value.filter(
+    (item) =>
+      item.categoryId === selectedCategoryId.value &&
+      bindableAttributeIds.value.has(item.attributeId) &&
+      !bindForm.attributeIds.includes(item.attributeId),
+  );
+  if (!selectedCategoryId.value) {
+    MessagePlugin.warning('请选择分类');
+    return;
+  }
+  if (removedBindings.length && !canRemoveBinding.value) return;
+  if (!newAttributeIds.length && !removedBindings.length) {
+    closeBindDialog();
+    MessagePlugin.info('绑定关系未变更');
     return;
   }
   try {
-    const created = await createCategoryAttributes({
-      categoryId: selectedCategoryId.value,
-      attributeIds: newAttributeIds,
-    });
+    const [created] = await Promise.all([
+      newAttributeIds.length
+        ? createCategoryAttributes({ categoryId: selectedCategoryId.value, attributeIds: newAttributeIds })
+        : Promise.resolve([] as CategoryAttributeRecord[]),
+      ...removedBindings.map((item) => deleteCategoryAttribute(item.id)),
+    ]);
+    const removedIds = new Set(removedBindings.map((item) => item.id));
+    bindings.value = bindings.value.filter((item) => !removedIds.has(item.id));
     bindings.value.push(...created);
     closeBindDialog();
-    MessagePlugin.success(`成功绑定 ${created.length} 个属性`);
+    MessagePlugin.success('绑定关系已更新');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '绑定失败');
+    await loadData();
+    MessagePlugin.error(error instanceof Error ? error.message : '绑定关系更新失败');
   }
 }
 

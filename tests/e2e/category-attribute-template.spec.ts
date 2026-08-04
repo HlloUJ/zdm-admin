@@ -223,9 +223,9 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(headers.nth(5)).toContainText('状态');
   await expect(headers.nth(6)).toContainText('绑定人');
   await expect(headers.nth(7)).toContainText('绑定时间');
-  await expect
-    .poll(() => headers.nth(8).evaluate((header) => header.getBoundingClientRect().width))
-    .toBeLessThanOrEqual(75);
+  const operationColumnWidth = await headers.nth(8).evaluate((header) => header.getBoundingClientRect().width);
+  expect(operationColumnWidth).toBeGreaterThanOrEqual(76);
+  expect(operationColumnWidth).toBeLessThanOrEqual(82);
   await expect(materialRow).toContainText('韩健');
 
   await bindButton.click();
@@ -238,9 +238,9 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(transferSource.getByRole('checkbox', { name: '颜色 / 标准选项' })).toBeVisible();
   await expect(transferSource.getByRole('checkbox', { name: '尺寸 / 数值' })).toBeVisible();
   await expect(transferSource.getByRole('checkbox', { name: '材质 / 标准选项' })).toHaveCount(0);
-  await expect(transferTarget.getByRole('checkbox', { name: '材质 / 标准选项' })).toBeVisible();
-  await expect(transferTarget.getByRole('checkbox', { name: '材质 / 标准选项' })).toBeDisabled();
+  await expect(transferTarget.getByRole('checkbox', { name: '材质 / 标准选项' })).toHaveCount(0);
   await expect(transferSource.getByRole('checkbox', { name: '停用属性 / 文本' })).toHaveCount(0);
+  await expect(transferTarget.getByRole('checkbox', { name: '停用属性 / 文本' })).toHaveCount(0);
 
   await transferSource.locator('.t-checkbox').filter({ hasText: '颜色 / 标准选项' }).click();
   await transferSource.locator('.t-checkbox').filter({ hasText: '尺寸 / 数值' }).click();
@@ -268,6 +268,18 @@ test('selects the first leaf and manages bindings from the template list', async
   await sizeRow.getByText('上移', { exact: true }).click();
   await expect(tableRows.nth(1)).toContainText('尺寸');
   await expect(tableRows.nth(2)).toContainText('颜色');
+
+  await bindButton.click();
+  const updatedBindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
+  const updatedTransferTarget = updatedBindDialog.locator('.t-transfer__list-target');
+  await updatedTransferTarget.locator('.t-checkbox').filter({ hasText: '尺寸 / 数值' }).click();
+  await updatedBindDialog.locator('.t-transfer__operations button').nth(1).click();
+  const unbindRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith('/api/admin/category-attributes/3') && request.method() === 'DELETE',
+  );
+  await updatedBindDialog.getByRole('button', { name: '提交', exact: true }).click();
+  await unbindRequestPromise;
+  await expect(sizeRow).toHaveCount(0);
 
   const removeRequestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/api/admin/category-attributes/2') && request.method() === 'DELETE',
