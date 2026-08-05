@@ -268,10 +268,10 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(materialRow).toBeVisible();
 
   const materialSwitches = materialRow.locator('.t-switch');
-  await materialSwitches.nth(0).click();
-  await expect(materialSwitches.nth(0)).toHaveClass(/t-is-loading/);
-  await expect(materialSwitches.nth(1)).not.toHaveClass(/t-is-loading/);
+  await materialSwitches.nth(1).click();
+  await expect(materialSwitches.nth(1)).toHaveClass(/t-is-loading/);
   await expect(materialSwitches.nth(0)).not.toHaveClass(/t-is-loading/);
+  await expect(materialSwitches.nth(1)).not.toHaveClass(/t-is-loading/);
 
   const toolbarPosition = await templatePanel.evaluate((panel) => {
     const filters = panel.querySelector<HTMLElement>('.filter-row')?.getBoundingClientRect();
@@ -317,8 +317,9 @@ test('selects the first leaf and manages bindings from the template list', async
 
   const headers = main.getByRole('columnheader');
   await expect(headers.nth(3)).toContainText('属性角色');
-  await expect(headers.nth(5)).toContainText('参与SKU组合');
-  const skuHeaderLayout = await headers.nth(5).evaluate((header) => {
+  await expect(headers.nth(4)).toContainText('参与SKU组合');
+  await expect(headers.nth(5)).toContainText('必填');
+  const skuHeaderLayout = await headers.nth(4).evaluate((header) => {
     const content = header.querySelector<HTMLElement>('.t-table__th-cell-inner') ?? header;
     const style = getComputedStyle(content);
     return {
@@ -423,7 +424,7 @@ test('selects the first leaf and manages bindings from the template list', async
   const sizeRoleSelect = sizeRow.locator('.attribute-role-select');
   const colorRoleInput = colorRoleSelect.getByRole('textbox');
   const sizeRoleInput = sizeRoleSelect.getByRole('textbox');
-  const sizeSkuSwitch = sizeRow.locator('.t-switch').nth(1);
+  const sizeSkuSwitch = sizeRow.locator('.t-switch').nth(0);
   await expect(colorRoleInput).toHaveValue('');
   await expect(sizeRoleInput).toHaveValue('');
   await expect(sizeSkuSwitch).toHaveClass(/t-is-disabled/);
@@ -548,10 +549,10 @@ test('每个类目最多只能开启4个SKU组合属性', async ({ page }) => {
 
   await page.goto('/category-attribute-template');
   const fifthRow = page.getByRole('main').locator('tbody tr').filter({ hasText: 'SKU属性5' });
-  await expect(fifthRow.locator('.t-switch').nth(1)).not.toHaveClass(/t-is-checked/);
-  await fifthRow.locator('.t-switch').nth(1).click();
+  await expect(fifthRow.locator('.t-switch').nth(0)).not.toHaveClass(/t-is-checked/);
+  await fifthRow.locator('.t-switch').nth(0).click();
   await expect(page.locator('.t-message').filter({ hasText: '参与SKU组合的属性最多只能开启4个' })).toBeVisible();
-  await expect(fifthRow.locator('.t-switch').nth(1)).not.toHaveClass(/t-is-checked/);
+  await expect(fifthRow.locator('.t-switch').nth(0)).not.toHaveClass(/t-is-checked/);
   expect(updateRequestCount).toBe(0);
 });
 

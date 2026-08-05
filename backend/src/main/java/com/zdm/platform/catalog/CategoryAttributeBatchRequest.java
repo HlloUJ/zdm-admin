@@ -8,4 +8,8 @@ public record CategoryAttributeBatchRequest(
     @NotNull
     Long categoryId,
     @NotEmpty
-    List<@NotNull Long> attributeIds) {}
+    List<@NotNull Long> attributeIds) {
+  public CategoryAttributeBatchRequest {
+    attributeIds = List.copyOf(attributeIds);
+  }
+}
