@@ -1,0 +1,30 @@
+services:
+  mysql:
+    container_name: !reset null
+    ports: !reset []
+    volumes: !reset []
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    container_name: !reset null
+    ports: !override
+      - '127.0.0.1:${ZDM_TASK_BACKEND_PORT:?set ZDM_TASK_BACKEND_PORT}:8080'
+    volumes: !override
+      - type: bind
+        source: '${ZDM_TASK_WORKSPACE:?set ZDM_TASK_WORKSPACE}'
+        target: /workspace
+      - type: volume
+        source: zdm_maven_repo
+        target: /root/.m2
+    tmpfs:
+      - /data/zdm/craft-images
+
+volumes:
+  zdm_maven_repo:
+    external: true
+    name: zdm-admin_zdm_maven_repo

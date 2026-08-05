@@ -15,7 +15,7 @@
 ## 验证分级
 
 - 后端启动和验证统一使用 `npm run backend:*` 命令，默认由 Docker 提供 JDK/Maven；不得因本机未安装 `mvn` 跳过后端验证。
-- Docker/本地服务授权按复合命令的实际调用链判断，不按入口命令名判断：`check:changed`、`check:fast` 在变更包含 `backend/**` 时会调用 `backend:test`；`check:full`、`verify`、`verify:local`、`integration:verify` 会调用 Docker 和/或本地监听服务。以上场景首次实际执行即使用当前有效的最小授权通道；允许先用 `check:changed --list` 做只读计划确认，但不得先用普通沙箱运行必然进入受限资源的实际检查。
+- Docker/本地服务授权按复合命令的实际调用链判断，不按入口命令名判断：`dev:task` 会按改动自动确保共享后端或创建任务 Docker 环境；`check:changed`、`check:fast` 在变更包含 `backend/**` 时会调用 `backend:test`；`check:full`、`verify`、`verify:local`、`integration:verify` 会调用 Docker 和/或本地监听服务。以上场景首次实际执行即使用当前有效的最小授权通道；允许先用 `check:changed --list` 做只读计划确认，但不得先用普通沙箱运行必然进入受限资源的实际检查。
 - 纯文案、规则或脚本别名：检查 diff 和文件格式。
 - 低风险样式、小交互、列顺序或已有字段位置调整：`npm run check:changed -- <本次文件>`，必要时只补受影响的指定 E2E；禁止为此运行完整 `verify`。
 - 中风险页面、表单、路由、服务层：变更文件检查加受影响单测或 E2E。
@@ -26,7 +26,9 @@
 ## Worktree 与预览
 
 - 每个任务在自己的任务分支和 Worktree 修改；Agent 基建、规则或工具优化也必须使用独立 Worktree，不得切换或占用其他活跃业务目录。
-- 前端任务在任务 Worktree 运行 `npm run dev:task`，只绑定本机 `127.0.0.1`，自动使用 `5174-5199` 的空闲端口并直接展示未提交改动。它代理固定集成后端；若提示存在后端或运行配置改动，此预览不能作为后端已生效的证据，必须补对应后端或隔离环境验证。
+- 任务 Worktree 统一运行 `npm run dev:task`：只绑定本机并自动使用 `5174-5199`。仅前端变化时复用集成后端；出现后端、API、数据库迁移或 Docker 配置变化时，自动创建任务专属 Compose 项目、`8081-8099` 后端和不暴露端口的临时 MySQL，完整加载该 Worktree 的前后端改动。
+- 完整任务环境在前端退出后保留供同一任务反馈复用；后端源码变化会自动重启任务后端。任务结束运行 `npm run dev:task:stop` 删除任务容器、网络和临时数据库，保留 Maven 共享缓存。
+- 旧任务分支尚未包含预览脚本时，从新版脚本所在 Worktree 运行 `node scripts/dev-task.mjs --worktree <旧任务Worktree>`；不得为获得预览能力把基建提交混入业务分支。
 - 固定集成 Worktree 使用 `5173`，只运行已正式推送并汇入的任务分支组合，用于整体兼容性检查；禁止把它当作普通开发目录。
 
 ## Git 交付
