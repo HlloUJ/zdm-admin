@@ -565,7 +565,7 @@ test('keeps template data visible while hiding ungranted binding operations', as
         name: '模板查看员',
         phone: '15926620020',
         roles: ['CATEGORY_ATTRIBUTE_VIEWER'],
-        permissions: ['admin.product-data-center.category-attribute-template.view'],
+        permissions: ['admin.product-data-center.category-attribute-template.finished.view'],
         dataPermission: 'self',
       }),
     );
@@ -573,6 +573,7 @@ test('keeps template data visible while hiding ungranted binding operations', as
 
   await page.goto('/category-attribute-template');
   const main = page.getByRole('main');
+  await expect(main.locator('.scope-controls .t-tabs')).toHaveCount(0);
   await expect(main.getByRole('button', { name: '岩板茶几', exact: true })).toHaveClass(/active/);
 
   const row = main.locator('tbody tr').filter({ hasText: '材质' }).first();
@@ -591,4 +592,29 @@ test('keeps template data visible while hiding ungranted binding operations', as
   await expect(row.getByText('移除', { exact: true })).toHaveCount(0);
   await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
   await expect(row.locator('.table-actions')).toHaveText('-');
+});
+
+test('enables only the granted category attribute field control', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 21,
+        name: '模板属性角色管理员',
+        phone: '15926620021',
+        roles: ['CATEGORY_ATTRIBUTE_ROLE_EDITOR'],
+        permissions: [
+          'admin.product-data-center.category-attribute-template.finished.view',
+          'admin.product-data-center.category-attribute-template.finished.attribute-role',
+        ],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/category-attribute-template');
+  const row = page.getByRole('main').locator('tbody tr').filter({ hasText: '材质' }).first();
+  await expect(row.locator('.attribute-role-select').getByRole('textbox')).toBeEnabled();
+  await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
+  await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
 });

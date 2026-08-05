@@ -91,6 +91,8 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     if ("published".equals(existing.getPublishStatus()) && hasConfigurationChanged(existing, payload)) {
       throw new IllegalArgumentException("请先取消发布后再修改属性配置");
     }
+    payload.setCategoryId(existing.getCategoryId());
+    payload.setAttributeId(existing.getAttributeId());
     validateSkuAttributeLimit(payload.getCategoryId(), id, payload.getSkuFlag());
     payload.setId(id);
     payload.setStatus(existing.getStatus());

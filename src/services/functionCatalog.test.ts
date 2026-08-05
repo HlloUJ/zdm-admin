@@ -65,9 +65,14 @@ describe('full function catalog', () => {
           ],
         },
         {
-          label: '类目属性模板',
+          label: '分类属性模板',
           direct: false,
-          pages: [{ label: '类目属性模板页', tabs: [] }],
+          pages: [
+            {
+              label: '类目属性模板页',
+              tabs: [{ label: '成品现货模板' }, { label: '配件模板' }],
+            },
+          ],
         },
         {
           label: '大板品种管理',
@@ -137,16 +142,31 @@ describe('full function catalog', () => {
     const categoryAttributePage = fullFunctionCatalog[0].menus.find(
       (menu) => menu.value === 'admin.product-data-center.category-attribute-template.menu',
     )?.pages[0];
-    expect(categoryAttributePage?.actions).toEqual([
-      { label: '查看', value: 'admin.product-data-center.category-attribute-template.view' },
-      { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
-      { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
-      {
-        label: '发布/取消发布',
-        value: 'admin.product-data-center.category-attribute-template.toggle-publish',
-      },
-      { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
-    ]);
+    expect(categoryAttributePage?.actions).toEqual([]);
+    expect(categoryAttributePage?.tabs).toEqual(
+      ['finished', 'accessory'].map((scope, index) => ({
+        label: index === 0 ? '成品现货模板' : '配件模板',
+        value: `admin.product-data-center.category-attribute-template.${scope}`,
+        actions: [
+          { label: '查看', value: `admin.product-data-center.category-attribute-template.${scope}.view` },
+          { label: '绑定属性', value: `admin.product-data-center.category-attribute-template.${scope}.create` },
+          {
+            label: '属性角色',
+            value: `admin.product-data-center.category-attribute-template.${scope}.attribute-role`,
+          },
+          {
+            label: '参与SKU组合',
+            value: `admin.product-data-center.category-attribute-template.${scope}.sku-combination`,
+          },
+          { label: '必填', value: `admin.product-data-center.category-attribute-template.${scope}.required` },
+          {
+            label: '发布/取消发布',
+            value: `admin.product-data-center.category-attribute-template.${scope}.toggle-publish`,
+          },
+          { label: '移除', value: `admin.product-data-center.category-attribute-template.${scope}.delete` },
+        ],
+      })),
+    );
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
@@ -166,11 +186,20 @@ describe('full function catalog', () => {
       'admin.product-data-center.category.accessory.disable',
       'admin.product-data-center.category.accessory.enable',
       'admin.product-data-center.category.accessory.delete',
-      'admin.product-data-center.category-attribute-template.view',
-      'admin.product-data-center.category-attribute-template.create',
-      'admin.product-data-center.category-attribute-template.edit',
-      'admin.product-data-center.category-attribute-template.toggle-publish',
-      'admin.product-data-center.category-attribute-template.delete',
+      'admin.product-data-center.category-attribute-template.finished.view',
+      'admin.product-data-center.category-attribute-template.finished.create',
+      'admin.product-data-center.category-attribute-template.finished.attribute-role',
+      'admin.product-data-center.category-attribute-template.finished.sku-combination',
+      'admin.product-data-center.category-attribute-template.finished.required',
+      'admin.product-data-center.category-attribute-template.finished.toggle-publish',
+      'admin.product-data-center.category-attribute-template.finished.delete',
+      'admin.product-data-center.category-attribute-template.accessory.view',
+      'admin.product-data-center.category-attribute-template.accessory.create',
+      'admin.product-data-center.category-attribute-template.accessory.attribute-role',
+      'admin.product-data-center.category-attribute-template.accessory.sku-combination',
+      'admin.product-data-center.category-attribute-template.accessory.required',
+      'admin.product-data-center.category-attribute-template.accessory.toggle-publish',
+      'admin.product-data-center.category-attribute-template.accessory.delete',
       'admin.product-data-center.slab-variety.view',
       'admin.product-data-center.slab-variety.create',
       'admin.product-data-center.slab-variety.edit',

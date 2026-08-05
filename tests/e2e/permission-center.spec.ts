@@ -524,7 +524,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('页面');
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(5);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(6);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -535,15 +535,16 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(accessoryCategoryPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     categoryCatalogActionLabels,
   );
-  const categoryAttributePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '类目属性模板页' });
-  await expect(categoryAttributePermissionRow.getByText('类目属性模板', { exact: true })).toBeVisible();
-  await expect(categoryAttributePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
-    '查看',
-    '绑定属性',
-    '编辑',
-    '发布/取消发布',
-    '移除',
-  ]);
+  const finishedTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货模板' });
+  const accessoryTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件模板' });
+  await expect(finishedTemplatePermissionRow.getByText('分类属性模板', { exact: true })).toBeVisible();
+  const templateActionLabels = ['查看', '绑定属性', '属性角色', '参与SKU组合', '必填', '发布/取消发布', '移除'];
+  await expect(finishedTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    templateActionLabels,
+  );
+  await expect(accessoryTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    templateActionLabels,
+  );
   const slabVarietyPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
   await expect(slabVarietyPermissionRow.getByText('大板品种管理', { exact: true })).toBeVisible();
   await expect(slabVarietyPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -631,7 +632,7 @@ test('shows verified product-data and permission-management resources in both te
   await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*33/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*42/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -640,7 +641,7 @@ test('shows verified product-data and permission-management resources in both te
   await expect(matrix.locator('thead')).toContainText('页面');
   await expect(matrix.locator('th.permission-tab-column')).toHaveText('Tab');
   await expect(matrix.locator('thead')).toContainText('操作权限');
-  await expect(matrix.locator('tbody tr')).toHaveCount(5);
+  await expect(matrix.locator('tbody tr')).toHaveCount(6);
   await expect(matrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -651,15 +652,24 @@ test('shows verified product-data and permission-management resources in both te
   await expect(accessoryCategoryAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     categoryCatalogActionLabels,
   );
-  const categoryAttributeAllocationRow = matrix.locator('tbody tr').filter({ hasText: '类目属性模板页' });
-  await expect(categoryAttributeAllocationRow.getByText('类目属性模板', { exact: true })).toBeVisible();
-  await expect(categoryAttributeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+  const finishedTemplateAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货模板' });
+  const accessoryTemplateAllocationRow = matrix.locator('tbody tr').filter({ hasText: '配件模板' });
+  await expect(finishedTemplateAllocationRow.getByText('分类属性模板', { exact: true })).toBeVisible();
+  const templateAllocationActionLabels = [
     '查看',
     '绑定属性',
-    '编辑',
+    '属性角色',
+    '参与SKU组合',
+    '必填',
     '发布/取消发布',
     '移除',
-  ]);
+  ];
+  await expect(finishedTemplateAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    templateAllocationActionLabels,
+  );
+  await expect(accessoryTemplateAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    templateAllocationActionLabels,
+  );
   const slabVarietyAllocationRow = matrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
   await expect(slabVarietyAllocationRow.getByText('大板品种管理', { exact: true })).toBeVisible();
   await expect(slabVarietyAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -710,7 +720,7 @@ test('shows verified product-data and permission-management resources in both te
   await expect(matrix.getByText('类目属性模板页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('大板品种管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(33);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(42);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();

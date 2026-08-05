@@ -64,7 +64,7 @@ export const adminMenuEntries: AdminMenuEntry[] = [
         permissionPrefix: 'admin.product-data-center.attribute-value',
       },
       {
-        label: '类目属性模板',
+        label: '分类属性模板',
         path: '/category-attribute-template',
         permissionPrefix: 'admin.product-data-center.category-attribute-template',
       },
@@ -148,6 +148,27 @@ export function getFirstAccessiblePath(user: LoginUser) {
 }
 
 const permissionAliases: Record<string, string[]> = {
+  'admin.product-data-center.category-attribute-template.finished.view': [
+    'admin.product-data-center.category-attribute-template.view',
+  ],
+  'admin.product-data-center.category-attribute-template.accessory.view': [
+    'admin.product-data-center.category-attribute-template.view',
+  ],
+  ...Object.fromEntries(
+    (['finished', 'accessory'] as const).flatMap((scope) =>
+      [
+        ['create', 'create'],
+        ['attribute-role', 'edit'],
+        ['sku-combination', 'edit'],
+        ['required', 'edit'],
+        ['toggle-publish', 'toggle-publish'],
+        ['delete', 'delete'],
+      ].map(([action, legacyAction]) => [
+        `admin.product-data-center.category-attribute-template.${scope}.${action}`,
+        [`admin.product-data-center.category-attribute-template.${legacyAction}`],
+      ]),
+    ),
+  ),
   'admin.permission-management.employee-management.create': [
     'admin.permission-management.employee-management.邀请员工',
   ],

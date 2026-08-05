@@ -11,7 +11,7 @@
         <AdminListLayout>
           <template #toolbar>
             <div class="scope-controls">
-              <t-tabs v-model="activeScope" :list="scopeTabs" />
+              <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
             </div>
           </template>
 
@@ -113,7 +113,7 @@
                   :data="pageData"
                   :columns="columns"
                   :loading="loading"
-                  :drag-sort="canEditBinding ? 'row-handler' : undefined"
+                  :drag-sort="canBindAttribute ? 'row-handler' : undefined"
                   :drag-sort-options="{ animation: 200 }"
                   hover
                   table-layout="fixed"
@@ -126,7 +126,7 @@
                       class="attribute-role-select"
                       :model-value="row.attributeRole || undefined"
                       :loading="savingId === row.id && savingField === 'attributeRole'"
-                      :disabled="!canEditBinding || row.publishStatus === 'published'"
+                      :disabled="!canSetAttributeRole || row.publishStatus === 'published'"
                       placeholder="请选择"
                       size="small"
                       @change="changeAttributeRole(row, $event)"
@@ -139,7 +139,7 @@
                     <t-switch
                       :model-value="row.requiredFlag"
                       :loading="savingId === row.id && savingField === 'requiredFlag'"
-                      :disabled="!canEditBinding || row.publishStatus === 'published'"
+                      :disabled="!canSetRequired || row.publishStatus === 'published'"
                       @change="changeFlag(row, 'requiredFlag', $event)"
                     />
                   </template>
@@ -158,7 +158,7 @@
                         :model-value="row.skuFlag"
                         :loading="savingId === row.id && savingField === 'skuFlag'"
                         :disabled="
-                          !canEditBinding || row.attributeRole !== 'sales' || row.publishStatus === 'published'
+                          !canSetSkuCombination || row.attributeRole !== 'sales' || row.publishStatus === 'published'
                         "
                         @change="changeFlag(row, 'skuFlag', $event)"
                       />
@@ -293,6 +293,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
@@ -352,14 +353,23 @@ interface BindAttributeRow {
 const activeScope = ref<Scope>('finished');
 const permissionPrefix = 'admin.product-data-center.category-attribute-template';
 const loginUser = computed(() => getLoginUser());
-const canBindAttribute = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.create`));
-const canEditBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.edit`));
-const canTogglePublish = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.toggle-publish`));
-const canRemoveBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
-const scopeTabs = [
+const categoryAttributeScopeTabs: { label: string; value: Scope }[] = [
   { label: '成品现货模板', value: 'finished' },
   { label: '配件模板', value: 'accessory' },
 ];
+const { visibleTabs: scopeTabs, showTabRail: showScopeTabRail } = usePermissionTabs({
+  tabs: categoryAttributeScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) => hasPermission(loginUser.value, `${permissionPrefix}.${tab.value}.view`),
+});
+const hasTemplateAction = (action: string) =>
+  hasPermission(loginUser.value, `${permissionPrefix}.${activeScope.value}.${action}`);
+const canBindAttribute = computed(() => hasTemplateAction('create'));
+const canSetAttributeRole = computed(() => hasTemplateAction('attribute-role'));
+const canSetSkuCombination = computed(() => hasTemplateAction('sku-combination'));
+const canSetRequired = computed(() => hasTemplateAction('required'));
+const canTogglePublish = computed(() => hasTemplateAction('toggle-publish'));
+const canRemoveBinding = computed(() => hasTemplateAction('delete'));
 const pageTitle = computed(() => (activeScope.value === 'finished' ? '成品现货发布模板' : '配件发布模板'));
 const loading = ref(false);
 const savingId = ref<number | null>(null);
@@ -387,7 +397,7 @@ const pageSizeOptions = [10, 20, 50];
 const bindForm = reactive({ attributeIds: [] as number[] });
 
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(canEditBinding.value ? [{ colKey: 'drag', title: '', width: 44, align: 'center' as const }] : []),
+  ...(canBindAttribute.value ? [{ colKey: 'drag', title: '', width: 44, align: 'center' as const }] : []),
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 120 },
   { colKey: 'attributeRole', title: '属性角色', width: 140, align: 'center' },
@@ -718,7 +728,10 @@ async function persistRow(
   patch: Partial<BindingRow>,
   field: 'attributeRole' | 'requiredFlag' | 'skuFlag' | null = null,
 ) {
-  if (!canEditBinding.value) return;
+  if (field === 'attributeRole' && !canSetAttributeRole.value) return;
+  if (field === 'requiredFlag' && !canSetRequired.value) return;
+  if (field === 'skuFlag' && !canSetSkuCombination.value) return;
+  if (field === null && !canBindAttribute.value) return;
   savingId.value = row.id;
   savingField.value = field;
   const nextRow = { ...row, ...patch };
@@ -755,7 +768,7 @@ function getCurrentBindingRow(row: BindingRow) {
 
 function changeAttributeRole(row: BindingRow, value: unknown) {
   const currentRow = getCurrentBindingRow(row);
-  if (!canEditBinding.value || currentRow.publishStatus === 'published') return;
+  if (!canSetAttributeRole.value || currentRow.publishStatus === 'published') return;
   const nextRole = getAttributeRoleValue(value);
   if (nextRole === currentRow.attributeRole) return;
   if (currentRow.skuFlag && nextRole !== 'sales') {
@@ -808,7 +821,7 @@ function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: u
 }
 
 async function handleDragSort(context: { current: BindingRow; target: BindingRow }) {
-  if (!canEditBinding.value || savingId.value !== null) return;
+  if (!canBindAttribute.value || savingId.value !== null) return;
   const orderedRows = allBindingRows.value.map((item) => ({ ...item }));
   const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
   const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);

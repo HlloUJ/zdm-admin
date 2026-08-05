@@ -303,10 +303,9 @@ class CategoryAttributeApiTest {
           (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
         VALUES (?, '类目属性模板操作角色', 'CATEGORY_ATTRIBUTE_OPERATOR_TEST', 'operation-platform',
           'admin', 'self', 'enabled',
-          'admin.product-data-center.category-attribute-template.view,'
-          'admin.product-data-center.category-attribute-template.create,'
-          'admin.product-data-center.category-attribute-template.edit,'
-          'admin.product-data-center.category-attribute-template.delete', '集成测试')
+          'admin.product-data-center.category-attribute-template.finished.view,'
+          'admin.product-data-center.category-attribute-template.finished.create,'
+          'admin.product-data-center.category-attribute-template.finished.delete', '集成测试')
         """,
         roleId);
     jdbcTemplate.update(
@@ -382,7 +381,7 @@ class CategoryAttributeApiTest {
         """
         UPDATE roles
         SET function_permissions = CONCAT(function_permissions,
-          ',admin.product-data-center.category-attribute-template.toggle-publish')
+          ',admin.product-data-center.category-attribute-template.finished.toggle-publish')
         WHERE id = ?
         """,
         roleId);
@@ -391,6 +390,31 @@ class CategoryAttributeApiTest {
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("请先选择属性角色"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", batchBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9920,
+                  "attributeId":9921,
+                  "attributeRole":"product",
+                  "requiredFlag":false,
+                  "skuFlag":false,
+                  "sortOrder":2,
+                  "status":"disabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+
+    jdbcTemplate.update(
+        """
+        UPDATE roles
+        SET function_permissions = CONCAT(function_permissions,
+          ',admin.product-data-center.category-attribute-template.finished.attribute-role')
+        WHERE id = ?
+        """,
+        roleId);
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}", batchBindingId)
             .header("Authorization", "Bearer " + token)
@@ -431,7 +455,32 @@ class CategoryAttributeApiTest {
                   "categoryId":9920,
                   "attributeId":9920,
                   "attributeRole":"sales",
-                  "requiredFlag":false,
+                  "requiredFlag":true,
+                  "skuFlag":true,
+                  "sortOrder":1,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+
+    jdbcTemplate.update(
+        """
+        UPDATE roles
+        SET function_permissions = CONCAT(function_permissions,
+          ',admin.product-data-center.category-attribute-template.finished.sku-combination')
+        WHERE id = ?
+        """,
+        roleId);
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", otherCreatorBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9920,
+                  "attributeId":9920,
+                  "attributeRole":"sales",
+                  "requiredFlag":true,
                   "skuFlag":true,
                   "sortOrder":1,
                   "status":"enabled"
@@ -440,6 +489,48 @@ class CategoryAttributeApiTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.createdByName").value("其他绑定人"))
         .andExpect(jsonPath("$.data.skuFlag").value(true));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", otherCreatorBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9920,
+                  "attributeId":9920,
+                  "attributeRole":"sales",
+                  "requiredFlag":false,
+                  "skuFlag":true,
+                  "sortOrder":1,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isForbidden());
+
+    jdbcTemplate.update(
+        """
+        UPDATE roles
+        SET function_permissions = CONCAT(function_permissions,
+          ',admin.product-data-center.category-attribute-template.finished.required')
+        WHERE id = ?
+        """,
+        roleId);
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}", otherCreatorBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "categoryId":9920,
+                  "attributeId":9920,
+                  "attributeRole":"sales",
+                  "requiredFlag":false,
+                  "skuFlag":true,
+                  "sortOrder":1,
+                  "status":"enabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.requiredFlag").value(false));
 
     mockMvc.perform(delete("/api/admin/category-attributes/{id}", otherCreatorBindingId)
             .header("Authorization", "Bearer " + token))
