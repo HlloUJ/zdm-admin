@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --configLoader runner --host 0.0.0.0",
+    "dev:task": "node scripts/dev-task.mjs",
     "dev:all": "node scripts/dev-all.mjs",
     "dev:status": "node scripts/dev-status.mjs",
     "integration:dev": "node scripts/run-integration.mjs dev:all",
