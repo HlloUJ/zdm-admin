@@ -4,31 +4,58 @@ import test from 'node:test';
 import {
   backendSensitiveFiles,
   findAvailablePort,
+  parseBackendPortBindings,
   parseTaskPreviewArgs,
   selectSharedNodeModules,
+  selectTaskPreviewMode,
   taskPreviewErrors,
+  taskProjectName,
 } from './dev-task.mjs';
 
-test('parses task preview overrides', () => {
-  assert.deepEqual(parseTaskPreviewArgs(['--port', '5180', '--api', 'http://127.0.0.1:8081']), {
-    port: 5180,
-    apiTarget: 'http://127.0.0.1:8081',
-    help: false,
-  });
+test('parses task preview mode, ports, target worktree, and stop options', () => {
+  assert.deepEqual(
+    parseTaskPreviewArgs([
+      '--mode',
+      'full',
+      '--port',
+      '5180',
+      '--backend-port',
+      '8088',
+      '--worktree',
+      '/tmp/task',
+      '--stop',
+    ]),
+    {
+      port: 5180,
+      backendPort: 8088,
+      apiTarget: null,
+      mode: 'full',
+      worktree: '/tmp/task',
+      stop: true,
+      help: false,
+    },
+  );
   assert.throws(() => parseTaskPreviewArgs(['--port', '5173']), /5174/);
-  assert.throws(() => parseTaskPreviewArgs(['--port', '5200']), /5199/);
-  assert.throws(() => parseTaskPreviewArgs(['--unknown']), /未知参数/);
+  assert.throws(() => parseTaskPreviewArgs(['--backend-port', '8080']), /8081/);
+  assert.throws(() => parseTaskPreviewArgs(['--mode', 'unknown']), /auto/);
 });
 
-test('requires a task branch and a running backend', () => {
-  assert.deepEqual(taskPreviewErrors({ branch: 'codex/task-preview', backendReady: true }), []);
-  assert.deepEqual(taskPreviewErrors({ branch: 'main', backendReady: false }), [
-    '只能从 codex/* 任务分支启动预览，当前为：main',
-    '共享集成后端未运行，先启动 npm run integration:dev',
-  ]);
+test('requires a task branch', () => {
+  assert.deepEqual(taskPreviewErrors({ branch: 'codex/task-preview' }), []);
+  assert.deepEqual(taskPreviewErrors({ branch: 'main' }), ['只能预览 codex/* 任务分支，当前为：main']);
 });
 
-test('chooses the first available preview port', async () => {
+test('routes frontend-only changes to shared backend and backend changes to full stack', () => {
+  assert.equal(selectTaskPreviewMode({ files: ['src/pages/example.vue'] }), 'frontend');
+  assert.equal(selectTaskPreviewMode({ files: ['backend/src/main/java/example.java'] }), 'full');
+  assert.equal(selectTaskPreviewMode({ files: ['src/pages/example.vue'], requestedMode: 'full' }), 'full');
+  assert.equal(
+    selectTaskPreviewMode({ files: ['backend/src/main/java/example.java'], apiTarget: 'http://127.0.0.1:9000' }),
+    'frontend',
+  );
+});
+
+test('chooses the first available port', async () => {
   const port = await findAvailablePort({
     start: 5174,
     end: 5177,
@@ -37,7 +64,7 @@ test('chooses the first available preview port', async () => {
   assert.equal(port, 5176);
 });
 
-test('identifies changes that are not loaded by the shared integration backend', () => {
+test('identifies changes that require a task backend', () => {
   assert.deepEqual(
     backendSensitiveFiles([
       'src/pages/example.vue',
@@ -47,6 +74,20 @@ test('identifies changes that are not loaded by the shared integration backend',
     ]),
     ['backend/src/main/java/example.java', 'docker-compose.yml'],
   );
+});
+
+test('creates a stable and worktree-specific Compose project name', () => {
+  const first = taskProjectName({ branch: 'codex/Category Attribute', root: '/tmp/a' });
+  const second = taskProjectName({ branch: 'codex/Category Attribute', root: '/tmp/a' });
+  assert.equal(first, second);
+  assert.match(first, /^zdm-task-category-attribute-[a-f0-9]{10}$/);
+  assert.notEqual(first, taskProjectName({ branch: 'codex/Category Attribute', root: '/tmp/b' }));
+});
+
+test('reads a task backend port from Docker bindings', () => {
+  assert.equal(parseBackendPortBindings('{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8086"}]}'), 8086);
+  assert.equal(parseBackendPortBindings('{}'), null);
+  assert.equal(parseBackendPortBindings('invalid'), null);
 });
 
 test('does not select dependencies without an identical lockfile', () => {
