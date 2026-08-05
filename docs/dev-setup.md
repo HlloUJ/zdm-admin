@@ -62,7 +62,7 @@ npm run dev:task
 - 纯前端任务复用集成后端；后端、API、Flyway 或运行配置任务启动该 Worktree 的任务后端。
 - 两种模式都使用唯一的集成 MySQL 和 `zdm_admin`，所以 5175 手工验收产生的数据会永久保留并被后续任务复用。
 - 只有并行对比时使用 `npm run dev:task -- --temporary`，临时端口为 `5176-5199`；Playwright 固定使用 `5174`。
-- `npm run dev:task:stop` 只停止任务前后端，不删除数据库、备份或旧版临时资源。
+- `npm run dev:task:stop` 只停止任务前后端，不删除共享数据库或备份。
 
 Flyway 迁移会自动检查其他共享数据库任务后端、暂停当前任务与集成后端、备份数据库并锁定任务切换；存在其他任务写入者时停止并报告，不会批量停止。非迁移但会批量删除、清空或破坏性导入数据时运行 `npm run dev:task -- --database-risk`。任务正式提交、推送并同步集成分支后运行：
 

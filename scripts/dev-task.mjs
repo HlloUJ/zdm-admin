@@ -366,17 +366,7 @@ function composeContext({ root, project, backendPort }) {
       ZDM_INTEGRATION_NETWORK: INTEGRATION_NETWORK,
       ZDM_TASK_MIGRATION_DIR: taskMigrationDirectory(project),
     },
-    args: [
-      'compose',
-      '--project-name',
-      project,
-      '--project-directory',
-      root,
-      '--file',
-      path.join(root, 'docker-compose.yml'),
-      '--file',
-      taskComposeFile,
-    ],
+    args: ['compose', '--project-name', project, '--project-directory', root, '--file', taskComposeFile],
   };
 }
 
@@ -853,7 +843,7 @@ export async function main(args = process.argv.slice(2)) {
     const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
     const context = composeContext({ root, project, backendPort });
     composeRun(context, ['stop', 'backend']);
-    console.log(`已停止 ${branch} 的任务前端和后端；共享数据库、备份及旧版临时 MySQL 均未删除。`);
+    console.log(`已停止 ${branch} 的任务前端和后端；共享数据库和备份均未删除。`);
     return;
   }
 

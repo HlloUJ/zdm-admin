@@ -174,6 +174,7 @@ test('task Compose reuses integration MySQL and contains no task database storag
   assert.match(compose, /SPRING_FLYWAY_LOCATIONS: filesystem:\/task-migrations/);
   assert.match(compose, /target: \/task-migrations/);
   assert.match(compose, /com\.zdm\.task\.database: integration/);
+  assert.doesNotMatch(compose, /^\s{2}mysql:/m);
   assert.doesNotMatch(compose, /\/var\/lib\/mysql|tmpfs:/);
 });
 
