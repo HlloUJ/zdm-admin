@@ -1,19 +1,17 @@
 services:
   mysql:
-    container_name: !reset null
-    ports: !reset []
-    volumes: !reset []
-    tmpfs:
-      - /var/lib/mysql
-    healthcheck:
-      interval: 2s
-      timeout: 3s
-      retries: 30
+    profiles: ['task-database-disabled']
 
   backend:
     container_name: !reset null
+    environment:
+      ZDM_DB_URL: jdbc:mysql://zdm-platform-mysql:3306/zdm_admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      ZDM_DB_USERNAME: zdm_admin
+      ZDM_DB_PASSWORD: zdm_admin_pwd
+      SPRING_FLYWAY_LOCATIONS: filesystem:/task-migrations
     ports: !override
       - '127.0.0.1:${ZDM_TASK_BACKEND_PORT:?set ZDM_TASK_BACKEND_PORT}:8080'
+    depends_on: !reset {}
     volumes: !override
       - type: bind
         source: '${ZDM_TASK_WORKSPACE:?set ZDM_TASK_WORKSPACE}'
@@ -21,10 +19,28 @@ services:
       - type: volume
         source: zdm_maven_repo
         target: /root/.m2
-    tmpfs:
-      - /data/zdm/craft-images
+      - type: volume
+        source: zdm_craft_images
+        target: /data/zdm/craft-images
+      - type: bind
+        source: '${ZDM_TASK_MIGRATION_DIR:?set ZDM_TASK_MIGRATION_DIR}'
+        target: /task-migrations
+        read_only: true
+    networks: !override
+      - integration
+    labels:
+      com.zdm.task.preview: 'true'
+      com.zdm.task.database: integration
+
+networks:
+  integration:
+    external: true
+    name: '${ZDM_INTEGRATION_NETWORK:?set ZDM_INTEGRATION_NETWORK}'
 
 volumes:
   zdm_maven_repo:
     external: true
     name: zdm-admin_zdm_maven_repo
+  zdm_craft_images:
+    external: true
+    name: zdm-admin_zdm_craft_images
