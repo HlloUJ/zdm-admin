@@ -13,6 +13,11 @@ DB_USER="${ZDM_DB_USERNAME:-zdm_admin}"
 DB_PASSWORD="${ZDM_DB_PASSWORD:-zdm_admin_pwd}"
 DB_CONTAINER="${ZDM_DB_CONTAINER:-zdm-platform-mysql}"
 
+if [ "${ZDM_CONFIRM_RESTORE:-}" != "${DB_NAME}" ]; then
+  echo "Restore replaces data in '${DB_NAME}'. Re-run only after explicit approval with ZDM_CONFIRM_RESTORE=${DB_NAME}." >&2
+  exit 1
+fi
+
 if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "${DB_CONTAINER}"; then
   gunzip -c "$1" | docker exec -i "${DB_CONTAINER}" mysql \
     --user="${DB_USER}" \

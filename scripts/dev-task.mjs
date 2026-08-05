@@ -1,21 +1,41 @@
-import { existsSync, readFileSync, symlinkSync, watch } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  symlinkSync,
+  unlinkSync,
+  watch,
+  writeFileSync,
+} from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { branchKind, DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from './git-workflow-core.mjs';
 
-const FRONTEND_PORT_START = 5174;
+export const CURRENT_TASK_FRONTEND_PORT = 5175;
+const FRONTEND_PORT_START = 5175;
 const FRONTEND_PORT_END = 5199;
+const TEMPORARY_FRONTEND_PORT_START = 5176;
 const BACKEND_PORT_START = 8081;
 const BACKEND_PORT_END = 8099;
 const SHARED_API_TARGET = 'http://127.0.0.1:8080';
+const INTEGRATION_MYSQL_CONTAINER = 'zdm-platform-mysql';
+const INTEGRATION_NETWORK = 'zdm-admin_default';
+const TASK_PREVIEW_CONTROL_PATH = '/__zdm_task_preview__';
+const TASK_PREVIEW_CONTROL_HEADER = 'x-zdm-task-preview-control';
+const TASK_PREVIEW_CONTROL_VALUE = 'switch-current-task';
 const MAVEN_VOLUME = 'zdm-admin_zdm_maven_repo';
+const CRAFT_IMAGE_VOLUME = 'zdm-admin_zdm_craft_images';
+const DATABASE_LOCK_FILENAME = 'active-database-task.json';
 const launcherRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const taskComposeFile = path.join(launcherRoot, 'docker-compose.task.yml');
 
@@ -26,6 +46,9 @@ export function parseTaskPreviewArgs(args) {
     apiTarget: null,
     mode: 'auto',
     worktree: null,
+    temporary: false,
+    databaseRisk: false,
+    handoff: false,
     stop: false,
     help: false,
   };
@@ -37,6 +60,18 @@ export function parseTaskPreviewArgs(args) {
     }
     if (value === '--stop') {
       result.stop = true;
+      continue;
+    }
+    if (value === '--temporary') {
+      result.temporary = true;
+      continue;
+    }
+    if (value === '--database-risk') {
+      result.databaseRisk = true;
+      continue;
+    }
+    if (value === '--handoff') {
+      result.handoff = true;
       continue;
     }
     if (value === '--port' || value === '--backend-port') {
@@ -95,6 +130,10 @@ export function backendSensitiveFiles(files) {
   );
 }
 
+export function databaseRiskFiles(files) {
+  return files.filter((file) => file.startsWith('backend/src/main/resources/db/migration/'));
+}
+
 export function selectTaskPreviewMode({ files, requestedMode = 'auto', apiTarget = null }) {
   if (requestedMode !== 'auto') return requestedMode;
   if (apiTarget) return 'frontend';
@@ -145,6 +184,39 @@ export async function findAvailablePort({ start, end, isOpen = isPortOpen } = {}
     if (!(await isOpen(port))) return port;
   }
   throw new Error(`${start}-${end} 没有可用端口`);
+}
+
+export async function chooseTaskFrontendPort({ requestedPort = null, temporary = false, isOpen = isPortOpen } = {}) {
+  if (requestedPort) return requestedPort;
+  if (!temporary) return CURRENT_TASK_FRONTEND_PORT;
+  return findAvailablePort({ start: TEMPORARY_FRONTEND_PORT_START, end: FRONTEND_PORT_END, isOpen });
+}
+
+export function parseTaskPreviewMetadata(value) {
+  try {
+    const metadata = JSON.parse(value);
+    if (metadata?.type !== 'zdm-task-preview' || typeof metadata.workspaceRoot !== 'string') return null;
+    return metadata;
+  } catch {
+    return null;
+  }
+}
+
+export function parseDatabaseLock(value) {
+  try {
+    const lock = JSON.parse(value);
+    if (
+      lock?.type !== 'zdm-shared-database-lock' ||
+      typeof lock.project !== 'string' ||
+      typeof lock.workspaceRoot !== 'string' ||
+      typeof lock.backupFile !== 'string'
+    ) {
+      return null;
+    }
+    return lock;
+  } catch {
+    return null;
+  }
 }
 
 export function selectSharedNodeModules({ root, worktrees }) {
@@ -200,6 +272,90 @@ function ensureNodeModules(root, worktrees) {
   console.log(`复用依赖：${sharedModules}`);
 }
 
+function integrationWorktreeFor(worktrees) {
+  const integrationWorktree = worktrees.find((worktree) => worktree.branch === DEFAULT_INTEGRATION_BRANCH);
+  if (!integrationWorktree) throw new Error(`未找到 ${DEFAULT_INTEGRATION_BRANCH} 固定 Worktree`);
+  return integrationWorktree;
+}
+
+function databaseRuntimePaths(integrationRoot) {
+  const directory = path.join(integrationRoot, 'backups', 'task-preview');
+  return {
+    directory,
+    lockFile: path.join(directory, DATABASE_LOCK_FILENAME),
+  };
+}
+
+function readDatabaseLock(integrationRoot) {
+  const { lockFile } = databaseRuntimePaths(integrationRoot);
+  if (!existsSync(lockFile)) return null;
+  const lock = parseDatabaseLock(readFileSync(lockFile, 'utf8'));
+  if (!lock) throw new Error(`共享数据库锁文件损坏，请先检查：${lockFile}`);
+  return lock;
+}
+
+export function databaseLockError(lock, { project, branch }) {
+  if (!lock || lock.project === project) return null;
+  return `共享数据库正由 ${lock.branch || lock.project} 执行结构或高风险数据任务；完成交付或经确认恢复后，才能切换到 ${branch}`;
+}
+
+function migrationVersion(filename) {
+  return filename.match(/^V(.+?)__.+\.sql$/i)?.[1] ?? null;
+}
+
+export function mergeMigrationCatalog({ integrationFiles, taskFiles }) {
+  const byName = new Map();
+  const byVersion = new Map();
+  for (const entry of [...integrationFiles, ...taskFiles]) {
+    const version = migrationVersion(entry.name);
+    if (version) {
+      const existingName = byVersion.get(version);
+      if (existingName && existingName !== entry.name) {
+        throw new Error(`Flyway 版本 V${version} 同时对应 ${existingName} 和 ${entry.name}`);
+      }
+      byVersion.set(version, entry.name);
+    }
+    const existing = byName.get(entry.name);
+    if (existing && existing.content !== entry.content) {
+      throw new Error(`Flyway 迁移内容冲突：${entry.name}`);
+    }
+    byName.set(entry.name, entry);
+  }
+  return [...byName.values()].sort((left, right) => left.name.localeCompare(right.name, 'en'));
+}
+
+function readMigrationCatalog(root) {
+  const directory = path.join(root, 'backend', 'src', 'main', 'resources', 'db', 'migration');
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
+    .map((entry) => ({ name: entry.name, content: readFileSync(path.join(directory, entry.name), 'utf8') }));
+}
+
+function taskMigrationDirectory(project) {
+  return path.join(tmpdir(), 'zdm-task-preview', project, 'migrations');
+}
+
+function prepareTaskMigrations({ root, integrationRoot, project }) {
+  const directory = taskMigrationDirectory(project);
+  if (existsSync(directory)) {
+    const stat = lstatSync(directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`任务迁移目录不安全：${directory}`);
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (!entry.isFile()) throw new Error(`任务迁移目录包含非文件项，已停止覆盖：${entry.name}`);
+      unlinkSync(path.join(directory, entry.name));
+    }
+  } else {
+    mkdirSync(directory, { recursive: true });
+  }
+  const catalog = mergeMigrationCatalog({
+    integrationFiles: readMigrationCatalog(integrationRoot),
+    taskFiles: readMigrationCatalog(root),
+  });
+  for (const entry of catalog) writeFileSync(path.join(directory, entry.name), entry.content, { flag: 'wx' });
+  return { directory, count: catalog.length };
+}
+
 function composeContext({ root, project, backendPort }) {
   return {
     cwd: root,
@@ -207,6 +363,8 @@ function composeContext({ root, project, backendPort }) {
       ...process.env,
       ZDM_TASK_WORKSPACE: root,
       ZDM_TASK_BACKEND_PORT: String(backendPort),
+      ZDM_INTEGRATION_NETWORK: INTEGRATION_NETWORK,
+      ZDM_TASK_MIGRATION_DIR: taskMigrationDirectory(project),
     },
     args: [
       'compose',
@@ -246,6 +404,59 @@ function requestStatus(url, timeoutMs = 1_000) {
   });
 }
 
+function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
+  return new Promise((resolve) => {
+    const request = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path: TASK_PREVIEW_CONTROL_PATH,
+        method,
+        headers: method === 'DELETE' ? { [TASK_PREVIEW_CONTROL_HEADER]: TASK_PREVIEW_CONTROL_VALUE } : undefined,
+        timeout: timeoutMs,
+      },
+      (response) => {
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => {
+          resolve({ statusCode: response.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') });
+        });
+      },
+    );
+    request.once('timeout', () => {
+      request.destroy();
+      resolve({ statusCode: 0, body: '' });
+    });
+    request.once('error', () => resolve({ statusCode: 0, body: '' }));
+    request.end();
+  });
+}
+
+async function currentManagedPreview(port = CURRENT_TASK_FRONTEND_PORT) {
+  const response = await taskPreviewControlRequest(port);
+  return response.statusCode === 200 ? parseTaskPreviewMetadata(response.body) : null;
+}
+
+async function stopManagedPreview(port = CURRENT_TASK_FRONTEND_PORT) {
+  const response = await taskPreviewControlRequest(port, 'DELETE');
+  if (response.statusCode !== 202) throw new Error(`无法切换固定任务预览端口 ${port}`);
+  await waitUntil(async () => !(await isPortOpen(port)), {
+    timeoutMs: 10_000,
+    message: `等待旧任务预览释放端口 ${port} 超时`,
+  });
+}
+
+async function prepareFrontendPort({ port, allowManagedSwitch }) {
+  if (!(await isPortOpen(port))) return;
+  if (!allowManagedSwitch) throw new Error(`前端端口 ${port} 已被占用`);
+  const currentPreview = await currentManagedPreview(port);
+  if (!currentPreview) {
+    throw new Error(`固定任务预览端口 ${port} 被非 Codex 任务预览进程占用，已停止自动切换`);
+  }
+  console.log(`正在把固定入口从 ${currentPreview.branch || currentPreview.workspaceRoot} 切换到当前任务…`);
+  await stopManagedPreview(port);
+}
+
 async function waitUntil(check, { timeoutMs, message }) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
@@ -266,9 +477,150 @@ function ensureDocker(root) {
   if (!capture('docker', ['info', '--format', '{{.ServerVersion}}'], { cwd: root, allowFailure: true })) {
     throw new Error('Docker 不可用，请启动 Docker Desktop 后重试');
   }
-  if (!capture('docker', ['volume', 'inspect', MAVEN_VOLUME], { cwd: root, allowFailure: true })) {
-    run('docker', ['volume', 'create', MAVEN_VOLUME], { cwd: root });
+  for (const volume of [MAVEN_VOLUME, CRAFT_IMAGE_VOLUME]) {
+    if (!capture('docker', ['volume', 'inspect', volume], { cwd: root, allowFailure: true })) {
+      run('docker', ['volume', 'create', volume], { cwd: root });
+    }
   }
+}
+
+function integrationComposeContext(integrationRoot) {
+  return {
+    cwd: integrationRoot,
+    args: [
+      'compose',
+      '--project-directory',
+      integrationRoot,
+      '--file',
+      path.join(integrationRoot, 'docker-compose.yml'),
+    ],
+  };
+}
+
+async function ensureIntegrationDatabase(integrationRoot) {
+  ensureDocker(integrationRoot);
+  const context = integrationComposeContext(integrationRoot);
+  run('docker', [...context.args, 'up', '-d', 'mysql'], context);
+  await waitUntil(
+    () =>
+      capture('docker', ['inspect', '--format', '{{.State.Health.Status}}', INTEGRATION_MYSQL_CONTAINER], {
+        cwd: integrationRoot,
+      }) === 'healthy',
+    { timeoutMs: 120_000, message: '等待集成 MySQL 健康检查超时' },
+  );
+}
+
+function failedFlywayVersions(integrationRoot) {
+  return capture(
+    'docker',
+    [
+      'exec',
+      INTEGRATION_MYSQL_CONTAINER,
+      'mysql',
+      '--user=zdm_admin',
+      '--password=zdm_admin_pwd',
+      '--database=zdm_admin',
+      '--batch',
+      '--skip-column-names',
+      '--execute',
+      'SELECT version FROM flyway_schema_history WHERE success = 0 ORDER BY installed_rank;',
+    ],
+    { cwd: integrationRoot },
+  );
+}
+
+function createDatabaseBackup({ integrationRoot, project }) {
+  const { directory } = databaseRuntimePaths(integrationRoot);
+  const backupDirectory = path.join(directory, project);
+  mkdirSync(backupDirectory, { recursive: true });
+  const result = spawnSync(path.join(launcherRoot, 'scripts', 'backup-db.sh'), [], {
+    cwd: integrationRoot,
+    env: { ...process.env, BACKUP_DIR: backupDirectory },
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr.trim() || '共享数据库备份失败');
+  }
+  const match = result.stdout.match(/^Created (.+)$/m);
+  if (!match || !existsSync(match[1])) throw new Error('共享数据库备份未生成有效文件');
+  return path.resolve(match[1]);
+}
+
+function stopIntegrationBackend(integrationRoot) {
+  const context = integrationComposeContext(integrationRoot);
+  run('docker', [...context.args, 'stop', 'backend'], context);
+}
+
+async function startIntegrationBackend(integrationRoot) {
+  run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'backend:ensure'], { cwd: integrationRoot });
+  await waitForHttp(`${SHARED_API_TARGET}/actuator/health`);
+}
+
+function otherSharedDatabaseTaskBackends(root, project) {
+  const value = capture(
+    'docker',
+    [
+      'ps',
+      '--filter',
+      'label=com.zdm.task.database=integration',
+      '--format',
+      '{{.Label "com.docker.compose.project"}}',
+    ],
+    { cwd: root, allowFailure: true },
+  );
+  return [...new Set(value.split(/\r?\n/).filter((candidate) => candidate && candidate !== project))];
+}
+
+async function acquireDatabaseLock({ context, integrationRoot, root, branch, project, riskFiles }) {
+  const existingLock = readDatabaseLock(integrationRoot);
+  const conflict = databaseLockError(existingLock, { project, branch });
+  if (conflict) throw new Error(`${conflict}\n当前任务备份：${existingLock.backupFile}`);
+  if (existingLock) {
+    stopIntegrationBackend(integrationRoot);
+    console.log(`复用共享数据库保护点：${existingLock.backupFile}`);
+    return existingLock;
+  }
+
+  const failedVersions = failedFlywayVersions(integrationRoot);
+  if (failedVersions)
+    throw new Error(`Flyway 存在失败记录（${failedVersions.split(/\r?\n/).join(', ')}），已停止启动任务后端`);
+
+  const otherBackends = otherSharedDatabaseTaskBackends(integrationRoot, project);
+  if (otherBackends.length > 0) {
+    throw new Error(`以下任务后端仍连接共享数据库，请先明确停止后再执行迁移：${otherBackends.join(', ')}`);
+  }
+
+  composeRun(context, ['stop', 'backend']);
+  stopIntegrationBackend(integrationRoot);
+  let backupFile;
+  try {
+    backupFile = createDatabaseBackup({ integrationRoot, project });
+  } catch (error) {
+    await startIntegrationBackend(integrationRoot);
+    composeRun(context, ['start', 'backend']);
+    throw error;
+  }
+  const { directory, lockFile } = databaseRuntimePaths(integrationRoot);
+  mkdirSync(directory, { recursive: true });
+  const lock = {
+    type: 'zdm-shared-database-lock',
+    project,
+    branch,
+    workspaceRoot: root,
+    backupFile,
+    riskFiles,
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    writeFileSync(lockFile, `${JSON.stringify(lock, null, 2)}\n`, { flag: 'wx' });
+  } catch (error) {
+    await startIntegrationBackend(integrationRoot);
+    composeRun(context, ['start', 'backend']);
+    throw error;
+  }
+  console.log(`共享数据库已备份：${backupFile}`);
+  console.log('集成后端已暂停写入；迁移失败时不会自动恢复数据库。');
+  return lock;
 }
 
 function existingTaskBackendPort(context) {
@@ -295,26 +647,31 @@ async function chooseBackendPort({ root, project, requestedPort }) {
   return findAvailablePort({ start: BACKEND_PORT_START, end: BACKEND_PORT_END });
 }
 
-async function ensureTaskBackend(context) {
-  ensureDocker(context.cwd);
-  composeRun(context, ['up', '-d', 'mysql']);
-  const mysqlId = composeCapture(context, ['ps', '--quiet', 'mysql']);
-  await waitUntil(
-    () =>
-      capture('docker', ['inspect', '--format', '{{.State.Health.Status}}', mysqlId], { cwd: context.cwd }) ===
-      'healthy',
-    { timeoutMs: 120_000, message: '等待任务 MySQL 健康检查超时' },
-  );
-  composeRun(context, ['up', '-d', '--force-recreate', 'backend']);
+async function ensureTaskBackend({ context, integrationRoot, root, branch, project, riskFiles = [] }) {
+  await ensureIntegrationDatabase(integrationRoot);
+  const migrations = prepareTaskMigrations({ root, integrationRoot, project });
+  const lock = readDatabaseLock(integrationRoot);
+  const conflict = databaseLockError(lock, { project, branch });
+  if (conflict) throw new Error(`${conflict}\n当前任务备份：${lock.backupFile}`);
+  if (riskFiles.length > 0) {
+    await acquireDatabaseLock({ context, integrationRoot, root, branch, project, riskFiles });
+  }
+  composeRun(context, ['up', '-d', '--no-deps', '--force-recreate', 'backend']);
   const healthUrl = `http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}/actuator/health`;
   try {
     await waitForHttp(healthUrl);
   } catch (error) {
     composeRun(context, ['logs', '--tail', '80', 'backend']);
+    const activeLock = readDatabaseLock(integrationRoot);
+    if (activeLock?.project === project) {
+      console.error(`数据库保护点保留：${activeLock.backupFile}`);
+      console.error('集成后端保持暂停；恢复数据库必须先取得用户明确确认。');
+    }
     throw error;
   }
   console.log(`任务后端：http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}`);
-  console.log('任务数据库：独立 MySQL（不暴露主机端口，停止任务环境时删除）');
+  console.log('任务数据库：复用集成 MySQL / zdm_admin（手工验收数据持续保留）');
+  console.log(`Flyway 迁移目录：集成基线 + 当前任务（${migrations.count} 个）`);
 }
 
 async function restartTaskBackend(context) {
@@ -333,12 +690,35 @@ async function restartTaskBackend(context) {
 async function ensureSharedBackend(worktrees) {
   const healthUrl = `${SHARED_API_TARGET}/actuator/health`;
   if ((await requestStatus(healthUrl)) === 200) return;
-  const integrationWorktree = worktrees.find((worktree) => worktree.branch === DEFAULT_INTEGRATION_BRANCH);
-  if (!integrationWorktree) throw new Error(`未找到 ${DEFAULT_INTEGRATION_BRANCH} 固定 Worktree`);
+  const integrationWorktree = integrationWorktreeFor(worktrees);
   run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'backend:ensure'], {
     cwd: integrationWorktree.path,
   });
   await waitForHttp(healthUrl);
+}
+
+async function handoffDatabaseTask({ root, branch, project, integrationRoot }) {
+  const lock = readDatabaseLock(integrationRoot);
+  if (!lock) {
+    console.log('当前没有待交接的共享数据库任务。');
+    return;
+  }
+  if (lock.project !== project) throw new Error(databaseLockError(lock, { project, branch }));
+  const taskHead = gitCapture(root, ['rev-parse', 'HEAD']);
+  const integrationHead = gitCapture(integrationRoot, ['rev-parse', 'HEAD']);
+  const contained = spawnSync('git', ['merge-base', '--is-ancestor', taskHead, integrationHead], {
+    cwd: integrationRoot,
+  }).status;
+  if (contained !== 0) {
+    throw new Error('任务提交尚未包含在 codex/integration-current，不能恢复集成后端或释放数据库锁');
+  }
+
+  await ensureIntegrationDatabase(integrationRoot);
+  await startIntegrationBackend(integrationRoot);
+  const { lockFile } = databaseRuntimePaths(integrationRoot);
+  unlinkSync(lockFile);
+  console.log(`数据库任务已交接到集成环境：${branch}`);
+  console.log(`安全备份继续保留：${lock.backupFile}`);
 }
 
 function targetViteConfig(root) {
@@ -347,7 +727,7 @@ function targetViteConfig(root) {
   return path.join(launcherRoot, 'vite.config.js');
 }
 
-function spawnFrontend({ root, port, apiTarget }) {
+function spawnFrontend({ root, branch, port, apiTarget }) {
   const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!existsSync(viteBin)) throw new Error(`缺少 Vite：${viteBin}`);
   return spawn(
@@ -367,6 +747,8 @@ function spawnFrontend({ root, port, apiTarget }) {
       cwd: root,
       env: {
         ...process.env,
+        ZDM_TASK_WORKSPACE: root,
+        ZDM_TASK_BRANCH: branch,
         VITE_PUBLIC_APP_ORIGIN: `http://127.0.0.1:${port}`,
         ZDM_TASK_PREVIEW: '1',
         ZDM_FRONTEND_PORT: String(port),
@@ -417,11 +799,14 @@ function printHelp() {
 
 Options:
   --mode auto|frontend|full  自动识别（默认）、只用共享后端或完整任务环境
-  --port 5174               指定任务前端端口（5174-5199）
+  --port 5176               指定临时任务前端端口（5175-5199）
+  --temporary               从 5176-5199 自动选择临时端口，不切换固定入口
   --backend-port 8081       指定任务后端端口（8081-8099）
   --api http://...          显式使用指定 API，并进入前端模式
+  --database-risk           将非 Flyway 的破坏性数据任务纳入备份与写入锁
   --worktree /path          从新版启动器预览尚未包含该脚本的旧任务 Worktree
-  --stop                    停止并删除该任务的完整后端与临时数据库`);
+  --handoff                 集成分支包含任务提交后，恢复集成后端并释放数据库锁
+  --stop                    仅停止当前任务前端和后端；不删除数据库或备份`);
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -431,6 +816,10 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   if (options.apiTarget && options.mode === 'full') throw new Error('--api 不能与 --mode full 同时使用');
+  if (options.databaseRisk && options.mode === 'frontend')
+    throw new Error('--database-risk 不能与 --mode frontend 同时使用');
+  if (options.port && options.temporary) throw new Error('--port 不能与 --temporary 同时使用');
+  if (options.stop && options.handoff) throw new Error('--stop 不能与 --handoff 同时使用');
 
   const root = await resolveTargetRoot(options.worktree);
   const branch = gitCapture(root, ['branch', '--show-current']);
@@ -442,28 +831,52 @@ export async function main(args = process.argv.slice(2)) {
   }
 
   const project = taskProjectName({ branch, root });
+  const integrationWorktree = integrationWorktreeFor(worktrees);
+  const integrationRoot = integrationWorktree.path;
+  if (options.handoff) {
+    ensureDocker(root);
+    await handoffDatabaseTask({ root, branch, project, integrationRoot });
+    return;
+  }
   if (options.stop) {
+    const lock = readDatabaseLock(integrationRoot);
+    if (lock?.project === project) {
+      throw new Error(
+        `当前任务仍持有共享数据库锁；先同步集成分支并运行 --handoff，或经用户确认后恢复备份：${lock.backupFile}`,
+      );
+    }
+    const fixedPreview = await currentManagedPreview();
+    if (fixedPreview && path.resolve(fixedPreview.workspaceRoot) === path.resolve(root)) {
+      await stopManagedPreview();
+    }
     ensureDocker(root);
     const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
     const context = composeContext({ root, project, backendPort });
-    composeRun(context, ['down', '--remove-orphans']);
-    console.log(`已停止 ${branch} 的完整任务环境；临时数据库已删除，Maven 共享缓存保留。`);
+    composeRun(context, ['stop', 'backend']);
+    console.log(`已停止 ${branch} 的任务前端和后端；共享数据库、备份及旧版临时 MySQL 均未删除。`);
     return;
   }
 
   ensureNodeModules(root, worktrees);
   const files = changedFiles(root);
   let mode = selectTaskPreviewMode({ files, requestedMode: options.mode, apiTarget: options.apiTarget });
-  const frontendPort =
-    options.port ?? (await findAvailablePort({ start: FRONTEND_PORT_START, end: FRONTEND_PORT_END }));
-  if (options.port && (await isPortOpen(options.port))) throw new Error(`前端端口 ${options.port} 已被占用`);
+  if (options.databaseRisk) mode = 'full';
+  const riskFiles = databaseRiskFiles(files);
+  if (options.databaseRisk) riskFiles.push('--database-risk');
+  const activeDatabaseLock = readDatabaseLock(integrationRoot);
+  const lockConflict = databaseLockError(activeDatabaseLock, { project, branch });
+  if (lockConflict) throw new Error(`${lockConflict}\n当前任务备份：${activeDatabaseLock.backupFile}`);
+  const frontendPort = await chooseTaskFrontendPort({
+    requestedPort: options.port,
+    temporary: options.temporary,
+  });
 
   let backendContext = null;
   let apiTarget = options.apiTarget;
   if (mode === 'full') {
     const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
     backendContext = composeContext({ root, project, backendPort });
-    await ensureTaskBackend(backendContext);
+    await ensureTaskBackend({ context: backendContext, integrationRoot, root, branch, project, riskFiles });
     apiTarget = `http://127.0.0.1:${backendPort}`;
   } else if (apiTarget) {
     const apiUrl = new URL(apiTarget);
@@ -478,14 +891,21 @@ export async function main(args = process.argv.slice(2)) {
     apiTarget = SHARED_API_TARGET;
   }
 
+  await prepareFrontendPort({
+    port: frontendPort,
+    allowManagedSwitch: !options.port && !options.temporary,
+  });
+
   console.log(`任务预览：${branch}`);
   console.log(`自动模式：${mode === 'full' ? '完整前后端' : '快速前端'}`);
   if (mode === 'full') {
     for (const file of backendSensitiveFiles(files)) console.log(`- 后端影响：${file}`);
   }
-  console.log(`页面地址：http://127.0.0.1:${frontendPort}/`);
+  console.log(
+    `${options.port || options.temporary ? '临时页面地址' : '固定页面地址'}：http://127.0.0.1:${frontendPort}/`,
+  );
   console.log(`API 代理：${apiTarget}`);
-  console.log('按 Ctrl+C 只停止前端；完整任务后端与数据库会保留供后续反馈复用。');
+  console.log('按 Ctrl+C 只停止前端；任务后端继续保留，数据始终位于集成数据库。');
 
   let frontend = null;
   let shuttingDown = false;
@@ -517,18 +937,36 @@ export async function main(args = process.argv.slice(2)) {
             console.log(`检测到 ${reason} 变化，正在自动升级为完整前后端模式…`);
             const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
             backendContext = composeContext({ root, project, backendPort });
-            await ensureTaskBackend(backendContext);
+            const currentRiskFiles = databaseRiskFiles(changedFiles(root));
+            if (options.databaseRisk) currentRiskFiles.push('--database-risk');
+            await ensureTaskBackend({
+              context: backendContext,
+              integrationRoot,
+              root,
+              branch,
+              project,
+              riskFiles: currentRiskFiles,
+            });
             apiTarget = `http://127.0.0.1:${backendPort}`;
             restartingFrontend = true;
             await stopChild(frontend);
-            frontend = attachFrontend(spawnFrontend({ root, port: frontendPort, apiTarget }));
+            frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget }));
             restartingFrontend = false;
             mode = 'full';
             console.log(`已切换完整模式，页面地址保持：http://127.0.0.1:${frontendPort}/`);
             return;
           }
-          if (['docker-compose.yml', 'compose.yml', 'compose.yaml'].includes(reason)) {
-            await ensureTaskBackend(backendContext);
+          const currentRiskFiles = databaseRiskFiles(changedFiles(root));
+          if (options.databaseRisk) currentRiskFiles.push('--database-risk');
+          if (currentRiskFiles.length > 0 || ['docker-compose.yml', 'compose.yml', 'compose.yaml'].includes(reason)) {
+            await ensureTaskBackend({
+              context: backendContext,
+              integrationRoot,
+              root,
+              branch,
+              project,
+              riskFiles: currentRiskFiles,
+            });
           } else {
             await restartTaskBackend(backendContext);
           }
@@ -541,7 +979,7 @@ export async function main(args = process.argv.slice(2)) {
     clearTimeout(backendTimer);
     for (const watcher of watchers) watcher.close();
   };
-  frontend = attachFrontend(spawnFrontend({ root, port: frontendPort, apiTarget }));
+  frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget }));
 
   const shutdown = async () => {
     if (shuttingDown) return;
@@ -549,7 +987,7 @@ export async function main(args = process.argv.slice(2)) {
     closeWatchers();
     await stopChild(frontend);
     if (mode === 'full') {
-      console.log(`完整任务环境仍在运行。清理命令：node ${fileURLToPath(import.meta.url)} --worktree "${root}" --stop`);
+      console.log(`任务后端仍在运行。停止命令：node ${fileURLToPath(import.meta.url)} --worktree "${root}" --stop`);
     }
     process.exit(0);
   };
