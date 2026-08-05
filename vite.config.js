@@ -5,7 +5,11 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const publicOrigin = env.VITE_PUBLIC_APP_ORIGIN ? new URL(env.VITE_PUBLIC_APP_ORIGIN) : null;
+  const taskPreview = process.env.ZDM_TASK_PREVIEW === '1';
+  const publicOriginValue = process.env.VITE_PUBLIC_APP_ORIGIN || env.VITE_PUBLIC_APP_ORIGIN;
+  const publicOrigin = !taskPreview && publicOriginValue ? new URL(publicOriginValue) : null;
+  const frontendPort = Number(process.env.ZDM_FRONTEND_PORT || 5173);
+  const apiProxyTarget = process.env.ZDM_API_PROXY_TARGET || 'http://127.0.0.1:8080';
 
   return {
     plugins: [vue()],
@@ -15,8 +19,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      host: '0.0.0.0',
-      port: 5173,
+      host: taskPreview ? '127.0.0.1' : '0.0.0.0',
+      port: frontendPort,
+      strictPort: taskPreview,
       allowedHosts: true,
       hmr: publicOrigin
         ? {
@@ -26,7 +31,7 @@ export default defineConfig(({ mode }) => {
         : undefined,
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:8080',
+          target: apiProxyTarget,
           changeOrigin: true,
         },
       },
