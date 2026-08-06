@@ -77,4 +77,20 @@ class FunctionPermissionNormalizerTest {
             "admin.product-data-center.attribute-value.finished.delete",
             "admin.product-data-center.attribute-value.accessory.delete");
   }
+
+  @Test
+  void mergesLegacyCategoryEnableAndDisablePermissionsIntoToggleStatus() {
+    assertThat(FunctionPermissionNormalizer.normalize(List.of(
+        "admin.tenant.store-category-management.disable",
+        "admin.tenant.store-category-management.enable",
+        "admin.product-data-center.category.finished.disable",
+        "admin.product-data-center.category.accessory.enable")))
+        .containsExactly(
+            "admin.tenant.store-category-management.view",
+            "admin.tenant.store-category-management.toggle-status",
+            "admin.product-data-center.category.finished.view",
+            "admin.product-data-center.category.finished.toggle-status",
+            "admin.product-data-center.category.accessory.view",
+            "admin.product-data-center.category.accessory.toggle-status");
+  }
 }
