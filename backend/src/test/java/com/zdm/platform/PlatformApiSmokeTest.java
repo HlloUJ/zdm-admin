@@ -707,6 +707,90 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void storeCategoryIsSharedWithinStoreAndIsolatedAcrossStores() throws Exception {
+    long accountId = 9022L;
+    long employeeId = 9022L;
+    long roleId = 9022L;
+    long storeId = 9022L;
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, status) VALUES (?, 1, '门店分类隔离测试门店', 'partner', 'enabled')",
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629022",
+        "门店分类查看员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, ?, '门店分类查看员', '15926629022', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId,
+        storeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, ?, 'enabled')
+        """,
+        accountId,
+        employeeId,
+        storeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, store_id, data_scope, status,
+           function_permissions, created_by_name)
+        VALUES (?, '门店分类查看角色', 'STORE_CATEGORY_VIEWER_TEST', 'partner-store',
+          'admin', ?, 'store', 'enabled',
+          'admin.tenant.store-category-management.view,admin.tenant.store-category-management.edit', '集成测试')
+        """,
+        roleId,
+        storeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, ?)
+        """,
+        accountId,
+        roleId,
+        storeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO store_categories
+          (id, store_id, name, sort_order, product_count, status, created_by_name)
+        VALUES
+          (9301, 1, '同名门店分类', 1, 0, 'enabled', '韩健'),
+          (9302, ?, '同名门店分类', 1, 0, 'enabled', '张飞')
+        """,
+        storeId);
+
+    try {
+      mockMvc.perform(get("/api/admin/store-categories")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.length()").value(1))
+          .andExpect(jsonPath("$.data[0].id").value(9302));
+      mockMvc.perform(put("/api/admin/store-categories/{id}", 9301)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId))
+              .contentType("application/json")
+              .content("{\"name\":\"跨门店修改\"}"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("分类不存在或已被删除"));
+    } finally {
+      jdbcTemplate.update("DELETE FROM store_categories WHERE id IN (9301, 9302)");
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM stores WHERE id = ?", storeId);
+    }
+  }
+
+  @Test
   void productCategoryListIsNewestFirstAndPersistsCreator() throws Exception {
     String creatorName = jdbcTemplate.queryForObject(
         "SELECT display_name FROM accounts WHERE id = 1",
@@ -1882,10 +1966,15 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void roleManagementAppliesCurrentEmployeeDataPermission() throws Exception {
+  void roleManagementIsSharedWithinStoreAndIsolatedAcrossStores() throws Exception {
     long accountId = 9002L;
     long employeeId = 9002L;
     String employeeName = "角色范围测试员工";
+    long otherStoreId = 9002L;
+
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, status) VALUES (?, 1, '角色隔离测试门店', 'partner', 'enabled')",
+        otherStoreId);
 
     jdbcTemplate.update(
         """
@@ -1924,25 +2013,42 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+          (name, code, category, client_code, store_id, data_scope, status,
+           function_permissions, created_by_name)
         VALUES
-          ('本人创建的范围角色', 'SELF_SCOPE_ROLE', 'operation-platform', 'admin', 'all', 'enabled', '', ?),
-          ('他人创建的范围角色', 'OTHER_SCOPE_ROLE', 'operation-platform', 'admin', 'all', 'enabled', '', '韩健')
+          ('本人创建的范围角色', 'SELF_SCOPE_ROLE', 'operation-platform', 'admin', 1, 'all', 'enabled', '', ?),
+          ('同店他人创建的角色', 'SAME_STORE_ROLE', 'operation-platform', 'admin', 1, 'all', 'enabled', '', '韩健'),
+          ('其他门店创建的角色', 'OTHER_STORE_ROLE', 'operation-platform', 'admin', ?, 'all', 'enabled', '', '韩健')
         """,
-        employeeName);
+        employeeName,
+        otherStoreId);
 
     mockMvc.perform(get("/api/admin/roles")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[?(@.code == 'SELF_SCOPE_ROLE')].name").value(hasItem("本人创建的范围角色")))
-        .andExpect(jsonPath("$.data[?(@.code == 'OTHER_SCOPE_ROLE')]").isEmpty())
-        .andExpect(jsonPath("$.data[?(@.code == 'SUPER_ADMIN')]").isEmpty());
+        .andExpect(jsonPath("$.data[?(@.code == 'SAME_STORE_ROLE')].name").value(hasItem("同店他人创建的角色")))
+        .andExpect(jsonPath("$.data[?(@.code == 'OTHER_STORE_ROLE')]").isEmpty());
 
-    mockMvc.perform(get("/api/admin/roles")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.code == 'SELF_SCOPE_ROLE')].name").value(hasItem("本人创建的范围角色")))
-        .andExpect(jsonPath("$.data[?(@.code == 'OTHER_SCOPE_ROLE')].name").value(hasItem("他人创建的范围角色")));
+    Long otherStoreRoleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'OTHER_STORE_ROLE'",
+        Long.class);
+    mockMvc.perform(put("/api/admin/roles/{id}", otherStoreRoleId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "跨门店修改角色",
+                  "code": "OTHER_STORE_ROLE",
+                  "category": "operation-platform",
+                  "clientCode": "admin",
+                  "dataScope": "all",
+                  "status": "enabled",
+                  "functionPermissions": ""
+                }
+                """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不能操作其他门店的角色"));
   }
 
   @Test
@@ -2008,7 +2114,14 @@ class PlatformApiSmokeTest {
     long managerEmployeeId = 9041L;
     long targetAccountId = 9042L;
     long targetEmployeeId = 9042L;
+    long otherStoreAccountId = 9043L;
+    long otherStoreEmployeeId = 9043L;
+    long otherStoreId = 9043L;
     long managerRoleId = 9041L;
+
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, status) VALUES (?, 1, '员工隔离测试门店', 'partner', 'enabled')",
+        otherStoreId);
 
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
@@ -2020,6 +2133,11 @@ class PlatformApiSmokeTest {
         targetAccountId,
         "15926629042",
         "待配置员工");
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        otherStoreAccountId,
+        "15926629043",
+        "其他门店员工");
     jdbcTemplate.update(
         """
         INSERT INTO employees
@@ -2034,6 +2152,16 @@ class PlatformApiSmokeTest {
         String.valueOf(managerRoleId),
         targetEmployeeId,
         targetAccountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
+           data_permission, created_by_name)
+        VALUES (?, ?, 1, ?, '其他门店员工', '15926629043', 'enabled', '2', 'all', '韩健')
+        """,
+        otherStoreEmployeeId,
+        otherStoreAccountId,
+        otherStoreId);
     jdbcTemplate.update(
         """
         INSERT INTO account_identities
@@ -2065,6 +2193,12 @@ class PlatformApiSmokeTest {
         managerRoleId,
         targetAccountId);
 
+    mockMvc.perform(get("/api/admin/employees")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == 9042)].name").value(hasItem("待配置员工")))
+        .andExpect(jsonPath("$.data[?(@.id == 9043)]").isEmpty());
+
     mockMvc.perform(patch("/api/admin/employees/{id}/permissions", targetEmployeeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
             .contentType("application/json")
@@ -2079,6 +2213,18 @@ class PlatformApiSmokeTest {
         .andExpect(jsonPath("$.data.dataPermission").value("self"))
         .andExpect(jsonPath("$.data.gender").doesNotExist())
         .andExpect(jsonPath("$.data.remark").doesNotExist());
+
+    mockMvc.perform(patch("/api/admin/employees/{id}/permissions", otherStoreEmployeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "roleIds": "2",
+                  "dataPermission": "self"
+                }
+                """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不能操作其他门店的员工"));
   }
 
   @Test

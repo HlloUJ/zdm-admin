@@ -1,6 +1,8 @@
 package com.zdm.platform.role;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.NotBlank;
@@ -19,6 +21,9 @@ public class Role {
 
   private String category;
   private String clientCode;
+
+  @TableField(insertStrategy = FieldStrategy.ALWAYS, updateStrategy = FieldStrategy.ALWAYS)
+  private Long storeId;
 
   @NotBlank
   private String dataScope;
@@ -70,6 +75,14 @@ public class Role {
 
   public void setClientCode(String clientCode) {
     this.clientCode = clientCode;
+  }
+
+  public Long getStoreId() {
+    return storeId;
+  }
+
+  public void setStoreId(Long storeId) {
+    this.storeId = storeId;
   }
 
   public String getDataScope() {

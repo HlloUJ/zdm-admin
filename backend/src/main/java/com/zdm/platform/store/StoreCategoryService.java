@@ -2,12 +2,14 @@ package com.zdm.platform.store;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +23,11 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     this.identityProvider = identityProvider;
   }
 
+  // 门店分类属于门店：同一门店内共享，不按创建人过滤，不得跨门店读写。
   public List<StoreCategory> listOrdered() {
+    Long storeId = requireStoreId();
     return lambdaQuery()
+        .eq(StoreCategory::getStoreId, storeId)
         .orderByAsc(StoreCategory::getSortOrder)
         .orderByDesc(StoreCategory::getCreatedAt)
         .orderByDesc(StoreCategory::getId)
@@ -31,7 +36,9 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
 
   @Transactional
   public StoreCategory createCategory(StoreCategoryCreateRequest request) {
+    Long storeId = requireStoreId();
     StoreCategory category = new StoreCategory();
+    category.setStoreId(storeId);
     category.setParentId(request.parentId());
     category.setName(request.name().trim());
     category.setStatus(request.status());
@@ -104,7 +111,10 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
   @Transactional
   public void deleteCategory(Long id) {
     StoreCategory category = requireCategory(id);
-    if (lambdaQuery().eq(StoreCategory::getParentId, id).count() > 0) {
+    if (lambdaQuery()
+        .eq(StoreCategory::getStoreId, category.getStoreId())
+        .eq(StoreCategory::getParentId, id)
+        .count() > 0) {
       throw new IllegalArgumentException("该分类包含下级分类，请先删除或转移下级分类");
     }
     if (category.getProductCount() != null && category.getProductCount() > 0) {
@@ -118,7 +128,10 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
   }
 
   private StoreCategory requireCategory(Long id) {
-    StoreCategory category = getById(id);
+    StoreCategory category = lambdaQuery()
+        .eq(StoreCategory::getId, id)
+        .eq(StoreCategory::getStoreId, requireStoreId())
+        .one();
     if (category == null) {
       throw new IllegalArgumentException("分类不存在或已被删除");
     }
@@ -136,8 +149,10 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
   }
 
   private List<Long> descendantIds(Long id) {
+    Long storeId = requireStoreId();
     List<StoreCategory> categories = lambdaQuery()
         .select(StoreCategory::getId, StoreCategory::getParentId)
+        .eq(StoreCategory::getStoreId, storeId)
         .list();
     Set<Long> familyIds = new HashSet<>();
     familyIds.add(id);
@@ -158,7 +173,9 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
   }
 
   private void requireUniqueName(Long parentId, String name, Long excludedId) {
-    var query = lambdaQuery().eq(StoreCategory::getName, name);
+    var query = lambdaQuery()
+        .eq(StoreCategory::getStoreId, requireStoreId())
+        .eq(StoreCategory::getName, name);
     if (parentId == null) {
       query.isNull(StoreCategory::getParentId);
     } else {
@@ -173,7 +190,8 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
   }
 
   private void makeRoomForNewest(Long parentId) {
-    var updateWrapper = Wrappers.<StoreCategory>lambdaUpdate();
+    var updateWrapper = Wrappers.<StoreCategory>lambdaUpdate()
+        .eq(StoreCategory::getStoreId, requireStoreId());
     if (parentId == null) {
       updateWrapper.isNull(StoreCategory::getParentId);
     } else {
@@ -184,7 +202,7 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
   }
 
   private List<StoreCategory> listSiblings(Long parentId) {
-    var query = lambdaQuery();
+    var query = lambdaQuery().eq(StoreCategory::getStoreId, requireStoreId());
     if (parentId == null) {
       query.isNull(StoreCategory::getParentId);
     } else {
@@ -200,5 +218,13 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
       sibling.setSortOrder(index + 1);
       updateById(sibling);
     }
+  }
+
+  private Long requireStoreId() {
+    CurrentIdentity identity = identityProvider.require();
+    if (identity.storeId() == null) {
+      throw new AccessDeniedException("当前身份未关联门店");
+    }
+    return identity.storeId();
   }
 }
