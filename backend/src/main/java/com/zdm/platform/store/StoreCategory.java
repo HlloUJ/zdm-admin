@@ -5,11 +5,20 @@ import com.zdm.platform.common.BaseEntity;
 
 @TableName("store_categories")
 public class StoreCategory extends BaseEntity {
+  private Long storeId;
   private Long parentId;
   private String name;
   private Integer sortOrder;
   private Integer productCount;
   private String createdByName;
+
+  public Long getStoreId() {
+    return storeId;
+  }
+
+  public void setStoreId(Long storeId) {
+    this.storeId = storeId;
+  }
 
   public Long getParentId() {
     return parentId;
