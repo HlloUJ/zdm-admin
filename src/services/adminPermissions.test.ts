@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LoginUser } from './auth';
-import { getFirstAccessiblePath, hasMenuPermission } from './adminPermissions';
+import { getFirstAccessiblePath, hasMenuPermission, hasPermission } from './adminPermissions';
 
 function createUser(permissions: string[]): LoginUser {
   return {
@@ -32,6 +32,31 @@ describe('admin menu permissions', () => {
     const user = createUser(['admin.permission-management.employee-management.edit']);
 
     expect(hasMenuPermission(user, 'admin.permission-management.role-management')).toBe(false);
+  });
+
+  it('exposes store-category menu only with its view permission', () => {
+    const viewUser = createUser(['admin.tenant.store-category-management.view']);
+    const actionOnlyUser = createUser(['admin.tenant.store-category-management.create-root']);
+
+    expect(hasMenuPermission(viewUser, 'admin.tenant.store-category-management')).toBe(true);
+    expect(getFirstAccessiblePath(viewUser)).toBe('/store-category-management');
+    expect(hasMenuPermission(actionOnlyUser, 'admin.tenant.store-category-management')).toBe(false);
+    expect(getFirstAccessiblePath(actionOnlyUser)).toBe('');
+  });
+
+  it('accepts legacy category enable and disable permissions for the merged toggle action', () => {
+    expect(
+      hasPermission(
+        createUser(['admin.tenant.store-category-management.disable']),
+        'admin.tenant.store-category-management.toggle-status',
+      ),
+    ).toBe(true);
+    expect(
+      hasPermission(
+        createUser(['admin.product-data-center.category.finished.enable']),
+        'admin.product-data-center.category.finished.toggle-status',
+      ),
+    ).toBe(true);
   });
 
   it('keeps menus without a permission prefix hidden from regular users', () => {

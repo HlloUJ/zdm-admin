@@ -110,6 +110,203 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void storeCategoryCrudAndOrderingPersistInDatabase() throws Exception {
+    String suffix = Long.toString(System.nanoTime() % 1_000_000);
+    String token = TokenAuthenticationFilter.DEV_TOKEN;
+
+    MvcResult firstRootResult = mockMvc.perform(post("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"门店一级分类甲-%s",
+                  "status":"enabled"
+                }
+                """.formatted(suffix)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sortOrder").value(1))
+        .andExpect(jsonPath("$.data.createdByName").isNotEmpty())
+        .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
+        .andReturn();
+    long firstRootId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+        firstRootResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
+
+    MvcResult secondRootResult = mockMvc.perform(post("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"门店一级分类乙-%s",
+                  "status":"enabled"
+                }
+                """.formatted(suffix)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sortOrder").value(1))
+        .andReturn();
+    long secondRootId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+        secondRootResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT sort_order FROM store_categories WHERE id = ?",
+        Integer.class,
+        firstRootId)).isEqualTo(2);
+
+    MvcResult childResult = mockMvc.perform(post("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":%d,
+                  "name":"门店二级分类-%s",
+                  "status":"enabled"
+                }
+                """.formatted(firstRootId, suffix)))
+        .andExpect(status().isOk())
+        .andReturn();
+    long childId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+        childResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
+
+    MvcResult listResult = mockMvc.perform(get("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andReturn();
+    java.util.List<Integer> categoryIds = com.jayway.jsonpath.JsonPath.read(
+        listResult.getResponse().getContentAsString(),
+        "$.data[*].id");
+    assertThat(categoryIds.indexOf(Math.toIntExact(secondRootId)))
+        .isLessThan(categoryIds.indexOf(Math.toIntExact(firstRootId)));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM store_categories WHERE created_by_name IS NOT NULL AND created_at IS NOT NULL",
+        Integer.class)).isEqualTo(3);
+
+    MvcResult grandchildResult = mockMvc.perform(post("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":%d,
+                  "name":"门店三级分类-%s",
+                  "status":"enabled"
+                }
+                """.formatted(childId, suffix)))
+        .andExpect(status().isOk())
+        .andReturn();
+    long grandchildId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+        grandchildResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
+
+    mockMvc.perform(post("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":%d,
+                  "name":"门店四级分类-%s",
+                  "status":"enabled"
+                }
+                """.formatted(grandchildId, suffix)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("门店分类最多支持三级"));
+
+    mockMvc.perform(post("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "parentId":%d,
+                  "name":" 门店二级分类-%s ",
+                  "status":"enabled"
+                }
+                """.formatted(firstRootId, suffix)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("同级分类名称不能重复"));
+
+    mockMvc.perform(put("/api/admin/store-categories/{id}", firstRootId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"门店一级分类甲-已编辑-%s"}
+                """.formatted(suffix)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("门店一级分类甲-已编辑-" + suffix));
+
+    mockMvc.perform(put("/api/admin/store-categories/{id}/move", secondRootId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("{\"direction\":\"down\"}"))
+        .andExpect(status().isOk());
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT sort_order FROM store_categories WHERE id = ?",
+        Integer.class,
+        secondRootId)).isEqualTo(2);
+    MvcResult movedListResult = mockMvc.perform(get("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andReturn();
+    java.util.List<Integer> movedCategoryIds = com.jayway.jsonpath.JsonPath.read(
+        movedListResult.getResponse().getContentAsString(),
+        "$.data[*].id");
+    assertThat(movedCategoryIds.indexOf(Math.toIntExact(firstRootId)))
+        .isLessThan(movedCategoryIds.indexOf(Math.toIntExact(secondRootId)));
+
+    mockMvc.perform(put("/api/admin/store-categories/{id}/status", firstRootId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isOk());
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT status FROM store_categories WHERE id = ?",
+        String.class,
+        childId)).isEqualTo("disabled");
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT status FROM store_categories WHERE id = ?",
+        String.class,
+        grandchildId)).isEqualTo("disabled");
+
+    mockMvc.perform(put("/api/admin/store-categories/{id}/status", firstRootId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("{\"status\":\"enabled\"}"))
+        .andExpect(status().isOk());
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT status FROM store_categories WHERE id = ?",
+        String.class,
+        childId)).isEqualTo("enabled");
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT status FROM store_categories WHERE id = ?",
+        String.class,
+        grandchildId)).isEqualTo("enabled");
+
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", firstRootId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该分类包含下级分类，请先删除或转移下级分类"));
+
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", childId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该分类包含下级分类，请先删除或转移下级分类"));
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", grandchildId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", childId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", firstRootId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", secondRootId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM store_categories WHERE name LIKE ?",
+        Integer.class,
+        "%" + suffix + "%")).isZero();
+  }
+
+  @Test
   void productCategoryListIsNewestFirstAndPersistsCreator() throws Exception {
     String creatorName = jdbcTemplate.queryForObject(
         "SELECT display_name FROM accounts WHERE id = 1",

@@ -148,6 +148,16 @@ export function getFirstAccessiblePath(user: LoginUser) {
 }
 
 const permissionAliases: Record<string, string[]> = {
+  'admin.tenant.store-category-management.toggle-status': [
+    'admin.tenant.store-category-management.disable',
+    'admin.tenant.store-category-management.enable',
+  ],
+  ...Object.fromEntries(
+    (['finished', 'accessory'] as const).map((scope) => [
+      `admin.product-data-center.category.${scope}.toggle-status`,
+      [`admin.product-data-center.category.${scope}.disable`, `admin.product-data-center.category.${scope}.enable`],
+    ]),
+  ),
   'admin.product-data-center.category-attribute-template.finished.view': [
     'admin.product-data-center.category-attribute-template.view',
   ],
