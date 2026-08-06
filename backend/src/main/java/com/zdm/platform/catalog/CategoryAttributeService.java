@@ -20,9 +20,16 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
   private static final String SKU_ATTRIBUTE_LIMIT_MESSAGE = "参与SKU组合的属性最多只能开启4个";
 
   private final CurrentIdentityProvider identityProvider;
+  private final ProductAttributeService attributeService;
+  private final CategoryAttributeValueBindingService valueBindingService;
 
-  public CategoryAttributeService(CurrentIdentityProvider identityProvider) {
+  public CategoryAttributeService(
+      CurrentIdentityProvider identityProvider,
+      ProductAttributeService attributeService,
+      CategoryAttributeValueBindingService valueBindingService) {
     this.identityProvider = identityProvider;
+    this.attributeService = attributeService;
+    this.valueBindingService = valueBindingService;
   }
 
   @Transactional
@@ -114,10 +121,25 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
       if (!StringUtils.hasText(existing.getAttributeRole())) {
         throw new IllegalArgumentException("请先选择属性角色");
       }
+      ProductAttribute attribute = attributeService.getById(existing.getAttributeId());
+      if (attribute != null
+          && "select".equals(attribute.getValueType())
+          && !valueBindingService.hasEnabledBinding(existing.getId())) {
+        throw new IllegalArgumentException("请先绑定选项值");
+      }
     }
     existing.setPublishStatus(publishStatus);
     updateById(existing);
     return getById(id);
+  }
+
+  public List<CategoryAttribute> listWithOptionCounts() {
+    List<CategoryAttribute> categoryAttributes = list();
+    var counts = valueBindingService.enabledBindingCounts(
+        categoryAttributes.stream().map(CategoryAttribute::getId).toList());
+    categoryAttributes.forEach(categoryAttribute ->
+        categoryAttribute.setOptionCount(counts.getOrDefault(categoryAttribute.getId(), 0L)));
+    return categoryAttributes;
   }
 
   private String normalizeAttributeRole(String attributeRole) {

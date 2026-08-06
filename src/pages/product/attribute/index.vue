@@ -9,7 +9,7 @@
           >属性库仅维护属性定义和值类型；必填及 SKU 规则统一在类目属性模板中配置。</t-alert
         >
         <section v-if="!lockedScope" class="table-card source-card">
-          <t-tabs v-model="activeScope" :list="scopeTabs" />
+          <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
           <div class="source-caption">{{ sourceDescription }}</div>
         </section>
         <AdminListLayout>
@@ -30,7 +30,7 @@
             </t-form>
           </template>
           <template #toolbar
-            ><t-button theme="primary" @click="openCreate"
+            ><t-button v-if="canCreateAttribute" theme="primary" @click="openCreate"
               ><template #icon><t-icon name="add" /></template>新增</t-button
             ></template
           >
@@ -45,11 +45,16 @@
               <template #operation="{ row }"
                 ><div class="table-actions">
                   <t-link
+                    v-if="canToggleAttributeStatus"
                     :theme="row.status === 'enabled' ? 'warning' : 'success'"
                     hover="color"
                     @click="openStatusConfirm(row)"
                     >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
-                  ><t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                  ><t-link v-if="canDeleteAttribute" theme="danger" hover="color" @click="openDeleteConfirm(row)"
+                    >删除</t-link
+                  ><span v-if="!canToggleAttributeStatus && !canDeleteAttribute" class="table-action-placeholder"
+                    >-</span
+                  >
                 </div></template
               >
             </t-table>
@@ -113,12 +118,14 @@ import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
   createProductAttribute,
   deleteProductAttribute,
   listProductAttributes,
-  updateProductAttribute,
-  type ProductAttributePayload,
+  updateProductAttributeStatus,
   type ProductAttributeRecord,
 } from '@/services/productAttributes';
 
@@ -134,23 +141,41 @@ interface Attribute {
   valueType: ValueType;
   templateCount: number;
   status: Status;
+  createdByName: string;
+  createdAt: string;
 }
 
 const route = useRoute();
-const resolveScope = (value: unknown): Scope =>
-  value === 'finished' || value === 'accessory' || value === 'shared' ? value : 'shared';
-const activeScope = ref<Scope>(resolveScope(route.query.scope));
-const lockedScope = computed(
-  () => route.query.scope === 'finished' || route.query.scope === 'accessory' || route.query.scope === 'shared',
-);
-const pageTitle = computed(
-  () => ({ shared: '共享基础属性库', finished: '成品现货属性库', accessory: '配件属性库' })[activeScope.value],
-);
-const scopeTabs = [
+const attributePermissionPrefix = 'admin.product-data-center.attribute';
+const loginUser = computed(() => getLoginUser());
+const attributeScopeTabs: { label: string; value: Scope }[] = [
   { label: '共享基础属性', value: 'shared' },
   { label: '成品现货专属属性', value: 'finished' },
   { label: '配件专属属性', value: 'accessory' },
 ];
+const resolveScope = (value: unknown): Scope =>
+  value === 'finished' || value === 'accessory' || value === 'shared' ? value : 'shared';
+const activeScope = ref<Scope>(resolveScope(route.query.scope));
+const {
+  visibleTabs: scopeTabs,
+  showTabRail: showScopeTabRail,
+  resolveAccessibleTab: resolveAccessibleScope,
+} = usePermissionTabs({
+  tabs: attributeScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) => hasPermission(loginUser.value, `${attributePermissionPrefix}.${tab.value}.view`),
+});
+const lockedScope = computed(
+  () => route.query.scope === 'finished' || route.query.scope === 'accessory' || route.query.scope === 'shared',
+);
+const hasAttributeAction = (action: string) =>
+  hasPermission(loginUser.value, `${attributePermissionPrefix}.${activeScope.value}.${action}`);
+const canCreateAttribute = computed(() => hasAttributeAction('create'));
+const canToggleAttributeStatus = computed(() => hasAttributeAction('toggle-status'));
+const canDeleteAttribute = computed(() => hasAttributeAction('delete'));
+const pageTitle = computed(
+  () => ({ shared: '共享基础属性库', finished: '成品现货属性库', accessory: '配件属性库' })[activeScope.value],
+);
 const sourceDescription = computed(
   () =>
     ({
@@ -178,8 +203,10 @@ const formRules: Record<string, FormRule[]> = {
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'name', title: '属性名称', width: 260, align: 'left' },
   { colKey: 'valueType', title: '值类型', width: 220, align: 'left' },
-  { colKey: 'templateCount', title: '引用类目模板', width: 190, align: 'left' },
+  { colKey: 'templateCount', title: '被引用次数', width: 190, align: 'left' },
   { colKey: 'status', title: '状态', width: 150, align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 160, align: 'left', fixed: 'right' },
 ];
 const filteredData = computed(() =>
@@ -192,6 +219,13 @@ const pageData = computed(() =>
 );
 const totalCount = computed(() => filteredData.value.length);
 const valueTypeLabel = (type: ValueType) => ({ select: '标准选项', number: '数值 + 单位', text: '文本输入' })[type];
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+  const pad = (number: number) => number.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 const normalizeStatus = (status?: ProductAttributeRecord['status']): Status =>
   status === 'disabled' ? 'disabled' : 'enabled';
 const createAttributeCode = (record: ProductAttributeRecord) => `attribute-${record.id}`;
@@ -201,15 +235,10 @@ const toAttribute = (record: ProductAttributeRecord): Attribute => ({
   name: record.name,
   scope: record.scope,
   valueType: record.valueType,
-  templateCount: 0,
+  templateCount: record.templateCount ?? 0,
   status: normalizeStatus(record.status),
-});
-const toAttributePayload = (item: Attribute): ProductAttributePayload => ({
-  scope: item.scope,
-  name: item.name,
-  valueType: item.valueType,
-  attributeRole: 'basic',
-  status: item.status,
+  createdByName: record.createdByName || '-',
+  createdAt: formatDateTime(record.createdAt),
 });
 const loadAttributes = async () => {
   loading.value = true;
@@ -248,6 +277,7 @@ const restorePageScroll = () => {
   if (typeof window !== 'undefined') window.requestAnimationFrame(() => window.scrollTo(0, pageScrollTop.value));
 };
 const openCreate = () => {
+  if (!canCreateAttribute.value) return;
   form.scope = activeScope.value;
   form.name = '';
   form.valueType = '';
@@ -279,11 +309,13 @@ const submit = async () => {
   }
 };
 const openStatusConfirm = (row: Attribute) => {
+  if (!canToggleAttributeStatus.value) return;
   confirmTarget.value = row;
   confirmType.value = row.status === 'enabled' ? 'disable' : 'enable';
   confirmDialogVisible.value = true;
 };
 const openDeleteConfirm = (row: Attribute) => {
+  if (!canDeleteAttribute.value) return;
   confirmTarget.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;
@@ -309,12 +341,9 @@ const handleConfirm = async () => {
       ensureCurrentPage();
       MessagePlugin.success('删除成功');
     } else {
-      const updated = await updateProductAttribute(
+      const updated = await updateProductAttributeStatus(
         confirmTarget.value.id,
-        toAttributePayload({
-          ...confirmTarget.value,
-          status: confirmType.value === 'enable' ? 'enabled' : 'disabled',
-        }),
+        confirmType.value === 'enable' ? 'enabled' : 'disabled',
       );
       const targetIndex = data.value.findIndex((item) => item.id === confirmTarget.value?.id);
       if (targetIndex !== -1) {
@@ -330,7 +359,7 @@ const handleConfirm = async () => {
 watch(
   () => route.query.scope,
   (scope) => {
-    activeScope.value = resolveScope(scope);
+    activeScope.value = resolveAccessibleScope(resolveScope(scope)) ?? activeScope.value;
     pagination.current = 1;
   },
 );
@@ -430,6 +459,9 @@ onMounted(loadAttributes);
 }
 .table-actions {
   gap: 12px;
+}
+.table-action-placeholder {
+  color: var(--td-text-color-placeholder);
 }
 :global(.attribute-create-dialog .t-dialog__body) {
   max-height: none;

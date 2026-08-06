@@ -161,6 +161,7 @@ const permissionAliases: Record<string, string[]> = {
         ['attribute-role', 'edit'],
         ['sku-combination', 'edit'],
         ['required', 'edit'],
+        ['bind-values', 'edit'],
         ['toggle-publish', 'toggle-publish'],
         ['delete', 'delete'],
       ].map(([action, legacyAction]) => [

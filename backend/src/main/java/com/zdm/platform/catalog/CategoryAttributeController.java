@@ -22,15 +22,18 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
 
   private final CategoryAttributeService service;
   private final ProductCategoryService categoryService;
+  private final CategoryAttributeValueBindingService valueBindingService;
   private final PermissionGuard permissionGuard;
 
   public CategoryAttributeController(
       CategoryAttributeService service,
       ProductCategoryService categoryService,
+      CategoryAttributeValueBindingService valueBindingService,
       PermissionGuard permissionGuard) {
     super(service, permissionGuard, PERMISSION_PREFIX);
     this.service = service;
     this.categoryService = categoryService;
+    this.valueBindingService = valueBindingService;
     this.permissionGuard = permissionGuard;
   }
 
@@ -41,7 +44,7 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
         PERMISSION_PREFIX + ".finished.view",
         PERMISSION_PREFIX + ".accessory.view",
         PERMISSION_PREFIX + ".view");
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(service.listWithOptionCounts());
   }
 
   @Override
@@ -104,6 +107,22 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     requireScopedPermission(getExisting(id).getCategoryId(), "delete", "delete");
     return ApiResponse.ok(service.removeById(id));
+  }
+
+  @GetMapping("/{id}/values")
+  public ApiResponse<List<CategoryAttributeValueOption>> listValueOptions(@PathVariable Long id) {
+    CategoryAttribute existing = getExisting(id);
+    requireScopedPermission(existing.getCategoryId(), "view", "view");
+    return ApiResponse.ok(valueBindingService.listOptions(id));
+  }
+
+  @PutMapping("/{id}/values")
+  public ApiResponse<List<CategoryAttributeValueOption>> replaceValueBindings(
+      @PathVariable Long id,
+      @Valid @RequestBody CategoryAttributeValueBindingRequest request) {
+    CategoryAttribute existing = getExisting(id);
+    requireScopedPermission(existing.getCategoryId(), "bind-values", "edit");
+    return ApiResponse.ok(valueBindingService.replaceBindings(id, request));
   }
 
   private CategoryAttribute getExisting(Long id) {

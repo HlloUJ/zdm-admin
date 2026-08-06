@@ -10,6 +10,10 @@ import org.springframework.util.StringUtils;
 
 public final class FunctionPermissionNormalizer {
   private static final String ALL_PERMISSION = "all";
+  private static final List<String> LEGACY_SCOPED_PERMISSION_PREFIXES = List.of(
+      "admin.product-data-center.attribute.",
+      "admin.product-data-center.attribute-value.");
+  private static final List<String> ATTRIBUTE_SCOPES = List.of("shared", "finished", "accessory");
   private static final Set<String> QUERY_SUFFIXES = Set.of("query", "查询");
   private static final Set<String> RESET_SUFFIXES = Set.of("reset", "重置");
 
@@ -35,7 +39,10 @@ public final class FunctionPermissionNormalizer {
     }
 
     LinkedHashSet<String> normalizedValues = new LinkedHashSet<>();
-    for (String permission : expandedValues) {
+    List<String> compatibleValues = expandedValues.stream()
+        .flatMap(FunctionPermissionNormalizer::expandLegacyScopedPermission)
+        .toList();
+    for (String permission : compatibleValues) {
       String suffix = suffix(permission);
       if (RESET_SUFFIXES.contains(suffix)) {
         continue;
@@ -55,6 +62,30 @@ public final class FunctionPermissionNormalizer {
 
   private static String suffix(String permission) {
     return permission.substring(permission.lastIndexOf('.') + 1);
+  }
+
+  private static Stream<String> expandLegacyScopedPermission(String permission) {
+    String legacyPermissionPrefix = LEGACY_SCOPED_PERMISSION_PREFIXES.stream()
+        .filter(permission::startsWith)
+        .findFirst()
+        .orElse(null);
+    if (legacyPermissionPrefix == null) {
+      return Stream.of(permission);
+    }
+
+    String legacyAction = permission.substring(legacyPermissionPrefix.length());
+    String action = switch (legacyAction) {
+      case "view", "query", "查询" -> "view";
+      case "create" -> "create";
+      case "edit", "toggle-status" -> "toggle-status";
+      case "delete" -> "delete";
+      default -> null;
+    };
+    if (action == null) {
+      return Stream.of(permission);
+    }
+    return ATTRIBUTE_SCOPES.stream()
+        .map(scope -> legacyPermissionPrefix + scope + "." + action);
   }
 
   private static String viewPermission(String permission) {

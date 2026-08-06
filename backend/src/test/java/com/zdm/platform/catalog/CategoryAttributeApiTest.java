@@ -50,6 +50,82 @@ class CategoryAttributeApiTest {
   }
 
   @Test
+  void productAttributeAndValueCreationPersistsCreatorAndCreationTime() throws Exception {
+    String creatorName = jdbcTemplate.queryForObject(
+        """
+        SELECT name
+        FROM employees
+        WHERE account_id = 1
+          AND status = 'enabled'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        String.class);
+    String suffix = Long.toString(System.nanoTime());
+    String token = TokenAuthenticationFilter.createAccountToken(1L);
+
+    MvcResult attributeResult = mockMvc.perform(post("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "scope":"shared",
+                  "name":"创建信息测试属性-%s",
+                  "valueType":"select",
+                  "attributeRole":"basic",
+                  "status":"enabled",
+                  "createdByName":"不应覆盖"
+                }
+                """.formatted(suffix)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
+        .andReturn();
+    String attributeId = com.jayway.jsonpath.JsonPath.read(
+        attributeResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    MvcResult valueResult = mockMvc.perform(post("/api/admin/product-attribute-values")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "attributeId":%s,
+                  "scope":"shared",
+                  "value":"创建信息测试属性值-%s",
+                  "code":"creator-metadata-%s",
+                  "status":"enabled",
+                  "createdByName":"不应覆盖"
+                }
+                """.formatted(attributeId, suffix, suffix)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
+        .andReturn();
+    String valueId = com.jayway.jsonpath.JsonPath.read(
+        valueResult.getResponse().getContentAsString(),
+        "$.data.id")
+        .toString();
+
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT created_by_name FROM product_attributes WHERE id = ?",
+        String.class,
+        Long.valueOf(attributeId))).isEqualTo(creatorName);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT created_by_name FROM product_attribute_values WHERE id = ?",
+        String.class,
+        Long.valueOf(valueId))).isEqualTo(creatorName);
+
+    mockMvc.perform(delete("/api/admin/product-attribute-values/{id}", valueId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", attributeId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void categoryAttributeCrudPersistsCreatorMetadataInDatabase() throws Exception {
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM category_attributes WHERE created_by_name IS NULL OR created_by_name = ''",
@@ -66,6 +142,14 @@ class CategoryAttributeApiTest {
         INSERT INTO product_attributes
           (id, scope, name, value_type, attribute_role, status)
         VALUES (9901, 'shared', '类目属性模板测试属性', 'select', 'basic', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attribute_values
+          (id, attribute_id, scope, value, code, status)
+        VALUES
+          (9901, 9901, 'shared', '测试选项一', 'category-template-option-1', 'enabled'),
+          (9902, 9901, 'shared', '测试选项二', 'category-template-option-2', 'disabled')
         """);
 
     String creatorName = jdbcTemplate.queryForObject(
@@ -130,8 +214,59 @@ class CategoryAttributeApiTest {
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", categoryAttributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先绑定选项值"));
+
+    mockMvc.perform(get("/api/admin/category-attributes/{id}/values", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].selected").value(false));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/values", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {"valueIds":[9902]}
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("只能绑定该属性下已启用的选项值"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/values", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {"valueIds":[9901]}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].selected").value(true));
+
+    mockMvc.perform(get("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == 9901)].templateCount")
+            .value(hasItem(1)));
+    mockMvc.perform(get("/api/admin/product-attribute-values")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(
+            "$.data[?(@.id == 9901)].useCount")
+            .value(hasItem(1)));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.publishStatus").value("published"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/values", categoryAttributeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
+            .contentType("application/json")
+            .content("""
+                {"valueIds":[9901]}
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先取消发布后再修改属性配置"));
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}", categoryAttributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L))
@@ -160,7 +295,10 @@ class CategoryAttributeApiTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath(
             "$.data[?(@.id == %s)].createdByName".formatted(categoryAttributeId))
-            .value(hasItem(creatorName)));
+            .value(hasItem(creatorName)))
+        .andExpect(jsonPath(
+            "$.data[?(@.id == %s)].optionCount".formatted(categoryAttributeId))
+            .value(hasItem(1)));
 
     mockMvc.perform(delete("/api/admin/category-attributes/{id}", categoryAttributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
@@ -332,6 +470,12 @@ class CategoryAttributeApiTest {
         """);
     jdbcTemplate.update(
         """
+        INSERT INTO product_attribute_values
+          (id, attribute_id, scope, value, code, status)
+        VALUES (9921, 9921, 'shared', '批量绑定选项', 'batch-binding-option', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
         INSERT INTO category_attributes
           (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
         VALUES (9920, 9920, 1, 0, 1, 'enabled', '其他绑定人')
@@ -432,6 +576,42 @@ class CategoryAttributeApiTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.attributeRole").value("product"));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", batchBindingId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先绑定选项值"));
+
+    mockMvc.perform(get("/api/admin/category-attributes/{id}/values", batchBindingId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].selected").value(false));
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/values", batchBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"valueIds":[9921]}
+                """))
+        .andExpect(status().isForbidden());
+
+    jdbcTemplate.update(
+        """
+        UPDATE roles
+        SET function_permissions = CONCAT(function_permissions,
+          ',admin.product-data-center.category-attribute-template.finished.bind-values')
+        WHERE id = ?
+        """,
+        roleId);
+
+    mockMvc.perform(put("/api/admin/category-attributes/{id}/values", batchBindingId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"valueIds":[9921]}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].selected").value(true));
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}/publish", batchBindingId)
             .header("Authorization", "Bearer " + token))

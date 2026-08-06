@@ -1,5 +1,6 @@
 package com.zdm.platform.catalog;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,11 @@ public class ProductAttribute extends BaseEntity {
   private String valueType;
 
   private String attributeRole;
+
+  private String createdByName;
+
+  @TableField(exist = false)
+  private Long templateCount;
 
   public String getScope() {
     return scope;
@@ -47,5 +53,21 @@ public class ProductAttribute extends BaseEntity {
 
   public void setAttributeRole(String attributeRole) {
     this.attributeRole = attributeRole;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
+  }
+
+  public Long getTemplateCount() {
+    return templateCount;
+  }
+
+  public void setTemplateCount(Long templateCount) {
+    this.templateCount = templateCount;
   }
 }
