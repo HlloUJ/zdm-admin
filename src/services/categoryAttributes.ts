@@ -10,6 +10,7 @@ export interface CategoryAttributeRecord {
   sortOrder?: number;
   status?: 'enabled' | 'disabled';
   publishStatus?: 'published' | 'unpublished';
+  optionCount?: number;
   createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -28,6 +29,14 @@ export interface CategoryAttributePayload {
 export interface CategoryAttributeBatchPayload {
   categoryId: number;
   attributeIds: number[];
+}
+
+export interface CategoryAttributeValueOption {
+  id: number;
+  value: string;
+  code: string;
+  status: 'enabled' | 'disabled';
+  selected: boolean;
 }
 
 export function listCategoryAttributes() {
@@ -66,5 +75,16 @@ export function unpublishCategoryAttribute(id: number) {
 export function deleteCategoryAttribute(id: number) {
   return request<boolean>(`/admin/category-attributes/${id}`, {
     method: 'DELETE',
+  });
+}
+
+export function listCategoryAttributeValueOptions(id: number) {
+  return request<CategoryAttributeValueOption[]>(`/admin/category-attributes/${id}/values`);
+}
+
+export function updateCategoryAttributeValueBindings(id: number, valueIds: number[]) {
+  return request<CategoryAttributeValueOption[]>(`/admin/category-attributes/${id}/values`, {
+    method: 'PUT',
+    body: JSON.stringify({ valueIds }),
   });
 }

@@ -1,5 +1,6 @@
 package com.zdm.platform.catalog;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,9 @@ public class CategoryAttribute extends BaseEntity {
   private Integer sortOrder;
   private String publishStatus;
   private String createdByName;
+
+  @TableField(exist = false)
+  private Long optionCount;
 
   public Long getCategoryId() {
     return categoryId;
@@ -81,5 +85,13 @@ public class CategoryAttribute extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getOptionCount() {
+    return optionCount;
+  }
+
+  public void setOptionCount(Long optionCount) {
+    this.optionCount = optionCount;
   }
 }

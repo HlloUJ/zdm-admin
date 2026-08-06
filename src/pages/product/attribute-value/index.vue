@@ -285,7 +285,7 @@ const toValue = (record: ProductAttributeValueRecord): Value => ({
   code: record.code,
   scope: record.scope,
   name: record.value,
-  useCount: 0,
+  useCount: record.useCount ?? 0,
   status: normalizeStatus(record.status),
   createdByName: record.createdByName || '-',
   createdAt: formatDateTime(record.createdAt),

@@ -7,6 +7,7 @@ export interface ProductAttributeValueRecord {
   scope: 'shared' | 'finished' | 'accessory';
   value: string;
   code: string;
+  useCount?: number;
   status?: 'enabled' | 'disabled';
   createdByName?: string;
   createdAt?: string;
@@ -36,7 +37,7 @@ export function createProductAttributeValue(payload: ProductAttributeValuePayloa
   });
 }
 
-export function updateProductAttributeValueStatus(id: number, status: 'enabled' | 'disabled') {
+export function updateProductAttributeValueStatus(id: number, status: ProductAttributeValuePayload['status']) {
   return request<ProductAttributeValueRecord>(`/admin/product-attribute-values/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),

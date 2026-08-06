@@ -85,6 +85,16 @@ const productAttributeTabActions = (scope: string): FunctionAction[] => [
   { label: '删除', value: `${scope}.delete` },
 ];
 
+const categoryAttributeTemplateTabActions = (scope: string): FunctionAction[] => [
+  { label: '绑定属性', value: `${scope}.create` },
+  { label: '属性角色', value: `${scope}.attribute-role` },
+  { label: '参与SKU组合', value: `${scope}.sku-combination` },
+  { label: '必填', value: `${scope}.required` },
+  { label: '绑定选项值', value: `${scope}.bind-values` },
+  { label: '发布/取消发布', value: `${scope}.toggle-publish` },
+  { label: '移除', value: `${scope}.delete` },
+];
+
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
   modules.map((module) => ({
     ...module,
@@ -193,23 +203,30 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
-        label: '类目属性模板',
+        label: '分类属性模板',
         value: 'admin.product-data-center.category-attribute-template.menu',
         direct: false,
         pages: [
           {
-            label: '类目属性模板页',
+            label: '分类属性模板页',
             value: 'admin.product-data-center.category-attribute-template',
-            actions: [
-              { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
-              { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
+            actions: [],
+            tabs: [
               {
-                label: '发布/取消发布',
-                value: 'admin.product-data-center.category-attribute-template.toggle-publish',
+                label: '成品现货模板',
+                value: 'admin.product-data-center.category-attribute-template.finished',
+                actions: categoryAttributeTemplateTabActions(
+                  'admin.product-data-center.category-attribute-template.finished',
+                ),
               },
-              { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
+              {
+                label: '配件模板',
+                value: 'admin.product-data-center.category-attribute-template.accessory',
+                actions: categoryAttributeTemplateTabActions(
+                  'admin.product-data-center.category-attribute-template.accessory',
+                ),
+              },
             ],
-            tabs: [],
           },
         ],
       },

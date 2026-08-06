@@ -5,6 +5,7 @@ import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,11 +21,14 @@ public class ProductAttributeValueService
     this.identityProvider = identityProvider;
   }
 
-  public List<ProductAttributeValue> listByScopes(Collection<String> scopes) {
+  public List<ProductAttributeValue> listWithUseCounts(Collection<String> scopes) {
     if (scopes.isEmpty()) {
       return List.of();
     }
-    return lambdaQuery().in(ProductAttributeValue::getScope, scopes).list();
+    Set<String> visibleScopes = Set.copyOf(scopes);
+    return baseMapper.selectWithUseCounts().stream()
+        .filter(value -> visibleScopes.contains(value.getScope()))
+        .toList();
   }
 
   @Transactional

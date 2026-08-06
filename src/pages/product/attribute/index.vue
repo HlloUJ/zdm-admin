@@ -211,7 +211,7 @@ const formRules: Record<string, FormRule[]> = {
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'name', title: '属性名称', width: 260, align: 'left' },
   { colKey: 'valueType', title: '值类型', width: 220, align: 'left' },
-  { colKey: 'templateCount', title: '引用类目模板', width: 190, align: 'left' },
+  { colKey: 'templateCount', title: '被引用次数', width: 190, align: 'left' },
   { colKey: 'status', title: '状态', width: 150, align: 'left' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },

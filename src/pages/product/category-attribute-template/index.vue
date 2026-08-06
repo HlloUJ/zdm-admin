@@ -6,12 +6,12 @@
       <AdminSideMenu />
 
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '类目属性模板']" :badge="pageTitle" />
+        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '分类属性模板']" :badge="pageTitle" />
 
         <AdminListLayout>
           <template #toolbar>
             <div class="scope-controls">
-              <t-tabs v-model="activeScope" :list="scopeTabs" />
+              <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
             </div>
           </template>
 
@@ -113,7 +113,7 @@
                   :data="pageData"
                   :columns="columns"
                   :loading="loading"
-                  :drag-sort="canEditBinding ? 'row-handler' : undefined"
+                  :drag-sort="canBindAttribute ? 'row-handler' : undefined"
                   :drag-sort-options="{ animation: 200 }"
                   hover
                   table-layout="fixed"
@@ -121,12 +121,23 @@
                 >
                   <template #drag><t-icon name="move" class="binding-drag-icon" title="拖拽排序" /></template>
                   <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
+                  <template #optionCount="{ row }">
+                    <t-link
+                      v-if="row.valueType === 'select'"
+                      theme="primary"
+                      hover="color"
+                      @click="openBoundValueView(row)"
+                    >
+                      {{ row.optionCount }}
+                    </t-link>
+                    <span v-else>-</span>
+                  </template>
                   <template #attributeRole="{ row }">
                     <t-select
                       class="attribute-role-select"
                       :model-value="row.attributeRole || undefined"
                       :loading="savingId === row.id && savingField === 'attributeRole'"
-                      :disabled="!canEditBinding || row.publishStatus === 'published'"
+                      :disabled="!canSetAttributeRole || row.publishStatus === 'published'"
                       placeholder="请选择"
                       size="small"
                       @change="changeAttributeRole(row, $event)"
@@ -139,7 +150,7 @@
                     <t-switch
                       :model-value="row.requiredFlag"
                       :loading="savingId === row.id && savingField === 'requiredFlag'"
-                      :disabled="!canEditBinding || row.publishStatus === 'published'"
+                      :disabled="!canSetRequired || row.publishStatus === 'published'"
                       @change="changeFlag(row, 'requiredFlag', $event)"
                     />
                   </template>
@@ -158,7 +169,7 @@
                         :model-value="row.skuFlag"
                         :loading="savingId === row.id && savingField === 'skuFlag'"
                         :disabled="
-                          !canEditBinding || row.attributeRole !== 'sales' || row.publishStatus === 'published'
+                          !canSetSkuCombination || row.attributeRole !== 'sales' || row.publishStatus === 'published'
                         "
                         @change="changeFlag(row, 'skuFlag', $event)"
                       />
@@ -177,6 +188,15 @@
                   <template #operation="{ row }">
                     <div class="table-actions">
                       <t-link
+                        v-if="row.valueType === 'select' && canBindOptionValues"
+                        theme="primary"
+                        hover="color"
+                        :disabled="row.publishStatus === 'published' || savingId !== null"
+                        @click="openValueBindingDialog(row)"
+                      >
+                        绑定选项值
+                      </t-link>
+                      <t-link
                         v-if="canTogglePublish"
                         :theme="row.publishStatus === 'published' ? 'warning' : 'success'"
                         hover="color"
@@ -193,7 +213,13 @@
                       >
                         移除
                       </t-link>
-                      <span v-if="!canTogglePublish && !canRemoveBinding">-</span>
+                      <span
+                        v-if="
+                          (row.valueType !== 'select' || !canBindOptionValues) && !canTogglePublish && !canRemoveBinding
+                        "
+                      >
+                        -
+                      </span>
                     </div>
                   </template>
                 </t-table>
@@ -240,6 +266,89 @@
         select-on-row-click
         table-layout="fixed"
       />
+    </AdminDialog>
+
+    <AdminDialog
+      v-model:visible="valueBindingDialogVisible"
+      header="绑定选项值"
+      width="760px"
+      confirm-btn="提交"
+      @confirm="submitValueBindings"
+      @close="closeValueBindingDialog"
+    >
+      <div class="bind-category-context">
+        <span class="bind-category-label">当前属性：</span>
+        <span>{{ valueBindingTarget?.name || '-' }}</span>
+      </div>
+      <div class="bind-list-toolbar">
+        <t-input v-model="valueSearchKeyword" clearable placeholder="请输入选项值" />
+        <span class="bind-list-count">已选择 {{ selectedValueIds.length }} 项</span>
+      </div>
+      <t-table
+        v-model:selected-row-keys="selectedValueIds"
+        class="bind-option-value-table"
+        row-key="id"
+        :columns="valueOptionColumns"
+        :data="filteredValueOptions"
+        :loading="valueOptionsLoading"
+        :max-height="360"
+        empty="暂无可绑定的选项值"
+        hover
+        select-on-row-click
+        table-layout="fixed"
+      >
+        <template #status="{ row }">
+          <t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">
+            {{ row.status === 'enabled' ? '启用' : '停用' }}
+          </t-tag>
+        </template>
+      </t-table>
+    </AdminDialog>
+
+    <AdminDialog
+      v-model:visible="boundValueViewVisible"
+      header="已绑定选项值"
+      width="620px"
+      confirm-btn="关闭"
+      :cancel-btn="null"
+      @confirm="closeBoundValueView"
+      @close="closeBoundValueView"
+    >
+      <div class="bind-category-context">
+        <span class="bind-category-label">当前属性：</span>
+        <span>{{ boundValueViewTarget?.name || '-' }}</span>
+      </div>
+      <div class="bind-list-toolbar">
+        <t-input v-model="boundValueSearchKeyword" clearable placeholder="请输入选项值" />
+        <span class="bind-list-count">已绑定 {{ boundValueOptions.length }} 项</span>
+      </div>
+      <t-table
+        class="bound-option-value-table"
+        row-key="id"
+        :columns="boundValueViewColumns"
+        :data="filteredBoundValueOptions"
+        :loading="boundValueViewLoading"
+        :max-height="360"
+        empty="暂无已绑定选项值"
+        hover
+        table-layout="fixed"
+      >
+        <template #status="{ row }">
+          <t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">
+            {{ row.status === 'enabled' ? '启用' : '停用' }}
+          </t-tag>
+        </template>
+        <template #operation="{ row }">
+          <t-link
+            v-if="canRemoveBoundValue"
+            theme="danger"
+            :disabled="boundValueRemovingId === row.id"
+            @click="removeBoundValue(row)"
+          >
+            移除
+          </t-link>
+        </template>
+      </t-table>
     </AdminDialog>
 
     <t-dialog
@@ -293,17 +402,21 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
   createCategoryAttributes,
   deleteCategoryAttribute,
+  listCategoryAttributeValueOptions,
   listCategoryAttributes,
   updateCategoryAttribute,
   publishCategoryAttribute,
   unpublishCategoryAttribute,
+  updateCategoryAttributeValueBindings,
   type CategoryAttributePayload,
   type CategoryAttributeRecord,
+  type CategoryAttributeValueOption,
 } from '@/services/categoryAttributes';
 import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
 import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
@@ -323,6 +436,7 @@ interface BindingRow {
   name: string;
   scope: ProductAttributeRecord['scope'];
   valueType: ProductAttributeRecord['valueType'];
+  optionCount: number;
   attributeRole: AttributeRole;
   requiredFlag: boolean;
   skuFlag: boolean;
@@ -352,14 +466,24 @@ interface BindAttributeRow {
 const activeScope = ref<Scope>('finished');
 const permissionPrefix = 'admin.product-data-center.category-attribute-template';
 const loginUser = computed(() => getLoginUser());
-const canBindAttribute = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.create`));
-const canEditBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.edit`));
-const canTogglePublish = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.toggle-publish`));
-const canRemoveBinding = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
-const scopeTabs = [
+const categoryAttributeScopeTabs: { label: string; value: Scope }[] = [
   { label: '成品现货模板', value: 'finished' },
   { label: '配件模板', value: 'accessory' },
 ];
+const { visibleTabs: scopeTabs, showTabRail: showScopeTabRail } = usePermissionTabs({
+  tabs: categoryAttributeScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) => hasPermission(loginUser.value, `${permissionPrefix}.${tab.value}.view`),
+});
+const hasTemplateAction = (action: string) =>
+  hasPermission(loginUser.value, `${permissionPrefix}.${activeScope.value}.${action}`);
+const canBindAttribute = computed(() => hasTemplateAction('create'));
+const canSetAttributeRole = computed(() => hasTemplateAction('attribute-role'));
+const canSetSkuCombination = computed(() => hasTemplateAction('sku-combination'));
+const canSetRequired = computed(() => hasTemplateAction('required'));
+const canBindOptionValues = computed(() => hasTemplateAction('bind-values'));
+const canTogglePublish = computed(() => hasTemplateAction('toggle-publish'));
+const canRemoveBinding = computed(() => hasTemplateAction('delete'));
 const pageTitle = computed(() => (activeScope.value === 'finished' ? '成品现货发布模板' : '配件发布模板'));
 const loading = ref(false);
 const savingId = ref<number | null>(null);
@@ -373,6 +497,19 @@ const categoryKeyword = ref('');
 const appliedCategoryKeyword = ref('');
 const bindDialogVisible = ref(false);
 const bindSearchKeyword = ref('');
+const valueBindingDialogVisible = ref(false);
+const valueBindingTarget = ref<BindingRow | null>(null);
+const valueOptions = ref<CategoryAttributeValueOption[]>([]);
+const valueSearchKeyword = ref('');
+const selectedValueIds = ref<number[]>([]);
+const valueOptionsLoading = ref(false);
+const valueBindingsSaving = ref(false);
+const boundValueViewVisible = ref(false);
+const boundValueViewTarget = ref<BindingRow | null>(null);
+const boundValueOptions = ref<CategoryAttributeValueOption[]>([]);
+const boundValueSearchKeyword = ref('');
+const boundValueViewLoading = ref(false);
+const boundValueRemovingId = ref<number | null>(null);
 const roleChangeConfirmVisible = ref(false);
 const roleChangeTarget = ref<BindingRow | null>(null);
 const roleChangeNextRole = ref<AttributeRole>('');
@@ -387,9 +524,10 @@ const pageSizeOptions = [10, 20, 50];
 const bindForm = reactive({ attributeIds: [] as number[] });
 
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(canEditBinding.value ? [{ colKey: 'drag', title: '', width: 44, align: 'center' as const }] : []),
+  ...(canBindAttribute.value ? [{ colKey: 'drag', title: '', width: 44, align: 'center' as const }] : []),
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 120 },
+  { colKey: 'optionCount', title: '选项数', width: 100, align: 'center' },
   { colKey: 'attributeRole', title: '属性角色', width: 140, align: 'center' },
   { colKey: 'skuFlag', title: '参与SKU组合', width: 160, align: 'center' },
   { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
@@ -397,7 +535,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'publishStatus', title: '发布', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 230, fixed: 'right' },
 ]);
 
 const bindColumns = computed<PrimaryTableCol<BindAttributeRow>[]>(() => [
@@ -410,6 +548,42 @@ const bindColumns = computed<PrimaryTableCol<BindAttributeRow>[]>(() => [
   { colKey: 'name', title: '属性名称', minWidth: 180, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 140 },
   { colKey: 'createdAt', title: '创建时间', width: 180 },
+]);
+
+const valueOptionColumns = computed<PrimaryTableCol<CategoryAttributeValueOption>[]>(() => [
+  {
+    colKey: 'row-select',
+    type: 'multiple',
+    width: 52,
+    disabled: ({ row }) => row.status !== 'enabled',
+  },
+  { colKey: 'value', title: '选项值', minWidth: 300, ellipsis: true },
+  { colKey: 'status', title: '状态', width: 90, align: 'center' },
+]);
+
+const filteredValueOptions = computed(() => {
+  const keyword = valueSearchKeyword.value.trim();
+  if (!keyword) return valueOptions.value;
+  return valueOptions.value.filter((option) => fuzzyIncludes(option.value, keyword));
+});
+
+const filteredBoundValueOptions = computed(() => {
+  const keyword = boundValueSearchKeyword.value.trim();
+  if (!keyword) return boundValueOptions.value;
+  return boundValueOptions.value.filter((option) => fuzzyIncludes(option.value, keyword));
+});
+
+const canRemoveBoundValue = computed(
+  () =>
+    canBindOptionValues.value &&
+    Boolean(boundValueViewTarget.value) &&
+    boundValueViewTarget.value?.publishStatus !== 'published',
+);
+
+const boundValueViewColumns = computed<PrimaryTableCol<CategoryAttributeValueOption>[]>(() => [
+  { colKey: 'value', title: '选项值', minWidth: 300, ellipsis: true },
+  { colKey: 'status', title: '状态', width: 90, align: 'center' },
+  ...(canRemoveBoundValue.value ? [{ colKey: 'operation', title: '操作', width: 90, align: 'center' as const }] : []),
 ]);
 
 const selectedCategoryPath = computed(() => {
@@ -454,6 +628,7 @@ const allBindingRows = computed<BindingRow[]>(() => {
         name: attribute?.name ?? `属性 #${item.attributeId}`,
         scope: attribute?.scope ?? 'shared',
         valueType: attribute?.valueType ?? 'text',
+        optionCount: item.optionCount ?? 0,
         attributeRole: (item.attributeRole === 'product' || item.attributeRole === 'sales'
           ? item.attributeRole
           : '') as AttributeRole,
@@ -603,6 +778,19 @@ function formatDateTime(value?: string) {
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function fuzzyIncludes(value: string, keyword: string) {
+  const source = value.toLowerCase().replace(/\s+/g, '');
+  const query = keyword.toLowerCase().replace(/\s+/g, '');
+  if (!query || source.includes(query)) return true;
+
+  let queryIndex = 0;
+  for (const character of source) {
+    if (character === query[queryIndex]) queryIndex += 1;
+    if (queryIndex === query.length) return true;
+  }
+  return false;
+}
+
 function toPayload(row: BindingRow): CategoryAttributePayload {
   return {
     categoryId: row.categoryId,
@@ -713,12 +901,109 @@ async function submitBind() {
   }
 }
 
+async function openValueBindingDialog(row: BindingRow) {
+  if (!canBindOptionValues.value || row.valueType !== 'select' || row.publishStatus === 'published') return;
+  valueBindingTarget.value = row;
+  valueSearchKeyword.value = '';
+  valueBindingDialogVisible.value = true;
+  valueOptionsLoading.value = true;
+  try {
+    valueOptions.value = await listCategoryAttributeValueOptions(row.id);
+    selectedValueIds.value = valueOptions.value
+      .filter((option) => option.selected && option.status === 'enabled')
+      .map((option) => option.id);
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '选项值加载失败');
+    closeValueBindingDialog();
+  } finally {
+    valueOptionsLoading.value = false;
+  }
+}
+
+function closeValueBindingDialog() {
+  valueBindingDialogVisible.value = false;
+  valueBindingTarget.value = null;
+  valueOptions.value = [];
+  valueSearchKeyword.value = '';
+  selectedValueIds.value = [];
+}
+
+async function openBoundValueView(row: BindingRow) {
+  if (row.valueType !== 'select') return;
+  boundValueViewTarget.value = row;
+  boundValueOptions.value = [];
+  boundValueSearchKeyword.value = '';
+  boundValueViewVisible.value = true;
+  boundValueViewLoading.value = true;
+  try {
+    const options = await listCategoryAttributeValueOptions(row.id);
+    boundValueOptions.value = options.filter((option) => option.selected && option.status === 'enabled');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '已绑定选项值加载失败');
+    closeBoundValueView();
+  } finally {
+    boundValueViewLoading.value = false;
+  }
+}
+
+function closeBoundValueView() {
+  boundValueViewVisible.value = false;
+  boundValueViewTarget.value = null;
+  boundValueOptions.value = [];
+  boundValueSearchKeyword.value = '';
+}
+
+async function removeBoundValue(row: CategoryAttributeValueOption) {
+  if (!canRemoveBoundValue.value || !boundValueViewTarget.value || boundValueRemovingId.value !== null) return;
+  boundValueRemovingId.value = row.id;
+  try {
+    const remainingValueIds = boundValueOptions.value
+      .filter((option) => option.id !== row.id)
+      .map((option) => option.id);
+    const updatedOptions = await updateCategoryAttributeValueBindings(boundValueViewTarget.value.id, remainingValueIds);
+    boundValueOptions.value = updatedOptions.filter((option) => option.selected && option.status === 'enabled');
+    const optionCount = boundValueOptions.value.length;
+    bindings.value = bindings.value.map((binding) =>
+      binding.id === boundValueViewTarget.value?.id ? { ...binding, optionCount } : binding,
+    );
+    MessagePlugin.success('选项值已移除');
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '选项值移除失败');
+  } finally {
+    boundValueRemovingId.value = null;
+  }
+}
+
+async function submitValueBindings() {
+  if (!canBindOptionValues.value || !valueBindingTarget.value || valueBindingsSaving.value) return;
+  valueBindingsSaving.value = true;
+  try {
+    const updatedOptions = await updateCategoryAttributeValueBindings(
+      valueBindingTarget.value.id,
+      selectedValueIds.value,
+    );
+    const optionCount = updatedOptions.filter((option) => option.selected && option.status === 'enabled').length;
+    bindings.value = bindings.value.map((binding) =>
+      binding.id === valueBindingTarget.value?.id ? { ...binding, optionCount } : binding,
+    );
+    MessagePlugin.success('选项值绑定成功');
+    closeValueBindingDialog();
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '选项值绑定失败');
+  } finally {
+    valueBindingsSaving.value = false;
+  }
+}
+
 async function persistRow(
   row: BindingRow,
   patch: Partial<BindingRow>,
   field: 'attributeRole' | 'requiredFlag' | 'skuFlag' | null = null,
 ) {
-  if (!canEditBinding.value) return;
+  if (field === 'attributeRole' && !canSetAttributeRole.value) return;
+  if (field === 'requiredFlag' && !canSetRequired.value) return;
+  if (field === 'skuFlag' && !canSetSkuCombination.value) return;
+  if (field === null && !canBindAttribute.value) return;
   savingId.value = row.id;
   savingField.value = field;
   const nextRow = { ...row, ...patch };
@@ -755,7 +1040,7 @@ function getCurrentBindingRow(row: BindingRow) {
 
 function changeAttributeRole(row: BindingRow, value: unknown) {
   const currentRow = getCurrentBindingRow(row);
-  if (!canEditBinding.value || currentRow.publishStatus === 'published') return;
+  if (!canSetAttributeRole.value || currentRow.publishStatus === 'published') return;
   const nextRole = getAttributeRoleValue(value);
   if (nextRole === currentRow.attributeRole) return;
   if (currentRow.skuFlag && nextRole !== 'sales') {
@@ -808,7 +1093,7 @@ function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: u
 }
 
 async function handleDragSort(context: { current: BindingRow; target: BindingRow }) {
-  if (!canEditBinding.value || savingId.value !== null) return;
+  if (!canBindAttribute.value || savingId.value !== null) return;
   const orderedRows = allBindingRows.value.map((item) => ({ ...item }));
   const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
   const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
@@ -853,11 +1138,23 @@ async function togglePublish(row: BindingRow) {
   }
 }
 
-function openPublishConfirm(row: BindingRow) {
+async function openPublishConfirm(row: BindingRow) {
   if (!canTogglePublish.value || savingId.value !== null) return;
   if (row.publishStatus === 'unpublished' && !row.attributeRole) {
     MessagePlugin.error('请先选择属性角色');
     return;
+  }
+  if (row.publishStatus === 'unpublished' && row.valueType === 'select') {
+    try {
+      const options = await listCategoryAttributeValueOptions(row.id);
+      if (!options.some((option) => option.selected && option.status === 'enabled')) {
+        MessagePlugin.error('请先绑定选项值');
+        return;
+      }
+    } catch (error) {
+      MessagePlugin.error(error instanceof Error ? error.message : '选项值加载失败');
+      return;
+    }
   }
   publishTarget.value = row;
   publishConfirmVisible.value = true;
@@ -899,6 +1196,8 @@ async function handleDelete() {
 }
 
 watch(activeScope, () => {
+  closeBoundValueView();
+  closeValueBindingDialog();
   selectedCategoryId.value = undefined;
   categoryKeyword.value = '';
   appliedCategoryKeyword.value = '';

@@ -35,7 +35,7 @@ public class ProductAttributeValueController {
   @GetMapping
   public ApiResponse<List<ProductAttributeValue>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listByScopes(visibleScopes()));
+    return ApiResponse.ok(service.listWithUseCounts(visibleScopes()));
   }
 
   @GetMapping("/attribute-options")
