@@ -351,9 +351,15 @@ class PlatformApiSmokeTest {
         """);
     jdbcTemplate.update(
         """
+        INSERT INTO product_attributes
+          (id, scope, name, value_type, attribute_role, status, created_by_name)
+        VALUES (9204, 'finished', '模板引用删除测试属性', 'select', 'basic', 'enabled', '韩健')
+        """);
+    jdbcTemplate.update(
+        """
         INSERT INTO category_attributes
           (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
-        VALUES (9203, 1, 0, 0, 1, 'enabled')
+        VALUES (9203, 9204, 0, 0, 1, 'enabled')
         """);
 
     mockMvc.perform(delete("/api/admin/product-categories/9203")

@@ -11,6 +11,7 @@ const fulfillJson = (route: Route, data: unknown) =>
   });
 
 async function installCategoryAttributeMocks(page: Page) {
+  const selectedValueIds = new Map<number, number[]>([[1, [101]]]);
   const categoryAttributes = [
     {
       id: 1,
@@ -22,6 +23,7 @@ async function installCategoryAttributeMocks(page: Page) {
       sortOrder: 1,
       status: 'enabled',
       publishStatus: 'unpublished',
+      optionCount: 1,
       createdByName: '韩健',
       createdAt: '2026-08-04T09:30:00',
     },
@@ -128,11 +130,24 @@ async function installCategoryAttributeMocks(page: Page) {
       sortOrder: categoryAttributes.length + index + 1,
       status: 'disabled',
       publishStatus: 'unpublished',
+      optionCount: 0,
       createdByName: '当前操作员',
       createdAt: '2026-08-04T10:00:00',
     }));
     categoryAttributes.push(...created);
     await fulfillJson(route, created);
+  });
+  await page.route(/\/api\/admin\/category-attributes\/\d+\/values$/, async (route) => {
+    const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON() as { valueIds: number[] };
+      selectedValueIds.set(id, payload.valueIds);
+    }
+    const selected = selectedValueIds.get(id) ?? [];
+    await fulfillJson(route, [
+      { id: 101, value: '岩板1', code: 'SLAB-1', status: 'enabled', selected: selected.includes(101) },
+      { id: 102, value: '实木2', code: 'WOOD-1', status: 'enabled', selected: selected.includes(102) },
+    ]);
   });
   await page.route(/\/api\/admin\/category-attributes\/\d+$/, async (route) => {
     const id = Number(new URL(route.request().url()).pathname.split('/').at(-1));
@@ -268,10 +283,10 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(materialRow).toBeVisible();
 
   const materialSwitches = materialRow.locator('.t-switch');
-  await materialSwitches.nth(0).click();
-  await expect(materialSwitches.nth(0)).toHaveClass(/t-is-loading/);
-  await expect(materialSwitches.nth(1)).not.toHaveClass(/t-is-loading/);
+  await materialSwitches.nth(1).click();
+  await expect(materialSwitches.nth(1)).toHaveClass(/t-is-loading/);
   await expect(materialSwitches.nth(0)).not.toHaveClass(/t-is-loading/);
+  await expect(materialSwitches.nth(1)).not.toHaveClass(/t-is-loading/);
 
   const toolbarPosition = await templatePanel.evaluate((panel) => {
     const filters = panel.querySelector<HTMLElement>('.filter-row')?.getBoundingClientRect();
@@ -316,8 +331,10 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(bindButton).toBeEnabled();
 
   const headers = main.getByRole('columnheader');
-  await expect(headers.nth(3)).toContainText('属性角色');
+  await expect(headers.nth(3)).toContainText('选项数');
+  await expect(headers.nth(4)).toContainText('属性角色');
   await expect(headers.nth(5)).toContainText('参与SKU组合');
+  await expect(headers.nth(6)).toContainText('必填');
   const skuHeaderLayout = await headers.nth(5).evaluate((header) => {
     const content = header.querySelector<HTMLElement>('.t-table__th-cell-inner') ?? header;
     const style = getComputedStyle(content);
@@ -329,17 +346,76 @@ test('selects the first leaf and manages bindings from the template list', async
   });
   expect(skuHeaderLayout.width).toBeGreaterThanOrEqual(156);
   expect(skuHeaderLayout.height).toBeLessThanOrEqual(skuHeaderLayout.lineHeight + 2);
-  await expect(headers.nth(6)).toContainText('状态');
-  await expect(headers.nth(7)).toContainText('发布');
-  await expect(headers.nth(8)).toContainText('绑定人');
-  await expect(headers.nth(9)).toContainText('绑定时间');
+  await expect(headers.nth(7)).toContainText('状态');
+  await expect(headers.nth(8)).toContainText('发布');
+  await expect(headers.nth(9)).toContainText('绑定人');
+  await expect(headers.nth(10)).toContainText('绑定时间');
   await expect(headers.getByText('排序', { exact: true })).toHaveCount(0);
-  const operationColumnWidth = await headers.nth(10).evaluate((header) => header.getBoundingClientRect().width);
-  expect(operationColumnWidth).toBeGreaterThanOrEqual(136);
-  expect(operationColumnWidth).toBeLessThanOrEqual(144);
+  const operationColumnWidth = await headers.nth(11).evaluate((header) => header.getBoundingClientRect().width);
+  expect(operationColumnWidth).toBeGreaterThanOrEqual(226);
+  expect(operationColumnWidth).toBeLessThanOrEqual(234);
   await expect(materialRow).toContainText('韩健');
+  await expect(materialRow.locator('td').nth(3)).toHaveText('1');
   const materialRoleInput = materialRow.locator('.attribute-role-select').getByRole('textbox');
   await expect(materialRoleInput).toHaveValue('商品属性');
+
+  await materialRow.locator('td').nth(3).getByText('1', { exact: true }).click();
+  const boundValueViewDialog = page.locator('.t-dialog').filter({ hasText: '已绑定选项值' });
+  await expect(boundValueViewDialog).toBeVisible();
+  await expect(boundValueViewDialog).toContainText('当前属性：材质');
+  await expect(boundValueViewDialog).toContainText('已绑定 1 项');
+  await expect(boundValueViewDialog.locator('tbody tr')).toHaveCount(1);
+  await expect(boundValueViewDialog.locator('tbody tr')).toContainText('岩板1');
+  await expect(boundValueViewDialog.getByRole('checkbox')).toHaveCount(0);
+  const boundValueSearchInput = boundValueViewDialog.getByPlaceholder('请输入选项值');
+  await boundValueSearchInput.fill('板1');
+  await expect(boundValueViewDialog.locator('tbody tr')).toHaveCount(1);
+  await boundValueSearchInput.fill('木');
+  await expect(boundValueViewDialog.getByText('暂无已绑定选项值', { exact: true })).toBeVisible();
+  await expect(boundValueViewDialog.getByText('岩板1', { exact: true })).toHaveCount(0);
+  await boundValueSearchInput.fill('');
+  const removeBoundValueRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith('/api/admin/category-attributes/1/values') && request.method() === 'PUT',
+  );
+  await boundValueViewDialog.getByText('移除', { exact: true }).click();
+  const removeBoundValueRequest = await removeBoundValueRequestPromise;
+  expect(removeBoundValueRequest.postDataJSON()).toEqual({ valueIds: [] });
+  await expect(boundValueViewDialog.getByText('暂无已绑定选项值', { exact: true })).toBeVisible();
+  await expect(materialRow.locator('td').nth(3)).toHaveText('0');
+  await boundValueViewDialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(boundValueViewDialog).toBeHidden();
+
+  await materialRow.getByText('绑定选项值', { exact: true }).click();
+  const valueBindingDialog = page.locator('.t-dialog').filter({ hasText: '当前属性：材质' });
+  await expect(valueBindingDialog).toBeVisible();
+  const valueRows = valueBindingDialog.locator('tbody tr');
+  await expect(valueRows).toHaveCount(2);
+  await expect(valueRows.filter({ hasText: '岩板' }).getByRole('checkbox')).not.toBeChecked();
+  await expect(valueRows.filter({ hasText: '玻璃' })).toHaveCount(0);
+  await expect(valueBindingDialog.getByRole('columnheader', { name: '选项编码' })).toHaveCount(0);
+  const valueSearchInput = valueBindingDialog.getByPlaceholder('请输入选项值');
+  await valueSearchInput.fill('木2');
+  await expect(valueRows).toHaveCount(1);
+  await expect(valueRows.filter({ hasText: '实木' })).toBeVisible();
+  await valueRows.filter({ hasText: '实木' }).locator('.t-checkbox').click();
+  await valueSearchInput.fill('');
+  await expect(valueRows).toHaveCount(2);
+  await expect(valueRows.filter({ hasText: '实木' }).getByRole('checkbox')).toBeChecked();
+  await valueRows.filter({ hasText: '岩板' }).locator('.t-checkbox').click();
+  await valueSearchInput.fill('1');
+  await expect(valueRows).toHaveCount(1);
+  await expect(valueRows.filter({ hasText: '岩板1' })).toBeVisible();
+  await valueSearchInput.fill('');
+  const valueBindingRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith('/api/admin/category-attributes/1/values') && request.method() === 'PUT',
+  );
+  await valueBindingDialog.getByRole('button', { name: '提交', exact: true }).click();
+  const valueBindingRequest = await valueBindingRequestPromise;
+  const valueBindingPayload = valueBindingRequest.postDataJSON() as { valueIds: number[] };
+  expect(valueBindingPayload.valueIds).toHaveLength(2);
+  expect(valueBindingPayload.valueIds).toEqual(expect.arrayContaining([101, 102]));
+  await expect(valueBindingDialog).toBeHidden();
+  await expect(materialRow.locator('td').nth(3)).toHaveText('2');
 
   let publishRequestCount = 0;
   await page.route('**/api/admin/category-attributes/1/publish', async (route) => {
@@ -369,7 +445,7 @@ test('selects the first leaf and manages bindings from the template list', async
   const operationButtonTops = await materialRow
     .locator('.table-actions .t-link')
     .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().top));
-  expect(operationButtonTops).toHaveLength(2);
+  expect(operationButtonTops).toHaveLength(3);
   expect(Math.max(...operationButtonTops) - Math.min(...operationButtonTops)).toBeLessThanOrEqual(1);
 
   let unpublishRequestCount = 0;
@@ -417,13 +493,14 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(colorRow.getByText('启用', { exact: true })).toHaveCount(1);
   await expect(colorRow.getByText('未发布', { exact: true })).toHaveCount(1);
   await expect(sizeRow).toContainText('当前操作员');
+  await expect(sizeRow.locator('td').nth(3)).toHaveText('-');
   await expect(sizeRow.getByText('启用', { exact: true })).toHaveCount(1);
   await expect(sizeRow.getByText('未发布', { exact: true })).toHaveCount(1);
   const colorRoleSelect = colorRow.locator('.attribute-role-select');
   const sizeRoleSelect = sizeRow.locator('.attribute-role-select');
   const colorRoleInput = colorRoleSelect.getByRole('textbox');
   const sizeRoleInput = sizeRoleSelect.getByRole('textbox');
-  const sizeSkuSwitch = sizeRow.locator('.t-switch').nth(1);
+  const sizeSkuSwitch = sizeRow.locator('.t-switch').nth(0);
   await expect(colorRoleInput).toHaveValue('');
   await expect(sizeRoleInput).toHaveValue('');
   await expect(sizeSkuSwitch).toHaveClass(/t-is-disabled/);
@@ -548,11 +625,33 @@ test('每个类目最多只能开启4个SKU组合属性', async ({ page }) => {
 
   await page.goto('/category-attribute-template');
   const fifthRow = page.getByRole('main').locator('tbody tr').filter({ hasText: 'SKU属性5' });
-  await expect(fifthRow.locator('.t-switch').nth(1)).not.toHaveClass(/t-is-checked/);
-  await fifthRow.locator('.t-switch').nth(1).click();
+  await expect(fifthRow.locator('.t-switch').nth(0)).not.toHaveClass(/t-is-checked/);
+  await fifthRow.locator('.t-switch').nth(0).click();
   await expect(page.locator('.t-message').filter({ hasText: '参与SKU组合的属性最多只能开启4个' })).toBeVisible();
-  await expect(fifthRow.locator('.t-switch').nth(1)).not.toHaveClass(/t-is-checked/);
+  await expect(fifthRow.locator('.t-switch').nth(0)).not.toHaveClass(/t-is-checked/);
   expect(updateRequestCount).toBe(0);
+});
+
+test('标准选项属性未绑定选项值时禁止发布', async ({ page }) => {
+  await page.route('**/api/admin/category-attributes/1/values', (route) =>
+    fulfillJson(route, [
+      { id: 101, value: '岩板', code: 'SLAB', status: 'enabled', selected: false },
+      { id: 102, value: '实木', code: 'WOOD', status: 'enabled', selected: false },
+    ]),
+  );
+  let publishRequestCount = 0;
+  await page.route('**/api/admin/category-attributes/1/publish', async (route) => {
+    publishRequestCount += 1;
+    await route.fallback();
+  });
+
+  await page.goto('/category-attribute-template');
+  const row = page.getByRole('main').locator('tbody tr').filter({ hasText: '材质' }).first();
+  await row.getByText('发布', { exact: true }).click();
+
+  await expect(page.locator('.t-message').filter({ hasText: '请先绑定选项值' })).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '是否发布属性【材质】？' })).toHaveCount(0);
+  expect(publishRequestCount).toBe(0);
 });
 
 test('keeps template data visible while hiding ungranted binding operations', async ({ page }) => {
@@ -564,7 +663,7 @@ test('keeps template data visible while hiding ungranted binding operations', as
         name: '模板查看员',
         phone: '15926620020',
         roles: ['CATEGORY_ATTRIBUTE_VIEWER'],
-        permissions: ['admin.product-data-center.category-attribute-template.view'],
+        permissions: ['admin.product-data-center.category-attribute-template.finished.view'],
         dataPermission: 'self',
       }),
     );
@@ -572,6 +671,7 @@ test('keeps template data visible while hiding ungranted binding operations', as
 
   await page.goto('/category-attribute-template');
   const main = page.getByRole('main');
+  await expect(main.locator('.scope-controls .t-tabs')).toHaveCount(0);
   await expect(main.getByRole('button', { name: '岩板茶几', exact: true })).toHaveClass(/active/);
 
   const row = main.locator('tbody tr').filter({ hasText: '材质' }).first();
@@ -589,5 +689,32 @@ test('keeps template data visible while hiding ungranted binding operations', as
   await expect(row.getByText('取消发布', { exact: true })).toHaveCount(0);
   await expect(row.getByText('移除', { exact: true })).toHaveCount(0);
   await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('绑定选项值', { exact: true })).toHaveCount(0);
   await expect(row.locator('.table-actions')).toHaveText('-');
+});
+
+test('enables only the granted category attribute field control', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 21,
+        name: '模板属性角色管理员',
+        phone: '15926620021',
+        roles: ['CATEGORY_ATTRIBUTE_ROLE_EDITOR'],
+        permissions: [
+          'admin.product-data-center.category-attribute-template.finished.view',
+          'admin.product-data-center.category-attribute-template.finished.attribute-role',
+        ],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/category-attribute-template');
+  const row = page.getByRole('main').locator('tbody tr').filter({ hasText: '材质' }).first();
+  await expect(row.locator('.attribute-role-select').getByRole('textbox')).toBeEnabled();
+  await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
+  await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
+  await expect(row.getByText('绑定选项值', { exact: true })).toHaveCount(0);
 });

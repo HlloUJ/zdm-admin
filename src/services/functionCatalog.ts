@@ -1,3 +1,5 @@
+import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
+
 export type TerminalType = 'store' | 'supplier';
 
 export interface FunctionAction {
@@ -77,6 +79,22 @@ const productCategoryTabActions = (scope: string): FunctionAction[] => [
   { label: '删除', value: `${scope}.delete` },
 ];
 
+const productAttributeTabActions = (scope: string): FunctionAction[] => [
+  { label: '新增', value: `${scope}.create` },
+  { label: '停用/启用', value: `${scope}.toggle-status` },
+  { label: '删除', value: `${scope}.delete` },
+];
+
+const categoryAttributeTemplateTabActions = (scope: string): FunctionAction[] => [
+  { label: '绑定属性', value: `${scope}.create` },
+  { label: '属性角色', value: `${scope}.attribute-role` },
+  { label: '参与SKU组合', value: `${scope}.sku-combination` },
+  { label: '必填', value: `${scope}.required` },
+  { label: '绑定选项值', value: `${scope}.bind-values` },
+  { label: '发布/取消发布', value: `${scope}.toggle-publish` },
+  { label: '移除', value: `${scope}.delete` },
+];
+
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
   modules.map((module) => ({
     ...module,
@@ -127,23 +145,88 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
-        label: '类目属性模板',
+        label: '属性库管理',
+        value: 'admin.product-data-center.attribute.menu',
+        direct: false,
+        pages: [
+          {
+            label: '属性库管理页',
+            value: 'admin.product-data-center.attribute',
+            actions: [],
+            tabs: [
+              {
+                label: '共享基础属性',
+                value: 'admin.product-data-center.attribute.shared',
+                actions: productAttributeTabActions('admin.product-data-center.attribute.shared'),
+              },
+              {
+                label: '成品现货专属属性',
+                value: 'admin.product-data-center.attribute.finished',
+                actions: productAttributeTabActions('admin.product-data-center.attribute.finished'),
+              },
+              {
+                label: '配件专属属性',
+                value: 'admin.product-data-center.attribute.accessory',
+                actions: productAttributeTabActions('admin.product-data-center.attribute.accessory'),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        label: '属性值管理',
+        value: 'admin.product-data-center.attribute-value.menu',
+        direct: false,
+        pages: [
+          {
+            label: '属性值管理页',
+            value: 'admin.product-data-center.attribute-value',
+            actions: [],
+            tabs: [
+              {
+                label: '共享基础属性值',
+                value: 'admin.product-data-center.attribute-value.shared',
+                actions: productAttributeTabActions('admin.product-data-center.attribute-value.shared'),
+              },
+              {
+                label: '成品现货专属值',
+                value: 'admin.product-data-center.attribute-value.finished',
+                actions: productAttributeTabActions('admin.product-data-center.attribute-value.finished'),
+              },
+              {
+                label: '配件专属值',
+                value: 'admin.product-data-center.attribute-value.accessory',
+                actions: productAttributeTabActions('admin.product-data-center.attribute-value.accessory'),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        label: '分类属性模板',
         value: 'admin.product-data-center.category-attribute-template.menu',
         direct: false,
         pages: [
           {
-            label: '类目属性模板页',
+            label: '分类属性模板页',
             value: 'admin.product-data-center.category-attribute-template',
-            actions: [
-              { label: '绑定属性', value: 'admin.product-data-center.category-attribute-template.create' },
-              { label: '编辑', value: 'admin.product-data-center.category-attribute-template.edit' },
+            actions: [],
+            tabs: [
               {
-                label: '发布/取消发布',
-                value: 'admin.product-data-center.category-attribute-template.toggle-publish',
+                label: '成品现货模板',
+                value: 'admin.product-data-center.category-attribute-template.finished',
+                actions: categoryAttributeTemplateTabActions(
+                  'admin.product-data-center.category-attribute-template.finished',
+                ),
               },
-              { label: '移除', value: 'admin.product-data-center.category-attribute-template.delete' },
+              {
+                label: '配件模板',
+                value: 'admin.product-data-center.category-attribute-template.accessory',
+                actions: categoryAttributeTemplateTabActions(
+                  'admin.product-data-center.category-attribute-template.accessory',
+                ),
+              },
             ],
-            tabs: [],
           },
         ],
       },
@@ -371,7 +454,10 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
   const catalogValues = getFunctionCatalogPermissionValues(modules);
   const allowedValues = new Set(catalogValues);
   const selectedValues = new Set(
-    permissions.map(toCanonicalPermission).filter((permission) => permission && allowedValues.has(permission)),
+    permissions
+      .flatMap(expandLegacyScopedPermission)
+      .map(toCanonicalPermission)
+      .filter((permission) => permission && allowedValues.has(permission)),
   );
 
   modules.flatMap(collectFunctionCatalogRows).forEach((row) => {

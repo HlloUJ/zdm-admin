@@ -1,4 +1,5 @@
 import { request } from './http';
+import type { ProductAttributeRecord } from './productAttributes';
 
 export interface ProductAttributeValueRecord {
   id: number;
@@ -6,7 +7,9 @@ export interface ProductAttributeValueRecord {
   scope: 'shared' | 'finished' | 'accessory';
   value: string;
   code: string;
+  useCount?: number;
   status?: 'enabled' | 'disabled';
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -23,6 +26,10 @@ export function listProductAttributeValues() {
   return request<ProductAttributeValueRecord[]>('/admin/product-attribute-values');
 }
 
+export function listProductAttributeValueOptions() {
+  return request<ProductAttributeRecord[]>('/admin/product-attribute-values/attribute-options');
+}
+
 export function createProductAttributeValue(payload: ProductAttributeValuePayload) {
   return request<ProductAttributeValueRecord>('/admin/product-attribute-values', {
     method: 'POST',
@@ -30,10 +37,10 @@ export function createProductAttributeValue(payload: ProductAttributeValuePayloa
   });
 }
 
-export function updateProductAttributeValue(id: number, payload: ProductAttributeValuePayload) {
-  return request<ProductAttributeValueRecord>(`/admin/product-attribute-values/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
+export function updateProductAttributeValueStatus(id: number, status: ProductAttributeValuePayload['status']) {
+  return request<ProductAttributeValueRecord>(`/admin/product-attribute-values/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
 }
 

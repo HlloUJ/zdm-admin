@@ -14,7 +14,7 @@
           >用于维护各属性的可选值。适用于枚举 / 下拉类型属性；停用后不再允许新商品选择。</t-alert
         >
         <section v-if="!lockedScope" class="table-card source-card">
-          <t-tabs v-model="activeScope" :list="scopeTabs" />
+          <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
           <div class="source-caption">{{ sourceDescription }}</div>
         </section>
         <section class="filter-card">
@@ -45,7 +45,7 @@
         </section>
         <section class="table-card">
           <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreate"
+            <t-button v-if="canCreateValue" theme="primary" @click="openCreate"
               ><template #icon><t-icon name="add" /></template>新增</t-button
             >
           </div>
@@ -58,11 +58,13 @@
             ><template #operation="{ row }"
               ><div class="table-actions">
                 <t-link
+                  v-if="canToggleValueStatus"
                   :theme="row.status === 'enabled' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
                   >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
-                ><t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                ><t-link v-if="canDeleteValue" theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link
+                ><span v-if="!canToggleValueStatus && !canDeleteValue" class="table-action-placeholder">-</span>
               </div></template
             ></t-table
           ><AdminPagination
@@ -119,13 +121,15 @@ import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminPagination } from '@/components/foundation';
-import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
 import {
   createProductAttributeValue,
   deleteProductAttributeValue,
+  listProductAttributeValueOptions,
   listProductAttributeValues,
-  updateProductAttributeValue,
-  type ProductAttributeValuePayload,
+  updateProductAttributeValueStatus,
   type ProductAttributeValueRecord,
 } from '@/services/productAttributeValues';
 
@@ -145,9 +149,13 @@ interface Value {
   name: string;
   useCount: number;
   status: Status;
+  createdByName: string;
+  createdAt: string;
 }
 
 const route = useRoute();
+const attributeValuePermissionPrefix = 'admin.product-data-center.attribute-value';
+const loginUser = computed(() => getLoginUser());
 const attributeOptions = ref<AttributeOption[]>([]);
 const attributeName = computed(() => Object.fromEntries(attributeOptions.value.map((item) => [item.code, item.name])));
 const initialAttribute = typeof route.query.attribute === 'string' ? route.query.attribute : '';
@@ -160,11 +168,25 @@ const activeScope = ref<Scope>(initialScope);
 const lockedScope = computed(
   () => route.query.scope === 'finished' || route.query.scope === 'accessory' || route.query.scope === 'shared',
 );
-const scopeTabs = [
+const attributeValueScopeTabs: { label: string; value: Scope }[] = [
   { label: '共享基础属性值', value: 'shared' },
   { label: '成品现货专属值', value: 'finished' },
   { label: '配件专属值', value: 'accessory' },
 ];
+const {
+  visibleTabs: scopeTabs,
+  showTabRail: showScopeTabRail,
+  resolveAccessibleTab: resolveAccessibleScope,
+} = usePermissionTabs({
+  tabs: attributeValueScopeTabs,
+  activeTab: activeScope,
+  canAccess: (tab) => hasPermission(loginUser.value, `${attributeValuePermissionPrefix}.${tab.value}.view`),
+});
+const hasValueAction = (action: string) =>
+  hasPermission(loginUser.value, `${attributeValuePermissionPrefix}.${activeScope.value}.${action}`);
+const canCreateValue = computed(() => hasValueAction('create'));
+const canToggleValueStatus = computed(() => hasValueAction('toggle-status'));
+const canDeleteValue = computed(() => hasValueAction('delete'));
 const sourceDescription = computed(
   () =>
     ({
@@ -200,6 +222,8 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'attribute', title: '所属属性', width: 160, align: 'left' },
   { colKey: 'useCount', title: '被引用次数', width: 150, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
 ];
 const filteredData = computed(() =>
@@ -217,7 +241,14 @@ const pageData = computed(() =>
 const totalCount = computed(() => filteredData.value.length);
 const normalizeStatus = (status?: ProductAttributeValueRecord['status']): Status =>
   status === 'disabled' ? 'disabled' : 'enabled';
-const toAttributeOption = (record: ProductAttributeRecord): AttributeOption => ({
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+  const pad = (number: number) => number.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+const toAttributeOption = (record: { id: number; name: string; scope: Scope }): AttributeOption => ({
   code: String(record.id),
   name: record.name,
   scope: record.scope,
@@ -228,22 +259,17 @@ const toValue = (record: ProductAttributeValueRecord): Value => ({
   code: record.code,
   scope: record.scope,
   name: record.value,
-  useCount: 0,
+  useCount: record.useCount ?? 0,
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName || '-',
+  createdAt: formatDateTime(record.createdAt),
 });
 const createValueCode = (attributeId: string, name: string) =>
   `attr-value-${attributeId}-${name.trim().length}-${Date.now()}`;
-const toValuePayload = (item: Value): ProductAttributeValuePayload => ({
-  attributeId: Number(item.attribute),
-  scope: item.scope,
-  value: item.name,
-  code: item.code,
-  status: item.status,
-});
 const loadValues = async () => {
   loading.value = true;
   try {
-    const [attributes, values] = await Promise.all([listProductAttributes(), listProductAttributeValues()]);
+    const [attributes, values] = await Promise.all([listProductAttributeValueOptions(), listProductAttributeValues()]);
     attributeOptions.value = attributes.map(toAttributeOption);
     data.value = values.map(toValue);
     if (!form.attribute) syncFormAttribute();
@@ -277,6 +303,7 @@ const syncFormAttribute = () => {
   form.attribute = formAttributes.value[0]?.code ?? '';
 };
 const openCreate = () => {
+  if (!canCreateValue.value) return;
   form.scope = activeScope.value;
   syncFormAttribute();
   form.name = '';
@@ -316,11 +343,13 @@ const submit = async () => {
   }
 };
 const openStatusConfirm = (row: Value) => {
+  if (!canToggleValueStatus.value) return;
   confirmTarget.value = row;
   confirmType.value = row.status === 'enabled' ? 'disable' : 'enable';
   confirmDialogVisible.value = true;
 };
 const openDeleteConfirm = (row: Value) => {
+  if (!canDeleteValue.value) return;
   confirmTarget.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;
@@ -343,12 +372,9 @@ const handleConfirm = async () => {
       ensureCurrentPage();
       MessagePlugin.success('删除成功');
     } else {
-      const updated = await updateProductAttributeValue(
+      const updated = await updateProductAttributeValueStatus(
         confirmTarget.value.id,
-        toValuePayload({
-          ...confirmTarget.value,
-          status: confirmType.value === 'enable' ? 'enabled' : 'disabled',
-        }),
+        confirmType.value === 'enable' ? 'enabled' : 'disabled',
       );
       const targetIndex = data.value.findIndex((item) => item.id === confirmTarget.value?.id);
       if (targetIndex !== -1) {
@@ -364,7 +390,7 @@ const handleConfirm = async () => {
 watch(
   () => route.query.scope,
   (scope) => {
-    activeScope.value = resolveScope(scope);
+    activeScope.value = resolveAccessibleScope(resolveScope(scope)) ?? activeScope.value;
     searchForm.attribute = '';
     applied.attribute = '';
     pagination.current = 1;
@@ -486,6 +512,9 @@ onMounted(loadValues);
 }
 .table-actions {
   gap: 12px;
+}
+.table-action-placeholder {
+  color: var(--td-text-color-placeholder);
 }
 :deep(.t-table th),
 :deep(.t-table td) {
