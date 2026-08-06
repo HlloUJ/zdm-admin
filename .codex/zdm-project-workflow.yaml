@@ -1,0 +1,88 @@
+version: 1
+
+project:
+  platform: zdm
+  id: zdm-admin
+  name: 装点猫管理后台
+  repository_mode: independent
+
+git:
+  remote: origin
+  main_branch: main
+  task_branch_prefix: codex/
+
+worktrees:
+  paths_relative_to: primary_worktree
+  task_parent: ../管理后台-worktrees
+
+integration:
+  enabled: true
+  branch: codex/integration-current
+  worktree: ../管理后台-worktrees/integration-current
+  reconcile_main: merge
+  commands:
+    start:
+      cwd: integration_worktree
+      run: npm run integration:dev
+    status:
+      cwd: integration_worktree
+      run: npm run integration:status
+    verify:
+      cwd: integration_worktree
+      run: npm run integration:verify
+
+preview:
+  commands:
+    start:
+      cwd: integration_worktree
+      run: 'npm run dev:task -- --worktree "{task_worktree}"'
+    temporary:
+      cwd: integration_worktree
+      run: 'npm run dev:task -- --worktree "{task_worktree}" --temporary'
+    database_risk:
+      cwd: integration_worktree
+      run: 'npm run dev:task -- --worktree "{task_worktree}" --database-risk'
+    stop:
+      cwd: integration_worktree
+      run: 'npm run dev:task:stop -- --worktree "{task_worktree}"'
+    handoff:
+      cwd: integration_worktree
+      run: 'npm run dev:task:handoff -- --worktree "{task_worktree}"'
+  urls:
+    current_task: http://127.0.0.1:5175
+    integration: http://127.0.0.1:5173
+    playwright: http://127.0.0.1:5174
+  frontend_ports:
+    current_task: 5175
+    temporary_range: 5176-5199
+    playwright: 5174
+  backend:
+    integration_port: 8080
+    task_port_range: 8081-8099
+    routing:
+      frontend_only: integration
+      backend_api_migration_or_runtime: task
+
+database:
+  strategy: shared-integration
+  name: zdm_admin
+  migration: flyway
+  safety:
+    create_task_database: false
+    launcher_enforced: true
+    backup_for:
+      - flyway
+      - database-risk
+    exclusive_high_risk_writer: true
+    handoff_after_integration: true
+    destructive_restore_requires_confirmation: true
+
+verification:
+  changed: 'npm run check:changed -- {changed_files}'
+  full: npm run verify:local
+  integration: npm run integration:verify
+
+delivery:
+  sync_integration:
+    cwd: integration_worktree
+    run: 'npm run git:integration:sync -- --task "{task_branch}"'
