@@ -1485,7 +1485,78 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void employeeInvitePersistsCurrentIdentityAsCreator() throws Exception {
+    long accountId = 9051L;
+    long employeeId = 9051L;
+    long roleId = 9051L;
+
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629051",
+        "邀请创建员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
+           data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '邀请创建员', '15926629051', 'enabled', ?, 'all', '韩健')
+        """,
+        employeeId,
+        accountId,
+        String.valueOf(roleId));
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '员工邀请创建测试角色', 'EMPLOYEE_INVITE_CREATOR_TEST', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.permission-management.employee-management.create', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    MvcResult inviteResult = mockMvc.perform(post("/api/admin/employee-invites")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.token").isString())
+        .andReturn();
+
+    String token = com.jayway.jsonpath.JsonPath.read(
+        inviteResult.getResponse().getContentAsString(),
+        "$.data.token");
+    Long createdByAccountId = jdbcTemplate.queryForObject(
+        "SELECT created_by_account_id FROM employee_invites WHERE token = ?",
+        Long.class,
+        token);
+    String createdByName = jdbcTemplate.queryForObject(
+        "SELECT created_by_name FROM employee_invites WHERE token = ?",
+        String.class,
+        token);
+
+    assertThat(createdByAccountId).isEqualTo(accountId);
+    assertThat(createdByName).isEqualTo("邀请创建员");
+  }
+
+  @Test
   void employeeInviteRegistrationRequiresAdminActivation() throws Exception {
+    String creatorName = jdbcTemplate.queryForObject(
+        "SELECT name FROM employees WHERE account_id = 1 AND status = 'enabled' LIMIT 1",
+        String.class);
     MvcResult inviteResult = mockMvc.perform(post("/api/admin/employee-invites")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
@@ -1550,13 +1621,13 @@ class PlatformApiSmokeTest {
     mockMvc.perform(get("/api/admin/employees")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.phone == '15926629999')].createdByName").value(hasItem("韩健")));
+        .andExpect(jsonPath("$.data[?(@.phone == '15926629999')].createdByName").value(hasItem(creatorName)));
 
     String createdByName = jdbcTemplate.queryForObject(
         "SELECT created_by_name FROM employees WHERE id = ?",
         String.class,
         Long.valueOf(employeeId));
-    assertThat(createdByName).isEqualTo("韩健");
+    assertThat(createdByName).isEqualTo(creatorName);
 
     mockMvc.perform(get("/api/open/employee-invites/{token}", token))
         .andExpect(status().isBadRequest())
