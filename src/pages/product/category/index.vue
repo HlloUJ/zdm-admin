@@ -6,131 +6,126 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <t-breadcrumb
-            ><t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item
-            ><t-breadcrumb-item>商品分类管理</t-breadcrumb-item></t-breadcrumb
-          >
-          <t-tag theme="primary" variant="light">最多支持 4 级分类</t-tag>
-        </header>
-
-        <t-tabs v-if="!lockedScope && showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
-
-        <section class="filter-card">
-          <t-form :data="searchForm" label-width="84px" colon>
-            <div class="filter-row">
-              <div class="filter-fields">
-                <t-form-item label="分类名称" name="keyword">
-                  <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
-                </t-form-item>
-                <t-form-item label="分类状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="全部">
-                    <t-option label="启用" value="enabled" />
-                    <t-option label="停用" value="disabled" />
-                  </t-select>
-                </t-form-item>
+        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '商品分类管理']" :badge="pageTitle" />
+        <t-alert v-if="tipVisible" theme="info" class="page-tip" close-btn @close="tipVisible = false">
+          商品分类最多支持 4 级；已关联商品的分类不支持删除；停用后不可用于新商品发布，历史商品保留原分类。
+        </t-alert>
+        <AdminListLayout>
+          <template #toolbar>
+            <div class="list-controls">
+              <div v-if="!lockedScope" class="scope-controls">
+                <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
+                <div class="source-caption">通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</div>
               </div>
-              <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
-                  <template #icon><t-icon name="search" /></template>
-                  查询
-                </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
-                  <template #icon><t-icon name="refresh" /></template>
-                  重置
+              <t-form :data="searchForm" label-width="84px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="分类名称" name="keyword">
+                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
+                    </t-form-item>
+                    <t-form-item label="分类状态" name="status">
+                      <t-select v-model="searchForm.status" clearable placeholder="全部">
+                        <t-option label="启用" value="enabled" />
+                        <t-option label="停用" value="disabled" />
+                      </t-select>
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="handleSearch">
+                      <template #icon><t-icon name="search" /></template>
+                      查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="handleReset">
+                      <template #icon><t-icon name="refresh" /></template>
+                      重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div class="table-toolbar">
+                <t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()">
+                  <template #icon><t-icon name="add" /></template>
+                  新增一级分类
                 </t-button>
               </div>
             </div>
-          </t-form>
-        </section>
-
-        <section class="category-card">
-          <div class="category-toolbar">
-            <div>
-              <h2>{{ activeScope === 'finished' ? '成品现货分类' : '配件分类' }}</h2>
-              <p>通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</p>
-            </div>
-            <t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()"
-              ><template #icon><t-icon name="add" /></template>新增一级分类</t-button
+          </template>
+          <template #table>
+            <t-table
+              v-if="displayRows.length"
+              row-key="key"
+              :data="displayRows"
+              :columns="columns"
+              :loading="loading"
+              hover
+              table-layout="fixed"
             >
-          </div>
-
-          <t-alert v-if="tipVisible" theme="info" class="category-tip" close-btn @close="tipVisible = false">
-            已关联商品的分类不支持删除；停用后不可用于新商品发布，历史商品保留原分类。
-          </t-alert>
-
-          <t-table
-            v-if="displayRows.length"
-            row-key="key"
-            :data="displayRows"
-            :columns="columns"
-            :loading="loading"
-            hover
-            table-layout="fixed"
-          >
-            <template #name="{ row }">
-              <div :class="['category-name-cell', `level-${row.level}`]">
-                <t-button
-                  v-if="row.node.children.length"
-                  class="tree-toggle"
-                  variant="text"
-                  shape="square"
-                  size="small"
-                  :aria-label="isExpanded(row.node) ? '收起下级分类' : '展开下级分类'"
-                  @click.stop="toggleExpanded(row.node)"
-                >
-                  <template #icon><t-icon :name="isExpanded(row.node) ? 'chevron-down' : 'chevron-right'" /></template>
-                </t-button>
-                <span v-else class="tree-toggle-placeholder"><t-icon name="minus" /></span>
-                <span>{{ row.name }}</span>
-              </div>
-            </template>
-            <template #level="{ row }"
-              ><span class="level-label">{{ levelLabel(row.level) }}</span></template
-            >
-            <template #status="{ row }"
-              ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
-                row.status === 'enabled' ? '启用' : '停用'
-              }}</t-tag></template
-            >
-            <template #sort="{ row }">{{ row.sort }}</template>
-            <template #createdAt="{ row }">{{ row.createdAt }}</template>
-            <template #operation="{ row }">
-              <div class="table-actions">
-                <t-link
-                  v-if="canCreateChildCategory && row.level < maxCategoryLevel"
-                  theme="primary"
-                  @click="openCreateDialog(row)"
-                  >新增下级</t-link
-                >
-                <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row)">编辑</t-link>
-                <t-link
-                  v-if="canMoveUpCategory"
-                  theme="primary"
-                  :disabled="siblingIndex(row) === 0"
-                  @click="moveCategory(row, -1)"
-                  >上移</t-link
-                >
-                <t-link
-                  v-if="canMoveDownCategory"
-                  theme="primary"
-                  :disabled="siblingIndex(row) === siblingNodes(row).length - 1"
-                  @click="moveCategory(row, 1)"
-                  >下移</t-link
-                >
-                <t-link
-                  v-if="row.status === 'enabled' ? canDisableCategory : canEnableCategory"
-                  :theme="row.status === 'enabled' ? 'warning' : 'success'"
-                  @click="openStatusConfirm(row.node)"
-                  >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
-                >
-                <t-link v-if="canDeleteCategory" theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
-                <span v-if="!hasVisibleRowAction(row)">-</span>
-              </div>
-            </template>
-          </t-table>
-          <t-empty v-else description="未找到符合条件的分类" />
-        </section>
+              <template #name="{ row }">
+                <div :class="['category-name-cell', `level-${row.level}`]">
+                  <t-button
+                    v-if="row.node.children.length"
+                    class="tree-toggle"
+                    variant="text"
+                    shape="square"
+                    size="small"
+                    :aria-label="isExpanded(row.node) ? '收起下级分类' : '展开下级分类'"
+                    @click.stop="toggleExpanded(row.node)"
+                  >
+                    <template #icon
+                      ><t-icon :name="isExpanded(row.node) ? 'chevron-down' : 'chevron-right'"
+                    /></template>
+                  </t-button>
+                  <span v-else class="tree-toggle-placeholder"><t-icon name="minus" /></span>
+                  <span>{{ row.name }}</span>
+                </div>
+              </template>
+              <template #level="{ row }"
+                ><span class="level-label">{{ levelLabel(row.level) }}</span></template
+              >
+              <template #status="{ row }"
+                ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
+                  row.status === 'enabled' ? '启用' : '停用'
+                }}</t-tag></template
+              >
+              <template #sort="{ row }">{{ row.sort }}</template>
+              <template #createdAt="{ row }">{{ row.createdAt }}</template>
+              <template #operation="{ row }">
+                <div class="table-actions">
+                  <t-link
+                    v-if="canCreateChildCategory && row.level < maxCategoryLevel"
+                    theme="primary"
+                    @click="openCreateDialog(row)"
+                    >新增下级</t-link
+                  >
+                  <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row)">编辑</t-link>
+                  <t-link
+                    v-if="canMoveUpCategory"
+                    theme="primary"
+                    :disabled="siblingIndex(row) === 0"
+                    @click="moveCategory(row, -1)"
+                    >上移</t-link
+                  >
+                  <t-link
+                    v-if="canMoveDownCategory"
+                    theme="primary"
+                    :disabled="siblingIndex(row) === siblingNodes(row).length - 1"
+                    @click="moveCategory(row, 1)"
+                    >下移</t-link
+                  >
+                  <t-link
+                    v-if="row.status === 'enabled' ? canDisableCategory : canEnableCategory"
+                    :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                    @click="openStatusConfirm(row.node)"
+                    >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
+                  >
+                  <t-link v-if="canDeleteCategory" theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+                  <span v-if="!hasVisibleRowAction(row)">-</span>
+                </div>
+              </template>
+            </t-table>
+            <t-empty v-else description="未找到符合条件的分类" />
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
@@ -208,6 +203,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { AdminListLayout, AdminPageHeader } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -264,6 +260,7 @@ const categoryScopeTabs: { label: string; value: Scope }[] = [
 ];
 const resolveScope = (value: unknown): Scope => (value === 'accessory' ? 'accessory' : 'finished');
 const activeScope = ref<Scope>(resolveScope(route.query.scope));
+const pageTitle = computed(() => (activeScope.value === 'finished' ? '成品现货分类' : '配件分类'));
 const {
   visibleTabs: scopeTabs,
   showTabRail: showScopeTabRail,
@@ -739,21 +736,25 @@ onMounted(loadCategories);
   flex: 1;
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
 }
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--td-comp-margin-l);
+.page-tip {
+  margin-bottom: 16px;
 }
-.scope-tabs,
-.filter-card {
-  margin-bottom: var(--td-comp-margin-l);
+.list-controls {
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
-.filter-card {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+.scope-controls {
+  min-width: 0;
+}
+.source-caption {
+  margin-top: var(--td-comp-margin-s);
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+}
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
 }
 .filter-row {
   display: flex;
@@ -771,46 +772,31 @@ onMounted(loadCategories);
   width: 260px;
   margin-bottom: 0;
 }
+.filter-fields :deep(.t-input),
+.filter-fields :deep(.t-select) {
+  width: 100%;
+}
 .filter-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
 }
-.category-card {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+.table-toolbar {
+  display: flex;
+  align-items: center;
 }
-.category-card {
+:deep(.zdm-admin-list-layout__content) {
   overflow-anchor: none;
 }
-.category-toolbar,
 .table-actions,
 .category-name-cell {
   display: flex;
   align-items: center;
 }
-.category-toolbar {
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-}
-.category-toolbar h2 {
-  margin: 0;
-  font: var(--td-font-title-medium);
-}
-.category-toolbar p {
-  margin: 4px 0 0;
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-small);
-}
-.category-tip {
-  margin-top: var(--td-comp-margin-l);
-}
-.category-card :deep(.t-table) {
-  width: calc(100% - 12px);
-  margin-top: var(--td-comp-margin-l);
-  margin-left: 12px;
+:deep(.t-table th),
+:deep(.t-table td) {
+  padding-left: 24px;
+  padding-right: 24px;
 }
 .category-name-cell {
   gap: var(--td-comp-margin-s);
@@ -859,12 +845,6 @@ onMounted(loadCategories);
   margin: 6px 0 0;
   color: var(--td-text-color-placeholder);
   font: var(--td-font-body-small);
-}
-@media (max-width: 1180px) {
-  .category-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
 }
 @media (max-width: 1120px) {
   .filter-row {
