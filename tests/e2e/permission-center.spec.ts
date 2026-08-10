@@ -220,7 +220,7 @@ test('shows only the granted product category tab', async ({ page }) => {
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
-  await expect(main.locator('.category-toolbar h2')).toHaveText('成品现货分类');
+  await expect(main.locator('.zdm-admin-page-header')).toContainText('成品现货分类');
   await expect(main.getByText('配件分类', { exact: true })).toHaveCount(0);
 });
 
@@ -243,7 +243,7 @@ test('falls back to the only granted product category tab', async ({ page }) => 
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
-  await expect(main.locator('.category-toolbar h2')).toHaveText('配件分类');
+  await expect(main.locator('.zdm-admin-page-header')).toContainText('配件分类');
   await expect(main.getByText('成品现货分类', { exact: true })).toHaveCount(0);
 });
 
