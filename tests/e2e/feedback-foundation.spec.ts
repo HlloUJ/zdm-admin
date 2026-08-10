@@ -76,7 +76,10 @@ test('shows the same object-specific success copy for category, store category, 
   expect(feedbackBox?.width).toBeLessThan(320);
 
   await page.goto('/store-category-management');
-  await page.getByRole('row', { name: /石材 1级分类/ }).getByRole('button', { name: '展开下级分类' }).click();
+  await page
+    .getByRole('row', { name: /石材 1级分类/ })
+    .getByRole('button', { name: '展开下级分类' })
+    .click();
   const storeCategoryRow = page.getByRole('row', { name: /大理石 2级分类/ });
   await storeCategoryRow.getByText('停用', { exact: true }).click();
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
