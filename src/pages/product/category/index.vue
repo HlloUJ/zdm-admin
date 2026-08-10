@@ -160,14 +160,12 @@
       </t-form>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="deleteVisible"
-      header="系统提示"
-      width="440px"
-      placement="center"
-      :prevent-scroll-through="false"
-      :confirm-btn="canDeleteTarget ? '确认' : '我知道了'"
-      :cancel-btn="canDeleteTarget ? '取消' : null"
+      action="删除"
+      object-type="分类"
+      :object-name="deleteTarget?.name"
+      :mode="canDeleteTarget ? 'confirm' : 'blocked'"
       @confirm="handleDeleteConfirm"
       @close="closeDeleteDialog"
       @opened="restorePageScroll"
@@ -180,30 +178,27 @@
       <template v-else-if="deleteTarget?.children.length"
         >分类“{{ deleteTarget.name }}”包含下级分类，请先删除或转移下级分类。</template
       >
-      <template v-else>是否删除分类【{{ deleteTarget?.name }}】？</template>
-    </t-dialog>
+      <template v-else>是否删除分类“{{ deleteTarget?.name }}”？</template>
+    </AdminConfirmDialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      :prevent-scroll-through="false"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="statusTarget?.status === 'enabled' ? '停用' : '启用'"
+      object-type="分类"
+      :object-name="statusTarget?.name"
       @confirm="handleStatusConfirm"
       @close="closeStatusConfirm"
       @opened="restorePageScroll"
       @closed="restorePageScroll"
     >
       {{ statusConfirmText }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { adminFeedback, AdminConfirmDialog } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -329,8 +324,8 @@ const canDeleteTarget = computed(() =>
 const statusConfirmText = computed(() => {
   if (!statusTarget.value) return '';
   return statusTarget.value.status === 'enabled'
-    ? `是否停用分类【${statusTarget.value.name}】？`
-    : `是否启用分类【${statusTarget.value.name}】？`;
+    ? `是否停用分类“${statusTarget.value.name}”？`
+    : `是否启用分类“${statusTarget.value.name}”？`;
 });
 
 const displayRows = computed<CategoryRow[]>(() => {
@@ -485,7 +480,7 @@ async function loadCategories() {
       accessory: buildCategoryTree(records, 'accessory'),
     };
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '分类列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '分类列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -517,7 +512,7 @@ function categoryExists() {
 }
 function openCreateDialog(parent?: CategoryRow) {
   if (parent && parent.level >= maxCategoryLevel) {
-    MessagePlugin.warning('分类最多支持 4 级，不能继续新增下级分类');
+    adminFeedback.warning('分类最多支持 4 级，不能继续新增下级分类');
     return;
   }
   formMode.value = 'create';
@@ -546,7 +541,7 @@ async function handleSubmit() {
   const result = await formRef.value?.validate();
   if (result !== true) return;
   if (categoryExists()) {
-    MessagePlugin.warning('同级分类名称不能重复');
+    adminFeedback.warning('同级分类名称不能重复');
     return;
   }
   const name = formData.name.trim();
@@ -561,18 +556,18 @@ async function handleSubmit() {
         productCount: 0,
         status: formData.status,
       });
-      MessagePlugin.success('新增成功');
+      adminFeedback.actionSuccess({ action: '新增', target: name });
     } else if (formData.id) {
       const node = findNode(formData.id);
       if (node) {
         await updateProductCategory(formData.id, toCategoryPayload({ ...node, name, status: formData.status }));
       }
-      MessagePlugin.success('保存成功');
+      adminFeedback.actionSuccess({ action: '保存', target: name });
     }
     await loadCategories();
     closeFormDialog();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 }
 async function moveCategory(row: CategoryRow, offset: number) {
@@ -590,9 +585,9 @@ async function moveCategory(row: CategoryRow, offset: number) {
       siblings.map((node) => updateProductCategory(node.id, toCategoryPayload(node, row.parent?.id ?? null))),
     );
     void nextTick(restoreSortScroll);
-    MessagePlugin.success('排序已更新');
+    adminFeedback.success('排序已更新');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '排序保存失败');
+    adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
     await loadCategories();
   }
 }
@@ -621,9 +616,12 @@ async function handleStatusConfirm() {
         nodes.map((node) => updateProductCategory(node.id, toCategoryPayload({ ...node, status: nextStatus }))),
       );
       updateDescendantStatus(statusTarget.value, nextStatus);
-      MessagePlugin.success(nextStatus === 'enabled' ? '已启用分类' : '已停用分类');
+      adminFeedback.actionSuccess({
+        action: nextStatus === 'enabled' ? '启用' : '停用',
+        target: statusTarget.value.name,
+      });
     } catch (error) {
-      MessagePlugin.error(error instanceof Error ? error.message : '状态保存失败');
+      adminFeedback.error(error instanceof Error ? error.message : '状态保存失败');
     }
   }
   closeStatusConfirm();
@@ -656,10 +654,10 @@ async function handleDeleteConfirm() {
     const deleted = await deleteProductCategory(node.id);
     if (!deleted) throw new Error('分类删除失败，请刷新后重试');
     removeNode(activeNodes.value, node.id);
-    MessagePlugin.success('删除成功');
+    adminFeedback.actionSuccess({ action: '删除', target: node.name });
     closeDeleteDialog();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '删除失败');
+    adminFeedback.error(error instanceof Error ? error.message : '删除失败');
   }
 }
 function handleSearch() {

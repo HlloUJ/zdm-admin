@@ -426,11 +426,12 @@ test('selects the first leaf and manages bindings from the template list', async
     (request) => request.url().endsWith('/api/admin/category-attributes/1/publish') && request.method() === 'PUT',
   );
   await materialRow.getByText('发布', { exact: true }).click();
-  const publishDialog = page.locator('.t-dialog').filter({ hasText: '是否发布属性【材质】？' });
+  const publishDialog = page.locator('.t-dialog').filter({ hasText: '是否发布属性“材质”？' });
   await expect(publishDialog).toBeVisible();
   expect(publishRequestCount).toBe(0);
-  await publishDialog.getByRole('button', { name: '确认', exact: true }).click();
+  await publishDialog.getByRole('button', { name: '确认发布', exact: true }).click();
   await publishRequestPromise;
+  await expect(page.getByText('已发布“材质”', { exact: true })).toBeVisible();
   expect(publishRequestCount).toBe(1);
   await expect(materialRow.getByText('已发布', { exact: true })).toHaveCount(1);
   await expect(materialRow.locator('.t-tag').filter({ hasText: '已发布' })).toHaveClass(/t-tag--success/);
@@ -457,11 +458,12 @@ test('selects the first leaf and manages bindings from the template list', async
     (request) => request.url().endsWith('/api/admin/category-attributes/1/unpublish') && request.method() === 'PUT',
   );
   await materialRow.getByText('取消发布', { exact: true }).click();
-  const unpublishDialog = page.locator('.t-dialog').filter({ hasText: '是否取消发布属性【材质】？' });
+  const unpublishDialog = page.locator('.t-dialog').filter({ hasText: '是否取消发布属性“材质”？' });
   await expect(unpublishDialog).toBeVisible();
   expect(unpublishRequestCount).toBe(0);
-  await unpublishDialog.getByRole('button', { name: '确认', exact: true }).click();
+  await unpublishDialog.getByRole('button', { name: '确认取消发布', exact: true }).click();
   await unpublishRequestPromise;
+  await expect(page.getByText('已取消发布“材质”', { exact: true })).toBeVisible();
   expect(unpublishRequestCount).toBe(1);
   await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
   await expect(materialRow.getByText('发布', { exact: true })).toBeVisible();
@@ -550,7 +552,7 @@ test('selects the first leaf and manages bindings from the template list', async
   const roleChangeDialog = page.locator('.t-dialog').filter({ hasText: '切换为商品属性后将关闭“参与SKU组合”' });
   await expect(roleChangeDialog).toBeVisible();
   expect(roleChangeRequestCount).toBe(0);
-  await roleChangeDialog.getByRole('button', { name: '确认', exact: true }).click();
+  await roleChangeDialog.getByRole('button', { name: '确认修改', exact: true }).click();
   const productRoleRequest = await productRoleRequestPromise;
   expect(productRoleRequest.postDataJSON()).toMatchObject({ attributeRole: 'product', skuFlag: false });
   expect(roleChangeRequestCount).toBe(1);
@@ -583,10 +585,11 @@ test('selects the first leaf and manages bindings from the template list', async
     (request) => request.url().endsWith('/api/admin/category-attributes/3') && request.method() === 'DELETE',
   );
   await colorRow.getByText('移除', { exact: true }).click();
-  const removeDialog = page.locator('.t-dialog').filter({ hasText: '是否移除属性【颜色】？' });
+  const removeDialog = page.locator('.t-dialog').filter({ hasText: '是否移除属性“颜色”？' });
   await expect(removeDialog).toBeVisible();
-  await removeDialog.getByRole('button', { name: '确认', exact: true }).click();
+  await removeDialog.getByRole('button', { name: '确认移除', exact: true }).click();
   await removeRequestPromise;
+  await expect(page.getByText('已移除“颜色”', { exact: true })).toBeVisible();
   await expect(colorRow).toHaveCount(0);
 
   await expect(templatePanel.locator('.zdm-admin-pagination')).toBeVisible();
@@ -650,7 +653,7 @@ test('标准选项属性未绑定选项值时禁止发布', async ({ page }) => 
   await row.getByText('发布', { exact: true }).click();
 
   await expect(page.locator('.t-message').filter({ hasText: '请先绑定选项值' })).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '是否发布属性【材质】？' })).toHaveCount(0);
+  await expect(page.locator('.t-dialog').filter({ hasText: '是否发布属性“材质”？' })).toHaveCount(0);
   expect(publishRequestCount).toBe(0);
 });
 

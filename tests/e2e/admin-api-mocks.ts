@@ -137,6 +137,20 @@ const employees = [
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
+  {
+    id: 3,
+    tenantId: 1,
+    storeId: 1,
+    name: '测试员工',
+    gender: 'male',
+    phone: '15926627777',
+    status: 'enabled',
+    roleIds: '2',
+    dataPermission: 'all',
+    remark: '统一提示验收数据',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:00:00',
+  },
 ];
 
 const productCategories = [
@@ -160,6 +174,29 @@ const productCategories = [
     status: 'disabled',
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const storeCategories = [
+  {
+    id: 1,
+    parentId: null,
+    name: '石材',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:00:00',
+  },
+  {
+    id: 2,
+    parentId: 1,
+    name: '大理石',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:10:00',
   },
 ];
 
@@ -276,6 +313,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
   await mockCollection(page, '**/api/admin/roles', roles);
   await mockCollection(page, '**/api/admin/employees', employees);
+  await mockCollection(page, '**/api/admin/store-categories', storeCategories);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
   await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
   await mockCollection(page, '**/api/admin/product-attribute-values', productAttributeValues);

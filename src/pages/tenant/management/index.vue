@@ -161,30 +161,27 @@
       </div>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
+      object-type="租户"
+      :object-name="confirmState.row?.tenantName"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import {
   createTenant,
   deleteTenant,
@@ -347,7 +344,7 @@ const loadTenants = async () => {
     tableData.value = records.map(toTenantItem);
     ensureCurrentPage();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '租户列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '租户列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -423,9 +420,9 @@ const handleSubmit = async () => {
     }
 
     closeFormDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.success(dialogMode.value === 'create' ? '已新增租户' : '已保存租户');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
@@ -451,9 +448,9 @@ const handleBusinessSubmit = async () => {
   try {
     await persistTenantItem({ ...target, businesses: [...businessSelection.value] });
     closeBusinessDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.success('已更新租户业务配置');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
@@ -461,14 +458,14 @@ const openStatusConfirm = (row: TenantItem) => {
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
-  confirmState.content = `是否${isNormal ? '停用' : '启用'}租户【${row.tenantName}】？`;
+  confirmState.content = `是否${isNormal ? '停用' : '启用'}租户“${row.tenantName}”？`;
   confirmDialogVisible.value = true;
 };
 
 const openDeleteConfirm = (row: TenantItem) => {
   confirmState.type = 'delete';
   confirmState.row = row;
-  confirmState.content = `是否删除租户【${row.tenantName}】？`;
+  confirmState.content = `是否删除租户“${row.tenantName}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -493,9 +490,11 @@ const handleConfirm = async () => {
     }
 
     closeConfirmDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.success(
+      confirmState.type === 'delete' ? '已删除租户' : confirmState.type === 'enable' ? '已启用租户' : '已停用租户',
+    );
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
