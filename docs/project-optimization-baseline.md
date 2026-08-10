@@ -28,7 +28,7 @@
 | 并行对比     | `127.0.0.1:5176-5199` | 仅显式请求时使用               |
 | 任务后端     | `127.0.0.1:8081-8099` | 含后端改动时使用               |
 
-`npm run dev:task` 自动把 5175 切换到当前 Worktree。纯前端任务使用任务前端和集成后端；后端、API、Flyway 或运行配置任务使用任务前端和任务后端。无论改动涉及一个还是多个模块，5175 都展示该任务 Worktree 的完整项目。
+首次运行 `npm run dev:task:install` 安装用户级 `launchd` 服务；之后 `npm run dev:task` 只把 5175 切换到当前 Worktree。5175 不依赖终端存活并在 macOS 登录后恢复上次任务；Docker Desktop 未运行时由守护服务后台启动，MySQL 与集成后端随后按重启策略恢复，任务后端仍按改动按需启动。纯前端任务使用任务前端和集成后端；后端、API、Flyway 或运行配置任务使用任务前端和任务后端。无论改动涉及一个还是多个模块，5175 都展示该任务 Worktree 的完整项目。
 
 ## 唯一开发数据库
 
@@ -36,7 +36,7 @@
 - 不按任务创建 MySQL，不克隆集成库，不做预览库与集成库的数据复制或回写。
 - 用户在 5175 手工验收产生的数据直接持久化到集成库，并被后续任务继续复用。
 - 页面 E2E 使用接口 Mock；后端测试使用 Testcontainers。自动化测试数据不进入集成库。
-- MySQL 数据卷长期保留，容器使用 `restart: unless-stopped`；Docker Desktop 启动后自动恢复 MySQL。
+- MySQL 数据卷长期保留，MySQL 和集成后端容器使用 `restart: unless-stopped`；Docker Desktop 启动后自动恢复。
 
 ### 数据库保护
 

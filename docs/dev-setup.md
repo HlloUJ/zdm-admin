@@ -52,17 +52,26 @@ npm run git:state
 
 ### 当前任务预览
 
-在任务 Worktree 运行：
+macOS 首次在任一任务 Worktree 安装一次登录常驻服务：
+
+```bash
+npm run dev:task:install
+```
+
+以后切换任务时，只需在目标任务 Worktree 运行：
 
 ```bash
 npm run dev:task
 ```
 
 - `http://127.0.0.1:5175` 永远是当前任务预览；切换任务不需要更换地址。
+- 预览由当前用户的 `launchd` 托管，关闭终端不会停止；下次登录会恢复上次选择的任务。Docker Desktop 未运行时，守护服务会在后台启动并等待就绪，不依赖 Docker 自身的登录项。
+- `npm run dev:task:status` 查看当前任务和进程，`npm run dev:task:logs -- --lines 200` 查看日志；更新守护脚本后重新运行一次 `dev:task:install` 即可原位升级。
 - 纯前端任务复用集成后端；后端、API、Flyway 或运行配置任务启动该 Worktree 的任务后端。
 - 两种模式都使用唯一的集成 MySQL 和 `zdm_admin`，所以 5175 手工验收产生的数据会永久保留并被后续任务复用。
-- 只有并行对比时使用 `npm run dev:task -- --temporary`，临时端口为 `5176-5199`；Playwright 固定使用 `5174`。
-- `npm run dev:task:stop` 只停止任务前后端，不删除共享数据库或备份。
+- 只有并行对比时使用 `npm run dev:task -- --temporary`，该模式仍在当前终端前台运行，临时端口为 `5176-5199`；Playwright 固定使用 `5174`。
+- `npm run dev:task:foreground` 仅用于调试启动器；日常验收不使用。
+- `npm run dev:task:stop` 停止当前任务前后端并让守护服务保持空闲，不删除共享数据库或备份；再次运行 `npm run dev:task` 即可恢复。
 
 Flyway 迁移会自动检查其他共享数据库任务后端、暂停当前任务与集成后端、备份数据库并锁定任务切换；存在其他任务写入者时停止并报告，不会批量停止。非迁移但会批量删除、清空或破坏性导入数据时运行 `npm run dev:task -- --database-risk`。任务正式提交、推送并同步集成分支后运行：
 
@@ -153,7 +162,7 @@ npm run backend:quality
 - 端口：`3306`
 - 数据卷：`zdm-admin_zdm_platform_mysql`
 
-5173、5175、集成后端和任务后端共同使用这一套开发数据库，不创建任务数据库、不克隆数据，也不存在预览数据回写或双向同步。页面 E2E 使用接口 Mock，后端自动化测试使用 Testcontainers，两者不污染该数据库。MySQL 容器使用 `restart: unless-stopped`；Docker Desktop 启动后会自动恢复，Docker Desktop 本身是否随 macOS 登录启动由系统“登录项”权限控制。
+5173、5175、集成后端和任务后端共同使用这一套开发数据库，不创建任务数据库、不克隆数据，也不存在预览数据回写或双向同步。页面 E2E 使用接口 Mock，后端自动化测试使用 Testcontainers，两者不污染该数据库。MySQL 和集成后端容器使用 `restart: unless-stopped`；任务预览服务在登录后确保 Docker Desktop 启动，再由 Docker 恢复容器。当前任务前端由用户级 `launchd` 恢复，任务后端仍按代码改动按需启动，不常驻所有任务。
 
 查看容器：
 
