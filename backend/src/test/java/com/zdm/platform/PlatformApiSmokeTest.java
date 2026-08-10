@@ -493,7 +493,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void slabVarietyManagementAppliesSelfDataScopeToListsAndOperations() throws Exception {
+  void slabVarietyManagementIgnoresSelfDataScopeWhenListing() throws Exception {
     long accountId = 9031L;
     long employeeId = 9031L;
     long roleId = 9031L;
@@ -550,7 +550,7 @@ class PlatformApiSmokeTest {
     mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[*].name", hasItem("本人创建的大板品种")))
-        .andExpect(jsonPath("$.data[*].name", not(hasItem("他人创建的大板品种"))));
+        .andExpect(jsonPath("$.data[*].name", hasItem("他人创建的大板品种")));
 
     MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-varieties")
             .header("Authorization", "Bearer " + token)
@@ -1018,7 +1018,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void craftManagementAppliesCurrentEmployeeDataPermission() throws Exception {
+  void craftManagementIgnoresCurrentEmployeeDataPermissionWhenListing() throws Exception {
     long accountId = 9003L;
     long employeeId = 9003L;
     long roleId = 9003L;
@@ -1051,7 +1051,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO roles
           (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'operation-platform', 'admin', 'all', 'enabled', ?, '集成测试')
+        VALUES (?, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'operation-platform', 'admin', 'self', 'enabled', ?, '集成测试')
         """,
         roleId,
         "admin.product-data-center.finished-stock-craft.view");
@@ -1075,7 +1075,8 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(ownCraftName))
             .value(hasItem(employeeName)))
-        .andExpect(jsonPath("$.data[?(@.name == '%s')]".formatted(otherCraftName)).isEmpty());
+        .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(otherCraftName))
+            .value(hasItem("韩健")));
 
     mockMvc.perform(get("/api/admin/crafts")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))

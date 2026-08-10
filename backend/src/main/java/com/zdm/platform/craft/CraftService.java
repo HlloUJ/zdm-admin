@@ -3,7 +3,6 @@ package com.zdm.platform.craft;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -16,20 +15,6 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
 
   public CraftService(CurrentIdentityProvider identityProvider) {
     this.identityProvider = identityProvider;
-  }
-
-  public List<Craft> listForCurrentAdmin() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    if (identity == null) {
-      return List.of();
-    }
-    if (identity.isSuperAdmin() || "all".equals(identity.dataPermission())) {
-      return list();
-    }
-    if (!StringUtils.hasText(identity.displayName())) {
-      return List.of();
-    }
-    return lambdaQuery().eq(Craft::getCreatedByName, identity.displayName()).list();
   }
 
   @Transactional
