@@ -158,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { MessagePlugin } from 'tdesign-vue-next';
+import { adminFeedback } from '@/components/foundation';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -359,7 +359,7 @@ const loadAllocation = async () => {
     });
     checkedValues.value = [...savedAllocationValues[activeTerminal.value]];
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '终端功能配置加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '终端功能配置加载失败');
   } finally {
     loading.value = false;
   }
@@ -367,7 +367,7 @@ const loadAllocation = async () => {
 
 const resetAllocation = () => {
   checkedValues.value = [...savedAllocationValues[activeTerminal.value]];
-  MessagePlugin.info('已重置为上次保存状态');
+  adminFeedback.info('已重置为上次保存状态');
 };
 
 const saveAllocation = async () => {
@@ -383,9 +383,9 @@ const saveAllocation = async () => {
       parsePermissions(saved.functionPermissions),
     );
     checkedValues.value = [...savedAllocationValues[terminal]];
-    MessagePlugin.success('保存成功');
+    adminFeedback.success('终端功能分配已保存');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '保存失败');
+    adminFeedback.error(error instanceof Error ? error.message : '保存失败');
   } finally {
     loading.value = false;
   }

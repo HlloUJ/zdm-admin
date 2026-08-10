@@ -73,8 +73,8 @@
 </template>
 
 <script setup lang="ts">
+import { adminFeedback } from '@/components/foundation';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -157,7 +157,7 @@ const loadData = async () => {
     const records = await listMasterData();
     data.value = records.map(toMasterDataItem);
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '主数据加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '主数据加载失败');
   } finally {
     loading.value = false;
   }
@@ -184,7 +184,7 @@ const openEdit = (row: MasterDataItem) => {
 };
 const submit = async () => {
   if (!form.name.trim() || !form.code.trim()) {
-    MessagePlugin.warning(`请填写${config.value.entityName}名称和${config.value.codeLabel}`);
+    adminFeedback.warning(`请填写${config.value.entityName}名称和${config.value.codeLabel}`);
     return;
   }
   if (
@@ -192,7 +192,7 @@ const submit = async () => {
       (item) => item.id !== editingRow.value?.id && (item.code === form.code.trim() || item.name === form.name.trim()),
     )
   ) {
-    MessagePlugin.warning('名称或编码已存在');
+    adminFeedback.warning('名称或编码已存在');
     return;
   }
   try {
@@ -203,9 +203,9 @@ const submit = async () => {
     }
     await loadData();
     dialogVisible.value = false;
-    MessagePlugin.success(editingRow.value ? '已保存修改' : `已新增${config.value.entityName}`);
+    adminFeedback.success(editingRow.value ? '已保存修改' : `已新增${config.value.entityName}`);
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 const toggle = async (row: MasterDataItem) => {
@@ -219,9 +219,9 @@ const toggle = async (row: MasterDataItem) => {
       status: nextStatus,
     });
     Object.assign(row, toMasterDataItem(updated));
-    MessagePlugin.success(nextStatus === 'enabled' ? '已启用' : '已停用');
+    adminFeedback.success(nextStatus === 'enabled' ? '已启用' : '已停用');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 

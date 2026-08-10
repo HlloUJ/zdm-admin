@@ -288,28 +288,25 @@
       </div>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="
+        confirmState.type === 'delete-category' ? '删除' : confirmState.type === 'remove-attribute' ? '移除' : '发布'
+      "
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 type ValueType = 'select' | 'number' | 'text';
@@ -706,7 +703,7 @@ const selectCategory = (id: string) => {
   if (!node) return;
   if (node.children.length) {
     node.expanded = !node.expanded;
-    MessagePlugin.info('请选择末级类目查看属性');
+    adminFeedback.info('请选择末级类目查看属性');
     return;
   }
   selectedCategoryId.value = id;
@@ -744,7 +741,7 @@ const handleCategorySubmit = async () => {
   }
 
   closeCategoryDialog();
-  MessagePlugin.success('操作成功');
+  adminFeedback.success(categoryDialogMode.value === 'create' ? '已新增分类' : '已保存分类');
 };
 
 const openAttributeTransferDialog = () => {
@@ -783,7 +780,7 @@ const submitAttributeTransfer = () => {
   categoryAttributes.value[selectedCategoryId.value] = [...newlyBoundRows, ...keptRows];
   pagination.current = 1;
   closeAttributeTransferDialog();
-  MessagePlugin.success('关联成功');
+  adminFeedback.success('关联成功');
 };
 
 const openOptionTransferDialog = (row: AttributeItem) => {
@@ -816,41 +813,41 @@ const submitOptionTransfer = () => {
     optionTransferTarget.value.optionIds = [...tempOptionIds.value];
   }
   closeOptionTransferDialog();
-  MessagePlugin.success('关联成功');
+  adminFeedback.success('关联成功');
 };
 
 const markRequired = (row: AttributeItem) => {
-  MessagePlugin.success(row.required ? '已设为必填' : '已取消必填');
+  adminFeedback.success(row.required ? '已设为必填' : '已取消必填');
 };
 
 const changeAttributeRole = (row: AttributeItem, value: unknown) => {
   const nextRole = value as AttributeRole;
   row.role = nextRole;
   const roleLabel = attributeRoleOptions.find((item) => item.value === row.role)?.label;
-  if (roleLabel) MessagePlugin.success(`已将【${row.name}】设为${roleLabel}`);
+  if (roleLabel) adminFeedback.success(`已将“${row.name}”设为${roleLabel}`);
 };
 
 const openRemoveAttributeConfirm = (row: AttributeItem) => {
   confirmState.type = 'remove-attribute';
   confirmState.category = null;
   confirmState.attribute = row;
-  confirmState.content = `是否移除属性【${row.name}】？`;
+  confirmState.content = `是否移除属性“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
 const openPublishConfirm = (row: AttributeItem) => {
   if (!row.role) {
-    MessagePlugin.warning(`请先为属性【${row.name}】选择属性角色`);
+    adminFeedback.warning(`请先为属性“${row.name}”选择属性角色`);
     return;
   }
   if (row.role === 'sales' && row.valueType === 'select' && row.optionIds.length < 2) {
-    MessagePlugin.warning(`销售属性【${row.name}】至少需关联 2 个可用选项`);
+    adminFeedback.warning(`销售属性“${row.name}”至少需关联 2 个可用选项`);
     return;
   }
   confirmState.type = 'publish-attribute';
   confirmState.category = null;
   confirmState.attribute = row;
-  confirmState.content = `是否发布属性【${row.name}】？`;
+  confirmState.content = `是否发布属性“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -888,7 +885,13 @@ const handleConfirm = () => {
   }
 
   closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+  adminFeedback.success(
+    confirmState.type === 'delete-category'
+      ? '已删除分类'
+      : confirmState.type === 'remove-attribute'
+        ? '已移除分类属性'
+        : '已发布分类属性',
+  );
 };
 </script>
 

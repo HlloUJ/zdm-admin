@@ -137,6 +137,20 @@ const employees = [
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
+  {
+    id: 3,
+    tenantId: 1,
+    storeId: 1,
+    name: '测试员工',
+    gender: 'male',
+    phone: '15926627777',
+    status: 'enabled',
+    roleIds: '2',
+    dataPermission: 'all',
+    remark: '统一提示验收数据',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:00:00',
+  },
 ];
 
 const productCategories = [

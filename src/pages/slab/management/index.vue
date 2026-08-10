@@ -356,19 +356,17 @@
       />
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="430px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmAction"
+      object-type="大板"
+      :object-name="confirmState.row?.name"
       @confirm="handleConfirmSubmit"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
 
     <t-dialog
       v-model:visible="reasonDialogVisible"
@@ -402,10 +400,9 @@
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, UploadFile } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref } from 'vue';
 type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 type PublisherType = '租户发布' | '平台发布';
@@ -663,6 +660,21 @@ const confirmState = reactive<{
   type: 'shelf',
   row: null,
   content: '',
+});
+const confirmAction = computed(() => {
+  const actionMap: Record<ConfirmType, string> = {
+    shelf: '上架',
+    delete: '删除',
+    restore: '恢复',
+    purge: '彻底删除',
+    reject: '驳回',
+    savePrice: '保存价格',
+    batchShelf: '批量上架',
+    batchRestore: '批量恢复',
+    batchPurge: '批量彻底删除',
+    clearRecycle: '清空回收站',
+  };
+  return actionMap[confirmState.type];
 });
 
 const reasonState = reactive<{
@@ -1062,7 +1074,7 @@ const handleProductSubmit = async () => {
   }
   if (!productForm.variety || !productForm.origin || !productForm.texture || !productForm.color || !productForm.grade) {
     productTab.value = 'base';
-    MessagePlugin.warning('请完善基础信息');
+    adminFeedback.warning('请完善基础信息');
     return;
   }
   if (productMode.value === 'create') {
@@ -1115,7 +1127,7 @@ const handleProductSubmit = async () => {
     }
   }
   closeProductDialog();
-  MessagePlugin.success('商品信息已提交');
+  adminFeedback.success('商品信息已提交');
 };
 
 const handleUploadClick = (item: (typeof uploadItems)[number]) => {
@@ -1132,7 +1144,7 @@ const closeUploadDialog = () => {
 
 const submitUpload = () => {
   closeUploadDialog();
-  MessagePlugin.success('上传素材已选择');
+  adminFeedback.success('上传素材已选择');
 };
 
 const handleBatchAction = (action: BatchAction) => {
@@ -1142,7 +1154,7 @@ const handleBatchAction = (action: BatchAction) => {
   }
   if (action === 'batchShelf') {
     if (!selectedKeys.value.length) {
-      MessagePlugin.warning('请先选择大板');
+      adminFeedback.warning('请先选择大板');
       return;
     }
     openConfirm('batchShelf', null, '是否批量上架所选大板？');
@@ -1150,7 +1162,7 @@ const handleBatchAction = (action: BatchAction) => {
   }
   if (action === 'batchOffShelf') {
     if (!selectedKeys.value.length) {
-      MessagePlugin.warning('请先选择大板');
+      adminFeedback.warning('请先选择大板');
       return;
     }
     selectedKeys.value.forEach((id) => {
@@ -1158,12 +1170,12 @@ const handleBatchAction = (action: BatchAction) => {
       if (row) row.status = 'offShelf';
     });
     selectedKeys.value = [];
-    MessagePlugin.success('批量下架成功');
+    adminFeedback.success('批量下架成功');
     return;
   }
   if (action === 'batchRestore') {
     if (!selectedKeys.value.length) {
-      MessagePlugin.warning('请先选择大板');
+      adminFeedback.warning('请先选择大板');
       return;
     }
     openConfirm('batchRestore', null, '是否批量放回到仓库？');
@@ -1171,7 +1183,7 @@ const handleBatchAction = (action: BatchAction) => {
   }
   if (action === 'batchPurge') {
     if (!selectedKeys.value.length) {
-      MessagePlugin.warning('请先选择大板');
+      adminFeedback.warning('请先选择大板');
       return;
     }
     openConfirm('batchPurge', null, '是否批量彻底删除所选大板？');
@@ -1182,10 +1194,10 @@ const handleBatchAction = (action: BatchAction) => {
 
 const handleRowAction = (action: RowAction, row: SlabItem) => {
   if (action === 'edit') openProductDialog('edit', row);
-  if (action === 'shelf') openConfirm('shelf', row, `是否上架大板【${row.name}】？`);
-  if (action === 'delete') openConfirm('delete', row, `是否删除大板【${row.name}】？`);
-  if (action === 'restore') openConfirm('restore', row, `是否放回到仓库【${row.name}】？`);
-  if (action === 'purge') openConfirm('purge', row, `是否彻底删除大板【${row.name}】？`);
+  if (action === 'shelf') openConfirm('shelf', row, `是否上架大板“${row.name}”？`);
+  if (action === 'delete') openConfirm('delete', row, `是否删除大板“${row.name}”？`);
+  if (action === 'restore') openConfirm('restore', row, `是否放回到仓库“${row.name}”？`);
+  if (action === 'purge') openConfirm('purge', row, `是否彻底删除大板“${row.name}”？`);
   if (action === 'reject') openReasonDialog('reject', row);
   if (action === 'offShelf') openReasonDialog('offShelf', row);
 };
@@ -1242,7 +1254,7 @@ const handleConfirmSubmit = () => {
     ensureCurrentPage();
   }
   closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+  adminFeedback.success('大板状态已更新');
 };
 
 const openReasonDialog = (type: 'reject' | 'offShelf', row: SlabItem) => {
@@ -1260,20 +1272,20 @@ const closeReasonDialog = () => {
 
 const handleReasonSubmit = () => {
   if (!reasonForm.reason) {
-    MessagePlugin.warning('请选择原因');
+    adminFeedback.warning('请选择原因');
     return;
   }
   if (reasonState.type === 'offShelf' && reasonState.row) {
     reasonState.row.status = 'offShelf';
     ensureCurrentPage();
     closeReasonDialog();
-    MessagePlugin.success('提交成功');
+    adminFeedback.success('大板下架原因已提交');
     return;
   }
   if (reasonState.type === 'reject' && reasonState.row) {
     const row = reasonState.row;
     closeReasonDialog();
-    openConfirm('reject', row, `是否驳回大板【${row.name}】？`);
+    openConfirm('reject', row, `是否驳回大板“${row.name}”？`);
     return;
   }
 };
@@ -1286,7 +1298,7 @@ const closePriceDrawer = () => {
 const saveBatchPrice = () => {
   const target = tableData.value.find((item) => item.id === priceDrawerRowId.value);
   if (target) {
-    openConfirm('savePrice', target, `是否保存大板【${target.name}】的价格？`);
+    openConfirm('savePrice', target, `是否保存大板“${target.name}”的价格？`);
   }
 };
 </script>

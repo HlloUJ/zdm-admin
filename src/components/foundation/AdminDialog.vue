@@ -20,14 +20,16 @@
 </template>
 
 <script setup lang="ts">
+import type { ButtonProps } from 'tdesign-vue-next';
+
 withDefaults(
   defineProps<{
     visible: boolean;
     header: string;
     width?: string;
     dialogClassName?: string;
-    confirmBtn?: string;
-    cancelBtn?: string | null;
+    confirmBtn?: string | ButtonProps;
+    cancelBtn?: string | ButtonProps | null;
   }>(),
   {
     width: '520px',

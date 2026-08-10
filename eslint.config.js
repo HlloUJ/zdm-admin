@@ -31,6 +31,24 @@ export default tseslint.config(
       'vue/no-v-html': 'off',
       'vue/no-side-effects-in-computed-properties': 'warn',
       'vue/singleline-html-element-content-newline': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'tdesign-vue-next',
+              importNames: ['DialogPlugin', 'MessagePlugin', 'NotifyPlugin'],
+              message: '业务模块必须通过 @/components/foundation 的统一反馈基座展示提示。',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/components/foundation/feedback/adminFeedback.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 );

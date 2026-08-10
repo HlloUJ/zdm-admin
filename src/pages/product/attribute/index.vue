@@ -95,29 +95,34 @@
         >
       </t-form>
     </AdminDialog>
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      :header="confirmTitle"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
+      object-type="属性"
+      :object-name="confirmTarget?.name"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
-      >{{ confirmText }}</t-dialog
     >
+      {{ confirmText }}
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import {
+  adminFeedback,
+  AdminConfirmDialog,
+  AdminDialog,
+  AdminListLayout,
+  AdminPageHeader,
+  AdminPagination,
+} from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -247,7 +252,7 @@ const loadAttributes = async () => {
     data.value = records.map(toAttribute);
     ensureCurrentPage();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '属性列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '属性列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -291,10 +296,11 @@ const closeCreateDialog = () => {
 const submit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
+  const name = form.name.trim();
   try {
     await createProductAttribute({
       scope: form.scope,
-      name: form.name.trim(),
+      name,
       valueType: form.valueType as ValueType,
       attributeRole: 'basic',
       status: 'enabled',
@@ -303,9 +309,9 @@ const submit = async () => {
     pagination.current = 1;
     dialogVisible.value = false;
     formRef.value?.clearValidate();
-    MessagePlugin.success('已新增标准属性');
+    adminFeedback.actionSuccess({ action: '新增', target: name });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 const openStatusConfirm = (row: Attribute) => {
@@ -324,36 +330,34 @@ const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
   confirmTarget.value = null;
 };
-const confirmTitle = computed(
-  () => ({ disable: '确认停用', enable: '确认启用', delete: '确认删除' })[confirmType.value],
-);
 const confirmText = computed(() => {
   const name = confirmTarget.value?.name ?? '';
-  return `是否${confirmType.value === 'disable' ? '停用' : confirmType.value === 'enable' ? '启用' : '删除'}属性【${name}】？`;
+  return `是否${confirmType.value === 'disable' ? '停用' : confirmType.value === 'enable' ? '启用' : '删除'}属性“${name}”？`;
 });
 const handleConfirm = async () => {
   if (!confirmTarget.value) return;
+  const target = confirmTarget.value;
+  const action = confirmType.value === 'delete' ? '删除' : confirmType.value === 'enable' ? '启用' : '停用';
 
   try {
     if (confirmType.value === 'delete') {
-      await deleteProductAttribute(confirmTarget.value.id);
-      data.value = data.value.filter((item) => item.id !== confirmTarget.value?.id);
+      await deleteProductAttribute(target.id);
+      data.value = data.value.filter((item) => item.id !== target.id);
       ensureCurrentPage();
-      MessagePlugin.success('删除成功');
     } else {
       const updated = await updateProductAttributeStatus(
-        confirmTarget.value.id,
+        target.id,
         confirmType.value === 'enable' ? 'enabled' : 'disabled',
       );
-      const targetIndex = data.value.findIndex((item) => item.id === confirmTarget.value?.id);
+      const targetIndex = data.value.findIndex((item) => item.id === target.id);
       if (targetIndex !== -1) {
         data.value.splice(targetIndex, 1, toAttribute(updated));
       }
-      MessagePlugin.success(confirmType.value === 'enable' ? '已启用属性' : '已停用属性');
     }
+    adminFeedback.actionSuccess({ action, target: target.name });
     closeConfirmDialog();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 watch(

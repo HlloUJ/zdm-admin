@@ -141,28 +141,25 @@
       </t-form>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
+      object-type="供应商"
+      :object-name="confirmState.row?.name"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import {
   createSupplier,
   deleteSupplier,
@@ -326,7 +323,7 @@ const loadSuppliers = async () => {
     tableData.value = records.map(toSupplierItem);
     ensureCurrentPage();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '供应商列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '供应商列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -408,9 +405,9 @@ const handleSubmit = async () => {
     }
 
     closeFormDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.success(dialogMode.value === 'create' ? '已新增供应商' : '已保存供应商');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
@@ -418,14 +415,14 @@ const openStatusConfirm = (row: SupplierItem) => {
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
-  confirmState.content = `是否${isNormal ? '停用' : '启用'}供应商【${row.name}】？`;
+  confirmState.content = `是否${isNormal ? '停用' : '启用'}供应商“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
 const openDeleteConfirm = (row: SupplierItem) => {
   confirmState.type = 'delete';
   confirmState.row = row;
-  confirmState.content = `是否删除供应商【${row.name}】？`;
+  confirmState.content = `是否删除供应商“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -466,9 +463,15 @@ const handleConfirm = async () => {
     }
 
     closeConfirmDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.success(
+      confirmState.type === 'delete'
+        ? '已删除供应商'
+        : confirmState.type === 'enable'
+          ? '已启用供应商'
+          : '已停用供应商',
+    );
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 

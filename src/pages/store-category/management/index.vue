@@ -149,46 +149,44 @@
       </t-form>
     </AdminDialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="deleteVisible"
-      header="删除分类"
-      width="440px"
-      placement="center"
-      :confirm-btn="deleteTarget?.productCount ? '我知道了' : '确认删除'"
-      :cancel-btn="deleteTarget?.productCount ? null : '取消'"
+      action="删除"
+      object-type="分类"
+      :object-name="deleteTarget?.name"
+      :mode="deleteBlocked ? 'blocked' : 'confirm'"
       @confirm="handleDeleteConfirm"
     >
       <template v-if="deleteTarget?.productCount">
         分类“{{ deleteTarget.name }}”已关联
         {{ deleteTarget.productCount }} 个商品，不能删除。请停用该分类，避免新商品继续使用。
       </template>
+      <template v-else-if="deleteParent && deleteTarget === deleteParent && deleteParent.children.length">
+        分类“{{ deleteTarget?.name }}”包含二级分类，请先删除或转移二级分类。
+      </template>
       <template v-else>删除后不可恢复，确认删除分类“{{ deleteTarget?.name }}”吗？</template>
-    </t-dialog>
+    </AdminConfirmDialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      :close-on-overlay-click="true"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="statusTarget?.status === 'enabled' ? '停用' : '启用'"
+      object-type="分类"
+      :object-name="statusTarget?.name"
       @confirm="handleStatusConfirm"
       @close="closeStatusConfirm"
     >
       {{ statusConfirmText }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminDialog, AdminPageHeader } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminPageHeader } from '@/components/foundation';
 
 type CategoryStatus = 'enabled' | 'disabled';
 type FormMode = 'create' | 'edit';
@@ -335,8 +333,14 @@ const parentName = computed(() => categoryData.value.find((item) => item.id === 
 const statusConfirmText = computed(() => {
   if (!statusTarget.value) return '';
   const name = statusTarget.value.name;
-  return statusTarget.value.status === 'enabled' ? `是否停用分类【${name}】？` : `是否启用分类【${name}】？`;
+  return statusTarget.value.status === 'enabled' ? `是否停用分类“${name}”？` : `是否启用分类“${name}”？`;
 });
+const deleteBlocked = computed(() =>
+  Boolean(
+    deleteTarget.value?.productCount ||
+    (deleteParent.value && deleteTarget.value === deleteParent.value && deleteParent.value.children.length),
+  ),
+);
 
 const syncSort = () =>
   categoryData.value.forEach((item, index) => {
@@ -400,7 +404,7 @@ const handleSubmit = async () => {
   if (result !== true) return;
   const name = formData.name.trim();
   if (categoryNameExists()) {
-    MessagePlugin.warning('同级分类名称不能重复');
+    adminFeedback.warning('同级分类名称不能重复');
     return;
   }
   if (formMode.value === 'create') {
@@ -417,17 +421,17 @@ const handleSubmit = async () => {
         children: [],
       });
     }
-    MessagePlugin.success('新增成功');
+    adminFeedback.actionSuccess({ action: '新增', target: name });
   } else if (formData.parentId) {
     const child = categoryData.value
       .find((item) => item.id === formData.parentId)
       ?.children.find((item) => item.id === formData.id);
     if (child) Object.assign(child, { name });
-    MessagePlugin.success('保存成功');
+    adminFeedback.actionSuccess({ action: '保存', target: name });
   } else {
     const parent = categoryData.value.find((item) => item.id === formData.id);
     if (parent) Object.assign(parent, { name });
-    MessagePlugin.success('保存成功');
+    adminFeedback.actionSuccess({ action: '保存', target: name });
   }
   closeFormDialog();
 };
@@ -444,7 +448,7 @@ const applyStatusChange = (parent: CategoryGroup, child?: CategoryChild) => {
     parent.children.forEach((item) => {
       item.status = 'disabled';
     });
-  MessagePlugin.success(`${target.status === 'enabled' ? '已启用' : '已停用'}“${target.name}”`);
+  adminFeedback.success(`${target.status === 'enabled' ? '已启用' : '已停用'}“${target.name}”`);
 };
 
 const openStatusConfirm = (parent: CategoryGroup, child?: CategoryChild) => {
@@ -483,7 +487,7 @@ const moveCategory = (category: CategoryGroup, offset: number) => {
     categoryData.value[index],
   ];
   syncSort();
-  MessagePlugin.success('排序已更新');
+  adminFeedback.success('排序已更新');
 };
 
 const moveChild = (parent: CategoryGroup, child: CategoryChild, offset: number) => {
@@ -491,7 +495,7 @@ const moveChild = (parent: CategoryGroup, child: CategoryChild, offset: number) 
   const targetIndex = index + offset;
   if (index < 0 || targetIndex < 0 || targetIndex >= parent.children.length) return;
   [parent.children[index], parent.children[targetIndex]] = [parent.children[targetIndex], parent.children[index]];
-  MessagePlugin.success('排序已更新');
+  adminFeedback.success('排序已更新');
 };
 
 const openDeleteDialog = (parent: CategoryGroup, child?: CategoryChild) => {
@@ -502,18 +506,14 @@ const openDeleteDialog = (parent: CategoryGroup, child?: CategoryChild) => {
 
 const handleDeleteConfirm = () => {
   if (!deleteTarget.value) return;
-  if (!deleteTarget.value.productCount) {
+  if (!deleteBlocked.value) {
     if (deleteParent.value && deleteTarget.value !== deleteParent.value) {
       deleteParent.value.children = deleteParent.value.children.filter((item) => item.id !== deleteTarget.value?.id);
     } else if (deleteParent.value) {
-      if (deleteParent.value.children.length) {
-        MessagePlugin.warning('请先删除或转移二级分类');
-        return;
-      }
       categoryData.value = categoryData.value.filter((item) => item.id !== deleteParent.value?.id);
       syncSort();
     }
-    MessagePlugin.success('删除成功');
+    adminFeedback.actionSuccess({ action: '删除', target: deleteTarget.value.name });
   }
   deleteVisible.value = false;
   deleteParent.value = null;

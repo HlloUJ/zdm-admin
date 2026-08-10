@@ -178,19 +178,17 @@
       </t-form>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
+      object-type="成品工艺"
+      :object-name="confirmState.row?.name"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
 
     <t-dialog
       v-model:visible="imagePreviewVisible"
@@ -210,10 +208,9 @@
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, UploadFile } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
@@ -397,7 +394,7 @@ const loadCrafts = async () => {
     tableData.value = records.map(toCraftItem);
     ensureCurrentPage();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '工艺列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '工艺列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -480,7 +477,7 @@ const handleSubmit = async () => {
     (item) => item.id !== editingId.value && item.name.trim() === normalizedName,
   );
   if (duplicateName) {
-    MessagePlugin.warning('工艺名称已存在');
+    adminFeedback.warning('工艺名称已存在');
     return;
   }
 
@@ -496,10 +493,11 @@ const handleSubmit = async () => {
       await loadCrafts();
     }
 
+    const action = dialogMode.value === 'create' ? '新增' : '保存';
     closeFormDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.actionSuccess({ action, target: normalizedName });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
@@ -507,14 +505,14 @@ const openStatusConfirm = (row: CraftItem) => {
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
-  confirmState.content = isNormal ? `是否停用工艺【${row.name}】？` : `是否启用工艺【${row.name}】？`;
+  confirmState.content = isNormal ? `是否停用工艺“${row.name}”？` : `是否启用工艺“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
 const openDeleteConfirm = (row: CraftItem) => {
   confirmState.type = 'delete';
   confirmState.row = row;
-  confirmState.content = `是否删除工艺【${row.name}】？`;
+  confirmState.content = `是否删除工艺“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -538,27 +536,29 @@ const ensureCurrentPage = () => {
 
 const handleConfirm = async () => {
   if (!confirmState.row) return;
+  const target = confirmState.row;
+  const action = confirmState.type === 'delete' ? '删除' : confirmState.type === 'enable' ? '启用' : '停用';
 
   try {
     if (confirmState.type === 'delete') {
-      await deleteCraft(confirmState.row.id);
-      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      await deleteCraft(target.id);
+      tableData.value = tableData.value.filter((item) => item.id !== target.id);
       ensureCurrentPage();
     } else {
       const updated = await updateCraftStatus(
-        confirmState.row.id,
+        target.id,
         toBackendStatus(confirmState.type === 'enable' ? 'normal' : 'disabled'),
       );
-      const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
+      const targetIndex = tableData.value.findIndex((item) => item.id === target.id);
       if (targetIndex !== -1) {
         tableData.value.splice(targetIndex, 1, toCraftItem(updated));
       }
     }
 
     closeConfirmDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.actionSuccess({ action, target: target.name });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 

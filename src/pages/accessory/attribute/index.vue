@@ -193,28 +193,25 @@
       </div>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
+      object-type="属性"
+      :object-name="confirmState.row?.name"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref } from 'vue';
 type AttributeStatus = 'normal' | 'disabled';
 type ControlType = 'input' | 'select';
@@ -446,7 +443,7 @@ const handleSubmit = async () => {
 
   pagination.current = 1;
   closeFormDialog();
-  MessagePlugin.success('操作成功');
+  adminFeedback.actionSuccess({ action: '新增', target: formData.name.trim() });
 };
 
 const openOptionDialog = (row: AttributeItem) => {
@@ -469,17 +466,17 @@ const handleAddOption = () => {
   const value = optionInput.value.trim();
   const code = optionCodeInput.value.trim();
   if (!value) {
-    MessagePlugin.warning('请输入选项值');
+    adminFeedback.warning('请输入选项值');
     return;
   }
 
   if (!code) {
-    MessagePlugin.warning('请输入选项编码');
+    adminFeedback.warning('请输入选项编码');
     return;
   }
 
   if (currentOptions.value.some((item) => item.value === value || item.code === code)) {
-    MessagePlugin.warning('选项名称或编码已存在');
+    adminFeedback.warning('选项名称或编码已存在');
     return;
   }
 
@@ -488,12 +485,12 @@ const handleAddOption = () => {
   optionInput.value = '';
   optionCodeInput.value = '';
   optionPagination.current = 1;
-  MessagePlugin.success('添加成功');
+  adminFeedback.success('添加成功');
 };
 
 const handleToggleOption = (row: OptionItem) => {
   row.status = row.status === 'normal' ? 'disabled' : 'normal';
-  MessagePlugin.success(row.status === 'normal' ? '已启用标准选项' : '已停用标准选项');
+  adminFeedback.success(row.status === 'normal' ? '已启用标准选项' : '已停用标准选项');
 };
 
 const valueModeLabel = (row: AttributeItem) => {
@@ -505,14 +502,14 @@ const openStatusConfirm = (row: AttributeItem) => {
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
-  confirmState.content = `是否${isNormal ? '停用' : '启用'}属性【${row.name}】？`;
+  confirmState.content = `是否${isNormal ? '停用' : '启用'}属性“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
 const openDeleteConfirm = (row: AttributeItem) => {
   confirmState.type = 'delete';
   confirmState.row = row;
-  confirmState.content = `是否删除属性【${row.name}】？`;
+  confirmState.content = `是否删除属性“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -533,7 +530,7 @@ const handleConfirm = () => {
   if (confirmState.type === 'delete') {
     if (confirmState.row.options.length) {
       closeConfirmDialog();
-      MessagePlugin.warning('属性已有标准选项，不能直接删除；请停用属性或先解除分类模板引用');
+      adminFeedback.warning('属性已有标准选项，不能直接删除；请停用属性或先解除分类模板引用');
       return;
     }
     tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
@@ -543,7 +540,9 @@ const handleConfirm = () => {
   }
 
   closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+  adminFeedback.success(
+    confirmState.type === 'delete' ? '已删除属性' : confirmState.type === 'enable' ? '已启用属性' : '已停用属性',
+  );
 };
 </script>
 

@@ -417,7 +417,7 @@ test('validates role and data permission before enabling employee', async ({ pag
   await pendingEmployeeRow.getByText('启用', { exact: true }).click();
 
   await expect(page.getByText('请先为员工配置角色和数据权限后再启用')).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '是否启用员工【待启用员工】？' })).toHaveCount(0);
+  await expect(page.locator('.t-dialog').filter({ hasText: '是否启用员工“待启用员工”？' })).toHaveCount(0);
 });
 
 test('opens enable confirmation after employee permissions are configured', async ({ page }) => {
@@ -443,7 +443,7 @@ test('opens enable confirmation after employee permissions are configured', asyn
   await pendingEmployeeRow.getByText('启用', { exact: true }).click();
 
   await expect(
-    page.locator('.t-dialog').filter({ hasText: '是否启用员工【待启用员工】？启用后恢复登录权限。' }),
+    page.locator('.t-dialog').filter({ hasText: '是否启用员工“待启用员工”？启用后恢复登录权限。' }),
   ).toBeVisible();
 });
 
@@ -726,7 +726,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await operationRoleRow.getByText('删除', { exact: true }).click();
   const deleteDialog = page.locator('.t-dialog').filter({ hasText: '是否删除角色' });
   await expect(deleteDialog).toContainText(
-    '是否删除角色【运营管理平台角色】？删除后，使用该角色的用户将被清空角色并自动停用账号，无法继续登录。请及时为相关用户重新分配角色。',
+    '是否删除角色“运营管理平台角色”？删除后，使用该角色的用户将被清空角色并自动停用账号，无法继续登录。请及时为相关用户重新分配角色。',
   );
   await deleteDialog.getByRole('button', { name: '取消' }).click();
 });
