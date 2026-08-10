@@ -192,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { adminFeedback, AdminConfirmDialog } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminListLayout, AdminPageHeader } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
