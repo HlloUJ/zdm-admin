@@ -170,7 +170,7 @@ export function parseBackendPortBindings(value) {
   try {
     const bindings = JSON.parse(value);
     const port = Number(bindings?.['8080/tcp']?.[0]?.HostPort);
-    return Number.isInteger(port) ? port : null;
+    return Number.isInteger(port) && port >= BACKEND_PORT_START && port <= BACKEND_PORT_END ? port : null;
   } catch {
     return null;
   }

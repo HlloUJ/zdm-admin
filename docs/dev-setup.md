@@ -30,14 +30,13 @@ npm run test:e2e:chrome
 
 ## 启动服务
 
-### 推荐方式
+### 集成环境
 
 ```bash
 npm run integration:dev
 ```
 
-该命令始终从 `codex/integration-current` 对应的固定 Worktree 启动完整项目，与当前正在开发的任务分支无关。集成 Worktree 由 Agent 统一创建和更新，不在其中直接开发。
-macOS 自启服务也固定从该集成 Worktree 启动。E2E 独立使用 `5174` 端口，不会误用 `5173` 上的日常浏览器服务。
+该命令始终从 `codex/integration-current` 固定 Worktree 启动已经正式交付的组合版本，不在其中直接开发。集成前端固定使用 `5173`，集成后端使用 `8080`。
 
 查看服务状态和手机可访问的局域网地址：
 
@@ -45,11 +44,44 @@ macOS 自启服务也固定从该集成 Worktree 启动。E2E 独立使用 `5174
 npm run integration:status
 ```
 
-仅需要隔离调试当前任务分支时，才在当前 Worktree 使用 `npm run dev:all`。查看 Git、远程和集成状态：
+查看 Git、远程和集成状态：
 
 ```bash
 npm run git:state
 ```
+
+### 当前任务预览
+
+macOS 首次在任一任务 Worktree 安装一次登录常驻服务：
+
+```bash
+npm run dev:task:install
+```
+
+以后切换任务时，只需在目标任务 Worktree 运行：
+
+```bash
+npm run dev:task
+```
+
+- `http://127.0.0.1:5175` 永远是当前任务预览；切换任务不需要更换地址。
+- 预览由当前用户的 `launchd` 托管，关闭终端不会停止；下次登录会恢复上次选择的任务。Docker Desktop 未运行时，守护服务会在后台启动并等待就绪，不依赖 Docker 自身的登录项。
+- `npm run dev:task:status` 查看当前任务和进程，`npm run dev:task:logs -- --lines 200` 查看日志；更新守护脚本后重新运行一次 `dev:task:install` 即可原位升级。
+- 纯前端任务复用集成后端；后端、API、Flyway 或运行配置任务启动该 Worktree 的任务后端。
+- 两种模式都使用唯一的集成 MySQL 和 `zdm_admin`，所以 5175 手工验收产生的数据会永久保留并被后续任务复用。
+- 只有并行对比时使用 `npm run dev:task -- --temporary`，该模式仍在当前终端前台运行，临时端口为 `5176-5199`；Playwright 固定使用 `5174`。
+- `npm run dev:task:foreground` 仅用于调试启动器；日常验收不使用。
+- `npm run dev:task:stop` 停止当前任务前后端并让守护服务保持空闲，不删除共享数据库或备份；再次运行 `npm run dev:task` 即可恢复。
+
+Flyway 迁移会自动检查其他共享数据库任务后端、暂停当前任务与集成后端、备份数据库并锁定任务切换；存在其他任务写入者时停止并报告，不会批量停止。非迁移但会批量删除、清空或破坏性导入数据时运行 `npm run dev:task -- --database-risk`。任务正式提交、推送并同步集成分支后运行：
+
+```bash
+npm run dev:task:handoff
+```
+
+该命令只有在集成分支已经包含任务提交且集成后端恢复健康时才释放数据库锁；备份仍保留，等待单独的清理确认。
+
+集成数据库可能包含尚未进入 `main` 的迁移。启动器会把集成分支迁移和当前任务迁移合成临时只读目录供任务后端完整校验；同版本不同文件、同文件内容不一致、失败迁移或 checksum 异常都会停止启动，不会通过忽略规则绕过。
 
 ### 分开启动
 
@@ -63,7 +95,9 @@ npm run dev
 
 ## 访问地址
 
-- 前端管理后台：`http://127.0.0.1:5173`
+- 当前任务预览：`http://127.0.0.1:5175`
+- 集成环境：`http://127.0.0.1:5173`
+- Playwright：`http://127.0.0.1:5174`
 - 后端健康检查：`http://127.0.0.1:8080/actuator/health`
 - Swagger UI：`http://127.0.0.1:8080/swagger-ui.html`
 - OpenAPI JSON：`http://127.0.0.1:8080/v3/api-docs`
@@ -111,7 +145,7 @@ npm run backend:test
 npm run backend:quality
 ```
 
-- 后端代码或 Flyway 迁移调整后，使用 `backend:restart` 让现有开发服务重新编译并应用迁移。
+- 普通集成后端代码调整可使用 `backend:restart`；任务中的后端或 Flyway 变化统一从任务 Worktree 运行 `dev:task`，不得绕过数据库备份与任务代码路由。
 - `backend:ensure` 会校验后端容器实际挂载的 Worktree；目录不匹配时自动从当前目录重建后端，完整验收会在 E2E 前自动执行。
 - 日常后端改动使用 `backend:test`。
 - 发布、合并或高风险回归使用 `backend:quality`。
@@ -127,6 +161,8 @@ npm run backend:quality
 - 密码：`zdm_admin_pwd`
 - 端口：`3306`
 - 数据卷：`zdm-admin_zdm_platform_mysql`
+
+5173、5175、集成后端和任务后端共同使用这一套开发数据库，不创建任务数据库、不克隆数据，也不存在预览数据回写或双向同步。页面 E2E 使用接口 Mock，后端自动化测试使用 Testcontainers，两者不污染该数据库。MySQL 和集成后端容器使用 `restart: unless-stopped`；任务预览服务在登录后确保 Docker Desktop 启动，再由 Docker 恢复容器。当前任务前端由用户级 `launchd` 恢复，任务后端仍按代码改动按需启动，不常驻所有任务。
 
 查看容器：
 
@@ -151,10 +187,10 @@ scripts/backup-db.sh
 恢复数据库：
 
 ```bash
-scripts/restore-db.sh backups/zdm_admin-YYYYmmdd-HHMMSS.sql.gz
+ZDM_CONFIRM_RESTORE=zdm_admin scripts/restore-db.sh backups/zdm_admin-YYYYmmdd-HHMMSS.sql.gz
 ```
 
-脚本会优先使用正在运行的 Docker MySQL 容器；如果容器不存在，则回退到本机 `mysqldump` 或 `mysql` 命令。
+恢复会覆盖当前开发数据，只能在用户明确确认后执行。脚本会优先使用正在运行的 Docker MySQL 容器；如果容器不存在，则回退到本机 `mysqldump` 或 `mysql` 命令。任务启动器生成的迁移前备份位于集成 Worktree 的 `backups/task-preview/`，不会在交付时自动删除。
 
 ## 代码回滚
 
