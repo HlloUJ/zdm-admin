@@ -5,10 +5,11 @@ import vue from '@vitejs/plugin-vue';
 import { defineConfig, loadEnv } from 'vite';
 
 const TASK_PREVIEW_CONTROL_PATH = '/__zdm_task_preview__';
+const TASK_PREVIEW_API_HEALTH_PATH = '/__zdm_task_preview_api_health__';
 const TASK_PREVIEW_CONTROL_HEADER = 'x-zdm-task-preview-control';
 const TASK_PREVIEW_CONTROL_VALUE = 'switch-current-task';
 
-function taskPreviewControlPlugin({ workspaceRoot, branch }) {
+function taskPreviewControlPlugin({ workspaceRoot, branch, mode, apiTarget }) {
   return {
     name: 'zdm-task-preview-control',
     configureServer(server) {
@@ -20,7 +21,15 @@ function taskPreviewControlPlugin({ workspaceRoot, branch }) {
         }
         if (request.method === 'GET') {
           response.setHeader('Content-Type', 'application/json; charset=utf-8');
-          response.end(JSON.stringify({ type: 'zdm-task-preview', workspaceRoot, branch }));
+          response.end(
+            JSON.stringify({
+              type: 'zdm-task-preview',
+              workspaceRoot,
+              branch,
+              mode,
+              apiTarget,
+            }),
+          );
           return;
         }
         if (
@@ -53,10 +62,23 @@ export default defineConfig(({ mode }) => {
   const frontendPort = Number(process.env.ZDM_FRONTEND_PORT || 5173);
   const apiProxyTarget = process.env.ZDM_API_PROXY_TARGET || 'http://127.0.0.1:8080';
   const taskBranch = process.env.ZDM_TASK_BRANCH || '';
+  const taskMode = process.env.ZDM_TASK_MODE || '';
 
   return {
     root: workspaceRoot,
-    plugins: [vue(), ...(taskPreview ? [taskPreviewControlPlugin({ workspaceRoot, branch: taskBranch })] : [])],
+    plugins: [
+      vue(),
+      ...(taskPreview
+        ? [
+            taskPreviewControlPlugin({
+              workspaceRoot,
+              branch: taskBranch,
+              mode: taskMode,
+              apiTarget: apiProxyTarget,
+            }),
+          ]
+        : []),
+    ],
     resolve: {
       alias: {
         '@': resolve(workspaceRoot, 'src'),
@@ -74,6 +96,15 @@ export default defineConfig(({ mode }) => {
           }
         : undefined,
       proxy: {
+        ...(taskPreview
+          ? {
+              [TASK_PREVIEW_API_HEALTH_PATH]: {
+                target: apiProxyTarget,
+                changeOrigin: true,
+                rewrite: () => '/actuator/health',
+              },
+            }
+          : {}),
         '/api': {
           target: apiProxyTarget,
           changeOrigin: true,
