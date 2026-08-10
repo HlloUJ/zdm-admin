@@ -11,11 +11,7 @@ export interface EmployeeRecord {
   roleIds?: string;
   dataPermission?: 'self' | 'all';
   remark?: string;
-  inviterName?: string;
-  invitedByName?: string;
   createdByName?: string;
-  inviter?: string;
-  createdBy?: string | number;
   createdAt?: string;
   updatedAt?: string;
 }

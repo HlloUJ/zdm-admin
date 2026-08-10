@@ -283,7 +283,7 @@ interface EmployeeItem {
   roleIds: string[];
   status: EmployeeStatus;
   remark: string;
-  inviterName: string;
+  createdByName: string;
   registeredAt: string;
   functionPermissions: string[];
   dataPermission: '' | DataPermission;
@@ -383,7 +383,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'phone', title: '手机号码', width: 140, align: 'left' },
   { colKey: 'roles', title: '角色', width: 160, align: 'left' },
   { colKey: 'status', title: '状态', width: 88, align: 'left' },
-  { colKey: 'inviterName', title: '邀请人', width: 112, align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: 112, align: 'left' },
   { colKey: 'registeredAt', title: '注册时间', width: 160, align: 'left' },
   { colKey: 'remark', title: '备注', width: 150, align: 'left' },
   { colKey: 'operation', title: '操作', width: 200, align: 'left', fixed: 'right' },
@@ -485,12 +485,6 @@ const formatDateTime = (value?: string) => {
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const resolveInviterName = (record: EmployeeRecord) => {
-  const candidates = [record.inviterName, record.invitedByName, record.createdByName, record.inviter, record.createdBy];
-  const inviter = candidates.map((value) => String(value ?? '').trim()).find(Boolean);
-  return inviter ?? '-';
-};
-
 const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
   const roleIds = parseRoleIds(record.roleIds);
   return {
@@ -501,7 +495,7 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
     roleIds,
     status: normalizeStatus(record.status),
     remark: record.remark ?? '',
-    inviterName: resolveInviterName(record),
+    createdByName: record.createdByName?.trim() || '-',
     registeredAt: formatDateTime(record.createdAt),
     functionPermissions: expandRolePermissions(roleIds),
     dataPermission: record.dataPermission ?? '',
