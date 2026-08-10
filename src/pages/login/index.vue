@@ -53,8 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import { adminFeedback } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { onBeforeUnmount, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -131,7 +131,7 @@ const onSubmit = async (ctx: SubmitContext) => {
     });
     await router.push(getFirstAccessiblePath(result.user) || '/dashboard');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '登录失败，请稍后重试');
+    adminFeedback.error(error instanceof Error ? error.message : '登录失败，请稍后重试');
   } finally {
     submitting.value = false;
   }

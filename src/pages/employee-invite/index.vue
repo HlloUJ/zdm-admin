@@ -104,8 +104,8 @@
 </template>
 
 <script setup lang="ts">
+import { adminFeedback } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
@@ -199,9 +199,9 @@ const sendCode = async () => {
   try {
     await requestEmployeeInviteCode(token.value, { phone: phoneForm.phone });
     startCounter();
-    MessagePlugin.success('验证码已发送');
+    adminFeedback.success('验证码已发送');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '验证码获取失败');
+    adminFeedback.error(error instanceof Error ? error.message : '验证码获取失败');
   } finally {
     requestingCode.value = false;
   }
@@ -214,7 +214,7 @@ const handlePhoneSubmit = async (ctx: SubmitContext) => {
     await verifyEmployeeInviteCode(token.value, phoneForm);
     step.value = 2;
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '验证码校验失败');
+    adminFeedback.error(error instanceof Error ? error.message : '验证码校验失败');
   } finally {
     submitting.value = false;
   }
@@ -232,7 +232,7 @@ const handleProfileSubmit = async (ctx: SubmitContext) => {
     });
     submitted.value = true;
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '注册提交失败');
+    adminFeedback.error(error instanceof Error ? error.message : '注册提交失败');
   } finally {
     submitting.value = false;
   }

@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { MessagePlugin } from 'tdesign-vue-next';
+import { adminFeedback } from '@/components/foundation';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -46,7 +46,7 @@ const roleText = computed(() => {
 
 const handleLogout = async () => {
   await logout();
-  MessagePlugin.success('已退出登录');
+  adminFeedback.success('已退出登录');
   await router.replace('/login');
 };
 </script>

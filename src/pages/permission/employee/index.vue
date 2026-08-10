@@ -231,30 +231,27 @@
       </t-form>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确定"
-      cancel-btn="取消"
+      :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
+      object-type="员工"
+      :object-name="confirmEmployee?.name"
       @confirm="handleConfirmSubmit"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmText }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
@@ -522,7 +519,7 @@ const loadPermissionCenter = async () => {
     operationRoles.value = roles.filter((role) => role.category === 'operation-platform' && role.status === 'enabled');
     employees.value = records.map(toEmployeeItem);
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '员工列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '员工列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -550,7 +547,7 @@ const openInviteDialog = async () => {
     inviteLink.value = generateInviteLink(invite.token);
     inviteDialogVisible.value = true;
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '邀请链接生成失败');
+    adminFeedback.error(error instanceof Error ? error.message : '邀请链接生成失败');
   } finally {
     inviteCreating.value = false;
   }
@@ -580,7 +577,7 @@ const copyInviteLink = async () => {
     document.execCommand('copy');
     document.body.removeChild(textarea);
   }
-  MessagePlugin.success({ content: '复制成功', duration: 3000 });
+  adminFeedback.success('已复制邀请链接');
 };
 
 const openProfileDialog = (row: EmployeeItem) => {
@@ -598,7 +595,7 @@ const closeProfileDialog = () => {
 
 const openPermissionDialog = (row: EmployeeItem) => {
   if (isSuperAdminEmployee(row)) {
-    MessagePlugin.warning('超级管理员天然拥有全量权限，无需配置权限');
+    adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
   activeEmployee.value = row;
@@ -630,9 +627,9 @@ const handleProfileSubmit = async () => {
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
       }
-      MessagePlugin.success('资料更新成功');
+      adminFeedback.success('资料更新成功');
     } catch (error) {
-      MessagePlugin.error(error instanceof Error ? error.message : '更新失败');
+      adminFeedback.error(error instanceof Error ? error.message : '更新失败');
       return;
     }
   }
@@ -643,11 +640,11 @@ const handleProfileSubmit = async () => {
 const handlePermissionSubmit = async () => {
   if ((await permissionFormRef.value?.validate()) !== true) return;
   if (!permissionFormData.roleIds.length) {
-    MessagePlugin.warning('请选择角色');
+    adminFeedback.warning('请选择角色');
     return;
   }
   if (!permissionFormData.dataPermission) {
-    MessagePlugin.warning('请选择数据权限');
+    adminFeedback.warning('请选择数据权限');
     return;
   }
   if (activeEmployee.value) {
@@ -660,9 +657,9 @@ const handlePermissionSubmit = async () => {
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
       }
-      MessagePlugin.success('权限配置成功');
+      adminFeedback.success('权限配置成功');
     } catch (error) {
-      MessagePlugin.error(error instanceof Error ? error.message : '更新失败');
+      adminFeedback.error(error instanceof Error ? error.message : '更新失败');
       return;
     }
   }
@@ -685,15 +682,15 @@ const validateEmployeeBeforeEnable = (row: EmployeeItem) => {
   const missingRole = row.roleIds.length === 0;
   const missingDataPermission = !row.dataPermission;
   if (missingRole && missingDataPermission) {
-    MessagePlugin.warning('请先为员工配置角色和数据权限后再启用');
+    adminFeedback.warning('请先为员工配置角色和数据权限后再启用');
     return false;
   }
   if (missingRole) {
-    MessagePlugin.warning('请先为员工配置角色后再启用');
+    adminFeedback.warning('请先为员工配置角色后再启用');
     return false;
   }
   if (missingDataPermission) {
-    MessagePlugin.warning('请先为员工配置数据权限后再启用');
+    adminFeedback.warning('请先为员工配置数据权限后再启用');
     return false;
   }
   return true;
@@ -701,7 +698,7 @@ const validateEmployeeBeforeEnable = (row: EmployeeItem) => {
 
 const openStatusConfirm = (row: EmployeeItem) => {
   if (isSuperAdminEmployee(row)) {
-    MessagePlugin.warning('超级管理员不可停用或启用');
+    adminFeedback.warning('超级管理员不可停用或启用');
     return;
   }
   const nextType = row.status === 'normal' ? 'disable' : 'enable';
@@ -714,7 +711,7 @@ const openStatusConfirm = (row: EmployeeItem) => {
 
 const openDeleteConfirm = (row: EmployeeItem) => {
   if (isSuperAdminEmployee(row)) {
-    MessagePlugin.warning('超级管理员不可删除');
+    adminFeedback.warning('超级管理员不可删除');
     return;
   }
   confirmEmployee.value = row;
@@ -729,9 +726,9 @@ const closeConfirmDialog = () => {
 
 const confirmText = computed(() => {
   const name = confirmEmployee.value?.name ?? '';
-  if (confirmType.value === 'disable') return `是否停用员工【${name}】？停用后该员工无法登录后台。`;
-  if (confirmType.value === 'enable') return `是否启用员工【${name}】？启用后恢复登录权限。`;
-  return `是否删除员工【${name}】？删除后账号数据不可恢复。`;
+  if (confirmType.value === 'disable') return `是否停用员工“${name}”？停用后该员工无法登录后台。`;
+  if (confirmType.value === 'enable') return `是否启用员工“${name}”？启用后恢复登录权限。`;
+  return `是否删除员工“${name}”？删除后账号数据不可恢复。`;
 });
 
 const handleConfirmSubmit = async () => {
@@ -742,7 +739,7 @@ const handleConfirmSubmit = async () => {
       await deleteEmployee(confirmEmployee.value.id);
       employees.value = employees.value.filter((employee) => employee.id !== confirmEmployee.value?.id);
       if (pagination.current > pageCount.value) pagination.current = pageCount.value;
-      MessagePlugin.success('删除成功');
+      adminFeedback.actionSuccess({ action: '删除', target: confirmEmployee.value.name });
     } else {
       const updated = await updateEmployee(
         confirmEmployee.value.id,
@@ -755,10 +752,13 @@ const handleConfirmSubmit = async () => {
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
       }
-      MessagePlugin.success('操作成功');
+      adminFeedback.actionSuccess({
+        action: confirmType.value === 'disable' ? '停用' : '启用',
+        target: confirmEmployee.value.name,
+      });
     }
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
     return;
   }
   closeConfirmDialog();

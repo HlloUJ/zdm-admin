@@ -950,29 +950,26 @@
       </div>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="430px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmAction"
+      object-type="商品"
+      :object-name="confirmState.product?.name"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { PrimaryTableCol, RowspanColspan, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import {
   createFinishedProduct,
   deleteFinishedProduct,
@@ -1459,6 +1456,20 @@ const confirmState = reactive<{ type: ConfirmType; product: StockItem | null; co
   product: null,
   content: '',
 });
+const confirmAction = computed(() => {
+  const actionMap: Record<ConfirmType, string> = {
+    shelf: '上架',
+    delete: '删除',
+    restore: '恢复',
+    purge: '彻底删除',
+    reject: '驳回',
+    batchShelf: '批量上架',
+    batchRestore: '批量恢复',
+    batchPurge: '批量彻底删除',
+    clearRecycle: '清空回收站',
+  };
+  return actionMap[confirmState.type];
+});
 
 const createStoneImage = (seed: number) => {
   const palettes = [
@@ -1612,7 +1623,7 @@ const loadInventoryData = async () => {
     dataItems.value = products.map(toStockItem);
     selectedKeys.value = [];
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '成品库存加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '成品库存加载失败');
   } finally {
     loading.value = false;
   }
@@ -1891,7 +1902,7 @@ const handleTabChange = () => {
 const handleSearch = () => {
   Object.assign(currentAppliedFilter.value, currentFilter.value);
   currentPagination.value.current = 1;
-  MessagePlugin.success('已按筛选条件刷新列表');
+  adminFeedback.success('已按筛选条件刷新列表');
 };
 
 const handleReset = () => {
@@ -1922,7 +1933,7 @@ const handleBatchAction = (action: BatchAction) => {
     return;
   }
   if (action !== 'clearRecycle' && selectedKeys.value.length === 0) {
-    MessagePlugin.warning('请先选择商品');
+    adminFeedback.warning('请先选择商品');
     return;
   }
   if (action === 'batchShelf') {
@@ -1955,7 +1966,7 @@ const handleRowAction = (action: RowAction, row: StockItem) => {
     return;
   }
   if (action === 'shelf') {
-    openConfirm('shelf', row, `是否上架商品【${fullName}】？`);
+    openConfirm('shelf', row, `是否上架商品“${fullName}”？`);
     return;
   }
   if (action === 'offShelf') {
@@ -1967,14 +1978,14 @@ const handleRowAction = (action: RowAction, row: StockItem) => {
     return;
   }
   if (action === 'restore') {
-    openConfirm('restore', row, `是否放回到仓库【${fullName}】？`);
+    openConfirm('restore', row, `是否放回到仓库“${fullName}”？`);
     return;
   }
   if (action === 'delete') {
-    openConfirm('delete', row, `是否删除商品【${fullName}】？`);
+    openConfirm('delete', row, `是否删除商品“${fullName}”？`);
     return;
   }
-  openConfirm('purge', row, `是否彻底删除商品【${fullName}】？`);
+  openConfirm('purge', row, `是否彻底删除商品“${fullName}”？`);
 };
 
 const movementTypeLabel = (type: MovementType) =>
@@ -2022,7 +2033,7 @@ const openMovementDrawer = async (row: StockItem) => {
         return (Number.isNaN(secondTime) ? 0 : secondTime) - (Number.isNaN(firstTime) ? 0 : firstTime);
       });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '库存流水加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '库存流水加载失败');
   } finally {
     movementLoading.value = false;
   }
@@ -2201,13 +2212,13 @@ const simulateUpload = (target: UploadTarget) => {
   if (target === 'mainImage' || target === 'video') {
     uploadState[target] = true;
   }
-  MessagePlugin.success(`${labelMap[target]}已选择占位资源`);
+  adminFeedback.success(`${labelMap[target]}已选择占位资源`);
 };
 
 const simulateSpecImageUpload = (row: SpecRow, field: SpecImageField) => {
   const key = `${field}Image` as 'specImage' | 'materialImage' | 'lengthImage' | 'colorImage' | 'sizeImage';
   row[key] = true;
-  MessagePlugin.success('规格图片已选择占位资源');
+  adminFeedback.success('规格图片已选择占位资源');
 };
 
 const isConfirmedImageField = (field: LayeredSpecField) => confirmedImageField.value === field;
@@ -2388,7 +2399,7 @@ const removeSpecValue = (name: string, index: number) => {
   const group = specGroups.find((item) => item.name === name);
   if (!group) return;
   if (group.values.length <= 1) {
-    MessagePlugin.warning('至少需要输入一个属性值');
+    adminFeedback.warning('至少需要输入一个属性值');
     return;
   }
   group?.values.splice(index, 1);
@@ -2396,7 +2407,7 @@ const removeSpecValue = (name: string, index: number) => {
 
 const toggleSpecGroup = (group: SpecGroup) => {
   if (!group.selected && selectedSpecGroups.value.length >= 3) {
-    MessagePlugin.warning('最多只能选择3个销售属性');
+    adminFeedback.warning('最多只能选择3个销售属性');
     return;
   }
   group.selected = !group.selected;
@@ -2466,7 +2477,7 @@ const confirmCreateSpec = () => {
           )
       : buildLayeredSpecRows();
   if (!rows.length) {
-    MessagePlugin.warning('请至少配置一条商品规格');
+    adminFeedback.warning('请至少配置一条商品规格');
     return;
   }
   confirmedSpecMode.value = specMode.value;
@@ -2476,7 +2487,7 @@ const confirmCreateSpec = () => {
   specRows.value = rows;
   priceRows.value = rows.map(specToPriceRow);
   closeSpecDialog();
-  MessagePlugin.success('规格表格已生成');
+  adminFeedback.success('规格表格已生成');
 };
 
 const normalizeLayeredValue = (field: LayeredSpecField, value: string) =>
@@ -2600,7 +2611,7 @@ const savePriceDrawer = () => {
   if (priceDrawerMode.value === 'batchFill') {
     const matchedIds = new Set(batchFillMatchedRows.value.map((row) => row.id));
     if (!matchedIds.size) {
-      MessagePlugin.warning('当前条件下没有可批量填写的规格');
+      adminFeedback.warning('当前条件下没有可批量填写的规格');
       return;
     }
     specRows.value = specRows.value.map((row) => {
@@ -2622,7 +2633,7 @@ const savePriceDrawer = () => {
         : row;
     });
     priceRows.value = specRows.value.map(specToPriceRow);
-    MessagePlugin.success(`已批量填充 ${matchedIds.size} 条规格`);
+    adminFeedback.success(`已批量填充 ${matchedIds.size} 条规格`);
   }
   closePriceDrawer();
 };
@@ -2643,7 +2654,7 @@ const validateProductForm = () => {
   const failed = checks.find((item) => !item.valid);
   if (failed) {
     formTab.value = failed.tab;
-    MessagePlugin.warning(failed.message);
+    adminFeedback.warning(failed.message);
     return false;
   }
   return true;
@@ -2694,9 +2705,9 @@ const submitProductForm = async () => {
       await createMovement(created.id, 'initial', 0, payload.totalStock ?? 0, '新建成品库存');
     }
     formPageVisible.value = false;
-    MessagePlugin.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+    adminFeedback.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '商品提交失败');
+    adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');
   } finally {
     saving.value = false;
   }
@@ -2717,7 +2728,7 @@ const closeReasonDialog = () => {
 
 const submitReason = async () => {
   if (!reasonForm.reason) {
-    MessagePlugin.warning('请选择原因');
+    adminFeedback.warning('请选择原因');
     return;
   }
   closeReasonDialog();
@@ -2725,19 +2736,19 @@ const submitReason = async () => {
   try {
     if (reasonState.type === 'reject' && reasonState.product) {
       await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason || '平台驳回');
-      MessagePlugin.success('商品已驳回');
+      adminFeedback.success('商品已驳回');
       return;
     }
     if (reasonState.isBatch) {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'offShelf', reasonForm.reason)));
       selectedKeys.value = [];
-      MessagePlugin.success('已批量下架');
+      adminFeedback.success('已批量下架');
     } else if (reasonState.product) {
       await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason);
-      MessagePlugin.success('商品已下架');
+      adminFeedback.success('商品已下架');
     }
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   } finally {
     saving.value = false;
   }
@@ -2820,9 +2831,9 @@ const handleConfirm = async () => {
       selectedKeys.value = [];
     }
     closeConfirmDialog();
-    MessagePlugin.success('操作已完成');
+    adminFeedback.success('操作已完成');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   } finally {
     saving.value = false;
   }

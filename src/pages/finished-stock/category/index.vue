@@ -288,28 +288,25 @@
       </div>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="
+        confirmState.type === 'delete-category' ? '删除' : confirmState.type === 'remove-attribute' ? '移除' : '发布'
+      "
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { computed, reactive, ref } from 'vue';
 type TabKey = 'goods' | 'sales';
 type ControlType = 'input' | 'select';
@@ -825,7 +822,7 @@ const selectCategory = (id: string) => {
   if (!node) return;
   if (node.children.length) {
     node.expanded = !node.expanded;
-    MessagePlugin.info('请选择末级类目查看属性');
+    adminFeedback.info('请选择末级类目查看属性');
     return;
   }
   selectedCategoryId.value = id;
@@ -838,7 +835,7 @@ const toggleCategory = (node: CategoryNode) => {
 
 const openCreateDialog = (parent?: CategoryNode) => {
   if (parent && getCategoryLevel(parent.id) >= maxCategoryLevel - 1) {
-    MessagePlugin.warning('类目最多支持创建4级');
+    adminFeedback.warning('类目最多支持创建4级');
     return;
   }
 
@@ -885,14 +882,14 @@ const handleCategorySubmit = async () => {
   }
 
   closeCategoryDialog();
-  MessagePlugin.success('操作成功');
+  adminFeedback.success(categoryDialogMode.value === 'create' ? '已新增分类' : '已保存分类');
 };
 
 const openDeleteCategoryConfirm = (node: CategoryNode) => {
   confirmState.type = 'delete-category';
   confirmState.category = node;
   confirmState.attribute = null;
-  confirmState.content = `是否删除类目【${node.name}】？`;
+  confirmState.content = `是否删除类目“${node.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -931,7 +928,7 @@ const submitAttributeTransfer = () => {
   currentState.value.categoryAttributes[selectedCategoryId.value] = [...newlyBoundRows, ...keptRows];
   currentState.value.pagination.current = 1;
   closeAttributeTransferDialog();
-  MessagePlugin.success('关联成功');
+  adminFeedback.success('关联成功');
 };
 
 const openOptionTransferDialog = (row: AttributeItem) => {
@@ -964,24 +961,24 @@ const submitOptionTransfer = () => {
     optionTransferTarget.value.optionIds = [...tempOptionIds.value];
   }
   closeOptionTransferDialog();
-  MessagePlugin.success('关联成功');
+  adminFeedback.success('关联成功');
 };
 
 const markRequired = (row: AttributeItem, checked: unknown) => {
   row.required = Boolean(checked);
-  MessagePlugin.success(row.required ? '已设为必填' : '已取消必填');
+  adminFeedback.success(row.required ? '已设为必填' : '已取消必填');
 };
 
 const markSpecBuild = (row: AttributeItem, checked: unknown) => {
   row.specBuild = Boolean(checked);
-  MessagePlugin.success(row.specBuild ? '已参与规格构建' : '已取消规格构建');
+  adminFeedback.success(row.specBuild ? '已参与规格构建' : '已取消规格构建');
 };
 
 const openRemoveAttributeConfirm = (row: AttributeItem) => {
   confirmState.type = 'remove-attribute';
   confirmState.category = null;
   confirmState.attribute = row;
-  confirmState.content = `是否移除属性【${row.name}】？`;
+  confirmState.content = `是否移除属性“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -989,7 +986,7 @@ const openPublishConfirm = (row: AttributeItem) => {
   confirmState.type = 'publish-attribute';
   confirmState.category = null;
   confirmState.attribute = row;
-  confirmState.content = `是否发布属性【${row.name}】？`;
+  confirmState.content = `是否发布属性“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -1028,7 +1025,13 @@ const handleConfirm = () => {
   }
 
   closeConfirmDialog();
-  MessagePlugin.success('操作成功');
+  adminFeedback.success(
+    confirmState.type === 'delete-category'
+      ? '已删除分类'
+      : confirmState.type === 'remove-attribute'
+        ? '已移除分类属性'
+        : '已发布分类属性',
+  );
 };
 </script>
 

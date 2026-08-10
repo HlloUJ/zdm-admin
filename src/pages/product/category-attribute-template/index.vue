@@ -351,57 +351,55 @@
       </t-table>
     </AdminDialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="roleChangeConfirmVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      action="修改"
+      object-type="属性角色"
+      :object-name="roleChangeTarget?.name"
       @confirm="handleRoleChangeConfirm"
       @close="closeRoleChangeConfirm"
     >
       {{ roleChangeConfirmText }}
-    </t-dialog>
+    </AdminConfirmDialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="publishConfirmVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="publishTarget?.publishStatus === 'published' ? '取消发布' : '发布'"
+      object-type="属性"
+      :object-name="publishTarget?.name"
       @confirm="handlePublishConfirm"
       @close="closePublishConfirm"
     >
-      {{ publishTarget?.publishStatus === 'published' ? '是否取消发布' : '是否发布' }}属性【{{
-        publishTarget?.name
-      }}】？
-    </t-dialog>
+      {{ publishTarget?.publishStatus === 'published' ? '是否取消发布' : '是否发布' }}属性“{{ publishTarget?.name }}”？
+    </AdminConfirmDialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="deleteConfirmVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      action="移除"
+      object-type="属性"
+      :object-name="deleteTarget?.name"
       @confirm="handleDelete"
       @close="closeDeleteConfirm"
     >
-      是否移除属性【{{ deleteTarget?.name }}】？
-    </t-dialog>
+      是否移除属性“{{ deleteTarget?.name }}”？
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination } from '@/components/foundation';
+import {
+  adminFeedback,
+  AdminConfirmDialog,
+  AdminDialog,
+  AdminListLayout,
+  AdminPageHeader,
+  AdminPagination,
+} from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -824,7 +822,7 @@ async function loadData() {
     syncSelectedCategory();
     expandAllCategories();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '类目属性模板加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '类目属性模板加载失败');
   } finally {
     loading.value = false;
   }
@@ -850,7 +848,7 @@ function handlePaginationChange(pageInfo: PageInfo) {
 function openBindDialog() {
   if (!canBindAttribute.value) return;
   if (!selectedCategoryId.value) {
-    MessagePlugin.warning('请选择分类');
+    adminFeedback.warning('请选择分类');
     return;
   }
   bindSearchKeyword.value = '';
@@ -874,13 +872,13 @@ async function submitBind() {
       !bindForm.attributeIds.includes(item.attributeId),
   );
   if (!selectedCategoryId.value) {
-    MessagePlugin.warning('请选择分类');
+    adminFeedback.warning('请选择分类');
     return;
   }
   if (removedBindings.length && !canRemoveBinding.value) return;
   if (!newAttributeIds.length && !removedBindings.length) {
     closeBindDialog();
-    MessagePlugin.info('绑定关系未变更');
+    adminFeedback.info('绑定关系未变更');
     return;
   }
   try {
@@ -893,11 +891,12 @@ async function submitBind() {
     const removedIds = new Set(removedBindings.map((item) => item.id));
     bindings.value = bindings.value.filter((item) => !removedIds.has(item.id));
     bindings.value.push(...created);
+    const target = selectedCategoryPath.value;
     closeBindDialog();
-    MessagePlugin.success('绑定关系已更新');
+    adminFeedback.actionSuccess({ action: '更新绑定关系', target });
   } catch (error) {
     await loadData();
-    MessagePlugin.error(error instanceof Error ? error.message : '绑定关系更新失败');
+    adminFeedback.error(error instanceof Error ? error.message : '绑定关系更新失败');
   }
 }
 
@@ -913,7 +912,7 @@ async function openValueBindingDialog(row: BindingRow) {
       .filter((option) => option.selected && option.status === 'enabled')
       .map((option) => option.id);
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '选项值加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '选项值加载失败');
     closeValueBindingDialog();
   } finally {
     valueOptionsLoading.value = false;
@@ -939,7 +938,7 @@ async function openBoundValueView(row: BindingRow) {
     const options = await listCategoryAttributeValueOptions(row.id);
     boundValueOptions.value = options.filter((option) => option.selected && option.status === 'enabled');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '已绑定选项值加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '已绑定选项值加载失败');
     closeBoundValueView();
   } finally {
     boundValueViewLoading.value = false;
@@ -966,9 +965,9 @@ async function removeBoundValue(row: CategoryAttributeValueOption) {
     bindings.value = bindings.value.map((binding) =>
       binding.id === boundValueViewTarget.value?.id ? { ...binding, optionCount } : binding,
     );
-    MessagePlugin.success('选项值已移除');
+    adminFeedback.actionSuccess({ action: '移除', target: row.value });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '选项值移除失败');
+    adminFeedback.error(error instanceof Error ? error.message : '选项值移除失败');
   } finally {
     boundValueRemovingId.value = null;
   }
@@ -976,20 +975,18 @@ async function removeBoundValue(row: CategoryAttributeValueOption) {
 
 async function submitValueBindings() {
   if (!canBindOptionValues.value || !valueBindingTarget.value || valueBindingsSaving.value) return;
+  const target = valueBindingTarget.value;
   valueBindingsSaving.value = true;
   try {
-    const updatedOptions = await updateCategoryAttributeValueBindings(
-      valueBindingTarget.value.id,
-      selectedValueIds.value,
-    );
+    const updatedOptions = await updateCategoryAttributeValueBindings(target.id, selectedValueIds.value);
     const optionCount = updatedOptions.filter((option) => option.selected && option.status === 'enabled').length;
     bindings.value = bindings.value.map((binding) =>
-      binding.id === valueBindingTarget.value?.id ? { ...binding, optionCount } : binding,
+      binding.id === target.id ? { ...binding, optionCount } : binding,
     );
-    MessagePlugin.success('选项值绑定成功');
+    adminFeedback.actionSuccess({ action: '绑定选项值', target: target.name });
     closeValueBindingDialog();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '选项值绑定失败');
+    adminFeedback.error(error instanceof Error ? error.message : '选项值绑定失败');
   } finally {
     valueBindingsSaving.value = false;
   }
@@ -1011,9 +1008,9 @@ async function persistRow(
     const updated = await updateCategoryAttribute(row.id, toPayload(nextRow));
     const index = bindings.value.findIndex((item) => item.id === row.id);
     if (index >= 0) bindings.value[index] = updated;
-    MessagePlugin.success('操作成功');
+    adminFeedback.actionSuccess({ action: field === null ? '绑定' : '保存', target: row.name });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   } finally {
     savingId.value = null;
     savingField.value = null;
@@ -1077,7 +1074,7 @@ function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: u
   const currentRow = getCurrentBindingRow(row);
   const nextValue = getSwitchValue(value);
   if (field === 'skuFlag' && nextValue && currentRow.attributeRole !== 'sales') {
-    MessagePlugin.error('只有销售属性才能参与SKU组合');
+    adminFeedback.error('只有销售属性才能参与SKU组合');
     return;
   }
   if (
@@ -1086,7 +1083,7 @@ function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: u
     !currentRow.skuFlag &&
     allBindingRows.value.filter((item) => item.skuFlag).length >= MAX_SKU_ATTRIBUTE_COUNT
   ) {
-    MessagePlugin.error(SKU_ATTRIBUTE_LIMIT_MESSAGE);
+    adminFeedback.error(SKU_ATTRIBUTE_LIMIT_MESSAGE);
     return;
   }
   persistRow(currentRow, { [field]: nextValue }, field);
@@ -1110,9 +1107,9 @@ async function handleDragSort(context: { current: BindingRow; target: BindingRow
     const updatedRows = await Promise.all(orderedRows.map((item) => updateCategoryAttribute(item.id, toPayload(item))));
     const updatedMap = new Map(updatedRows.map((item) => [item.id, item]));
     bindings.value = bindings.value.map((item) => updatedMap.get(item.id) ?? item);
-    MessagePlugin.success('排序已更新');
+    adminFeedback.actionSuccess({ action: '更新排序', target: context.current.name });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '排序保存失败');
+    adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
     await loadData();
   } finally {
     savingId.value = null;
@@ -1130,9 +1127,12 @@ async function togglePublish(row: BindingRow) {
         : await publishCategoryAttribute(row.id);
     const index = bindings.value.findIndex((item) => item.id === row.id);
     if (index >= 0) bindings.value[index] = updated;
-    MessagePlugin.success(row.publishStatus === 'published' ? '已取消发布' : '发布成功');
+    adminFeedback.actionSuccess({
+      action: row.publishStatus === 'published' ? '取消发布' : '发布',
+      target: row.name,
+    });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '发布状态更新失败');
+    adminFeedback.error(error instanceof Error ? error.message : '发布状态更新失败');
   } finally {
     savingId.value = null;
   }
@@ -1141,18 +1141,18 @@ async function togglePublish(row: BindingRow) {
 async function openPublishConfirm(row: BindingRow) {
   if (!canTogglePublish.value || savingId.value !== null) return;
   if (row.publishStatus === 'unpublished' && !row.attributeRole) {
-    MessagePlugin.error('请先选择属性角色');
+    adminFeedback.error('请先选择属性角色');
     return;
   }
   if (row.publishStatus === 'unpublished' && row.valueType === 'select') {
     try {
       const options = await listCategoryAttributeValueOptions(row.id);
       if (!options.some((option) => option.selected && option.status === 'enabled')) {
-        MessagePlugin.error('请先绑定选项值');
+        adminFeedback.error('请先绑定选项值');
         return;
       }
     } catch (error) {
-      MessagePlugin.error(error instanceof Error ? error.message : '选项值加载失败');
+      adminFeedback.error(error instanceof Error ? error.message : '选项值加载失败');
       return;
     }
   }
@@ -1185,13 +1185,14 @@ function closeDeleteConfirm() {
 async function handleDelete() {
   if (!canRemoveBinding.value) return;
   if (!deleteTarget.value) return;
+  const target = deleteTarget.value;
   try {
-    await deleteCategoryAttribute(deleteTarget.value.id);
-    bindings.value = bindings.value.filter((item) => item.id !== deleteTarget.value?.id);
+    await deleteCategoryAttribute(target.id);
+    bindings.value = bindings.value.filter((item) => item.id !== target.id);
     closeDeleteConfirm();
-    MessagePlugin.success('移除成功');
+    adminFeedback.actionSuccess({ action: '移除', target: target.name });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '移除失败');
+    adminFeedback.error(error instanceof Error ? error.message : '移除失败');
   }
 }
 

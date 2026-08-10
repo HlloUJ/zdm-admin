@@ -119,25 +119,23 @@
       </t-form>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      :header="confirmState.title"
-      width="420px"
-      placement="center"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
+      object-type="品种"
+      :object-name="confirmState.row?.name"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
       {{ confirmState.content }}
-    </t-dialog>
+    </AdminConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { adminFeedback, AdminConfirmDialog } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { getLoginUser } from '@/services/auth';
@@ -223,12 +221,10 @@ const formRules: Record<string, FormRule[]> = {
 
 const confirmDialogVisible = ref(false);
 const confirmState = reactive<{
-  title: string;
   content: string;
   type: ConfirmType;
   row: VarietyItem | null;
 }>({
-  title: '',
   content: '',
   type: 'disable',
   row: null,
@@ -290,7 +286,7 @@ const loadVarieties = async () => {
     tableData.value = records.map(toVarietyItem);
     ensureCurrentPage();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '品种列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '品种列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -357,27 +353,27 @@ const handleSubmit = async () => {
       await loadVarieties();
     }
 
+    const action = dialogMode.value === 'create' ? '新增' : '保存';
+    const target = formData.name.trim();
     closeFormDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.actionSuccess({ action, target });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
 const openStatusConfirm = (row: VarietyItem) => {
   const isNormal = row.status === 'normal';
-  confirmState.title = isNormal ? '确认停用' : '确认启用';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
-  confirmState.content = `是否${isNormal ? '停用' : '启用'}品种【${row.name}】？`;
+  confirmState.content = `是否${isNormal ? '停用' : '启用'}品种“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
 const openDeleteConfirm = (row: VarietyItem) => {
-  confirmState.title = '确认删除';
   confirmState.type = 'delete';
   confirmState.row = row;
-  confirmState.content = `是否删除品种【${row.name}】？`;
+  confirmState.content = `是否删除品种“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
 
@@ -395,27 +391,29 @@ const ensureCurrentPage = () => {
 
 const handleConfirm = async () => {
   if (!confirmState.row) return;
+  const target = confirmState.row;
+  const action = confirmState.type === 'delete' ? '删除' : confirmState.type === 'enable' ? '启用' : '停用';
 
   try {
     if (confirmState.type === 'delete') {
-      await deleteSlabVariety(confirmState.row.id);
-      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      await deleteSlabVariety(target.id);
+      tableData.value = tableData.value.filter((item) => item.id !== target.id);
       ensureCurrentPage();
     } else {
       const updated = await updateSlabVarietyStatus(
-        confirmState.row.id,
+        target.id,
         toBackendStatus(confirmState.type === 'enable' ? 'normal' : 'disabled'),
       );
-      const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
+      const targetIndex = tableData.value.findIndex((item) => item.id === target.id);
       if (targetIndex !== -1) {
         tableData.value.splice(targetIndex, 1, toVarietyItem(updated));
       }
     }
 
     closeConfirmDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.actionSuccess({ action, target: target.name });
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 

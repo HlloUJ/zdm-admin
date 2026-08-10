@@ -113,20 +113,17 @@
       </t-form>
     </t-dialog>
 
-    <t-dialog
+    <AdminConfirmDialog
       v-model:visible="deleteDialogVisible"
-      header="系统提示"
-      width="420px"
-      placement="center"
-      :close-on-overlay-click="true"
-      confirm-btn="确认"
-      cancel-btn="取消"
+      action="删除"
+      object-type="角色"
+      :object-name="deletingRole?.name"
       @confirm="handleDeleteConfirm"
       @cancel="closeDeleteDialog"
       @close="closeDeleteDialog"
     >
       {{ deleteConfirmText }}
-    </t-dialog>
+    </AdminConfirmDialog>
 
     <t-dialog
       v-model:visible="permissionDialogVisible"
@@ -277,12 +274,11 @@
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   collectFunctionCatalogRows,
@@ -426,7 +422,7 @@ const pageData = computed(() => {
 });
 const deleteConfirmText = computed(
   () =>
-    `是否删除角色【${deletingRole.value?.name ?? ''}】？删除后，使用该角色的用户将被清空角色并自动停用账号，无法继续登录。请及时为相关用户重新分配角色。`,
+    `是否删除角色“${deletingRole.value?.name ?? ''}”？删除后，使用该角色的用户将被清空角色并自动停用账号，无法继续登录。请及时为相关用户重新分配角色。`,
 );
 const activePermissionModule = computed(
   () => permissionModules.find((module) => module.value === activePermissionModuleValue.value) ?? permissionModules[0],
@@ -495,7 +491,7 @@ const loadRoles = async () => {
       .map(toRoleItem);
     ensureCurrentPage();
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '角色列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '角色列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -624,15 +620,15 @@ const handleSubmit = async () => {
     }
 
     closeFormDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.success(dialogMode.value === 'create' ? '已新增角色' : '已保存角色');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
 const openDeleteConfirm = (row: RoleItem) => {
   if (isSuperAdminRole(row)) {
-    MessagePlugin.warning('超级管理员角色不可删除');
+    adminFeedback.warning('超级管理员角色不可删除');
     return;
   }
   deletingRole.value = row;
@@ -652,15 +648,15 @@ const handleDeleteConfirm = async () => {
     roles.value = roles.value.filter((item) => item.id !== deletingRole.value?.id);
     ensureCurrentPage();
     closeDeleteDialog();
-    MessagePlugin.success('操作成功');
+    adminFeedback.success('已删除角色');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
 const openPermissionDialog = (row: RoleItem) => {
   if (isSuperAdminRole(row)) {
-    MessagePlugin.warning('超级管理员天然拥有全量权限，无需配置权限');
+    adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
   permissionRole.value = row;
@@ -688,7 +684,7 @@ const clearAllPermissions = () => {
 const handlePermissionSave = async () => {
   if (!permissionRole.value) return;
   if (!permissionModules.length) {
-    MessagePlugin.warning('全量功能目录暂未发布，无法保存功能权限');
+    adminFeedback.warning('全量功能目录暂未发布，无法保存功能权限');
     return;
   }
 
@@ -702,9 +698,9 @@ const handlePermissionSave = async () => {
       roles.value.splice(targetIndex, 1, toRoleItem(updated));
     }
     closePermissionDialog();
-    MessagePlugin.success('保存成功');
+    adminFeedback.success('角色功能权限已保存');
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : '保存失败');
+    adminFeedback.error(error instanceof Error ? error.message : '保存失败');
   }
 };
 
