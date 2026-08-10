@@ -978,10 +978,7 @@ async function submitValueBindings() {
   const target = valueBindingTarget.value;
   valueBindingsSaving.value = true;
   try {
-    const updatedOptions = await updateCategoryAttributeValueBindings(
-      target.id,
-      selectedValueIds.value,
-    );
+    const updatedOptions = await updateCategoryAttributeValueBindings(target.id, selectedValueIds.value);
     const optionCount = updatedOptions.filter((option) => option.selected && option.status === 'enabled').length;
     bindings.value = bindings.value.map((binding) =>
       binding.id === target.id ? { ...binding, optionCount } : binding,
