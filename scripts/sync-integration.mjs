@@ -72,7 +72,7 @@ try {
           .status === 0;
       if (mergeInProgress) run(['merge', '--abort'], integrationWorktree.path);
       throw new Error(
-        `任务分支合入集成分支失败，集成 Worktree 已恢复：${error instanceof Error ? error.message : error}`,
+        `任务分支合入集成分支失败，集成 Worktree 已恢复。请停止并报告冲突，不得手工扩展到任务范围外文件：${error instanceof Error ? error.message : error}`,
         { cause: error },
       );
     }

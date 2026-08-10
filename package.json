@@ -5,6 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --configLoader runner --host 0.0.0.0",
+    "dev:task": "node scripts/task-preview-service.mjs switch",
+    "dev:task:foreground": "node scripts/dev-task.mjs",
+    "dev:task:install": "node scripts/task-preview-service.mjs install",
+    "dev:task:status": "node scripts/task-preview-service.mjs status",
+    "dev:task:logs": "node scripts/task-preview-service.mjs logs",
+    "dev:task:stop": "node scripts/task-preview-service.mjs stop",
+    "dev:task:handoff": "node scripts/dev-task.mjs --handoff",
     "dev:all": "node scripts/dev-all.mjs",
     "dev:status": "node scripts/dev-status.mjs",
     "integration:dev": "node scripts/run-integration.mjs dev:all",

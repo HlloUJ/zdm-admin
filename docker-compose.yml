@@ -4,6 +4,7 @@ services:
   mysql:
     image: mysql:8.4
     container_name: zdm-platform-mysql
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: zdm_admin
       MYSQL_USER: zdm_admin
@@ -23,6 +24,7 @@ services:
   backend:
     image: maven:3.9.9-eclipse-temurin-21
     container_name: zdm-platform-backend
+    restart: unless-stopped
     working_dir: /workspace/backend
     command: mvn spring-boot:run
     environment:
