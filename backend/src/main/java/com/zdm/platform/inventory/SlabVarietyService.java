@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import java.util.List;
 import java.util.Objects;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,17 +26,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
       CurrentIdentityProvider identityProvider) {
     this.slabInventoryMapper = slabInventoryMapper;
     this.identityProvider = identityProvider;
-  }
-
-  public List<SlabVariety> listForCurrentAdmin() {
-    CurrentIdentity identity = identityProvider.require();
-    if (identity.isSuperAdmin() || "all".equals(identity.dataPermission())) {
-      return list();
-    }
-    if (!StringUtils.hasText(identity.displayName())) {
-      return List.of();
-    }
-    return lambdaQuery().eq(SlabVariety::getCreatedByName, identity.displayName()).list();
   }
 
   @Transactional
