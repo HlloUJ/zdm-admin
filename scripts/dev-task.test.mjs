@@ -188,6 +188,8 @@ test('creates a stable and worktree-specific Compose project name', () => {
 
 test('reads a task backend port from Docker bindings', () => {
   assert.equal(parseBackendPortBindings('{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8086"}]}'), 8086);
+  assert.equal(parseBackendPortBindings('{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8080"}]}'), null);
+  assert.equal(parseBackendPortBindings('{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8100"}]}'), null);
   assert.equal(parseBackendPortBindings('{}'), null);
   assert.equal(parseBackendPortBindings('invalid'), null);
 });
