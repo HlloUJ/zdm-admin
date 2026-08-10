@@ -310,7 +310,7 @@ test('opens employee invite and edit dialogs', async ({ page }) => {
 
   await expect(main.getByText('员工管理')).toBeVisible();
   await expect(main.getByText(/共 \d+ 条数据/)).toBeVisible();
-  await expect(main.locator('thead')).toContainText('邀请人');
+  await expect(main.locator('thead')).toContainText('创建人');
   await expect(main.locator('thead')).toContainText('注册时间');
 
   await main.getByRole('button', { name: /邀请员工/ }).click();
