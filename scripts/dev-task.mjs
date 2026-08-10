@@ -15,7 +15,7 @@ import { once } from 'node:events';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,11 +31,20 @@ const SHARED_API_TARGET = 'http://127.0.0.1:8080';
 const INTEGRATION_MYSQL_CONTAINER = 'zdm-platform-mysql';
 const INTEGRATION_NETWORK = 'zdm-admin_default';
 const TASK_PREVIEW_CONTROL_PATH = '/__zdm_task_preview__';
+export const TASK_PREVIEW_API_HEALTH_PATH = '/__zdm_task_preview_api_health__';
 const TASK_PREVIEW_CONTROL_HEADER = 'x-zdm-task-preview-control';
 const TASK_PREVIEW_CONTROL_VALUE = 'switch-current-task';
 const MAVEN_VOLUME = 'zdm-admin_zdm_maven_repo';
 const CRAFT_IMAGE_VOLUME = 'zdm-admin_zdm_craft_images';
 const DATABASE_LOCK_FILENAME = 'active-database-task.json';
+const PREVIEW_SERVICE_SOCKET = path.join(
+  homedir(),
+  'Library',
+  'Application Support',
+  'zdm-admin',
+  'task-preview',
+  'service.sock',
+);
 const launcherRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const taskComposeFile = path.join(launcherRoot, 'docker-compose.task.yml');
 
@@ -50,6 +59,7 @@ export function parseTaskPreviewArgs(args) {
     databaseRisk: false,
     handoff: false,
     stop: false,
+    check: false,
     help: false,
   };
   for (let index = 0; index < args.length; index += 1) {
@@ -60,6 +70,10 @@ export function parseTaskPreviewArgs(args) {
     }
     if (value === '--stop') {
       result.stop = true;
+      continue;
+    }
+    if (value === '--check') {
+      result.check = true;
       continue;
     }
     if (value === '--temporary') {
@@ -200,6 +214,46 @@ export function parseTaskPreviewMetadata(value) {
   } catch {
     return null;
   }
+}
+
+export function taskPreviewReadinessErrors({
+  metadata,
+  expectedWorkspaceRoot = null,
+  expectedBranch = null,
+  expectedMode = null,
+  expectedApiTarget = null,
+  healthStatus = 0,
+  healthBody = '',
+}) {
+  if (!metadata) return ['当前端口不是可识别的装点猫任务预览'];
+  const errors = [];
+  if (typeof metadata.mode !== 'string' || typeof metadata.apiTarget !== 'string') {
+    errors.push('预览元数据版本过旧，无法证明 API 链路；请重新运行 dev:task');
+  }
+  if (expectedWorkspaceRoot && path.resolve(metadata.workspaceRoot) !== path.resolve(expectedWorkspaceRoot)) {
+    errors.push(`当前预览属于 ${metadata.workspaceRoot}，不是 ${expectedWorkspaceRoot}`);
+  }
+  if (expectedBranch && metadata.branch !== expectedBranch) {
+    errors.push(`当前预览分支为 ${metadata.branch || '(未知)'}，不是 ${expectedBranch}`);
+  }
+  if (expectedMode && metadata.mode !== expectedMode) {
+    errors.push(`当前预览模式为 ${metadata.mode || '(未知)'}，不是 ${expectedMode}`);
+  }
+  if (expectedApiTarget && metadata.apiTarget !== expectedApiTarget) {
+    errors.push(`当前 API 目标为 ${metadata.apiTarget || '(未知)'}，不是 ${expectedApiTarget}`);
+  }
+  if (errors.length === 0) {
+    if (healthStatus !== 200) {
+      errors.push(`预览 API 代理不可用（HTTP ${healthStatus || '无法连接'}）`);
+    } else {
+      try {
+        if (JSON.parse(healthBody)?.status !== 'UP') errors.push('预览 API 代理未返回 UP');
+      } catch {
+        errors.push('预览 API 健康检查返回了非 JSON 内容');
+      }
+    }
+  }
+  return errors;
 }
 
 export function parseDatabaseLock(value) {
@@ -378,20 +432,30 @@ function composeRun(context, args) {
   run('docker', [...context.args, ...args], context);
 }
 
-function requestStatus(url, timeoutMs = 1_000) {
+function requestResponse(url, timeoutMs = 1_000) {
   return new Promise((resolve) => {
     const target = new URL(url);
     const client = target.protocol === 'https:' ? https : http;
     const request = client.get(target, { timeout: timeoutMs }, (response) => {
-      response.resume();
-      resolve(response.statusCode ?? 0);
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => {
+        resolve({
+          statusCode: response.statusCode ?? 0,
+          body: Buffer.concat(chunks).toString('utf8'),
+        });
+      });
     });
     request.once('timeout', () => {
       request.destroy();
-      resolve(0);
+      resolve({ statusCode: 0, body: '' });
     });
-    request.once('error', () => resolve(0));
+    request.once('error', () => resolve({ statusCode: 0, body: '' }));
   });
+}
+
+async function requestStatus(url, timeoutMs = 1_000) {
+  return (await requestResponse(url, timeoutMs)).statusCode;
 }
 
 function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
@@ -422,9 +486,121 @@ function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
   });
 }
 
+function previewServiceRequest(method, requestPath, timeoutMs = 30_000) {
+  return new Promise((resolve) => {
+    if (!existsSync(PREVIEW_SERVICE_SOCKET)) {
+      resolve({ statusCode: 0, body: '' });
+      return;
+    }
+    const request = http.request(
+      {
+        socketPath: PREVIEW_SERVICE_SOCKET,
+        path: requestPath,
+        method,
+        timeout: timeoutMs,
+      },
+      (response) => {
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => {
+          resolve({ statusCode: response.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') });
+        });
+      },
+    );
+    request.once('timeout', () => {
+      request.destroy();
+      resolve({ statusCode: 0, body: '' });
+    });
+    request.once('error', () => resolve({ statusCode: 0, body: '' }));
+    request.end();
+  });
+}
+
+function parseJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+export function previewServiceOwnsWorktree(status, root) {
+  return (
+    status?.type === 'zdm-task-preview-service' &&
+    typeof status.worktree === 'string' &&
+    path.resolve(status.worktree) === path.resolve(root)
+  );
+}
+
+async function stopSupervisedPreview(root) {
+  const currentResponse = await previewServiceRequest('GET', '/status');
+  const currentStatus = currentResponse.statusCode === 200 ? parseJson(currentResponse.body) : null;
+  if (!previewServiceOwnsWorktree(currentStatus, root)) return false;
+
+  const stopResponse = await previewServiceRequest('POST', '/stop');
+  if (stopResponse.statusCode >= 200 && stopResponse.statusCode < 300) return true;
+  const finalResponse = await previewServiceRequest('GET', '/status');
+  const finalStatus = finalResponse.statusCode === 200 ? parseJson(finalResponse.body) : null;
+  if (previewServiceOwnsWorktree(finalStatus, root)) {
+    throw new Error(`任务预览守护服务未能释放旧任务：${root}`);
+  }
+  return true;
+}
+
 async function currentManagedPreview(port = CURRENT_TASK_FRONTEND_PORT) {
   const response = await taskPreviewControlRequest(port);
   return response.statusCode === 200 ? parseTaskPreviewMetadata(response.body) : null;
+}
+
+async function inspectManagedPreview({
+  port = CURRENT_TASK_FRONTEND_PORT,
+  expectedWorkspaceRoot = null,
+  expectedBranch = null,
+  expectedMode = null,
+  expectedApiTarget = null,
+}) {
+  const metadata = await currentManagedPreview(port);
+  let health = { statusCode: 0, body: '' };
+  if (typeof metadata?.mode === 'string' && typeof metadata?.apiTarget === 'string') {
+    health = await requestResponse(`http://127.0.0.1:${port}${TASK_PREVIEW_API_HEALTH_PATH}`, 3_000);
+  }
+  const errors = taskPreviewReadinessErrors({
+    metadata,
+    expectedWorkspaceRoot,
+    expectedBranch,
+    expectedMode,
+    expectedApiTarget,
+    healthStatus: health.statusCode,
+    healthBody: health.body,
+  });
+  return { metadata, errors };
+}
+
+async function requireManagedPreviewReady(options) {
+  const result = await inspectManagedPreview(options);
+  if (result.errors.length > 0) {
+    throw new Error(result.errors.map((error) => `- ${error}`).join('\n'));
+  }
+  return result.metadata;
+}
+
+async function waitForManagedPreviewReady(options, timeoutMs = 30_000) {
+  let latestErrors = [];
+  try {
+    await waitUntil(
+      async () => {
+        const result = await inspectManagedPreview(options);
+        latestErrors = result.errors;
+        return result.errors.length === 0;
+      },
+      {
+        timeoutMs,
+        message: '等待任务预览 API 链路就绪超时',
+      },
+    );
+  } catch {
+    throw new Error(['等待任务预览 API 链路就绪超时', ...latestErrors.map((error) => `- ${error}`)].join('\n'));
+  }
 }
 
 async function stopManagedPreview(port = CURRENT_TASK_FRONTEND_PORT) {
@@ -687,28 +863,38 @@ async function ensureSharedBackend(worktrees) {
   await waitForHttp(healthUrl);
 }
 
-async function handoffDatabaseTask({ root, branch, project, integrationRoot }) {
+async function handoffDatabaseTask({ root, branch, project, integrationRoot, context }) {
   const lock = readDatabaseLock(integrationRoot);
-  if (!lock) {
-    console.log('当前没有待交接的共享数据库任务。');
-    return;
-  }
-  if (lock.project !== project) throw new Error(databaseLockError(lock, { project, branch }));
+  if (lock && lock.project !== project) throw new Error(databaseLockError(lock, { project, branch }));
   const taskHead = gitCapture(root, ['rev-parse', 'HEAD']);
   const integrationHead = gitCapture(integrationRoot, ['rev-parse', 'HEAD']);
   const contained = spawnSync('git', ['merge-base', '--is-ancestor', taskHead, integrationHead], {
     cwd: integrationRoot,
   }).status;
   if (contained !== 0) {
-    throw new Error('任务提交尚未包含在 codex/integration-current，不能恢复集成后端或释放数据库锁');
+    throw new Error('任务提交尚未包含在 codex/integration-current，不能执行任务交接');
   }
 
+  const supervisedPreviewStopped = await stopSupervisedPreview(root);
+  const managedPreview = supervisedPreviewStopped ? null : await currentManagedPreview();
+  if (managedPreview && path.resolve(managedPreview.workspaceRoot) === path.resolve(root)) {
+    await stopManagedPreview();
+  }
+  if (supervisedPreviewStopped || managedPreview) {
+    console.log(`旧任务预览已停止：${branch}`);
+  }
+  composeRun(context, ['stop', 'backend']);
   await ensureIntegrationDatabase(integrationRoot);
   await startIntegrationBackend(integrationRoot);
-  const { lockFile } = databaseRuntimePaths(integrationRoot);
-  unlinkSync(lockFile);
-  console.log(`数据库任务已交接到集成环境：${branch}`);
-  console.log(`安全备份继续保留：${lock.backupFile}`);
+  if (lock) {
+    const { lockFile } = databaseRuntimePaths(integrationRoot);
+    unlinkSync(lockFile);
+    console.log(`共享数据库锁已释放：${branch}`);
+    console.log(`安全备份继续保留：${lock.backupFile}`);
+  } else {
+    console.log('当前任务没有共享数据库锁。');
+  }
+  console.log(`任务运行环境已交接到集成环境：${branch}`);
 }
 
 function targetViteConfig(root) {
@@ -717,7 +903,7 @@ function targetViteConfig(root) {
   return path.join(launcherRoot, 'vite.config.js');
 }
 
-function spawnFrontend({ root, branch, port, apiTarget }) {
+function spawnFrontend({ root, branch, port, apiTarget, mode }) {
   const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!existsSync(viteBin)) throw new Error(`缺少 Vite：${viteBin}`);
   return spawn(
@@ -739,6 +925,7 @@ function spawnFrontend({ root, branch, port, apiTarget }) {
         ...process.env,
         ZDM_TASK_WORKSPACE: root,
         ZDM_TASK_BRANCH: branch,
+        ZDM_TASK_MODE: mode,
         VITE_PUBLIC_APP_ORIGIN: `http://127.0.0.1:${port}`,
         ZDM_TASK_PREVIEW: '1',
         ZDM_FRONTEND_PORT: String(port),
@@ -795,7 +982,8 @@ Options:
   --api http://...          显式使用指定 API，并进入前端模式
   --database-risk           将非 Flyway 的破坏性数据任务纳入备份与写入锁
   --worktree /path          从新版启动器预览尚未包含该脚本的旧任务 Worktree
-  --handoff                 集成分支包含任务提交后，恢复集成后端并释放数据库锁
+  --check                   检查当前任务预览身份及其 API 代理链路
+  --handoff                 集成分支包含任务提交后，停止任务预览和后端、恢复集成后端并释放数据库锁
   --stop                    仅停止当前任务前端和后端；不删除数据库或备份`);
 }
 
@@ -810,6 +998,30 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error('--database-risk 不能与 --mode frontend 同时使用');
   if (options.port && options.temporary) throw new Error('--port 不能与 --temporary 同时使用');
   if (options.stop && options.handoff) throw new Error('--stop 不能与 --handoff 同时使用');
+  if (
+    options.check &&
+    (options.backendPort ||
+      options.apiTarget ||
+      options.mode !== 'auto' ||
+      options.temporary ||
+      options.databaseRisk ||
+      options.handoff ||
+      options.stop)
+  ) {
+    throw new Error('--check 只能与 --port 或 --worktree 组合使用');
+  }
+
+  if (options.check) {
+    const expectedWorkspaceRoot = options.worktree ? await resolveTargetRoot(options.worktree) : null;
+    const port = options.port || CURRENT_TASK_FRONTEND_PORT;
+    const metadata = await requireManagedPreviewReady({ port, expectedWorkspaceRoot });
+    console.log(`任务预览就绪：http://127.0.0.1:${port}/`);
+    console.log(`Worktree：${metadata.workspaceRoot}`);
+    console.log(`分支：${metadata.branch}`);
+    console.log(`模式：${metadata.mode}`);
+    console.log(`API 目标：${metadata.apiTarget}`);
+    return;
+  }
 
   const root = await resolveTargetRoot(options.worktree);
   const branch = gitCapture(root, ['branch', '--show-current']);
@@ -825,25 +1037,26 @@ export async function main(args = process.argv.slice(2)) {
   const integrationRoot = integrationWorktree.path;
   if (options.handoff) {
     ensureDocker(root);
-    await handoffDatabaseTask({ root, branch, project, integrationRoot });
+    const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
+    const context = composeContext({ root, project, backendPort });
+    await handoffDatabaseTask({ root, branch, project, integrationRoot, context });
     return;
   }
   if (options.stop) {
     const lock = readDatabaseLock(integrationRoot);
-    if (lock?.project === project) {
-      throw new Error(
-        `当前任务仍持有共享数据库锁；先同步集成分支并运行 --handoff，或经用户确认后恢复备份：${lock.backupFile}`,
-      );
-    }
-    const fixedPreview = await currentManagedPreview();
-    if (fixedPreview && path.resolve(fixedPreview.workspaceRoot) === path.resolve(root)) {
-      await stopManagedPreview();
+    const previewPort = options.port || CURRENT_TASK_FRONTEND_PORT;
+    const managedPreview = await currentManagedPreview(previewPort);
+    if (managedPreview && path.resolve(managedPreview.workspaceRoot) === path.resolve(root)) {
+      await stopManagedPreview(previewPort);
     }
     ensureDocker(root);
     const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
     const context = composeContext({ root, project, backendPort });
     composeRun(context, ['stop', 'backend']);
     console.log(`已停止 ${branch} 的任务前端和后端；共享数据库和备份均未删除。`);
+    if (lock?.project === project) {
+      console.log(`共享数据库锁继续保留：${lock.backupFile}`);
+    }
     return;
   }
 
@@ -892,7 +1105,7 @@ export async function main(args = process.argv.slice(2)) {
     for (const file of backendSensitiveFiles(files)) console.log(`- 后端影响：${file}`);
   }
   console.log(
-    `${options.port || options.temporary ? '临时页面地址' : '固定页面地址'}：http://127.0.0.1:${frontendPort}/`,
+    `${options.port || options.temporary ? '准备临时页面' : '准备固定页面'}：http://127.0.0.1:${frontendPort}/`,
   );
   console.log(`API 代理：${apiTarget}`);
   console.log('按 Ctrl+C 只停止前端；任务后端继续保留，数据始终位于集成数据库。');
@@ -940,9 +1153,22 @@ export async function main(args = process.argv.slice(2)) {
             apiTarget = `http://127.0.0.1:${backendPort}`;
             restartingFrontend = true;
             await stopChild(frontend);
-            frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget }));
-            restartingFrontend = false;
             mode = 'full';
+            frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
+            try {
+              await waitForManagedPreviewReady({
+                port: frontendPort,
+                expectedWorkspaceRoot: root,
+                expectedBranch: branch,
+                expectedMode: mode,
+                expectedApiTarget: apiTarget,
+              });
+            } catch (error) {
+              await stopChild(frontend);
+              throw error;
+            } finally {
+              restartingFrontend = false;
+            }
             console.log(`已切换完整模式，页面地址保持：http://127.0.0.1:${frontendPort}/`);
             return;
           }
@@ -961,7 +1187,13 @@ export async function main(args = process.argv.slice(2)) {
             await restartTaskBackend(backendContext);
           }
         })
-        .catch((error) => console.error(error instanceof Error ? error.message : error));
+        .catch(async (error) => {
+          console.error(error instanceof Error ? error.message : error);
+          closeWatchers();
+          await stopChild(frontend);
+          process.exitCode = 1;
+          console.error('任务后端未能恢复健康，已关闭当前任务页面入口。');
+        });
     }, 700);
   });
 
@@ -969,7 +1201,24 @@ export async function main(args = process.argv.slice(2)) {
     clearTimeout(backendTimer);
     for (const watcher of watchers) watcher.close();
   };
-  frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget }));
+  frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
+  try {
+    await waitForManagedPreviewReady({
+      port: frontendPort,
+      expectedWorkspaceRoot: root,
+      expectedBranch: branch,
+      expectedMode: mode,
+      expectedApiTarget: apiTarget,
+    });
+  } catch (error) {
+    closeWatchers();
+    await stopChild(frontend);
+    if (mode === 'full') {
+      console.log('任务后端继续保留，便于检查日志；当前页面入口已关闭。');
+    }
+    throw error;
+  }
+  console.log(`预览 API 链路已就绪：http://127.0.0.1:${frontendPort}/ → ${apiTarget}`);
 
   const shutdown = async () => {
     if (shuttingDown) return;

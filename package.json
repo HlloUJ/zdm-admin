@@ -10,6 +10,7 @@
     "dev:task:install": "node scripts/task-preview-service.mjs install",
     "dev:task:status": "node scripts/task-preview-service.mjs status",
     "dev:task:logs": "node scripts/task-preview-service.mjs logs",
+    "dev:task:check": "node scripts/dev-task.mjs --check",
     "dev:task:stop": "node scripts/task-preview-service.mjs stop",
     "dev:task:handoff": "node scripts/dev-task.mjs --handoff",
     "dev:all": "node scripts/dev-all.mjs",

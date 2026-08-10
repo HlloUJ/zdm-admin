@@ -4,15 +4,13 @@ export function branchKind(branch) {
   if (!branch) return 'detached';
   if (branch === 'main') return 'main';
   if (branch === DEFAULT_INTEGRATION_BRANCH) return 'integration';
-  if (branch.startsWith('codex/acceptance-')) return 'acceptance';
   if (branch.startsWith('codex/')) return 'task';
   return 'other';
 }
 
-export function isManagedCommitBlocked({ branch, mergeInProgress, acceptanceOverride }) {
+export function isManagedCommitBlocked({ branch, mergeInProgress }) {
   const kind = branchKind(branch);
-  if (!['main', 'integration', 'acceptance'].includes(kind) || mergeInProgress) return false;
-  return !(kind === 'acceptance' && acceptanceOverride);
+  return ['main', 'integration'].includes(kind) && !mergeInProgress;
 }
 
 export function parseAheadBehind(value) {

@@ -11,30 +11,18 @@ import {
 } from './git-workflow-core.mjs';
 import { normalizeDockerMountPath } from './backend-runtime.mjs';
 
-test('classifies task, integration, acceptance, and main branches', () => {
+test('classifies task, integration, and main branches', () => {
   assert.equal(branchKind('codex/fix-product-category'), 'task');
   assert.equal(branchKind('codex/integration-current'), 'integration');
-  assert.equal(branchKind('codex/acceptance-2026-08-03'), 'acceptance');
   assert.equal(branchKind('main'), 'main');
 });
 
 test('blocks direct commits on managed branches while allowing merges', () => {
-  for (const branch of ['main', 'codex/integration-current', 'codex/acceptance-2026-08-03']) {
-    assert.equal(isManagedCommitBlocked({ branch, mergeInProgress: false, acceptanceOverride: false }), true);
-    assert.equal(isManagedCommitBlocked({ branch, mergeInProgress: true, acceptanceOverride: false }), false);
+  for (const branch of ['main', 'codex/integration-current']) {
+    assert.equal(isManagedCommitBlocked({ branch, mergeInProgress: false }), true);
+    assert.equal(isManagedCommitBlocked({ branch, mergeInProgress: true }), false);
   }
-  assert.equal(
-    isManagedCommitBlocked({
-      branch: 'codex/acceptance-2026-08-03',
-      mergeInProgress: false,
-      acceptanceOverride: true,
-    }),
-    false,
-  );
-  assert.equal(
-    isManagedCommitBlocked({ branch: 'codex/fix-product-category', mergeInProgress: false, acceptanceOverride: false }),
-    false,
-  );
+  assert.equal(isManagedCommitBlocked({ branch: 'codex/fix-product-category', mergeInProgress: false }), false);
 });
 
 test('parses ahead and behind counts', () => {

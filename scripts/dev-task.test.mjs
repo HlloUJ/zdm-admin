@@ -5,6 +5,9 @@ import test from 'node:test';
 
 import viteConfig from '../vite.config.js';
 
+const syncIntegrationSource = readFileSync(new URL('./sync-integration.mjs', import.meta.url), 'utf8');
+const taskPreviewSource = readFileSync(new URL('./dev-task.mjs', import.meta.url), 'utf8');
+
 import {
   backendSensitiveFiles,
   chooseTaskFrontendPort,
@@ -17,8 +20,10 @@ import {
   parseDatabaseLock,
   parseTaskPreviewArgs,
   parseTaskPreviewMetadata,
+  previewServiceOwnsWorktree,
   selectSharedNodeModules,
   selectTaskPreviewMode,
+  taskPreviewReadinessErrors,
   taskPreviewErrors,
   taskProjectName,
 } from './dev-task.mjs';
@@ -48,6 +53,7 @@ test('parses task preview mode, ports, target worktree, and stop options', () =>
       databaseRisk: true,
       handoff: false,
       stop: true,
+      check: false,
       help: false,
     },
   );
@@ -55,6 +61,31 @@ test('parses task preview mode, ports, target worktree, and stop options', () =>
   assert.throws(() => parseTaskPreviewArgs(['--backend-port', '8080']), /8081/);
   assert.throws(() => parseTaskPreviewArgs(['--mode', 'unknown']), /auto/);
   assert.equal(parseTaskPreviewArgs(['--handoff']).handoff, true);
+  assert.equal(parseTaskPreviewArgs(['--check']).check, true);
+});
+
+test('makes integration sync invoke the mandatory task handoff', () => {
+  assert.match(syncIntegrationSource, /dev:task:handoff/);
+  assert.match(syncIntegrationSource, /任务交接：completed/);
+});
+
+test('makes task handoff stop the old managed preview before its backend', () => {
+  const handoffStart = taskPreviewSource.indexOf('async function handoffDatabaseTask');
+  const handoffEnd = taskPreviewSource.indexOf('function targetViteConfig', handoffStart);
+  const handoffSource = taskPreviewSource.slice(handoffStart, handoffEnd);
+  const previewStop = handoffSource.indexOf('await stopSupervisedPreview(root);');
+  const backendStop = handoffSource.indexOf("composeRun(context, ['stop', 'backend']);", previewStop);
+  assert.ok(handoffStart >= 0);
+  assert.ok(handoffEnd > handoffStart);
+  assert.ok(previewStop >= 0);
+  assert.ok(backendStop > previewStop);
+});
+
+test('scopes preview supervisor shutdown to the handed-off worktree', () => {
+  const status = { type: 'zdm-task-preview-service', worktree: '/tmp/task-a' };
+  assert.equal(previewServiceOwnsWorktree(status, '/tmp/task-a'), true);
+  assert.equal(previewServiceOwnsWorktree(status, '/tmp/task-b'), false);
+  assert.equal(previewServiceOwnsWorktree({ type: 'other', worktree: '/tmp/task-a' }, '/tmp/task-a'), false);
 });
 
 test('uses one fixed current-task port and reserves dynamic ports for temporary previews', async () => {
@@ -63,15 +94,69 @@ test('uses one fixed current-task port and reserves dynamic ports for temporary 
   assert.equal(await chooseTaskFrontendPort({ requestedPort: 5188 }), 5188);
 });
 
-test('recognizes only managed task preview metadata', () => {
+test('recognizes managed task preview metadata including its API route', () => {
   assert.deepEqual(
     parseTaskPreviewMetadata(
-      JSON.stringify({ type: 'zdm-task-preview', workspaceRoot: '/tmp/task', branch: 'codex/task' }),
+      JSON.stringify({
+        type: 'zdm-task-preview',
+        workspaceRoot: '/tmp/task',
+        branch: 'codex/task',
+        mode: 'frontend',
+        apiTarget: 'http://127.0.0.1:8080',
+      }),
     ),
-    { type: 'zdm-task-preview', workspaceRoot: '/tmp/task', branch: 'codex/task' },
+    {
+      type: 'zdm-task-preview',
+      workspaceRoot: '/tmp/task',
+      branch: 'codex/task',
+      mode: 'frontend',
+      apiTarget: 'http://127.0.0.1:8080',
+    },
   );
   assert.equal(parseTaskPreviewMetadata('{"type":"other"}'), null);
   assert.equal(parseTaskPreviewMetadata('invalid'), null);
+});
+
+test('requires exact preview identity and an UP response through the frontend proxy', () => {
+  const metadata = {
+    type: 'zdm-task-preview',
+    workspaceRoot: '/tmp/task',
+    branch: 'codex/task',
+    mode: 'frontend',
+    apiTarget: 'http://127.0.0.1:8080',
+  };
+  assert.deepEqual(
+    taskPreviewReadinessErrors({
+      metadata,
+      expectedWorkspaceRoot: '/tmp/task',
+      expectedBranch: 'codex/task',
+      expectedMode: 'frontend',
+      expectedApiTarget: 'http://127.0.0.1:8080',
+      healthStatus: 200,
+      healthBody: '{"status":"UP"}',
+    }),
+    [],
+  );
+  assert.match(
+    taskPreviewReadinessErrors({
+      metadata: { type: 'zdm-task-preview', workspaceRoot: '/tmp/old', branch: 'codex/old' },
+      healthStatus: 200,
+      healthBody: '<html></html>',
+    }).join('\n'),
+    /版本过旧/,
+  );
+  assert.match(
+    taskPreviewReadinessErrors({
+      metadata,
+      expectedWorkspaceRoot: '/tmp/other',
+      healthStatus: 502,
+    }).join('\n'),
+    /不是 \/tmp\/other/,
+  );
+  assert.match(
+    taskPreviewReadinessErrors({ metadata, healthStatus: 200, healthBody: '<html></html>' }).join('\n'),
+    /非 JSON/,
+  );
 });
 
 test('requires a task branch', () => {
@@ -201,10 +286,14 @@ test('does not select dependencies without an identical lockfile', () => {
 test('roots task preview assets and aliases in the selected worktree', () => {
   const previousPreview = process.env.ZDM_TASK_PREVIEW;
   const previousWorkspace = process.env.ZDM_TASK_WORKSPACE;
+  const previousMode = process.env.ZDM_TASK_MODE;
+  const previousApiTarget = process.env.ZDM_API_PROXY_TARGET;
   const selectedWorktree = '/tmp/zdm-selected-task-worktree';
 
   process.env.ZDM_TASK_PREVIEW = '1';
   process.env.ZDM_TASK_WORKSPACE = selectedWorktree;
+  process.env.ZDM_TASK_MODE = 'frontend';
+  process.env.ZDM_API_PROXY_TARGET = 'http://127.0.0.1:8080';
   try {
     const config = viteConfig({ mode: 'development' });
     assert.equal(config.root, resolve(selectedWorktree));
@@ -213,10 +302,16 @@ test('roots task preview assets and aliases in the selected worktree', () => {
       config.plugins.some((plugin) => plugin.name === 'zdm-task-preview-control'),
       true,
     );
+    assert.equal(config.server.proxy['/__zdm_task_preview_api_health__'].target, 'http://127.0.0.1:8080');
+    assert.equal(config.server.proxy['/__zdm_task_preview_api_health__'].rewrite(), '/actuator/health');
   } finally {
     if (previousPreview === undefined) delete process.env.ZDM_TASK_PREVIEW;
     else process.env.ZDM_TASK_PREVIEW = previousPreview;
     if (previousWorkspace === undefined) delete process.env.ZDM_TASK_WORKSPACE;
     else process.env.ZDM_TASK_WORKSPACE = previousWorkspace;
+    if (previousMode === undefined) delete process.env.ZDM_TASK_MODE;
+    else process.env.ZDM_TASK_MODE = previousMode;
+    if (previousApiTarget === undefined) delete process.env.ZDM_API_PROXY_TARGET;
+    else process.env.ZDM_API_PROXY_TARGET = previousApiTarget;
   }
 });
