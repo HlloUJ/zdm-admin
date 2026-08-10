@@ -9,13 +9,13 @@
         <AdminPageHeader :breadcrumbs="['门店分类管理']" />
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="74px" colon>
+          <t-form :data="searchForm" label-width="84px" colon>
             <div class="filter-row">
               <div class="filter-fields">
-                <t-form-item label="分类名称">
+                <t-form-item label="分类名称" name="keyword">
                   <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
                 </t-form-item>
-                <t-form-item label="分类状态">
+                <t-form-item label="分类状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="全部">
                     <t-option label="启用" value="enabled" />
                     <t-option label="停用" value="disabled" />
@@ -26,7 +26,7 @@
                 <t-button theme="primary" @click="handleSearch"
                   ><template #icon><t-icon name="search" /></template>查询</t-button
                 >
-                <t-button variant="base" @click="handleReset"
+                <t-button theme="default" variant="base" @click="handleReset"
                   ><template #icon><t-icon name="refresh" /></template>重置</t-button
                 >
               </div>
@@ -38,10 +38,10 @@
           <div class="category-toolbar">
             <div>
               <h2>门店分类</h2>
-              <p>按手工分类维护；商品上架时须选择二级分类，最多支持两级。</p>
+              <p>按手工分类维护，最多支持三级。</p>
             </div>
-            <t-button theme="primary" @click="openCreateDialog()"
-              ><template #icon><t-icon name="add" /></template>添加手工分类</t-button
+            <t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()"
+              ><template #icon><t-icon name="add" /></template>新增一级分类</t-button
             >
           </div>
 
@@ -50,82 +50,86 @@
           </t-alert>
 
           <t-table
-            v-if="displayRows.length"
+            v-if="loading || displayRows.length"
             row-key="key"
             :data="displayRows"
             :columns="columns"
+            :loading="loading"
             hover
             table-layout="fixed"
           >
             <template #name="{ row }">
               <div :class="['category-name-cell', `level-${row.level}`]">
-                <t-icon :name="row.level === 1 ? 'folder' : 'chevron-right'" />
+                <t-button
+                  v-if="row.node.children.length"
+                  class="tree-toggle"
+                  variant="text"
+                  shape="square"
+                  size="small"
+                  :aria-label="isNodeExpanded(row.node) ? '收起下级分类' : '展开下级分类'"
+                  @click.stop="toggleNode(row.node)"
+                >
+                  <template #icon
+                    ><t-icon :name="isNodeExpanded(row.node) ? 'chevron-down' : 'chevron-right'"
+                  /></template>
+                </t-button>
+                <span v-else class="tree-toggle-placeholder"><t-icon name="minus" /></span>
                 <span>{{ row.name }}</span>
               </div>
             </template>
             <template #level="{ row }">
-              <span class="level-label">{{ row.level === 1 ? '一级分类' : '二级分类' }}</span>
+              <span class="level-label">{{ row.level }}级分类</span>
             </template>
             <template #status="{ row }">
-              <t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">
+              <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
                 {{ row.status === 'enabled' ? '启用' : '停用' }}
               </t-tag>
             </template>
-            <template #sort="{ row }">{{ row.level === 1 ? row.sort : '—' }}</template>
+            <template #sort="{ row }">{{ row.sort }}</template>
+            <template #createdByName="{ row }">{{ row.createdByName }}</template>
+            <template #createdAt="{ row }">{{ row.createdAt }}</template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <template v-if="row.level === 1">
-                  <t-link theme="primary" @click="openCreateDialog(row.parent)">添加子分类</t-link>
-                  <t-link theme="primary" @click="openEditDialog(row.parent)">编辑</t-link>
-                  <t-link
-                    theme="primary"
-                    :disabled="parentIndex(row.parent) === 0"
-                    @click="moveCategory(row.parent, -1)"
-                    >上移</t-link
-                  >
-                  <t-link
-                    theme="primary"
-                    :disabled="parentIndex(row.parent) === categoryData.length - 1"
-                    @click="moveCategory(row.parent, 1)"
-                    >下移</t-link
-                  >
-                  <t-dropdown
-                    :options="moreActions(row.parent)"
-                    @click="(data: { value: string | number }) => handleMoreAction(data, row.parent)"
-                  >
-                    <t-link theme="primary">更多 <t-icon name="chevron-down" size="14px" /></t-link>
-                  </t-dropdown>
-                </template>
-                <template v-else>
-                  <t-link theme="primary" @click="openEditDialog(row.parent, row.child)">编辑</t-link>
-                  <t-link
-                    theme="primary"
-                    :disabled="childIndex(row.parent, row.child) === 0"
-                    @click="moveChild(row.parent, row.child, -1)"
-                    >上移</t-link
-                  >
-                  <t-link
-                    theme="primary"
-                    :disabled="childIndex(row.parent, row.child) === row.parent.children.length - 1"
-                    @click="moveChild(row.parent, row.child, 1)"
-                    >下移</t-link
-                  >
-                  <t-link theme="primary" @click="openStatusConfirm(row.parent, row.child)">{{
-                    row.child.status === 'enabled' ? '停用' : '启用'
-                  }}</t-link>
-                  <t-link theme="danger" @click="openDeleteDialog(row.parent, row.child)">删除</t-link>
-                </template>
+                <t-link
+                  v-if="canCreateChildCategory && row.level < 3"
+                  theme="primary"
+                  @click="openCreateDialog(row.node)"
+                  >新增下级</t-link
+                >
+                <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row.node)">编辑</t-link>
+                <t-link
+                  v-if="canMoveUpCategory"
+                  theme="primary"
+                  :disabled="siblingIndex(row.node) === 0"
+                  @click="moveCategory(row.node, -1)"
+                  >上移</t-link
+                >
+                <t-link
+                  v-if="canMoveDownCategory"
+                  theme="primary"
+                  :disabled="siblingIndex(row.node) === siblingCount(row.node) - 1"
+                  @click="moveCategory(row.node, 1)"
+                  >下移</t-link
+                >
+                <t-link
+                  v-if="canToggleCategoryStatus"
+                  :theme="row.node.status === 'enabled' ? 'warning' : 'success'"
+                  @click="openStatusConfirm(row.node)"
+                  >{{ row.node.status === 'enabled' ? '停用' : '启用' }}</t-link
+                >
+                <t-link v-if="canDeleteCategory" theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+                <span v-if="!hasVisibleRowAction(row)">-</span>
               </div>
             </template>
           </t-table>
-          <t-empty v-else description="未找到符合条件的分类" />
+          <t-empty v-else class="category-empty" description="未找到符合条件的分类" />
         </section>
       </main>
     </div>
 
     <AdminDialog
       v-model:visible="formVisible"
-      :header="formMode === 'create' ? `新增${formData.parentId ? '二级' : '一级'}分类` : '编辑分类'"
+      :header="formMode === 'create' ? `新增${formLevel}级分类` : '编辑分类'"
       width="520px"
       placement="center"
       confirm-btn="保存"
@@ -133,7 +137,7 @@
       @close="closeFormDialog"
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
-        <t-form-item v-if="formData.parentId" label="一级分类">
+        <t-form-item v-if="formData.parentId" label="上级分类">
           <t-input :value="parentName" disabled />
         </t-form-item>
         <t-form-item label="分类名称" name="name" required-mark>
@@ -151,18 +155,21 @@
 
     <t-dialog
       v-model:visible="deleteVisible"
-      header="删除分类"
+      header="系统提示"
       width="440px"
       placement="center"
-      :confirm-btn="deleteTarget?.productCount ? '我知道了' : '确认删除'"
-      :cancel-btn="deleteTarget?.productCount ? null : '取消'"
+      :confirm-btn="deleteBlocked ? '我知道了' : '确认'"
+      :cancel-btn="deleteBlocked ? null : '取消'"
       @confirm="handleDeleteConfirm"
     >
       <template v-if="deleteTarget?.productCount">
         分类“{{ deleteTarget.name }}”已关联
         {{ deleteTarget.productCount }} 个商品，不能删除。请停用该分类，避免新商品继续使用。
       </template>
-      <template v-else>删除后不可恢复，确认删除分类“{{ deleteTarget?.name }}”吗？</template>
+      <template v-else-if="deleteTarget && 'children' in deleteTarget && deleteTarget.children.length">
+        分类“{{ deleteTarget.name }}”包含下级分类，请先删除或转移下级分类。
+      </template>
+      <template v-else>是否删除分类【{{ deleteTarget?.name }}】？</template>
     </t-dialog>
 
     <t-dialog
@@ -184,29 +191,49 @@
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminDialog, AdminPageHeader } from '@/components/foundation';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
+import {
+  createStoreCategory,
+  deleteStoreCategory,
+  listStoreCategories,
+  moveStoreCategory,
+  type StoreCategoryRecord,
+  updateStoreCategory,
+  updateStoreCategoryStatus,
+} from '@/services/storeCategories';
 
 type CategoryStatus = 'enabled' | 'disabled';
 type FormMode = 'create' | 'edit';
 
-interface CategoryChild {
-  id: number;
-  name: string;
-  status: CategoryStatus;
-  productCount: number;
-}
+const permissionPrefix = 'admin.tenant.store-category-management';
+const loginUser = computed(() => getLoginUser());
+const hasCategoryAction = (action: string) => hasPermission(loginUser.value, `${permissionPrefix}.${action}`);
+const canCreateRootCategory = computed(() => hasCategoryAction('create-root'));
+const canCreateChildCategory = computed(() => hasCategoryAction('create-child'));
+const canEditCategory = computed(() => hasCategoryAction('edit'));
+const canMoveUpCategory = computed(() => hasCategoryAction('move-up'));
+const canMoveDownCategory = computed(() => hasCategoryAction('move-down'));
+const canToggleCategoryStatus = computed(() => hasCategoryAction('toggle-status'));
+const canDeleteCategory = computed(() => hasCategoryAction('delete'));
 
-interface CategoryGroup {
+interface CategoryNode {
   id: number;
+  parentId: number | null;
+  level: 1 | 2 | 3;
   name: string;
   status: CategoryStatus;
   sort: number;
   productCount: number;
-  children: CategoryChild[];
+  createdByName: string;
+  createdAt: string;
+  parent?: CategoryNode;
+  children: CategoryNode[];
 }
 
 interface CategoryForm {
@@ -218,55 +245,22 @@ interface CategoryForm {
 
 interface CategoryRow {
   key: string;
-  level: 1 | 2;
+  level: 1 | 2 | 3;
   name: string;
   status: CategoryStatus;
   sort: number;
   productCount: number;
-  parent: CategoryGroup;
-  child?: CategoryChild;
+  createdByName: string;
+  createdAt: string;
+  node: CategoryNode;
 }
 
-const categoryData = ref<CategoryGroup[]>([
-  {
-    id: 1,
-    name: '石材主材',
-    status: 'enabled',
-    sort: 1,
-    productCount: 82,
-    children: [
-      { id: 11, name: '大理石', status: 'enabled', productCount: 36 },
-      { id: 12, name: '奢石', status: 'enabled', productCount: 28 },
-      { id: 13, name: '花岗岩', status: 'disabled', productCount: 18 },
-    ],
-  },
-  {
-    id: 2,
-    name: '成品家具',
-    status: 'enabled',
-    sort: 2,
-    productCount: 37,
-    children: [
-      { id: 21, name: '餐桌茶几', status: 'enabled', productCount: 16 },
-      { id: 22, name: '背景墙', status: 'enabled', productCount: 12 },
-      { id: 23, name: '卫浴台面', status: 'enabled', productCount: 9 },
-    ],
-  },
-  {
-    id: 3,
-    name: '五金配件',
-    status: 'enabled',
-    sort: 3,
-    productCount: 11,
-    children: [
-      { id: 31, name: '台面配件', status: 'enabled', productCount: 7 },
-      { id: 32, name: '安装辅材', status: 'enabled', productCount: 4 },
-    ],
-  },
-]);
+const categoryData = ref<CategoryNode[]>([]);
+const loading = ref(false);
 
 const searchForm = reactive({ keyword: '', status: '' as CategoryStatus | '' });
 const appliedSearch = reactive({ keyword: '', status: '' as CategoryStatus | '' });
+const expandedNodeIds = ref<Set<number>>(new Set());
 const tipVisible = ref(true);
 const formVisible = ref(false);
 const deleteVisible = ref(false);
@@ -274,10 +268,9 @@ const statusConfirmVisible = ref(false);
 const formRef = ref<FormInstanceFunctions>();
 const formMode = ref<FormMode>('create');
 const formData = reactive<CategoryForm>({ id: null, parentId: null, name: '', status: 'enabled' });
-const deleteParent = ref<CategoryGroup | null>(null);
-const deleteTarget = ref<CategoryGroup | CategoryChild | null>(null);
-const statusParent = ref<CategoryGroup | null>(null);
-const statusTarget = ref<CategoryGroup | CategoryChild | null>(null);
+const deleteTarget = ref<CategoryNode | null>(null);
+const statusTarget = ref<CategoryNode | null>(null);
+const deleteBlocked = computed(() => Boolean(deleteTarget.value?.productCount || deleteTarget.value?.children.length));
 
 const formRules: Record<string, FormRule[]> = {
   name: [
@@ -287,64 +280,165 @@ const formRules: Record<string, FormRule[]> = {
 };
 
 const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '分类名称', minWidth: 300, align: 'left' },
-  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },
-  { colKey: 'productCount', title: '关联商品', width: 120, align: 'center' },
-  { colKey: 'status', title: '状态', width: 100, align: 'center' },
-  { colKey: 'sort', title: '排序', width: 80, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 340, align: 'left', fixed: 'right' },
+  { colKey: 'name', title: '分类名称', width: 155, align: 'left' },
+  { colKey: 'level', title: '分类级别', width: 90, align: 'left' },
+  { colKey: 'productCount', title: '关联商品', width: 90, align: 'center' },
+  { colKey: 'status', title: '状态', width: 60, align: 'center' },
+  { colKey: 'sort', title: '排序', width: 60, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 90, align: 'center' },
+  { colKey: 'createdAt', title: '创建时间', width: 150, align: 'center' },
+  { colKey: 'operation', title: '操作', width: 240, align: 'left', fixed: 'right' },
 ];
 
 const displayRows = computed<CategoryRow[]>(() => {
   const keyword = appliedSearch.keyword.trim();
   const hasFilter = Boolean(keyword || appliedSearch.status);
-  return categoryData.value.flatMap((parent) => {
-    const parentMatched =
-      (!keyword || parent.name.includes(keyword)) && (!appliedSearch.status || parent.status === appliedSearch.status);
-    const matchingChildren = parent.children.filter(
-      (child) =>
-        (!keyword || child.name.includes(keyword)) && (!appliedSearch.status || child.status === appliedSearch.status),
-    );
-    if (hasFilter && !parentMatched && !matchingChildren.length) return [];
-    const childRows = hasFilter && parentMatched && !matchingChildren.length ? parent.children : matchingChildren;
-    return [
-      {
-        key: `parent-${parent.id}`,
-        level: 1,
-        name: parent.name,
-        status: parent.status,
-        sort: parent.sort,
-        productCount: parent.productCount,
-        parent,
-      },
-      ...childRows.map((child) => ({
-        key: `child-${child.id}`,
-        level: 2 as const,
-        name: child.name,
-        status: child.status,
-        sort: 0,
-        productCount: child.productCount,
-        parent,
-        child,
-      })),
-    ];
-  });
+  const matches = (node: CategoryNode) =>
+    (!keyword || node.name.includes(keyword)) && (!appliedSearch.status || node.status === appliedSearch.status);
+  const subtreeMatches = (node: CategoryNode): boolean => matches(node) || node.children.some(subtreeMatches);
+  const rows: CategoryRow[] = [];
+  const appendNodes = (nodes: CategoryNode[], forceDescendants = false) => {
+    nodes.forEach((node, position) => {
+      const nodeMatches = matches(node);
+      if (hasFilter && !forceDescendants && !subtreeMatches(node)) return;
+      rows.push({
+        key: `category-${node.id}`,
+        level: node.level,
+        name: node.name,
+        status: node.status,
+        sort: position + 1,
+        productCount: node.productCount,
+        createdByName: node.createdByName,
+        createdAt: formatDateTime(node.createdAt),
+        node,
+      });
+      if (hasFilter) {
+        appendNodes(
+          nodeMatches || forceDescendants ? node.children : node.children.filter(subtreeMatches),
+          nodeMatches,
+        );
+      } else if (isNodeExpanded(node)) {
+        appendNodes(node.children);
+      }
+    });
+  };
+  appendNodes(categoryData.value);
+  return rows;
 });
 
-const parentName = computed(() => categoryData.value.find((item) => item.id === formData.parentId)?.name ?? '');
+const findNode = (id: number | null, nodes = categoryData.value): CategoryNode | undefined => {
+  if (id == null) return undefined;
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const matched = findNode(id, node.children);
+    if (matched) return matched;
+  }
+  return undefined;
+};
+
+const formParent = computed(() => findNode(formData.parentId));
+const parentName = computed(() => formParent.value?.name ?? '');
+const formLevel = computed(() => (formParent.value ? formParent.value.level + 1 : 1));
 const statusConfirmText = computed(() => {
   if (!statusTarget.value) return '';
   const name = statusTarget.value.name;
   return statusTarget.value.status === 'enabled' ? `是否停用分类【${name}】？` : `是否启用分类【${name}】？`;
 });
 
-const syncSort = () =>
-  categoryData.value.forEach((item, index) => {
-    item.sort = index + 1;
+const siblingsOf = (node: CategoryNode) => node.parent?.children ?? categoryData.value;
+const siblingIndex = (node: CategoryNode) => siblingsOf(node).findIndex((item) => item.id === node.id);
+const siblingCount = (node: CategoryNode) => siblingsOf(node).length;
+const hasVisibleRowAction = (row: CategoryRow) =>
+  (canCreateChildCategory.value && row.level < 3) ||
+  canEditCategory.value ||
+  canMoveUpCategory.value ||
+  canMoveDownCategory.value ||
+  canToggleCategoryStatus.value ||
+  canDeleteCategory.value;
+
+const isNodeExpanded = (node: CategoryNode) =>
+  Boolean(appliedSearch.keyword.trim() || appliedSearch.status || expandedNodeIds.value.has(node.id));
+
+const toggleNode = (node: CategoryNode) => {
+  const nextIds = new Set(expandedNodeIds.value);
+  if (nextIds.has(node.id)) nextIds.delete(node.id);
+  else nextIds.add(node.id);
+  expandedNodeIds.value = nextIds;
+};
+
+const createdAtTimestamp = (record: Pick<StoreCategoryRecord, 'createdAt'>) => {
+  const timestamp = new Date(record.createdAt ?? '').getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const toCategoryTree = (records: StoreCategoryRecord[]): CategoryNode[] => {
+  const sortedRecords = [...records].sort(
+    (left, right) => createdAtTimestamp(right) - createdAtTimestamp(left) || right.id - left.id,
+  );
+  const nodeMap = new Map<number, CategoryNode>();
+  sortedRecords.forEach((item) => {
+    nodeMap.set(item.id, {
+      id: item.id,
+      parentId: item.parentId ?? null,
+      level: 1,
+      name: item.name,
+      status: item.status,
+      sort: item.sortOrder,
+      productCount: item.productCount,
+      createdByName: item.createdByName || '-',
+      createdAt: item.createdAt ?? '',
+      children: [],
+    });
   });
-const parentIndex = (category: CategoryGroup) => categoryData.value.findIndex((item) => item.id === category.id);
-const childIndex = (parent: CategoryGroup, child?: CategoryChild) =>
-  parent.children.findIndex((item) => item.id === child?.id);
+  const roots: CategoryNode[] = [];
+  sortedRecords.forEach((record) => {
+    const node = nodeMap.get(record.id) as CategoryNode;
+    const parent = record.parentId == null ? undefined : nodeMap.get(record.parentId);
+    if (!parent) {
+      roots.push(node);
+      return;
+    }
+    node.parent = parent;
+    parent.children.push(node);
+  });
+  const assignLevels = (nodes: CategoryNode[], level: 1 | 2 | 3) =>
+    nodes.forEach((node) => {
+      node.level = level;
+      if (level < 3) assignLevels(node.children, (level + 1) as 2 | 3);
+    });
+  const sortTree = (nodes: CategoryNode[]) => {
+    nodes.sort(
+      (left, right) =>
+        left.sort - right.sort || createdAtTimestamp(right) - createdAtTimestamp(left) || right.id - left.id,
+    );
+    nodes.forEach((node) => sortTree(node.children));
+  };
+  sortTree(roots);
+  assignLevels(roots, 1);
+  return roots;
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
+  const pad = (number: number) => number.toString().padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const showError = (error: unknown, fallback: string) =>
+  MessagePlugin.error(error instanceof Error ? error.message : fallback);
+
+const loadCategories = async () => {
+  loading.value = true;
+  try {
+    categoryData.value = toCategoryTree(await listStoreCategories());
+  } catch (error) {
+    showError(error, '门店分类加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
 
 const handleSearch = () => {
   appliedSearch.keyword = searchForm.keyword;
@@ -364,19 +458,19 @@ const resetForm = () => {
   formData.status = 'enabled';
 };
 
-const openCreateDialog = (parent?: CategoryGroup) => {
+const openCreateDialog = (parent?: CategoryNode) => {
   formMode.value = 'create';
   resetForm();
   if (parent) formData.parentId = parent.id;
   formVisible.value = true;
 };
 
-const openEditDialog = (parent: CategoryGroup, child?: CategoryChild) => {
+const openEditDialog = (node: CategoryNode) => {
   formMode.value = 'edit';
-  formData.id = child?.id ?? parent.id;
-  formData.parentId = child ? parent.id : null;
-  formData.name = child?.name ?? parent.name;
-  formData.status = child?.status ?? parent.status;
+  formData.id = node.id;
+  formData.parentId = node.parentId;
+  formData.name = node.name;
+  formData.status = node.status;
   formVisible.value = true;
 };
 
@@ -385,15 +479,10 @@ const closeFormDialog = () => {
   resetForm();
 };
 
-const categoryNameExists = () =>
-  categoryData.value.some((parent) => {
-    if (formData.parentId)
-      return (
-        parent.id === formData.parentId &&
-        parent.children.some((child) => child.name === formData.name.trim() && child.id !== formData.id)
-      );
-    return parent.name === formData.name.trim() && parent.id !== formData.id;
-  });
+const categoryNameExists = () => {
+  const siblings = formData.parentId ? (findNode(formData.parentId)?.children ?? []) : categoryData.value;
+  return siblings.some((node) => node.name === formData.name.trim() && node.id !== formData.id);
+};
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
@@ -403,122 +492,90 @@ const handleSubmit = async () => {
     MessagePlugin.warning('同级分类名称不能重复');
     return;
   }
-  if (formMode.value === 'create') {
-    if (formData.parentId) {
-      const parent = categoryData.value.find((item) => item.id === formData.parentId);
-      parent?.children.push({ id: Date.now(), name, status: formData.status, productCount: 0 });
+  try {
+    if (formMode.value === 'create') {
+      await createStoreCategory({ parentId: formData.parentId, name, status: formData.status });
+      MessagePlugin.success('新增成功');
     } else {
-      categoryData.value.push({
-        id: Date.now(),
-        name,
-        status: formData.status,
-        sort: categoryData.value.length + 1,
-        productCount: 0,
-        children: [],
-      });
+      await updateStoreCategory(formData.id as number, name);
+      MessagePlugin.success('保存成功');
     }
-    MessagePlugin.success('新增成功');
-  } else if (formData.parentId) {
-    const child = categoryData.value
-      .find((item) => item.id === formData.parentId)
-      ?.children.find((item) => item.id === formData.id);
-    if (child) Object.assign(child, { name });
-    MessagePlugin.success('保存成功');
-  } else {
-    const parent = categoryData.value.find((item) => item.id === formData.id);
-    if (parent) Object.assign(parent, { name });
-    MessagePlugin.success('保存成功');
+    closeFormDialog();
+    await loadCategories();
+  } catch (error) {
+    showError(error, '分类保存失败');
   }
-  closeFormDialog();
 };
 
-const moreActions = (category: CategoryGroup) => [
-  { content: category.status === 'enabled' ? '停用一级分类' : '启用一级分类', value: 'toggle' },
-  { content: '删除一级分类', value: 'delete', theme: 'error' },
-];
-
-const applyStatusChange = (parent: CategoryGroup, child?: CategoryChild) => {
-  const target = child ?? parent;
-  target.status = target.status === 'enabled' ? 'disabled' : 'enabled';
-  if (!child && target.status === 'disabled')
-    parent.children.forEach((item) => {
-      item.status = 'disabled';
-    });
-  MessagePlugin.success(`${target.status === 'enabled' ? '已启用' : '已停用'}“${target.name}”`);
+const applyStatusChange = async (node: CategoryNode) => {
+  const status = node.status === 'enabled' ? 'disabled' : 'enabled';
+  await updateStoreCategoryStatus(node.id, status);
+  MessagePlugin.success(`${status === 'enabled' ? '已启用' : '已停用'}“${node.name}”`);
+  await loadCategories();
 };
 
-const openStatusConfirm = (parent: CategoryGroup, child?: CategoryChild) => {
-  statusParent.value = parent;
-  statusTarget.value = child ?? parent;
+const openStatusConfirm = (node: CategoryNode) => {
+  statusTarget.value = node;
   statusConfirmVisible.value = true;
 };
 
 const closeStatusConfirm = () => {
   statusConfirmVisible.value = false;
-  statusParent.value = null;
   statusTarget.value = null;
 };
 
-const handleStatusConfirm = () => {
-  if (statusParent.value && statusTarget.value) {
-    applyStatusChange(
-      statusParent.value,
-      statusTarget.value === statusParent.value ? undefined : (statusTarget.value as CategoryChild),
-    );
+const handleStatusConfirm = async () => {
+  try {
+    if (statusTarget.value) await applyStatusChange(statusTarget.value);
+    closeStatusConfirm();
+  } catch (error) {
+    showError(error, '分类状态更新失败');
   }
-  closeStatusConfirm();
 };
 
-const handleMoreAction = (data: { value: string | number }, category: CategoryGroup) => {
-  if (data.value === 'toggle') openStatusConfirm(category);
-  if (data.value === 'delete') openDeleteDialog(category);
-};
-
-const moveCategory = (category: CategoryGroup, offset: number) => {
-  const index = categoryData.value.findIndex((item) => item.id === category.id);
+const moveCategory = async (category: CategoryNode, offset: number) => {
+  const siblings = siblingsOf(category);
+  const index = siblings.findIndex((item) => item.id === category.id);
   const targetIndex = index + offset;
-  if (index < 0 || targetIndex < 0 || targetIndex >= categoryData.value.length) return;
-  [categoryData.value[index], categoryData.value[targetIndex]] = [
-    categoryData.value[targetIndex],
-    categoryData.value[index],
-  ];
-  syncSort();
-  MessagePlugin.success('排序已更新');
+  if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
+  try {
+    await moveStoreCategory(category.id, offset < 0 ? 'up' : 'down');
+    MessagePlugin.success('排序已更新');
+    await loadCategories();
+  } catch (error) {
+    showError(error, '分类排序更新失败');
+  }
 };
 
-const moveChild = (parent: CategoryGroup, child: CategoryChild, offset: number) => {
-  const index = childIndex(parent, child);
-  const targetIndex = index + offset;
-  if (index < 0 || targetIndex < 0 || targetIndex >= parent.children.length) return;
-  [parent.children[index], parent.children[targetIndex]] = [parent.children[targetIndex], parent.children[index]];
-  MessagePlugin.success('排序已更新');
-};
-
-const openDeleteDialog = (parent: CategoryGroup, child?: CategoryChild) => {
-  deleteParent.value = parent;
-  deleteTarget.value = child ?? parent;
+const openDeleteDialog = (node: CategoryNode) => {
+  deleteTarget.value = node;
   deleteVisible.value = true;
 };
 
-const handleDeleteConfirm = () => {
+const handleDeleteConfirm = async () => {
   if (!deleteTarget.value) return;
+  if (deleteBlocked.value) {
+    deleteVisible.value = false;
+    deleteTarget.value = null;
+    return;
+  }
   if (!deleteTarget.value.productCount) {
-    if (deleteParent.value && deleteTarget.value !== deleteParent.value) {
-      deleteParent.value.children = deleteParent.value.children.filter((item) => item.id !== deleteTarget.value?.id);
-    } else if (deleteParent.value) {
-      if (deleteParent.value.children.length) {
-        MessagePlugin.warning('请先删除或转移二级分类');
-        return;
-      }
-      categoryData.value = categoryData.value.filter((item) => item.id !== deleteParent.value?.id);
-      syncSort();
+    try {
+      await deleteStoreCategory(deleteTarget.value.id);
+      MessagePlugin.success('删除成功');
+      deleteVisible.value = false;
+      deleteTarget.value = null;
+      await loadCategories();
+    } catch (error) {
+      showError(error, '分类删除失败');
     }
-    MessagePlugin.success('删除成功');
+    return;
   }
   deleteVisible.value = false;
-  deleteParent.value = null;
   deleteTarget.value = null;
 };
+
+onMounted(loadCategories);
 </script>
 
 <style scoped>
@@ -526,7 +583,8 @@ const handleDeleteConfirm = () => {
 .category-card {
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
   background: var(--td-bg-color-container);
-  border-radius: var(--td-radius-medium);
+  border: 1px solid var(--td-component-border);
+  border-radius: 6px;
 }
 
 .filter-card {
@@ -544,19 +602,21 @@ const handleDeleteConfirm = () => {
 }
 
 .filter-row {
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--td-comp-margin-l);
 }
 .filter-fields {
-  flex: 1;
-  gap: var(--td-comp-margin-xl);
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 280px;
+  width: 260px;
   margin-bottom: 0;
 }
 .filter-actions {
-  flex: 0 0 auto;
+  justify-content: flex-end;
   gap: var(--td-comp-margin-s);
 }
 
@@ -577,7 +637,12 @@ const handleDeleteConfirm = () => {
   margin-top: var(--td-comp-margin-l);
 }
 .category-card :deep(.t-table) {
+  width: calc(100% - 12px);
   margin-top: var(--td-comp-margin-l);
+  margin-left: 12px;
+}
+.category-empty {
+  margin-top: var(--td-comp-margin-xl);
 }
 .category-name-cell {
   gap: var(--td-comp-margin-s);
@@ -585,22 +650,35 @@ const handleDeleteConfirm = () => {
 .category-name-cell.level-1 {
   font-weight: 600;
 }
-.category-name-cell.level-1 :deep(.t-icon) {
-  color: var(--td-brand-color);
-}
 .category-name-cell.level-2 {
-  padding-left: 30px;
+  padding-left: 28px;
   color: var(--td-text-color-secondary);
 }
-.category-name-cell.level-2 :deep(.t-icon) {
+.category-name-cell.level-3 {
+  padding-left: 56px;
+  color: var(--td-text-color-placeholder);
+}
+.tree-toggle,
+.tree-toggle-placeholder {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+}
+.tree-toggle {
+  color: var(--td-text-color-secondary);
+}
+.tree-toggle-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--td-text-color-placeholder);
 }
 .level-label {
   color: var(--td-text-color-secondary);
 }
 .table-actions {
-  flex-wrap: wrap;
-  gap: var(--td-comp-margin-m);
+  flex-wrap: nowrap;
+  gap: var(--td-comp-margin-xs);
 }
 .table-actions :deep(.t-link) {
   white-space: nowrap;
@@ -611,10 +689,24 @@ const handleDeleteConfirm = () => {
   font: var(--td-font-body-small);
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .category-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+@media (max-width: 1120px) {
+  .filter-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .filter-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 720px) {
+  .filter-fields :deep(.t-form__item) {
+    width: 100%;
   }
 }
 </style>

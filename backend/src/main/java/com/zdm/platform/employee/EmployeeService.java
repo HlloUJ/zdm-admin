@@ -42,20 +42,13 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   public List<Employee> listForCurrentAdmin() {
-    CurrentIdentity identity = identityProvider.require();
-    if (identity.isSuperAdmin() || "all".equals(identity.dataPermission())) {
-      return list();
-    }
-    if (!StringUtils.hasText(identity.displayName())) {
-      return List.of();
-    }
-    return lambdaQuery().eq(Employee::getCreatedByName, identity.displayName()).list();
+    return lambdaQuery().eq(Employee::getStoreId, requireStoreId()).list();
   }
 
   @Transactional
   public Employee createEmployee(Employee employee) {
     authorizeCreate(employee);
-    normalizeScope(employee);
+    applyCurrentStoreScope(employee);
     Long accountId = findOrCreateAccount(employee.getPhone(), employee.getName());
     employee.setAccountId(accountId);
     employee.setCreatedByName(currentEmployeeName());
@@ -74,21 +67,19 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     requireAccessibleEmployee(existing);
 
+    if (payload.getStoreId() != null && !Objects.equals(payload.getStoreId(), existing.getStoreId())) {
+      throw new AccessDeniedException("不能将员工转移到其他门店");
+    }
     payload.setId(id);
     payload.setAccountId(existing.getAccountId());
     if (!StringUtils.hasText(payload.getPhone())) {
       payload.setPhone(existing.getPhone());
     }
-    if (payload.getTenantId() == null) {
-      payload.setTenantId(existing.getTenantId());
-    }
-    if (payload.getStoreId() == null) {
-      payload.setStoreId(existing.getStoreId());
-    }
+    payload.setTenantId(existing.getTenantId());
+    payload.setStoreId(existing.getStoreId());
     if (!StringUtils.hasText(payload.getCreatedByName())) {
       payload.setCreatedByName(existing.getCreatedByName());
     }
-    normalizeScope(payload);
     authorizeUpdate(existing, payload);
 
     if (payload.getAccountId() == null) {
@@ -182,13 +173,17 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
   }
 
-  private void normalizeScope(Employee employee) {
-    if (employee.getTenantId() == null) {
-      employee.setTenantId(DEFAULT_TENANT_ID);
+  private void applyCurrentStoreScope(Employee employee) {
+    CurrentIdentity identity = identityProvider.require();
+    Long storeId = requireStoreId();
+    if (employee.getStoreId() != null && !Objects.equals(employee.getStoreId(), storeId)) {
+      throw new AccessDeniedException("不能为其他门店创建员工");
     }
-    if (employee.getStoreId() == null) {
-      employee.setStoreId(DEFAULT_STORE_ID);
+    if (employee.getTenantId() != null && !Objects.equals(employee.getTenantId(), identity.tenantId())) {
+      throw new AccessDeniedException("不能为其他租户创建员工");
     }
+    employee.setTenantId(identity.tenantId());
+    employee.setStoreId(storeId);
   }
 
   private void validateBeforeEnabled(Employee employee) {
@@ -200,6 +195,16 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     if (!StringUtils.hasText(employee.getDataPermission())) {
       throw new IllegalArgumentException("请先为员工配置数据权限后再启用");
+    }
+    for (Long roleId : parseRoleIds(employee.getRoleIds())) {
+      Integer roleCount = jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM roles WHERE id = ? AND store_id = ?",
+          Integer.class,
+          roleId,
+          employee.getStoreId());
+      if (roleCount == null || roleCount == 0) {
+        throw new AccessDeniedException("只能配置当前门店的角色");
+      }
     }
   }
 
@@ -332,12 +337,17 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   private void requireAccessibleEmployee(Employee employee) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin()
-        && !"all".equals(identity.dataPermission())
-        && !Objects.equals(employee.getCreatedByName(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该员工");
+    if (!Objects.equals(employee.getStoreId(), requireStoreId())) {
+      throw new AccessDeniedException("不能操作其他门店的员工");
     }
+  }
+
+  private Long requireStoreId() {
+    CurrentIdentity identity = identityProvider.require();
+    if (identity.storeId() == null) {
+      throw new AccessDeniedException("当前身份未关联门店");
+    }
+    return identity.storeId();
   }
 
   private String currentEmployeeName() {

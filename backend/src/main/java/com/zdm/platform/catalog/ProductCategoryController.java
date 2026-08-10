@@ -72,8 +72,7 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
       operationDetected = true;
     }
     if (!Objects.equals(existing.getStatus(), category.getStatus())) {
-      String operation = "enabled".equals(category.getStatus()) ? "enable" : "disable";
-      requireCategoryPermission(existing.getScope(), operation);
+      requireCategoryPermission(existing.getScope(), "toggle-status");
       operationDetected = true;
     }
     if (!operationDetected) {

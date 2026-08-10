@@ -74,8 +74,7 @@ const productCategoryTabActions = (scope: string): FunctionAction[] => [
   { label: '编辑', value: `${scope}.edit` },
   { label: '上移', value: `${scope}.move-up` },
   { label: '下移', value: `${scope}.move-down` },
-  { label: '停用', value: `${scope}.disable` },
-  { label: '启用', value: `${scope}.enable` },
+  { label: '停用/启用', value: `${scope}.toggle-status` },
   { label: '删除', value: `${scope}.delete` },
 ];
 
@@ -116,6 +115,32 @@ export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionM
 // 全量功能目录只接收已完成业务梳理、实现并验证通过的正式功能资源。
 // 终端功能分配和角色管理共同消费此目录，禁止在各页面内维护功能数据副本。
 const verifiedFunctionCatalog: FunctionModule[] = [
+  {
+    label: '门店分类管理',
+    value: 'admin.tenant.store-category-management',
+    menus: [
+      {
+        value: 'admin.tenant.store-category-management.menu',
+        direct: true,
+        pages: [
+          {
+            label: '门店分类管理页',
+            value: 'admin.tenant.store-category-management',
+            actions: [
+              { label: '新增一级分类', value: 'admin.tenant.store-category-management.create-root' },
+              { label: '新增下级', value: 'admin.tenant.store-category-management.create-child' },
+              { label: '编辑', value: 'admin.tenant.store-category-management.edit' },
+              { label: '上移', value: 'admin.tenant.store-category-management.move-up' },
+              { label: '下移', value: 'admin.tenant.store-category-management.move-down' },
+              { label: '停用/启用', value: 'admin.tenant.store-category-management.toggle-status' },
+              { label: '删除', value: 'admin.tenant.store-category-management.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+    ],
+  },
   {
     label: '商品基础数据中心',
     value: 'admin.product-data-center',
