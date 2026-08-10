@@ -9,27 +9,38 @@
 ## 始终适用
 
 - 业务页面优先复用当前项目 `@/components/foundation`，不得另建页面间距、表格、分页或弹窗规范。
+- TDesign 官方组件和管理后台原型基座默认完整保留官方视觉样式；未经用户明确要求，不得新增 CSS、内联样式、深度选择器、全局覆盖或主题变量来改写其间距、尺寸、圆角、阴影、颜色、字体和动效。仅官方组件及项目基座无法表达的业务布局允许新增必要样式。
 - 表单弹窗优先使用 `AdminDialog`；旧页面只在需求涉及处逐步迁移。
 - 业务代码、接口和数据库规则以当前实现及有效产品文档为准，不从历史方案反推当前规则。
 
 ## 验证分级
 
 - 后端启动和验证统一使用 `npm run backend:*` 命令，默认由 Docker 提供 JDK/Maven；不得因本机未安装 `mvn` 跳过后端验证。
-- Docker/本地服务授权按复合命令的实际调用链判断，不按入口命令名判断：`check:changed`、`check:fast` 在变更包含 `backend/**` 时会调用 `backend:test`；`check:full`、`verify`、`verify:local`、`integration:verify` 会调用 Docker 和/或本地监听服务。以上场景首次实际执行即使用当前有效的最小授权通道；允许先用 `check:changed --list` 做只读计划确认，但不得先用普通沙箱运行必然进入受限资源的实际检查。
+- Docker/本地服务授权按复合命令的实际调用链判断，不按入口命令名判断：`dev:task` 会按改动确保集成后端或任务后端及共享开发数据库；`check:changed`、`check:fast` 在变更包含 `backend/**` 时会调用 `backend:test`；`check:full`、`verify`、`verify:local`、`integration:verify` 会调用 Docker 和/或本地监听服务。以上场景首次实际执行即使用当前有效的最小授权通道；允许先用 `check:changed --list` 做只读计划确认，但不得先用普通沙箱运行必然进入受限资源的实际检查。
 - 纯文案、规则或脚本别名：检查 diff 和文件格式。
 - 低风险样式、小交互：`npm run check:changed -- <本次文件>`。
 - 中风险页面、表单、路由、服务层：变更文件检查加受影响单测或 E2E。
 - 高风险登录、权限、API、后端、数据状态：相关前后端测试；边界不明时运行 `npm run check:full`。
 - 发布、合并或高风险回归前：运行 `npm run verify` 或 `npm run verify:local`。
 
+## Worktree 与预览
+
+- 每个任务在自己的任务分支和 Worktree 修改；固定项目目录作为 `main` 基线锚点，不在其中继续已合并的旧任务。Agent 基建、规则或工具优化也必须使用独立 Worktree。
+- 任务 Worktree 统一通过 `npm run dev:task` 启动当前任务预览；`127.0.0.1:5175` 只代表当前任务，启动成功必须同时满足 Worktree、分支、运行模式、API 目标和代理健康检查一致，不能只凭端口存活判断。
+- 纯前端改动使用任务前端、集成后端和唯一的集成 MySQL；后端、API、迁移或 Docker 改动使用任务前端、任务后端和同一个集成 MySQL。不得把需要任务后端的任务静默降级到集成后端。
+- 只有需要并行对比时才使用 `npm run dev:task -- --temporary`；固定集成 Worktree 继续使用 `5173`，只运行已正式汇入的组合。
+- Flyway 或显式数据库高风险任务必须走启动器保护流程；共享数据库、备份、容器和日志的清理与 Git 交付分开授权。
+- `npm run dev:task:stop` 必须同时停止由该任务管理的前端与任务后端；不得留下可访问但 API 已失效的 `5175`。
+
 ## Git 交付
 
 - 稳定主分支为 `main`，任务分支默认使用 `codex/<task-slug>`。
+- 每次收到新的代码要求，先按交付和回滚边界判断是否仍属于当前任务；边界未变化时继续当前分支且不打断用户，边界变化时必须在修改代码或创建分支前说明。前一任务未验收时不得为了开启新任务提前合并 `main`。
 - 每轮明确改动完成并通过对应验证后，在所属任务分支提交并推送；交付时必须证明本地任务分支与同名远程分支一致。
 - `codex/integration-current` 是持续汇总已推送任务分支的完整项目分支，固定 Worktree 用于日常运行和组合调试；禁止在该分支直接开发或提交普通业务改动。
 - 任务分支推送后通过 `npm run git:integration:sync -- --task <branch>` 汇入集成分支；冲突、验证失败或远程分叉时停止自动同步。
+- 任务代码成功汇入并推送 `codex/integration-current` 后，必须在同一次交付中完成运行环境交接：停止旧任务预览和后端、恢复并验证集成后端、释放该任务持有的共享数据库锁并保留安全备份。任一步失败都视为交付未完成，不得报告“任务完成”，也不得遗留会阻塞下一个任务的运行资源；`git:integration:sync` 必须自动执行该交接。
 - 单人开发且验收期间能暂停集成汇入时，可固定准确集成 SHA 和候选清单直接验收；合并 `main` 时仍按清单分别合并任务分支，不直接合并滚动集成分支。
-- 多人协作、验收期间持续汇入或需要稳定快照时，使用从准确候选清单创建的临时 `codex/acceptance-*`；验收缺陷从验收使用的准确提交创建修复分支，不带入同模块后续未验收功能。
-- `main`、`codex/integration-current` 和 `codex/acceptance-*` 禁止直接提交普通改动，pre-commit 会拦截；仅联合冲突修复可在验收分支使用 `ZDM_ALLOW_ACCEPTANCE_INTEGRATION_COMMIT=1` 放行并记录原因。
+- `main` 和 `codex/integration-current` 禁止直接提交普通改动，pre-commit 会拦截。
 - 任务分支验收前同步最新 `origin/main`；正式验收、合并或高风险回归运行 `npm run verify` 或 `npm run verify:local`。
 - 未经用户明确表示验收通过并允许合并，不合并 `main`；合并授权不等于生产发布授权。

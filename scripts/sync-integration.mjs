@@ -44,6 +44,7 @@ try {
   const integrationLocalRef = `refs/heads/${DEFAULT_INTEGRATION_BRANCH}`;
   const integrationRemoteRef = `refs/remotes/origin/${DEFAULT_INTEGRATION_BRANCH}`;
   const worktrees = parseWorktreePorcelain(capture(['worktree', 'list', '--porcelain'], { cwd: root }));
+  const taskWorktree = worktrees.find((worktree) => worktree.branch === taskBranch) ?? null;
   const integrationWorktree = worktrees.find((worktree) => worktree.branch === DEFAULT_INTEGRATION_BRANCH) ?? null;
   const integrationClean = integrationWorktree
     ? capture(['status', '--porcelain'], { cwd: integrationWorktree.path }) === ''
@@ -59,6 +60,7 @@ try {
     integrationWorktreeClean: integrationClean,
   });
   if (errors.length > 0) throw new Error(errors.map((error) => `- ${error}`).join('\n'));
+  if (!taskWorktree) throw new Error(`未找到 ${taskBranch} 的任务 Worktree，不能执行完整交接`);
 
   const alreadyIntegrated =
     spawnSync('git', ['merge-base', '--is-ancestor', taskLocalRef, integrationLocalRef], { cwd: root }).status === 0;
@@ -113,12 +115,19 @@ try {
     }
   }
 
+  execFileSync(
+    process.platform === 'win32' ? 'npm.cmd' : 'npm',
+    ['run', 'dev:task:handoff', '--', '--worktree', taskWorktree.path],
+    { cwd: integrationWorktree.path, stdio: 'inherit' },
+  );
+
   console.log(
     alreadyIntegrated
       ? `${taskBranch} 已存在于 ${DEFAULT_INTEGRATION_BRANCH}，本地与远程一致。`
       : `${taskBranch} 已合入并推送 ${DEFAULT_INTEGRATION_BRANCH}。`,
   );
   console.log(`完整集成后端：${backendReload}`);
+  console.log(`任务交接：completed（${taskWorktree.path}）`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);

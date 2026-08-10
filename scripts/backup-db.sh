@@ -10,8 +10,10 @@ DB_USER="${ZDM_DB_USERNAME:-zdm_admin}"
 DB_PASSWORD="${ZDM_DB_PASSWORD:-zdm_admin_pwd}"
 DB_CONTAINER="${ZDM_DB_CONTAINER:-zdm-platform-mysql}"
 OUTPUT_FILE="${BACKUP_DIR}/${DB_NAME}-${TIMESTAMP}.sql.gz"
+PARTIAL_FILE="${OUTPUT_FILE}.partial"
 
 mkdir -p "${BACKUP_DIR}"
+trap 'rm -f "${PARTIAL_FILE}"' EXIT
 
 if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "${DB_CONTAINER}"; then
   docker exec "${DB_CONTAINER}" mysqldump \
@@ -21,7 +23,7 @@ if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -
     --no-tablespaces \
     --routines \
     --triggers \
-    "${DB_NAME}" | gzip > "${OUTPUT_FILE}"
+    "${DB_NAME}" | gzip > "${PARTIAL_FILE}"
 elif command -v mysqldump >/dev/null 2>&1; then
   mysqldump \
     --host="${DB_HOST}" \
@@ -32,10 +34,13 @@ elif command -v mysqldump >/dev/null 2>&1; then
     --no-tablespaces \
     --routines \
     --triggers \
-    "${DB_NAME}" | gzip > "${OUTPUT_FILE}"
+    "${DB_NAME}" | gzip > "${PARTIAL_FILE}"
 else
   echo "Neither Docker MySQL container '${DB_CONTAINER}' nor local mysqldump is available." >&2
   exit 1
 fi
 
+gzip -t "${PARTIAL_FILE}"
+mv "${PARTIAL_FILE}" "${OUTPUT_FILE}"
+trap - EXIT
 echo "Created ${OUTPUT_FILE}"
