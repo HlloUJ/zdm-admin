@@ -119,7 +119,7 @@
                   >下移</t-link
                 >
                 <t-link
-                  v-if="row.status === 'enabled' ? canDisableCategory : canEnableCategory"
+                  v-if="canToggleCategoryStatus"
                   :theme="row.status === 'enabled' ? 'warning' : 'success'"
                   @click="openStatusConfirm(row.node)"
                   >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
@@ -276,8 +276,7 @@ const canCreateChildCategory = computed(() => hasCategoryAction('create-child'))
 const canEditCategory = computed(() => hasCategoryAction('edit'));
 const canMoveUpCategory = computed(() => hasCategoryAction('move-up'));
 const canMoveDownCategory = computed(() => hasCategoryAction('move-down'));
-const canDisableCategory = computed(() => hasCategoryAction('disable'));
-const canEnableCategory = computed(() => hasCategoryAction('enable'));
+const canToggleCategoryStatus = computed(() => hasCategoryAction('toggle-status'));
 const canDeleteCategory = computed(() => hasCategoryAction('delete'));
 
 const categoryData = ref<Record<Scope, CategoryNode[]>>({ finished: [], accessory: [] });
@@ -344,7 +343,7 @@ function hasVisibleRowAction(row: CategoryRow) {
     canEditCategory.value ||
     canMoveUpCategory.value ||
     canMoveDownCategory.value ||
-    (row.status === 'enabled' ? canDisableCategory.value : canEnableCategory.value) ||
+    canToggleCategoryStatus.value ||
     canDeleteCategory.value
   );
 }

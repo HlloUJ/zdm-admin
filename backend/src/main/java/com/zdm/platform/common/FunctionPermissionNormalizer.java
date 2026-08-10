@@ -14,6 +14,10 @@ public final class FunctionPermissionNormalizer {
       "admin.product-data-center.attribute.",
       "admin.product-data-center.attribute-value.");
   private static final List<String> ATTRIBUTE_SCOPES = List.of("shared", "finished", "accessory");
+  private static final List<String> CATEGORY_STATUS_PERMISSION_PREFIXES = List.of(
+      "admin.tenant.store-category-management",
+      "admin.product-data-center.category.finished",
+      "admin.product-data-center.category.accessory");
   private static final Set<String> QUERY_SUFFIXES = Set.of("query", "查询");
   private static final Set<String> RESET_SUFFIXES = Set.of("reset", "重置");
 
@@ -65,6 +69,14 @@ public final class FunctionPermissionNormalizer {
   }
 
   private static Stream<String> expandLegacyScopedPermission(String permission) {
+    String legacyCategoryStatusPrefix = CATEGORY_STATUS_PERMISSION_PREFIXES.stream()
+        .filter(prefix -> permission.equals(prefix + ".disable") || permission.equals(prefix + ".enable"))
+        .findFirst()
+        .orElse(null);
+    if (legacyCategoryStatusPrefix != null) {
+      return Stream.of(legacyCategoryStatusPrefix + ".toggle-status");
+    }
+
     String legacyPermissionPrefix = LEGACY_SCOPED_PERMISSION_PREFIXES.stream()
         .filter(permission::startsWith)
         .findFirst()

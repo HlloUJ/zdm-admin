@@ -177,6 +177,29 @@ const productCategories = [
   },
 ];
 
+const storeCategories = [
+  {
+    id: 1,
+    parentId: null,
+    name: '石材',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:00:00',
+  },
+  {
+    id: 2,
+    parentId: 1,
+    name: '大理石',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:10:00',
+  },
+];
+
 const productAttributes = [
   {
     id: 1,
@@ -290,6 +313,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
   await mockCollection(page, '**/api/admin/roles', roles);
   await mockCollection(page, '**/api/admin/employees', employees);
+  await mockCollection(page, '**/api/admin/store-categories', storeCategories);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
   await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
   await mockCollection(page, '**/api/admin/product-attribute-values', productAttributeValues);
