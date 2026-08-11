@@ -128,16 +128,17 @@ const deletionCases = [
   { path: '/employee-management', target: '测试员工' },
   { path: '/finished-stock-craft', target: 'E2E 边工艺' },
   { path: '/slab-variety', target: '潘多拉' },
-  { path: '/product-attribute', target: 'E2E 共享属性' },
-  { path: '/product-attribute-value', target: 'E2E 共享属性值' },
+  { path: '/product-attribute', target: 'E2E 共享属性', targetPattern: /E2E (?:全局)?共享属性/ },
+  { path: '/product-attribute-value', target: 'E2E 共享属性值', targetPattern: /E2E (?:全局)?共享属性值/ },
 ];
 
 for (const item of deletionCases) {
   test(`shows 已删除加名称 after deleting ${item.target}`, async ({ page }) => {
     await page.goto(item.path);
-    const row = page.locator('tbody tr').filter({ hasText: item.target });
+    const row = page.locator('tbody tr').filter({ hasText: item.targetPattern ?? item.target });
+    const targetName = item.targetPattern ? await row.locator('td').first().innerText() : item.target;
     await row.getByText('删除', { exact: true }).click();
     await page.getByRole('button', { name: '确认删除', exact: true }).click();
-    await expect(page.getByText(`已删除“${item.target}”`, { exact: true })).toBeVisible();
+    await expect(page.getByText(`已删除“${targetName}”`, { exact: true })).toBeVisible();
   });
 }
