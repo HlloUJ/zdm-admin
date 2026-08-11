@@ -116,6 +116,29 @@ export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionM
 // 终端功能分配和角色管理共同消费此目录，禁止在各页面内维护功能数据副本。
 const verifiedFunctionCatalog: FunctionModule[] = [
   {
+    label: '供应商管理',
+    value: 'admin.supplier-management',
+    menus: [
+      {
+        value: 'admin.supplier-management.menu',
+        direct: true,
+        pages: [
+          {
+            label: '供应商管理页',
+            value: 'admin.supplier-management',
+            actions: [
+              { label: '新增', value: 'admin.supplier-management.create' },
+              { label: '编辑', value: 'admin.supplier-management.edit' },
+              { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
+              { label: '删除', value: 'admin.supplier-management.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+    ],
+  },
+  {
     label: '门店分类管理',
     value: 'admin.tenant.store-category-management',
     menus: [

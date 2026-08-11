@@ -47,11 +47,21 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
-  it('publishes verified store-category, product-data and permission-management resources to shared consumers', () => {
+  it('publishes verified supplier, store-category, product-data and permission-management resources to shared consumers', () => {
     expect(terminalFunctionTrees.store).toBe(fullFunctionCatalog);
     expect(terminalFunctionTrees.supplier).toBe(fullFunctionCatalog);
-    expect(fullFunctionCatalog).toHaveLength(3);
+    expect(fullFunctionCatalog).toHaveLength(4);
     expect(fullFunctionCatalog[0]).toMatchObject({
+      label: '供应商管理',
+      value: 'admin.supplier-management',
+      menus: [
+        {
+          direct: true,
+          pages: [{ label: '供应商管理页', tabs: [] }],
+        },
+      ],
+    });
+    expect(fullFunctionCatalog[1]).toMatchObject({
       label: '门店分类管理',
       value: 'admin.tenant.store-category-management',
       menus: [
@@ -61,7 +71,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[1]).toMatchObject({
+    expect(fullFunctionCatalog[2]).toMatchObject({
       label: '商品基础数据中心',
       menus: [
         {
@@ -116,7 +126,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[2]).toMatchObject({
+    expect(fullFunctionCatalog[3]).toMatchObject({
       label: '权限管理',
       menus: [
         {
@@ -136,7 +146,24 @@ describe('full function catalog', () => {
         },
       ],
     });
-    const storeCategoryPage = fullFunctionCatalog[0].menus[0].pages[0];
+    const supplierPage = fullFunctionCatalog[0].menus[0].pages[0];
+    expect(supplierPage.actions).toEqual([
+      { label: '查看', value: 'admin.supplier-management.view' },
+      { label: '新增', value: 'admin.supplier-management.create' },
+      { label: '编辑', value: 'admin.supplier-management.edit' },
+      { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
+      { label: '删除', value: 'admin.supplier-management.delete' },
+    ]);
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[0])).toEqual([
+      expect.objectContaining({
+        direct: true,
+        menuLabel: undefined,
+        pageLabel: '供应商管理页',
+        tabLabels: [],
+        actions: supplierPage.actions,
+      }),
+    ]);
+    const storeCategoryPage = fullFunctionCatalog[1].menus[0].pages[0];
     expect(storeCategoryPage.actions).toEqual([
       { label: '查看', value: 'admin.tenant.store-category-management.view' },
       { label: '新增一级分类', value: 'admin.tenant.store-category-management.create-root' },
@@ -147,7 +174,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: 'admin.tenant.store-category-management.toggle-status' },
       { label: '删除', value: 'admin.tenant.store-category-management.delete' },
     ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[0])).toEqual([
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[1])).toEqual([
       expect.objectContaining({
         direct: true,
         menuLabel: undefined,
@@ -156,7 +183,7 @@ describe('full function catalog', () => {
         actions: storeCategoryPage.actions,
       }),
     ]);
-    const categoryPage = fullFunctionCatalog[1].menus[0].pages[0];
+    const categoryPage = fullFunctionCatalog[2].menus[0].pages[0];
     expect(categoryPage.tabs).toEqual([
       {
         label: '成品现货分类',
@@ -193,7 +220,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: `${scope}.toggle-status` },
       { label: '删除', value: `${scope}.delete` },
     ];
-    const attributePage = fullFunctionCatalog[1].menus.find(
+    const attributePage = fullFunctionCatalog[2].menus.find(
       (menu) => menu.value === 'admin.product-data-center.attribute.menu',
     )?.pages[0];
     expect(attributePage?.actions).toEqual([]);
@@ -204,7 +231,7 @@ describe('full function catalog', () => {
         actions: productAttributeActions(`admin.product-data-center.attribute.${scope}`),
       })),
     );
-    const attributeValuePage = fullFunctionCatalog[1].menus.find(
+    const attributeValuePage = fullFunctionCatalog[2].menus.find(
       (menu) => menu.value === 'admin.product-data-center.attribute-value.menu',
     )?.pages[0];
     expect(attributeValuePage?.actions).toEqual([]);
@@ -215,7 +242,7 @@ describe('full function catalog', () => {
         actions: productAttributeActions(`admin.product-data-center.attribute-value.${scope}`),
       })),
     );
-    const categoryAttributePage = fullFunctionCatalog[1].menus.find(
+    const categoryAttributePage = fullFunctionCatalog[2].menus.find(
       (menu) => menu.value === 'admin.product-data-center.category-attribute-template.menu',
     )?.pages[0];
     expect(categoryAttributePage?.actions).toEqual([]);
@@ -248,6 +275,11 @@ describe('full function catalog', () => {
       })),
     );
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
+      'admin.supplier-management.view',
+      'admin.supplier-management.create',
+      'admin.supplier-management.edit',
+      'admin.supplier-management.toggle-status',
+      'admin.supplier-management.delete',
       'admin.tenant.store-category-management.view',
       'admin.tenant.store-category-management.create-root',
       'admin.tenant.store-category-management.create-child',

@@ -17,6 +17,7 @@ public class Supplier extends BaseEntity {
   private String region;
   private String address;
   private String qualificationStatus;
+  private String createdByName;
   private String remark;
 
   public String getName() {
@@ -73,6 +74,14 @@ public class Supplier extends BaseEntity {
 
   public void setQualificationStatus(String qualificationStatus) {
     this.qualificationStatus = qualificationStatus;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
   }
 
   public String getRemark() {

@@ -198,7 +198,6 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminListLayout, AdminPageHeader } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';

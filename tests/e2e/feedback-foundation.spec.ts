@@ -66,6 +66,15 @@ test('uses the same action-specific confirmation foundation across modules', asy
 test('shows the same object-specific success copy for category, store category, and employee status changes', async ({
   page,
 }) => {
+  await page.goto('/supplier-management');
+  const supplierRow = page.getByRole('row', { name: /装点猫大板供应商/ });
+  await supplierRow.getByText('停用', { exact: true }).click();
+  await page.getByRole('button', { name: '确认停用', exact: true }).click();
+  await expect(page.getByText('已停用“装点猫大板供应商”', { exact: true })).toBeVisible();
+  await supplierRow.getByText('启用', { exact: true }).click();
+  await page.getByRole('button', { name: '确认启用', exact: true }).click();
+  await expect(page.getByText('已启用“装点猫大板供应商”', { exact: true })).toBeVisible();
+
   await page.goto('/product-category');
   const productCategoryRow = page.getByRole('row', { name: /成品现货 一级分类/ });
   await productCategoryRow.getByText('停用', { exact: true }).click();

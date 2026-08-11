@@ -125,8 +125,18 @@ class PlatformApiSmokeTest {
           AND index_name = 'uk_product_attributes_scope_name'
         """,
         Integer.class);
+    Integer sampleSupplierCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM suppliers WHERE id IN (1, 2) AND remark = '系统内置供应商'",
+        Integer.class);
+    Integer sampleSupplierBusinessRecordCount = jdbcTemplate.queryForObject(
+        """
+        SELECT
+          (SELECT COUNT(*) FROM slab_inventory WHERE serial_no = 'SLAB-A001')
+          + (SELECT COUNT(*) FROM finished_products WHERE sku = 'FP-PANDORA-TABLE-1800')
+        """,
+        Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(34);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(44);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
@@ -138,6 +148,8 @@ class PlatformApiSmokeTest {
     assertThat(productAttributeValueWithoutCreatorCount).isZero();
     assertThat(productAttributeGlobalUniqueIndexCount).isEqualTo(1);
     assertThat(legacyProductAttributeUniqueIndexCount).isZero();
+    assertThat(sampleSupplierCount).isZero();
+    assertThat(sampleSupplierBusinessRecordCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -507,6 +519,330 @@ class PlatformApiSmokeTest {
   void protectedAdminApiRequiresAuthentication() throws Exception {
     mockMvc.perform(get("/api/admin/tenants"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void supplierCrudPersistsThroughApi() throws Exception {
+    String suffix = Long.toString(System.nanoTime());
+    String supplierName = "数据库集成测试供应商-" + suffix;
+    String token = TokenAuthenticationFilter.DEV_TOKEN;
+    String creatorName = jdbcTemplate.queryForObject(
+        """
+        SELECT name
+        FROM employees
+        WHERE account_id = 1
+          AND status = 'enabled'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        String.class);
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/suppliers")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s",
+                  "type":"slab",
+                  "contactName":"测试联系人",
+                  "contactPhone":"13900009999",
+                  "qualificationStatus":"approved",
+                  "createdByName":"不应覆盖",
+                  "remark":"数据库写入验证",
+                  "status":"enabled"
+                }
+                """.formatted(supplierName)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.id").isNumber())
+        .andExpect(jsonPath("$.data.name").value(supplierName))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andReturn();
+    long supplierId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
+
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM suppliers WHERE id = ? AND name = ? AND status = 'enabled'",
+        Integer.class,
+        supplierId,
+        supplierName)).isEqualTo(1);
+
+    mockMvc.perform(put("/api/admin/suppliers/{id}", supplierId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"%s",
+                  "type":"finished",
+                  "contactName":"更新联系人",
+                  "contactPhone":"13800009999",
+                  "qualificationStatus":"approved",
+                  "createdByName":"仍不应覆盖",
+                  "remark":"数据库更新验证",
+                  "status":"disabled"
+                }
+                """.formatted(supplierName)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.type").value("finished"))
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
+        .andExpect(jsonPath("$.data.status").value("enabled"));
+
+    mockMvc.perform(patch("/api/admin/suppliers/{id}/status", supplierId)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "status":"disabled"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(get("/api/admin/suppliers")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == %d)].remark".formatted(supplierId))
+            .value(hasItem("数据库更新验证")));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM suppliers WHERE id = ? AND type = 'finished' AND status = 'disabled'",
+        Integer.class,
+        supplierId)).isEqualTo(1);
+
+    mockMvc.perform(delete("/api/admin/suppliers/{id}", supplierId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM suppliers WHERE id = ?",
+        Integer.class,
+        supplierId)).isZero();
+  }
+
+  @Test
+  void supplierDeleteReturnsBusinessErrorsWhenReferenced() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO suppliers
+          (id, name, type, status)
+        VALUES
+          (9220, '大板引用删除测试供应商', 'slab', 'enabled'),
+          (9221, '成品引用删除测试供应商', 'finished', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_inventory
+          (id, supplier_id, name, serial_no, status)
+        VALUES (9220, 9220, '供应商删除保护测试库存', 'SUPPLIER-DELETE-GUARD-9220', 'warehouse')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO finished_products
+          (id, supplier_id, name, sku, total_stock, status)
+        VALUES (9221, 9221, '供应商删除保护测试成品', 'SUPPLIER-DELETE-GUARD-9221', 0, 'warehouse')
+        """);
+
+    try {
+      mockMvc.perform(delete("/api/admin/suppliers/9220")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message")
+              .value("该供应商已关联大板库存，不能删除，请先停用该供应商"));
+      mockMvc.perform(delete("/api/admin/suppliers/9221")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message")
+              .value("该供应商已关联成品，不能删除，请先停用该供应商"));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM suppliers WHERE id IN (9220, 9221)",
+          Integer.class)).isEqualTo(2);
+    } finally {
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = 9220");
+      jdbcTemplate.update("DELETE FROM finished_products WHERE id = 9221");
+      jdbcTemplate.update("DELETE FROM suppliers WHERE id IN (9220, 9221)");
+    }
+  }
+
+  @Test
+  void supplierNameMustBeUniqueWhenCreatingAndEditing() throws Exception {
+    String suffix = Long.toString(System.nanoTime());
+    String existingName = "供应商重名校验-" + suffix;
+    String otherName = "供应商重名编辑-" + suffix;
+    String token = TokenAuthenticationFilter.DEV_TOKEN;
+
+    MvcResult existingResult = mockMvc.perform(post("/api/admin/suppliers")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"%s","type":"slab","status":"enabled"}
+                """.formatted(existingName)))
+        .andExpect(status().isOk())
+        .andReturn();
+    long existingId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+        existingResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
+
+    mockMvc.perform(post("/api/admin/suppliers")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":" %s ","type":"finished","status":"enabled"}
+                """.formatted(existingName)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("供应商名称已存在"));
+
+    MvcResult otherResult = mockMvc.perform(post("/api/admin/suppliers")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {"name":"%s","type":"finished","status":"enabled"}
+                """.formatted(otherName)))
+        .andExpect(status().isOk())
+        .andReturn();
+    long otherId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+        otherResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
+
+    try {
+      mockMvc.perform(put("/api/admin/suppliers/{id}", otherId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {"name":"%s","type":"finished","status":"enabled"}
+                  """.formatted(existingName)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("供应商名称已存在"));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM suppliers WHERE name = ?",
+          Integer.class,
+          existingName)).isEqualTo(1);
+    } finally {
+      jdbcTemplate.update("DELETE FROM suppliers WHERE id IN (?, ?)", existingId, otherId);
+    }
+  }
+
+  @Test
+  void supplierManagementSeparatesEditAndStatusPermissions() throws Exception {
+    long accountId = 9081L;
+    long employeeId = 9081L;
+    long roleId = 9081L;
+    long supplierId = 9260L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629081",
+        "供应商权限测试员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '供应商权限测试员', '15926629081', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '供应商编辑测试角色', 'SUPPLIER_EDIT_TEST', 'operation-platform',
+          'admin', 'all', 'enabled',
+          'admin.supplier-management.view,admin.supplier-management.edit', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO suppliers (id, name, type, status, created_by_name, created_at)
+        VALUES
+          (?, '供应商权限集成测试', 'slab', 'enabled', '集成测试', '2098-01-01 00:00:00'),
+          (9261, '供应商排序集成测试', 'finished', 'enabled', '集成测试', '2099-01-01 00:00:00')
+        """,
+        supplierId);
+
+    try {
+      String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      mockMvc.perform(get("/api/admin/suppliers")
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[0].id").value(9261))
+          .andExpect(jsonPath("$.data[1].id").value(supplierId));
+      mockMvc.perform(put("/api/admin/suppliers/{id}", supplierId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {"name":"供应商权限集成测试-已编辑","type":"finished","status":"disabled"}
+                  """))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.name").value("供应商权限集成测试-已编辑"))
+          .andExpect(jsonPath("$.data.status").value("enabled"));
+      mockMvc.perform(patch("/api/admin/suppliers/{id}/status", supplierId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {"status":"disabled"}
+                  """))
+          .andExpect(status().isForbidden());
+
+      jdbcTemplate.update(
+          "UPDATE roles SET function_permissions = ? WHERE id = ?",
+          "admin.supplier-management.view,admin.supplier-management.toggle-status",
+          roleId);
+      mockMvc.perform(put("/api/admin/suppliers/{id}", supplierId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {"name":"无权编辑供应商","type":"slab","status":"enabled"}
+                  """))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(patch("/api/admin/suppliers/{id}/status", supplierId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {"status":"disabled"}
+                  """))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("disabled"));
+
+      jdbcTemplate.update(
+          "UPDATE roles SET function_permissions = ? WHERE id = ?",
+          "admin.supplier-management.view,admin.supplier-management.create,admin.supplier-management.delete",
+          roleId);
+      MvcResult createdResult = mockMvc.perform(post("/api/admin/suppliers")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {"name":"自有数据权限新增供应商","type":"accessory","status":"enabled"}
+                  """))
+          .andExpect(status().isOk())
+          .andReturn();
+      long createdSupplierId = Long.parseLong(com.jayway.jsonpath.JsonPath.read(
+          createdResult.getResponse().getContentAsString(),
+          "$.data.id").toString());
+      mockMvc.perform(delete("/api/admin/suppliers/{id}", createdSupplierId)
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+    } finally {
+      jdbcTemplate.update("DELETE FROM suppliers WHERE id IN (?, 9261) OR name = '自有数据权限新增供应商'", supplierId);
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ? AND role_id = ?", accountId, roleId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
   }
 
   @Test
@@ -1019,10 +1355,20 @@ class PlatformApiSmokeTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("该分类包含下级分类，请先删除或转移下级分类"));
 
-    mockMvc.perform(delete("/api/admin/product-categories/3")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("该分类已关联商品，不能删除，请先停用该分类"));
+    jdbcTemplate.update(
+        """
+        INSERT INTO finished_products
+          (id, category_id, name, sku, total_stock, status)
+        VALUES (9210, 3, '分类删除保护测试商品', 'CATEGORY-DELETE-GUARD-9210', 0, 'warehouse')
+        """);
+    try {
+      mockMvc.perform(delete("/api/admin/product-categories/3")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("该分类已关联商品，不能删除，请先停用该分类"));
+    } finally {
+      jdbcTemplate.update("DELETE FROM finished_products WHERE id = 9210");
+    }
 
     jdbcTemplate.update(
         """
@@ -1051,12 +1397,22 @@ class PlatformApiSmokeTest {
 
   @Test
   void slabVarietyDeleteReturnsBusinessErrorWhenReferencedByInventory() throws Exception {
-    mockMvc.perform(delete("/api/admin/slab-varieties/1")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value(400))
-        .andExpect(jsonPath("$.message")
-            .value("该品种已被大板库存引用，不能删除，请先停用该品种"));
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_inventory
+          (id, variety_id, name, serial_no, status)
+        VALUES (9211, 1, '品种删除保护测试库存', 'VARIETY-DELETE-GUARD-9211', 'warehouse')
+        """);
+    try {
+      mockMvc.perform(delete("/api/admin/slab-varieties/1")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value(400))
+          .andExpect(jsonPath("$.message")
+              .value("该品种已被大板库存引用，不能删除，请先停用该品种"));
+    } finally {
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = 9211");
+    }
 
     Integer pandoraCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_varieties WHERE id = 1 AND name = '潘多拉'",

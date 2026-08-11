@@ -34,7 +34,7 @@
                 </t-form-item>
                 <t-form-item label="状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
-                    <t-option label="正常" value="normal" />
+                    <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
                 </t-form-item>
@@ -56,7 +56,7 @@
 
         <section class="table-card">
           <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
+            <t-button v-if="canCreateSupplier" theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
             </t-button>
@@ -76,20 +76,23 @@
             </template>
             <template #status="{ row }">
               <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'normal' ? '正常' : '停用' }}
+                {{ row.status === 'normal' ? '启用' : '停用' }}
               </t-tag>
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canEditSupplier" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
+                  v-if="canToggleSupplierStatus"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link v-if="canDeleteSupplier" theme="danger" hover="color" @click="openDeleteConfirm(row)">
+                  删除
+                </t-link>
               </div>
             </template>
           </t-table>
@@ -160,11 +163,14 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { getLoginUser } from '@/services/auth';
+import { hasPermission } from '@/services/adminPermissions';
 import {
   createSupplier,
   deleteSupplier,
   listSuppliers,
   updateSupplier,
+  updateSupplierStatus,
   type SupplierPayload,
   type SupplierRecord,
 } from '@/services/suppliers';
@@ -180,6 +186,7 @@ interface SupplierItem {
   contact: string;
   phone: string;
   status: SupplierStatus;
+  createdByName: string;
   createdAt: string;
   remark?: string;
 }
@@ -202,6 +209,14 @@ const supplierTypeLabel = (type: SupplierType) => supplierTypeOptions.find((item
 
 const tableData = ref<SupplierItem[]>([]);
 const loading = ref(false);
+const supplierPermissionPrefix = 'admin.supplier-management';
+const loginUser = computed(() => getLoginUser());
+const canCreateSupplier = computed(() => hasPermission(loginUser.value, `${supplierPermissionPrefix}.create`));
+const canEditSupplier = computed(() => hasPermission(loginUser.value, `${supplierPermissionPrefix}.edit`));
+const canToggleSupplierStatus = computed(() =>
+  hasPermission(loginUser.value, `${supplierPermissionPrefix}.toggle-status`),
+);
+const canDeleteSupplier = computed(() => hasPermission(loginUser.value, `${supplierPermissionPrefix}.delete`));
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
@@ -210,6 +225,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'contact', title: '联系人', width: 120, align: 'center' },
   { colKey: 'phone', title: '联系电话', width: 150, align: 'center' },
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 200, align: 'left', fixed: 'right' },
 ];
@@ -302,6 +318,7 @@ const toSupplierItem = (record: SupplierRecord): SupplierItem => ({
   contact: record.contactName ?? '',
   phone: record.contactPhone ?? '',
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName || '-',
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
@@ -431,16 +448,8 @@ const closeConfirmDialog = () => {
   confirmState.row = null;
 };
 
-const persistSupplierItem = async (item: SupplierItem) => {
-  const updated = await updateSupplier(item.id, {
-    name: item.name,
-    type: item.type,
-    contactName: item.contact,
-    contactPhone: item.phone,
-    qualificationStatus: 'approved',
-    status: toBackendStatus(item.status),
-    remark: item.remark ?? '',
-  });
+const persistSupplierStatus = async (item: SupplierItem, status: SupplierStatus) => {
+  const updated = await updateSupplierStatus(item.id, toBackendStatus(status));
   const targetIndex = tableData.value.findIndex((row) => row.id === item.id);
   if (targetIndex !== -1) {
     tableData.value.splice(targetIndex, 1, toSupplierItem(updated));
@@ -450,26 +459,25 @@ const persistSupplierItem = async (item: SupplierItem) => {
 const handleConfirm = async () => {
   if (!confirmState.row) return;
 
+  const targetName = confirmState.row.name;
   try {
     if (confirmState.type === 'delete') {
       await deleteSupplier(confirmState.row.id);
       tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
       ensureCurrentPage();
     } else {
-      await persistSupplierItem({
-        ...confirmState.row,
-        status: confirmState.type === 'enable' ? 'normal' : 'disabled',
-      });
+      await persistSupplierStatus(confirmState.row, confirmState.type === 'enable' ? 'normal' : 'disabled');
     }
 
     closeConfirmDialog();
-    adminFeedback.success(
-      confirmState.type === 'delete'
-        ? '已删除供应商'
-        : confirmState.type === 'enable'
-          ? '已启用供应商'
-          : '已停用供应商',
-    );
+    if (confirmState.type === 'delete') {
+      adminFeedback.success('已删除供应商');
+    } else {
+      adminFeedback.actionSuccess({
+        action: confirmState.type === 'enable' ? '启用' : '停用',
+        target: targetName,
+      });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
