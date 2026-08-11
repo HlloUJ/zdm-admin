@@ -213,6 +213,7 @@ import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createCraft,
   deleteCraft,
@@ -391,7 +392,7 @@ const loadCrafts = async () => {
   loading.value = true;
   try {
     const records = await listCrafts();
-    tableData.value = records.map(toCraftItem);
+    tableData.value = sortByCreatedAtDesc(records).map(toCraftItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '工艺列表加载失败');

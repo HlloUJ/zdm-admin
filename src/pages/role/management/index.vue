@@ -292,6 +292,7 @@ import {
 } from '@/services/functionCatalog';
 import { getLoginUser } from '@/services/auth';
 import { hasAnyPermission, hasPermissionPrefix } from '@/services/adminPermissions';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import { createRole, deleteRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
 
 type RoleCategory = 'partner-store' | 'supplier-store' | 'operation-platform';
@@ -486,9 +487,9 @@ const loadRoles = async () => {
   loading.value = true;
   try {
     const records = await listRoles();
-    roles.value = records
-      .filter((record) => record.category !== 'terminal-policy' && record.status === 'enabled')
-      .map(toRoleItem);
+    roles.value = sortByCreatedAtDesc(
+      records.filter((record) => record.category !== 'terminal-policy' && record.status === 'enabled'),
+    ).map(toRoleItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '角色列表加载失败');
