@@ -1003,7 +1003,10 @@ const ensureCurrentPage = () => {
 };
 
 const handleConfirm = () => {
-  if (confirmState.type === 'delete-category' && confirmState.category) {
+  const type = confirmState.type;
+  const targetName = type === 'delete-category' ? confirmState.category?.name : confirmState.attribute?.name;
+
+  if (type === 'delete-category' && confirmState.category) {
     const deletedId = confirmState.category.id;
     removeCategory(deletedId);
     delete tabsState.goods.categoryAttributes[deletedId];
@@ -1013,25 +1016,23 @@ const handleConfirm = () => {
     }
   }
 
-  if (confirmState.type === 'remove-attribute' && confirmState.attribute) {
+  if (type === 'remove-attribute' && confirmState.attribute) {
     currentState.value.categoryAttributes[selectedCategoryId.value] = selectedAttributes.value.filter(
       (item) => item.id !== confirmState.attribute?.id,
     );
     ensureCurrentPage();
   }
 
-  if (confirmState.type === 'publish-attribute' && confirmState.attribute) {
+  if (type === 'publish-attribute' && confirmState.attribute) {
     confirmState.attribute.publishStatus = 'published';
   }
 
   closeConfirmDialog();
-  adminFeedback.success(
-    confirmState.type === 'delete-category'
-      ? '已删除分类'
-      : confirmState.type === 'remove-attribute'
-        ? '已移除分类属性'
-        : '已发布分类属性',
-  );
+  if (type === 'delete-category' && targetName) {
+    adminFeedback.deleted(targetName);
+  } else {
+    adminFeedback.success(type === 'remove-attribute' ? '已移除分类属性' : '已发布分类属性');
+  }
 };
 </script>
 

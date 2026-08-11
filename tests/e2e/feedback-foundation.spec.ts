@@ -119,3 +119,25 @@ test('shows object-specific success copy in craft, slab variety, attribute, and 
     await expect(page.getByText(`已停用“${item.target}”`, { exact: true })).toBeVisible();
   }
 });
+
+test('shows 已删除加名称 after deletion across management modules', async ({ page }) => {
+  const cases = [
+    { path: '/supplier-management', target: '装点猫大板供应商' },
+    { path: '/tenant-management', target: '装点猫直营租户' },
+    { path: '/tenant-store-management', target: '杭州体验门店' },
+    { path: '/role-management', target: '运营管理平台角色' },
+    { path: '/employee-management', target: '测试员工' },
+    { path: '/finished-stock-craft', target: 'E2E 边工艺' },
+    { path: '/slab-variety', target: '潘多拉' },
+    { path: '/product-attribute', target: 'E2E 共享属性' },
+    { path: '/product-attribute-value', target: 'E2E 共享属性值' },
+  ];
+
+  for (const item of cases) {
+    await page.goto(item.path);
+    const row = page.locator('tbody tr').filter({ hasText: item.target });
+    await row.getByText('删除', { exact: true }).click();
+    await page.getByRole('button', { name: '确认删除', exact: true }).click();
+    await expect(page.getByText(`已删除“${item.target}”`, { exact: true })).toBeVisible();
+  }
+});

@@ -642,13 +642,14 @@ const closeDeleteDialog = () => {
 
 const handleDeleteConfirm = async () => {
   if (!deletingRole.value) return;
+  const target = deletingRole.value;
 
   try {
-    await deleteRole(deletingRole.value.id);
-    roles.value = roles.value.filter((item) => item.id !== deletingRole.value?.id);
+    await deleteRole(target.id);
+    roles.value = roles.value.filter((item) => item.id !== target.id);
     ensureCurrentPage();
     closeDeleteDialog();
-    adminFeedback.success('已删除角色');
+    adminFeedback.deleted(target.name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

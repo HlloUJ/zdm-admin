@@ -476,11 +476,12 @@ const closeConfirmDialog = () => {
 
 const handleConfirm = async () => {
   if (!confirmState.row) return;
+  const target = confirmState.row;
 
   try {
     if (confirmState.type === 'delete') {
-      await deleteTenant(confirmState.row.id);
-      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      await deleteTenant(target.id);
+      tableData.value = tableData.value.filter((item) => item.id !== target.id);
       ensureCurrentPage();
     } else {
       await persistTenantItem({
@@ -490,9 +491,11 @@ const handleConfirm = async () => {
     }
 
     closeConfirmDialog();
-    adminFeedback.success(
-      confirmState.type === 'delete' ? '已删除租户' : confirmState.type === 'enable' ? '已启用租户' : '已停用租户',
-    );
+    if (confirmState.type === 'delete') {
+      adminFeedback.deleted(target.tenantName);
+    } else {
+      adminFeedback.success(confirmState.type === 'enable' ? '已启用租户' : '已停用租户');
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

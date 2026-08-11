@@ -739,7 +739,7 @@ const handleConfirmSubmit = async () => {
       await deleteEmployee(confirmEmployee.value.id);
       employees.value = employees.value.filter((employee) => employee.id !== confirmEmployee.value?.id);
       if (pagination.current > pageCount.value) pagination.current = pageCount.value;
-      adminFeedback.actionSuccess({ action: '删除', target: confirmEmployee.value.name });
+      adminFeedback.deleted(confirmEmployee.value.name);
     } else {
       const updated = await updateEmployee(
         confirmEmployee.value.id,
