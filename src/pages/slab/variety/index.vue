@@ -25,7 +25,7 @@
                 </t-form-item>
                 <t-form-item label="状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
-                    <t-option label="正常" value="normal" />
+                    <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
                 </t-form-item>
@@ -59,7 +59,7 @@
             </template>
             <template #status="{ row }">
               <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'normal' ? '正常' : '停用' }}
+                {{ row.status === 'normal' ? '启用' : '停用' }}
               </t-tag>
             </template>
             <template #operation="{ row }">
