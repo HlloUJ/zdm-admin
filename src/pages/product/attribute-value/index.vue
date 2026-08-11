@@ -367,7 +367,7 @@ const submit = async () => {
     await loadValues();
     pagination.current = 1;
     closeFormDialog();
-    adminFeedback.actionSuccess({ action: '新增', target: name });
+    adminFeedback.created(name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

@@ -443,7 +443,7 @@ const handleSubmit = async () => {
 
   pagination.current = 1;
   closeFormDialog();
-  adminFeedback.actionSuccess({ action: '新增', target: formData.name.trim() });
+  adminFeedback.created(formData.name.trim());
 };
 
 const openOptionDialog = (row: AttributeItem) => {

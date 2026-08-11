@@ -317,7 +317,7 @@ const submit = async () => {
     pagination.current = 1;
     dialogVisible.value = false;
     formRef.value?.clearValidate();
-    adminFeedback.actionSuccess({ action: '新增', target: name });
+    adminFeedback.created(name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

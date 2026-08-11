@@ -60,6 +60,18 @@ describe('adminFeedback', () => {
     );
   });
 
+  it('统一新增成功提示为已新增加名称', async () => {
+    const { adminFeedback } = await import('./adminFeedback');
+
+    adminFeedback.created('一级分类3');
+
+    expect(messageMocks.success).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: '已新增“一级分类3”',
+      }),
+    );
+  });
+
   it('不向页面暴露数据库内部错误', async () => {
     const { getSafeErrorMessage } = await import('./adminFeedback');
 

@@ -353,10 +353,13 @@ const handleSubmit = async () => {
       await loadVarieties();
     }
 
-    const action = dialogMode.value === 'create' ? '新增' : '保存';
     const target = formData.name.trim();
     closeFormDialog();
-    adminFeedback.actionSuccess({ action, target });
+    if (dialogMode.value === 'create') {
+      adminFeedback.created(target);
+    } else {
+      adminFeedback.actionSuccess({ action: '保存', target });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

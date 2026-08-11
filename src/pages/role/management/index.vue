@@ -620,7 +620,11 @@ const handleSubmit = async () => {
     }
 
     closeFormDialog();
-    adminFeedback.success(dialogMode.value === 'create' ? '已新增角色' : '已保存角色');
+    if (dialogMode.value === 'create') {
+      adminFeedback.created(roleName);
+    } else {
+      adminFeedback.success('已保存角色');
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

@@ -552,7 +552,7 @@ async function handleSubmit() {
         productCount: 0,
         status: formData.status,
       });
-      adminFeedback.actionSuccess({ action: '新增', target: name });
+      adminFeedback.created(name);
     } else if (formData.id) {
       const node = findNode(formData.id);
       if (node) {
