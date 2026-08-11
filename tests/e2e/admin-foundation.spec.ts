@@ -63,6 +63,99 @@ test('uses the official TDesign pagination controls on routed list pages', async
   }
 });
 
+test('orders the requested management lists by creation time descending', async ({ page }) => {
+  const cases = [
+    {
+      path: '/slab-variety',
+      endpoint: '**/api/admin/slab-varieties',
+      newerName: '较新品种',
+      records: [
+        { id: 101, name: '较早品种', code: 'older-variety', status: 'enabled', createdAt: '2026-08-01T09:00:00' },
+        { id: 102, name: '较新品种', code: 'newer-variety', status: 'enabled', createdAt: '2026-08-03T09:00:00' },
+      ],
+    },
+    {
+      path: '/finished-stock-craft',
+      endpoint: '**/api/admin/crafts',
+      newerName: '较新工艺',
+      records: [
+        { id: 201, name: '较早工艺', type: '边工艺', status: 'enabled', createdAt: '2026-08-01T09:00:00' },
+        { id: 202, name: '较新工艺', type: '边工艺', status: 'enabled', createdAt: '2026-08-03T09:00:00' },
+      ],
+    },
+    {
+      path: '/employee-management',
+      endpoint: '**/api/admin/employees',
+      newerName: '较新员工',
+      records: [
+        {
+          id: 301,
+          name: '较早员工',
+          gender: 'male',
+          phone: '15900000301',
+          status: 'enabled',
+          roleIds: '2',
+          dataPermission: 'all',
+          createdAt: '2026-08-01T09:00:00',
+        },
+        {
+          id: 302,
+          name: '较新员工',
+          gender: 'female',
+          phone: '15900000302',
+          status: 'enabled',
+          roleIds: '2',
+          dataPermission: 'all',
+          createdAt: '2026-08-03T09:00:00',
+        },
+      ],
+    },
+    {
+      path: '/role-management',
+      endpoint: '**/api/admin/roles',
+      newerName: '较新角色',
+      records: [
+        {
+          id: 401,
+          name: '较早角色',
+          code: 'OLDER_ROLE',
+          category: 'operation-platform',
+          clientCode: 'admin',
+          dataScope: 'all',
+          status: 'enabled',
+          functionPermissions: '',
+          createdAt: '2026-08-01T09:00:00',
+        },
+        {
+          id: 402,
+          name: '较新角色',
+          code: 'NEWER_ROLE',
+          category: 'operation-platform',
+          clientCode: 'admin',
+          dataScope: 'all',
+          status: 'enabled',
+          functionPermissions: '',
+          createdAt: '2026-08-03T09:00:00',
+        },
+      ],
+    },
+  ];
+
+  for (const item of cases) {
+    await page.unroute(item.endpoint);
+    await page.route(item.endpoint, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', data: item.records }),
+      }),
+    );
+
+    await page.goto(item.path);
+    await expect(page.getByRole('main').locator('tbody tr').first()).toContainText(item.newerName);
+  }
+});
+
 test('opens tenant create, business and edit dialogs', async ({ page }) => {
   await page.goto('/tenant-management');
   const main = page.getByRole('main');

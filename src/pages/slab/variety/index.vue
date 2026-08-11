@@ -140,6 +140,7 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createSlabVariety,
   deleteSlabVariety,
@@ -283,7 +284,7 @@ const loadVarieties = async () => {
   loading.value = true;
   try {
     const records = await listSlabVarieties();
-    tableData.value = records.map(toVarietyItem);
+    tableData.value = sortByCreatedAtDesc(records).map(toVarietyItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '品种列表加载失败');

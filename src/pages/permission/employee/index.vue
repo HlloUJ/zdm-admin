@@ -268,6 +268,7 @@ import {
   type EmployeeRecord,
 } from '@/services/employees';
 import { createEmployeeInvite } from '@/services/employeeInvites';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import { listRoles, type RoleRecord } from '@/services/roles';
 
 type EmployeeStatus = 'normal' | 'disabled';
@@ -517,7 +518,7 @@ const loadPermissionCenter = async () => {
   try {
     const [roles, records] = await Promise.all([listRoles(), listEmployees()]);
     operationRoles.value = roles.filter((role) => role.category === 'operation-platform' && role.status === 'enabled');
-    employees.value = records.map(toEmployeeItem);
+    employees.value = sortByCreatedAtDesc(records).map(toEmployeeItem);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '员工列表加载失败');
   } finally {
