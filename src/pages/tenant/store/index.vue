@@ -730,11 +730,12 @@ const closeConfirmDialog = () => {
 
 const handleConfirm = async () => {
   if (!confirmState.row) return;
+  const target = confirmState.row;
 
   try {
     if (confirmState.type === 'delete') {
-      await deleteStore(confirmState.row.id);
-      tableData.value = tableData.value.filter((item) => item.id !== confirmState.row?.id);
+      await deleteStore(target.id);
+      tableData.value = tableData.value.filter((item) => item.id !== target.id);
     } else {
       const updated = await updateStore(
         confirmState.row.id,
@@ -750,9 +751,11 @@ const handleConfirm = async () => {
     }
 
     closeConfirmDialog();
-    adminFeedback.success(
-      confirmState.type === 'delete' ? '已删除店铺' : confirmState.type === 'enable' ? '已启用店铺' : '已停用店铺',
-    );
+    if (confirmState.type === 'delete') {
+      adminFeedback.deleted(target.shopName);
+    } else {
+      adminFeedback.success(confirmState.type === 'enable' ? '已启用店铺' : '已停用店铺');
+    }
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

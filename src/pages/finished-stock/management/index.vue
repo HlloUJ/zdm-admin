@@ -2800,6 +2800,8 @@ const updateProductStatus = async (id: number, status: StockStatus, reason?: str
 const handleConfirm = async () => {
   const type = confirmState.type;
   const product = confirmState.product;
+  const selectedCount = selectedKeys.value.length;
+  const recycleCount = dataItems.value.filter((item) => item.status === 'recycle').length;
   saving.value = true;
   try {
     if (type === 'shelf' && product) {
@@ -2831,7 +2833,15 @@ const handleConfirm = async () => {
       selectedKeys.value = [];
     }
     closeConfirmDialog();
-    adminFeedback.success('操作已完成');
+    if ((type === 'delete' || type === 'purge') && product) {
+      adminFeedback.deleted(product.name);
+    } else if (type === 'batchPurge') {
+      adminFeedback.deleted(`${selectedCount} 个商品`);
+    } else if (type === 'clearRecycle') {
+      adminFeedback.deleted(`${recycleCount} 个回收站商品`);
+    } else {
+      adminFeedback.success('操作已完成');
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   } finally {

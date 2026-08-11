@@ -471,7 +471,7 @@ const handleConfirm = async () => {
 
     closeConfirmDialog();
     if (confirmState.type === 'delete') {
-      adminFeedback.success('已删除供应商');
+      adminFeedback.deleted(targetName);
     } else {
       adminFeedback.actionSuccess({
         action: confirmState.type === 'enable' ? '启用' : '停用',

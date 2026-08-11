@@ -1215,12 +1215,15 @@ const closeConfirmDialog = () => {
 };
 
 const handleConfirmSubmit = () => {
+  const type = confirmState.type;
   const row = confirmState.row;
-  if (confirmState.type === 'shelf' && row) row.status = 'selling';
-  if (confirmState.type === 'delete' && row) row.status = 'recycle';
-  if (confirmState.type === 'restore' && row) row.status = 'warehouse';
-  if (confirmState.type === 'reject' && row) row.status = 'recycle';
-  if (confirmState.type === 'savePrice' && row) {
+  const selectedCount = selectedKeys.value.length;
+  const recycleCount = tableData.value.filter((item) => item.status === 'recycle').length;
+  if (type === 'shelf' && row) row.status = 'selling';
+  if (type === 'delete' && row) row.status = 'recycle';
+  if (type === 'restore' && row) row.status = 'warehouse';
+  if (type === 'reject' && row) row.status = 'recycle';
+  if (type === 'savePrice' && row) {
     row.price = {
       cost: batchPriceRows[0].price,
       guide: batchPriceRows[1].price,
@@ -1230,31 +1233,39 @@ const handleConfirmSubmit = () => {
     };
     closePriceDrawer();
   }
-  if (confirmState.type === 'purge' && row) {
+  if (type === 'purge' && row) {
     tableData.value = tableData.value.filter((item) => item.id !== row.id);
   }
-  if (confirmState.type === 'batchRestore') {
+  if (type === 'batchRestore') {
     tableData.value.forEach((item) => {
       if (selectedKeys.value.includes(item.id)) item.status = 'warehouse';
     });
   }
-  if (confirmState.type === 'batchShelf') {
+  if (type === 'batchShelf') {
     tableData.value.forEach((item) => {
       if (selectedKeys.value.includes(item.id)) item.status = 'selling';
     });
   }
-  if (confirmState.type === 'batchPurge') {
+  if (type === 'batchPurge') {
     tableData.value = tableData.value.filter((item) => !selectedKeys.value.includes(item.id));
   }
-  if (confirmState.type === 'clearRecycle') {
+  if (type === 'clearRecycle') {
     tableData.value = tableData.value.filter((item) => item.status !== 'recycle');
   }
-  if (confirmState.type !== 'savePrice') {
+  if (type !== 'savePrice') {
     selectedKeys.value = [];
     ensureCurrentPage();
   }
   closeConfirmDialog();
-  adminFeedback.success('大板状态已更新');
+  if ((type === 'delete' || type === 'purge') && row) {
+    adminFeedback.deleted(row.name);
+  } else if (type === 'batchPurge') {
+    adminFeedback.deleted(`${selectedCount} 个大板`);
+  } else if (type === 'clearRecycle') {
+    adminFeedback.deleted(`${recycleCount} 个回收站大板`);
+  } else {
+    adminFeedback.success('大板状态已更新');
+  }
 };
 
 const openReasonDialog = (type: 'reject' | 'offShelf', row: SlabItem) => {

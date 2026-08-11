@@ -556,7 +556,11 @@ const handleConfirm = async () => {
     }
 
     closeConfirmDialog();
-    adminFeedback.actionSuccess({ action, target: target.name });
+    if (confirmState.type === 'delete') {
+      adminFeedback.deleted(target.name);
+    } else {
+      adminFeedback.actionSuccess({ action, target: target.name });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

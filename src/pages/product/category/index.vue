@@ -650,7 +650,7 @@ async function handleDeleteConfirm() {
     const deleted = await deleteProductCategory(node.id);
     if (!deleted) throw new Error('分类删除失败，请刷新后重试');
     removeNode(activeNodes.value, node.id);
-    adminFeedback.actionSuccess({ action: '删除', target: node.name });
+    adminFeedback.deleted(node.name);
     closeDeleteDialog();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '删除失败');

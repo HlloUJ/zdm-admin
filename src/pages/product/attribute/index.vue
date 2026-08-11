@@ -354,7 +354,11 @@ const handleConfirm = async () => {
         data.value.splice(targetIndex, 1, toAttribute(updated));
       }
     }
-    adminFeedback.actionSuccess({ action, target: target.name });
+    if (confirmType.value === 'delete') {
+      adminFeedback.deleted(target.name);
+    } else {
+      adminFeedback.actionSuccess({ action, target: target.name });
+    }
     closeConfirmDialog();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

@@ -559,7 +559,7 @@ const handleDeleteConfirm = async () => {
     deleteVisible.value = false;
     deleteTarget.value = null;
     await loadCategories();
-    adminFeedback.actionSuccess({ action: '删除', target: target.name });
+    adminFeedback.deleted(target.name);
   } catch (error) {
     showError(error, '分类删除失败');
     return;
