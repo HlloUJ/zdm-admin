@@ -54,6 +54,7 @@ const suppliers = [
     qualificationStatus: 'approved',
     status: 'enabled',
     remark: '系统内置供应商',
+    createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
   {
@@ -65,6 +66,7 @@ const suppliers = [
     qualificationStatus: 'approved',
     status: 'enabled',
     remark: 'E2E 成品供应商',
+    createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
 ];
@@ -399,7 +401,9 @@ async function mockCollection(page: Page, pattern: string, records: unknown[]) {
     }
     if (route.request().method() === 'PUT' || route.request().method() === 'PATCH') {
       const pathParts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
-      const id = Number(pathParts.at(-1) === 'permissions' ? pathParts.at(-2) : pathParts.at(-1));
+      const id = Number(
+        ['permissions', 'status'].includes(pathParts.at(-1) ?? '') ? pathParts.at(-2) : pathParts.at(-1),
+      );
       const targetIndex = records.findIndex((record) => {
         if (!record || typeof record !== 'object' || !('id' in record)) return false;
         return Number(record.id) === id;

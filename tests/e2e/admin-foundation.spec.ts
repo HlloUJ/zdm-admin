@@ -149,6 +149,7 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   await expect(createDialog).toBeHidden();
 
   const supplierRow = page.locator('tbody tr').filter({ hasText: '装点猫大板供应商' }).first();
+  await expect(supplierRow.getByText('韩健', { exact: true })).toBeVisible();
   await supplierRow.getByText('编辑').click();
   const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
   await expect(editDialog).toBeVisible();

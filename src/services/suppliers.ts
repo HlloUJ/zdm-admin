@@ -9,6 +9,7 @@ export interface SupplierRecord {
   region?: string;
   address?: string;
   qualificationStatus?: string;
+  createdByName?: string;
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdAt?: string;
@@ -42,6 +43,13 @@ export function updateSupplier(id: number, payload: SupplierPayload) {
   return request<SupplierRecord>(`/admin/suppliers/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateSupplierStatus(id: number, status: SupplierPayload['status']) {
+  return request<SupplierRecord>(`/admin/suppliers/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
 }
 
