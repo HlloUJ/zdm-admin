@@ -526,7 +526,7 @@ const handleSubmit = async () => {
   });
   currentState.value.pagination.current = 1;
   closeFormDialog();
-  adminFeedback.actionSuccess({ action: '新增', target: name });
+  adminFeedback.created(name);
 };
 
 const openOptionDialog = (row: AttributeItem) => {

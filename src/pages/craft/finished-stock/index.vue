@@ -493,9 +493,12 @@ const handleSubmit = async () => {
       await loadCrafts();
     }
 
-    const action = dialogMode.value === 'create' ? '新增' : '保存';
     closeFormDialog();
-    adminFeedback.actionSuccess({ action, target: normalizedName });
+    if (dialogMode.value === 'create') {
+      adminFeedback.created(normalizedName);
+    } else {
+      adminFeedback.actionSuccess({ action: '保存', target: normalizedName });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

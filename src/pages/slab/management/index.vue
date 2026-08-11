@@ -1077,13 +1077,14 @@ const handleProductSubmit = async () => {
     adminFeedback.warning('请完善基础信息');
     return;
   }
+  const targetName = `${productForm.variety}大板`;
   if (productMode.value === 'create') {
     const nextId = Math.max(...tableData.value.map((item) => item.id), 860100) + 1;
     tableData.value.unshift({
       id: nextId,
       code: `DB-${nextId}`,
       image: createStoneImage(nextId),
-      name: `${productForm.variety}大板`,
+      name: targetName,
       size: `${productForm.length} x ${productForm.width} x ${productForm.height}mm`,
       origin: productForm.origin,
       texture: productForm.texture,
@@ -1127,7 +1128,11 @@ const handleProductSubmit = async () => {
     }
   }
   closeProductDialog();
-  adminFeedback.success('商品信息已提交');
+  if (productMode.value === 'create') {
+    adminFeedback.created(targetName);
+  } else {
+    adminFeedback.success('商品信息已提交');
+  }
 };
 
 const handleUploadClick = (item: (typeof uploadItems)[number]) => {

@@ -105,6 +105,7 @@ export const adminFeedback = {
   error: (input: FeedbackInput) => showFeedback('error', input),
   warning: (input: FeedbackInput) => showFeedback('warning', input),
   info: (input: FeedbackInput) => showFeedback('info', input),
+  created: (target: string) => showFeedback('success', buildActionSuccessText('新增', target)),
   deleted: (target: string) => showFeedback('success', buildActionSuccessText('删除', target)),
   actionSuccess: ({ action, target }: ActionFeedbackOptions) =>
     showFeedback('success', buildActionSuccessText(action, target)),

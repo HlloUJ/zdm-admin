@@ -2689,6 +2689,7 @@ const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string)
 const submitProductForm = async () => {
   submitAttempted.value = true;
   if (!validateProductForm()) return;
+  const isCreate = formPageMode.value !== 'edit' || !editingProduct.value;
   saving.value = true;
   try {
     const payload = buildProductPayloadFromForm();
@@ -2705,7 +2706,11 @@ const submitProductForm = async () => {
       await createMovement(created.id, 'initial', 0, payload.totalStock ?? 0, '新建成品库存');
     }
     formPageVisible.value = false;
-    adminFeedback.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+    if (isCreate) {
+      adminFeedback.created(payload.name);
+    } else {
+      adminFeedback.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');
   } finally {

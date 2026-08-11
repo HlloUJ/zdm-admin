@@ -120,6 +120,17 @@ test('shows object-specific success copy in craft, slab variety, attribute, and 
   }
 });
 
+test('shows 已新增加名称 after creating an item', async ({ page }) => {
+  await page.goto('/product-attribute');
+  await page.getByRole('main').getByRole('button', { name: '新增', exact: true }).click();
+
+  await page.getByPlaceholder('请输入属性名称').fill('E2E 新增属性');
+  await page.getByText('文本输入', { exact: true }).click();
+  await page.getByRole('button', { name: '提交', exact: true }).click();
+
+  await expect(page.getByText('已新增“E2E 新增属性”', { exact: true })).toBeVisible();
+});
+
 const deletionCases = [
   { path: '/supplier-management', target: '装点猫大板供应商' },
   { path: '/tenant-management', target: '装点猫直营租户' },

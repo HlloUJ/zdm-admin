@@ -203,7 +203,11 @@ const submit = async () => {
     }
     await loadData();
     dialogVisible.value = false;
-    adminFeedback.success(editingRow.value ? '已保存修改' : `已新增${config.value.entityName}`);
+    if (editingRow.value) {
+      adminFeedback.success('已保存修改');
+    } else {
+      adminFeedback.created(form.name.trim());
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

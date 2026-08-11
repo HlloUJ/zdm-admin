@@ -422,7 +422,11 @@ const handleSubmit = async () => {
     }
 
     closeFormDialog();
-    adminFeedback.success(dialogMode.value === 'create' ? '已新增供应商' : '已保存供应商');
+    if (dialogMode.value === 'create') {
+      adminFeedback.created(formData.name.trim());
+    } else {
+      adminFeedback.success('已保存供应商');
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

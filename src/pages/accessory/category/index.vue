@@ -741,7 +741,11 @@ const handleCategorySubmit = async () => {
   }
 
   closeCategoryDialog();
-  adminFeedback.success(categoryDialogMode.value === 'create' ? '已新增分类' : '已保存分类');
+  if (categoryDialogMode.value === 'create') {
+    adminFeedback.created(name);
+  } else {
+    adminFeedback.success('已保存分类');
+  }
 };
 
 const openAttributeTransferDialog = () => {

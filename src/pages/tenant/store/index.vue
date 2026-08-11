@@ -666,7 +666,11 @@ const handleSubmit = async () => {
     }
 
     closeFormDialog();
-    adminFeedback.success(dialogMode.value === 'create' ? '已新增店铺' : '已保存店铺');
+    if (dialogMode.value === 'create') {
+      adminFeedback.created(formData.shopName.trim());
+    } else {
+      adminFeedback.success('已保存店铺');
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
