@@ -78,6 +78,11 @@ const router = createRouter({
       component: () => import('@/pages/slab/origin/index.vue'),
     },
     {
+      path: '/slab-texture',
+      name: 'slabTexture',
+      component: () => import('@/pages/slab/texture/index.vue'),
+    },
+    {
       path: '/slab-management',
       name: 'slabManagement',
       component: () => import('@/pages/slab/management/index.vue'),
