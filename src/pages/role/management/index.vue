@@ -208,6 +208,7 @@
                   <thead>
                     <tr>
                       <th class="permission-menu-column">二级菜单</th>
+                      <th class="permission-third-menu-column">三级菜单</th>
                       <th class="permission-page-column">页面</th>
                       <th class="permission-tab-column">页面 Tab</th>
                       <th class="permission-action-column">操作权限</th>
@@ -218,6 +219,12 @@
                       <td v-if="row.showMenu" class="permission-menu-cell" :rowspan="row.menuRowspan">
                         <t-tag v-if="row.direct" class="permission-level-tag" variant="light">一级菜单直达</t-tag>
                         <span v-else class="permission-menu-name">{{ row.menuLabel }}</span>
+                      </td>
+                      <td v-if="row.showThirdMenu" class="permission-third-menu-cell" :rowspan="row.thirdMenuRowspan">
+                        <span v-if="row.thirdMenuLabel" class="permission-third-menu-name">{{
+                          row.thirdMenuLabel
+                        }}</span>
+                        <span v-else class="permission-empty-value">—</span>
                       </td>
                       <td v-if="row.showPage" class="permission-page-cell" :rowspan="row.pageRowspan">
                         <div class="permission-page-name">{{ row.pageLabel }}</div>
@@ -254,7 +261,7 @@
                       </td>
                     </tr>
                     <tr v-if="!activePermissionRows.length" class="permission-matrix-empty-row">
-                      <td colspan="4">
+                      <td colspan="5">
                         <div class="permission-matrix-empty">
                           <strong>暂无功能目录数据</strong>
                           <span>完成一个业务模块的梳理、实现和验证后，再将该模块加入全量功能目录</span>
@@ -951,13 +958,19 @@ onMounted(loadRoles);
 
 .permission-menu-column,
 .permission-menu-cell {
-  width: 13.25%;
+  width: 12%;
+  border-right: 1px solid var(--td-component-border);
+}
+
+.permission-third-menu-column,
+.permission-third-menu-cell {
+  width: 12%;
   border-right: 1px solid var(--td-component-border);
 }
 
 .permission-page-column,
 .permission-page-cell {
-  width: 18.375%;
+  width: 16%;
   border-right: 1px solid var(--td-component-border);
 }
 
@@ -969,10 +982,11 @@ onMounted(loadRoles);
 
 .permission-action-column,
 .permission-action-cell {
-  width: 55.5125%;
+  width: 47.1375%;
 }
 
 .permission-menu-name,
+.permission-third-menu-name,
 .permission-tab-text {
   color: var(--td-text-color-primary);
   font: var(--td-font-body-medium);
