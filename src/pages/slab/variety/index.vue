@@ -10,7 +10,8 @@
           <div>
             <t-breadcrumb>
               <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-              <t-breadcrumb-item>大板品种管理</t-breadcrumb-item>
+              <t-breadcrumb-item>大板基础数据管理</t-breadcrumb-item>
+              <t-breadcrumb-item>品种管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
           <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
