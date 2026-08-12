@@ -301,10 +301,65 @@ const slabVarieties = [
     id: 1,
     name: '潘多拉',
     code: 'pandora',
+    originId: 1,
     remark: '按钮权限测试数据',
     status: 'enabled',
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const slabs = [
+  {
+    id: 6,
+    supplierId: 1,
+    varietyId: 1,
+    name: '雪花白大板 06',
+    serialNo: 'SLAB-E2E-006',
+    warehouse: '云浮仓',
+    publisherType: '平台发布',
+    lengthMm: 3200,
+    widthMm: 1800,
+    thicknessMm: 18,
+    areaSquareMeter: 5.76,
+    costPrice: 6800,
+    guidePrice: 9800,
+    status: 'warehouse',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 7,
+    supplierId: 1,
+    varietyId: 1,
+    name: '回收站大板 07',
+    serialNo: 'SLAB-E2E-007',
+    warehouse: '云浮仓',
+    publisherType: '平台发布',
+    lengthMm: 3000,
+    widthMm: 1700,
+    thicknessMm: 18,
+    areaSquareMeter: 5.1,
+    costPrice: 6200,
+    guidePrice: 9000,
+    status: 'recycle',
+    createdAt: '2026-07-27T09:10:00',
+  },
+  {
+    id: 8,
+    supplierId: 1,
+    varietyId: 1,
+    name: '回收站大板 08',
+    serialNo: 'SLAB-E2E-008',
+    warehouse: '云浮仓',
+    publisherType: '平台发布',
+    lengthMm: 2800,
+    widthMm: 1600,
+    thicknessMm: 18,
+    areaSquareMeter: 4.48,
+    costPrice: 5800,
+    guidePrice: 8500,
+    status: 'recycle',
+    createdAt: '2026-07-27T09:20:00',
   },
 ];
 
@@ -350,6 +405,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);
   await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
+  await mockCollection(page, '**/api/admin/slabs', slabs);
   await mockCollection(page, '**/api/admin/slab-origins', slabOrigins);
   await mockCollection(page, '**/api/admin/slab-textures', slabTextures);
   await page.route('**/api/admin/slab-textures/*/aliases**', async (route) => {
