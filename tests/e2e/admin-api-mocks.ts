@@ -374,6 +374,16 @@ const slabOrigins = [
   },
 ];
 
+const slabTextures = [
+  { id: 1, name: '细纹', remark: '', status: 'enabled', createdByName: '韩健', createdAt: '2026-08-12T09:00:00' },
+  { id: 2, name: '直纹', remark: '', status: 'enabled', createdByName: '韩健', createdAt: '2026-08-12T08:00:00' },
+];
+
+const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
+  1: [{ id: 1, textureId: 1, name: '幼纹', status: 'enabled', createdAt: '2026-08-12T09:10:00' }],
+  2: [],
+};
+
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
   await mockCollection(page, '**/api/admin/tenants', tenants);
@@ -397,6 +407,28 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
   await mockCollection(page, '**/api/admin/slabs', slabs);
   await mockCollection(page, '**/api/admin/slab-origins', slabOrigins);
+  await mockCollection(page, '**/api/admin/slab-textures', slabTextures);
+  await page.route('**/api/admin/slab-textures/*/aliases**', async (route) => {
+    const parts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
+    const textureId = Number(parts[3]);
+    const aliasId = parts.length > 5 ? Number(parts[5]) : null;
+    const records = slabTextureAliases[textureId] ?? (slabTextureAliases[textureId] = []);
+    if (route.request().method() === 'GET') return fulfillJson(route, records);
+    if (route.request().method() === 'DELETE' && aliasId) {
+      const index = records.findIndex((item) => Number(item.id) === aliasId);
+      if (index >= 0) records.splice(index, 1);
+      return fulfillJson(route, true);
+    }
+    const payload = route.request().postDataJSON() as { name: string };
+    if (route.request().method() === 'POST') {
+      const record = { id: Date.now(), textureId, name: payload.name, status: 'enabled' };
+      records.push(record);
+      return fulfillJson(route, record);
+    }
+    const record = records.find((item) => Number(item.id) === aliasId);
+    if (record) record.name = payload.name;
+    return fulfillJson(route, record ?? {});
+  });
 }
 
 async function mockEmployeeInvites(page: Page) {

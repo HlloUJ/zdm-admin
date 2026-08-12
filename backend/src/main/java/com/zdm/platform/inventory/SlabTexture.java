@@ -1,0 +1,20 @@
+package com.zdm.platform.inventory;
+
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.zdm.platform.common.BaseEntity;
+import jakarta.validation.constraints.NotBlank;
+
+@TableName("slab_textures")
+public class SlabTexture extends BaseEntity {
+  @NotBlank
+  private String name;
+  private String createdByName;
+  private String remark;
+
+  public String getName() { return name; }
+  public void setName(String name) { this.name = name; }
+  public String getCreatedByName() { return createdByName; }
+  public void setCreatedByName(String createdByName) { this.createdByName = createdByName; }
+  public String getRemark() { return remark; }
+  public void setRemark(String remark) { this.remark = remark; }
+}
