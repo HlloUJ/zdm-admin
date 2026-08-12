@@ -4,16 +4,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
-@TableName("slab_varieties")
-public class SlabVariety extends BaseEntity {
+@TableName("slab_origins")
+public class SlabOrigin extends BaseEntity {
   @NotBlank
   private String name;
 
-  @NotBlank
-  private String code;
-
-  private Long originId;
-  private String color;
   private String createdByName;
   private String remark;
 
@@ -23,30 +18,6 @@ public class SlabVariety extends BaseEntity {
 
   public void setName(String name) {
     this.name = name;
-  }
-
-  public String getCode() {
-    return code;
-  }
-
-  public void setCode(String code) {
-    this.code = code;
-  }
-
-  public Long getOriginId() {
-    return originId;
-  }
-
-  public void setOriginId(Long originId) {
-    this.originId = originId;
-  }
-
-  public String getColor() {
-    return color;
-  }
-
-  public void setColor(String color) {
-    this.color = color;
   }
 
   public String getCreatedByName() {

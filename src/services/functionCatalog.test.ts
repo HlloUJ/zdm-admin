@@ -120,6 +120,11 @@ describe('full function catalog', () => {
           pages: [{ label: '大板品种管理页', tabs: [] }],
         },
         {
+          label: '大板产地管理',
+          direct: false,
+          pages: [{ label: '大板产地管理页', tabs: [] }],
+        },
+        {
           label: '成品现货工艺管理',
           direct: false,
           pages: [{ label: '成品现货工艺管理页', tabs: [] }],
@@ -349,6 +354,11 @@ describe('full function catalog', () => {
       'admin.product-data-center.slab-variety.edit',
       'admin.product-data-center.slab-variety.toggle-status',
       'admin.product-data-center.slab-variety.delete',
+      'admin.product-data-center.slab-origin.view',
+      'admin.product-data-center.slab-origin.create',
+      'admin.product-data-center.slab-origin.edit',
+      'admin.product-data-center.slab-origin.toggle-status',
+      'admin.product-data-center.slab-origin.delete',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
       'admin.product-data-center.finished-stock-craft.edit',
