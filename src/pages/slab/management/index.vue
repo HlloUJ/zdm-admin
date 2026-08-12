@@ -231,7 +231,12 @@
                 </t-select>
               </t-form-item>
               <t-form-item label="产地" name="origin">
-                <t-select v-model="productForm.origin" :disabled="productMode === 'view'" placeholder="请选择">
+                <t-select
+                  v-model="productForm.origin"
+                  :disabled="productMode === 'view'"
+                  filterable
+                  placeholder="请选择"
+                >
                   <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
                 </t-select>
               </t-form-item>

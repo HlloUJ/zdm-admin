@@ -145,7 +145,7 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
   await expect(page.locator('.upload-large-preview[alt="1:1主图"]')).toBeVisible();
 });
 
-test('filters slab varieties by search text when publishing a product', async ({ page }) => {
+test('filters slab varieties and origins by search text when publishing a product', async ({ page }) => {
   await page.goto('/slab-management');
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   await page.getByText('基础信息', { exact: true }).click();
@@ -156,6 +156,13 @@ test('filters slab varieties by search text when publishing a product', async ({
   await expect(page.getByText('潘多拉', { exact: true })).toBeVisible();
   await varietyInput.fill('不存在的品种');
   await expect(page.getByText('潘多拉', { exact: true })).toHaveCount(0);
+
+  const originInput = productDialog.locator('.t-form__item').filter({ hasText: '产地' }).getByRole('textbox');
+  await originInput.fill('巴');
+  const originDropdown = page.locator('.t-select__dropdown:visible');
+  await expect(originDropdown.getByText('巴西', { exact: true })).toBeVisible();
+  await originInput.fill('不存在的产地');
+  await expect(originDropdown.getByText('巴西', { exact: true })).toHaveCount(0);
 });
 
 test('shows the same object-specific success copy for category, store category, and employee status changes', async ({
