@@ -63,6 +63,101 @@ test('uses the same action-specific confirmation foundation across modules', asy
   });
 });
 
+test('permanently deletes one or multiple slabs from the recycle tab after confirmation', async ({ page }) => {
+  await page.goto('/slab-management');
+  await page.getByText('回收站 2', { exact: true }).click();
+
+  const singleRow = page.getByRole('row', { name: /回收站大板 07/ });
+  await singleRow.getByText('彻底删除', { exact: true }).click();
+  await expectUnifiedConfirmDialog(page, {
+    action: '彻底删除',
+    content: '彻底删除后无法恢复，是否彻底删除大板“回收站大板 07”？',
+    danger: true,
+  });
+  const singleDelete = page.waitForRequest(
+    (request) => request.method() === 'DELETE' && request.url().endsWith('/api/admin/slabs/7'),
+  );
+  await page.getByRole('button', { name: '确认彻底删除', exact: true }).click();
+  await singleDelete;
+  await expect(singleRow).toHaveCount(0);
+  await expect(page.locator('.zdm-admin-confirm-dialog')).toBeHidden();
+
+  const batchRow = page.getByRole('row', { name: /回收站大板 08/ });
+  await batchRow.locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量彻底删除', exact: true }).click();
+  await expectUnifiedConfirmDialog(page, {
+    action: '批量彻底删除',
+    content: '彻底删除后无法恢复，是否批量彻底删除所选大板？',
+    danger: true,
+  });
+  const batchDelete = page.waitForRequest(
+    (request) => request.method() === 'DELETE' && request.url().endsWith('/api/admin/slabs/8'),
+  );
+  await page.getByRole('button', { name: '确认批量彻底删除', exact: true }).click();
+  await batchDelete;
+  await expect(batchRow).toHaveCount(0);
+});
+
+test('places clear recycle after batch purge and permanently deletes every recycled slab', async ({ page }) => {
+  await page.goto('/slab-management');
+  await page.getByText('回收站 2', { exact: true }).click();
+
+  await expect(page.locator('.toolbar-buttons button')).toHaveText([
+    '批量放回到仓库',
+    '批量彻底删除',
+    '清空回收站',
+  ]);
+  await page.getByRole('button', { name: '清空回收站', exact: true }).click();
+  await expectUnifiedConfirmDialog(page, {
+    action: '清空回收站',
+    content: '清空后所有回收站大板将无法恢复，是否清空回收站？',
+    danger: true,
+  });
+
+  const deleteRequests = [7, 8].map((id) =>
+    page.waitForRequest((request) => request.method() === 'DELETE' && request.url().endsWith(`/api/admin/slabs/${id}`)),
+  );
+  await page.getByRole('button', { name: '确认清空回收站', exact: true }).click();
+  await Promise.all(deleteRequests);
+  await expect(page.getByRole('row', { name: /回收站大板/ })).toHaveCount(0);
+  await expect(page.getByText('已删除“2 个回收站大板”', { exact: true })).toBeVisible();
+});
+
+test('opens the file chooser directly, shows a thumbnail, and previews the uploaded image', async ({ page }) => {
+  await page.goto('/slab-management');
+  await page.getByRole('button', { name: '发布商品', exact: true }).click();
+
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.getByText('点击上传图片', { exact: true }).first().click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles({
+    name: 'slab-preview.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#567"/></svg>'),
+  });
+
+  await expect(page.getByText('上传成功', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '提交', exact: true })).toHaveCount(0);
+  const preview = page.locator('.upload-preview[alt="1:1主图"]');
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute('src', /^data:image\/svg\+xml;base64,/);
+  await preview.click();
+  await expect(page.locator('.upload-large-preview[alt="1:1主图"]')).toBeVisible();
+});
+
+test('filters slab varieties by search text when publishing a product', async ({ page }) => {
+  await page.goto('/slab-management');
+  await page.getByRole('button', { name: '发布商品', exact: true }).click();
+  await page.getByText('基础信息', { exact: true }).click();
+
+  const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
+  const varietyInput = productDialog.locator('.t-form__item').filter({ hasText: '品种' }).getByRole('textbox');
+  await varietyInput.fill('潘多');
+  await expect(page.getByText('潘多拉', { exact: true })).toBeVisible();
+  await varietyInput.fill('不存在的品种');
+  await expect(page.getByText('潘多拉', { exact: true })).toHaveCount(0);
+});
+
 test('shows the same object-specific success copy for category, store category, and employee status changes', async ({
   page,
 }) => {
