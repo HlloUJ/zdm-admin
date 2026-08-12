@@ -1,0 +1,113 @@
+package com.zdm.platform.inventory;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
+import java.util.Objects;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+@Service
+public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin> {
+  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+  private static final String DUPLICATE_NAME_MESSAGE = "产地名称已存在";
+  private static final String REFERENCED_MESSAGE =
+      "该产地已被大板品种引用，不能删除，请先停用该产地";
+
+  private final SlabVarietyMapper slabVarietyMapper;
+  private final CurrentIdentityProvider identityProvider;
+
+  public SlabOriginService(
+      SlabVarietyMapper slabVarietyMapper,
+      CurrentIdentityProvider identityProvider) {
+    this.slabVarietyMapper = slabVarietyMapper;
+    this.identityProvider = identityProvider;
+  }
+
+  @Transactional
+  public SlabOrigin createOrigin(SlabOrigin origin) {
+    origin.setId(null);
+    normalizeAndValidateName(origin, null);
+    origin.setCreatedByName(resolveCreatedByName());
+    save(origin);
+    return origin;
+  }
+
+  @Transactional
+  public SlabOrigin updateOrigin(Long id, SlabOrigin payload) {
+    SlabOrigin existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+    requireAccessibleOrigin(existing);
+    payload.setId(id);
+    payload.setStatus(existing.getStatus());
+    payload.setCreatedByName(existing.getCreatedByName());
+    normalizeAndValidateName(payload, id);
+    updateById(payload);
+    return getById(id);
+  }
+
+  @Transactional
+  public SlabOrigin updateStatus(Long id, String status) {
+    SlabOrigin existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+    requireAccessibleOrigin(existing);
+    existing.setStatus(status);
+    updateById(existing);
+    return getById(id);
+  }
+
+  @Transactional
+  public boolean deleteOrigin(Long id) {
+    SlabOrigin existing = getById(id);
+    if (existing == null) {
+      return false;
+    }
+    requireAccessibleOrigin(existing);
+    Long referenceCount = slabVarietyMapper.selectCount(
+        Wrappers.<SlabVariety>lambdaQuery().eq(SlabVariety::getOriginId, id));
+    if (referenceCount > 0) {
+      throw new IllegalArgumentException(REFERENCED_MESSAGE);
+    }
+    try {
+      return removeById(id);
+    } catch (DataIntegrityViolationException exception) {
+      throw new IllegalArgumentException(REFERENCED_MESSAGE, exception);
+    }
+  }
+
+  private String resolveCreatedByName() {
+    CurrentIdentity identity = identityProvider.current().orElse(null);
+    return identity != null && StringUtils.hasText(identity.displayName())
+        ? identity.displayName()
+        : DEFAULT_CREATED_BY_NAME;
+  }
+
+  private void requireAccessibleOrigin(SlabOrigin origin) {
+    CurrentIdentity identity = identityProvider.require();
+    if (!identity.isSuperAdmin()
+        && !"all".equals(identity.dataPermission())
+        && !Objects.equals(origin.getCreatedByName(), identity.displayName())) {
+      throw new AccessDeniedException("当前数据权限不允许操作该产地");
+    }
+  }
+
+  private void normalizeAndValidateName(SlabOrigin origin, Long excludedOriginId) {
+    String originName = origin.getName().trim();
+    origin.setName(originName);
+    var duplicateQuery = lambdaQuery().eq(SlabOrigin::getName, originName);
+    if (excludedOriginId != null) {
+      duplicateQuery.ne(SlabOrigin::getId, excludedOriginId);
+    }
+    if (duplicateQuery.count() > 0) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
+    }
+  }
+}

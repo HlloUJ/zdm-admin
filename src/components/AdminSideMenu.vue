@@ -76,6 +76,7 @@ const baseInfoPaths = new Set([
   '/finished-stock-attribute',
   '/accessory-attribute',
   '/slab-variety',
+  '/slab-origin',
   '/finished-stock-craft',
 ]);
 

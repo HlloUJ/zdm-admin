@@ -297,6 +297,24 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
+        label: '大板产地管理',
+        value: 'admin.product-data-center.slab-origin.menu',
+        direct: false,
+        pages: [
+          {
+            label: '大板产地管理页',
+            value: 'admin.product-data-center.slab-origin',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-origin.create' },
+              { label: '编辑', value: 'admin.product-data-center.slab-origin.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-origin.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-origin.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+      {
         label: '成品现货工艺管理',
         value: 'admin.product-data-center.finished-stock-craft.menu',
         direct: false,

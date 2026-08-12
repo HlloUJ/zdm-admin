@@ -415,6 +415,7 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { listSlabOrigins, type SlabOriginRecord } from '@/services/slabOrigins';
 import { listSlabVarieties, type SlabVarietyRecord } from '@/services/slabVarieties';
 import {
   createSlab,
@@ -621,13 +622,12 @@ const uploadPreviews = reactive<Partial<Record<UploadItemKey, { name: string; ur
 const uploadPreviewDialogVisible = ref(false);
 const uploadPreviewTitle = ref('');
 const uploadPreviewUrl = ref('');
+const slabOrigins = ref<SlabOriginRecord[]>([]);
 const slabVarieties = ref<SlabVarietyRecord[]>([]);
 const slabSuppliers = ref<SupplierRecord[]>([]);
 
 const varietyOptions = computed(() => slabVarieties.value.map((item) => item.name));
-const originOptions = computed(() =>
-  Array.from(new Set(slabVarieties.value.map((item) => item.origin).filter((item): item is string => Boolean(item)))),
-);
+const originOptions = computed(() => slabOrigins.value.map((item) => item.name));
 const colorOptions = computed(() =>
   Array.from(new Set(slabVarieties.value.map((item) => item.color).filter((item): item is string => Boolean(item)))),
 );
@@ -669,6 +669,7 @@ const normalizeStatus = (status?: string): SlabStatus => {
 const normalizePublisherType = (publisherType?: string): PublisherType =>
   publisherType === '租户发布' ? '租户发布' : '平台发布';
 
+const originById = (id?: number) => slabOrigins.value.find((item) => item.id === id);
 const varietyById = (id?: number) => slabVarieties.value.find((item) => item.id === id);
 const supplierById = (id?: number) => slabSuppliers.value.find((item) => item.id === id);
 const varietyIdByName = (name: string) => slabVarieties.value.find((item) => item.name === name)?.id;
@@ -690,7 +691,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     image: createStoneImage(record.id),
     name: record.name,
     size: formatSize(record),
-    origin: variety?.origin || '-',
+    origin: originById(variety?.originId)?.name || '-',
     texture: '-',
     color: variety?.color || '-',
     grade: '-',
@@ -744,11 +745,13 @@ const upsertSlabItem = (record: SlabRecord) => {
 const loadSlabs = async () => {
   loading.value = true;
   try {
-    const [records, varietiesResult, suppliersResult] = await Promise.all([
+    const [records, originsResult, varietiesResult, suppliersResult] = await Promise.all([
       listSlabs(),
+      listSlabOrigins().catch(() => []),
       listSlabVarieties().catch(() => []),
       listSuppliers().catch(() => []),
     ]);
+    slabOrigins.value = originsResult;
     slabVarieties.value = varietiesResult;
     slabSuppliers.value = suppliersResult;
     tableData.value = records.map(toSlabItem);
