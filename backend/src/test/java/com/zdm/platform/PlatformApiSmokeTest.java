@@ -1421,6 +1421,243 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabOriginMigrationAndCrudLifecycleWork() throws Exception {
+    Integer originColumnCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'slab_varieties'
+          AND column_name = 'origin'
+        """,
+        Integer.class);
+    assertThat(originColumnCount).isZero();
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_origins WHERE name = '巴西' AND status = 'enabled'",
+        Integer.class)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM slab_varieties sv
+        JOIN slab_origins so ON so.id = sv.origin_id
+        WHERE sv.name = '潘多拉' AND so.name = '巴西'
+        """,
+        Integer.class)).isEqualTo(1);
+
+    String originName = "产地集成测试-" + System.nanoTime();
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-origins")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {"name":"%s","status":"enabled","remark":"新增"}
+                """.formatted(originName)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value(originName))
+        .andExpect(jsonPath("$.data.createdByName").value("超级管理员"))
+        .andReturn();
+    String originId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+    mockMvc.perform(post("/api/admin/slab-origins")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {"name":" %s ","status":"enabled"}
+                """.formatted(originName)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("产地名称已存在"));
+
+    mockMvc.perform(put("/api/admin/slab-origins/{id}", originId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {"name":"%s-已编辑","status":"disabled","remark":"编辑"}
+                """.formatted(originName)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value(originName + "-已编辑"))
+        .andExpect(jsonPath("$.data.status").value("enabled"));
+
+    mockMvc.perform(patch("/api/admin/slab-origins/{id}/status", originId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(delete("/api/admin/slab-origins/{id}", originId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void slabOriginManagementIgnoresSelfDataScopeWhenListing() throws Exception {
+    long accountId = 9081L;
+    long employeeId = 9081L;
+    long roleId = 9081L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629081",
+        "大板产地自有操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '大板产地自有操作员', '15926629081', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '大板产地自有操作角色', 'SLAB_ORIGIN_SELF_TEST', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.product-data-center.slab-origin.view,'
+          'admin.product-data-center.slab-origin.create,'
+          'admin.product-data-center.slab-origin.edit,'
+          'admin.product-data-center.slab-origin.toggle-status,'
+          'admin.product-data-center.slab-origin.delete', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_origins (id, name, status, created_by_name)
+        VALUES
+          (9081, '本人创建的大板产地', 'enabled', '大板产地自有操作员'),
+          (9082, '他人创建的大板产地', 'enabled', '韩健')
+        """);
+
+    try {
+      String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      mockMvc.perform(get("/api/admin/slab-origins").header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].name", hasItem("本人创建的大板产地")))
+          .andExpect(jsonPath("$.data[*].name", hasItem("他人创建的大板产地")));
+
+      MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-origins")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"本人新增的大板产地\",\"status\":\"enabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.createdByName").value("大板产地自有操作员"))
+          .andReturn();
+      String createdOriginId = com.jayway.jsonpath.JsonPath.read(
+          createdResult.getResponse().getContentAsString(),
+          "$.data.id")
+          .toString();
+
+      mockMvc.perform(put("/api/admin/slab-origins/9082")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"越权编辑的大板产地\",\"status\":\"enabled\"}"))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(patch("/api/admin/slab-origins/9082/status")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(delete("/api/admin/slab-origins/9082")
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(delete("/api/admin/slab-origins/{id}", createdOriginId)
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+    } finally {
+      jdbcTemplate.update("DELETE FROM slab_origins WHERE id IN (9081, 9082)");
+      jdbcTemplate.update("DELETE FROM slab_origins WHERE name = '本人新增的大板产地'");
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+  }
+
+  @Test
+  void slabOriginRejectsReferencedDeleteAndUnauthorizedAccess() throws Exception {
+    mockMvc.perform(delete("/api/admin/slab-origins/1")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message")
+            .value("该产地已被大板品种引用，不能删除，请先停用该产地"));
+
+    long accountId = 9071L;
+    long employeeId = 9071L;
+    long roleId = 9071L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629071",
+        "无产地权限操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '无产地权限操作员', '15926629071', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, remark)
+        VALUES (?, '无产地权限角色', 'NO_SLAB_ORIGIN_PERMISSION', 'operation-platform',
+          'admin', 'all', 'enabled', 'admin.product-data-center.slab-variety.view', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+    try {
+      String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      mockMvc.perform(get("/api/admin/slab-origins")
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(post("/api/admin/slab-origins")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"越权产地\",\"status\":\"enabled\"}"))
+          .andExpect(status().isForbidden());
+    } finally {
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+  }
+
+  @Test
   void slabVarietyNameMustBeUniqueWhenCreatingAndEditing() throws Exception {
     mockMvc.perform(post("/api/admin/slab-varieties")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)

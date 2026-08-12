@@ -73,6 +73,11 @@ const router = createRouter({
       component: () => import('@/pages/slab/variety/index.vue'),
     },
     {
+      path: '/slab-origin',
+      name: 'slabOrigin',
+      component: () => import('@/pages/slab/origin/index.vue'),
+    },
+    {
       path: '/slab-management',
       name: 'slabManagement',
       component: () => import('@/pages/slab/management/index.vue'),

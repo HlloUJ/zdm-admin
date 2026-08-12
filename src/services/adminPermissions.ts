@@ -69,6 +69,7 @@ export const adminMenuEntries: AdminMenuEntry[] = [
         permissionPrefix: 'admin.product-data-center.category-attribute-template',
       },
       { label: '大板品种管理', path: '/slab-variety', permissionPrefix: 'admin.product-data-center.slab-variety' },
+      { label: '大板产地管理', path: '/slab-origin', permissionPrefix: 'admin.product-data-center.slab-origin' },
       {
         label: '成品现货工艺管理',
         path: '/finished-stock-craft',

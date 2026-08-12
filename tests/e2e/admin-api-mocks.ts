@@ -330,6 +330,17 @@ const slabVarieties = [
   },
 ];
 
+const slabOrigins = [
+  {
+    id: 1,
+    name: '巴西',
+    remark: '从现有大板品种迁移',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+];
+
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
   await mockCollection(page, '**/api/admin/tenants', tenants);
@@ -351,6 +362,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);
   await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
+  await mockCollection(page, '**/api/admin/slab-origins', slabOrigins);
 }
 
 async function mockEmployeeInvites(page: Page) {
