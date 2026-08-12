@@ -16,6 +16,7 @@ export interface FunctionTab {
 export interface FunctionPage {
   label: string;
   value: string;
+  thirdMenuLabel?: string;
   actions: FunctionAction[];
   tabs: FunctionTab[];
   note?: string;
@@ -41,6 +42,9 @@ export interface FunctionCatalogRow {
   direct: boolean;
   showMenu: boolean;
   menuRowspan: number;
+  thirdMenuLabel?: string;
+  showThirdMenu: boolean;
+  thirdMenuRowspan: number;
   pageLabel: string;
   pageNote?: string;
   showPage: boolean;
@@ -279,42 +283,6 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
-        label: '大板品种管理',
-        value: 'admin.product-data-center.slab-variety.menu',
-        direct: false,
-        pages: [
-          {
-            label: '大板品种管理页',
-            value: 'admin.product-data-center.slab-variety',
-            actions: [
-              { label: '新增', value: 'admin.product-data-center.slab-variety.create' },
-              { label: '编辑', value: 'admin.product-data-center.slab-variety.edit' },
-              { label: '停用/启用', value: 'admin.product-data-center.slab-variety.toggle-status' },
-              { label: '删除', value: 'admin.product-data-center.slab-variety.delete' },
-            ],
-            tabs: [],
-          },
-        ],
-      },
-      {
-        label: '大板产地管理',
-        value: 'admin.product-data-center.slab-origin.menu',
-        direct: false,
-        pages: [
-          {
-            label: '大板产地管理页',
-            value: 'admin.product-data-center.slab-origin',
-            actions: [
-              { label: '新增', value: 'admin.product-data-center.slab-origin.create' },
-              { label: '编辑', value: 'admin.product-data-center.slab-origin.edit' },
-              { label: '停用/启用', value: 'admin.product-data-center.slab-origin.toggle-status' },
-              { label: '删除', value: 'admin.product-data-center.slab-origin.delete' },
-            ],
-            tabs: [],
-          },
-        ],
-      },
-      {
         label: '成品现货工艺管理',
         value: 'admin.product-data-center.finished-stock-craft.menu',
         direct: false,
@@ -327,6 +295,37 @@ const verifiedFunctionCatalog: FunctionModule[] = [
               { label: '编辑', value: 'admin.product-data-center.finished-stock-craft.edit' },
               { label: '停用/启用', value: 'admin.product-data-center.finished-stock-craft.toggle-status' },
               { label: '删除', value: 'admin.product-data-center.finished-stock-craft.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+      {
+        label: '大板基础数据管理',
+        value: 'admin.product-data-center.slab-base-data.menu',
+        direct: false,
+        pages: [
+          {
+            label: '品种管理页',
+            value: 'admin.product-data-center.slab-variety',
+            thirdMenuLabel: '品种管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-variety.create' },
+              { label: '编辑', value: 'admin.product-data-center.slab-variety.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-variety.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-variety.delete' },
+            ],
+            tabs: [],
+          },
+          {
+            label: '产地管理页',
+            value: 'admin.product-data-center.slab-origin',
+            thirdMenuLabel: '产地管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-origin.create' },
+              { label: '编辑', value: 'admin.product-data-center.slab-origin.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-origin.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-origin.delete' },
             ],
             tabs: [],
           },
@@ -469,6 +468,9 @@ export const collectFunctionCatalogRows = (module?: FunctionModule): FunctionCat
             key: `${menu.value}.${page.value}.${tab.value}`,
             menuLabel: menu.label,
             direct: menu.direct,
+            thirdMenuLabel: page.thirdMenuLabel,
+            showThirdMenu: index === 0,
+            thirdMenuRowspan: rowTabs.length,
             pageLabel: page.label,
             pageNote: page.note,
             showPage: index === 0,
@@ -485,6 +487,9 @@ export const collectFunctionCatalogRows = (module?: FunctionModule): FunctionCat
           key: `${menu.value}.${page.value}`,
           menuLabel: menu.label,
           direct: menu.direct,
+          thirdMenuLabel: page.thirdMenuLabel,
+          showThirdMenu: true,
+          thirdMenuRowspan: 1,
           pageLabel: page.label,
           pageNote: page.note,
           showPage: true,

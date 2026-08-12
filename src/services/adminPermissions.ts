@@ -7,11 +7,19 @@ export interface AdminMenuItem {
   permissionPrefix?: string;
 }
 
+export interface AdminMenuSubgroup {
+  label: string;
+  value: string;
+  children: AdminMenuItem[];
+}
+
+export type AdminMenuChild = AdminMenuItem | AdminMenuSubgroup;
+
 export interface AdminMenuGroup {
   label: string;
   value: string;
   icon: string;
-  children: AdminMenuItem[];
+  children: AdminMenuChild[];
 }
 
 export type AdminMenuEntry = AdminMenuItem | AdminMenuGroup;
@@ -68,12 +76,18 @@ export const adminMenuEntries: AdminMenuEntry[] = [
         path: '/category-attribute-template',
         permissionPrefix: 'admin.product-data-center.category-attribute-template',
       },
-      { label: '大板品种管理', path: '/slab-variety', permissionPrefix: 'admin.product-data-center.slab-variety' },
-      { label: '大板产地管理', path: '/slab-origin', permissionPrefix: 'admin.product-data-center.slab-origin' },
       {
         label: '成品现货工艺管理',
         path: '/finished-stock-craft',
         permissionPrefix: 'admin.product-data-center.finished-stock-craft',
+      },
+      {
+        label: '大板基础数据管理',
+        value: 'slab-base-data-management',
+        children: [
+          { label: '品种管理', path: '/slab-variety', permissionPrefix: 'admin.product-data-center.slab-variety' },
+          { label: '产地管理', path: '/slab-origin', permissionPrefix: 'admin.product-data-center.slab-origin' },
+        ],
       },
     ],
   },
@@ -103,7 +117,13 @@ export const adminMenuEntries: AdminMenuEntry[] = [
 
 export const routePermissionPrefixMap = Object.fromEntries(
   adminMenuEntries.flatMap((entry) => {
-    if ('children' in entry) return entry.children.map((item) => [item.path, item.permissionPrefix]);
+    if ('children' in entry) {
+      return entry.children.flatMap((item) =>
+        'path' in item
+          ? [[item.path, item.permissionPrefix]]
+          : item.children.map((child) => [child.path, child.permissionPrefix]),
+      );
+    }
     return [[entry.path, entry.permissionPrefix]];
   }),
 );
@@ -139,7 +159,9 @@ export function hasMenuPermission(user: LoginUser, prefix?: string) {
 export function getFirstAccessiblePath(user: LoginUser) {
   for (const entry of adminMenuEntries) {
     if ('children' in entry) {
-      const firstChild = entry.children.find((item) => hasMenuPermission(user, item.permissionPrefix));
+      const firstChild = entry.children
+        .flatMap((item) => ('path' in item ? [item] : item.children))
+        .find((item) => hasMenuPermission(user, item.permissionPrefix));
       if (firstChild) return firstChild.path;
     } else if (hasMenuPermission(user, entry.permissionPrefix)) {
       return entry.path;
