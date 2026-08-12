@@ -1021,6 +1021,62 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabTextureAndAliasLifecycleWork() throws Exception {
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_textures WHERE name IN ('细纹', '直纹', '乱纹', '山水纹', '晶体纹')",
+        Integer.class)).isEqualTo(5);
+
+    String textureName = "纹理集成测试-" + System.nanoTime();
+    MvcResult textureResult = mockMvc.perform(post("/api/admin/slab-textures")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {"name":"%s","status":"enabled","remark":"新增"}
+                """.formatted(textureName)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value(textureName))
+        .andExpect(jsonPath("$.data.createdByName").value("超级管理员"))
+        .andReturn();
+    String textureId = com.jayway.jsonpath.JsonPath.read(
+        textureResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+    MvcResult aliasResult = mockMvc.perform(post("/api/admin/slab-textures/{id}/aliases", textureId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"name\":\"集成别名\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("集成别名"))
+        .andReturn();
+    String aliasId = com.jayway.jsonpath.JsonPath.read(
+        aliasResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+    mockMvc.perform(get("/api/admin/slab-textures/{id}/aliases", textureId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].name", hasItem("集成别名")));
+    mockMvc.perform(put("/api/admin/slab-textures/{id}/aliases/{aliasId}", textureId, aliasId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"name\":\"集成别名已编辑\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("集成别名已编辑"));
+    mockMvc.perform(post("/api/admin/slab-textures/{id}/aliases", textureId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"name\":\"细纹\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("别名已存在或与标准纹理重复"));
+
+    mockMvc.perform(delete("/api/admin/slab-textures/{id}", textureId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_texture_aliases WHERE id = ?", Integer.class, Long.valueOf(aliasId)))
+        .isZero();
+  }
+
+  @Test
   void slabOriginMigrationAndCrudLifecycleWork() throws Exception {
     Integer originColumnCount = jdbcTemplate.queryForObject(
         """
