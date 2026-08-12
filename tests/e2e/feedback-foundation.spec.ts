@@ -102,11 +102,7 @@ test('places clear recycle after batch purge and permanently deletes every recyc
   await page.goto('/slab-management');
   await page.getByText('回收站 2', { exact: true }).click();
 
-  await expect(page.locator('.toolbar-buttons button')).toHaveText([
-    '批量放回到仓库',
-    '批量彻底删除',
-    '清空回收站',
-  ]);
+  await expect(page.locator('.toolbar-buttons button')).toHaveText(['批量放回到仓库', '批量彻底删除', '清空回收站']);
   await page.getByRole('button', { name: '清空回收站', exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
     action: '清空回收站',
@@ -133,7 +129,9 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
   await chooser.setFiles({
     name: 'slab-preview.svg',
     mimeType: 'image/svg+xml',
-    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#567"/></svg>'),
+    buffer: Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#567"/></svg>',
+    ),
   });
 
   await expect(page.getByText('上传成功', { exact: true })).toBeVisible();

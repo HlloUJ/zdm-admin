@@ -636,10 +636,10 @@ const originOptions = computed(() => slabOrigins.value.map((item) => item.name))
 const colorOptions = computed(() =>
   Array.from(new Set(slabVarieties.value.map((item) => item.color).filter((item): item is string => Boolean(item)))),
 );
-const tenantOptions = computed(() => slabSuppliers.value.filter((item) => item.type === 'slab').map((item) => item.name));
-const storeOptions = computed(() =>
-  Array.from(new Set(tableData.value.map((item) => item.store).filter(Boolean))),
+const tenantOptions = computed(() =>
+  slabSuppliers.value.filter((item) => item.type === 'slab').map((item) => item.name),
 );
+const storeOptions = computed(() => Array.from(new Set(tableData.value.map((item) => item.store).filter(Boolean))));
 
 const filters = reactive<Record<SlabStatus, FilterState>>({
   warehouse: makeFilterState(),
@@ -1204,7 +1204,8 @@ const handleProductSubmit = async () => {
     return;
   }
   const targetName = `${productForm.variety}大板`;
-  const editingItem = editingRowId.value == null ? undefined : tableData.value.find((item) => item.id === editingRowId.value);
+  const editingItem =
+    editingRowId.value == null ? undefined : tableData.value.find((item) => item.id === editingRowId.value);
   const lengthMm = toNumber(productForm.length);
   const widthMm = toNumber(productForm.width);
   const thicknessMm = toNumber(productForm.height);
