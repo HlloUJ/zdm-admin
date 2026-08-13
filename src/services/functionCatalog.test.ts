@@ -127,6 +127,7 @@ describe('full function catalog', () => {
             { label: '产地管理页', thirdMenuLabel: '产地管理', tabs: [] },
             { label: '纹理管理页', thirdMenuLabel: '纹理管理', tabs: [] },
             { label: '色系管理页', thirdMenuLabel: '色系管理', tabs: [] },
+            { label: '等级管理页', thirdMenuLabel: '等级管理', tabs: [] },
           ],
         },
       ],
@@ -279,6 +280,16 @@ describe('full function catalog', () => {
         ],
       })),
     );
+    const slabGradePage = fullFunctionCatalog[2].menus
+      .find((menu) => menu.value === 'admin.product-data-center.slab-base-data.menu')
+      ?.pages.find((page) => page.value === 'admin.product-data-center.slab-grade');
+    expect(slabGradePage?.actions).toEqual([
+      { label: '查看', value: 'admin.product-data-center.slab-grade.view' },
+      { label: '新增', value: 'admin.product-data-center.slab-grade.create' },
+      { label: '编辑', value: 'admin.product-data-center.slab-grade.edit' },
+      { label: '停用/启用', value: 'admin.product-data-center.slab-grade.toggle-status' },
+      { label: '删除', value: 'admin.product-data-center.slab-grade.delete' },
+    ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
       'admin.supplier-management.view',
       'admin.supplier-management.create',
@@ -376,6 +387,11 @@ describe('full function catalog', () => {
       'admin.product-data-center.slab-color.edit',
       'admin.product-data-center.slab-color.toggle-status',
       'admin.product-data-center.slab-color.delete',
+      'admin.product-data-center.slab-grade.view',
+      'admin.product-data-center.slab-grade.create',
+      'admin.product-data-center.slab-grade.edit',
+      'admin.product-data-center.slab-grade.toggle-status',
+      'admin.product-data-center.slab-grade.delete',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.create',
       'admin.permission-management.employee-management.edit',
