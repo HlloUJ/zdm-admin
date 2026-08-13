@@ -1077,6 +1077,128 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabColorAndCategoryLifecycleWork() throws Exception {
+    String categoryName = "测试白色系-" + System.nanoTime();
+    String colorName = "测试奶白-" + System.nanoTime();
+
+    MvcResult categoryResult = mockMvc.perform(post("/api/admin/slab-colors/categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"name\":\"" + categoryName + "\",\"remark\":\"集成测试\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value(categoryName))
+        .andReturn();
+    String categoryId = com.jayway.jsonpath.JsonPath.read(
+        categoryResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+    MvcResult colorResult = mockMvc.perform(post("/api/admin/slab-colors")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"name\":\"" + colorName + "\",\"categoryId\":" + categoryId
+                + ",\"status\":\"enabled\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value(colorName))
+        .andExpect(jsonPath("$.data.categoryName").value(categoryName))
+        .andReturn();
+    String colorId = com.jayway.jsonpath.JsonPath.read(
+        colorResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+    mockMvc.perform(get("/api/admin/slab-colors")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].name", hasItem(colorName)))
+        .andExpect(jsonPath("$.data[*].categoryName", hasItem(categoryName)));
+
+    mockMvc.perform(delete("/api/admin/slab-colors/categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该色系分类已被色系引用，无法删除"));
+
+    mockMvc.perform(patch("/api/admin/slab-colors/{id}/status", colorId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+
+    mockMvc.perform(delete("/api/admin/slab-colors/{id}", colorId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+    mockMvc.perform(delete("/api/admin/slab-colors/categories/{id}", categoryId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void slabColorOperationsRequireTheirOwnPermissions() throws Exception {
+    long accountId = 9061L;
+    long employeeId = 9061L;
+    long roleId = 9061L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629061",
+        "色系只读操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '色系只读操作员', '15926629061', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, remark)
+        VALUES (?, '色系只读角色', 'SLAB_COLOR_VIEW_ONLY', 'operation-platform',
+          'admin', 'all', 'enabled', 'admin.product-data-center.slab-color.view', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    try {
+      String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      mockMvc.perform(get("/api/admin/slab-colors").header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk());
+      mockMvc.perform(get("/api/admin/slab-colors/categories").header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk());
+      mockMvc.perform(post("/api/admin/slab-colors")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"越权色系\",\"categoryId\":1,\"status\":\"enabled\"}"))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(post("/api/admin/slab-colors/categories")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"越权色系分类\"}"))
+          .andExpect(status().isForbidden());
+    } finally {
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+  }
+
+  @Test
   void slabOriginMigrationAndCrudLifecycleWork() throws Exception {
     Integer originColumnCount = jdbcTemplate.queryForObject(
         """

@@ -379,6 +379,33 @@ const slabTextures = [
   { id: 2, name: '直纹', remark: '', status: 'enabled', createdByName: '韩健', createdAt: '2026-08-12T08:00:00' },
 ];
 
+const slabColorCategories = [
+  { id: 1, name: '白色系', remark: '白色及浅灰色', createdByName: '韩健', createdAt: '2026-08-13T09:00:00' },
+];
+
+const slabColors = [
+  {
+    id: 1,
+    categoryId: 1,
+    categoryName: '白色系',
+    name: '奶白',
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T09:10:00',
+  },
+  {
+    id: 2,
+    categoryId: 1,
+    categoryName: '白色系',
+    name: '冷白',
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T09:05:00',
+  },
+];
+
 const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
   1: [{ id: 1, textureId: 1, name: '幼纹', status: 'enabled', createdAt: '2026-08-12T09:10:00' }],
   2: [],
@@ -408,6 +435,8 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/slabs', slabs);
   await mockCollection(page, '**/api/admin/slab-origins', slabOrigins);
   await mockCollection(page, '**/api/admin/slab-textures', slabTextures);
+  await mockCollection(page, '**/api/admin/slab-colors', slabColors);
+  await mockCollection(page, '**/api/admin/slab-colors/categories', slabColorCategories);
   await page.route('**/api/admin/slab-textures/*/aliases**', async (route) => {
     const parts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
     const textureId = Number(parts[3]);
