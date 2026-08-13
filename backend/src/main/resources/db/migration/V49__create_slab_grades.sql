@@ -1,0 +1,12 @@
+CREATE TABLE slab_grades (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(10) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'enabled',
+  created_by_name VARCHAR(80) NOT NULL DEFAULT '韩健',
+  remark VARCHAR(255),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_slab_grades_code (code),
+  UNIQUE KEY uk_slab_grades_name (name)
+);

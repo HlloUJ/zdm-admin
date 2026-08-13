@@ -406,6 +406,36 @@ const slabColors = [
   },
 ];
 
+const slabGrades = [
+  {
+    id: 1,
+    code: 'A+',
+    name: '超精品料',
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T10:10:00',
+  },
+  {
+    id: 2,
+    code: 'A',
+    name: '精品料',
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T10:05:00',
+  },
+  {
+    id: 3,
+    code: 'B',
+    name: '标准料',
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T10:00:00',
+  },
+];
+
 const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
   1: [{ id: 1, textureId: 1, name: '幼纹', status: 'enabled', createdAt: '2026-08-12T09:10:00' }],
   2: [],
@@ -437,6 +467,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/slab-textures', slabTextures);
   await mockCollection(page, '**/api/admin/slab-colors', slabColors);
   await mockCollection(page, '**/api/admin/slab-colors/categories', slabColorCategories);
+  await mockCollection(page, '**/api/admin/slab-grades', slabGrades);
   await page.route('**/api/admin/slab-textures/*/aliases**', async (route) => {
     const parts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
     const textureId = Number(parts[3]);

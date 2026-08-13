@@ -88,6 +88,11 @@ const router = createRouter({
       component: () => import('@/pages/slab/color/index.vue'),
     },
     {
+      path: '/slab-grade',
+      name: 'slabGrade',
+      component: () => import('@/pages/slab/grade/index.vue'),
+    },
+    {
       path: '/slab-management',
       name: 'slabManagement',
       component: () => import('@/pages/slab/management/index.vue'),

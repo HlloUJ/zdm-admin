@@ -106,6 +106,7 @@ const baseInfoPaths = new Set([
   '/slab-origin',
   '/slab-texture',
   '/slab-color',
+  '/slab-grade',
   '/finished-stock-craft',
 ]);
 
@@ -126,7 +127,8 @@ watch(
       route.path === '/slab-variety' ||
       route.path === '/slab-origin' ||
       route.path === '/slab-texture' ||
-      route.path === '/slab-color'
+      route.path === '/slab-color' ||
+      route.path === '/slab-grade'
     ) {
       requiredExpandedMenus.push('slab-base-data-management');
     }

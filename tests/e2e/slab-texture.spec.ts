@@ -28,6 +28,7 @@ test('manages standard textures and multiple aliases from the third-level menu',
     '产地管理',
     '纹理管理',
     '色系管理',
+    '等级管理',
   ]);
   await expect(page.locator('[data-menu-path="/slab-texture"]')).toBeVisible();
   await expect(main.locator('.t-breadcrumb')).toHaveText(/商品基础数据中心.*大板基础数据管理.*纹理管理/);

@@ -30,6 +30,7 @@ test('manages colors and their categories from one menu page', async ({ page }) 
     '产地管理',
     '纹理管理',
     '色系管理',
+    '等级管理',
   ]);
   await expect(page.locator('[data-menu-path="/slab-color"]')).toBeVisible();
   await expect(main.locator('.t-breadcrumb')).toHaveText(/商品基础数据中心.*大板基础数据管理.*色系管理/);

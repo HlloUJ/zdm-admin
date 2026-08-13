@@ -355,6 +355,18 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             ],
             tabs: [],
           },
+          {
+            label: '等级管理页',
+            value: 'admin.product-data-center.slab-grade',
+            thirdMenuLabel: '等级管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-grade.create' },
+              { label: '编辑', value: 'admin.product-data-center.slab-grade.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-grade.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-grade.delete' },
+            ],
+            tabs: [],
+          },
         ],
       },
     ],
