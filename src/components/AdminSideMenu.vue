@@ -105,6 +105,7 @@ const baseInfoPaths = new Set([
   '/slab-variety',
   '/slab-origin',
   '/slab-texture',
+  '/slab-color',
   '/finished-stock-craft',
 ]);
 
@@ -121,7 +122,12 @@ watch(
     const requiredExpandedMenus = [];
     if (tenantManagementPaths.has(route.path)) requiredExpandedMenus.push('tenant-management');
     if (baseInfoPaths.has(route.path)) requiredExpandedMenus.push('product-data-center');
-    if (route.path === '/slab-variety' || route.path === '/slab-origin' || route.path === '/slab-texture') {
+    if (
+      route.path === '/slab-variety' ||
+      route.path === '/slab-origin' ||
+      route.path === '/slab-texture' ||
+      route.path === '/slab-color'
+    ) {
       requiredExpandedMenus.push('slab-base-data-management');
     }
     if (permissionManagementPaths.has(route.path)) requiredExpandedMenus.push('permission-management');
