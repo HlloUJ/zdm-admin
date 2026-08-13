@@ -89,6 +89,7 @@ export const adminMenuEntries: AdminMenuEntry[] = [
           { label: '产地管理', path: '/slab-origin', permissionPrefix: 'admin.product-data-center.slab-origin' },
           { label: '纹理管理', path: '/slab-texture', permissionPrefix: 'admin.product-data-center.slab-texture' },
           { label: '色系管理', path: '/slab-color', permissionPrefix: 'admin.product-data-center.slab-color' },
+          { label: '等级管理', path: '/slab-grade', permissionPrefix: 'admin.product-data-center.slab-grade' },
         ],
       },
     ],

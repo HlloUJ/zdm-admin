@@ -1599,6 +1599,122 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabGradeMigrationCrudAndValidationWork() throws Exception {
+    Integer gradeTableCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE() AND table_name = 'slab_grades'
+        """,
+        Integer.class);
+    assertThat(gradeTableCount).isEqualTo(1);
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/slab-grades")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"code\":\"A+\",\"name\":\"超精品料\",\"status\":\"enabled\",\"remark\":\"新增\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.code").value("A+"))
+        .andExpect(jsonPath("$.data.name").value("超精品料"))
+        .andExpect(jsonPath("$.data.createdByName").value("超级管理员"))
+        .andReturn();
+    String gradeId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+    try {
+      mockMvc.perform(post("/api/admin/slab-grades")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"code\":\"A+\",\"name\":\"另一个名称\",\"status\":\"enabled\"}"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("等级已存在"));
+
+      mockMvc.perform(put("/api/admin/slab-grades/{id}", gradeId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"code\":\"S\",\"name\":\"精品料\",\"status\":\"disabled\",\"remark\":\"编辑\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.code").value("S"))
+          .andExpect(jsonPath("$.data.name").value("精品料"))
+          .andExpect(jsonPath("$.data.status").value("enabled"));
+
+      mockMvc.perform(patch("/api/admin/slab-grades/{id}/status", gradeId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("disabled"));
+
+      mockMvc.perform(delete("/api/admin/slab-grades/{id}", gradeId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+    } finally {
+      jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", Long.valueOf(gradeId));
+    }
+  }
+
+  @Test
+  void slabGradeOperationsRequireTheirOwnPermissions() throws Exception {
+    long accountId = 9085L;
+    long employeeId = 9085L;
+    long roleId = 9085L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId,
+        "15926629085",
+        "等级只读操作员");
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '等级只读操作员', '15926629085', 'enabled', 'all', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '等级只读角色', 'SLAB_GRADE_VIEW_TEST', 'operation-platform',
+          'admin', 'all', 'enabled', 'admin.product-data-center.slab-grade.view', '集成测试')
+        """,
+        roleId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    try {
+      String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      mockMvc.perform(get("/api/admin/slab-grades").header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk());
+      mockMvc.perform(post("/api/admin/slab-grades")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"code\":\"B\",\"name\":\"越权等级\",\"status\":\"enabled\"}"))
+          .andExpect(status().isForbidden());
+    } finally {
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+  }
+
+  @Test
   void slabOriginMigrationAndCrudLifecycleWork() throws Exception {
     Integer originColumnCount = jdbcTemplate.queryForObject(
         """

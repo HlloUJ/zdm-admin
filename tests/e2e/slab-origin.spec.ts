@@ -32,6 +32,7 @@ test('shows slab origin in the slab base-data submenu and supports search and CR
     '产地管理',
     '纹理管理',
     '色系管理',
+    '等级管理',
   ]);
   expect(
     await slabBaseDataMenu.evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
