@@ -703,7 +703,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
     categoryCatalogActionLabels,
   );
   await roleModuleList.getByText('商品基础数据中心', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(14);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(15);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -777,6 +777,16 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '查看',
     '新增',
     '别名',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const slabColorPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '色系管理页' });
+  await expect(slabColorPermissionRow.getByText('色系管理', { exact: true })).toBeVisible();
+  await expect(slabColorPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '色系分类管理',
     '编辑',
     '停用/启用',
     '删除',
@@ -895,8 +905,8 @@ test('shows verified supplier, store-category, product-data and permission-manag
     categoryCatalogActionLabels,
   );
   await moduleList.getByText('商品基础数据中心', { exact: true }).click();
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*77/);
-  await expect(matrix.locator('tbody tr')).toHaveCount(14);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*83/);
+  await expect(matrix.locator('tbody tr')).toHaveCount(15);
   await expect(matrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -974,6 +984,16 @@ test('shows verified supplier, store-category, product-data and permission-manag
     '停用/启用',
     '删除',
   ]);
+  const slabColorAllocationRow = matrix.locator('tbody tr').filter({ hasText: '色系管理页' });
+  await expect(slabColorAllocationRow.getByText('色系管理', { exact: true })).toBeVisible();
+  await expect(slabColorAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '色系分类管理',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
   await expect(matrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
   const craftAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货工艺管理页' });
@@ -1035,7 +1055,7 @@ test('shows verified supplier, store-category, product-data and permission-manag
   await expect(matrix.getByText('品种管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('产地管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('纹理管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(77);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(83);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();

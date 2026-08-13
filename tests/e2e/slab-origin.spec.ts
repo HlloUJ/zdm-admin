@@ -27,7 +27,12 @@ test('shows slab origin in the slab base-data submenu and supports search and CR
   const originMenuItem = page.locator('[data-menu-path="/slab-origin"]');
   const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
   await expect(slabBaseDataMenu).toBeVisible();
-  await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText(['品种管理', '产地管理', '纹理管理']);
+  await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText([
+    '品种管理',
+    '产地管理',
+    '纹理管理',
+    '色系管理',
+  ]);
   expect(
     await slabBaseDataMenu.evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
   ).toBe('/finished-stock-craft');
