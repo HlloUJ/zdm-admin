@@ -18,15 +18,24 @@ class CreatorOwnershipGuardTest {
     identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     ownershipGuard = new CreatorOwnershipGuard(identityProvider);
     when(identityProvider.require()).thenReturn(new CurrentIdentity(
-        2L, 2L, 2L, 2L, "admin", 1L, 1L, "同名员工", "all",
-        List.of("SUPER_ADMIN"), List.of("all")));
+        2L, 2L, 2L, 2L, "admin", 1L, 1L, "同名员工", "self",
+        List.of("ADMIN"), List.of("admin.product-data-center.attribute.shared.edit")));
   }
 
   @Test
-  void accountIdIsAuthoritativeEvenForSuperAdminWithSameDisplayName() {
+  void accountIdIsAuthoritativeForRegularAccountsWithSameDisplayName() {
     assertThatThrownBy(() -> ownershipGuard.requireCreator(3L, "同名员工"))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessage(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE);
+  }
+
+  @Test
+  void superAdminCanOperateDataCreatedByAnotherAccount() {
+    when(identityProvider.require()).thenReturn(new CurrentIdentity(
+        1L, 1L, 1L, 1L, "admin", 1L, 1L, "超级管理员", "all",
+        List.of("SUPER_ADMIN"), List.of("all")));
+
+    ownershipGuard.requireCreator(3L, "其他管理员");
   }
 
   @Test

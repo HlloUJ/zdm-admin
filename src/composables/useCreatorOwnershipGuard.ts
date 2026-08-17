@@ -1,4 +1,5 @@
 import { adminFeedback } from '@/components/foundation';
+import { isSuperAdmin } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 
 export const CREATOR_OWNERSHIP_MESSAGE = '不可操作其他用户添加的数据';
@@ -10,6 +11,7 @@ export interface CreatorOwnedRecord {
 
 function isCreatorOwned(record: CreatorOwnedRecord) {
   const currentUser = getLoginUser();
+  if (isSuperAdmin(currentUser)) return true;
   return record.createdByAccountId == null
     ? record.createdByName?.trim() === currentUser.name.trim()
     : Number(record.createdByAccountId) === currentUser.id;
