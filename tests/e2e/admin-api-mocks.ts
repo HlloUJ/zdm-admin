@@ -531,11 +531,8 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/stores', stores);
   await page.route('**/api/admin/stores/1/deletion-references', async (route) => {
     await fulfillJson(route, {
-      totalCount: 9,
-      references: [
-        { code: 'employees', name: '员工', count: 2, examples: ['超级管理员（启用）', '待启用员工（停用）'] },
-        { code: 'employeeInvites', name: '员工邀请', count: 7, examples: ['有效 2条', '已使用 5条'] },
-      ],
+      totalCount: 0,
+      references: [],
     });
   });
   await mockCollection(page, '**/api/admin/store-levels', storeLevels);

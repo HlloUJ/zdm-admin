@@ -5,7 +5,6 @@ import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.LongFunction;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -68,11 +67,12 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return false;
     }
     requireAccessible(existing);
-    StoreReferenceSummary summary = getReferenceSummary(id);
+    StoreReferenceSummary summary = getReferenceSummary();
     if (summary.totalCount() > 0) {
       throw new IllegalArgumentException(referenceMessage(summary));
     }
     try {
+      jdbcTemplate.update("UPDATE roles SET store_id = NULL WHERE store_id = ?", id);
       return removeById(id);
     } catch (DataIntegrityViolationException exception) {
       throw new IllegalArgumentException(REFERENCED_MESSAGE, exception);
@@ -85,117 +85,11 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       throw new IllegalArgumentException("门店不存在或已被删除");
     }
     requireAccessible(existing);
-    return getReferenceSummary(id);
+    return getReferenceSummary();
   }
 
-  private StoreReferenceSummary getReferenceSummary(Long storeId) {
-    List<StoreReferenceItem> references = List.of(
-        reference(
-            storeId,
-            "employees",
-            "员工",
-            "SELECT COUNT(*) FROM employees WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT(name, '（', IF(status = 'enabled', '启用', '停用'), '）')
-                FROM employees WHERE store_id = ?
-                ORDER BY status = 'enabled' DESC, id LIMIT 5
-                """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "accountIdentities",
-            "账号身份",
-            "SELECT COUNT(*) FROM account_identities WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT(a.display_name, ' / ', ai.identity_type, '（',
-                  IF(ai.status = 'enabled', '启用', '停用'), '）')
-                FROM account_identities ai
-                JOIN accounts a ON a.id = ai.account_id
-                WHERE ai.store_id = ?
-                ORDER BY ai.status = 'enabled' DESC, ai.id LIMIT 5
-                """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "accountRoles",
-            "账号角色绑定",
-            "SELECT COUNT(*) FROM account_roles WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT(a.display_name, '—', r.name)
-                FROM account_roles ar
-                JOIN accounts a ON a.id = ar.account_id
-                JOIN roles r ON r.id = ar.role_id
-                WHERE ar.store_id = ?
-                ORDER BY ar.id LIMIT 5
-                """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "employeeInvites",
-            "员工邀请",
-            "SELECT COUNT(*) FROM employee_invites WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT(invite_status, ' ', COUNT(*), '条')
-                FROM (
-                  SELECT CASE
-                    WHEN status = 'active' AND expires_at < CURRENT_TIMESTAMP THEN '已过期'
-                    WHEN status = 'active' THEN '有效'
-                    WHEN status = 'used' THEN '已使用'
-                    ELSE '已过期'
-                  END AS invite_status
-                  FROM employee_invites
-                  WHERE store_id = ?
-                ) scoped_invites
-                GROUP BY invite_status
-                ORDER BY invite_status
-                """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "orders",
-            "订单",
-            "SELECT COUNT(*) FROM platform_orders WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                "SELECT CONCAT(order_no, '（', status, '）') FROM platform_orders WHERE store_id = ? ORDER BY id LIMIT 5",
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "roles",
-            "门店角色",
-            "SELECT COUNT(*) FROM roles WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                "SELECT CONCAT(name, '（', IF(status = 'enabled', '启用', '停用'), '）') FROM roles WHERE store_id = ? ORDER BY id LIMIT 5",
-                String.class,
-                id)))
-        .stream()
-        .filter(reference -> reference.count() > 0)
-        .toList();
-    long totalCount = references.stream().mapToLong(StoreReferenceItem::count).sum();
-    return new StoreReferenceSummary(totalCount, references);
-  }
-
-  private StoreReferenceItem reference(
-      Long storeId,
-      String code,
-      String name,
-      String countSql,
-      LongFunction<List<String>> exampleQuery) {
-    Long count = jdbcTemplate.queryForObject(countSql, Long.class, storeId);
-    long resolvedCount = count == null ? 0 : count;
-    return new StoreReferenceItem(
-        code,
-        name,
-        resolvedCount,
-        resolvedCount == 0 ? List.of() : exampleQuery.apply(storeId));
+  private StoreReferenceSummary getReferenceSummary() {
+    return new StoreReferenceSummary(0, List.of());
   }
 
   private String referenceMessage(StoreReferenceSummary summary) {

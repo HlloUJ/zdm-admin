@@ -236,21 +236,12 @@ const deletionCases = [
   { path: '/tenant-management', target: '装点猫直营租户' },
   { path: '/role-management', target: '运营管理平台角色' },
   { path: '/employee-management', target: '测试员工' },
+  { path: '/tenant-store-management', target: '杭州体验门店' },
   { path: '/finished-stock-craft', target: 'E2E 边工艺' },
   { path: '/slab-variety', target: '潘多拉' },
   { path: '/product-attribute', target: 'E2E 共享属性' },
   { path: '/product-attribute-value', target: 'E2E 共享属性值' },
 ];
-
-test('shows store reference details instead of sending a failing delete request', async ({ page }) => {
-  await page.goto('/tenant-store-management');
-  const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
-  await row.getByText('删除', { exact: true }).click();
-
-  await expect(page.getByText('员工 2 条', { exact: false })).toBeVisible();
-  await expect(page.getByText('员工邀请 7 条', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: '我知道了', exact: true })).toBeVisible();
-});
 
 for (const item of deletionCases) {
   test(`shows 已删除加名称 after deleting ${item.target}`, async ({ page }) => {
