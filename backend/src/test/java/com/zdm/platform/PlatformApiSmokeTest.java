@@ -1755,6 +1755,33 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void superAdminCanOperateStoreLevelCreatedByAnotherAccount() throws Exception {
+    jdbcTemplate.update(
+        "INSERT INTO store_levels (name, status, created_by_name, created_by_account_id) VALUES (?, 'enabled', ?, ?)",
+        "超级管理员跨创建人操作测试",
+        "其他管理员",
+        99087L);
+    Long levelId = jdbcTemplate.queryForObject(
+        "SELECT id FROM store_levels WHERE name = ?",
+        Long.class,
+        "超级管理员跨创建人操作测试");
+
+    try {
+      mockMvc.perform(put("/api/admin/store-levels/{id}", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"name\":\"超级管理员跨创建人操作测试-已编辑\",\"status\":\"enabled\"}"))
+          .andExpect(status().isOk());
+      mockMvc.perform(delete("/api/admin/store-levels/{id}", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+    } finally {
+      jdbcTemplate.update("DELETE FROM store_levels WHERE id = ?", levelId);
+    }
+  }
+
+  @Test
   void referencedStoreCannotBeDeletedAndReturnsActionableMessage() throws Exception {
     mockMvc.perform(get("/api/admin/stores/{id}/deletion-references", 1)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
