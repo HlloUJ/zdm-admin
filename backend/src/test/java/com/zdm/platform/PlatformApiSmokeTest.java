@@ -116,104 +116,6 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void slabPublishOptionsComeFromReferenceTablesAndSelectionsArePersisted() throws Exception {
-    String suffix = String.valueOf(System.nanoTime());
-    String colorCategoryName = "大板发布色系分类-" + suffix;
-    String colorName = "大板发布色系-" + suffix;
-    String gradeCode = "P" + suffix.substring(Math.max(0, suffix.length() - 6));
-    String gradeName = "大板发布等级-" + suffix;
-    String serialNo = "SLAB-PUBLISH-" + suffix;
-
-    jdbcTemplate.update(
-        "INSERT INTO slab_color_categories (name, status) VALUES (?, 'enabled')",
-        colorCategoryName);
-    Long colorCategoryId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_color_categories WHERE name = ?", Long.class, colorCategoryName);
-    jdbcTemplate.update(
-        "INSERT INTO slab_colors (category_id, name, status) VALUES (?, ?, 'enabled')",
-        colorCategoryId,
-        colorName);
-    Long colorId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_colors WHERE name = ?", Long.class, colorName);
-    jdbcTemplate.update(
-        "INSERT INTO slab_grades (code, name, status) VALUES (?, ?, 'enabled')",
-        gradeCode,
-        gradeName);
-    Long gradeId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_grades WHERE code = ?", Long.class, gradeCode);
-    Long textureId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_textures WHERE name = '细纹'", Long.class);
-
-    Long slabId = null;
-    try {
-      mockMvc.perform(get("/api/admin/slabs/publish-options")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.textures[*].label", hasItem("细纹")))
-          .andExpect(jsonPath("$.data.colorCategories[*].label", hasItem(colorCategoryName)))
-          .andExpect(jsonPath("$.data.colorCategories[*].children[*].label", hasItem(colorName)))
-          .andExpect(jsonPath("$.data.grades[*].label", hasItem(gradeCode)))
-          .andExpect(jsonPath("$.data.grades[*].description", hasItem(gradeName)));
-
-      MvcResult slabResult = mockMvc.perform(post("/api/admin/slabs")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
-              .contentType("application/json")
-              .content("""
-                  {
-                    "name":"大板发布选项测试",
-                    "serialNo":"%s",
-                    "textureId":%d,
-                    "colorId":%d,
-                    "gradeId":%d,
-                    "status":"warehouse"
-                  }
-                  """.formatted(serialNo, textureId, colorId, gradeId)))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.textureId").value(textureId))
-          .andExpect(jsonPath("$.data.colorId").value(colorId))
-          .andExpect(jsonPath("$.data.gradeId").value(gradeId))
-          .andReturn();
-      slabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
-          slabResult.getResponse().getContentAsString(), "$.data.id").toString());
-
-      Integer persistedCount = jdbcTemplate.queryForObject(
-          """
-          SELECT COUNT(*) FROM slab_inventory
-          WHERE id = ? AND texture_id = ? AND color_id = ? AND grade_id = ?
-          """,
-          Integer.class,
-          slabId,
-          textureId,
-          colorId,
-          gradeId);
-      assertThat(persistedCount).isEqualTo(1);
-
-      mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
-              .contentType("application/json")
-              .content("""
-                  {
-                    "name":"大板发布选项测试",
-                    "serialNo":"%s",
-                    "textureId":999999999,
-                    "colorId":%d,
-                    "gradeId":%d,
-                    "status":"warehouse"
-                  }
-                  """.formatted(serialNo, colorId, gradeId)))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.message").value("纹理不存在"));
-    } finally {
-      if (slabId != null) {
-        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
-      }
-      jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", gradeId);
-      jdbcTemplate.update("DELETE FROM slab_colors WHERE id = ?", colorId);
-      jdbcTemplate.update("DELETE FROM slab_color_categories WHERE id = ?", colorCategoryId);
-    }
-  }
-
-  @Test
   void protectedAdminApiRequiresAuthentication() throws Exception {
     mockMvc.perform(get("/api/admin/tenants"))
         .andExpect(status().isUnauthorized());
@@ -3058,6 +2960,104 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.name").value("集成测试租户-已更新"));
+  }
+
+  @Test
+  void slabPublishOptionsComeFromReferenceTablesAndSelectionsArePersisted() throws Exception {
+    String suffix = String.valueOf(System.nanoTime());
+    String colorCategoryName = "大板发布色系分类-" + suffix;
+    String colorName = "大板发布色系-" + suffix;
+    String gradeCode = "P" + suffix.substring(Math.max(0, suffix.length() - 6));
+    String gradeName = "大板发布等级-" + suffix;
+    String serialNo = "SLAB-PUBLISH-" + suffix;
+
+    jdbcTemplate.update(
+        "INSERT INTO slab_color_categories (name, status) VALUES (?, 'enabled')",
+        colorCategoryName);
+    Long colorCategoryId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_color_categories WHERE name = ?", Long.class, colorCategoryName);
+    jdbcTemplate.update(
+        "INSERT INTO slab_colors (category_id, name, status) VALUES (?, ?, 'enabled')",
+        colorCategoryId,
+        colorName);
+    Long colorId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_colors WHERE name = ?", Long.class, colorName);
+    jdbcTemplate.update(
+        "INSERT INTO slab_grades (code, name, status) VALUES (?, ?, 'enabled')",
+        gradeCode,
+        gradeName);
+    Long gradeId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_grades WHERE code = ?", Long.class, gradeCode);
+    Long textureId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_textures WHERE name = '细纹'", Long.class);
+
+    Long slabId = null;
+    try {
+      mockMvc.perform(get("/api/admin/slabs/publish-options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.textures[*].label", hasItem("细纹")))
+          .andExpect(jsonPath("$.data.colorCategories[*].label", hasItem(colorCategoryName)))
+          .andExpect(jsonPath("$.data.colorCategories[*].children[*].label", hasItem(colorName)))
+          .andExpect(jsonPath("$.data.grades[*].label", hasItem(gradeCode)))
+          .andExpect(jsonPath("$.data.grades[*].description", hasItem(gradeName)));
+
+      MvcResult slabResult = mockMvc.perform(post("/api/admin/slabs")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
+                  {
+                    "name":"大板发布选项测试",
+                    "serialNo":"%s",
+                    "textureId":%d,
+                    "colorId":%d,
+                    "gradeId":%d,
+                    "status":"warehouse"
+                  }
+                  """.formatted(serialNo, textureId, colorId, gradeId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.textureId").value(textureId))
+          .andExpect(jsonPath("$.data.colorId").value(colorId))
+          .andExpect(jsonPath("$.data.gradeId").value(gradeId))
+          .andReturn();
+      slabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
+          slabResult.getResponse().getContentAsString(), "$.data.id").toString());
+
+      Integer persistedCount = jdbcTemplate.queryForObject(
+          """
+          SELECT COUNT(*) FROM slab_inventory
+          WHERE id = ? AND texture_id = ? AND color_id = ? AND grade_id = ?
+          """,
+          Integer.class,
+          slabId,
+          textureId,
+          colorId,
+          gradeId);
+      assertThat(persistedCount).isEqualTo(1);
+
+      mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
+                  {
+                    "name":"大板发布选项测试",
+                    "serialNo":"%s",
+                    "textureId":999999999,
+                    "colorId":%d,
+                    "gradeId":%d,
+                    "status":"warehouse"
+                  }
+                  """.formatted(serialNo, colorId, gradeId)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("纹理不存在"));
+    } finally {
+      if (slabId != null) {
+        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
+      }
+      jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", gradeId);
+      jdbcTemplate.update("DELETE FROM slab_colors WHERE id = ?", colorId);
+      jdbcTemplate.update("DELETE FROM slab_color_categories WHERE id = ?", colorCategoryId);
+    }
   }
 
   @Test
