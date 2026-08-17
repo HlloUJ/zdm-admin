@@ -93,6 +93,8 @@ const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
 );
 
 const baseInfoPaths = new Set([
+  '/finished-stock-management',
+  '/slab-management',
   '/product-category',
   '/product-attribute',
   '/product-attribute-value',
@@ -110,7 +112,7 @@ const baseInfoPaths = new Set([
   '/finished-stock-craft',
 ]);
 
-const tenantManagementPaths = new Set(['/tenant-management', '/tenant-store-management']);
+const tenantManagementPaths = new Set(['/tenant-management', '/tenant-store-management', '/store-level-management']);
 const permissionManagementPaths = new Set([
   '/employee-management',
   '/role-management',
@@ -122,7 +124,17 @@ watch(
   () => {
     const requiredExpandedMenus = [];
     if (tenantManagementPaths.has(route.path)) requiredExpandedMenus.push('tenant-management');
-    if (baseInfoPaths.has(route.path)) requiredExpandedMenus.push('product-data-center');
+    if (route.path === '/store-level-management') requiredExpandedMenus.push('store-base-data-management');
+    if (baseInfoPaths.has(route.path)) requiredExpandedMenus.push('product-management');
+    if (
+      route.path === '/product-category' ||
+      route.path === '/product-attribute' ||
+      route.path === '/product-attribute-value' ||
+      route.path === '/category-attribute-template'
+    ) {
+      requiredExpandedMenus.push('product-common-base-data');
+    }
+    if (route.path === '/finished-stock-craft') requiredExpandedMenus.push('finished-stock-base-data');
     if (
       route.path === '/slab-variety' ||
       route.path === '/slab-origin' ||

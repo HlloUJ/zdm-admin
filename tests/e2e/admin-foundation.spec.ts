@@ -130,8 +130,8 @@ test('orders the requested management lists by creation time descending', async 
       endpoint: '**/api/admin/slab-varieties',
       newerName: '较新品种',
       records: [
-        { id: 101, name: '较早品种', code: 'older-variety', status: 'enabled', createdAt: '2026-08-01T09:00:00' },
-        { id: 102, name: '较新品种', code: 'newer-variety', status: 'enabled', createdAt: '2026-08-03T09:00:00' },
+        { id: 101, name: '较早品种', status: 'enabled', createdAt: '2026-08-01T09:00:00' },
+        { id: 102, name: '较新品种', status: 'enabled', createdAt: '2026-08-03T09:00:00' },
       ],
     },
     {

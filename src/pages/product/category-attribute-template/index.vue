@@ -6,7 +6,7 @@
       <AdminSideMenu />
 
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '分类属性模板']" :badge="pageTitle" />
+        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '分类属性模板']" :badge="pageTitle" />
 
         <AdminListLayout>
           <template #toolbar>

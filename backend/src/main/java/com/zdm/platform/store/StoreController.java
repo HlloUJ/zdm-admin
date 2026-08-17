@@ -19,10 +19,15 @@ public class StoreController {
   private static final String PERMISSION_PREFIX = "admin.tenant.tenant-store-management";
 
   private final StoreService storeService;
+  private final StoreLevelService storeLevelService;
   private final PermissionGuard permissionGuard;
 
-  public StoreController(StoreService storeService, PermissionGuard permissionGuard) {
+  public StoreController(
+      StoreService storeService,
+      StoreLevelService storeLevelService,
+      PermissionGuard permissionGuard) {
     this.storeService = storeService;
+    this.storeLevelService = storeLevelService;
     this.permissionGuard = permissionGuard;
   }
 
@@ -30,6 +35,18 @@ public class StoreController {
   public ApiResponse<List<Store>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
     return ApiResponse.ok(storeService.listForCurrentAdmin());
+  }
+
+  @GetMapping("/level-options")
+  public ApiResponse<List<StoreLevel>> listLevelOptions() {
+    permissionGuard.requireView(PERMISSION_PREFIX);
+    return ApiResponse.ok(storeLevelService.listEnabled());
+  }
+
+  @GetMapping("/{id}/deletion-references")
+  public ApiResponse<StoreReferenceSummary> deletionReferences(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    return ApiResponse.ok(storeService.getDeletionReferences(id));
   }
 
   @PostMapping

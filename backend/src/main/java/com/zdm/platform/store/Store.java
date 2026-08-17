@@ -22,6 +22,7 @@ public class Store {
   private String type;
 
   private String shopLevel;
+  private Long storeLevelId;
   private String manager;
   private String region;
   private String detailAddress;
@@ -73,6 +74,14 @@ public class Store {
 
   public void setShopLevel(String shopLevel) {
     this.shopLevel = shopLevel;
+  }
+
+  public Long getStoreLevelId() {
+    return storeLevelId;
+  }
+
+  public void setStoreLevelId(Long storeLevelId) {
+    this.storeLevelId = storeLevelId;
   }
 
   public String getManager() {

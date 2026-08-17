@@ -57,7 +57,7 @@ const menuRows = [
   { domain: '租户与门店', pages: '租户管理、门店管理、门店分类管理', path: '/tenant-management' },
   { domain: '商品管理', pages: '成品现货管理、大板管理、供应商管理', path: '/finished-stock-management' },
   {
-    domain: '商品基础数据中心',
+    domain: '商品管理',
     pages: '商品分类、属性库、属性值、类目属性模板、大板品种、成品工艺',
     path: '/product-category',
   },

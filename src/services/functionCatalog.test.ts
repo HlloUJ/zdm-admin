@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   collectFunctionCatalogRows,
+  filterFunctionCatalogByAudience,
+  filterFunctionCatalogByPermissions,
   fullFunctionCatalog,
   getFunctionCatalogPermissionValues,
   initialAllocationValues,
@@ -47,11 +49,25 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
-  it('publishes verified supplier, store-category, product-data and permission-management resources to shared consumers', () => {
-    expect(terminalFunctionTrees.store).toBe(fullFunctionCatalog);
-    expect(terminalFunctionTrees.supplier).toBe(fullFunctionCatalog);
-    expect(fullFunctionCatalog).toHaveLength(4);
+  it('publishes the confirmed menu hierarchy and exposes the full catalog during development', () => {
+    expect(fullFunctionCatalog).toHaveLength(5);
+    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual(
+      fullFunctionCatalog.map((module) => module.value),
+    );
+    expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual(
+      fullFunctionCatalog.map((module) => module.value),
+    );
     expect(fullFunctionCatalog[0]).toMatchObject({
+      label: '租户与门店',
+      value: 'admin.tenant',
+      menus: [
+        {
+          label: '门店基础数据',
+          pages: [{ label: '店铺级别管理页', thirdMenuLabel: '店铺级别管理', tabs: [] }],
+        },
+      ],
+    });
+    expect(fullFunctionCatalog[1]).toMatchObject({
       label: '供应商管理',
       value: 'admin.supplier-management',
       menus: [
@@ -61,7 +77,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[1]).toMatchObject({
+    expect(fullFunctionCatalog[2]).toMatchObject({
       label: '门店分类管理',
       value: 'admin.tenant.store-category-management',
       menus: [
@@ -71,56 +87,42 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[2]).toMatchObject({
-      label: '商品基础数据中心',
+    expect(fullFunctionCatalog[3]).toMatchObject({
+      label: '商品管理',
       menus: [
         {
-          label: '商品分类管理',
+          label: '商品公共基础数据',
           direct: false,
           pages: [
             {
               label: '商品分类管理页',
+              thirdMenuLabel: '商品分类管理',
               tabs: [{ label: '成品现货分类' }, { label: '配件分类' }],
             },
-          ],
-        },
-        {
-          label: '属性库管理',
-          direct: false,
-          pages: [
             {
               label: '属性库管理页',
+              thirdMenuLabel: '属性库管理',
               tabs: [{ label: '共享基础属性' }, { label: '成品现货专属属性' }, { label: '配件专属属性' }],
             },
-          ],
-        },
-        {
-          label: '属性值管理',
-          direct: false,
-          pages: [
             {
               label: '属性值管理页',
+              thirdMenuLabel: '属性值管理',
               tabs: [{ label: '共享基础属性值' }, { label: '成品现货专属值' }, { label: '配件专属值' }],
             },
-          ],
-        },
-        {
-          label: '分类属性模板',
-          direct: false,
-          pages: [
             {
               label: '分类属性模板页',
+              thirdMenuLabel: '分类属性模板',
               tabs: [{ label: '成品现货模板' }, { label: '配件模板' }],
             },
           ],
         },
         {
-          label: '成品现货工艺管理',
+          label: '成品现货基础数据',
           direct: false,
-          pages: [{ label: '成品现货工艺管理页', tabs: [] }],
+          pages: [{ label: '成品现货工艺管理页', thirdMenuLabel: '工艺管理', tabs: [] }],
         },
         {
-          label: '大板基础数据管理',
+          label: '大板基础数据',
           direct: false,
           pages: [
             { label: '品种管理页', thirdMenuLabel: '品种管理', tabs: [] },
@@ -132,7 +134,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[3]).toMatchObject({
+    expect(fullFunctionCatalog[4]).toMatchObject({
       label: '权限管理',
       menus: [
         {
@@ -152,7 +154,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    const supplierPage = fullFunctionCatalog[0].menus[0].pages[0];
+    const supplierPage = fullFunctionCatalog[1].menus[0].pages[0];
     expect(supplierPage.actions).toEqual([
       { label: '查看', value: 'admin.supplier-management.view' },
       { label: '新增', value: 'admin.supplier-management.create' },
@@ -160,7 +162,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
       { label: '删除', value: 'admin.supplier-management.delete' },
     ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[0])).toEqual([
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[1])).toEqual([
       expect.objectContaining({
         direct: true,
         menuLabel: undefined,
@@ -169,7 +171,7 @@ describe('full function catalog', () => {
         actions: supplierPage.actions,
       }),
     ]);
-    const storeCategoryPage = fullFunctionCatalog[1].menus[0].pages[0];
+    const storeCategoryPage = fullFunctionCatalog[2].menus[0].pages[0];
     expect(storeCategoryPage.actions).toEqual([
       { label: '查看', value: 'admin.tenant.store-category-management.view' },
       { label: '新增一级分类', value: 'admin.tenant.store-category-management.create-root' },
@@ -180,7 +182,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: 'admin.tenant.store-category-management.toggle-status' },
       { label: '删除', value: 'admin.tenant.store-category-management.delete' },
     ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[1])).toEqual([
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[2])).toEqual([
       expect.objectContaining({
         direct: true,
         menuLabel: undefined,
@@ -189,8 +191,10 @@ describe('full function catalog', () => {
         actions: storeCategoryPage.actions,
       }),
     ]);
-    const categoryPage = fullFunctionCatalog[2].menus[0].pages[0];
-    expect(categoryPage.tabs).toEqual([
+    const productModule = fullFunctionCatalog[3];
+    const productPages = productModule.menus.flatMap((menu) => menu.pages);
+    const categoryPage = productPages.find((page) => page.value === 'admin.product-data-center.category');
+    expect(categoryPage?.tabs).toEqual([
       {
         label: '成品现货分类',
         value: 'admin.product-data-center.category.finished',
@@ -226,9 +230,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: `${scope}.toggle-status` },
       { label: '删除', value: `${scope}.delete` },
     ];
-    const attributePage = fullFunctionCatalog[2].menus.find(
-      (menu) => menu.value === 'admin.product-data-center.attribute.menu',
-    )?.pages[0];
+    const attributePage = productPages.find((page) => page.value === 'admin.product-data-center.attribute');
     expect(attributePage?.actions).toEqual([]);
     expect(attributePage?.tabs).toEqual(
       ['shared', 'finished', 'accessory'].map((scope, index) => ({
@@ -237,9 +239,7 @@ describe('full function catalog', () => {
         actions: productAttributeActions(`admin.product-data-center.attribute.${scope}`),
       })),
     );
-    const attributeValuePage = fullFunctionCatalog[2].menus.find(
-      (menu) => menu.value === 'admin.product-data-center.attribute-value.menu',
-    )?.pages[0];
+    const attributeValuePage = productPages.find((page) => page.value === 'admin.product-data-center.attribute-value');
     expect(attributeValuePage?.actions).toEqual([]);
     expect(attributeValuePage?.tabs).toEqual(
       ['shared', 'finished', 'accessory'].map((scope, index) => ({
@@ -248,9 +248,9 @@ describe('full function catalog', () => {
         actions: productAttributeActions(`admin.product-data-center.attribute-value.${scope}`),
       })),
     );
-    const categoryAttributePage = fullFunctionCatalog[2].menus.find(
-      (menu) => menu.value === 'admin.product-data-center.category-attribute-template.menu',
-    )?.pages[0];
+    const categoryAttributePage = productPages.find(
+      (page) => page.value === 'admin.product-data-center.category-attribute-template',
+    );
     expect(categoryAttributePage?.actions).toEqual([]);
     expect(categoryAttributePage?.tabs).toEqual(
       ['finished', 'accessory'].map((scope, index) => ({
@@ -280,9 +280,7 @@ describe('full function catalog', () => {
         ],
       })),
     );
-    const slabGradePage = fullFunctionCatalog[2].menus
-      .find((menu) => menu.value === 'admin.product-data-center.slab-base-data.menu')
-      ?.pages.find((page) => page.value === 'admin.product-data-center.slab-grade');
+    const slabGradePage = productPages.find((page) => page.value === 'admin.product-data-center.slab-grade');
     expect(slabGradePage?.actions).toEqual([
       { label: '查看', value: 'admin.product-data-center.slab-grade.view' },
       { label: '新增', value: 'admin.product-data-center.slab-grade.create' },
@@ -291,6 +289,11 @@ describe('full function catalog', () => {
       { label: '删除', value: 'admin.product-data-center.slab-grade.delete' },
     ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
+      'admin.tenant.store-level-management.view',
+      'admin.tenant.store-level-management.create',
+      'admin.tenant.store-level-management.edit',
+      'admin.tenant.store-level-management.toggle-status',
+      'admin.tenant.store-level-management.delete',
       'admin.supplier-management.view',
       'admin.supplier-management.create',
       'admin.supplier-management.edit',
@@ -444,6 +447,27 @@ describe('full function catalog', () => {
       'admin.permission-management.employee-management.permission',
     ]);
     expect(normalizeTerminalPermissions('supplier', ['admin.slab-management.warehouse.view-price'])).toEqual([]);
+  });
+
+  it('keeps production audience filters available and limits store roles to terminal grants', () => {
+    const operationValues = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));
+    expect(operationValues).toContain('admin.tenant.store-level-management.view');
+    expect(operationValues).not.toContain('admin.tenant.store-category-management.view');
+
+    expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.store)).toContain(
+      'admin.tenant.store-level-management.view',
+    );
+    expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.supplier)).toContain(
+      'admin.tenant.store-category-management.view',
+    );
+
+    const storeRoleCatalog = filterFunctionCatalogByPermissions(terminalFunctionTrees.store, [
+      'admin.tenant.store-category-management.create-root',
+    ]);
+    expect(getFunctionCatalogPermissionValues(storeRoleCatalog)).toEqual([
+      'admin.tenant.store-category-management.view',
+      'admin.tenant.store-category-management.create-root',
+    ]);
   });
 
   it('keeps legacy category enable and disable grants as one toggle-status permission', () => {

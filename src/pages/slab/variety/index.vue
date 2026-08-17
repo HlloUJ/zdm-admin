@@ -9,8 +9,8 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-              <t-breadcrumb-item>大板基础数据管理</t-breadcrumb-item>
+              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
+              <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
               <t-breadcrumb-item>品种管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
@@ -157,7 +157,6 @@ type ConfirmType = 'enable' | 'disable' | 'delete';
 
 interface VarietyItem {
   id: number;
-  code: string;
   name: string;
   status: VarietyStatus;
   createdByName: string;
@@ -262,11 +261,8 @@ const formatDateTime = (value?: string) => {
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const createCode = (name: string) => `slab-variety-${name.trim().length}-${Date.now()}`;
-
 const toVarietyItem = (record: SlabVarietyRecord): VarietyItem => ({
   id: record.id,
-  code: record.code,
   name: record.name,
   status: normalizeStatus(record.status),
   createdByName: record.createdByName ?? '-',
@@ -274,9 +270,8 @@ const toVarietyItem = (record: SlabVarietyRecord): VarietyItem => ({
   remark: record.remark ?? '',
 });
 
-const toVarietyPayload = (status: VarietyStatus, code?: string): SlabVarietyPayload => ({
+const toVarietyPayload = (status: VarietyStatus): SlabVarietyPayload => ({
   name: formData.name.trim(),
-  code: code ?? createCode(formData.name),
   status: toBackendStatus(status),
   remark: formData.remark.trim(),
 });
@@ -351,7 +346,7 @@ const handleSubmit = async () => {
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
-      await updateSlabVariety(editingId.value, toVarietyPayload(current?.status ?? 'normal', current?.code));
+      await updateSlabVariety(editingId.value, toVarietyPayload(current?.status ?? 'normal'));
       await loadVarieties();
     }
 

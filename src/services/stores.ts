@@ -5,7 +5,7 @@ export interface StoreRecord {
   tenantId: number;
   name: string;
   type: 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
-  shopLevel?: 'level1' | 'level2' | 'level3';
+  storeLevelId?: number;
   manager?: string;
   region?: string;
   detailAddress?: string;
@@ -21,7 +21,7 @@ export interface StorePayload {
   tenantId: number;
   name: string;
   type: 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
-  shopLevel?: 'level1' | 'level2' | 'level3';
+  storeLevelId: number;
   manager?: string;
   region?: string;
   detailAddress?: string;
@@ -29,6 +29,18 @@ export interface StorePayload {
   status: 'enabled' | 'disabled';
   remark?: string;
   createdBy?: string;
+}
+
+export interface StoreReferenceItem {
+  code: string;
+  name: string;
+  count: number;
+  examples: string[];
+}
+
+export interface StoreReferenceSummary {
+  totalCount: number;
+  references: StoreReferenceItem[];
 }
 
 export function listStores() {
@@ -53,4 +65,8 @@ export function deleteStore(id: number) {
   return request<boolean>(`/admin/stores/${id}`, {
     method: 'DELETE',
   });
+}
+
+export function getStoreDeletionReferences(id: number) {
+  return request<StoreReferenceSummary>(`/admin/stores/${id}/deletion-references`);
 }

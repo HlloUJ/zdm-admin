@@ -32,7 +32,7 @@ const stores = [
     tenantId: 1,
     name: '杭州体验门店',
     type: 'cityPartner',
-    shopLevel: 'level1',
+    storeLevelId: 1,
     manager: '超级管理员',
     region: 'zhejiang/hangzhou/xihu',
     detailAddress: '样例地址 1 号',
@@ -41,6 +41,33 @@ const stores = [
     remark: '系统内置门店',
     createdAt: '2026-07-27T09:00:00',
     createdBy: '韩健',
+  },
+];
+
+const storeLevels = [
+  {
+    id: 1,
+    name: '1级',
+    status: 'enabled',
+    createdByName: '韩健',
+    remark: '历史店铺级别迁移',
+    createdAt: '2026-08-17T08:00:00',
+  },
+  {
+    id: 2,
+    name: '2级',
+    status: 'enabled',
+    createdByName: '韩健',
+    remark: '历史店铺级别迁移',
+    createdAt: '2026-08-17T07:00:00',
+  },
+  {
+    id: 3,
+    name: '3级',
+    status: 'disabled',
+    createdByName: '韩健',
+    remark: '已停用级别',
+    createdAt: '2026-08-17T06:00:00',
   },
 ];
 
@@ -467,6 +494,22 @@ export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
   await mockCollection(page, '**/api/admin/tenants', tenants);
   await mockCollection(page, '**/api/admin/stores', stores);
+  await page.route('**/api/admin/stores/1/deletion-references', async (route) => {
+    await fulfillJson(route, {
+      totalCount: 9,
+      references: [
+        { code: 'employees', name: '员工', count: 2, examples: ['超级管理员（启用）', '待启用员工（停用）'] },
+        { code: 'employeeInvites', name: '员工邀请', count: 7, examples: ['有效 2条', '已使用 5条'] },
+      ],
+    });
+  });
+  await mockCollection(page, '**/api/admin/store-levels', storeLevels);
+  await page.route('**/api/admin/stores/level-options', async (route) => {
+    await fulfillJson(
+      route,
+      storeLevels.filter((level) => level.status === 'enabled'),
+    );
+  });
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
   await mockCollection(page, '**/api/admin/roles', roles);
   await mockCollection(page, '**/api/admin/employees', employees);

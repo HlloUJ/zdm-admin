@@ -113,6 +113,11 @@ const router = createRouter({
       component: () => import('@/pages/tenant/store/index.vue'),
     },
     {
+      path: '/store-level-management',
+      name: 'storeLevelManagement',
+      component: () => import('@/pages/store-level/management/index.vue'),
+    },
+    {
       path: '/store-category-management',
       name: 'storeCategoryManagement',
       component: () => import('@/pages/store-category/management/index.vue'),
