@@ -12,6 +12,7 @@ public class SlabVariety extends BaseEntity {
   private Long originId;
   private String color;
   private String createdByName;
+  private Long createdByAccountId;
   private String remark;
 
   public String getName() {
@@ -44,6 +45,14 @@ public class SlabVariety extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public String getRemark() {

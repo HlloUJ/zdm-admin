@@ -10,6 +10,7 @@ public class StoreLevel extends BaseEntity {
   private String name;
 
   private String createdByName;
+  private Long createdByAccountId;
   private String remark;
 
   public String getName() {
@@ -26,6 +27,14 @@ public class StoreLevel extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public String getRemark() {

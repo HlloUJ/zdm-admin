@@ -4,10 +4,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
-import java.util.Objects;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -19,10 +18,15 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
 
   private final StoreMapper storeMapper;
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public StoreLevelService(StoreMapper storeMapper, CurrentIdentityProvider identityProvider) {
+  public StoreLevelService(
+      StoreMapper storeMapper,
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.storeMapper = storeMapper;
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   public List<StoreLevel> listEnabled() {
@@ -35,6 +39,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     normalizeAndValidate(level, null);
     level.setStatus("enabled");
     level.setCreatedByName(resolveCreatedByName());
+    level.setCreatedByAccountId(ownershipGuard.currentAccountId());
     save(level);
     return level;
   }
@@ -49,6 +54,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidate(payload, id);
     updateById(payload);
     return getById(id);
@@ -103,12 +109,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
   }
 
   private void requireAccessible(StoreLevel level) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin()
-        && !"all".equals(identity.dataPermission())
-        && !Objects.equals(level.getCreatedByName(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该店铺级别");
-    }
+    ownershipGuard.requireCreator(level.getCreatedByAccountId(), level.getCreatedByName());
   }
 
   private void normalizeAndValidate(StoreLevel level, Long excludedId) {

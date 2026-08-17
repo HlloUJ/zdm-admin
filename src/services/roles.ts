@@ -11,6 +11,7 @@ export interface RoleRecord {
   remark?: string;
   functionPermissions?: string;
   createdByName?: string;
+  createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
 }

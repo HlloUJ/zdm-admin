@@ -3,6 +3,7 @@ package com.zdm.platform.employee;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import com.zdm.platform.security.PermissionGuard;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,14 +28,17 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   private final SimpleJdbcInsert accountInsert;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
+  private final CreatorOwnershipGuard ownershipGuard;
 
   public EmployeeService(
       JdbcTemplate jdbcTemplate,
       CurrentIdentityProvider identityProvider,
-      PermissionGuard permissionGuard) {
+      PermissionGuard permissionGuard,
+      CreatorOwnershipGuard ownershipGuard) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
+    this.ownershipGuard = ownershipGuard;
     this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
         .withTableName("accounts")
         .usingColumns("phone", "display_name", "account_type", "status")
@@ -42,7 +46,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   public List<Employee> listForCurrentAdmin() {
-    return lambdaQuery().eq(Employee::getStoreId, requireStoreId()).list();
+    return list();
   }
 
   @Transactional
@@ -52,6 +56,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     Long accountId = findOrCreateAccount(employee.getPhone(), employee.getName());
     employee.setAccountId(accountId);
     employee.setCreatedByName(currentEmployeeName());
+    employee.setCreatedByAccountId(ownershipGuard.currentAccountId());
     validateBeforeEnabled(employee);
     save(employee);
     syncAdminIdentity(employee);
@@ -77,9 +82,8 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     payload.setTenantId(existing.getTenantId());
     payload.setStoreId(existing.getStoreId());
-    if (!StringUtils.hasText(payload.getCreatedByName())) {
-      payload.setCreatedByName(existing.getCreatedByName());
-    }
+    payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     authorizeUpdate(existing, payload);
 
     if (payload.getAccountId() == null) {
@@ -149,6 +153,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     employee.setPhone(request.phone());
     employee.setStatus("disabled");
     employee.setCreatedByName(invite.getCreatedByName());
+    employee.setCreatedByAccountId(invite.getCreatedByAccountId());
     save(employee);
     syncAdminIdentity(employee);
     return new EmployeeInviteRegisterResponse(employee.getId(), employee.getStatus());
@@ -337,9 +342,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   private void requireAccessibleEmployee(Employee employee) {
-    if (!Objects.equals(employee.getStoreId(), requireStoreId())) {
-      throw new AccessDeniedException("不能操作其他门店的员工");
-    }
+    ownershipGuard.requireCreator(employee.getCreatedByAccountId(), employee.getCreatedByName());
   }
 
   private Long requireStoreId() {

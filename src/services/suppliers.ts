@@ -10,6 +10,7 @@ export interface SupplierRecord {
   address?: string;
   qualificationStatus?: string;
   createdByName?: string;
+  createdByAccountId?: number;
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdAt?: string;

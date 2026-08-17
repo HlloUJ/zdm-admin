@@ -12,6 +12,7 @@ export interface EmployeeRecord {
   dataPermission?: 'self' | 'all';
   remark?: string;
   createdByName?: string;
+  createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -6,6 +6,7 @@ export interface SlabVarietyRecord {
   originId?: number;
   color?: string;
   createdByName?: string;
+  createdByAccountId?: number;
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdAt?: string;

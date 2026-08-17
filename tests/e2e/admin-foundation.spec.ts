@@ -5,6 +5,17 @@ import { installAdminApiMocks } from './admin-api-mocks';
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 1,
+        name: '韩健',
+        phone: '15926626945',
+        roles: ['SUPER_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    );
   });
   await installAdminApiMocks(page);
 });

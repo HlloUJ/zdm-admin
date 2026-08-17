@@ -132,6 +132,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import {
   adminFeedback,
   AdminConfirmDialog,
@@ -172,6 +173,7 @@ interface Value {
   useCount: number;
   status: Status;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
 }
 
@@ -293,6 +295,7 @@ const toValue = (record: ProductAttributeValueRecord): Value => ({
   useCount: record.useCount ?? 0,
   status: normalizeStatus(record.status),
   createdByName: record.createdByName || '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
 });
 const createValueCode = (attributeId: string, name: string) =>
@@ -373,11 +376,13 @@ const submit = async () => {
   }
 };
 const openStatusConfirm = (row: Value) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmTarget.value = row;
   confirmType.value = row.status === 'enabled' ? 'disable' : 'enable';
   confirmDialogVisible.value = true;
 };
 const openDeleteConfirm = (row: Value) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmTarget.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;

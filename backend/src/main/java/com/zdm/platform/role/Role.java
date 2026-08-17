@@ -34,6 +34,7 @@ public class Role {
   private String remark;
   private String functionPermissions;
   private String createdByName;
+  private Long createdByAccountId;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -123,6 +124,14 @@ public class Role {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public LocalDateTime getCreatedAt() {

@@ -4,6 +4,7 @@ export interface SlabColorCategoryRecord {
   id: number;
   name: string;
   createdByName?: string;
+  createdByAccountId?: number;
   remark?: string;
   createdAt?: string;
 }
@@ -15,6 +16,7 @@ export interface SlabColorRecord {
   name: string;
   status: 'enabled' | 'disabled';
   createdByName?: string;
+  createdByAccountId?: number;
   remark?: string;
   createdAt?: string;
 }

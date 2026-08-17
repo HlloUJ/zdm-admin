@@ -3,6 +3,7 @@ package com.zdm.platform.supplier;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -24,10 +25,15 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
 
   private final JdbcTemplate jdbcTemplate;
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public SupplierService(JdbcTemplate jdbcTemplate, CurrentIdentityProvider identityProvider) {
+  public SupplierService(
+      JdbcTemplate jdbcTemplate,
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   public List<Supplier> listSuppliers() {
@@ -42,6 +48,7 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
     supplier.setId(null);
     normalizeAndValidateName(supplier, null);
     supplier.setCreatedByName(resolveCreatedByName());
+    supplier.setCreatedByAccountId(ownershipGuard.currentAccountId());
     try {
       save(supplier);
     } catch (DuplicateKeyException exception) {
@@ -56,10 +63,12 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
     if (existing == null) {
       return null;
     }
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     payload.setId(id);
     normalizeAndValidateName(payload, id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     try {
       updateById(payload);
     } catch (DuplicateKeyException exception) {
@@ -74,6 +83,7 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
     if (existing == null) {
       return null;
     }
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
@@ -81,9 +91,11 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
 
   @Transactional
   public boolean deleteSupplier(Long id) {
-    if (getById(id) == null) {
+    Supplier existing = getById(id);
+    if (existing == null) {
       return false;
     }
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
 
     Long slabInventoryReferenceCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_inventory WHERE supplier_id = ?",

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import com.zdm.platform.security.PermissionGuard;
 import java.util.List;
 import java.util.Objects;
@@ -26,14 +27,17 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   private final JdbcTemplate jdbcTemplate;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
+  private final CreatorOwnershipGuard ownershipGuard;
 
   public RoleService(
       JdbcTemplate jdbcTemplate,
       CurrentIdentityProvider identityProvider,
-      PermissionGuard permissionGuard) {
+      PermissionGuard permissionGuard,
+      CreatorOwnershipGuard ownershipGuard) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
+    this.ownershipGuard = ownershipGuard;
   }
 
   public List<Role> listForCurrentAdmin() {
@@ -48,16 +52,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
       throw new AccessDeniedException("无权访问角色数据");
     }
 
-    Long storeId = requireStoreId();
-    List<Role> scopedRoles = lambdaQuery()
-        .and(query -> {
-          query.eq(Role::getStoreId, storeId);
-          if (identity.isSuperAdmin()) {
-            query.or().eq(Role::getCategory, "terminal-policy");
-          }
-        })
-        .list();
-    return scopedRoles.stream()
+    return list().stream()
         .filter(role -> visibleRole(role, identity, canAssignEmployeeRole, canViewLegacyRolePage))
         .toList();
   }
@@ -71,6 +66,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     normalizeAndValidateRoleName(role, null);
     role.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(role.getFunctionPermissions()));
     role.setCreatedByName(resolveCreatedByName());
+    role.setCreatedByAccountId(ownershipGuard.currentAccountId());
     return save(role);
   }
 
@@ -89,6 +85,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     payload.setClientCode(existing.getClientCode());
     payload.setStoreId(existing.getStoreId());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     if (isSuperAdminRole(existing)) {
       payload.setCode(SUPER_ADMIN_CODE);
       payload.setDataScope("all");
@@ -171,12 +168,9 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
+    ownershipGuard.requireCreator(role.getCreatedByAccountId(), role.getCreatedByName());
     if ("terminal-policy".equals(role.getCategory())) {
       permissionGuard.requireSuperAdmin();
-      return;
-    }
-    if (!Objects.equals(role.getStoreId(), requireStoreId())) {
-      throw new AccessDeniedException("不能操作其他门店的角色");
     }
   }
 

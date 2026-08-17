@@ -125,6 +125,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -239,6 +240,7 @@ const openCreate = () => {
   formVisible.value = true;
 };
 const openEdit = (row: GradeItem) => {
+  if (!requireCreatorOwnership(row)) return;
   editingId.value = row.id;
   Object.assign(formData, { code: row.code, name: row.name, remark: row.remark ?? '' });
   formVisible.value = true;
@@ -272,6 +274,7 @@ const confirmVisible = ref(false);
 const confirmType = ref<ConfirmType>('disable');
 const confirmRow = ref<GradeItem | null>(null);
 const openConfirm = (row: GradeItem, type: ConfirmType) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmRow.value = row;
   confirmType.value = type;
   confirmVisible.value = true;

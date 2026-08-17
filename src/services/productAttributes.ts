@@ -9,6 +9,7 @@ export interface ProductAttributeRecord {
   templateCount?: number;
   status?: 'enabled' | 'disabled';
   createdByName?: string;
+  createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
 }

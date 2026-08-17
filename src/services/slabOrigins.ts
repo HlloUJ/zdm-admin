@@ -4,6 +4,7 @@ export interface SlabOriginRecord {
   id: number;
   name: string;
   createdByName?: string;
+  createdByAccountId?: number;
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdAt?: string;

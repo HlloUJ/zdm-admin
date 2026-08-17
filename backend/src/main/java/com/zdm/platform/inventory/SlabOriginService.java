@@ -4,9 +4,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import java.util.Objects;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,12 +19,15 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
 
   private final SlabVarietyMapper slabVarietyMapper;
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
   public SlabOriginService(
       SlabVarietyMapper slabVarietyMapper,
-      CurrentIdentityProvider identityProvider) {
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.slabVarietyMapper = slabVarietyMapper;
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -33,6 +35,7 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     origin.setId(null);
     normalizeAndValidateName(origin, null);
     origin.setCreatedByName(resolveCreatedByName());
+    origin.setCreatedByAccountId(ownershipGuard.currentAccountId());
     save(origin);
     return origin;
   }
@@ -47,6 +50,7 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateName(payload, id);
     updateById(payload);
     return getById(id);
@@ -91,12 +95,7 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
   }
 
   private void requireAccessibleOrigin(SlabOrigin origin) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin()
-        && !"all".equals(identity.dataPermission())
-        && !Objects.equals(origin.getCreatedByName(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该产地");
-    }
+    ownershipGuard.requireCreator(origin.getCreatedByAccountId(), origin.getCreatedByName());
   }
 
   private void normalizeAndValidateName(SlabOrigin origin, Long excludedOriginId) {

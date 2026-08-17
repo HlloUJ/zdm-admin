@@ -160,6 +160,7 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import { computed, onMounted, reactive, ref } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminPagination } from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
@@ -264,6 +265,7 @@ const openCreate = () => {
   formVisible.value = true;
 };
 const openEdit = (row: TextureItem) => {
+  if (!requireCreatorOwnership(row)) return;
   editingId.value = row.id;
   Object.assign(formData, { name: row.name, remark: row.remark ?? '' });
   formVisible.value = true;
@@ -290,6 +292,7 @@ const aliasesVisible = ref(false);
 const activeTexture = ref<TextureItem | null>(null);
 const aliases = ref<SlabTextureAliasRecord[]>([]);
 const openAliases = async (row: TextureItem) => {
+  if (!requireCreatorOwnership(row)) return;
   activeTexture.value = row;
   aliases.value = await listSlabTextureAliases(row.id);
   aliasesVisible.value = true;
@@ -338,6 +341,7 @@ const confirmVisible = ref(false);
 const confirmRow = ref<TextureItem | null>(null);
 const confirmType = ref<ConfirmType>('disable');
 const openConfirm = (row: TextureItem, type: ConfirmType) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmRow.value = row;
   confirmType.value = type;
   confirmVisible.value = true;
