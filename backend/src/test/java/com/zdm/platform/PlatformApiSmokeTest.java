@@ -101,6 +101,9 @@ class PlatformApiSmokeTest {
           + (SELECT COUNT(*) FROM finished_products WHERE sku = 'FP-PANDORA-TABLE-1800')
         """,
         Integer.class);
+    Integer sampleOrderCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM platform_orders WHERE order_no = 'SO202607270001'",
+        Integer.class);
 
     assertThat(migrationCount).isGreaterThanOrEqualTo(44);
     assertThat(superAdminCount).isEqualTo(1);
@@ -111,6 +114,7 @@ class PlatformApiSmokeTest {
     assertThat(slabVarietyWithoutCreatorCount).isZero();
     assertThat(sampleSupplierCount).isZero();
     assertThat(sampleSupplierBusinessRecordCount).isZero();
+    assertThat(sampleOrderCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -1382,24 +1386,81 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void referencedStoreCannotBeDeletedAndReturnsActionableMessage() throws Exception {
-    mockMvc.perform(get("/api/admin/stores/{id}/deletion-references", 1)
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.totalCount").value(greaterThanOrEqualTo(1)))
-        .andExpect(jsonPath("$.data.references[?(@.code == 'employees')].name").value(hasItem("员工")))
-        .andExpect(jsonPath("$.data.references[0].examples[0]").isString());
+  void adminIdentityRecordsDoNotBlockStoreDeletion() throws Exception {
+    long storeId = 99086L;
+    long accountId = 99086L;
+    long employeeId = 99086L;
+    long roleId = 99086L;
+    String inviteToken = "store-decoupling-test";
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, status, created_by) VALUES (?, 1, '运营身份解耦门店', 'cityPartner', 'disabled', '韩健')",
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, account_type, status) VALUES (?, '15926629085', '解耦测试管理员', 'person', 'enabled')",
+        accountId);
+    jdbcTemplate.update(
+        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, created_by_name) VALUES (?, ?, 1, ?, '解耦测试员工', '15926629085', 'disabled', '韩健')",
+        employeeId,
+        accountId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, ?, 'disabled')",
+        accountId,
+        employeeId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO roles (id, name, code, category, client_code, store_id, data_scope, status, function_permissions, created_by_name) VALUES (?, '解耦测试角色', 'STORE_DECOUPLING_TEST', 'operation-platform', 'admin', ?, 'self', 'enabled', '', '韩健')",
+        roleId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, ?)",
+        accountId,
+        roleId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO employee_invites (token, tenant_id, store_id, status, expires_at) VALUES (?, 1, ?, 'active', DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 DAY))",
+        inviteToken,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO platform_orders (order_no, order_type, source_client, tenant_id, store_id, status) VALUES ('STORE-DECOUPLING-TEST', 'sales', 'admin', 1, ?, 'draft')",
+        storeId);
 
-    mockMvc.perform(delete("/api/admin/stores/{id}", 1)
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value(containsString("该门店存在关联数据，不能删除")))
-        .andExpect(jsonPath("$.message").value(containsString("员工")));
+    try {
+      mockMvc.perform(get("/api/admin/stores/{id}/deletion-references", storeId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.totalCount").value(0))
+          .andExpect(jsonPath("$.data.references").isEmpty());
 
-    Integer storeCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM stores WHERE id = 1",
-        Integer.class);
-    assertThat(storeCount).isEqualTo(1);
+      mockMvc.perform(delete("/api/admin/stores/{id}", storeId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM stores WHERE id = ?", Integer.class, storeId)).isZero();
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_id FROM employees WHERE id = ?", Long.class, employeeId)).isNull();
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_id FROM account_identities WHERE account_id = ?", Long.class, accountId)).isNull();
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_id FROM account_roles WHERE account_id = ?", Long.class, accountId)).isNull();
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_id FROM roles WHERE id = ?", Long.class, roleId)).isNull();
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_id FROM employee_invites WHERE token = ?", Long.class, inviteToken)).isNull();
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_id FROM platform_orders WHERE order_no = 'STORE-DECOUPLING-TEST'", Long.class)).isNull();
+    } finally {
+      jdbcTemplate.update("DELETE FROM platform_orders WHERE order_no = 'STORE-DECOUPLING-TEST'");
+      jdbcTemplate.update("DELETE FROM employee_invites WHERE token = ?", inviteToken);
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM stores WHERE id = ?", storeId);
+    }
   }
 
   @Test
