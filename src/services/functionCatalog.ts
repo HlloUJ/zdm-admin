@@ -1,6 +1,7 @@
 import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 
 export type TerminalType = 'store' | 'supplier';
+export type FunctionAudience = 'admin' | TerminalType;
 
 export interface FunctionAction {
   label: string;
@@ -33,6 +34,7 @@ export interface FunctionMenu {
 export interface FunctionModule {
   label: string;
   value: string;
+  audiences?: FunctionAudience[];
   menus: FunctionMenu[];
 }
 
@@ -145,6 +147,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   {
     label: '门店分类管理',
     value: 'admin.tenant.store-category-management',
+    audiences: ['store'],
     menus: [
       {
         value: 'admin.tenant.store-category-management.menu',
@@ -169,7 +172,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
     ],
   },
   {
-    label: '商品基础数据中心',
+    label: '商品管理',
     value: 'admin.product-data-center',
     menus: [
       {
@@ -301,7 +304,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
-        label: '大板基础数据管理',
+        label: '大板基础数据',
         value: 'admin.product-data-center.slab-base-data.menu',
         direct: false,
         pages: [
@@ -374,6 +377,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   {
     label: '权限管理',
     value: 'admin.permission-management',
+    audiences: ['admin'],
     menus: [
       {
         label: '员工管理',
@@ -470,11 +474,84 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   },
 ];
 
-export const fullFunctionCatalog = withDefaultViewPermissions(verifiedFunctionCatalog);
+const storeLevelModule: FunctionModule = {
+  label: '租户与门店',
+  value: 'admin.tenant',
+  audiences: ['admin'],
+  menus: [
+    {
+      label: '门店基础数据',
+      value: 'admin.tenant.store-base-data.menu',
+      direct: false,
+      pages: [
+        {
+          label: '店铺级别管理页',
+          value: 'admin.tenant.store-level-management',
+          thirdMenuLabel: '店铺级别管理',
+          actions: [
+            { label: '新增', value: 'admin.tenant.store-level-management.create' },
+            { label: '编辑', value: 'admin.tenant.store-level-management.edit' },
+            { label: '停用/启用', value: 'admin.tenant.store-level-management.toggle-status' },
+            { label: '删除', value: 'admin.tenant.store-level-management.delete' },
+          ],
+          tabs: [],
+        },
+      ],
+    },
+  ],
+};
+
+const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionModule[] =>
+  modules.map((module) => {
+    if (module.value !== 'admin.product-data-center') return module;
+
+    const commonValues = new Set([
+      'admin.product-data-center.category.menu',
+      'admin.product-data-center.attribute.menu',
+      'admin.product-data-center.attribute-value.menu',
+      'admin.product-data-center.category-attribute-template.menu',
+    ]);
+    const commonMenus = module.menus.filter((menu) => commonValues.has(menu.value));
+    const craftMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.finished-stock-craft.menu');
+    const slabMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.slab-base-data.menu');
+
+    return {
+      ...module,
+      label: '商品管理',
+      menus: [
+        {
+          label: '商品公共基础数据',
+          value: 'admin.product-data-center.common-base-data.menu',
+          direct: false,
+          pages: commonMenus.flatMap((menu) => menu.pages.map((page) => ({ ...page, thirdMenuLabel: menu.label }))),
+        },
+        ...(craftMenu
+          ? [
+              {
+                ...craftMenu,
+                label: '成品现货基础数据',
+                pages: craftMenu.pages.map((page) => ({ ...page, thirdMenuLabel: '工艺管理' })),
+              },
+            ]
+          : []),
+        ...(slabMenu ? [{ ...slabMenu, label: '大板基础数据' }] : []),
+      ],
+    };
+  });
+
+export const fullFunctionCatalog = applyConfirmedNavigationStructure(
+  withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog]),
+);
+
+export const filterFunctionCatalogByAudience = (audience: FunctionAudience) =>
+  fullFunctionCatalog.filter((module) => !module.audiences || module.audiences.includes(audience));
+
+export const getRuntimeFunctionCatalog = (audience: FunctionAudience) =>
+  import.meta.env.PROD ? filterFunctionCatalogByAudience(audience) : fullFunctionCatalog;
 
 export const terminalFunctionTrees: Record<TerminalType, FunctionModule[]> = {
-  store: fullFunctionCatalog,
-  supplier: fullFunctionCatalog,
+  store: getRuntimeFunctionCatalog('store'),
+  supplier: getRuntimeFunctionCatalog('supplier'),
 };
 
 export const getFunctionModulePermissionValues = (module?: FunctionModule) =>
@@ -583,7 +660,35 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
 };
 
 export const normalizeTerminalPermissions = (_terminal: TerminalType, permissions: string[]) =>
-  normalizeFunctionCatalogPermissions(fullFunctionCatalog, permissions).filter((permission) => permission !== 'all');
+  normalizeFunctionCatalogPermissions(terminalFunctionTrees[_terminal], permissions).filter(
+    (permission) => permission !== 'all',
+  );
+
+export const filterFunctionCatalogByPermissions = (
+  modules: FunctionModule[],
+  permissions: string[],
+): FunctionModule[] => {
+  const allowed = new Set(normalizeFunctionCatalogPermissions(modules, permissions));
+  return modules
+    .map((module) => ({
+      ...module,
+      menus: module.menus
+        .map((menu) => ({
+          ...menu,
+          pages: menu.pages
+            .map((page) => ({
+              ...page,
+              actions: page.actions.filter((action) => allowed.has(action.value)),
+              tabs: page.tabs
+                .map((tab) => ({ ...tab, actions: tab.actions.filter((action) => allowed.has(action.value)) }))
+                .filter((tab) => tab.actions.length),
+            }))
+            .filter((page) => page.actions.length || page.tabs.length),
+        }))
+        .filter((menu) => menu.pages.length),
+    }))
+    .filter((module) => module.menus.length);
+};
 
 export const initialAllocationValues: Record<TerminalType, string[]> = {
   store: [],

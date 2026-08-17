@@ -1,6 +1,7 @@
 package com.zdm.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
@@ -1199,6 +1200,209 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void storeLevelMigrationCrudOptionsAndReferencesWork() throws Exception {
+    Integer tableCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'store_levels'",
+        Integer.class);
+    Integer columnCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'stores' AND column_name = 'store_level_id'",
+        Integer.class);
+    assertThat(tableCount).isEqualTo(1);
+    assertThat(columnCount).isEqualTo(1);
+
+    Long referencedLevelId = jdbcTemplate.queryForObject(
+        "SELECT id FROM store_levels WHERE name = '1级'", Long.class);
+    mockMvc.perform(delete("/api/admin/store-levels/{id}", referencedLevelId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该店铺级别已被门店引用，不能删除，请先停用该店铺级别"));
+
+    MvcResult createdResult = mockMvc.perform(post("/api/admin/store-levels")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"name\":\"4级\",\"status\":\"enabled\",\"remark\":\"新增\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.code").doesNotExist())
+        .andExpect(jsonPath("$.data.name").value("4级"))
+        .andExpect(jsonPath("$.data.createdByName").value("超级管理员"))
+        .andReturn();
+    String levelId = com.jayway.jsonpath.JsonPath.read(
+        createdResult.getResponse().getContentAsString(), "$.data.id").toString();
+    try {
+      mockMvc.perform(get("/api/admin/stores/level-options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].name", hasItem("4级")));
+
+      mockMvc.perform(put("/api/admin/store-levels/{id}", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"name\":\"四级门店\",\"status\":\"disabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.code").doesNotExist())
+          .andExpect(jsonPath("$.data.name").value("四级门店"))
+          .andExpect(jsonPath("$.data.status").value("enabled"));
+
+      mockMvc.perform(patch("/api/admin/store-levels/{id}/status", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("disabled"));
+
+      mockMvc.perform(get("/api/admin/stores/level-options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].name", not(hasItem("四级门店"))));
+
+      mockMvc.perform(post("/api/admin/stores")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"tenantId\":1,\"name\":\"停用级别门店\",\"type\":\"cityPartner\",\"storeLevelId\":" + levelId + ",\"status\":\"enabled\"}"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("店铺级别已停用"));
+
+      mockMvc.perform(post("/api/admin/stores")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"tenantId\":1,\"name\":\"无效级别门店\",\"type\":\"cityPartner\",\"storeLevelId\":999999,\"status\":\"enabled\"}"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("店铺级别不存在"));
+
+      mockMvc.perform(delete("/api/admin/store-levels/{id}", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+    } finally {
+      jdbcTemplate.update("DELETE FROM store_levels WHERE id = ?", Long.valueOf(levelId));
+    }
+  }
+
+  @Test
+  void storeLevelOperationsRequireTheirOwnPermissions() throws Exception {
+    long accountId = 99086L;
+    long employeeId = 99086L;
+    long roleId = 99086L;
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId, "15926629086", "店铺级别只读操作员");
+    jdbcTemplate.update(
+        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '店铺级别只读操作员', '15926629086', 'enabled', 'self', '韩健')",
+        employeeId, accountId);
+    jdbcTemplate.update(
+        "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
+        accountId, employeeId);
+    jdbcTemplate.update(
+        "INSERT INTO roles (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name) VALUES (?, '店铺级别只读角色', 'STORE_LEVEL_VIEW_TEST', 'operation-platform', 'admin', 'self', 'enabled', 'admin.tenant.store-level-management.view', '集成测试')",
+        roleId);
+    jdbcTemplate.update(
+        "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
+        accountId, roleId);
+
+    try {
+      String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      mockMvc.perform(get("/api/admin/store-levels").header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk());
+      mockMvc.perform(post("/api/admin/store-levels")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"越权级别\",\"status\":\"enabled\"}"))
+          .andExpect(status().isForbidden());
+
+      jdbcTemplate.update(
+          "UPDATE roles SET function_permissions = ? WHERE id = ?",
+          "admin.tenant.store-level-management.view,"
+              + "admin.tenant.store-level-management.create,"
+              + "admin.tenant.store-level-management.edit,"
+              + "admin.tenant.store-level-management.toggle-status,"
+              + "admin.tenant.store-level-management.delete",
+          roleId);
+      MvcResult createdResult = mockMvc.perform(post("/api/admin/store-levels")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"本人创建的店铺级别\",\"status\":\"enabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.createdByName").value("店铺级别只读操作员"))
+          .andReturn();
+      String createdLevelId = com.jayway.jsonpath.JsonPath.read(
+          createdResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+      mockMvc.perform(put("/api/admin/store-levels/{id}", createdLevelId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"本人创建的店铺级别-已编辑\",\"status\":\"enabled\"}"))
+          .andExpect(status().isOk());
+      mockMvc.perform(put("/api/admin/store-levels/{id}", 1)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"name\":\"越权修改其他人的级别\",\"status\":\"enabled\"}"))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.message").value("当前数据权限不允许操作该店铺级别"));
+      mockMvc.perform(delete("/api/admin/store-levels/{id}", createdLevelId)
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+    } finally {
+      jdbcTemplate.update("DELETE FROM store_levels WHERE name LIKE '本人创建的店铺级别%'");
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+  }
+
+  @Test
+  void referencedStoreCannotBeDeletedAndReturnsActionableMessage() throws Exception {
+    mockMvc.perform(get("/api/admin/stores/{id}/deletion-references", 1)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.totalCount").value(greaterThanOrEqualTo(1)))
+        .andExpect(jsonPath("$.data.references[?(@.code == 'employees')].name").value(hasItem("员工")))
+        .andExpect(jsonPath("$.data.references[0].examples[0]").isString());
+
+    mockMvc.perform(delete("/api/admin/stores/{id}", 1)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(containsString("该门店存在关联数据，不能删除")))
+        .andExpect(jsonPath("$.message").value(containsString("员工")));
+
+    Integer storeCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM stores WHERE id = 1",
+        Integer.class);
+    assertThat(storeCount).isEqualTo(1);
+  }
+
+  @Test
+  void unreferencedStoreCanBeDeleted() throws Exception {
+    long storeId = 99087L;
+    long categoryId = 99087L;
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, status, created_by) VALUES (?, 1, '无关联测试门店', 'cityPartner', 'disabled', '韩健')",
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO store_categories (id, store_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, '门店删除级联分类', 1, 0, 'enabled', '韩健')",
+        categoryId,
+        storeId);
+
+    mockMvc.perform(get("/api/admin/stores/{id}/deletion-references", storeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.totalCount").value(0))
+        .andExpect(jsonPath("$.data.references").isEmpty());
+
+    mockMvc.perform(delete("/api/admin/stores/{id}", storeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
+
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM stores WHERE id = ?", Integer.class, storeId)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM store_categories WHERE id = ?", Integer.class, categoryId)).isZero();
+  }
+
+  @Test
   void slabGradeMigrationCrudAndValidationWork() throws Exception {
     Integer gradeTableCount = jdbcTemplate.queryForObject(
         """
@@ -1559,7 +1763,6 @@ class PlatformApiSmokeTest {
             .content("""
                 {
                   "name":" 潘多拉 ",
-                  "code":"duplicate-pandora",
                   "status":"enabled"
                 }
                 """))
@@ -1573,10 +1776,9 @@ class PlatformApiSmokeTest {
             .content("""
                 {
                   "name":"%s",
-                  "code":"duplicate-edit-test-%d",
                   "status":"enabled"
                 }
-                """.formatted(varietyName, System.nanoTime())))
+                """.formatted(varietyName)))
         .andExpect(status().isOk())
         .andReturn();
     String varietyId = com.jayway.jsonpath.JsonPath.read(
@@ -1590,10 +1792,9 @@ class PlatformApiSmokeTest {
             .content("""
                 {
                   "name":"潘多拉",
-                  "code":"duplicate-edit-test-%d",
                   "status":"enabled"
                 }
-                """.formatted(System.nanoTime())))
+                """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("品种名称已存在"));
 
@@ -1622,11 +1823,10 @@ class PlatformApiSmokeTest {
             .content("""
                 {
                   "name":"%s",
-                  "code":"creator-test-%d",
                   "status":"enabled",
                   "createdByName":"不应覆盖"
                 }
-                """.formatted(varietyName, System.nanoTime())))
+                """.formatted(varietyName)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.createdByName").value(creatorName))
         .andReturn();
@@ -1641,11 +1841,10 @@ class PlatformApiSmokeTest {
             .content("""
                 {
                   "name":"%s-已编辑",
-                  "code":"creator-test-updated-%d",
                   "status":"disabled",
                   "createdByName":"不应覆盖"
                 }
-                """.formatted(varietyName, System.nanoTime())))
+                """.formatted(varietyName)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.createdByName").value(creatorName))
         .andExpect(jsonPath("$.data.status").value("enabled"));
@@ -1714,10 +1913,10 @@ class PlatformApiSmokeTest {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO slab_varieties (id, name, code, status, created_by_name)
+        INSERT INTO slab_varieties (id, name, status, created_by_name)
         VALUES
-          (9031, '本人创建的大板品种', 'self-owned-variety', 'enabled', '大板品种自有操作员'),
-          (9032, '他人创建的大板品种', 'other-owned-variety', 'enabled', '韩健')
+          (9031, '本人创建的大板品种', 'enabled', '大板品种自有操作员'),
+          (9032, '他人创建的大板品种', 'enabled', '韩健')
         """);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
@@ -1732,7 +1931,6 @@ class PlatformApiSmokeTest {
             .content("""
                 {
                   "name":"本人新增的大板品种",
-                  "code":"self-created-variety",
                   "status":"enabled"
                 }
                 """))
@@ -1750,7 +1948,6 @@ class PlatformApiSmokeTest {
             .content("""
                 {
                   "name":"越权编辑的大板品种",
-                  "code":"other-owned-variety",
                   "status":"enabled"
                 }
                 """))
@@ -1815,8 +2012,8 @@ class PlatformApiSmokeTest {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO slab_varieties (id, name, code, status, created_by_name)
-        VALUES (9011, '权限集成测试品种', 'permission-test-variety', 'enabled', '集成测试')
+        INSERT INTO slab_varieties (id, name, status, created_by_name)
+        VALUES (9011, '权限集成测试品种', 'enabled', '集成测试')
         """);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
@@ -1826,14 +2023,14 @@ class PlatformApiSmokeTest {
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("""
-                {"name":"无权新增品种","code":"forbidden-create","status":"enabled"}
+                {"name":"无权新增品种","status":"enabled"}
                 """))
         .andExpect(status().isForbidden());
     mockMvc.perform(put("/api/admin/slab-varieties/9011")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("""
-                {"name":"权限集成测试品种-已编辑","code":"permission-test-variety","status":"disabled"}
+                {"name":"权限集成测试品种-已编辑","status":"disabled"}
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.name").value("权限集成测试品种-已编辑"))
@@ -2781,6 +2978,75 @@ class PlatformApiSmokeTest {
 
     assertThat(createdByAccountId).isEqualTo(accountId);
     assertThat(createdByName).isEqualTo("邀请创建员");
+  }
+
+  @Test
+  void employeeInviteUsesCurrentIdentityStoreScope() throws Exception {
+    long storeId = 9052L;
+    long accountId = 9052L;
+    long employeeId = 9052L;
+    long roleId = 9052L;
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, status, created_by) VALUES (?, 1, '邀请作用域测试门店', 'cityPartner', 'enabled', '集成测试')",
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, '15926629052', '跨门店邀请创建员', 'enabled')",
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
+           data_permission, created_by_name)
+        VALUES (?, ?, 1, ?, '跨门店邀请创建员', '15926629052', 'enabled', ?, 'all', '集成测试')
+        """,
+        employeeId,
+        accountId,
+        storeId,
+        String.valueOf(roleId));
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, ?, 'enabled')
+        """,
+        accountId,
+        employeeId,
+        storeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (id, name, code, category, client_code, store_id, data_scope, status,
+           function_permissions, created_by_name)
+        VALUES (?, '跨门店邀请测试角色', 'EMPLOYEE_INVITE_SCOPE_TEST', 'operation-platform',
+          'admin', ?, 'all', 'enabled',
+          'admin.permission-management.employee-management.create', '集成测试')
+        """,
+        roleId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, ?)",
+        accountId,
+        roleId,
+        storeId);
+
+    try {
+      mockMvc.perform(post("/api/admin/employee-invites")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+          .andExpect(status().isOk());
+
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_id FROM employee_invites WHERE created_by_account_id = ? ORDER BY id DESC LIMIT 1",
+          Long.class,
+          accountId)).isEqualTo(storeId);
+    } finally {
+      jdbcTemplate.update("DELETE FROM employee_invites WHERE created_by_account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM stores WHERE id = ?", storeId);
+    }
   }
 
   @Test

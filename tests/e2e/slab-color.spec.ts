@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 test('manages colors and their categories from one menu page', async ({ page }) => {
   await page.goto('/slab-color');
   const main = page.getByRole('main');
-  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
+  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据' });
 
   await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText([
     '品种管理',
@@ -33,7 +33,7 @@ test('manages colors and their categories from one menu page', async ({ page }) 
     '等级管理',
   ]);
   await expect(page.locator('[data-menu-path="/slab-color"]')).toBeVisible();
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品基础数据中心.*大板基础数据管理.*色系管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*色系管理/);
   await expect(main.getByText('奶白', { exact: true })).toBeVisible();
   await expect(main.locator('tbody tr').filter({ hasText: '奶白' })).toContainText('白色系');
 
@@ -74,7 +74,7 @@ test('hides color operations and category configuration without operation permis
   );
   await page.goto('/slab-color');
   const main = page.getByRole('main');
-  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
+  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据' });
 
   await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText(['色系管理']);
   await expect(main.getByText('奶白', { exact: true })).toBeVisible();

@@ -9,8 +9,9 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-              <t-breadcrumb-item>成品现货工艺管理</t-breadcrumb-item>
+              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
+              <t-breadcrumb-item>成品现货基础数据</t-breadcrumb-item>
+              <t-breadcrumb-item>工艺管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
           <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>

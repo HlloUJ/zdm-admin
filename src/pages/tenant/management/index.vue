@@ -9,7 +9,7 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>租户管理</t-breadcrumb-item>
+              <t-breadcrumb-item>租户与门店</t-breadcrumb-item>
               <t-breadcrumb-item>租户管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>

@@ -1,16 +1,14 @@
-package com.zdm.platform.inventory;
+package com.zdm.platform.store;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
-@TableName("slab_varieties")
-public class SlabVariety extends BaseEntity {
+@TableName("store_levels")
+public class StoreLevel extends BaseEntity {
   @NotBlank
   private String name;
 
-  private Long originId;
-  private String color;
   private String createdByName;
   private String remark;
 
@@ -20,22 +18,6 @@ public class SlabVariety extends BaseEntity {
 
   public void setName(String name) {
     this.name = name;
-  }
-
-  public Long getOriginId() {
-    return originId;
-  }
-
-  public void setOriginId(Long originId) {
-    this.originId = originId;
-  }
-
-  public String getColor() {
-    return color;
-  }
-
-  public void setColor(String color) {
-    this.color = color;
   }
 
   public String getCreatedByName() {
