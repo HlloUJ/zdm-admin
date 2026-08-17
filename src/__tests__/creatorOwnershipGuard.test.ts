@@ -11,7 +11,7 @@ describe('requireCreatorOwnership', () => {
       name: '张飞',
       phone: '15900000001',
       roles: ['ADMIN'],
-      permissions: ['all'],
+      permissions: ['admin.product-data-center.attribute.shared.edit'],
       dataPermission: 'self',
     });
     vi.restoreAllMocks();
@@ -26,6 +26,21 @@ describe('requireCreatorOwnership', () => {
 
     expect(requireCreatorOwnership({ createdByAccountId: 4, createdByName: '貂蝉' })).toBe(false);
     expect(warning).toHaveBeenCalledWith(CREATOR_OWNERSHIP_MESSAGE);
+  });
+
+  it('超级管理员可操作其他用户添加的数据', () => {
+    setLoginUser({
+      id: 1,
+      name: '超级管理员',
+      phone: '15926626945',
+      roles: ['SUPER_ADMIN'],
+      permissions: ['all'],
+      dataPermission: 'all',
+    });
+    const warning = vi.spyOn(adminFeedback, 'warning').mockImplementation(() => Promise.resolve(undefined as never));
+
+    expect(requireCreatorOwnership({ createdByAccountId: 4, createdByName: '貂蝉' })).toBe(true);
+    expect(warning).not.toHaveBeenCalled();
   });
 
   it('历史数据缺少账号 ID 时按创建人姓名兼容', () => {

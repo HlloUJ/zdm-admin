@@ -20,6 +20,9 @@ public class CreatorOwnershipGuard {
 
   public void requireCreator(Long createdByAccountId, String createdByName) {
     CurrentIdentity identity = identityProvider.require();
+    if (identity.isSuperAdmin()) {
+      return;
+    }
     boolean ownsData = createdByAccountId != null
         ? Objects.equals(createdByAccountId, identity.accountId())
         : Objects.equals(createdByName, identity.displayName());
