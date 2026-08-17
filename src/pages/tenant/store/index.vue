@@ -377,7 +377,7 @@ const shopTypeLabel = (type: ShopType) => shopTypeOptions.find((item) => item.va
 const shopLevelLabel = (levelId: number) =>
   shopLevelOptions.value.find((item) => item.value === levelId)?.label ?? `级别#${levelId}`;
 const referenceExampleText = (item: StoreReferenceItem) => {
-  const suffix = item.count > item.examples.length ? '等' : '';
+  const suffix = item.code !== 'employeeInvites' && item.count > item.examples.length ? '等' : '';
   return `${item.examples.join('、')}${suffix}`;
 };
 
