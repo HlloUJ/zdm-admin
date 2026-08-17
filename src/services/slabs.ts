@@ -6,6 +6,9 @@ export interface SlabRecord {
   id: number;
   supplierId?: number;
   varietyId?: number;
+  textureId?: number;
+  colorId?: number;
+  gradeId?: number;
   name: string;
   serialNo: string;
   warehouse?: string;
@@ -24,6 +27,9 @@ export interface SlabRecord {
 export interface SlabPayload {
   supplierId?: number;
   varietyId?: number;
+  textureId?: number;
+  colorId?: number;
+  gradeId?: number;
   name: string;
   serialNo: string;
   warehouse?: string;
@@ -37,8 +43,29 @@ export interface SlabPayload {
   status: SlabStatus;
 }
 
+export interface SlabPublishOption {
+  id: number;
+  label: string;
+  description?: string;
+  status: 'enabled' | 'disabled';
+}
+
+export interface SlabPublishColorCategoryOption extends SlabPublishOption {
+  children: SlabPublishOption[];
+}
+
+export interface SlabPublishOptions {
+  textures: SlabPublishOption[];
+  colorCategories: SlabPublishColorCategoryOption[];
+  grades: SlabPublishOption[];
+}
+
 export function listSlabs() {
   return request<SlabRecord[]>('/admin/slabs');
+}
+
+export function getSlabPublishOptions() {
+  return request<SlabPublishOptions>('/admin/slabs/publish-options');
 }
 
 export function createSlab(payload: SlabPayload) {
