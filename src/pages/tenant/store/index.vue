@@ -9,7 +9,7 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>租户管理</t-breadcrumb-item>
+              <t-breadcrumb-item>租户与门店</t-breadcrumb-item>
               <t-breadcrumb-item>门店管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
@@ -77,9 +77,9 @@
                 {{ shopTypeLabel(row.shopType) }}
               </t-tag>
             </template>
-            <template #shopLevel="{ row }">
+            <template #storeLevelId="{ row }">
               <div class="level-cell">
-                <span>{{ shopLevelLabel(row.shopLevel) }}</span>
+                <span>{{ shopLevelLabel(row.storeLevelId) }}</span>
                 <t-button
                   class="level-edit-button"
                   shape="square"
@@ -173,8 +173,8 @@
         <t-form-item label="详细地址" name="detailAddress" required-mark>
           <t-input v-model="formData.detailAddress" clearable placeholder="请输入" />
         </t-form-item>
-        <t-form-item v-if="dialogMode === 'create'" label="店铺级别" name="shopLevel" required-mark>
-          <t-select v-model="formData.shopLevel" clearable placeholder="请选择">
+        <t-form-item v-if="dialogMode === 'create'" label="店铺级别" name="storeLevelId" required-mark>
+          <t-select v-model="formData.storeLevelId" clearable filterable placeholder="请选择">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
@@ -201,8 +201,8 @@
       @close="closeLevelDialog"
     >
       <t-form ref="levelFormRef" :data="levelFormData" :rules="levelFormRules" label-width="96px" colon>
-        <t-form-item label="店铺级别" name="shopLevel" required-mark>
-          <t-select v-model="levelFormData.shopLevel" clearable placeholder="请选择">
+        <t-form-item label="店铺级别" name="storeLevelId" required-mark>
+          <t-select v-model="levelFormData.storeLevelId" clearable filterable placeholder="请选择">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
@@ -212,13 +212,25 @@
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
       :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
+      :mode="confirmState.type === 'delete' && (confirmState.references?.totalCount ?? 0) > 0 ? 'blocked' : 'confirm'"
       object-type="店铺"
       :object-name="confirmState.row?.shopName"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
       @close="closeConfirmDialog"
     >
-      {{ confirmState.content }}
+      <template v-if="confirmState.type === 'delete' && (confirmState.references?.totalCount ?? 0) > 0">
+        <p>该店铺存在以下关联数据，暂时不能删除：</p>
+        <ul>
+          <li v-for="item in confirmState.references?.references" :key="item.code">
+            {{ item.name }} {{ item.count }} 条<span v-if="item.examples.length"
+              >：{{ referenceExampleText(item) }}</span
+            >
+          </li>
+        </ul>
+        <p>请先处理关联数据；如果只是停止使用该店铺，建议执行“停用”。</p>
+      </template>
+      <template v-else>{{ confirmState.content }}</template>
     </AdminConfirmDialog>
   </div>
 </template>
@@ -233,15 +245,18 @@ import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components
 import {
   createStore,
   deleteStore,
+  getStoreDeletionReferences,
   listStores,
   updateStore,
   type StorePayload,
   type StoreRecord,
+  type StoreReferenceItem,
+  type StoreReferenceSummary,
 } from '@/services/stores';
 import { listTenants, type TenantRecord } from '@/services/tenants';
+import { listStoreLevelOptions, type StoreLevelRecord } from '@/services/storeLevels';
 
 type ShopType = 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
-type ShopLevel = 'level1' | 'level2' | 'level3';
 type StoreStatus = 'normal' | 'disabled';
 type ConfirmType = 'enable' | 'disable' | 'delete';
 
@@ -255,7 +270,7 @@ interface StoreItem {
   id: number;
   shopName: string;
   shopType: ShopType;
-  shopLevel: ShopLevel;
+  storeLevelId: number;
   manager: string;
   region: string;
   detailAddress: string;
@@ -273,7 +288,7 @@ interface StoreForm {
   shopName: string;
   region: string;
   detailAddress: string;
-  shopLevel: ShopLevel | '';
+  storeLevelId: number | undefined;
   remark: string;
 }
 
@@ -284,11 +299,8 @@ const shopTypeOptions: { label: string; value: ShopType }[] = [
   { label: '工厂', value: 'factory' },
 ];
 
-const shopLevelOptions: { label: string; value: ShopLevel }[] = [
-  { label: '1级', value: 'level1' },
-  { label: '2级', value: 'level2' },
-  { label: '3级', value: 'level3' },
-];
+const storeLevelRecords = ref<StoreLevelRecord[]>([]);
+const shopLevelOptions = computed(() => storeLevelRecords.value.map((item) => ({ label: item.name, value: item.id })));
 
 const tenantOptions = ref<TenantOption[]>([]);
 
@@ -362,7 +374,12 @@ const regionOptions = [
 ];
 
 const shopTypeLabel = (type: ShopType) => shopTypeOptions.find((item) => item.value === type)?.label ?? '';
-const shopLevelLabel = (level: ShopLevel) => shopLevelOptions.find((item) => item.value === level)?.label ?? '';
+const shopLevelLabel = (levelId: number) =>
+  shopLevelOptions.value.find((item) => item.value === levelId)?.label ?? `级别#${levelId}`;
+const referenceExampleText = (item: StoreReferenceItem) => {
+  const suffix = item.code !== 'employeeInvites' && item.count > item.examples.length ? '等' : '';
+  return `${item.examples.join('、')}${suffix}`;
+};
 
 const regionLabel = (value: string) => {
   for (const province of regionOptions) {
@@ -381,7 +398,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'shopName', title: '店铺名称', minWidth: 180, align: 'left' },
   { colKey: 'shopType', title: '店铺类型', width: 130, align: 'center' },
-  { colKey: 'shopLevel', title: '店铺级别', width: 140, align: 'center' },
+  { colKey: 'storeLevelId', title: '店铺级别', width: 140, align: 'center' },
   { colKey: 'manager', title: '店长', width: 110, align: 'center' },
   { colKey: 'address', title: '门店地址', minWidth: 260, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', width: 120, align: 'center' },
@@ -415,7 +432,7 @@ const formData = reactive<StoreForm>({
   shopName: '',
   region: '',
   detailAddress: '',
-  shopLevel: '',
+  storeLevelId: undefined,
   remark: '',
 });
 
@@ -425,7 +442,7 @@ const formRules: Record<string, FormRule[]> = {
   shopName: [{ required: true, message: '请输入店铺名称', type: 'error' }],
   region: [{ required: true, message: '请选择门店地址', type: 'error' }],
   detailAddress: [{ required: true, message: '请输入详细地址', type: 'error' }],
-  shopLevel: [{ required: true, message: '请选择店铺级别', type: 'error' }],
+  storeLevelId: [{ required: true, message: '请选择店铺级别', type: 'error' }],
   remark: [{ max: 100, message: '备注最多可输入100个字符', type: 'error' }],
 };
 
@@ -433,19 +450,21 @@ const levelFormRef = ref<FormInstanceFunctions>();
 const levelDialogVisible = ref(false);
 const levelEditingId = ref<number | null>(null);
 const levelFormData = reactive({
-  shopLevel: '' as ShopLevel | '',
+  storeLevelId: undefined as number | undefined,
 });
 const levelFormRules: Record<string, FormRule[]> = {
-  shopLevel: [{ required: true, message: '请选择店铺级别', type: 'error' }],
+  storeLevelId: [{ required: true, message: '请选择店铺级别', type: 'error' }],
 };
 
 const confirmDialogVisible = ref(false);
 const confirmState = reactive<{
   content: string;
+  references: StoreReferenceSummary | null;
   type: ConfirmType;
   row: StoreItem | null;
 }>({
   content: '',
+  references: null,
   type: 'disable',
   row: null,
 });
@@ -500,9 +519,6 @@ const toTenantOption = (record: TenantRecord): TenantOption => ({
 const normalizeShopType = (value: string): ShopType =>
   shopTypeOptions.some((item) => item.value === value) ? (value as ShopType) : 'cityPartner';
 
-const normalizeShopLevel = (value?: string): ShopLevel =>
-  shopLevelOptions.some((item) => item.value === value) ? (value as ShopLevel) : 'level1';
-
 const toStoreItem = (record: StoreRecord): StoreItem => {
   const tenant = tenantOptions.value.find((item) => item.id === record.tenantId);
   const detailAddress = record.detailAddress ?? record.address ?? '';
@@ -511,7 +527,7 @@ const toStoreItem = (record: StoreRecord): StoreItem => {
     id: record.id,
     shopName: record.name,
     shopType: normalizeShopType(record.type),
-    shopLevel: normalizeShopLevel(record.shopLevel),
+    storeLevelId: record.storeLevelId ?? 0,
     manager: record.manager ?? '',
     region: record.region ?? '',
     detailAddress,
@@ -524,7 +540,7 @@ const toStoreItem = (record: StoreRecord): StoreItem => {
   };
 };
 
-const toStorePayload = (status: StoreStatus, shopLevel: ShopLevel, manager = ''): StorePayload => {
+const toStorePayload = (status: StoreStatus, storeLevelId: number, manager = ''): StorePayload => {
   const tenant = selectedTenant.value;
   if (!tenant || !formData.shopType) {
     throw new Error('请选择租户和店铺类型');
@@ -535,7 +551,7 @@ const toStorePayload = (status: StoreStatus, shopLevel: ShopLevel, manager = '')
     tenantId: tenant.id,
     name: formData.shopName.trim(),
     type: formData.shopType,
-    shopLevel,
+    storeLevelId,
     manager,
     region: formData.region,
     detailAddress,
@@ -555,7 +571,7 @@ const toStorePayloadFromItem = (item: StoreItem): StorePayload => {
     tenantId: tenant.id,
     name: item.shopName,
     type: item.shopType,
-    shopLevel: item.shopLevel,
+    storeLevelId: item.storeLevelId,
     manager: item.manager,
     region: item.region,
     detailAddress: item.detailAddress,
@@ -569,8 +585,9 @@ const toStorePayloadFromItem = (item: StoreItem): StorePayload => {
 const loadStorePage = async () => {
   loading.value = true;
   try {
-    const [tenants, stores] = await Promise.all([listTenants(), listStores()]);
+    const [tenants, levels, stores] = await Promise.all([listTenants(), listStoreLevelOptions(), listStores()]);
     tenantOptions.value = tenants.map(toTenantOption);
+    storeLevelRecords.value = levels;
     tableData.value = stores.map(toStoreItem);
     ensureCurrentPage();
   } catch (error) {
@@ -586,7 +603,7 @@ const resetFormData = () => {
   formData.shopName = '';
   formData.region = '';
   formData.detailAddress = '';
-  formData.shopLevel = '';
+  formData.storeLevelId = undefined;
   formData.remark = '';
 };
 
@@ -596,7 +613,7 @@ const fillFormData = (row: StoreItem) => {
   formData.shopName = row.shopName;
   formData.region = row.region;
   formData.detailAddress = row.detailAddress;
-  formData.shopLevel = row.shopLevel;
+  formData.storeLevelId = row.storeLevelId;
   formData.remark = row.remark ?? '';
 };
 
@@ -652,15 +669,15 @@ const handleSubmit = async () => {
   if (!formData.region) return;
   try {
     if (dialogMode.value === 'create') {
-      if (!formData.shopLevel) return;
-      await createStore(toStorePayload('normal', formData.shopLevel));
+      if (!formData.storeLevelId) return;
+      await createStore(toStorePayload('normal', formData.storeLevelId));
       await loadStorePage();
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
       await updateStore(
         editingId.value,
-        toStorePayload(current?.status ?? 'normal', current?.shopLevel ?? 'level1', current?.manager ?? ''),
+        toStorePayload(current?.status ?? 'normal', current?.storeLevelId ?? 0, current?.manager ?? ''),
       );
       await loadStorePage();
     }
@@ -678,7 +695,7 @@ const handleSubmit = async () => {
 
 const openLevelDialog = (row: StoreItem) => {
   levelEditingId.value = row.id;
-  levelFormData.shopLevel = row.shopLevel;
+  levelFormData.storeLevelId = row.storeLevelId;
   levelDialogVisible.value = true;
 };
 
@@ -690,7 +707,7 @@ const closeLevelDialog = () => {
 
 const handleLevelSubmit = async () => {
   const result = await levelFormRef.value?.validate();
-  if (result !== true || !levelFormData.shopLevel) return;
+  if (result !== true || !levelFormData.storeLevelId) return;
 
   const target = tableData.value.find((item) => item.id === levelEditingId.value);
   if (!target) return;
@@ -698,7 +715,7 @@ const handleLevelSubmit = async () => {
   try {
     const updated = await updateStore(
       target.id,
-      toStorePayloadFromItem({ ...target, shopLevel: levelFormData.shopLevel }),
+      toStorePayloadFromItem({ ...target, storeLevelId: levelFormData.storeLevelId }),
     );
     const targetIndex = tableData.value.findIndex((item) => item.id === target.id);
     if (targetIndex !== -1) {
@@ -717,24 +734,38 @@ const openStatusConfirm = (row: StoreItem) => {
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
   confirmState.content = `是否${isNormal ? '停用' : '启用'}店铺“${row.shopName}”？`;
+  confirmState.references = null;
   confirmDialogVisible.value = true;
 };
 
-const openDeleteConfirm = (row: StoreItem) => {
+const openDeleteConfirm = async (row: StoreItem) => {
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除店铺“${row.shopName}”？`;
-  confirmDialogVisible.value = true;
+  confirmState.references = null;
+  try {
+    confirmState.references = await getStoreDeletionReferences(row.id);
+    confirmDialogVisible.value = true;
+  } catch (error) {
+    confirmState.row = null;
+    adminFeedback.error(error instanceof Error ? error.message : '关联数据检查失败');
+  }
 };
 
 const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
   confirmState.row = null;
+  confirmState.references = null;
 };
 
 const handleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
+
+  if (confirmState.type === 'delete' && (confirmState.references?.totalCount ?? 0) > 0) {
+    closeConfirmDialog();
+    return;
+  }
 
   try {
     if (confirmState.type === 'delete') {

@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
 test('manages standard textures and multiple aliases from the third-level menu', async ({ page }) => {
   await page.goto('/slab-texture');
   const main = page.getByRole('main');
-  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
+  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据' });
   await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText([
     '品种管理',
     '产地管理',
@@ -31,7 +31,7 @@ test('manages standard textures and multiple aliases from the third-level menu',
     '等级管理',
   ]);
   await expect(page.locator('[data-menu-path="/slab-texture"]')).toBeVisible();
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品基础数据中心.*大板基础数据管理.*纹理管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*纹理管理/);
   await expect(main.getByText('细纹', { exact: true })).toBeVisible();
   await expect(main.locator('tbody tr').filter({ hasText: '细纹' })).toContainText('1');
 

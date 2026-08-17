@@ -9,8 +9,8 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-              <t-breadcrumb-item>大板基础数据管理</t-breadcrumb-item>
+              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
+              <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
               <t-breadcrumb-item>产地管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>

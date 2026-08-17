@@ -6,7 +6,7 @@
       <AdminSideMenu />
 
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '商品分类管理']" :badge="pageTitle" />
+        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '商品分类管理']" :badge="pageTitle" />
         <t-alert v-if="tipVisible" theme="info" class="page-tip" close-btn @close="tipVisible = false">
           商品分类最多支持 4 级；已关联商品的分类不支持删除；停用后不可用于新商品发布，历史商品保留原分类。
         </t-alert>

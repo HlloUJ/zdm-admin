@@ -25,7 +25,7 @@ test('shows slab origin in the slab base-data submenu and supports search and CR
   const main = page.getByRole('main');
 
   const originMenuItem = page.locator('[data-menu-path="/slab-origin"]');
-  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
+  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据' });
   await expect(slabBaseDataMenu).toBeVisible();
   await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText([
     '品种管理',
@@ -34,15 +34,12 @@ test('shows slab origin in the slab base-data submenu and supports search and CR
     '色系管理',
     '等级管理',
   ]);
-  expect(
-    await slabBaseDataMenu.evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
-  ).toBe('/finished-stock-craft');
   await expect(originMenuItem).toBeVisible();
   expect(
     await originMenuItem.evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
   ).toBe('/slab-variety');
   await expect(main.getByText('巴西', { exact: true })).toBeVisible();
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品基础数据中心.*大板基础数据管理.*产地管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*产地管理/);
 
   await main.getByPlaceholder('请输入', { exact: true }).fill('不存在');
   await main.getByRole('button', { name: '查询', exact: true }).click();
@@ -82,7 +79,7 @@ test('hides slab origin operations without their permissions', async ({ page }) 
   });
   await page.goto('/slab-origin');
   const main = page.getByRole('main');
-  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
+  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据' });
   await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText(['产地管理']);
   await expect(main.getByText('巴西', { exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);

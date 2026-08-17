@@ -4,7 +4,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '属性库管理']" :badge="pageTitle" />
+        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '属性库管理']" :badge="pageTitle" />
         <t-alert theme="info" class="page-tip"
           >属性库仅维护属性定义和值类型；必填及 SKU 规则统一在类目属性模板中配置。</t-alert
         >

@@ -289,11 +289,13 @@ import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   collectFunctionCatalogRows,
-  fullFunctionCatalog,
+  filterFunctionCatalogByPermissions,
+  getRuntimeFunctionCatalog,
   getFunctionCatalogPermissionValues,
   getFunctionModulePermissionValues,
   getRowViewPermissionValue,
   normalizeFunctionCatalogPermissions,
+  terminalFunctionTrees,
   type FunctionCatalogRow,
   type FunctionModule,
 } from '@/services/functionCatalog';
@@ -344,7 +346,12 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'operation', title: '操作', width: '22%', align: 'left' },
 ];
 
-const permissionModules = fullFunctionCatalog;
+const terminalPolicyPermissions = reactive<Record<'store' | 'supplier', string[]>>({ store: [], supplier: [] });
+const permissionModules = computed(() => {
+  if (activeCategory.value === 'operation-platform') return getRuntimeFunctionCatalog('admin');
+  const terminal = activeCategory.value === 'partner-store' ? 'store' : 'supplier';
+  return filterFunctionCatalogByPermissions(terminalFunctionTrees[terminal], terminalPolicyPermissions[terminal]);
+});
 
 const pageSizeOptions = [10, 20, 50];
 const activeCategory = ref<RoleCategory>('operation-platform');
@@ -363,7 +370,7 @@ const { visibleTabs: roleTabs, showTabRail: showRoleTabRail } = usePermissionTab
     hasLegacyRolePagePermission.value ||
     hasPermissionPrefix(loginUser.value, `${rolePagePermissionPrefix}.${tab.value}`),
 });
-const activePermissionModuleValue = ref(permissionModules[0]?.value ?? '');
+const activePermissionModuleValue = ref(permissionModules.value[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
   pageSize: 10,
@@ -371,6 +378,7 @@ const pagination = reactive({
 
 watch(activeCategory, () => {
   pagination.current = 1;
+  activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
 });
 
 const formRef = ref<FormInstanceFunctions>();
@@ -433,7 +441,9 @@ const deleteConfirmText = computed(
     `是否删除角色“${deletingRole.value?.name ?? ''}”？删除后，使用该角色的用户将被清空角色并自动停用账号，无法继续登录。请及时为相关用户重新分配角色。`,
 );
 const activePermissionModule = computed(
-  () => permissionModules.find((module) => module.value === activePermissionModuleValue.value) ?? permissionModules[0],
+  () =>
+    permissionModules.value.find((module) => module.value === activePermissionModuleValue.value) ??
+    permissionModules.value[0],
 );
 const activePermissionRows = computed(() => collectFunctionCatalogRows(activePermissionModule.value));
 
@@ -494,6 +504,12 @@ const loadRoles = async () => {
   loading.value = true;
   try {
     const records = await listRoles();
+    const parsePolicy = (code: string) =>
+      parsePermissions(
+        records.find((record) => record.category === 'terminal-policy' && record.code === code)?.functionPermissions,
+      );
+    terminalPolicyPermissions.store = parsePolicy('TERMINAL_STORE_POLICY');
+    terminalPolicyPermissions.supplier = parsePolicy('TERMINAL_SUPPLIER_POLICY');
     roles.value = sortByCreatedAtDesc(
       records.filter((record) => record.category !== 'terminal-policy' && record.status === 'enabled'),
     ).map(toRoleItem);
@@ -507,7 +523,7 @@ const loadRoles = async () => {
 
 const getModuleActionValues = (module?: FunctionModule) => getFunctionModulePermissionValues(module);
 const getRowActionValues = (row: FunctionCatalogRow) => row.actions.map((action) => action.value);
-const allPermissionValues = getFunctionCatalogPermissionValues(permissionModules);
+const allPermissionValues = computed(() => getFunctionCatalogPermissionValues(permissionModules.value));
 const getSelectedCount = (values: string[]) =>
   values.filter((value) => permissionDraft.functionPermissions.includes(value)).length;
 const getCheckedValue = (checked: unknown) => {
@@ -673,10 +689,10 @@ const openPermissionDialog = (row: RoleItem) => {
     return;
   }
   permissionRole.value = row;
-  activePermissionModuleValue.value = permissionModules[0]?.value ?? '';
+  activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
   permissionDraft.functionPermissions = row.functionPermissions.includes('all')
-    ? [...allPermissionValues]
-    : normalizeFunctionCatalogPermissions(permissionModules, row.functionPermissions);
+    ? [...allPermissionValues.value]
+    : normalizeFunctionCatalogPermissions(permissionModules.value, row.functionPermissions);
   permissionDialogVisible.value = true;
 };
 
@@ -687,7 +703,7 @@ const closePermissionDialog = () => {
 };
 
 const selectAllPermissions = () => {
-  permissionDraft.functionPermissions = [...allPermissionValues];
+  permissionDraft.functionPermissions = [...allPermissionValues.value];
 };
 
 const clearAllPermissions = () => {
@@ -696,7 +712,7 @@ const clearAllPermissions = () => {
 
 const handlePermissionSave = async () => {
   if (!permissionRole.value) return;
-  if (!permissionModules.length) {
+  if (!permissionModules.value.length) {
     adminFeedback.warning('全量功能目录暂未发布，无法保存功能权限');
     return;
   }

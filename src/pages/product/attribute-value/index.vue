@@ -4,7 +4,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '属性值管理']" badge="标准属性值库" />
+        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '属性值管理']" badge="标准属性值库" />
         <t-alert theme="info" class="page-tip"
           >用于维护各属性的可选值。适用于枚举 / 下拉类型属性；停用后不再允许新商品选择。</t-alert
         >
