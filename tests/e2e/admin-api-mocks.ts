@@ -242,6 +242,18 @@ const storeCategories = [
 
 const productAttributes = [
   {
+    id: 4,
+    scope: 'shared',
+    name: 'E2E 共享属性',
+    valueType: 'select',
+    attributeRole: 'basic',
+    templateCount: 0,
+    status: 'enabled',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-08-04T09:30:00',
+  },
+  {
     id: 1,
     scope: 'shared',
     name: 'E2E 全局共享属性',
@@ -277,6 +289,18 @@ const productAttributes = [
 ];
 
 const productAttributeValues = [
+  {
+    id: 4,
+    attributeId: 4,
+    scope: 'shared',
+    value: 'E2E 共享属性值',
+    code: 'e2e-owned-shared-value',
+    useCount: 0,
+    status: 'enabled',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-08-04T10:30:00',
+  },
   {
     id: 1,
     attributeId: 1,

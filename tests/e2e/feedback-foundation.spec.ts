@@ -35,11 +35,11 @@ async function expectUnifiedConfirmDialog(page: Page, options: { action: string;
 
 test('uses the same action-specific confirmation foundation across modules', async ({ page }) => {
   await page.goto('/product-attribute');
-  const attributeRow = page.locator('tbody tr').filter({ hasText: 'E2E 全局共享属性' });
+  const attributeRow = page.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
   await attributeRow.getByText('删除', { exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
     action: '删除',
-    content: '是否删除属性“E2E 全局共享属性”？',
+    content: '是否删除属性“E2E 共享属性”？',
     danger: true,
   });
   await page.getByRole('button', { name: '取消', exact: true }).click();
@@ -207,8 +207,8 @@ test('shows object-specific success copy in craft, slab variety, attribute, and 
   const cases = [
     { path: '/finished-stock-craft', target: 'E2E 边工艺' },
     { path: '/slab-variety', target: '潘多拉' },
-    { path: '/product-attribute', target: 'E2E 全局共享属性' },
-    { path: '/product-attribute-value', target: 'E2E 全局共享属性值' },
+    { path: '/product-attribute', target: 'E2E 共享属性' },
+    { path: '/product-attribute-value', target: 'E2E 共享属性值' },
   ];
 
   for (const item of cases) {
@@ -238,8 +238,8 @@ const deletionCases = [
   { path: '/employee-management', target: '测试员工' },
   { path: '/finished-stock-craft', target: 'E2E 边工艺' },
   { path: '/slab-variety', target: '潘多拉' },
-  { path: '/product-attribute', target: 'E2E 共享属性', targetPattern: /E2E (?:全局)?共享属性/ },
-  { path: '/product-attribute-value', target: 'E2E 共享属性值', targetPattern: /E2E (?:全局)?共享属性值/ },
+  { path: '/product-attribute', target: 'E2E 共享属性' },
+  { path: '/product-attribute-value', target: 'E2E 共享属性值' },
 ];
 
 test('shows store reference details instead of sending a failing delete request', async ({ page }) => {
