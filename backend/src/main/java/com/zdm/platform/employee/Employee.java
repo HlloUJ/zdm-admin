@@ -32,6 +32,7 @@ public class Employee {
   private String dataPermission;
   private String remark;
   private String createdByName;
+  private Long createdByAccountId;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -129,6 +130,14 @@ public class Employee {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public LocalDateTime getCreatedAt() {

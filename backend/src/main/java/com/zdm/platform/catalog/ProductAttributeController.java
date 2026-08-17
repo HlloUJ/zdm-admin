@@ -58,7 +58,7 @@ public class ProductAttributeController {
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     ProductAttribute existing = requireAttribute(id);
     requireAttributePermission(existing.getScope(), "delete");
-    return ApiResponse.ok(service.removeById(id));
+    return ApiResponse.ok(service.deleteAttribute(id));
   }
 
   private ProductAttribute requireAttribute(Long id) {

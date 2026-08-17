@@ -139,6 +139,7 @@ import { adminFeedback, AdminConfirmDialog } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
@@ -160,6 +161,7 @@ interface VarietyItem {
   name: string;
   status: VarietyStatus;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
   remark?: string;
 }
@@ -266,6 +268,7 @@ const toVarietyItem = (record: SlabVarietyRecord): VarietyItem => ({
   name: record.name,
   status: normalizeStatus(record.status),
   createdByName: record.createdByName ?? '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
@@ -324,6 +327,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: VarietyItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -363,6 +367,7 @@ const handleSubmit = async () => {
 };
 
 const openStatusConfirm = (row: VarietyItem) => {
+  if (!requireCreatorOwnership(row)) return;
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
@@ -371,6 +376,7 @@ const openStatusConfirm = (row: VarietyItem) => {
 };
 
 const openDeleteConfirm = (row: VarietyItem) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除品种“${row.name}”？`;

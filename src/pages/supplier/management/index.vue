@@ -162,6 +162,7 @@
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
@@ -187,6 +188,7 @@ interface SupplierItem {
   phone: string;
   status: SupplierStatus;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
   remark?: string;
 }
@@ -319,6 +321,7 @@ const toSupplierItem = (record: SupplierRecord): SupplierItem => ({
   phone: record.contactPhone ?? '',
   status: normalizeStatus(record.status),
   createdByName: record.createdByName || '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
@@ -393,6 +396,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: SupplierItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -433,6 +437,7 @@ const handleSubmit = async () => {
 };
 
 const openStatusConfirm = (row: SupplierItem) => {
+  if (!requireCreatorOwnership(row)) return;
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
@@ -441,6 +446,7 @@ const openStatusConfirm = (row: SupplierItem) => {
 };
 
 const openDeleteConfirm = (row: SupplierItem) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除供应商“${row.name}”？`;

@@ -3,6 +3,7 @@ package com.zdm.platform.catalog;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -17,9 +18,13 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   private static final String DUPLICATE_NAME_MESSAGE = "属性名称已存在";
 
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public ProductAttributeService(CurrentIdentityProvider identityProvider) {
+  public ProductAttributeService(
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   public List<ProductAttribute> listWithTemplateCounts(Collection<String> scopes) {
@@ -40,6 +45,7 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
     }
     attribute.setCreatedByName(resolveCreatedByName());
+    attribute.setCreatedByAccountId(ownershipGuard.currentAccountId());
     try {
       save(attribute);
     } catch (DuplicateKeyException exception) {
@@ -50,13 +56,26 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
 
   @Transactional
   public ProductAttribute updateStatus(Long id, String status) {
-    ProductAttribute existing = getById(id);
-    if (existing == null) {
-      throw new IllegalArgumentException("属性不存在或已被删除");
-    }
+    ProductAttribute existing = requireAttribute(id);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
+  }
+
+  @Transactional
+  public boolean deleteAttribute(Long id) {
+    ProductAttribute existing = requireAttribute(id);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
+    return removeById(id);
+  }
+
+  private ProductAttribute requireAttribute(Long id) {
+    ProductAttribute attribute = getById(id);
+    if (attribute == null) {
+      throw new IllegalArgumentException("属性不存在或已被删除");
+    }
+    return attribute;
   }
 
   private String resolveCreatedByName() {

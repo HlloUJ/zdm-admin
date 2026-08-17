@@ -16,6 +16,7 @@ public interface ProductAttributeMapper extends BaseMapper<ProductAttribute> {
         pa.attribute_role,
         pa.status,
         pa.created_by_name,
+        pa.created_by_account_id,
         pa.created_at,
         pa.updated_at,
         COUNT(ca.id) AS template_count
@@ -29,6 +30,7 @@ public interface ProductAttributeMapper extends BaseMapper<ProductAttribute> {
         pa.attribute_role,
         pa.status,
         pa.created_by_name,
+        pa.created_by_account_id,
         pa.created_at,
         pa.updated_at
       ORDER BY pa.created_at DESC, pa.id DESC

@@ -285,6 +285,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
@@ -315,6 +316,7 @@ interface RoleItem {
   status: 'enabled' | 'disabled';
   name: string;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
   remark: string;
   functionPermissions: string[];
@@ -471,6 +473,7 @@ const toRoleItem = (record: RoleRecord): RoleItem => ({
   status: record.status,
   name: record.name,
   createdByName: record.createdByName || '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
   functionPermissions: parsePermissions(record.functionPermissions),
@@ -603,6 +606,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: RoleItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -655,6 +659,7 @@ const handleSubmit = async () => {
 };
 
 const openDeleteConfirm = (row: RoleItem) => {
+  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminRole(row)) {
     adminFeedback.warning('超级管理员角色不可删除');
     return;
@@ -684,6 +689,7 @@ const handleDeleteConfirm = async () => {
 };
 
 const openPermissionDialog = (row: RoleItem) => {
+  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminRole(row)) {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;

@@ -251,6 +251,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
@@ -285,6 +286,7 @@ interface EmployeeItem {
   status: EmployeeStatus;
   remark: string;
   createdByName: string;
+  createdByAccountId?: number;
   registeredAt: string;
   functionPermissions: string[];
   dataPermission: '' | DataPermission;
@@ -497,6 +499,7 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
     status: normalizeStatus(record.status),
     remark: record.remark ?? '',
     createdByName: record.createdByName?.trim() || '-',
+    createdByAccountId: record.createdByAccountId,
     registeredAt: formatDateTime(record.createdAt),
     functionPermissions: expandRolePermissions(roleIds),
     dataPermission: record.dataPermission ?? '',
@@ -582,6 +585,7 @@ const copyInviteLink = async () => {
 };
 
 const openProfileDialog = (row: EmployeeItem) => {
+  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   profileFormData.name = row.name;
   profileFormData.gender = row.gender;
@@ -595,6 +599,7 @@ const closeProfileDialog = () => {
 };
 
 const openPermissionDialog = (row: EmployeeItem) => {
+  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminEmployee(row)) {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
@@ -698,6 +703,7 @@ const validateEmployeeBeforeEnable = (row: EmployeeItem) => {
 };
 
 const openStatusConfirm = (row: EmployeeItem) => {
+  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminEmployee(row)) {
     adminFeedback.warning('超级管理员不可停用或启用');
     return;
@@ -711,6 +717,7 @@ const openStatusConfirm = (row: EmployeeItem) => {
 };
 
 const openDeleteConfirm = (row: EmployeeItem) => {
+  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminEmployee(row)) {
     adminFeedback.warning('超级管理员不可删除');
     return;

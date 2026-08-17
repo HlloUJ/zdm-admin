@@ -19,6 +19,7 @@ public class CategoryAttribute extends BaseEntity {
   private Integer sortOrder;
   private String publishStatus;
   private String createdByName;
+  private Long createdByAccountId;
 
   @TableField(exist = false)
   private Long optionCount;
@@ -85,6 +86,14 @@ public class CategoryAttribute extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public Long getOptionCount() {

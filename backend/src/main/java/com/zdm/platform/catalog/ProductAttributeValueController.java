@@ -73,7 +73,7 @@ public class ProductAttributeValueController {
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     ProductAttributeValue existing = requireValue(id);
     requireValuePermission(existing.getScope(), "delete");
-    return ApiResponse.ok(service.removeById(id));
+    return ApiResponse.ok(service.deleteValue(id));
   }
 
   private List<String> visibleScopes() {

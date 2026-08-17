@@ -3,6 +3,7 @@ package com.zdm.platform.catalog;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -16,9 +17,13 @@ public class ProductAttributeValueService
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
 
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public ProductAttributeValueService(CurrentIdentityProvider identityProvider) {
+  public ProductAttributeValueService(
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   public List<ProductAttributeValue> listWithUseCounts(Collection<String> scopes) {
@@ -35,19 +40,33 @@ public class ProductAttributeValueService
   public ProductAttributeValue createValue(ProductAttributeValue value) {
     value.setId(null);
     value.setCreatedByName(resolveCreatedByName());
+    value.setCreatedByAccountId(ownershipGuard.currentAccountId());
     save(value);
     return getById(value.getId());
   }
 
   @Transactional
   public ProductAttributeValue updateStatus(Long id, String status) {
-    ProductAttributeValue existing = getById(id);
-    if (existing == null) {
-      throw new IllegalArgumentException("属性值不存在或已被删除");
-    }
+    ProductAttributeValue existing = requireValue(id);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
+  }
+
+  @Transactional
+  public boolean deleteValue(Long id) {
+    ProductAttributeValue existing = requireValue(id);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
+    return removeById(id);
+  }
+
+  private ProductAttributeValue requireValue(Long id) {
+    ProductAttributeValue value = getById(id);
+    if (value == null) {
+      throw new IllegalArgumentException("属性值不存在或已被删除");
+    }
+    return value;
   }
 
   private String resolveCreatedByName() {

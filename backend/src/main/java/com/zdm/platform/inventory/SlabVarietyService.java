@@ -4,9 +4,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import java.util.Objects;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,12 +19,15 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
 
   private final SlabInventoryMapper slabInventoryMapper;
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
   public SlabVarietyService(
       SlabInventoryMapper slabInventoryMapper,
-      CurrentIdentityProvider identityProvider) {
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.slabInventoryMapper = slabInventoryMapper;
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -33,6 +35,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     variety.setId(null);
     normalizeAndValidateName(variety, null);
     variety.setCreatedByName(resolveCreatedByName());
+    variety.setCreatedByAccountId(ownershipGuard.currentAccountId());
     save(variety);
     return variety;
   }
@@ -48,6 +51,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateName(payload, id);
     updateById(payload);
     return getById(id);
@@ -94,12 +98,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
   }
 
   private void requireAccessibleVariety(SlabVariety variety) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin()
-        && !"all".equals(identity.dataPermission())
-        && !Objects.equals(variety.getCreatedByName(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该品种");
-    }
+    ownershipGuard.requireCreator(variety.getCreatedByAccountId(), variety.getCreatedByName());
   }
 
   private void normalizeAndValidateName(SlabVariety variety, Long excludedVarietyId) {

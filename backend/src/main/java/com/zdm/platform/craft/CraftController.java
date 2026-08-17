@@ -76,21 +76,18 @@ public class CraftController extends AdminCrudController<Craft> {
       @PathVariable Long id,
       @Valid @RequestBody CraftStatusRequest request) {
     permissionGuard.requireToggleStatus();
-    Craft craft = service.getById(id);
+    Craft craft = service.updateStatus(id, request.status());
     if (craft == null) {
       throw new IllegalArgumentException("工艺不存在");
     }
-
-    craft.setStatus(request.status());
-    service.updateById(craft);
-    return ApiResponse.ok(service.getById(id));
+    return ApiResponse.ok(craft);
   }
 
   @Override
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requireDelete();
-    return ApiResponse.ok(service.removeById(id));
+    return ApiResponse.ok(service.deleteCraft(id));
   }
 
   @ExceptionHandler(DuplicateKeyException.class)

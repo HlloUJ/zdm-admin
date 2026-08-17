@@ -12,6 +12,7 @@ export interface CategoryAttributeRecord {
   publishStatus?: 'published' | 'unpublished';
   optionCount?: number;
   createdByName?: string;
+  createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
 }

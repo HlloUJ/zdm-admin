@@ -18,6 +18,7 @@ public class ProductAttribute extends BaseEntity {
 
   private String attributeRole;
   private String createdByName;
+  private Long createdByAccountId;
 
   @TableField(exist = false)
   private Long templateCount;
@@ -60,6 +61,14 @@ public class ProductAttribute extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public Long getTemplateCount() {

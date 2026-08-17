@@ -11,6 +11,7 @@ export interface CraftRecord {
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdByName?: string;
+  createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -21,6 +21,7 @@ public class ProductAttributeValue extends BaseEntity {
   private String code;
 
   private String createdByName;
+  private Long createdByAccountId;
 
   @TableField(exist = false)
   private Long useCount;
@@ -63,6 +64,14 @@ public class ProductAttributeValue extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public Long getUseCount() {
