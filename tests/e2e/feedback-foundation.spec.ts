@@ -255,10 +255,9 @@ test('shows store reference details instead of sending a failing delete request'
 for (const item of deletionCases) {
   test(`shows 已删除加名称 after deleting ${item.target}`, async ({ page }) => {
     await page.goto(item.path);
-    const row = page.locator('tbody tr').filter({ hasText: item.targetPattern ?? item.target });
-    const targetName = item.targetPattern ? await row.locator('td').first().innerText() : item.target;
+    const row = page.locator('tbody tr').filter({ hasText: item.target });
     await row.getByText('删除', { exact: true }).click();
     await page.getByRole('button', { name: '确认删除', exact: true }).click();
-    await expect(page.getByText(`已删除“${targetName}”`, { exact: true })).toBeVisible();
+    await expect(page.getByText(`已删除“${item.target}”`, { exact: true })).toBeVisible();
   });
 }
