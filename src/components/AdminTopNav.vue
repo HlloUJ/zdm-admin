@@ -51,7 +51,18 @@ const identityContexts = ref<IdentityContext[]>([]);
 const selectedIdentityId = ref<number>();
 const switchingIdentity = ref(false);
 const avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');
-const currentIdentityLabel = computed(() => loginUser.value.storeName ?? loginUser.value.tenantName ?? '运营管理平台');
+const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string> = {
+  cityPartner: '城市合伙人',
+  slabSupplier: '大板供应商',
+  finishedSupplier: '成品供应商',
+  factory: '工厂',
+};
+const formatStoreLabel = (storeName: string, storeType?: IdentityContext['storeType']) =>
+  storeType ? `${storeName} · ${storeTypeLabels[storeType]}` : storeName;
+const currentIdentityLabel = computed(() => {
+  if (loginUser.value.storeName) return formatStoreLabel(loginUser.value.storeName, loginUser.value.storeType);
+  return loginUser.value.tenantName ?? '运营管理平台';
+});
 const roleText = computed(() => {
   if (loginUser.value.roles.includes('SUPER_ADMIN')) return '超级管理员';
   return loginUser.value.roleNames?.length
@@ -60,7 +71,9 @@ const roleText = computed(() => {
 });
 const identityLabel = (context: IdentityContext) => {
   if (context.identityType === 'platform_admin') return '运营管理平台';
-  if (context.storeName) return `${context.tenantName ?? '租户'} / ${context.storeName}`;
+  if (context.storeName) {
+    return `${context.tenantName ?? '租户'} / ${formatStoreLabel(context.storeName, context.storeType)}`;
+  }
   return context.tenantName ?? '租户管理身份';
 };
 const switchableIdentityContexts = computed(() =>
