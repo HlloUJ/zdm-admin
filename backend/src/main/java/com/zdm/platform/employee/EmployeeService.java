@@ -206,18 +206,15 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
       throw new IllegalArgumentException("请先为员工配置数据权限后再启用");
     }
     for (Long roleId : parseRoleIds(employee.getRoleIds())) {
-      Integer roleCount = employee.getStoreId() == null
-          ? jdbcTemplate.queryForObject(
-              "SELECT COUNT(*) FROM roles WHERE id = ? AND category = 'operation-platform' AND store_id IS NULL",
-              Integer.class,
-              roleId)
-          : jdbcTemplate.queryForObject(
-              "SELECT COUNT(*) FROM roles WHERE id = ? AND store_id = ? AND category <> 'operation-platform'",
-              Integer.class,
-              roleId,
-              employee.getStoreId());
+      if (employee.getStoreId() != null) {
+        throw new AccessDeniedException("门店角色请在对应用户端维护");
+      }
+      Integer roleCount = jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM roles WHERE id = ?",
+          Integer.class,
+          roleId);
       if (roleCount == null || roleCount == 0) {
-        throw new AccessDeniedException("只能配置当前门店的角色");
+        throw new AccessDeniedException("只能配置运营管理平台角色");
       }
     }
   }

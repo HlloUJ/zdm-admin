@@ -683,8 +683,8 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
         identityType: 'platform_admin',
         permissions: [
           'admin.permission-management.employee-management.view',
-          'admin.permission-management.role-management.operation-platform.view',
-          'admin.permission-management.role-management.operation-platform.permission',
+          'admin.permission-management.role-management.view',
+          'admin.permission-management.role-management.permission',
         ],
         employeeId: 3,
         dataPermission: 'all',
@@ -881,7 +881,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('权限管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(4);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(2);
   await expect(roleMatrix.getByText('员工管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('员工管理页', { exact: true })).toBeVisible();
   const employeePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '员工管理页' });
@@ -898,28 +898,17 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(employeeViewPermission).toBeChecked();
   await employeePermissionRow.getByText('查看', { exact: true }).click();
   await expect(employeePermissionRow.locator('.permission-action-grid input[type="checkbox"]:checked')).toHaveCount(0);
-  const operationRolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '运营管理平台角色' });
-  const partnerRolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '城市合伙人门店角色' });
-  const supplierRolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板供应商门店角色' });
-  await expect(operationRolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+  const rolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '角色管理页' });
+  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('—');
+  await expect(rolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
     '编辑',
     '权限',
     '删除',
   ]);
-  await expect(partnerRolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
-    '查看',
-    '新增',
-    '编辑',
-    '删除',
-  ]);
-  await expect(supplierRolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
-    '查看',
-    '新增',
-    '编辑',
-    '删除',
-  ]);
+  await expect(roleMatrix.getByText('城市合伙人门店角色', { exact: true })).toHaveCount(0);
+  await expect(roleMatrix.getByText('大板供应商门店角色', { exact: true })).toHaveCount(0);
   await expect(permissionDialog.getByRole('button', { name: '全选全部' })).toBeEnabled();
   await expect(permissionDialog.getByRole('button', { name: '清空全部' })).toBeEnabled();
   await expect(permissionDialog.getByRole('checkbox', { name: '全选当前模块' })).toBeEnabled();
@@ -1117,7 +1106,7 @@ test('shows the full function catalog for both terminals during development', as
     '删除',
   ]);
   await moduleList.getByText('权限管理', { exact: true }).click();
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*19/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*11/);
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '全选全部' })).toBeEnabled();
@@ -1155,5 +1144,5 @@ test('shows the full function catalog for both terminals during development', as
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(19);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(11);
 });

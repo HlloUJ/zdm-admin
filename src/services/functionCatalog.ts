@@ -406,67 +406,13 @@ const verifiedFunctionCatalog: FunctionModule[] = [
           {
             label: '角色管理页',
             value: 'admin.permission-management.role-management',
-            actions: [],
-            tabs: [
-              {
-                label: '运营管理平台角色',
-                value: 'admin.permission-management.role-management.operation-platform',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.operation-platform.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.operation-platform.edit',
-                  },
-                  {
-                    label: '权限',
-                    value: 'admin.permission-management.role-management.operation-platform.permission',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.operation-platform.delete',
-                  },
-                ],
-              },
-              {
-                label: '城市合伙人门店角色',
-                value: 'admin.permission-management.role-management.partner-store',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.partner-store.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.partner-store.edit',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.partner-store.delete',
-                  },
-                ],
-              },
-              {
-                label: '大板供应商门店角色',
-                value: 'admin.permission-management.role-management.supplier-store',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.supplier-store.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.supplier-store.edit',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.supplier-store.delete',
-                  },
-                ],
-              },
+            actions: [
+              { label: '新增', value: 'admin.permission-management.role-management.create' },
+              { label: '编辑', value: 'admin.permission-management.role-management.edit' },
+              { label: '权限', value: 'admin.permission-management.role-management.permission' },
+              { label: '删除', value: 'admin.permission-management.role-management.delete' },
             ],
+            tabs: [],
           },
         ],
       },

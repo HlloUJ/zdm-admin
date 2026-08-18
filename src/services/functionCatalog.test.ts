@@ -158,7 +158,7 @@ describe('full function catalog', () => {
           pages: [
             {
               label: '角色管理页',
-              tabs: [{ label: '运营管理平台角色' }, { label: '城市合伙人门店角色' }, { label: '大板供应商门店角色' }],
+              tabs: [],
             },
           ],
         },
@@ -464,19 +464,11 @@ describe('full function catalog', () => {
       'admin.permission-management.employee-management.permission',
       'admin.permission-management.employee-management.toggle-status',
       'admin.permission-management.employee-management.delete',
-      'admin.permission-management.role-management.operation-platform.view',
-      'admin.permission-management.role-management.operation-platform.create',
-      'admin.permission-management.role-management.operation-platform.edit',
-      'admin.permission-management.role-management.operation-platform.permission',
-      'admin.permission-management.role-management.operation-platform.delete',
-      'admin.permission-management.role-management.partner-store.view',
-      'admin.permission-management.role-management.partner-store.create',
-      'admin.permission-management.role-management.partner-store.edit',
-      'admin.permission-management.role-management.partner-store.delete',
-      'admin.permission-management.role-management.supplier-store.view',
-      'admin.permission-management.role-management.supplier-store.create',
-      'admin.permission-management.role-management.supplier-store.edit',
-      'admin.permission-management.role-management.supplier-store.delete',
+      'admin.permission-management.role-management.view',
+      'admin.permission-management.role-management.create',
+      'admin.permission-management.role-management.edit',
+      'admin.permission-management.role-management.permission',
+      'admin.permission-management.role-management.delete',
     ]);
     expect(initialAllocationValues).toEqual({ store: [], supplier: [] });
   });

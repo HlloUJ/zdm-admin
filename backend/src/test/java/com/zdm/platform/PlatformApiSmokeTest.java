@@ -66,9 +66,8 @@ class PlatformApiSmokeTest {
     Integer emptyTerminalPolicyCount = jdbcTemplate.queryForObject(
         """
         SELECT COUNT(*)
-        FROM roles
-        WHERE category = 'terminal-policy'
-          AND code IN ('TERMINAL_STORE_POLICY', 'TERMINAL_SUPPLIER_POLICY')
+        FROM terminal_function_policies
+        WHERE terminal IN ('store', 'supplier')
           AND COALESCE(function_permissions, '') = ''
         """,
         Integer.class);
@@ -142,8 +141,22 @@ class PlatformApiSmokeTest {
         WHERE table_schema = DATABASE() AND table_name = 'platform_orders'
         """,
         Integer.class);
-    Integer incorrectlyScopedPlatformRoleCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM roles WHERE category = 'operation-platform' AND store_id IS NOT NULL",
+    Integer legacyRoleColumnCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'roles'
+          AND column_name IN ('category', 'client_code', 'store_id', 'store_scope_key')
+        """,
+        Integer.class);
+    Integer legacyRolePermissionCodeCount = jdbcTemplate.queryForObject(
+        """
+        SELECT
+          (SELECT COUNT(*) FROM roles
+           WHERE function_permissions REGEXP 'role-management[.](operation-platform|partner-store|supplier-store)[.]')
+          + (SELECT COUNT(*) FROM terminal_function_policies
+             WHERE function_permissions REGEXP 'role-management[.](operation-platform|partner-store|supplier-store)[.]')
+        """,
         Integer.class);
     Integer incorrectlyScopedPlatformIdentityCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM account_identities WHERE identity_type = 'platform_admin' AND (tenant_id IS NOT NULL OR store_id IS NOT NULL)",
@@ -155,7 +168,7 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM tenants WHERE created_by_name IS NULL OR created_by_name = ''",
         Integer.class);
 
-    assertThat(migrationCount).isGreaterThanOrEqualTo(44);
+    assertThat(migrationCount).isGreaterThanOrEqualTo(58);
     assertThat(superAdminCount).isEqualTo(1);
     assertThat(emptyTerminalPolicyCount).isEqualTo(2);
     assertThat(legacyReadPermissionCount).isZero();
@@ -170,7 +183,8 @@ class PlatformApiSmokeTest {
     assertThat(sampleSupplierCount).isZero();
     assertThat(sampleSupplierBusinessRecordCount).isZero();
     assertThat(legacyOrderTableCount).isZero();
-    assertThat(incorrectlyScopedPlatformRoleCount).isZero();
+    assertThat(legacyRoleColumnCount).isZero();
+    assertThat(legacyRolePermissionCodeCount).isZero();
     assertThat(incorrectlyScopedPlatformIdentityCount).isZero();
     assertThat(tenantBusinessCount).isEqualTo(1);
     assertThat(tenantWithoutCreatorCount).isZero();
@@ -774,9 +788,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '供应商编辑测试角色', 'SUPPLIER_EDIT_TEST', 'operation-platform',
-          'admin', 'all', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '供应商编辑测试角色', 'SUPPLIER_EDIT_TEST', 'all', 'enabled',
           'admin.supplier-management.view,admin.supplier-management.edit', '集成测试')
         """,
         roleId);
@@ -1113,14 +1126,12 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, store_id, data_scope, status,
+          (id, name, code, data_scope, status,
            function_permissions, created_by_name)
-        VALUES (?, '门店分类查看角色', 'STORE_CATEGORY_VIEWER_TEST', 'partner-store',
-          'admin', ?, 'store', 'enabled',
+        VALUES (?, '门店分类查看角色', 'STORE_CATEGORY_VIEWER_TEST', 'store', 'enabled',
           'admin.tenant.store-category-management.view,admin.tenant.store-category-management.edit', '集成测试')
         """,
-        roleId,
-        storeId);
+        roleId);
     jdbcTemplate.update(
         """
         INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
@@ -1257,9 +1268,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '成品分类操作角色', 'FINISHED_CATEGORY_OPERATOR_TEST', 'operation-platform',
-          'admin', 'all', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '成品分类操作角色', 'FINISHED_CATEGORY_OPERATOR_TEST', 'all', 'enabled',
           'admin.product-data-center.category.finished.view,'
           'admin.product-data-center.category.finished.create-root,'
           'admin.product-data-center.category.finished.disable,'
@@ -1597,9 +1607,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, remark)
-        VALUES (?, '色系只读角色', 'SLAB_COLOR_VIEW_ONLY', 'operation-platform',
-          'admin', 'all', 'enabled', 'admin.product-data-center.slab-color.view', '集成测试')
+          (id, name, code, data_scope, status, function_permissions, remark)
+        VALUES (?, '色系只读角色', 'SLAB_COLOR_VIEW_ONLY', 'all', 'enabled', 'admin.product-data-center.slab-color.view', '集成测试')
         """,
         roleId);
     jdbcTemplate.update(
@@ -1729,7 +1738,7 @@ class PlatformApiSmokeTest {
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
         accountId, employeeId);
     jdbcTemplate.update(
-        "INSERT INTO roles (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name) VALUES (?, '店铺级别只读角色', 'STORE_LEVEL_VIEW_TEST', 'operation-platform', 'admin', 'self', 'enabled', 'admin.tenant.store-level-management.view', '集成测试')",
+        "INSERT INTO roles (id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, '店铺级别只读角色', 'STORE_LEVEL_VIEW_TEST', 'self', 'enabled', 'admin.tenant.store-level-management.view', '集成测试')",
         roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
@@ -1911,7 +1920,7 @@ class PlatformApiSmokeTest {
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
         accountId, employeeId);
     jdbcTemplate.update(
-        "INSERT INTO roles (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name) VALUES (?, '门店编辑测试角色', 'STORE_EDIT_TEST', 'operation-platform', 'admin', 'self', 'enabled', 'admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit', '集成测试')",
+        "INSERT INTO roles (id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, '门店编辑测试角色', 'STORE_EDIT_TEST', 'self', 'enabled', 'admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit', '集成测试')",
         roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
@@ -2115,9 +2124,8 @@ class PlatformApiSmokeTest {
         storeId,
         secondCategoryId);
     jdbcTemplate.update(
-        "INSERT INTO roles (id, name, code, category, client_code, store_id, data_scope, status) VALUES (?, '门店删除自动清理角色', 'STORE_DELETE_CASCADE_ROLE', 'partner-store', 'store', ?, 'all', 'enabled')",
-        roleId,
-        storeId);
+        "INSERT INTO roles (id, name, code, data_scope, status) VALUES (?, '门店删除自动清理角色', 'STORE_DELETE_CASCADE_ROLE', 'all', 'enabled')",
+        roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (1, ?, 'admin', 1, ?)",
         roleId,
@@ -2152,7 +2160,7 @@ class PlatformApiSmokeTest {
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM store_categories WHERE id = ?", Integer.class, sameNameChildCategoryId)).isZero();
     assertThat(jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM roles WHERE id = ?", Integer.class, roleId)).isZero();
+        "SELECT COUNT(*) FROM roles WHERE id = ?", Integer.class, roleId)).isEqualTo(1);
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM account_roles WHERE role_id = ?", Integer.class, roleId)).isZero();
     assertThat(jdbcTemplate.queryForObject(
@@ -2161,6 +2169,7 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM account_identities WHERE store_id = ?", Integer.class, storeId)).isZero();
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM accounts WHERE id = ?", Integer.class, storeId)).isEqualTo(1);
+    jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
     jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", storeId);
   }
 
@@ -2249,9 +2258,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '等级只读角色', 'SLAB_GRADE_VIEW_TEST', 'operation-platform',
-          'admin', 'all', 'enabled', 'admin.product-data-center.slab-grade.view', '集成测试')
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '等级只读角色', 'SLAB_GRADE_VIEW_TEST', 'all', 'enabled', 'admin.product-data-center.slab-grade.view', '集成测试')
         """,
         roleId);
     jdbcTemplate.update(
@@ -2379,9 +2387,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '大板产地自有操作角色', 'SLAB_ORIGIN_SELF_TEST', 'operation-platform',
-          'admin', 'self', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '大板产地自有操作角色', 'SLAB_ORIGIN_SELF_TEST', 'self', 'enabled',
           'admin.product-data-center.slab-origin.view,'
           'admin.product-data-center.slab-origin.create,'
           'admin.product-data-center.slab-origin.edit,'
@@ -2486,9 +2493,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, remark)
-        VALUES (?, '无产地权限角色', 'NO_SLAB_ORIGIN_PERMISSION', 'operation-platform',
-          'admin', 'all', 'enabled', 'admin.product-data-center.slab-variety.view', '集成测试')
+          (id, name, code, data_scope, status, function_permissions, remark)
+        VALUES (?, '无产地权限角色', 'NO_SLAB_ORIGIN_PERMISSION', 'all', 'enabled', 'admin.product-data-center.slab-variety.view', '集成测试')
         """,
         roleId);
     jdbcTemplate.update(
@@ -2656,9 +2662,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'operation-platform',
-          'admin', 'self', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'self', 'enabled',
           'admin.product-data-center.slab-variety.view,'
           'admin.product-data-center.slab-variety.create,'
           'admin.product-data-center.slab-variety.edit,'
@@ -2759,9 +2764,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '品种编辑角色', 'SLAB_VARIETY_EDITOR_TEST', 'operation-platform',
-          'admin', 'all', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '品种编辑角色', 'SLAB_VARIETY_EDITOR_TEST', 'all', 'enabled',
           'admin.product-data-center.slab-variety.view,admin.product-data-center.slab-variety.edit', '集成测试')
         """,
         roleId);
@@ -2917,9 +2921,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES ('无租户权限角色', 'NO_TENANT_PERMISSION_ROLE', 'operation-platform',
-          'admin', 'all', 'enabled',
+          (name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES ('无租户权限角色', 'NO_TENANT_PERMISSION_ROLE', 'all', 'enabled',
           'admin.permission-management.employee-management.view', '韩健')
         """);
     Long roleId = jdbcTemplate.queryForObject(
@@ -2968,9 +2971,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES ('租户全部查看角色', 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE', 'operation-platform',
-          'admin', 'self', 'enabled',
+          (name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES ('租户全部查看角色', 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE', 'self', 'enabled',
           'admin.tenant.tenant-management.view,admin.tenant.tenant-management.edit,
            admin.tenant.tenant-management.open-business,admin.tenant.tenant-management.toggle-status,
            admin.tenant.tenant-management.delete', '韩健')
@@ -3186,8 +3188,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '工艺查看角色', 'CRAFT_VIEWER_TEST', 'operation-platform', 'admin', 'all', 'enabled', ?, '集成测试')
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '工艺查看角色', 'CRAFT_VIEWER_TEST', 'all', 'enabled', ?, '集成测试')
         """,
         roleId,
         "admin.product-data-center.finished-stock-craft.view");
@@ -3270,8 +3272,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'operation-platform', 'admin', 'self', 'enabled', ?, '集成测试')
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'self', 'enabled', ?, '集成测试')
         """,
         roleId,
         "admin.product-data-center.finished-stock-craft.view");
@@ -3315,7 +3317,10 @@ class PlatformApiSmokeTest {
         .andExpect(jsonPath("$.data[?(@.code == 'SUPER_ADMIN')].createdByName").value(hasItem("韩健")))
         .andExpect(jsonPath("$.data[?(@.code == 'ADMIN_MANAGER')].createdByName").value(hasItem("韩健")))
         .andExpect(jsonPath("$.data[?(@.code == 'OPERATOR')].createdByName").value(hasItem("韩健")))
-        .andExpect(jsonPath("$.data[?(@.status == 'enabled')].code").value(not(hasItem("CUSTOMER_SERVICE"))));
+        .andExpect(jsonPath("$.data[?(@.status == 'enabled')].code").value(not(hasItem("CUSTOMER_SERVICE"))))
+        .andExpect(jsonPath("$.data[0].category").doesNotExist())
+        .andExpect(jsonPath("$.data[0].clientCode").doesNotExist())
+        .andExpect(jsonPath("$.data[0].storeId").doesNotExist());
 
     String creatorName = jdbcTemplate.queryForObject(
         """
@@ -3334,8 +3339,6 @@ class PlatformApiSmokeTest {
                 {
                   "name": "集成测试角色",
                   "code": "INTEGRATION_TEST_ROLE",
-                  "category": "operation-platform",
-                  "clientCode": "admin",
                   "dataScope": "all",
                   "status": "enabled",
                   "remark": "API smoke",
@@ -3358,8 +3361,6 @@ class PlatformApiSmokeTest {
                 {
                   "name": "集成测试角色-已更新",
                   "code": "INTEGRATION_TEST_ROLE",
-                  "category": "operation-platform",
-                  "clientCode": "admin",
                   "dataScope": "all",
                   "status": "enabled",
                   "remark": "API smoke updated",
@@ -3487,8 +3488,6 @@ class PlatformApiSmokeTest {
                 {
                   "name": "集成测试回退角色",
                   "code": "INTEGRATION_TEST_FALLBACK_ROLE",
-                  "category": "operation-platform",
-                  "clientCode": "admin",
                   "dataScope": "all",
                   "status": "enabled",
                   "remark": "API smoke fallback",
@@ -3500,7 +3499,33 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void roleManagementIsIsolatedByCurrentStore() throws Exception {
+  void terminalFunctionPoliciesAreMaintainedOutsideRoles() throws Exception {
+    mockMvc.perform(get("/api/admin/terminal-function-policies")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].terminal").value(hasItem("store")))
+        .andExpect(jsonPath("$.data[*].terminal").value(hasItem("supplier")));
+
+    mockMvc.perform(put("/api/admin/terminal-function-policies/store")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "functionPermissions": "store.home.view,store.home.view"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.terminal").value("store"))
+        .andExpect(jsonPath("$.data.functionPermissions").value("store.home.view"));
+
+    String storedPermissions = jdbcTemplate.queryForObject(
+        "SELECT function_permissions FROM terminal_function_policies WHERE terminal = 'store'",
+        String.class);
+    assertThat(storedPermissions).isEqualTo("store.home.view");
+  }
+
+  @Test
+  void roleManagementRejectsStoreIdentity() throws Exception {
     long accountId = 9002L;
     long employeeId = 9002L;
     String employeeName = "角色范围测试员工";
@@ -3547,22 +3572,19 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (name, code, category, client_code, store_id, data_scope, status,
+          (name, code, data_scope, status,
            function_permissions, created_by_name)
         VALUES
-          ('本人创建的范围角色', 'SELF_SCOPE_ROLE', 'partner-store', 'store', 1, 'all', 'enabled', '', ?),
-          ('同店他人创建的角色', 'SAME_STORE_ROLE', 'partner-store', 'store', 1, 'all', 'enabled', '', '韩健'),
-          ('其他门店创建的角色', 'OTHER_STORE_ROLE', 'partner-store', 'store', ?, 'all', 'enabled', '', '韩健')
+          ('本人创建的范围角色', 'SELF_SCOPE_ROLE', 'all', 'enabled', '', ?),
+          ('同店他人创建的角色', 'SAME_STORE_ROLE', 'all', 'enabled', '', '韩健'),
+          ('其他门店创建的角色', 'OTHER_STORE_ROLE', 'all', 'enabled', '', '韩健')
         """,
-        employeeName,
-        otherStoreId);
+        employeeName);
 
     mockMvc.perform(get("/api/admin/roles")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.code == 'SELF_SCOPE_ROLE')].name").value(hasItem("本人创建的范围角色")))
-        .andExpect(jsonPath("$.data[?(@.code == 'SAME_STORE_ROLE')].name").value(hasItem("同店他人创建的角色")))
-        .andExpect(jsonPath("$.data[?(@.code == 'OTHER_STORE_ROLE')]").isEmpty());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("无权访问运营管理平台角色数据"));
 
     Long otherStoreRoleId = jdbcTemplate.queryForObject(
         "SELECT id FROM roles WHERE code = 'OTHER_STORE_ROLE'",
@@ -3574,28 +3596,25 @@ class PlatformApiSmokeTest {
                 {
                   "name": "跨门店修改角色",
                   "code": "OTHER_STORE_ROLE",
-                  "category": "partner-store",
-                  "clientCode": "store",
                   "dataScope": "all",
                   "status": "enabled",
                   "functionPermissions": ""
                 }
                 """))
         .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("当前组织无权操作该角色"));
+        .andExpect(jsonPath("$.message").value("当前身份无权维护运营管理平台角色"));
   }
 
   @Test
-  void roleNameMustBeUniqueWithinItsCategory() throws Exception {
+  void roleNameMustBeUniqueWithinPlatform() throws Exception {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (name, code, category, client_code, data_scope, status, remark, function_permissions,
+          (name, code, data_scope, status, remark, function_permissions,
            created_by_account_id)
         VALUES
-          ('同名角色', 'DUPLICATE_NAME_OPERATION', 'operation-platform', 'admin', 'all', 'enabled', '', '', 1),
-          ('同名角色', 'DUPLICATE_NAME_PARTNER', 'partner-store', 'store', 'store', 'enabled', '', '', 1),
-          ('待重命名角色', 'ROLE_TO_RENAME', 'operation-platform', 'admin', 'all', 'enabled', '', '', 1)
+          ('同名角色', 'DUPLICATE_NAME_OPERATION', 'all', 'enabled', '', '', 1),
+          ('待重命名角色', 'ROLE_TO_RENAME', 'all', 'enabled', '', '', 1)
         """);
 
     mockMvc.perform(post("/api/admin/roles")
@@ -3605,8 +3624,6 @@ class PlatformApiSmokeTest {
                 {
                   "name": " 同名角色 ",
                   "code": "DUPLICATE_NAME_CREATE",
-                  "category": "operation-platform",
-                  "clientCode": "admin",
                   "dataScope": "all",
                   "status": "enabled",
                   "remark": "",
@@ -3614,7 +3631,7 @@ class PlatformApiSmokeTest {
                 }
                 """))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("当前用户端已存在同名角色"));
+        .andExpect(jsonPath("$.message").value("运营管理平台已存在同名角色"));
 
     Long roleToRenameId = jdbcTemplate.queryForObject(
         "SELECT id FROM roles WHERE code = 'ROLE_TO_RENAME'",
@@ -3626,8 +3643,6 @@ class PlatformApiSmokeTest {
                 {
                   "name": "同名角色",
                   "code": "ROLE_TO_RENAME",
-                  "category": "operation-platform",
-                  "clientCode": "admin",
                   "dataScope": "all",
                   "status": "enabled",
                   "remark": "",
@@ -3635,12 +3650,12 @@ class PlatformApiSmokeTest {
                 }
                 """))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("当前用户端已存在同名角色"));
+        .andExpect(jsonPath("$.message").value("运营管理平台已存在同名角色"));
 
     Integer crossCategoryCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM roles WHERE name = '同名角色'",
         Integer.class);
-    assertThat(crossCategoryCount).isEqualTo(2);
+    assertThat(crossCategoryCount).isEqualTo(1);
   }
 
   @Test
@@ -3712,10 +3727,9 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, store_id, data_scope, status,
+          (id, name, code, data_scope, status,
            function_permissions, created_by_name)
-        VALUES (?, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'partner-store',
-          'store', 1, 'self', 'enabled',
+        VALUES (?, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'self', 'enabled',
           'admin.permission-management.employee-management.view,'
           'admin.permission-management.employee-management.permission', '集成测试')
         """,
@@ -3745,11 +3759,8 @@ class PlatformApiSmokeTest {
                   "dataPermission": "self"
                 }
                 """.formatted(managerRoleId)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.roleIds").value(String.valueOf(managerRoleId)))
-        .andExpect(jsonPath("$.data.dataPermission").value("self"))
-        .andExpect(jsonPath("$.data.gender").doesNotExist())
-        .andExpect(jsonPath("$.data.remark").doesNotExist());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("门店角色请在对应用户端维护"));
 
     mockMvc.perform(patch("/api/admin/employees/{id}/permissions", otherStoreEmployeeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
@@ -3796,9 +3807,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '员工邀请创建测试角色', 'EMPLOYEE_INVITE_CREATOR_TEST', 'operation-platform',
-          'admin', 'all', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '员工邀请创建测试角色', 'EMPLOYEE_INVITE_CREATOR_TEST', 'all', 'enabled',
           'admin.permission-management.employee-management.create', '集成测试')
         """,
         roleId);
@@ -3867,14 +3877,12 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, store_id, data_scope, status,
+          (id, name, code, data_scope, status,
            function_permissions, created_by_name)
-        VALUES (?, '跨门店邀请测试角色', 'EMPLOYEE_INVITE_SCOPE_TEST', 'operation-platform',
-          'admin', ?, 'all', 'enabled',
+        VALUES (?, '跨门店邀请测试角色', 'EMPLOYEE_INVITE_SCOPE_TEST', 'all', 'enabled',
           'admin.permission-management.employee-management.create', '集成测试')
         """,
-        roleId,
-        storeId);
+        roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, ?)",
         accountId,
@@ -3902,7 +3910,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void employeeInviteRegistrationRequiresAdminActivation() throws Exception {
+  void employeeInviteRegistrationDefersStoreRoleActivationToUserEnd() throws Exception {
     String creatorName = "邀请注册测试员";
     String adminToken = createStoreScopedEmployee(
         98002L,
@@ -4030,8 +4038,8 @@ class PlatformApiSmokeTest {
                   "remark": ""
                 }
                 """))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value("enabled"));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("门店角色请在对应用户端维护"));
 
     mockMvc.perform(post("/api/admin/auth/login")
             .contentType("application/json")
@@ -4041,8 +4049,8 @@ class PlatformApiSmokeTest {
                   "verifyCode": "888888"
                 }
                 """))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.user.phone").value("15926629999"));
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("账号不存在或已停用"));
   }
 
   @Test
@@ -4452,14 +4460,13 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, store_id, data_scope, status,
+          (id, name, code, data_scope, status,
            function_permissions, created_by_name, created_by_account_id)
-        VALUES (?, ?, ?, 'partner-store', 'store', ?, 'all', 'enabled', ?, ?, ?)
+        VALUES (?, ?, ?, 'all', 'enabled', ?, ?, ?)
         """,
         id,
         name + "角色",
         "STORE_SCOPED_TEST_" + id,
-        id,
         permissions,
         name,
         id);
