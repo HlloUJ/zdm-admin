@@ -320,9 +320,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '属性值全局操作测试角色', 'ATTRIBUTE_VALUE_GLOBAL_OPERATOR_TEST', 'operation-platform',
-          'admin', 'self', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '属性值全局操作测试角色', 'ATTRIBUTE_VALUE_GLOBAL_OPERATOR_TEST', 'all', 'enabled',
           'admin.product-data-center.attribute-value.shared.view,'
           'admin.product-data-center.attribute-value.shared.create,'
           'admin.product-data-center.attribute-value.shared.toggle-status,'
@@ -441,9 +440,8 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '属性库全局操作测试角色', 'ATTRIBUTE_GLOBAL_OPERATOR_TEST', 'operation-platform',
-          'admin', 'self', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '属性库全局操作测试角色', 'ATTRIBUTE_GLOBAL_OPERATOR_TEST', 'all', 'enabled',
           'admin.product-data-center.attribute.shared.view,'
           'admin.product-data-center.attribute.shared.create,'
           'admin.product-data-center.attribute.shared.toggle-status,'
