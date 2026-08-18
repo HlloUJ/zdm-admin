@@ -15,14 +15,14 @@ function createUser(permissions: string[]): LoginUser {
 
 describe('admin menu permissions', () => {
   it('shows the parent page when the user owns a descendant view permission', () => {
-    const user = createUser(['admin.permission-management.role-management.operation-platform.view']);
+    const user = createUser(['admin.permission-management.role-management.view']);
 
     expect(hasMenuPermission(user, 'admin.permission-management.role-management')).toBe(true);
     expect(getFirstAccessiblePath(user)).toBe('/role-management');
   });
 
   it('does not infer page access from a mutating action without view', () => {
-    const user = createUser(['admin.permission-management.role-management.operation-platform.permission']);
+    const user = createUser(['admin.permission-management.role-management.permission']);
 
     expect(hasMenuPermission(user, 'admin.permission-management.role-management')).toBe(false);
     expect(getFirstAccessiblePath(user)).toBe('');

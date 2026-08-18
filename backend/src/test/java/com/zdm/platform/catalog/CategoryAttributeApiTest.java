@@ -449,9 +449,8 @@ class CategoryAttributeApiTest {
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '类目属性模板操作角色', 'CATEGORY_ATTRIBUTE_OPERATOR_TEST', 'operation-platform',
-          'admin', 'self', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '类目属性模板操作角色', 'CATEGORY_ATTRIBUTE_OPERATOR_TEST', 'self', 'enabled',
           'admin.product-data-center.category-attribute-template.finished.view,'
           'admin.product-data-center.category-attribute-template.finished.create,'
           'admin.product-data-center.category-attribute-template.finished.delete', '集成测试')
