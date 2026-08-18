@@ -50,7 +50,7 @@
 
         <section class="table-card">
           <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
+            <t-button v-if="canCreateTenant" theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
             </t-button>
@@ -83,16 +83,21 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link theme="primary" hover="color" @click="openBusinessDialog(row)">业务开通</t-link>
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canOpenTenantBusiness" theme="primary" hover="color" @click="openBusinessDialog(row)">
+                  业务开通
+                </t-link>
+                <t-link v-if="canEditTenant" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
+                  v-if="canToggleTenantStatus"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link v-if="canDeleteTenant" theme="danger" hover="color" @click="openDeleteConfirm(row)">
+                  删除
+                </t-link>
               </div>
             </template>
           </t-table>
@@ -182,11 +187,17 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
+import { getLoginUser } from '@/services/auth';
+import { hasPermission } from '@/services/adminPermissions';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createTenant,
   deleteTenant,
   listTenants,
   updateTenant,
+  updateTenantBusinesses,
+  updateTenantStatus,
   type TenantPayload,
   type TenantRecord,
 } from '@/services/tenants';
@@ -201,6 +212,8 @@ interface TenantItem {
   phone: string;
   businesses: BusinessType[];
   status: TenantStatus;
+  createdByName: string;
+  createdByAccountId?: number | null;
   createdAt: string;
   remark?: string;
 }
@@ -222,6 +235,13 @@ const businessLabel = (type: BusinessType) => businessOptions.find((item) => ite
 
 const tableData = ref<TenantItem[]>([]);
 const loading = ref(false);
+const currentUser = getLoginUser();
+const permissionPrefix = 'admin.tenant.tenant-management';
+const canCreateTenant = computed(() => hasPermission(currentUser, `${permissionPrefix}.create`));
+const canOpenTenantBusiness = computed(() => hasPermission(currentUser, `${permissionPrefix}.open-business`));
+const canEditTenant = computed(() => hasPermission(currentUser, `${permissionPrefix}.edit`));
+const canToggleTenantStatus = computed(() => hasPermission(currentUser, `${permissionPrefix}.toggle-status`));
+const canDeleteTenant = computed(() => hasPermission(currentUser, `${permissionPrefix}.delete`));
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
@@ -229,6 +249,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'phone', title: '联系方式', width: 150, align: 'center' },
   { colKey: 'businesses', title: '开通业务', minWidth: 260, align: 'left' },
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 280, align: 'left', fixed: 'right' },
 ];
@@ -324,6 +345,8 @@ const toTenantItem = (record: TenantRecord): TenantItem => ({
   phone: record.contactPhone,
   businesses: parseBusinessTypes(record.businessTypes),
   status: normalizeStatus(record.status),
+  createdByName: record.createdByName?.trim() || '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
@@ -341,7 +364,7 @@ const loadTenants = async () => {
   loading.value = true;
   try {
     const records = await listTenants();
-    tableData.value = records.map(toTenantItem);
+    tableData.value = sortByCreatedAtDesc(records).map(toTenantItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '租户列表加载失败');
@@ -393,6 +416,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: TenantItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -408,6 +432,8 @@ const handleSubmit = async () => {
   const result = await formRef.value?.validate();
   if (result !== true) return;
 
+  const targetName = formData.tenantName.trim();
+  const action = dialogMode.value === 'create' ? '新增' : '保存';
   try {
     if (dialogMode.value === 'create') {
       await createTenant(toTenantPayload('normal'));
@@ -421,25 +447,17 @@ const handleSubmit = async () => {
 
     closeFormDialog();
     if (dialogMode.value === 'create') {
-      adminFeedback.created(formData.tenantName.trim());
+      adminFeedback.created(targetName);
     } else {
-      adminFeedback.success('已保存租户');
+      adminFeedback.actionSuccess({ action, target: targetName });
     }
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.actionError({ action, target: targetName, error });
   }
 };
 
-const persistTenantItem = async (item: TenantItem) => {
-  const updated = await updateTenant(item.id, {
-    name: item.tenantName,
-    contactName: item.tenantName,
-    contactPhone: item.phone,
-    status: toBackendStatus(item.status),
-    businessTypes: item.businesses.join(','),
-    remark: item.remark ?? '',
-  });
-  const targetIndex = tableData.value.findIndex((row) => row.id === item.id);
+const replaceTenantItem = (updated: TenantRecord) => {
+  const targetIndex = tableData.value.findIndex((row) => row.id === updated.id);
   if (targetIndex !== -1) {
     tableData.value.splice(targetIndex, 1, toTenantItem(updated));
   }
@@ -448,17 +466,20 @@ const persistTenantItem = async (item: TenantItem) => {
 const handleBusinessSubmit = async () => {
   const target = tableData.value.find((item) => item.id === businessEditingId.value);
   if (!target) return;
+  const businessNames = businessSelection.value.map(businessLabel).filter(Boolean).join('、');
 
   try {
-    await persistTenantItem({ ...target, businesses: [...businessSelection.value] });
+    const updated = await updateTenantBusinesses(target.id, businessSelection.value.join(','));
+    replaceTenantItem(updated);
     closeBusinessDialog();
-    adminFeedback.success('已更新租户业务配置');
+    adminFeedback.actionSuccess({ action: '开通', target: businessNames });
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.actionError({ action: '开通', target: businessNames, error });
   }
 };
 
 const openStatusConfirm = (row: TenantItem) => {
+  if (!requireCreatorOwnership(row)) return;
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
@@ -467,6 +488,7 @@ const openStatusConfirm = (row: TenantItem) => {
 };
 
 const openDeleteConfirm = (row: TenantItem) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除租户“${row.tenantName}”？`;
@@ -481,6 +503,7 @@ const closeConfirmDialog = () => {
 const handleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
+  const action = confirmState.type === 'delete' ? '删除' : confirmState.type === 'enable' ? '启用' : '停用';
 
   try {
     if (confirmState.type === 'delete') {
@@ -488,26 +511,25 @@ const handleConfirm = async () => {
       tableData.value = tableData.value.filter((item) => item.id !== target.id);
       ensureCurrentPage();
     } else {
-      await persistTenantItem({
-        ...confirmState.row,
-        status: confirmState.type === 'enable' ? 'normal' : 'disabled',
-      });
+      const updated = await updateTenantStatus(target.id, confirmState.type === 'enable' ? 'enabled' : 'disabled');
+      replaceTenantItem(updated);
     }
 
     closeConfirmDialog();
     if (confirmState.type === 'delete') {
       adminFeedback.deleted(target.tenantName);
     } else {
-      adminFeedback.success(confirmState.type === 'enable' ? '已启用租户' : '已停用租户');
+      adminFeedback.actionSuccess({ action, target: target.tenantName });
     }
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.actionError({ action, target: target.tenantName, error });
   }
 };
 
 onMounted(loadTenants);
 
 const openBusinessDialog = (row: TenantItem) => {
+  if (!requireCreatorOwnership(row)) return;
   businessEditingId.value = row.id;
   businessSelection.value = [...row.businesses];
   businessDialogVisible.value = true;

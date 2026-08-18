@@ -480,6 +480,25 @@ const storeLevelModule: FunctionModule = {
   audiences: ['admin'],
   menus: [
     {
+      label: '租户管理',
+      value: 'admin.tenant.tenant-management.menu',
+      direct: true,
+      pages: [
+        {
+          label: '租户管理页',
+          value: 'admin.tenant.tenant-management',
+          actions: [
+            { label: '新增', value: 'admin.tenant.tenant-management.create' },
+            { label: '业务开通', value: 'admin.tenant.tenant-management.open-business' },
+            { label: '编辑', value: 'admin.tenant.tenant-management.edit' },
+            { label: '停用/启用', value: 'admin.tenant.tenant-management.toggle-status' },
+            { label: '删除', value: 'admin.tenant.tenant-management.delete' },
+          ],
+          tabs: [],
+        },
+      ],
+    },
+    {
       label: '门店基础数据',
       value: 'admin.tenant.store-base-data.menu',
       direct: false,

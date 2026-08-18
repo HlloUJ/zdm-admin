@@ -5,6 +5,8 @@ import java.util.List;
 public record LoginResponse(String token, LoginUser user) {
   public record LoginUser(
       Long id,
+      Long identityId,
+      String identityType,
       String name,
       String phone,
       List<String> roles,
@@ -13,6 +15,9 @@ public record LoginResponse(String token, LoginUser user) {
       Long employeeId,
       Long tenantId,
       Long storeId,
+      String tenantName,
+      String storeName,
+      String storeType,
       String dataPermission) {
     public LoginUser {
       roles = List.copyOf(roles);

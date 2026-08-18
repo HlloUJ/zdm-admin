@@ -6,6 +6,8 @@ export interface TenantRecord {
   contactName: string;
   contactPhone: string;
   status: 'enabled' | 'disabled';
+  createdByName?: string;
+  createdByAccountId?: number | null;
   businessTypes?: string;
   remark?: string;
   createdAt?: string;
@@ -36,6 +38,20 @@ export function updateTenant(id: number, payload: TenantPayload) {
   return request<TenantRecord>(`/admin/tenants/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateTenantBusinesses(id: number, businessTypes: string) {
+  return request<TenantRecord>(`/admin/tenants/${id}/businesses`, {
+    method: 'PATCH',
+    body: JSON.stringify({ businessTypes }),
+  });
+}
+
+export function updateTenantStatus(id: number, status: TenantRecord['status']) {
+  return request<TenantRecord>(`/admin/tenants/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
 }
 
