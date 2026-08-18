@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,26 +34,23 @@ public class StoreController {
   }
 
   @GetMapping
-  public ApiResponse<List<Store>> list() {
-    permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(storeService.listForCurrentAdmin());
+  public ApiResponse<List<Store>> list(@RequestParam(defaultValue = "operating") String scope) {
+    if (!"operating".equals(scope) && !"archived".equals(scope)) {
+      throw new IllegalArgumentException("门店列表类型错误");
+    }
+    permissionGuard.requirePermission(PERMISSION_PREFIX + "." + scope + ".view");
+    return ApiResponse.ok(storeService.listForCurrentAdmin("archived".equals(scope)));
   }
 
   @GetMapping("/level-options")
   public ApiResponse<List<StoreLevel>> listLevelOptions() {
-    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.view");
     return ApiResponse.ok(storeLevelService.listEnabled());
-  }
-
-  @GetMapping("/{id}/deletion-references")
-  public ApiResponse<StoreReferenceSummary> deletionReferences(@PathVariable Long id) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
-    return ApiResponse.ok(storeService.getDeletionReferences(id));
   }
 
   @PostMapping
   public ApiResponse<Store> create(@Valid @RequestBody Store store) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.create");
     store.setId(null);
     storeService.createStore(store);
     return ApiResponse.ok(store);
@@ -60,27 +58,39 @@ public class StoreController {
 
   @PutMapping("/{id}")
   public ApiResponse<Store> update(@PathVariable Long id, @Valid @RequestBody Store store) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.edit");
     return ApiResponse.ok(storeService.updateStore(id, store));
   }
 
   @PatchMapping("/{id}/level")
   public ApiResponse<Store> updateLevel(
       @PathVariable Long id, @Valid @RequestBody StoreLevelSelectionRequest request) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit-level");
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.edit-level");
     return ApiResponse.ok(storeService.updateLevel(id, request.storeLevelId()));
   }
 
   @PatchMapping("/{id}/status")
   public ApiResponse<Store> updateStatus(
       @PathVariable Long id, @Valid @RequestBody StoreStatusRequest request) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.toggle-status");
     return ApiResponse.ok(storeService.updateStatus(id, request.status()));
+  }
+
+  @PatchMapping("/{id}/archive")
+  public ApiResponse<Store> archive(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.archive");
+    return ApiResponse.ok(storeService.archiveStore(id));
+  }
+
+  @PatchMapping("/{id}/restore")
+  public ApiResponse<Store> restore(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.restore");
+    return ApiResponse.ok(storeService.restoreStore(id));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
     return ApiResponse.ok(storeService.deleteStore(id));
   }
 }
