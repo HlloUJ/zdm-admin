@@ -51,6 +51,21 @@ public interface AuthAccountMapper {
   AuthAccount findByPhone(@Param("phone") String phone);
 
   @Select("""
+      SELECT COUNT(*)
+      FROM accounts a
+      JOIN account_identities ai
+        ON ai.account_id = a.id AND ai.client_code = 'admin' AND ai.status = 'enabled'
+      JOIN stores s ON s.id = ai.store_id AND s.status = 'archived'
+      LEFT JOIN employees e
+        ON ai.identity_type = 'employee' AND e.id = ai.subject_id
+       AND e.account_id = a.id AND e.status = 'enabled'
+      WHERE a.phone = #{phone}
+        AND a.status = 'enabled'
+        AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)
+      """)
+  int countArchivedStoreIdentitiesByPhone(@Param("phone") String phone);
+
+  @Select("""
       SELECT
         a.id,
         ai.id AS identityId,
@@ -86,6 +101,16 @@ public interface AuthAccountMapper {
       LIMIT 1
       """)
   AuthAccount findByIdentityId(@Param("identityId") Long identityId);
+
+  @Select("""
+      SELECT COUNT(*)
+      FROM account_identities ai
+      JOIN stores s ON s.id = ai.store_id AND s.status = 'archived'
+      WHERE ai.id = #{identityId} AND ai.account_id = #{accountId}
+      """)
+  int countArchivedStoreIdentity(
+      @Param("accountId") Long accountId,
+      @Param("identityId") Long identityId);
 
   @Select("""
       SELECT

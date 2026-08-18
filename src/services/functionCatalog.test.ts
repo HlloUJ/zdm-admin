@@ -69,7 +69,7 @@ describe('full function catalog', () => {
         {
           label: '门店管理',
           direct: true,
-          pages: [{ label: '门店管理页', tabs: [] }],
+          pages: [{ label: '门店管理页', tabs: [{ label: '运营中' }, { label: '已归档' }] }],
         },
         {
           label: '门店基础数据',
@@ -217,13 +217,29 @@ describe('full function catalog', () => {
     const storePage = fullFunctionCatalog[0].menus
       .flatMap((menu) => menu.pages)
       .find((page) => page.value === 'admin.tenant.tenant-store-management');
-    expect(storePage?.actions).toEqual([
-      { label: '查看', value: 'admin.tenant.tenant-store-management.view' },
-      { label: '新增', value: 'admin.tenant.tenant-store-management.create' },
-      { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.edit-level' },
-      { label: '编辑', value: 'admin.tenant.tenant-store-management.edit' },
-      { label: '停用/启用', value: 'admin.tenant.tenant-store-management.toggle-status' },
-      { label: '删除', value: 'admin.tenant.tenant-store-management.delete' },
+    expect(storePage?.actions).toEqual([]);
+    expect(storePage?.tabs).toEqual([
+      {
+        label: '运营中',
+        value: 'admin.tenant.tenant-store-management.operating',
+        actions: [
+          { label: '查看', value: 'admin.tenant.tenant-store-management.operating.view' },
+          { label: '新增', value: 'admin.tenant.tenant-store-management.operating.create' },
+          { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.operating.edit-level' },
+          { label: '编辑', value: 'admin.tenant.tenant-store-management.operating.edit' },
+          { label: '停用/启用', value: 'admin.tenant.tenant-store-management.operating.toggle-status' },
+          { label: '归档', value: 'admin.tenant.tenant-store-management.operating.archive' },
+        ],
+      },
+      {
+        label: '已归档',
+        value: 'admin.tenant.tenant-store-management.archived',
+        actions: [
+          { label: '查看', value: 'admin.tenant.tenant-store-management.archived.view' },
+          { label: '恢复运营', value: 'admin.tenant.tenant-store-management.archived.restore' },
+          { label: '删除', value: 'admin.tenant.tenant-store-management.archived.delete' },
+        ],
+      },
     ]);
     const categoryPage = productPages.find((page) => page.value === 'admin.product-data-center.category');
     expect(categoryPage?.tabs).toEqual([
@@ -327,12 +343,15 @@ describe('full function catalog', () => {
       'admin.tenant.tenant-management.edit',
       'admin.tenant.tenant-management.toggle-status',
       'admin.tenant.tenant-management.delete',
-      'admin.tenant.tenant-store-management.view',
-      'admin.tenant.tenant-store-management.create',
-      'admin.tenant.tenant-store-management.edit-level',
-      'admin.tenant.tenant-store-management.edit',
-      'admin.tenant.tenant-store-management.toggle-status',
-      'admin.tenant.tenant-store-management.delete',
+      'admin.tenant.tenant-store-management.operating.view',
+      'admin.tenant.tenant-store-management.operating.create',
+      'admin.tenant.tenant-store-management.operating.edit-level',
+      'admin.tenant.tenant-store-management.operating.edit',
+      'admin.tenant.tenant-store-management.operating.toggle-status',
+      'admin.tenant.tenant-store-management.operating.archive',
+      'admin.tenant.tenant-store-management.archived.view',
+      'admin.tenant.tenant-store-management.archived.restore',
+      'admin.tenant.tenant-store-management.archived.delete',
       'admin.tenant.store-level-management.view',
       'admin.tenant.store-level-management.create',
       'admin.tenant.store-level-management.edit',
@@ -529,6 +548,21 @@ describe('full function catalog', () => {
       'admin.product-data-center.category.finished.toggle-status',
       'admin.product-data-center.category.accessory.view',
       'admin.product-data-center.category.accessory.toggle-status',
+    ]);
+  });
+
+  it('maps legacy store grants to both tab views but never grants permanent delete implicitly', () => {
+    expect(
+      normalizeFunctionCatalogPermissions(fullFunctionCatalog, [
+        'admin.tenant.tenant-store-management.view',
+        'admin.tenant.tenant-store-management.edit',
+        'admin.tenant.tenant-store-management.delete',
+      ]),
+    ).toEqual([
+      'admin.tenant.tenant-store-management.operating.view',
+      'admin.tenant.tenant-store-management.operating.edit',
+      'admin.tenant.tenant-store-management.operating.archive',
+      'admin.tenant.tenant-store-management.archived.view',
     ]);
   });
 
