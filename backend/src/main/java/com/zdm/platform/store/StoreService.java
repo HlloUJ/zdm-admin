@@ -3,12 +3,12 @@ package com.zdm.platform.store;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.LongFunction;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,24 +17,24 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   private static final String REFERENCED_MESSAGE = "该门店存在关联数据，不能删除，请先处理关联数据或停用该门店";
 
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
   private final StoreLevelService storeLevelService;
   private final JdbcTemplate jdbcTemplate;
 
   public StoreService(
       CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard,
       StoreLevelService storeLevelService,
       JdbcTemplate jdbcTemplate) {
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
     this.storeLevelService = storeLevelService;
     this.jdbcTemplate = jdbcTemplate;
   }
 
   public List<Store> listForCurrentAdmin() {
-    CurrentIdentity identity = identityProvider.require();
-    if (identity.isSuperAdmin() || "all".equals(identity.dataPermission())) {
-      return list();
-    }
-    return lambdaQuery().eq(Store::getCreatedBy, identity.displayName()).list();
+    identityProvider.require();
+    return list();
   }
 
   @Transactional
@@ -59,15 +59,39 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (!Objects.equals(existing.getType(), payload.getType())) {
       requireOpenedBusiness(existing.getTenantId(), payload.getType());
     }
-    if (!Objects.equals(existing.getStoreLevelId(), payload.getStoreLevelId())) {
-      storeLevelService.requireSelectable(payload.getStoreLevelId());
-    }
     payload.setId(id);
+    payload.setStoreLevelId(existing.getStoreLevelId());
+    payload.setStatus(existing.getStatus());
     payload.setCreatedBy(existing.getCreatedBy());
     updateById(payload);
+    return getById(id);
+  }
+
+  @Transactional
+  public Store updateLevel(Long id, Long storeLevelId) {
+    Store existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+    requireAccessible(existing);
+    storeLevelService.requireSelectable(storeLevelId);
+    existing.setStoreLevelId(storeLevelId);
+    updateById(existing);
+    return getById(id);
+  }
+
+  @Transactional
+  public Store updateStatus(Long id, String status) {
+    Store existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+    requireAccessible(existing);
+    existing.setStatus(status);
+    updateById(existing);
     jdbcTemplate.update(
         "UPDATE account_identities SET status = ? WHERE store_id = ? AND identity_type = 'store_admin'",
-        payload.getStatus(),
+        status,
         id);
     return getById(id);
   }
@@ -220,11 +244,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   }
 
   private void requireAccessible(Store store) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin()
-        && !"all".equals(identity.dataPermission())
-        && !Objects.equals(store.getCreatedBy(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该门店");
-    }
+    ownershipGuard.requireCreator(null, store.getCreatedBy());
   }
 }

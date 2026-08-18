@@ -61,6 +61,20 @@ export function updateStore(id: number, payload: StorePayload) {
   });
 }
 
+export function updateStoreLevelSelection(id: number, storeLevelId: number) {
+  return request<StoreRecord>(`/admin/stores/${id}/level`, {
+    method: 'PATCH',
+    body: JSON.stringify({ storeLevelId }),
+  });
+}
+
+export function updateStoreStatus(id: number, status: StorePayload['status']) {
+  return request<StoreRecord>(`/admin/stores/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function deleteStore(id: number) {
   return request<boolean>(`/admin/stores/${id}`, {
     method: 'DELETE',

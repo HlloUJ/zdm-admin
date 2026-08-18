@@ -67,8 +67,13 @@ describe('full function catalog', () => {
           pages: [{ label: '租户管理页', tabs: [] }],
         },
         {
+          label: '门店管理',
+          direct: true,
+          pages: [{ label: '门店管理页', tabs: [] }],
+        },
+        {
           label: '门店基础数据',
-          pages: [{ label: '店铺级别管理页', thirdMenuLabel: '店铺级别管理', tabs: [] }],
+          pages: [{ label: '门店级别管理页', thirdMenuLabel: '门店级别管理', tabs: [] }],
         },
       ],
     });
@@ -209,6 +214,17 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: 'admin.tenant.tenant-management.toggle-status' },
       { label: '删除', value: 'admin.tenant.tenant-management.delete' },
     ]);
+    const storePage = fullFunctionCatalog[0].menus
+      .flatMap((menu) => menu.pages)
+      .find((page) => page.value === 'admin.tenant.tenant-store-management');
+    expect(storePage?.actions).toEqual([
+      { label: '查看', value: 'admin.tenant.tenant-store-management.view' },
+      { label: '新增', value: 'admin.tenant.tenant-store-management.create' },
+      { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.edit-level' },
+      { label: '编辑', value: 'admin.tenant.tenant-store-management.edit' },
+      { label: '停用/启用', value: 'admin.tenant.tenant-store-management.toggle-status' },
+      { label: '删除', value: 'admin.tenant.tenant-store-management.delete' },
+    ]);
     const categoryPage = productPages.find((page) => page.value === 'admin.product-data-center.category');
     expect(categoryPage?.tabs).toEqual([
       {
@@ -311,6 +327,12 @@ describe('full function catalog', () => {
       'admin.tenant.tenant-management.edit',
       'admin.tenant.tenant-management.toggle-status',
       'admin.tenant.tenant-management.delete',
+      'admin.tenant.tenant-store-management.view',
+      'admin.tenant.tenant-store-management.create',
+      'admin.tenant.tenant-store-management.edit-level',
+      'admin.tenant.tenant-store-management.edit',
+      'admin.tenant.tenant-store-management.toggle-status',
+      'admin.tenant.tenant-store-management.delete',
       'admin.tenant.store-level-management.view',
       'admin.tenant.store-level-management.create',
       'admin.tenant.store-level-management.edit',

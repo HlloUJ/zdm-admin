@@ -637,6 +637,40 @@ test('shows current account info and logout on tenant management page', async ({
   await expect(page.getByRole('button', { name: /退出登录/ })).toBeVisible();
 });
 
+test('shows only granted store management operations for a restricted account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 12,
+        name: '门店受限管理员',
+        phone: '15900000012',
+        roles: ['STORE_OPERATOR'],
+        permissions: [
+          'admin.tenant.tenant-store-management.view',
+          'admin.tenant.tenant-store-management.edit-level',
+          'admin.tenant.tenant-store-management.toggle-status',
+        ],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/tenant-store-management');
+  const main = page.getByRole('main');
+  const row = main.locator('tbody tr').filter({ hasText: '杭州体验门店' });
+
+  await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);
+  await expect(row.getByRole('button', { name: '修改门店级别' })).toBeVisible();
+  await expect(row.locator('.table-actions .t-link')).toHaveText(['停用']);
+  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
+
+  await row.getByRole('button', { name: '修改门店级别' }).click({ force: true });
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '店铺级别' })).toHaveCount(0);
+});
+
 test('filters role actions by logged-in permissions', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -706,7 +740,16 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
   await roleModuleList.getByText('租户与门店', { exact: true }).click();
-  const storeLevelPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '店铺级别管理页' });
+  const storePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店管理页' });
+  await expect(storePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '修改门店级别',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const storeLevelPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
   await expect(storeLevelPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
@@ -900,7 +943,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*11/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*17/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -919,7 +962,16 @@ test('shows the full function catalog for both terminals during development', as
     '停用/启用',
     '删除',
   ]);
-  const storeLevelAllocationRow = matrix.locator('tbody tr').filter({ hasText: '店铺级别管理页' });
+  const storeAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店管理页' });
+  await expect(storeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '修改门店级别',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const storeLevelAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
   await expect(storeLevelAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
@@ -1070,8 +1122,9 @@ test('shows the full function catalog for both terminals during development', as
   await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await moduleList.getByText('租户与门店', { exact: true }).click();
   await expect(matrix.getByText('租户管理页', { exact: true })).toBeVisible();
-  await expect(matrix.getByText('店铺级别管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(11);
+  await expect(matrix.getByText('门店管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('门店级别管理页', { exact: true })).toBeVisible();
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(17);
   await moduleList.getByText('供应商管理', { exact: true }).click();
   await expect(matrix.getByText('供应商管理页', { exact: true })).toBeVisible();
   await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);

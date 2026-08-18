@@ -25,8 +25,8 @@ test('manages store levels under tenant store base data', async ({ page }) => {
   const main = page.getByRole('main');
   const baseDataMenu = page.locator('.menu-level-two').filter({ hasText: '门店基础数据' });
 
-  await expect(baseDataMenu.locator('.menu-level-three-item')).toHaveText(['店铺级别管理']);
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/租户与门店.*门店基础数据.*店铺级别管理/);
+  await expect(baseDataMenu.locator('.menu-level-three-item')).toHaveText(['门店级别管理']);
+  await expect(main.locator('.t-breadcrumb')).toHaveText(/租户与门店.*门店基础数据.*门店级别管理/);
   await expect(main.getByRole('row', { name: /^1 1级 / })).toBeVisible();
   await expect(main.getByRole('row', { name: /^2 2级 / })).toBeVisible();
   await expect(main.getByText('级别编码', { exact: true })).toHaveCount(0);
