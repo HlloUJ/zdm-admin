@@ -8,7 +8,7 @@
           <t-breadcrumb>
             <t-breadcrumb-item>租户与门店</t-breadcrumb-item>
             <t-breadcrumb-item>门店基础数据</t-breadcrumb-item>
-            <t-breadcrumb-item>店铺级别管理</t-breadcrumb-item>
+            <t-breadcrumb-item>门店级别管理</t-breadcrumb-item>
           </t-breadcrumb>
           <t-tag theme="primary" variant="light">门店统一级别数据源</t-tag>
         </header>

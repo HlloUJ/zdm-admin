@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,6 +62,20 @@ public class StoreController {
   public ApiResponse<Store> update(@PathVariable Long id, @Valid @RequestBody Store store) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
     return ApiResponse.ok(storeService.updateStore(id, store));
+  }
+
+  @PatchMapping("/{id}/level")
+  public ApiResponse<Store> updateLevel(
+      @PathVariable Long id, @Valid @RequestBody StoreLevelSelectionRequest request) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit-level");
+    return ApiResponse.ok(storeService.updateLevel(id, request.storeLevelId()));
+  }
+
+  @PatchMapping("/{id}/status")
+  public ApiResponse<Store> updateStatus(
+      @PathVariable Long id, @Valid @RequestBody StoreStatusRequest request) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+    return ApiResponse.ok(storeService.updateStatus(id, request.status()));
   }
 
   @DeleteMapping("/{id}")
