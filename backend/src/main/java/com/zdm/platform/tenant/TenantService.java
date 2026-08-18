@@ -1,12 +1,16 @@
 package com.zdm.platform.tenant;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.stereotype.Service;
@@ -15,26 +19,49 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
+  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private static final Set<String> BUSINESS_TYPES =
       Set.of("cityPartner", "slabSupplier", "finishedSupplier", "factory");
 
   private final JdbcTemplate jdbcTemplate;
   private final SimpleJdbcInsert accountInsert;
+  private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public TenantService(JdbcTemplate jdbcTemplate) {
+  public TenantService(
+      JdbcTemplate jdbcTemplate,
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.jdbcTemplate = jdbcTemplate;
+    this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
     this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
         .withTableName("accounts")
         .usingColumns("phone", "display_name", "account_type", "status")
         .usingGeneratedKeyColumns("id");
   }
 
+  public List<Tenant> listTenants() {
+    return lambdaQuery()
+        .orderByDesc(Tenant::getCreatedAt)
+        .orderByDesc(Tenant::getId)
+        .list();
+  }
+
   @Transactional
   public Tenant createTenant(Tenant tenant) {
-    List<String> businesses = normalizeBusinesses(tenant.getBusinessTypes());
-    tenant.setBusinessTypes(String.join(",", businesses));
-    Long accountId = findOrCreateAccount(tenant.getContactPhone(), tenant.getContactName());
-    save(tenant);
+    List<String> businesses = List.of();
+    tenant.setBusinessTypes("");
+    tenant.setCreatedByName(resolveCreatedByName());
+    tenant.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    requireAvailableTenantPhone(tenant.getContactPhone(), null);
+    Long accountId;
+    try {
+      accountId = findOrCreateAccount(tenant.getContactPhone(), tenant.getContactName());
+      save(tenant);
+    } catch (DuplicateKeyException exception) {
+      throw new IllegalArgumentException("该手机号已存在", exception);
+    }
     syncBusinesses(tenant.getId(), businesses);
     syncTenantAdminIdentity(tenant, accountId);
     return tenant;
@@ -46,19 +73,52 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     if (existing == null) {
       throw new IllegalArgumentException("租户不存在");
     }
+    ownershipGuard.requireCreator(
+        existing.getCreatedByAccountId(), existing.getCreatedByName());
     Long ownerAccountId = requireOwnerAccountId(id);
+    requireAvailableTenantPhone(payload.getContactPhone(), id);
     requireAvailablePhone(payload.getContactPhone(), ownerAccountId);
-    List<String> businesses = normalizeBusinesses(payload.getBusinessTypes());
     payload.setId(id);
-    payload.setBusinessTypes(String.join(",", businesses));
-    updateById(payload);
-    jdbcTemplate.update(
-        "UPDATE accounts SET phone = ?, display_name = ? WHERE id = ?",
-        payload.getContactPhone(),
-        payload.getContactName(),
-        ownerAccountId);
+    payload.setStatus(existing.getStatus());
+    payload.setBusinessTypes(existing.getBusinessTypes());
+    payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
+    try {
+      updateById(payload);
+      jdbcTemplate.update(
+          "UPDATE accounts SET phone = ?, display_name = ? WHERE id = ?",
+          payload.getContactPhone(),
+          payload.getContactName(),
+          ownerAccountId);
+    } catch (DuplicateKeyException exception) {
+      throw new IllegalArgumentException("该手机号已存在", exception);
+    }
+    return getById(id);
+  }
+
+  @Transactional
+  public Tenant updateBusinesses(Long id, String businessTypes) {
+    Tenant existing = requireTenant(id);
+    ownershipGuard.requireCreator(
+        existing.getCreatedByAccountId(), existing.getCreatedByName());
+    List<String> businesses = normalizeBusinesses(businessTypes);
+    existing.setBusinessTypes(String.join(",", businesses));
+    updateById(existing);
     syncBusinesses(id, businesses);
-    syncTenantIdentityStatus(id, payload.getStatus());
+    return getById(id);
+  }
+
+  @Transactional
+  public Tenant updateStatus(Long id, String status) {
+    Tenant existing = requireTenant(id);
+    ownershipGuard.requireCreator(
+        existing.getCreatedByAccountId(), existing.getCreatedByName());
+    if (!Set.of("enabled", "disabled").contains(status)) {
+      throw new IllegalArgumentException("存在无效的租户状态");
+    }
+    existing.setStatus(status);
+    updateById(existing);
+    syncTenantIdentityStatus(id, status);
     return getById(id);
   }
 
@@ -68,6 +128,8 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     if (existing == null) {
       return false;
     }
+    ownershipGuard.requireCreator(
+        existing.getCreatedByAccountId(), existing.getCreatedByName());
     Integer storeCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM stores WHERE tenant_id = ?", Integer.class, id);
     Integer employeeCount = jdbcTemplate.queryForObject(
@@ -117,6 +179,14 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     return values;
   }
 
+  private Tenant requireTenant(Long id) {
+    Tenant tenant = getById(id);
+    if (tenant == null) {
+      throw new IllegalArgumentException("租户不存在");
+    }
+    return tenant;
+  }
+
   private void syncBusinesses(Long tenantId, List<String> businesses) {
     jdbcTemplate.update("DELETE FROM tenant_businesses WHERE tenant_id = ?", tenantId);
     for (String business : businesses) {
@@ -153,6 +223,24 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
         throw new IllegalArgumentException("该手机号已属于其他账号");
       }
     });
+  }
+
+  private void requireAvailableTenantPhone(String phone, Long tenantId) {
+    Integer count = tenantId == null
+        ? jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM tenants WHERE contact_phone = ?", Integer.class, phone)
+        : jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM tenants WHERE contact_phone = ? AND id <> ?", Integer.class, phone, tenantId);
+    if (count != null && count > 0) {
+      throw new IllegalArgumentException("该手机号已存在");
+    }
+  }
+
+  private String resolveCreatedByName() {
+    return identityProvider.current()
+        .map(CurrentIdentity::displayName)
+        .filter(StringUtils::hasText)
+        .orElse(DEFAULT_CREATED_BY_NAME);
   }
 
   private Long requireOwnerAccountId(Long tenantId) {

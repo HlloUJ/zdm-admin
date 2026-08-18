@@ -116,6 +116,9 @@ class PlatformApiSmokeTest {
     Integer tenantBusinessCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM tenant_businesses WHERE tenant_id = 1 AND business_type = 'cityPartner'",
         Integer.class);
+    Integer tenantWithoutCreatorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM tenants WHERE created_by_name IS NULL OR created_by_name = ''",
+        Integer.class);
 
     assertThat(migrationCount).isGreaterThanOrEqualTo(44);
     assertThat(superAdminCount).isEqualTo(1);
@@ -130,6 +133,7 @@ class PlatformApiSmokeTest {
     assertThat(incorrectlyScopedPlatformRoleCount).isZero();
     assertThat(incorrectlyScopedPlatformIdentityCount).isZero();
     assertThat(tenantBusinessCount).isEqualTo(1);
+    assertThat(tenantWithoutCreatorCount).isZero();
     assertThat(adminManagerPermissions)
         .contains("admin.permission-management.employee-management.view")
         .contains("admin.permission-management.role-management.view");
@@ -2285,6 +2289,92 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void tenantPermissionsIgnoreDataScopeButOperationsRequireStrictCreatorOwnership() throws Exception {
+    long accountId = 9012L;
+    long employeeId = 9012L;
+    jdbcTemplate.update(
+        """
+        INSERT INTO accounts (id, phone, display_name, account_type, status)
+        VALUES (?, '15900009012', '租户权限操作员', 'person', 'enabled')
+        """,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO employees
+          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, '租户权限操作员', '15900009012', 'enabled', 'self', '韩健')
+        """,
+        employeeId,
+        accountId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        """,
+        accountId,
+        employeeId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO roles
+          (name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
+        VALUES ('租户全部查看角色', 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE', 'operation-platform',
+          'admin', 'self', 'enabled',
+          'admin.tenant.tenant-management.view,admin.tenant.tenant-management.edit,
+           admin.tenant.tenant-management.open-business,admin.tenant.tenant-management.toggle-status,
+           admin.tenant.tenant-management.delete', '韩健')
+        """);
+    Long roleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE'",
+        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
+        VALUES (?, ?, 'admin', 1, 1)
+        """,
+        accountId,
+        roleId);
+
+    String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    mockMvc.perform(get("/api/admin/tenants")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == 1)]").isNotEmpty());
+
+    mockMvc.perform(put("/api/admin/tenants/1")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name":"不应修改的租户",
+                  "contactName":"不应修改",
+                  "contactPhone":"15926626945",
+                  "status":"enabled",
+                  "businessTypes":"",
+                  "remark":""
+                }
+                """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+    mockMvc.perform(patch("/api/admin/tenants/1/businesses")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("{\"businessTypes\":\"cityPartner\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+    mockMvc.perform(patch("/api/admin/tenants/1/status")
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json")
+            .content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+    mockMvc.perform(delete("/api/admin/tenants/1")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+  }
+
+  @Test
   void craftManagementPersistsUploadedImageAndHandlesBusinessErrors() throws Exception {
     String craftName = "集成测试工艺-" + System.nanoTime();
     String creatorName = jdbcTemplate.queryForObject(
@@ -3306,6 +3396,9 @@ class PlatformApiSmokeTest {
 
   @Test
   void tenantCrudPersistsThroughApi() throws Exception {
+    String creatorName = jdbcTemplate.queryForObject(
+        "SELECT name FROM employees WHERE account_id = 1 ORDER BY id DESC LIMIT 1",
+        String.class);
     MvcResult createResult = mockMvc.perform(post("/api/admin/tenants")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
@@ -3322,6 +3415,7 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
         .andExpect(jsonPath("$.data.id").isNumber())
+        .andExpect(jsonPath("$.data.createdByName").value(creatorName))
         .andReturn();
 
     String tenantId = com.jayway.jsonpath.JsonPath.read(
@@ -3337,7 +3431,11 @@ class PlatformApiSmokeTest {
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM tenant_businesses WHERE tenant_id = ? AND business_type = 'cityPartner' AND status = 'enabled'",
         Integer.class,
-        tenantIdValue)).isEqualTo(1);
+        tenantIdValue)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT created_by_account_id FROM tenants WHERE id = ?",
+        Long.class,
+        tenantIdValue)).isEqualTo(1L);
     Long tenantIdentityId = jdbcTemplate.queryForObject(
         "SELECT id FROM account_identities WHERE account_id = ? AND identity_type = 'tenant_admin' AND tenant_id = ? AND store_id IS NULL",
         Long.class,
@@ -3360,6 +3458,30 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.name").value("集成测试租户-已更新"));
+
+    mockMvc.perform(patch("/api/admin/tenants/{id}/businesses", tenantId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"businessTypes\":\"cityPartner\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.businessTypes").value("cityPartner"));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM tenant_businesses WHERE tenant_id = ? AND business_type = 'cityPartner' AND status = 'enabled'",
+        Integer.class,
+        tenantIdValue)).isEqualTo(1);
+
+    mockMvc.perform(patch("/api/admin/tenants/{id}/status", tenantId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("disabled"));
+    mockMvc.perform(patch("/api/admin/tenants/{id}/status", tenantId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"status\":\"enabled\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("enabled"));
 
     Long storeLevelId = jdbcTemplate.queryForObject(
         "SELECT id FROM store_levels WHERE status = 'enabled' ORDER BY id LIMIT 1",
@@ -3491,6 +3613,50 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value(400));
+  }
+
+  @Test
+  void tenantCreationAllowsDuplicateNameAndRejectsDuplicatePhone() throws Exception {
+    MvcResult createResult = mockMvc.perform(post("/api/admin/tenants")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "装点猫直营租户",
+                  "contactName": "同名租户联系人",
+                  "contactPhone": "15926626947",
+                  "status": "enabled",
+                  "businessTypes": "",
+                  "remark": "允许租户同名"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("装点猫直营租户"))
+        .andReturn();
+
+    String tenantId = com.jayway.jsonpath.JsonPath.read(
+        createResult.getResponse().getContentAsString(),
+        "$.data.id").toString();
+
+    mockMvc.perform(post("/api/admin/tenants")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "另一个租户姓名",
+                  "contactName": "重复手机号联系人",
+                  "contactPhone": "15926626947",
+                  "status": "enabled",
+                  "businessTypes": "",
+                  "remark": ""
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该手机号已存在"));
+
+    mockMvc.perform(delete("/api/admin/tenants/{id}", tenantId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk());
   }
 
   private String createStoreScopedEmployee(
