@@ -40,9 +40,12 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   @Transactional
   public boolean createStore(Store store) {
     CurrentIdentity identity = identityProvider.require();
+    requireOpenedBusiness(store.getTenantId(), store.getType());
     storeLevelService.requireSelectable(store.getStoreLevelId());
     store.setCreatedBy(identity.displayName());
-    return save(store);
+    boolean saved = save(store);
+    provisionStoreAdmins(store);
+    return saved;
   }
 
   @Transactional
@@ -52,12 +55,20 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return null;
     }
     requireAccessible(existing);
+    payload.setTenantId(existing.getTenantId());
+    if (!Objects.equals(existing.getType(), payload.getType())) {
+      requireOpenedBusiness(existing.getTenantId(), payload.getType());
+    }
     if (!Objects.equals(existing.getStoreLevelId(), payload.getStoreLevelId())) {
       storeLevelService.requireSelectable(payload.getStoreLevelId());
     }
     payload.setId(id);
     payload.setCreatedBy(existing.getCreatedBy());
     updateById(payload);
+    jdbcTemplate.update(
+        "UPDATE account_identities SET status = ? WHERE store_id = ? AND identity_type = 'store_admin'",
+        payload.getStatus(),
+        id);
     return getById(id);
   }
 
@@ -73,10 +84,38 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       throw new IllegalArgumentException(referenceMessage(summary));
     }
     try {
+      jdbcTemplate.update(
+          "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)",
+          id);
+      jdbcTemplate.update(
+          "DELETE FROM account_roles WHERE store_id = ? OR role_id IN (SELECT id FROM roles WHERE store_id = ?)",
+          id,
+          id);
+      jdbcTemplate.update(
+          "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE store_id = ?)",
+          id);
+      jdbcTemplate.update("DELETE FROM roles WHERE store_id = ?", id);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE store_id = ?", id);
+      jdbcTemplate.update("DELETE FROM employee_invites WHERE store_id = ?", id);
+      deleteStoreCategories(id);
       return removeById(id);
     } catch (DataIntegrityViolationException exception) {
       throw new IllegalArgumentException(REFERENCED_MESSAGE, exception);
     }
+  }
+
+  private void deleteStoreCategories(Long storeId) {
+    int deletedCount;
+    do {
+      deletedCount = jdbcTemplate.update(
+          """
+          DELETE category
+          FROM store_categories category
+          LEFT JOIN store_categories child ON child.parent_id = category.id
+          WHERE category.store_id = ? AND child.id IS NULL
+          """,
+          storeId);
+    } while (deletedCount > 0);
   }
 
   public StoreReferenceSummary getDeletionReferences(Long id) {
@@ -105,75 +144,16 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
                 id)),
         reference(
             storeId,
-            "accountIdentities",
-            "账号身份",
-            "SELECT COUNT(*) FROM account_identities WHERE store_id = ?",
+            "activeEmployeeInvites",
+            "有效员工邀请",
+            "SELECT COUNT(*) FROM employee_invites WHERE store_id = ? AND status = 'active' AND expires_at >= CURRENT_TIMESTAMP",
             id -> jdbcTemplate.queryForList(
                 """
-                SELECT CONCAT(a.display_name, ' / ', ai.identity_type, '（',
-                  IF(ai.status = 'enabled', '启用', '停用'), '）')
-                FROM account_identities ai
-                JOIN accounts a ON a.id = ai.account_id
-                WHERE ai.store_id = ?
-                ORDER BY ai.status = 'enabled' DESC, ai.id LIMIT 5
+                SELECT CONCAT('有效至', DATE_FORMAT(expires_at, '%Y-%m-%d %H:%i'))
+                FROM employee_invites
+                WHERE store_id = ? AND status = 'active' AND expires_at >= CURRENT_TIMESTAMP
+                ORDER BY expires_at LIMIT 5
                 """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "accountRoles",
-            "账号角色绑定",
-            "SELECT COUNT(*) FROM account_roles WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT(a.display_name, '—', r.name)
-                FROM account_roles ar
-                JOIN accounts a ON a.id = ar.account_id
-                JOIN roles r ON r.id = ar.role_id
-                WHERE ar.store_id = ?
-                ORDER BY ar.id LIMIT 5
-                """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "employeeInvites",
-            "员工邀请",
-            "SELECT COUNT(*) FROM employee_invites WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT(invite_status, ' ', COUNT(*), '条')
-                FROM (
-                  SELECT CASE
-                    WHEN status = 'active' AND expires_at < CURRENT_TIMESTAMP THEN '已过期'
-                    WHEN status = 'active' THEN '有效'
-                    WHEN status = 'used' THEN '已使用'
-                    ELSE '已过期'
-                  END AS invite_status
-                  FROM employee_invites
-                  WHERE store_id = ?
-                ) scoped_invites
-                GROUP BY invite_status
-                ORDER BY invite_status
-                """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "orders",
-            "订单",
-            "SELECT COUNT(*) FROM platform_orders WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                "SELECT CONCAT(order_no, '（', status, '）') FROM platform_orders WHERE store_id = ? ORDER BY id LIMIT 5",
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "roles",
-            "门店角色",
-            "SELECT COUNT(*) FROM roles WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                "SELECT CONCAT(name, '（', IF(status = 'enabled', '启用', '停用'), '）') FROM roles WHERE store_id = ? ORDER BY id LIMIT 5",
                 String.class,
                 id)))
         .stream()
@@ -204,6 +184,39 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
         .reduce((left, right) -> left + "、" + right)
         .orElse("");
     return REFERENCED_MESSAGE + "（" + referenceCounts + "）";
+  }
+
+  private void requireOpenedBusiness(Long tenantId, String storeType) {
+    Integer count = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM tenant_businesses tb
+        JOIN tenants t ON t.id = tb.tenant_id AND t.status = 'enabled'
+        WHERE tb.tenant_id = ? AND tb.business_type = ? AND tb.status = 'enabled'
+        """,
+        Integer.class,
+        tenantId,
+        storeType);
+    if (count == null || count == 0) {
+      throw new IllegalArgumentException("该租户未启用对应业务，不能创建或变更为该类型门店");
+    }
+  }
+
+  private void provisionStoreAdmins(Store store) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO account_identities
+          (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
+        SELECT account_id, 'admin', 'store_admin', ?, ?, ?, ?
+        FROM account_identities
+        WHERE identity_type = 'tenant_admin' AND tenant_id = ? AND status = 'enabled'
+        ON DUPLICATE KEY UPDATE status = VALUES(status)
+        """,
+        store.getId(),
+        store.getTenantId(),
+        store.getId(),
+        store.getStatus(),
+        store.getTenantId());
   }
 
   private void requireAccessible(Store store) {

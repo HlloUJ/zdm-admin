@@ -589,10 +589,10 @@ test('shows current account info and logout on tenant management page', async ({
         phone: '15900000004',
         roles: ['TENANT_MANAGER'],
         roleNames: ['租户管理员'],
+        identityType: 'tenant_admin',
         permissions: ['admin.tenant.tenant-management.view'],
         employeeId: 4,
         tenantId: 1,
-        storeId: 1,
         dataPermission: 'all',
       }),
     );
@@ -614,14 +614,13 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
         name: '角色权限员工',
         phone: '15900000002',
         roles: ['ROLE_PERMISSION_MANAGER'],
+        identityType: 'platform_admin',
         permissions: [
           'admin.permission-management.employee-management.view',
           'admin.permission-management.role-management.operation-platform.view',
           'admin.permission-management.role-management.operation-platform.permission',
         ],
         employeeId: 3,
-        tenantId: 1,
-        storeId: 1,
         dataPermission: 'all',
       }),
     );
@@ -645,11 +644,8 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
 test('opens role permission configuration dialog', async ({ page }) => {
   await page.goto('/role-management');
   const main = page.getByRole('main');
-  const roleTabs = main.locator('.role-tabs .t-tabs__nav-item');
-
   await expect(main.getByText('角色管理')).toBeVisible();
-  await expect(roleTabs).toHaveText(['运营管理平台角色', '城市合伙人门店角色', '大板供应商门店角色']);
-  await expect(roleTabs.filter({ hasText: '运营管理平台角色' })).toHaveClass(/t-is-active/);
+  await expect(main.locator('.role-tabs')).toHaveCount(0);
 
   const superAdminRoleRow = page.locator('tbody tr').filter({ hasText: '超级管理员' }).first();
   await expect(superAdminRoleRow).toBeVisible();

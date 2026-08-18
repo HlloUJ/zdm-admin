@@ -38,23 +38,20 @@ public class TenantController {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
     permissionGuard.requireAllData();
     tenant.setId(null);
-    tenantService.save(tenant);
-    return ApiResponse.ok(tenant);
+    return ApiResponse.ok(tenantService.createTenant(tenant));
   }
 
   @PutMapping("/{id}")
   public ApiResponse<Tenant> update(@PathVariable Long id, @Valid @RequestBody Tenant tenant) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
     permissionGuard.requireAllData();
-    tenant.setId(id);
-    tenantService.updateById(tenant);
-    return ApiResponse.ok(tenantService.getById(id));
+    return ApiResponse.ok(tenantService.updateTenant(id, tenant));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
     permissionGuard.requireAllData();
-    return ApiResponse.ok(tenantService.removeById(id));
+    return ApiResponse.ok(tenantService.deleteTenant(id));
   }
 }

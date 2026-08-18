@@ -11,6 +11,8 @@ export interface LoginPayload {
 
 export interface LoginUser {
   id: number;
+  identityId?: number;
+  identityType?: 'platform_admin' | 'tenant_admin' | 'store_admin' | 'employee';
   name: string;
   phone: string;
   roles: string[];
@@ -19,7 +21,20 @@ export interface LoginUser {
   employeeId?: number;
   tenantId?: number;
   storeId?: number;
+  tenantName?: string;
+  storeName?: string;
+  storeType?: 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
   dataPermission?: 'self' | 'all' | '';
+}
+
+export interface IdentityContext {
+  identityId: number;
+  identityType: 'platform_admin' | 'tenant_admin' | 'store_admin' | 'employee';
+  tenantId?: number;
+  storeId?: number;
+  tenantName?: string;
+  storeName?: string;
+  storeType?: LoginUser['storeType'];
 }
 
 export interface LoginResult {
@@ -66,6 +81,8 @@ function readLoginUser() {
     if (!user.name) return defaultLoginUser;
     return {
       id: Number(user.id ?? 0),
+      identityId: user.identityId,
+      identityType: user.identityType,
       name: user.name,
       phone: user.phone ?? '',
       roles: user.roles ?? [],
@@ -74,6 +91,9 @@ function readLoginUser() {
       employeeId: user.employeeId,
       tenantId: user.tenantId,
       storeId: user.storeId,
+      tenantName: user.tenantName,
+      storeName: user.storeName,
+      storeType: user.storeType,
       dataPermission: user.dataPermission ?? '',
     };
   } catch {
@@ -118,6 +138,20 @@ export async function login(payload: LoginPayload) {
   const result = await request<LoginResult>('/admin/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+  setAuthToken(result.token);
+  setLoginUser(result.user);
+  return result;
+}
+
+export function listIdentityContexts() {
+  return request<IdentityContext[]>('/admin/auth/contexts');
+}
+
+export async function switchIdentity(identityId: number) {
+  const result = await request<LoginResult>('/admin/auth/switch-identity', {
+    method: 'POST',
+    body: JSON.stringify({ identityId }),
   });
   setAuthToken(result.token);
   setLoginUser(result.user);

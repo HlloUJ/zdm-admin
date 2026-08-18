@@ -62,7 +62,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     requireCategory(role.getCategory());
     requireRoleAction(role.getCategory(), "create");
     role.setId(null);
-    role.setStoreId("terminal-policy".equals(role.getCategory()) ? null : requireStoreId());
+    role.setStoreId(requiresStoreScope(role.getCategory()) ? requireStoreId() : null);
     normalizeAndValidateRoleName(role, null);
     role.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(role.getFunctionPermissions()));
     role.setCreatedByName(resolveCreatedByName());
@@ -126,9 +126,13 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     if ("terminal-policy".equals(role.getCategory())) {
       return identity.isSuperAdmin();
     }
-    return canAssignEmployeeRole
+    boolean sameScope = identity.storeId() == null
+        ? role.getStoreId() == null && "operation-platform".equals(role.getCategory())
+        : Objects.equals(role.getStoreId(), identity.storeId())
+            && !"operation-platform".equals(role.getCategory());
+    return sameScope && (canAssignEmployeeRole
         || canViewLegacyRolePage
-        || permissionGuard.hasView(rolePermissionPrefix(role.getCategory()));
+        || permissionGuard.hasView(rolePermissionPrefix(role.getCategory())));
   }
 
   private void authorizeUpdate(Role existing, Role payload) {
@@ -168,6 +172,16 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
+    CurrentIdentity identity = identityProvider.require();
+    if (!"terminal-policy".equals(role.getCategory())) {
+      boolean sameScope = identity.storeId() == null
+          ? role.getStoreId() == null && "operation-platform".equals(role.getCategory())
+          : Objects.equals(role.getStoreId(), identity.storeId())
+              && !"operation-platform".equals(role.getCategory());
+      if (!sameScope) {
+        throw new AccessDeniedException("当前组织无权操作该角色");
+      }
+    }
     ownershipGuard.requireCreator(role.getCreatedByAccountId(), role.getCreatedByName());
     if ("terminal-policy".equals(role.getCategory())) {
       permissionGuard.requireSuperAdmin();
@@ -274,5 +288,9 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
       throw new AccessDeniedException("当前身份未关联门店");
     }
     return identity.storeId();
+  }
+
+  private boolean requiresStoreScope(String category) {
+    return !"terminal-policy".equals(category) && !"operation-platform".equals(category);
   }
 }
