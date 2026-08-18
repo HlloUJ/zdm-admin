@@ -25,6 +25,8 @@ public class Tenant {
   @NotBlank
   private String status;
 
+  private String createdByName;
+  private Long createdByAccountId;
   private String businessTypes;
   private String remark;
   private LocalDateTime createdAt;
@@ -68,6 +70,22 @@ public class Tenant {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public String getBusinessTypes() {

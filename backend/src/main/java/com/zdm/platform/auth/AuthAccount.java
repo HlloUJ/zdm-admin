@@ -3,6 +3,7 @@ package com.zdm.platform.auth;
 public class AuthAccount {
   private Long id;
   private Long identityId;
+  private String identityType;
   private String clientCode;
   private String phone;
   private String displayName;
@@ -11,6 +12,9 @@ public class AuthAccount {
   private Long tenantId;
   private Long storeId;
   private String dataPermission;
+  private String tenantName;
+  private String storeName;
+  private String storeType;
 
   public Long getId() {
     return id;
@@ -26,6 +30,14 @@ public class AuthAccount {
 
   public void setIdentityId(Long identityId) {
     this.identityId = identityId;
+  }
+
+  public String getIdentityType() {
+    return identityType;
+  }
+
+  public void setIdentityType(String identityType) {
+    this.identityType = identityType;
   }
 
   public String getClientCode() {
@@ -90,5 +102,29 @@ public class AuthAccount {
 
   public void setDataPermission(String dataPermission) {
     this.dataPermission = dataPermission;
+  }
+
+  public String getTenantName() {
+    return tenantName;
+  }
+
+  public void setTenantName(String tenantName) {
+    this.tenantName = tenantName;
+  }
+
+  public String getStoreName() {
+    return storeName;
+  }
+
+  public void setStoreName(String storeName) {
+    this.storeName = storeName;
+  }
+
+  public String getStoreType() {
+    return storeType;
+  }
+
+  public void setStoreType(String storeType) {
+    this.storeType = storeType;
   }
 }

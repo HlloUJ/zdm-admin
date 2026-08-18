@@ -62,6 +62,11 @@ describe('full function catalog', () => {
       value: 'admin.tenant',
       menus: [
         {
+          label: '租户管理',
+          direct: true,
+          pages: [{ label: '租户管理页', tabs: [] }],
+        },
+        {
           label: '门店基础数据',
           pages: [{ label: '店铺级别管理页', thirdMenuLabel: '店铺级别管理', tabs: [] }],
         },
@@ -193,6 +198,17 @@ describe('full function catalog', () => {
     ]);
     const productModule = fullFunctionCatalog[3];
     const productPages = productModule.menus.flatMap((menu) => menu.pages);
+    const tenantPage = fullFunctionCatalog[0].menus
+      .flatMap((menu) => menu.pages)
+      .find((page) => page.value === 'admin.tenant.tenant-management');
+    expect(tenantPage?.actions).toEqual([
+      { label: '查看', value: 'admin.tenant.tenant-management.view' },
+      { label: '新增', value: 'admin.tenant.tenant-management.create' },
+      { label: '业务开通', value: 'admin.tenant.tenant-management.open-business' },
+      { label: '编辑', value: 'admin.tenant.tenant-management.edit' },
+      { label: '停用/启用', value: 'admin.tenant.tenant-management.toggle-status' },
+      { label: '删除', value: 'admin.tenant.tenant-management.delete' },
+    ]);
     const categoryPage = productPages.find((page) => page.value === 'admin.product-data-center.category');
     expect(categoryPage?.tabs).toEqual([
       {
@@ -289,6 +305,12 @@ describe('full function catalog', () => {
       { label: '删除', value: 'admin.product-data-center.slab-grade.delete' },
     ]);
     expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
+      'admin.tenant.tenant-management.view',
+      'admin.tenant.tenant-management.create',
+      'admin.tenant.tenant-management.open-business',
+      'admin.tenant.tenant-management.edit',
+      'admin.tenant.tenant-management.toggle-status',
+      'admin.tenant.tenant-management.delete',
       'admin.tenant.store-level-management.view',
       'admin.tenant.store-level-management.create',
       'admin.tenant.store-level-management.edit',
@@ -451,6 +473,7 @@ describe('full function catalog', () => {
 
   it('keeps production audience filters available and limits store roles to terminal grants', () => {
     const operationValues = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));
+    expect(operationValues).toContain('admin.tenant.tenant-management.view');
     expect(operationValues).toContain('admin.tenant.store-level-management.view');
     expect(operationValues).not.toContain('admin.tenant.store-category-management.view');
 

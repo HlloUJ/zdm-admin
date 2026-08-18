@@ -248,7 +248,7 @@ test('shows store reference details instead of sending a failing delete request'
   await row.getByText('删除', { exact: true }).click();
 
   await expect(page.getByText('员工 2 条', { exact: false })).toBeVisible();
-  await expect(page.getByText('员工邀请 7 条', { exact: false })).toBeVisible();
+  await expect(page.getByText('有效员工邀请 1 条', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: '我知道了', exact: true })).toBeVisible();
 });
 

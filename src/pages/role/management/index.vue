@@ -368,9 +368,18 @@ const hasLegacyRolePagePermission = computed(() =>
 const { visibleTabs: roleTabs, showTabRail: showRoleTabRail } = usePermissionTabs({
   tabs: allRoleTabs,
   activeTab: activeCategory,
-  canAccess: (tab) =>
-    hasLegacyRolePagePermission.value ||
-    hasPermissionPrefix(loginUser.value, `${rolePagePermissionPrefix}.${tab.value}`),
+  canAccess: (tab) => {
+    const currentScopeCategory = !loginUser.value.storeId
+      ? 'operation-platform'
+      : loginUser.value.storeType === 'cityPartner'
+        ? 'partner-store'
+        : 'supplier-store';
+    if (tab.value !== currentScopeCategory) return false;
+    return (
+      hasLegacyRolePagePermission.value ||
+      hasPermissionPrefix(loginUser.value, `${rolePagePermissionPrefix}.${tab.value}`)
+    );
+  },
 });
 const activePermissionModuleValue = ref(permissionModules.value[0]?.value ?? '');
 const pagination = reactive({

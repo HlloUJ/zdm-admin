@@ -26,6 +26,7 @@ test('stores and displays the logged-in user', async ({ page }) => {
             phone: '15900000001',
             roles: ['OPERATION_MANAGER'],
             roleNames: ['运营经理'],
+            identityType: 'platform_admin',
             permissions: ['admin.permission-management.employee-management.view'],
           },
         },
@@ -67,4 +68,72 @@ test('logs out and clears the local account session', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '欢迎登录' })).toBeVisible();
   expect(await page.evaluate(() => window.localStorage.getItem('zdm-admin-token'))).toBeNull();
   expect(await page.evaluate(() => window.localStorage.getItem('zdm-admin-user'))).toBeNull();
+});
+
+test('places the available store switcher under the brand', async ({ page }) => {
+  await installAdminApiMocks(page);
+  await page.route('**/api/admin/auth/contexts', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          {
+            identityId: 1,
+            identityType: 'platform_admin',
+            tenantId: null,
+            storeId: null,
+            tenantName: null,
+            storeName: null,
+            storeType: null,
+          },
+          {
+            identityId: 11,
+            identityType: 'store_admin',
+            tenantId: 1,
+            storeId: 1,
+            tenantName: '华东石材',
+            storeName: '杭州体验门店',
+            storeType: 'cityPartner',
+          },
+          {
+            identityId: 12,
+            identityType: 'store_admin',
+            tenantId: 1,
+            storeId: 2,
+            tenantName: '华东石材',
+            storeName: '宁波体验门店',
+            storeType: 'cityPartner',
+          },
+        ],
+      }),
+    });
+  });
+  await page.addInitScript(() => {
+    window.localStorage.setItem('zdm-admin-token', 'dev-token:1');
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 1,
+        identityId: 1,
+        identityType: 'platform_admin',
+        name: '超级管理员',
+        phone: '15926626945',
+        roles: ['SUPER_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/dashboard');
+
+  await expect(page.locator('.brand .brand-context-select')).toBeVisible();
+  await expect(page.locator('.top-actions .t-select')).toHaveCount(0);
+  await page.locator('.brand .brand-context-select').click();
+  await expect(page.getByText('运营管理平台', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('华东石材 / 杭州体验门店', { exact: true })).toBeVisible();
+  await expect(page.getByText('华东石材 / 宁波体验门店', { exact: true })).toBeVisible();
 });

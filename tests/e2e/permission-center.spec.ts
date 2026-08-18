@@ -621,10 +621,10 @@ test('shows current account info and logout on tenant management page', async ({
         phone: '15900000004',
         roles: ['TENANT_MANAGER'],
         roleNames: ['租户管理员'],
+        identityType: 'tenant_admin',
         permissions: ['admin.tenant.tenant-management.view'],
         employeeId: 4,
         tenantId: 1,
-        storeId: 1,
         dataPermission: 'all',
       }),
     );
@@ -646,14 +646,13 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
         name: '角色权限员工',
         phone: '15900000002',
         roles: ['ROLE_PERMISSION_MANAGER'],
+        identityType: 'platform_admin',
         permissions: [
           'admin.permission-management.employee-management.view',
           'admin.permission-management.role-management.operation-platform.view',
           'admin.permission-management.role-management.operation-platform.permission',
         ],
         employeeId: 3,
-        tenantId: 1,
-        storeId: 1,
         dataPermission: 'all',
       }),
     );
@@ -677,11 +676,8 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
 test('opens role permission configuration dialog', async ({ page }) => {
   await page.goto('/role-management');
   const main = page.getByRole('main');
-  const roleTabs = main.locator('.role-tabs .t-tabs__nav-item');
-
   await expect(main.getByText('角色管理')).toBeVisible();
-  await expect(roleTabs).toHaveText(['运营管理平台角色', '城市合伙人门店角色', '大板供应商门店角色']);
-  await expect(roleTabs.filter({ hasText: '运营管理平台角色' })).toHaveClass(/t-is-active/);
+  await expect(main.locator('.role-tabs')).toHaveCount(0);
 
   const superAdminRoleRow = page.locator('tbody tr').filter({ hasText: '超级管理员' }).first();
   await expect(superAdminRoleRow).toBeVisible();
@@ -904,7 +900,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*5/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*11/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -914,6 +910,15 @@ test('shows the full function catalog for both terminals during development', as
   await expect(matrix.locator('thead')).toContainText('页面');
   await expect(matrix.locator('th.permission-tab-column')).toHaveText('Tab');
   await expect(matrix.locator('thead')).toContainText('操作权限');
+  const tenantAllocationRow = matrix.locator('tbody tr').filter({ hasText: '租户管理页' });
+  await expect(tenantAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '业务开通',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
   const storeLevelAllocationRow = matrix.locator('tbody tr').filter({ hasText: '店铺级别管理页' });
   await expect(storeLevelAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
@@ -1064,8 +1069,9 @@ test('shows the full function catalog for both terminals during development', as
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await moduleList.getByText('租户与门店', { exact: true }).click();
+  await expect(matrix.getByText('租户管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('店铺级别管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(11);
   await moduleList.getByText('供应商管理', { exact: true }).click();
   await expect(matrix.getByText('供应商管理页', { exact: true })).toBeVisible();
   await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);

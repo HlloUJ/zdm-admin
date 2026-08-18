@@ -527,14 +527,27 @@ const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
 
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
+  await page.route('**/api/admin/auth/contexts', async (route) => {
+    await fulfillJson(route, [
+      {
+        identityId: 1,
+        identityType: 'platform_admin',
+        tenantId: null,
+        storeId: null,
+        tenantName: null,
+        storeName: null,
+        storeType: null,
+      },
+    ]);
+  });
   await mockCollection(page, '**/api/admin/tenants', tenants);
   await mockCollection(page, '**/api/admin/stores', stores);
   await page.route('**/api/admin/stores/1/deletion-references', async (route) => {
     await fulfillJson(route, {
-      totalCount: 9,
+      totalCount: 3,
       references: [
         { code: 'employees', name: '员工', count: 2, examples: ['超级管理员（启用）', '待启用员工（停用）'] },
-        { code: 'employeeInvites', name: '员工邀请', count: 7, examples: ['有效 2条', '已使用 5条'] },
+        { code: 'activeEmployeeInvites', name: '有效员工邀请', count: 1, examples: ['有效至2026-08-25 10:00'] },
       ],
     });
   });
