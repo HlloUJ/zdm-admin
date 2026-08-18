@@ -281,7 +281,7 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
 
   const storeRow = page.locator('tbody tr').filter({ hasText: '杭州体验门店' }).first();
   await storeRow.locator('.level-cell').hover();
-  await storeRow.getByLabel('快速编辑店铺级别').click();
+  await storeRow.getByLabel('修改门店级别').click();
   const levelDialog = page.locator('.t-dialog').filter({ hasText: '店铺级别' });
   await expect(levelDialog).toBeVisible();
   await expect(levelDialog.getByText('店铺级别').first()).toBeVisible();

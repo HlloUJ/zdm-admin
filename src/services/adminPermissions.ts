@@ -38,7 +38,7 @@ export const adminMenuEntries: AdminMenuEntry[] = [
         value: 'store-base-data-management',
         children: [
           {
-            label: '店铺级别管理',
+            label: '门店级别管理',
             path: '/store-level-management',
             permissionPrefix: 'admin.tenant.store-level-management',
           },

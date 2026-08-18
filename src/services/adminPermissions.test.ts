@@ -56,7 +56,7 @@ describe('admin menu permissions', () => {
           children: expect.arrayContaining([
             expect.objectContaining({
               label: '门店基础数据',
-              children: [expect.objectContaining({ label: '店铺级别管理', path: '/store-level-management' })],
+              children: [expect.objectContaining({ label: '门店级别管理', path: '/store-level-management' })],
             }),
           ]),
         }),

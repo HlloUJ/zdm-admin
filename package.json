@@ -73,6 +73,7 @@
     ]
   },
   "dependencies": {
+    "@vant/area-data": "^2.1.0",
     "tdesign-icons-vue-next": "^0.4.4",
     "tdesign-vue-next": "^1.20.2",
     "typescript": "~6.0.3",

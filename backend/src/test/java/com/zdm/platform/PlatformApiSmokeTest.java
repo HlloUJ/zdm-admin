@@ -1416,6 +1416,159 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void storeOperationsRequireIndependentPermissionsAndEditPreservesProtectedFields() throws Exception {
+    long accountId = 99088L;
+    long employeeId = 99088L;
+    long roleId = 99088L;
+    long storeId = 99088L;
+    long otherStoreId = 99089L;
+    Long originalLevelId = jdbcTemplate.queryForObject(
+        "SELECT id FROM store_levels WHERE status = 'enabled' ORDER BY id LIMIT 1",
+        Long.class);
+    Long targetLevelId = jdbcTemplate.queryForObject(
+        "SELECT id FROM store_levels WHERE status = 'enabled' AND id <> ? ORDER BY id LIMIT 1",
+        Long.class,
+        originalLevelId);
+
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
+        accountId, "15926629088", "门店权限测试操作员");
+    jdbcTemplate.update(
+        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '门店权限测试操作员', '15926629088', 'enabled', 'self', '韩健')",
+        employeeId, accountId);
+    jdbcTemplate.update(
+        "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
+        accountId, employeeId);
+    jdbcTemplate.update(
+        "INSERT INTO roles (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name) VALUES (?, '门店编辑测试角色', 'STORE_EDIT_TEST', 'operation-platform', 'admin', 'self', 'enabled', 'admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit', '集成测试')",
+        roleId);
+    jdbcTemplate.update(
+        "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
+        accountId, roleId);
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, store_level_id, status, created_by) VALUES (?, 1, '门店权限测试门店', 'cityPartner', ?, 'enabled', '门店权限测试操作员')",
+        storeId, originalLevelId);
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, store_level_id, status, created_by) VALUES (?, 1, '其他人创建的门店权限测试门店', 'cityPartner', ?, 'enabled', '其他管理员')",
+        otherStoreId, originalLevelId);
+
+    try {
+      String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      mockMvc.perform(get("/api/admin/stores").header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[?(@.id == %d)]".formatted(storeId)).isNotEmpty())
+          .andExpect(jsonPath("$.data[?(@.id == %d)]".formatted(otherStoreId)).isNotEmpty());
+      mockMvc.perform(patch("/api/admin/stores/{id}/level", storeId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + targetLevelId + "}"))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(patch("/api/admin/stores/{id}/status", storeId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isForbidden());
+
+      mockMvc.perform(put("/api/admin/stores/{id}", storeId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {
+                    "tenantId": 1,
+                    "name": "门店权限测试门店-已编辑",
+                    "type": "cityPartner",
+                    "storeLevelId": %d,
+                    "status": "disabled"
+                  }
+                  """.formatted(targetLevelId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.name").value("门店权限测试门店-已编辑"))
+          .andExpect(jsonPath("$.data.storeLevelId").value(originalLevelId))
+          .andExpect(jsonPath("$.data.status").value("enabled"));
+
+      jdbcTemplate.update(
+          "UPDATE roles SET function_permissions = ? WHERE id = ?",
+          "admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit-level",
+          roleId);
+      mockMvc.perform(patch("/api/admin/stores/{id}/level", storeId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + targetLevelId + "}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.storeLevelId").value(targetLevelId));
+
+      jdbcTemplate.update(
+          "UPDATE roles SET function_permissions = ? WHERE id = ?",
+          "admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.toggle-status",
+          roleId);
+      mockMvc.perform(patch("/api/admin/stores/{id}/status", storeId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("disabled"));
+
+      jdbcTemplate.update("UPDATE employees SET data_permission = 'all' WHERE id = ?", employeeId);
+      jdbcTemplate.update(
+          "UPDATE roles SET function_permissions = ? WHERE id = ?",
+          "admin.tenant.tenant-store-management.view,"
+              + "admin.tenant.tenant-store-management.edit-level,"
+              + "admin.tenant.tenant-store-management.edit,"
+              + "admin.tenant.tenant-store-management.toggle-status,"
+              + "admin.tenant.tenant-store-management.delete",
+          roleId);
+      mockMvc.perform(put("/api/admin/stores/{id}", otherStoreId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {
+                    "tenantId": 1,
+                    "name": "越权编辑其他人的门店",
+                    "type": "cityPartner",
+                    "storeLevelId": %d,
+                    "status": "enabled"
+                  }
+                  """.formatted(originalLevelId)))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+      mockMvc.perform(patch("/api/admin/stores/{id}/level", otherStoreId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + targetLevelId + "}"))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+      mockMvc.perform(patch("/api/admin/stores/{id}/status", otherStoreId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+      mockMvc.perform(get("/api/admin/stores/{id}/deletion-references", otherStoreId)
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+      mockMvc.perform(delete("/api/admin/stores/{id}", otherStoreId)
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+
+      mockMvc.perform(patch("/api/admin/stores/{id}/status", otherStoreId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("disabled"));
+    } finally {
+      jdbcTemplate.update("DELETE FROM stores WHERE id IN (?, ?)", storeId, otherStoreId);
+      jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+  }
+
+  @Test
   void storeWithEmployeeCannotBeDeletedButRolesAreNotReportedAsBlockers() throws Exception {
     long storeId = 998003L;
     createStoreScopedEmployee(

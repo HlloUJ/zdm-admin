@@ -499,14 +499,33 @@ const storeLevelModule: FunctionModule = {
       ],
     },
     {
+      label: '门店管理',
+      value: 'admin.tenant.tenant-store-management.menu',
+      direct: true,
+      pages: [
+        {
+          label: '门店管理页',
+          value: 'admin.tenant.tenant-store-management',
+          actions: [
+            { label: '新增', value: 'admin.tenant.tenant-store-management.create' },
+            { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.edit-level' },
+            { label: '编辑', value: 'admin.tenant.tenant-store-management.edit' },
+            { label: '停用/启用', value: 'admin.tenant.tenant-store-management.toggle-status' },
+            { label: '删除', value: 'admin.tenant.tenant-store-management.delete' },
+          ],
+          tabs: [],
+        },
+      ],
+    },
+    {
       label: '门店基础数据',
       value: 'admin.tenant.store-base-data.menu',
       direct: false,
       pages: [
         {
-          label: '店铺级别管理页',
+          label: '门店级别管理页',
           value: 'admin.tenant.store-level-management',
-          thirdMenuLabel: '店铺级别管理',
+          thirdMenuLabel: '门店级别管理',
           actions: [
             { label: '新增', value: 'admin.tenant.store-level-management.create' },
             { label: '编辑', value: 'admin.tenant.store-level-management.edit' },
