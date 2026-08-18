@@ -149,13 +149,8 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
           "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)",
           id);
       jdbcTemplate.update(
-          "DELETE FROM account_roles WHERE store_id = ? OR role_id IN (SELECT id FROM roles WHERE store_id = ?)",
-          id,
+          "DELETE FROM account_roles WHERE store_id = ?",
           id);
-      jdbcTemplate.update(
-          "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE store_id = ?)",
-          id);
-      jdbcTemplate.update("DELETE FROM roles WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM account_identities WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM employee_invites WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM employees WHERE store_id = ?", id);

@@ -181,7 +181,11 @@ import {
   type FunctionModule,
   type TerminalType,
 } from '@/services/functionCatalog';
-import { createRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
+import {
+  listTerminalFunctionPolicies,
+  saveTerminalFunctionPolicy,
+  type TerminalFunctionPolicyRecord,
+} from '@/services/terminalFunctionPolicies';
 
 const activeTerminal = ref<TerminalType>('store');
 const activeModuleValue = ref(terminalFunctionTrees.store[0]?.value ?? '');
@@ -191,7 +195,7 @@ const savedAllocationValues = reactive<Record<TerminalType, string[]>>({
   store: [...initialAllocationValues.store],
   supplier: [...initialAllocationValues.supplier],
 });
-const terminalPolicyRoles = reactive<Partial<Record<TerminalType, RoleRecord>>>({});
+const terminalPolicies = reactive<Partial<Record<TerminalType, TerminalFunctionPolicyRecord>>>({});
 
 const currentTree = computed(() => terminalFunctionTrees[activeTerminal.value]);
 
@@ -277,30 +281,14 @@ const clearAllNodes = () => {
 
 const parsePermissions = (value?: string) => value?.split(',').filter(Boolean) ?? [];
 
-const terminalCode = (terminal: TerminalType) =>
-  terminal === 'store' ? 'TERMINAL_STORE_POLICY' : 'TERMINAL_SUPPLIER_POLICY';
-
-const terminalName = (terminal: TerminalType) => (terminal === 'store' ? '门店后台功能配置' : '供应商后台功能配置');
-
-const toPolicyPayload = (terminal: TerminalType, permissions: string[]): RolePayload => ({
-  name: terminalName(terminal),
-  code: terminalCode(terminal),
-  category: 'terminal-policy',
-  clientCode: terminal,
-  dataScope: 'store',
-  status: 'enabled',
-  remark: `系统配置：${terminal === 'store' ? '门店后台' : '供应商后台'}可下放功能范围`,
-  functionPermissions: permissions.join(','),
-});
-
 const loadAllocation = async () => {
   loading.value = true;
   try {
-    const roles = await listRoles();
+    const policies = await listTerminalFunctionPolicies();
     (['store', 'supplier'] as TerminalType[]).forEach((terminal) => {
-      const policy = roles.find((role) => role.code === terminalCode(terminal));
+      const policy = policies.find((item) => item.terminal === terminal);
       if (policy) {
-        terminalPolicyRoles[terminal] = policy;
+        terminalPolicies[terminal] = policy;
         savedAllocationValues[terminal] = normalizeTerminalPermissions(
           terminal,
           parsePermissions(policy.functionPermissions),
@@ -322,12 +310,10 @@ const resetAllocation = () => {
 
 const saveAllocation = async () => {
   const terminal = activeTerminal.value;
-  const payload = toPolicyPayload(terminal, checkedValues.value);
   loading.value = true;
   try {
-    const policy = terminalPolicyRoles[terminal];
-    const saved = policy ? await updateRole(policy.id, payload) : await createRole(payload);
-    terminalPolicyRoles[terminal] = saved;
+    const saved = await saveTerminalFunctionPolicy(terminal, checkedValues.value.join(','));
+    terminalPolicies[terminal] = saved;
     savedAllocationValues[terminal] = normalizeTerminalPermissions(
       terminal,
       parsePermissions(saved.functionPermissions),

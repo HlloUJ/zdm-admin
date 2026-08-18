@@ -24,7 +24,7 @@ class PermissionGuardTest {
   void nestedViewPermissionOpensItsOwningPage() {
     when(identityProvider.require()).thenReturn(identity(
         "all",
-        List.of("admin.permission-management.role-management.operation-platform.view")));
+        List.of("admin.permission-management.role-management.view")));
 
     assertThat(permissionGuard.hasView("admin.permission-management.role-management")).isTrue();
     assertThat(permissionGuard.hasView("admin.tenant.tenant-management")).isFalse();

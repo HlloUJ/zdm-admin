@@ -520,12 +520,7 @@ const loadPermissionCenter = async () => {
   loading.value = true;
   try {
     const [roles, records] = await Promise.all([listRoles(), listEmployees()]);
-    const roleCategory = !loginUser.value.storeId
-      ? 'operation-platform'
-      : loginUser.value.storeType === 'cityPartner'
-        ? 'partner-store'
-        : 'supplier-store';
-    operationRoles.value = roles.filter((role) => role.category === roleCategory && role.status === 'enabled');
+    operationRoles.value = roles.filter((role) => role.status === 'enabled');
     employees.value = sortByCreatedAtDesc(records).map(toEmployeeItem);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '员工列表加载失败');

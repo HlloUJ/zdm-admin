@@ -115,8 +115,6 @@ const roles = [
     id: 1,
     name: '超级管理员',
     code: 'SUPER_ADMIN',
-    category: 'operation-platform',
-    clientCode: 'admin',
     dataScope: 'all',
     status: 'enabled',
     remark: '系统内置角色',
@@ -129,12 +127,10 @@ const roles = [
     id: 2,
     name: '运营管理平台角色',
     code: 'OPERATION_MANAGER',
-    category: 'operation-platform',
-    clientCode: 'admin',
     dataScope: 'all',
     status: 'enabled',
     remark: 'E2E 运营角色',
-    functionPermissions: 'admin.permission-management.role-management.operation-platform.view',
+    functionPermissions: 'admin.permission-management.role-management.view',
     createdByAccountId: 1,
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
@@ -143,8 +139,6 @@ const roles = [
     id: 3,
     name: '未配置权限角色',
     code: 'EMPTY_PERMISSION_ROLE',
-    category: 'operation-platform',
-    clientCode: 'admin',
     dataScope: 'all',
     status: 'enabled',
     remark: 'E2E 未配置权限角色',
@@ -153,6 +147,11 @@ const roles = [
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
+];
+
+const terminalFunctionPolicies = [
+  { id: 1, terminal: 'store', functionPermissions: '' },
+  { id: 2, terminal: 'supplier', functionPermissions: '' },
 ];
 
 const employees = [
@@ -519,6 +518,7 @@ export async function installAdminApiMocks(page: Page) {
   });
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
   await mockCollection(page, '**/api/admin/roles', roles);
+  await mockCollection(page, '**/api/admin/terminal-function-policies', terminalFunctionPolicies);
   await mockCollection(page, '**/api/admin/employees', employees);
   await mockCollection(page, '**/api/admin/store-categories', storeCategories);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);

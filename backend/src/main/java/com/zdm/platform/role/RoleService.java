@@ -43,26 +43,22 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   public List<Role> listForCurrentAdmin() {
     CurrentIdentity identity = identityProvider.require();
     boolean canAssignEmployeeRole = permissionGuard.hasPermission(EMPLOYEE_ASSIGN_PERMISSION);
-    boolean canViewLegacyRolePage = permissionGuard.hasPermission(ROLE_PERMISSION_PREFIX + ".view");
-    boolean canViewAnyRoleCategory = canViewLegacyRolePage
-        || List.of("operation-platform", "partner-store", "supplier-store")
-        .stream()
-        .anyMatch(category -> permissionGuard.hasView(rolePermissionPrefix(category)));
-    if (!identity.isSuperAdmin() && !canAssignEmployeeRole && !canViewAnyRoleCategory) {
-      throw new AccessDeniedException("无权访问角色数据");
+    boolean canViewRolePage = permissionGuard.hasView(ROLE_PERMISSION_PREFIX);
+    if (identity.storeId() != null || (!identity.isSuperAdmin() && !canAssignEmployeeRole && !canViewRolePage)) {
+      throw new AccessDeniedException("无权访问运营管理平台角色数据");
     }
 
-    return list().stream()
-        .filter(role -> visibleRole(role, identity, canAssignEmployeeRole, canViewLegacyRolePage))
-        .toList();
+    return lambdaQuery()
+        .orderByDesc(Role::getCreatedAt)
+        .list();
   }
 
   @Transactional
   public boolean createRole(Role role) {
-    requireCategory(role.getCategory());
-    requireRoleAction(role.getCategory(), "create");
+    requirePlatformIdentity();
+    requireRoleAction("create");
     role.setId(null);
-    role.setStoreId(requiresStoreScope(role.getCategory()) ? requireStoreId() : null);
+    role.setDataScope("all");
     normalizeAndValidateRoleName(role, null);
     role.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(role.getFunctionPermissions()));
     role.setCreatedByName(resolveCreatedByName());
@@ -81,9 +77,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
 
     payload.setId(id);
     payload.setCode(existing.getCode());
-    payload.setCategory(existing.getCategory());
-    payload.setClientCode(existing.getClientCode());
-    payload.setStoreId(existing.getStoreId());
+    payload.setDataScope("all");
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     if (isSuperAdminRole(existing)) {
@@ -105,7 +99,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
       return false;
     }
     requireAccessibleRole(existing);
-    requireRoleAction(existing.getCategory(), "delete");
+    requireRoleAction("delete");
     if (isSuperAdminRole(existing)) {
       throw new IllegalArgumentException("超级管理员角色不可删除");
     }
@@ -118,99 +112,45 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     return SUPER_ADMIN_CODE.equals(role.getCode());
   }
 
-  private boolean visibleRole(
-      Role role,
-      CurrentIdentity identity,
-      boolean canAssignEmployeeRole,
-      boolean canViewLegacyRolePage) {
-    if ("terminal-policy".equals(role.getCategory())) {
-      return identity.isSuperAdmin();
-    }
-    boolean sameScope = identity.storeId() == null
-        ? role.getStoreId() == null && "operation-platform".equals(role.getCategory())
-        : Objects.equals(role.getStoreId(), identity.storeId())
-            && !"operation-platform".equals(role.getCategory());
-    return sameScope && (canAssignEmployeeRole
-        || canViewLegacyRolePage
-        || permissionGuard.hasView(rolePermissionPrefix(role.getCategory())));
-  }
-
   private void authorizeUpdate(Role existing, Role payload) {
-    if ("terminal-policy".equals(existing.getCategory())) {
-      permissionGuard.requireSuperAdmin();
-      return;
-    }
-
     boolean profileChanged = !Objects.equals(existing.getName(), payload.getName())
-        || !Objects.equals(existing.getDataScope(), payload.getDataScope())
-        || !Objects.equals(existing.getStatus(), payload.getStatus())
         || !Objects.equals(existing.getRemark(), payload.getRemark());
     boolean permissionChanged = !Objects.equals(
         FunctionPermissionNormalizer.normalizeCsv(existing.getFunctionPermissions()),
         FunctionPermissionNormalizer.normalizeCsv(payload.getFunctionPermissions()));
 
     if (profileChanged || !permissionChanged) {
-      requireRoleAction(existing.getCategory(), "edit");
+      requireRoleAction("edit");
     }
     if (permissionChanged) {
-      requireRoleAction(existing.getCategory(), "permission");
+      requireRoleAction("permission");
     }
   }
 
-  private void requireRoleAction(String category, String action) {
-    if ("terminal-policy".equals(category)) {
-      permissionGuard.requireSuperAdmin();
-      return;
-    }
-    permissionGuard.requireAnyPermission(
-        rolePermissionPrefix(category) + "." + action,
-        ROLE_PERMISSION_PREFIX + "." + action);
-  }
-
-  private String rolePermissionPrefix(String category) {
-    return ROLE_PERMISSION_PREFIX + "." + category;
+  private void requireRoleAction(String action) {
+    permissionGuard.requirePermission(ROLE_PERMISSION_PREFIX + "." + action);
   }
 
   private void requireAccessibleRole(Role role) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!"terminal-policy".equals(role.getCategory())) {
-      boolean sameScope = identity.storeId() == null
-          ? role.getStoreId() == null && "operation-platform".equals(role.getCategory())
-          : Objects.equals(role.getStoreId(), identity.storeId())
-              && !"operation-platform".equals(role.getCategory());
-      if (!sameScope) {
-        throw new AccessDeniedException("当前组织无权操作该角色");
-      }
-    }
+    requirePlatformIdentity();
     ownershipGuard.requireCreator(role.getCreatedByAccountId(), role.getCreatedByName());
-    if ("terminal-policy".equals(role.getCategory())) {
-      permissionGuard.requireSuperAdmin();
-    }
   }
 
   private void normalizeAndValidateRoleName(Role role, Long excludedRoleId) {
-    requireCategory(role.getCategory());
-
     String roleName = role.getName().trim();
     role.setName(roleName);
-    var duplicateQuery = lambdaQuery();
-    if (role.getStoreId() == null) {
-      duplicateQuery.isNull(Role::getStoreId);
-    } else {
-      duplicateQuery.eq(Role::getStoreId, role.getStoreId());
-    }
-    duplicateQuery.eq(Role::getCategory, role.getCategory()).eq(Role::getName, roleName);
+    var duplicateQuery = lambdaQuery().eq(Role::getName, roleName);
     if (excludedRoleId != null) {
       duplicateQuery.ne(Role::getId, excludedRoleId);
     }
     if (duplicateQuery.count() > 0) {
-      throw new IllegalArgumentException("当前用户端已存在同名角色");
+      throw new IllegalArgumentException("运营管理平台已存在同名角色");
     }
   }
 
-  private void requireCategory(String category) {
-    if (!StringUtils.hasText(category)) {
-      throw new IllegalArgumentException("角色所属用户端不能为空");
+  private void requirePlatformIdentity() {
+    if (identityProvider.require().storeId() != null) {
+      throw new AccessDeniedException("当前身份无权维护运营管理平台角色");
     }
   }
 
@@ -282,15 +222,4 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
         .orElse(DEFAULT_CREATED_BY_NAME);
   }
 
-  private Long requireStoreId() {
-    CurrentIdentity identity = identityProvider.require();
-    if (identity.storeId() == null) {
-      throw new AccessDeniedException("当前身份未关联门店");
-    }
-    return identity.storeId();
-  }
-
-  private boolean requiresStoreScope(String category) {
-    return !"terminal-policy".equals(category) && !"operation-platform".equals(category);
-  }
 }

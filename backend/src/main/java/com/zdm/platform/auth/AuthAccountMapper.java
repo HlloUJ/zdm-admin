@@ -200,13 +200,11 @@ public interface AuthAccountMapper {
 
   @Select("""
       SELECT function_permissions
-      FROM roles
-      WHERE category = 'terminal-policy'
-        AND code = CASE
-          WHEN #{storeType} = 'cityPartner' THEN 'TERMINAL_STORE_POLICY'
-          ELSE 'TERMINAL_SUPPLIER_POLICY'
+      FROM terminal_function_policies
+      WHERE terminal = CASE
+          WHEN #{storeType} = 'cityPartner' THEN 'store'
+          ELSE 'supplier'
         END
-        AND status = 'enabled'
       LIMIT 1
       """)
   String findTerminalPermissionValue(@Param("storeType") String storeType);
