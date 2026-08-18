@@ -44,6 +44,16 @@ const stores = [
   },
 ];
 
+const archivedStores = [
+  {
+    ...stores[0],
+    id: 2,
+    name: '已归档门店',
+    status: 'archived',
+    createdAt: '2026-07-26T09:00:00',
+  },
+];
+
 const storeLevels = [
   {
     id: 1,
@@ -542,14 +552,9 @@ export async function installAdminApiMocks(page: Page) {
   });
   await mockCollection(page, '**/api/admin/tenants', tenants);
   await mockCollection(page, '**/api/admin/stores', stores);
-  await page.route('**/api/admin/stores/1/deletion-references', async (route) => {
-    await fulfillJson(route, {
-      totalCount: 3,
-      references: [
-        { code: 'employees', name: '员工', count: 2, examples: ['超级管理员（启用）', '待启用员工（停用）'] },
-        { code: 'activeEmployeeInvites', name: '有效员工邀请', count: 1, examples: ['有效至2026-08-25 10:00'] },
-      ],
-    });
+  await page.route('**/api/admin/stores?scope=*', async (route) => {
+    const scope = new URL(route.request().url()).searchParams.get('scope');
+    await fulfillJson(route, scope === 'archived' ? archivedStores : stores);
   });
   await mockCollection(page, '**/api/admin/store-levels', storeLevels);
   await page.route('**/api/admin/stores/level-options', async (route) => {

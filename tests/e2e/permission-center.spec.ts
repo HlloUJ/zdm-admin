@@ -747,6 +747,12 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '修改门店级别',
     '编辑',
     '停用/启用',
+    '归档',
+  ]);
+  const archivedStorePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '已归档' });
+  await expect(archivedStorePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
     '删除',
   ]);
   const storeLevelPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
@@ -943,7 +949,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*17/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*20/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -969,6 +975,12 @@ test('shows the full function catalog for both terminals during development', as
     '修改门店级别',
     '编辑',
     '停用/启用',
+    '归档',
+  ]);
+  const archivedStoreAllocationRow = matrix.locator('tbody tr').filter({ hasText: '已归档' });
+  await expect(archivedStoreAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
     '删除',
   ]);
   const storeLevelAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
@@ -1124,7 +1136,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(matrix.getByText('租户管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('门店管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('门店级别管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(17);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(20);
   await moduleList.getByText('供应商管理', { exact: true }).click();
   await expect(matrix.getByText('供应商管理页', { exact: true })).toBeVisible();
   await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);

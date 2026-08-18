@@ -242,14 +242,43 @@ const deletionCases = [
   { path: '/product-attribute-value', target: 'E2E 共享属性值' },
 ];
 
-test('shows store reference details instead of sending a failing delete request', async ({ page }) => {
+test('archives an operating store and warns before permanently deleting an archived store', async ({ page }) => {
   await page.goto('/tenant-store-management');
   const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
-  await row.getByText('删除', { exact: true }).click();
+  await row.getByText('归档', { exact: true }).click();
+  await expect(page.getByText('归档后，该门店的全部员工将无法登录或切换到该门店。', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '取消', exact: true }).click();
 
-  await expect(page.getByText('员工 2 条', { exact: false })).toBeVisible();
-  await expect(page.getByText('有效员工邀请 1 条', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: '我知道了', exact: true })).toBeVisible();
+  await page.getByRole('main').getByText('已归档', { exact: true }).click();
+  const archivedRow = page.locator('tbody tr').filter({ hasText: '已归档门店' });
+  await expect(archivedRow.getByText('恢复运营', { exact: true })).toBeVisible();
+  await archivedRow.getByText('删除', { exact: true }).click();
+  await expect(page.getByText('门店删除后，该门店的经营数据永久不可恢复，请谨慎操作', { exact: true })).toBeVisible();
+});
+
+test('shows the duplicate store name error on the edit form', async ({ page }) => {
+  await page.route('**/api/admin/stores/1', async (route) => {
+    if (route.request().method() !== 'PUT') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 400, message: '店铺名称已存在', data: null }),
+    });
+  });
+
+  await page.goto('/tenant-store-management');
+  const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
+  await row.getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
+  await dialog.locator('.t-form__item').filter({ hasText: '店铺名称' }).getByPlaceholder('请输入').fill('已归档门店');
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+
+  await expect(dialog.locator('.t-form__item').filter({ hasText: '店铺名称' })).toContainText('店铺名称已存在');
+  await expect(page.getByText('编辑“已归档门店”失败：店铺名称已存在', { exact: true })).toBeVisible();
+  await expect(dialog).toBeVisible();
 });
 
 for (const item of deletionCases) {

@@ -6,7 +6,6 @@ import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.LongFunction;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -14,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StoreService extends ServiceImpl<StoreMapper, Store> {
-  private static final String REFERENCED_MESSAGE = "该门店存在关联数据，不能删除，请先处理关联数据或停用该门店";
+  private static final String DELETE_FAILED_MESSAGE = "门店经营数据删除失败，请稍后重试";
+  private static final String DUPLICATE_NAME_MESSAGE = "店铺名称已存在";
 
   private final CurrentIdentityProvider identityProvider;
   private final CreatorOwnershipGuard ownershipGuard;
@@ -32,14 +32,20 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     this.jdbcTemplate = jdbcTemplate;
   }
 
-  public List<Store> listForCurrentAdmin() {
+  public List<Store> listForCurrentAdmin(boolean archived) {
     identityProvider.require();
-    return list();
+    return lambdaQuery()
+        .eq(archived, Store::getStatus, "archived")
+        .ne(!archived, Store::getStatus, "archived")
+        .orderByDesc(Store::getCreatedAt)
+        .list();
   }
 
   @Transactional
   public boolean createStore(Store store) {
     CurrentIdentity identity = identityProvider.require();
+    store.setId(null);
+    normalizeAndValidateName(store, null);
     requireOpenedBusiness(store.getTenantId(), store.getType());
     storeLevelService.requireSelectable(store.getStoreLevelId());
     store.setCreatedBy(identity.displayName());
@@ -55,6 +61,8 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return null;
     }
     requireAccessible(existing);
+    requireOperating(existing);
+    normalizeAndValidateName(payload, id);
     payload.setTenantId(existing.getTenantId());
     if (!Objects.equals(existing.getType(), payload.getType())) {
       requireOpenedBusiness(existing.getTenantId(), payload.getType());
@@ -74,6 +82,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return null;
     }
     requireAccessible(existing);
+    requireOperating(existing);
     storeLevelService.requireSelectable(storeLevelId);
     existing.setStoreLevelId(storeLevelId);
     updateById(existing);
@@ -87,11 +96,42 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return null;
     }
     requireAccessible(existing);
+    requireOperating(existing);
     existing.setStatus(status);
     updateById(existing);
     jdbcTemplate.update(
         "UPDATE account_identities SET status = ? WHERE store_id = ? AND identity_type = 'store_admin'",
         status,
+        id);
+    return getById(id);
+  }
+
+  @Transactional
+  public Store archiveStore(Long id) {
+    Store existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+    requireAccessible(existing);
+    requireOperating(existing);
+    existing.setStatus("archived");
+    updateById(existing);
+    revokeStoreSessions(id);
+    return getById(id);
+  }
+
+  @Transactional
+  public Store restoreStore(Long id) {
+    Store existing = getById(id);
+    if (existing == null) {
+      return null;
+    }
+    requireAccessible(existing);
+    requireArchived(existing);
+    existing.setStatus("enabled");
+    updateById(existing);
+    jdbcTemplate.update(
+        "UPDATE account_identities SET status = 'enabled' WHERE store_id = ? AND identity_type = 'store_admin'",
         id);
     return getById(id);
   }
@@ -103,10 +143,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return false;
     }
     requireAccessible(existing);
-    StoreReferenceSummary summary = getReferenceSummary(id);
-    if (summary.totalCount() > 0) {
-      throw new IllegalArgumentException(referenceMessage(summary));
-    }
+    requireArchived(existing);
     try {
       jdbcTemplate.update(
           "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)",
@@ -121,11 +158,23 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       jdbcTemplate.update("DELETE FROM roles WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM account_identities WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM employee_invites WHERE store_id = ?", id);
+      jdbcTemplate.update("DELETE FROM employees WHERE store_id = ?", id);
       deleteStoreCategories(id);
       return removeById(id);
     } catch (DataIntegrityViolationException exception) {
-      throw new IllegalArgumentException(REFERENCED_MESSAGE, exception);
+      throw new IllegalArgumentException(DELETE_FAILED_MESSAGE, exception);
     }
+  }
+
+  private void revokeStoreSessions(Long storeId) {
+    jdbcTemplate.update(
+        """
+        UPDATE auth_sessions
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE revoked_at IS NULL
+          AND identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)
+        """,
+        storeId);
   }
 
   private void deleteStoreCategories(Long storeId) {
@@ -142,73 +191,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     } while (deletedCount > 0);
   }
 
-  public StoreReferenceSummary getDeletionReferences(Long id) {
-    Store existing = getById(id);
-    if (existing == null) {
-      throw new IllegalArgumentException("门店不存在或已被删除");
-    }
-    requireAccessible(existing);
-    return getReferenceSummary(id);
-  }
-
-  private StoreReferenceSummary getReferenceSummary(Long storeId) {
-    List<StoreReferenceItem> references = List.of(
-        reference(
-            storeId,
-            "employees",
-            "员工",
-            "SELECT COUNT(*) FROM employees WHERE store_id = ?",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT(name, '（', IF(status = 'enabled', '启用', '停用'), '）')
-                FROM employees WHERE store_id = ?
-                ORDER BY status = 'enabled' DESC, id LIMIT 5
-                """,
-                String.class,
-                id)),
-        reference(
-            storeId,
-            "activeEmployeeInvites",
-            "有效员工邀请",
-            "SELECT COUNT(*) FROM employee_invites WHERE store_id = ? AND status = 'active' AND expires_at >= CURRENT_TIMESTAMP",
-            id -> jdbcTemplate.queryForList(
-                """
-                SELECT CONCAT('有效至', DATE_FORMAT(expires_at, '%Y-%m-%d %H:%i'))
-                FROM employee_invites
-                WHERE store_id = ? AND status = 'active' AND expires_at >= CURRENT_TIMESTAMP
-                ORDER BY expires_at LIMIT 5
-                """,
-                String.class,
-                id)))
-        .stream()
-        .filter(reference -> reference.count() > 0)
-        .toList();
-    long totalCount = references.stream().mapToLong(StoreReferenceItem::count).sum();
-    return new StoreReferenceSummary(totalCount, references);
-  }
-
-  private StoreReferenceItem reference(
-      Long storeId,
-      String code,
-      String name,
-      String countSql,
-      LongFunction<List<String>> exampleQuery) {
-    Long count = jdbcTemplate.queryForObject(countSql, Long.class, storeId);
-    long resolvedCount = count == null ? 0 : count;
-    return new StoreReferenceItem(
-        code,
-        name,
-        resolvedCount,
-        resolvedCount == 0 ? List.of() : exampleQuery.apply(storeId));
-  }
-
-  private String referenceMessage(StoreReferenceSummary summary) {
-    String referenceCounts = summary.references().stream()
-        .map(reference -> reference.name() + reference.count() + "条")
-        .reduce((left, right) -> left + "、" + right)
-        .orElse("");
-    return REFERENCED_MESSAGE + "（" + referenceCounts + "）";
-  }
 
   private void requireOpenedBusiness(Long tenantId, String storeType) {
     Integer count = jdbcTemplate.queryForObject(
@@ -223,6 +205,18 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
         storeType);
     if (count == null || count == 0) {
       throw new IllegalArgumentException("该租户未启用对应业务，不能创建或变更为该类型门店");
+    }
+  }
+
+  private void normalizeAndValidateName(Store store, Long excludedStoreId) {
+    String storeName = store.getName().trim();
+    store.setName(storeName);
+    var duplicateQuery = lambdaQuery().eq(Store::getName, storeName);
+    if (excludedStoreId != null) {
+      duplicateQuery.ne(Store::getId, excludedStoreId);
+    }
+    if (duplicateQuery.count() > 0) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
     }
   }
 
@@ -245,5 +239,17 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
 
   private void requireAccessible(Store store) {
     ownershipGuard.requireCreator(null, store.getCreatedBy());
+  }
+
+  private void requireOperating(Store store) {
+    if ("archived".equals(store.getStatus())) {
+      throw new IllegalArgumentException("该门店已归档");
+    }
+  }
+
+  private void requireArchived(Store store) {
+    if (!"archived".equals(store.getStatus())) {
+      throw new IllegalArgumentException("请先归档门店");
+    }
   }
 }

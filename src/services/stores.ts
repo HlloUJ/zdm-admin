@@ -10,7 +10,7 @@ export interface StoreRecord {
   region?: string;
   detailAddress?: string;
   address?: string;
-  status: 'enabled' | 'disabled';
+  status: 'enabled' | 'disabled' | 'archived';
   remark?: string;
   createdAt?: string;
   createdBy?: string;
@@ -31,20 +31,8 @@ export interface StorePayload {
   createdBy?: string;
 }
 
-export interface StoreReferenceItem {
-  code: string;
-  name: string;
-  count: number;
-  examples: string[];
-}
-
-export interface StoreReferenceSummary {
-  totalCount: number;
-  references: StoreReferenceItem[];
-}
-
-export function listStores() {
-  return request<StoreRecord[]>('/admin/stores');
+export function listStores(scope: 'operating' | 'archived') {
+  return request<StoreRecord[]>(`/admin/stores?scope=${scope}`);
 }
 
 export function createStore(payload: StorePayload) {
@@ -75,12 +63,16 @@ export function updateStoreStatus(id: number, status: StorePayload['status']) {
   });
 }
 
+export function archiveStore(id: number) {
+  return request<StoreRecord>(`/admin/stores/${id}/archive`, { method: 'PATCH' });
+}
+
+export function restoreStore(id: number) {
+  return request<StoreRecord>(`/admin/stores/${id}/restore`, { method: 'PATCH' });
+}
+
 export function deleteStore(id: number) {
   return request<boolean>(`/admin/stores/${id}`, {
     method: 'DELETE',
   });
-}
-
-export function getStoreDeletionReferences(id: number) {
-  return request<StoreReferenceSummary>(`/admin/stores/${id}/deletion-references`);
 }
