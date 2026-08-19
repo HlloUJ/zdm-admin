@@ -1,7 +1,7 @@
 package com.zdm.platform.auth;
 
-import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.config.SecurityProperties;
+import com.zdm.platform.security.EffectivePermissionResolver;
 import com.zdm.platform.security.SessionTokenService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -14,14 +14,17 @@ public class AuthService {
   private final AuthAccountMapper authAccountMapper;
   private final SessionTokenService sessionTokenService;
   private final SecurityProperties securityProperties;
+  private final EffectivePermissionResolver effectivePermissionResolver;
 
   public AuthService(
       AuthAccountMapper authAccountMapper,
       SessionTokenService sessionTokenService,
-      SecurityProperties securityProperties) {
+      SecurityProperties securityProperties,
+      EffectivePermissionResolver effectivePermissionResolver) {
     this.authAccountMapper = authAccountMapper;
     this.sessionTokenService = sessionTokenService;
     this.securityProperties = securityProperties;
+    this.effectivePermissionResolver = effectivePermissionResolver;
   }
 
   public LoginResponse login(LoginRequest request) {
@@ -68,7 +71,7 @@ public class AuthService {
     if (roles.isEmpty()) {
       throw new IllegalArgumentException("账号未开通管理后台权限");
     }
-    List<String> permissions = resolvePermissions(account);
+    List<String> permissions = effectivePermissionResolver.resolve(account);
     List<String> roleNames = resolveRoleNames(account);
     var user = new LoginResponse.LoginUser(
         account.getId(),
@@ -107,27 +110,8 @@ public class AuthService {
     };
   }
 
-  private List<String> resolvePermissions(AuthAccount account) {
-    return switch (identityType(account)) {
-      case "platform_admin" -> List.of("all");
-      case "tenant_admin" -> List.of();
-      case "store_admin" -> {
-        String terminalPermissions = authAccountMapper.findTerminalPermissionValue(account.getStoreType());
-        yield StringUtils.hasText(terminalPermissions)
-            ? expandPermissionValues(List.of(terminalPermissions))
-            : List.of();
-      }
-      default -> expandPermissionValues(
-          authAccountMapper.findAdminPermissionValues(account.getId(), account.getIdentityId()));
-    };
-  }
-
   private String identityType(AuthAccount account) {
     return StringUtils.hasText(account.getIdentityType()) ? account.getIdentityType() : "employee";
-  }
-
-  private List<String> expandPermissionValues(List<String> permissionValues) {
-    return FunctionPermissionNormalizer.normalize(permissionValues);
   }
 
   private boolean validVerificationCode(String candidate) {

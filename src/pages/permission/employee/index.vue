@@ -213,7 +213,7 @@
     >
       <t-form ref="permissionFormRef" :data="permissionFormData" :rules="permissionFormRules" label-width="96px" colon>
         <t-form-item label="角色" name="roleIds" required-mark>
-          <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择运营管理平台角色">
+          <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择当前组织角色">
             <t-option
               v-for="role in configurableOperationRoleOptions"
               :key="role.value"
@@ -251,7 +251,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
@@ -585,7 +584,6 @@ const copyInviteLink = async () => {
 };
 
 const openProfileDialog = (row: EmployeeItem) => {
-  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   profileFormData.name = row.name;
   profileFormData.gender = row.gender;
@@ -599,7 +597,6 @@ const closeProfileDialog = () => {
 };
 
 const openPermissionDialog = (row: EmployeeItem) => {
-  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminEmployee(row)) {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
@@ -703,7 +700,6 @@ const validateEmployeeBeforeEnable = (row: EmployeeItem) => {
 };
 
 const openStatusConfirm = (row: EmployeeItem) => {
-  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminEmployee(row)) {
     adminFeedback.warning('超级管理员不可停用或启用');
     return;
@@ -717,7 +713,6 @@ const openStatusConfirm = (row: EmployeeItem) => {
 };
 
 const openDeleteConfirm = (row: EmployeeItem) => {
-  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminEmployee(row)) {
     adminFeedback.warning('超级管理员不可删除');
     return;

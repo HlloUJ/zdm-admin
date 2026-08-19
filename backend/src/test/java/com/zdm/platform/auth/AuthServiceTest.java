@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.zdm.platform.config.SecurityProperties;
+import com.zdm.platform.security.EffectivePermissionResolver;
 import com.zdm.platform.security.SessionTokenService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ class AuthServiceTest {
   private AuthAccountMapper authAccountMapper;
   private SessionTokenService sessionTokenService;
   private SecurityProperties securityProperties;
+  private EffectivePermissionResolver effectivePermissionResolver;
   private AuthService authService;
 
   @BeforeEach
@@ -22,8 +24,10 @@ class AuthServiceTest {
     authAccountMapper = Mockito.mock(AuthAccountMapper.class);
     sessionTokenService = Mockito.mock(SessionTokenService.class);
     securityProperties = new SecurityProperties();
+    effectivePermissionResolver = Mockito.mock(EffectivePermissionResolver.class);
     securityProperties.setVerificationCode("888888");
-    authService = new AuthService(authAccountMapper, sessionTokenService, securityProperties);
+    authService = new AuthService(
+        authAccountMapper, sessionTokenService, securityProperties, effectivePermissionResolver);
   }
 
   @Test
@@ -43,6 +47,7 @@ class AuthServiceTest {
     when(authAccountMapper.findAdminRoleCodes(1L, 11L)).thenReturn(List.of("SUPER_ADMIN"));
     when(authAccountMapper.findAdminRoleNames(1L, 11L)).thenReturn(List.of("超级管理员"));
     when(authAccountMapper.findAdminPermissionValues(1L, 11L)).thenReturn(List.of("all"));
+    when(effectivePermissionResolver.resolve(account)).thenReturn(List.of("all"));
     when(sessionTokenService.issue(account)).thenReturn("opaque-session-token");
 
     LoginResponse response = authService.login(new LoginRequest("15926626945", "888888"));
@@ -76,6 +81,9 @@ class AuthServiceTest {
             "admin.permission-management.employee-management.query,"
                 + "admin.permission-management.employee-management.reset,"
                 + "admin.permission-management.employee-management.edit"));
+    when(effectivePermissionResolver.resolve(account)).thenReturn(List.of(
+        "admin.permission-management.employee-management.view",
+        "admin.permission-management.employee-management.edit"));
     when(sessionTokenService.issue(account)).thenReturn("opaque-session-token");
 
     LoginResponse response = authService.login(new LoginRequest("15900000001", "888888"));

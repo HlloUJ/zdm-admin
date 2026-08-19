@@ -564,6 +564,9 @@ export async function installAdminApiMocks(page: Page) {
   });
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
   await mockCollection(page, '**/api/admin/roles', roles);
+  await page.route('**/api/admin/roles/permission-scope', async (route) => {
+    await fulfillJson(route, { audience: 'admin', functionPermissions: 'all' });
+  });
   await mockCollection(page, '**/api/admin/terminal-function-policies', terminalFunctionPolicies);
   await mockCollection(page, '**/api/admin/employees', employees);
   await mockCollection(page, '**/api/admin/store-categories', storeCategories);

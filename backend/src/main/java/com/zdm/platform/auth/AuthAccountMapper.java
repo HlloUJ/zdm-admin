@@ -220,7 +220,10 @@ public interface AuthAccountMapper {
        AND ai.status = 'enabled'
        AND ((ai.tenant_id = ar.tenant_id) OR (ai.tenant_id IS NULL AND ar.tenant_id IS NULL))
        AND ((ai.store_id = ar.store_id) OR (ai.store_id IS NULL AND ar.store_id IS NULL))
-      JOIN roles r ON r.id = ar.role_id
+      JOIN roles r
+        ON r.id = ar.role_id
+       AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
+       AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
       WHERE ar.account_id = #{accountId}
         AND ar.client_code = 'admin'
         AND r.status = 'enabled'
@@ -240,7 +243,10 @@ public interface AuthAccountMapper {
        AND ai.status = 'enabled'
        AND ((ai.tenant_id = ar.tenant_id) OR (ai.tenant_id IS NULL AND ar.tenant_id IS NULL))
        AND ((ai.store_id = ar.store_id) OR (ai.store_id IS NULL AND ar.store_id IS NULL))
-      JOIN roles r ON r.id = ar.role_id
+      JOIN roles r
+        ON r.id = ar.role_id
+       AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
+       AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
       WHERE ar.account_id = #{accountId}
         AND ar.client_code = 'admin'
         AND r.status = 'enabled'
@@ -262,7 +268,10 @@ public interface AuthAccountMapper {
          AND ai.status = 'enabled'
          AND ((ai.tenant_id = ar.tenant_id) OR (ai.tenant_id IS NULL AND ar.tenant_id IS NULL))
          AND ((ai.store_id = ar.store_id) OR (ai.store_id IS NULL AND ar.store_id IS NULL))
-        JOIN roles r ON r.id = ar.role_id
+        JOIN roles r
+          ON r.id = ar.role_id
+         AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
+         AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
         WHERE ar.account_id = #{accountId}
           AND ar.client_code = 'admin'
           AND r.status = 'enabled'
@@ -281,7 +290,11 @@ public interface AuthAccountMapper {
          AND ai.status = 'enabled'
          AND ((ai.tenant_id = ar.tenant_id) OR (ai.tenant_id IS NULL AND ar.tenant_id IS NULL))
          AND ((ai.store_id = ar.store_id) OR (ai.store_id IS NULL AND ar.store_id IS NULL))
-        JOIN roles r ON r.id = ar.role_id AND r.status = 'enabled'
+        JOIN roles r
+          ON r.id = ar.role_id
+         AND r.status = 'enabled'
+         AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
+         AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
         JOIN role_permissions rp ON rp.role_id = r.id
         JOIN permissions p ON p.code = rp.permission_code AND p.status = 'enabled'
         WHERE ar.account_id = #{accountId}

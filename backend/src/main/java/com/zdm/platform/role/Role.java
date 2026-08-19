@@ -11,6 +11,9 @@ public class Role {
   @TableId(type = IdType.AUTO)
   private Long id;
 
+  private Long tenantId;
+  private Long storeId;
+
   @NotBlank
   private String name;
 
@@ -36,6 +39,22 @@ public class Role {
 
   public void setId(Long id) {
     this.id = id;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long tenantId) {
+    this.tenantId = tenantId;
+  }
+
+  public Long getStoreId() {
+    return storeId;
+  }
+
+  public void setStoreId(Long storeId) {
+    this.storeId = storeId;
   }
 
   public String getName() {

@@ -2,7 +2,6 @@ package com.zdm.platform.security;
 
 import com.zdm.platform.auth.AuthAccount;
 import com.zdm.platform.auth.AuthAccountMapper;
-import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.config.SecurityProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -28,14 +27,17 @@ public class SessionTokenService {
   private final JdbcTemplate jdbcTemplate;
   private final AuthAccountMapper authAccountMapper;
   private final SecurityProperties securityProperties;
+  private final EffectivePermissionResolver effectivePermissionResolver;
 
   public SessionTokenService(
       JdbcTemplate jdbcTemplate,
       AuthAccountMapper authAccountMapper,
-      SecurityProperties securityProperties) {
+      SecurityProperties securityProperties,
+      EffectivePermissionResolver effectivePermissionResolver) {
     this.jdbcTemplate = jdbcTemplate;
     this.authAccountMapper = authAccountMapper;
     this.securityProperties = securityProperties;
+    this.effectivePermissionResolver = effectivePermissionResolver;
   }
 
   @Transactional
@@ -143,18 +145,7 @@ public class SessionTokenService {
     if (roles.isEmpty()) {
       return null;
     }
-    List<String> permissions = switch (identityType) {
-      case "platform_admin" -> List.of("all");
-      case "tenant_admin" -> List.of();
-      case "store_admin" -> {
-        String terminalPermissions = authAccountMapper.findTerminalPermissionValue(account.getStoreType());
-        yield StringUtils.hasText(terminalPermissions)
-            ? FunctionPermissionNormalizer.normalize(List.of(terminalPermissions))
-            : List.of();
-      }
-      default -> FunctionPermissionNormalizer.normalize(
-          authAccountMapper.findAdminPermissionValues(account.getId(), account.getIdentityId()));
-    };
+    List<String> permissions = effectivePermissionResolver.resolve(account);
     return new CurrentIdentity(
         sessionId,
         account.getId(),
