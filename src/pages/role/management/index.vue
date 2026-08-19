@@ -277,11 +277,11 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import {
   collectFunctionCatalogRows,
-  getRuntimeFunctionCatalog,
+  filterFunctionCatalogByAudience,
+  filterFunctionCatalogByPermissions,
   getFunctionCatalogPermissionValues,
   getFunctionModulePermissionValues,
   getRowViewPermissionValue,
@@ -292,7 +292,16 @@ import {
 import { getLoginUser } from '@/services/auth';
 import { hasAnyPermission } from '@/services/adminPermissions';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
-import { createRole, deleteRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
+import {
+  createRole,
+  deleteRole,
+  getRolePermissionScope,
+  listRoles,
+  updateRole,
+  type RolePayload,
+  type RolePermissionScope,
+  type RoleRecord,
+} from '@/services/roles';
 
 type DialogMode = 'create' | 'edit';
 
@@ -320,6 +329,7 @@ interface RolePermissionConfig {
 
 const roles = ref<RoleItem[]>([]);
 const loading = ref(false);
+const parsePermissions = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: '14%', align: 'left' },
@@ -329,7 +339,12 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'operation', title: '操作', width: '22%', align: 'left' },
 ];
 
-const permissionModules = computed(() => getRuntimeFunctionCatalog('admin'));
+const rolePermissionScope = ref<RolePermissionScope>({ audience: 'admin', functionPermissions: 'all' });
+const permissionModules = computed(() => {
+  const modules = filterFunctionCatalogByAudience(rolePermissionScope.value.audience);
+  const permissions = parsePermissions(rolePermissionScope.value.functionPermissions);
+  return permissions.includes('all') ? modules : filterFunctionCatalogByPermissions(modules, permissions);
+});
 
 const pageSizeOptions = [10, 20, 50];
 const loginUser = computed(() => getLoginUser());
@@ -385,8 +400,6 @@ const activePermissionModule = computed(
 );
 const activePermissionRows = computed(() => collectFunctionCatalogRows(activePermissionModule.value));
 
-const parsePermissions = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
-
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
   const date = new Date(value);
@@ -409,7 +422,7 @@ const toRoleItem = (record: RoleRecord): RoleItem => ({
   functionPermissions: parsePermissions(record.functionPermissions),
 });
 
-const createRoleCode = (roleName: string) => `OPERATION_PLATFORM_${roleName.trim().length}_${Date.now()}`.toUpperCase();
+const createRoleCode = (roleName: string) => `ROLE_${roleName.trim().length}_${Date.now()}`.toUpperCase();
 
 const toRolePayload = (role: RoleItem): RolePayload => ({
   name: role.name,
@@ -425,7 +438,9 @@ const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 const loadRoles = async () => {
   loading.value = true;
   try {
-    const records = await listRoles();
+    const [records, scope] = await Promise.all([listRoles(), getRolePermissionScope()]);
+    rolePermissionScope.value = scope;
+    activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
     roles.value = sortByCreatedAtDesc(records.filter((record) => record.status === 'enabled')).map(toRoleItem);
     ensureCurrentPage();
   } catch (error) {
@@ -510,7 +525,6 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: RoleItem) => {
-  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -561,7 +575,6 @@ const handleSubmit = async () => {
 };
 
 const openDeleteConfirm = (row: RoleItem) => {
-  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminRole(row)) {
     adminFeedback.warning('超级管理员角色不可删除');
     return;
@@ -591,7 +604,6 @@ const handleDeleteConfirm = async () => {
 };
 
 const openPermissionDialog = (row: RoleItem) => {
-  if (!requireCreatorOwnership(row)) return;
   if (isSuperAdminRole(row)) {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;

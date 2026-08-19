@@ -2,6 +2,8 @@ import { request } from './http';
 
 export interface RoleRecord {
   id: number;
+  tenantId?: number;
+  storeId?: number;
   name: string;
   code: string;
   dataScope: string;
@@ -12,6 +14,11 @@ export interface RoleRecord {
   createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface RolePermissionScope {
+  audience: 'admin' | 'store' | 'supplier';
+  functionPermissions: string;
 }
 
 export interface RolePayload {
@@ -25,6 +32,10 @@ export interface RolePayload {
 
 export function listRoles() {
   return request<RoleRecord[]>('/admin/roles');
+}
+
+export function getRolePermissionScope() {
+  return request<RolePermissionScope>('/admin/roles/permission-scope');
 }
 
 export function createRole(payload: RolePayload) {
