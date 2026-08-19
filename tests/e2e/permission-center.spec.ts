@@ -696,9 +696,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(permissionDialog.getByRole('heading', { name: '功能权限', exact: true })).toBeVisible();
   const roleModuleList = permissionDialog.locator('.permission-module-list');
   const roleMatrix = permissionDialog.locator('.permission-matrix');
-  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(5);
+  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(4);
   await expect(roleModuleList.getByText('租户与门店', { exact: true })).toBeVisible();
-  await expect(roleModuleList.getByText('门店分类管理', { exact: true })).toBeVisible();
+  await expect(roleModuleList.getByText('门店分类管理', { exact: true })).toHaveCount(0);
   await expect(roleModuleList.getByText('商品管理', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('供应商管理', { exact: true })).toBeVisible();

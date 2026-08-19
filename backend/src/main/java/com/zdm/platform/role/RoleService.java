@@ -4,10 +4,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import com.zdm.platform.security.PermissionGuard;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -23,46 +24,66 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
       "admin.permission-management.employee-management.permission";
 
   private record AffectedEmployee(Long id, Long accountId, Long tenantId, Long storeId) {}
+  private record RoleScope(Long tenantId, Long storeId, String audience) {}
 
   private final JdbcTemplate jdbcTemplate;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
-  private final CreatorOwnershipGuard ownershipGuard;
 
   public RoleService(
       JdbcTemplate jdbcTemplate,
       CurrentIdentityProvider identityProvider,
-      PermissionGuard permissionGuard,
-      CreatorOwnershipGuard ownershipGuard) {
+      PermissionGuard permissionGuard) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
-    this.ownershipGuard = ownershipGuard;
   }
 
   public List<Role> listForCurrentAdmin() {
-    CurrentIdentity identity = identityProvider.require();
+    RoleScope scope = requireCurrentScope();
     boolean canAssignEmployeeRole = permissionGuard.hasPermission(EMPLOYEE_ASSIGN_PERMISSION);
     boolean canViewRolePage = permissionGuard.hasView(ROLE_PERMISSION_PREFIX);
-    if (identity.storeId() != null || (!identity.isSuperAdmin() && !canAssignEmployeeRole && !canViewRolePage)) {
-      throw new AccessDeniedException("无权访问运营管理平台角色数据");
+    if (!identityProvider.require().isSuperAdmin() && !canAssignEmployeeRole && !canViewRolePage) {
+      throw new AccessDeniedException("无权访问当前组织角色数据");
     }
 
-    return lambdaQuery()
+    var query = lambdaQuery();
+    if (scope.storeId() == null) {
+      query.isNull(Role::getTenantId).isNull(Role::getStoreId);
+    } else {
+      query.eq(Role::getTenantId, scope.tenantId()).eq(Role::getStoreId, scope.storeId());
+    }
+    return query
         .orderByDesc(Role::getCreatedAt)
         .list();
   }
 
+  public RolePermissionScope permissionScopeForCurrentAdmin() {
+    RoleScope scope = requireCurrentScope();
+    boolean canAssignEmployeeRole = permissionGuard.hasPermission(EMPLOYEE_ASSIGN_PERMISSION);
+    boolean canManageRolePermission = permissionGuard.hasPermission(ROLE_PERMISSION_PREFIX + ".permission");
+    if (!identityProvider.require().isSuperAdmin() && !canAssignEmployeeRole && !canManageRolePermission) {
+      throw new AccessDeniedException("无权读取当前组织可分配权限");
+    }
+    return new RolePermissionScope(scope.audience(), availableFunctionPermissions(scope));
+  }
+
   @Transactional
   public boolean createRole(Role role) {
-    requirePlatformIdentity();
+    RoleScope scope = requireCurrentScope();
     requireRoleAction("create");
     role.setId(null);
+    role.setTenantId(scope.tenantId());
+    role.setStoreId(scope.storeId());
     role.setDataScope("all");
     normalizeAndValidateRoleName(role, null);
     role.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(role.getFunctionPermissions()));
+    requireAllowedRolePermissions(role, scope);
+    if (SUPER_ADMIN_CODE.equals(role.getCode())) {
+      throw new IllegalArgumentException("超级管理员是系统内置角色");
+    }
     role.setCreatedByName(resolveCreatedByName());
-    role.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    role.setCreatedByAccountId(identityProvider.require().accountId());
     return save(role);
   }
 
@@ -77,6 +98,8 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
 
     payload.setId(id);
     payload.setCode(existing.getCode());
+    payload.setTenantId(existing.getTenantId());
+    payload.setStoreId(existing.getStoreId());
     payload.setDataScope("all");
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
@@ -87,6 +110,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
       payload.setFunctionPermissions("all");
     } else {
       payload.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(payload.getFunctionPermissions()));
+      requireAllowedRolePermissions(payload, requireCurrentScope());
     }
     normalizeAndValidateRoleName(payload, id);
     return updateById(payload);
@@ -132,25 +156,76 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
-    requirePlatformIdentity();
-    ownershipGuard.requireCreator(role.getCreatedByAccountId(), role.getCreatedByName());
+    RoleScope scope = requireCurrentScope();
+    if (!Objects.equals(role.getTenantId(), scope.tenantId())
+        || !Objects.equals(role.getStoreId(), scope.storeId())) {
+      throw new AccessDeniedException("当前组织无权操作该角色");
+    }
   }
 
   private void normalizeAndValidateRoleName(Role role, Long excludedRoleId) {
     String roleName = role.getName().trim();
     role.setName(roleName);
-    var duplicateQuery = lambdaQuery().eq(Role::getName, roleName);
+    var duplicateQuery = lambdaQuery()
+        .eq(Role::getName, roleName)
+        .eq(role.getTenantId() != null, Role::getTenantId, role.getTenantId())
+        .isNull(role.getTenantId() == null, Role::getTenantId)
+        .eq(role.getStoreId() != null, Role::getStoreId, role.getStoreId())
+        .isNull(role.getStoreId() == null, Role::getStoreId);
     if (excludedRoleId != null) {
       duplicateQuery.ne(Role::getId, excludedRoleId);
     }
     if (duplicateQuery.count() > 0) {
-      throw new IllegalArgumentException("运营管理平台已存在同名角色");
+      throw new IllegalArgumentException("当前组织已存在同名角色");
     }
   }
 
-  private void requirePlatformIdentity() {
-    if (identityProvider.require().storeId() != null) {
-      throw new AccessDeniedException("当前身份无权维护运营管理平台角色");
+  private RoleScope requireCurrentScope() {
+    CurrentIdentity identity = identityProvider.require();
+    if (identity.tenantId() == null && identity.storeId() == null) {
+      return new RoleScope(null, null, "admin");
+    }
+    if (identity.tenantId() == null || identity.storeId() == null) {
+      throw new AccessDeniedException("请先切换到具体门店身份");
+    }
+    String storeType = jdbcTemplate.queryForObject(
+        "SELECT type FROM stores WHERE id = ? AND tenant_id = ?",
+        String.class,
+        identity.storeId(),
+        identity.tenantId());
+    if ("cityPartner".equals(storeType)) {
+      return new RoleScope(identity.tenantId(), identity.storeId(), "store");
+    }
+    if ("slabSupplier".equals(storeType) || "finishedSupplier".equals(storeType)) {
+      return new RoleScope(identity.tenantId(), identity.storeId(), "supplier");
+    }
+    throw new AccessDeniedException("当前用户端尚未开通角色维护");
+  }
+
+  private String availableFunctionPermissions(RoleScope scope) {
+    if (scope.storeId() == null) {
+      return "all";
+    }
+    String value = jdbcTemplate.queryForObject(
+        "SELECT function_permissions FROM terminal_function_policies WHERE terminal = ?",
+        String.class,
+        scope.audience());
+    return FunctionPermissionNormalizer.normalizeCsv(value);
+  }
+
+  private void requireAllowedRolePermissions(Role role, RoleScope scope) {
+    List<String> selected = FunctionPermissionNormalizer.normalize(
+        List.of(role.getFunctionPermissions() == null ? "" : role.getFunctionPermissions()));
+    if (selected.contains("all")) {
+      throw new AccessDeniedException("非内置角色不能授予全平台权限");
+    }
+    if (scope.storeId() == null || selected.isEmpty()) {
+      return;
+    }
+    Set<String> available = new HashSet<>(FunctionPermissionNormalizer.normalize(
+        List.of(availableFunctionPermissions(scope))));
+    if (!available.containsAll(selected)) {
+      throw new AccessDeniedException("角色权限不能超出当前用户端功能范围");
     }
   }
 

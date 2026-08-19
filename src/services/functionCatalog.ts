@@ -377,7 +377,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   {
     label: '权限管理',
     value: 'admin.permission-management',
-    audiences: ['admin'],
+    audiences: ['admin', 'store', 'supplier'],
     menus: [
       {
         label: '员工管理',

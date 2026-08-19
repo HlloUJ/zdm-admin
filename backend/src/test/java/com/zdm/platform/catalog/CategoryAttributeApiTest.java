@@ -434,7 +434,7 @@ class CategoryAttributeApiTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '模板绑定操作员', '15926629920', 'enabled', 'self', '韩健')
+        VALUES (?, ?, NULL, NULL, '模板绑定操作员', '15926629920', 'enabled', 'self', '韩健')
         """,
         employeeId,
         accountId);
@@ -442,7 +442,7 @@ class CategoryAttributeApiTest {
         """
         INSERT INTO account_identities
           (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
-        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        VALUES (?, 'admin', 'employee', ?, NULL, NULL, 'enabled')
         """,
         accountId,
         employeeId);
@@ -459,7 +459,7 @@ class CategoryAttributeApiTest {
     jdbcTemplate.update(
         """
         INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
-        VALUES (?, ?, 'admin', 1, 1)
+        VALUES (?, ?, 'admin', NULL, NULL)
         """,
         accountId,
         roleId);
