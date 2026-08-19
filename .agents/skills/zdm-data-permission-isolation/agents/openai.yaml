@@ -1,4 +1,4 @@
 interface:
-  display_name: "装点猫数据权限隔离"
-  short_description: "统一审查多用户端、租户、门店及其他组织的数据归属和隔离实现"
-  default_prompt: "使用 $zdm-data-permission-isolation 审查并实现当前业务模块的数据归属、组织隔离与越权测试。"
+  display_name: '装点猫数据权限隔离'
+  short_description: '统一审查多用户端、租户、门店及其他组织的数据归属和隔离实现'
+  default_prompt: '使用 $zdm-data-permission-isolation 审查并实现当前业务模块的数据归属、组织隔离与越权测试。'
