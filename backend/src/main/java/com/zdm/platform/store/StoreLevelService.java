@@ -14,7 +14,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
-  private static final String REFERENCED_MESSAGE = "该店铺级别已被门店引用，不能删除，请先停用该店铺级别";
+  private static final String REFERENCED_MESSAGE = "该门店级别已被门店引用，不能删除";
 
   private final StoreMapper storeMapper;
   private final CurrentIdentityProvider identityProvider;
@@ -79,16 +79,22 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
       return false;
     }
     requireAccessible(existing);
-    Long referenceCount = storeMapper.selectCount(
-        Wrappers.<Store>lambdaQuery().eq(Store::getStoreLevelId, id));
-    if (referenceCount > 0) {
-      throw new IllegalArgumentException(REFERENCED_MESSAGE);
-    }
+    requireUnreferenced(id);
     try {
       return removeById(id);
     } catch (DataIntegrityViolationException exception) {
       throw new IllegalArgumentException(REFERENCED_MESSAGE, exception);
     }
+  }
+
+  public boolean previewDelete(Long id) {
+    StoreLevel existing = getById(id);
+    if (existing == null) {
+      throw new IllegalArgumentException("门店级别不存在");
+    }
+    requireAccessible(existing);
+    requireUnreferenced(id);
+    return true;
   }
 
   public void requireSelectable(Long id) {
@@ -110,6 +116,14 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
 
   private void requireAccessible(StoreLevel level) {
     ownershipGuard.requireCreator(level.getCreatedByAccountId(), level.getCreatedByName());
+  }
+
+  private void requireUnreferenced(Long id) {
+    Long referenceCount = storeMapper.selectCount(
+        Wrappers.<Store>lambdaQuery().eq(Store::getStoreLevelId, id));
+    if (referenceCount > 0) {
+      throw new IllegalArgumentException(REFERENCED_MESSAGE);
+    }
   }
 
   private void normalizeAndValidate(StoreLevel level, Long excludedId) {

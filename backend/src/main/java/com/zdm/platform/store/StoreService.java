@@ -35,8 +35,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   public List<Store> listForCurrentAdmin(boolean archived) {
     identityProvider.require();
     return lambdaQuery()
-        .eq(archived, Store::getStatus, "archived")
-        .ne(!archived, Store::getStatus, "archived")
+        .eq(Store::getStatus, archived ? "disabled" : "enabled")
         .orderByDesc(Store::getCreatedAt)
         .list();
   }
@@ -48,6 +47,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     normalizeAndValidateName(store, null);
     requireOpenedBusiness(store.getTenantId(), store.getType());
     storeLevelService.requireSelectable(store.getStoreLevelId());
+    store.setStatus("enabled");
     store.setCreatedBy(identity.displayName());
     boolean saved = save(store);
     provisionStoreAdmins(store);
@@ -90,23 +90,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   }
 
   @Transactional
-  public Store updateStatus(Long id, String status) {
-    Store existing = getById(id);
-    if (existing == null) {
-      return null;
-    }
-    requireAccessible(existing);
-    requireOperating(existing);
-    existing.setStatus(status);
-    updateById(existing);
-    jdbcTemplate.update(
-        "UPDATE account_identities SET status = ? WHERE store_id = ? AND identity_type = 'store_admin'",
-        status,
-        id);
-    return getById(id);
-  }
-
-  @Transactional
   public Store archiveStore(Long id) {
     Store existing = getById(id);
     if (existing == null) {
@@ -114,8 +97,9 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     }
     requireAccessible(existing);
     requireOperating(existing);
-    existing.setStatus("archived");
+    existing.setStatus("disabled");
     updateById(existing);
+    jdbcTemplate.update("UPDATE stores SET archived_by_tenant = 0 WHERE id = ?", id);
     revokeStoreSessions(id);
     return getById(id);
   }
@@ -128,11 +112,10 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     }
     requireAccessible(existing);
     requireArchived(existing);
+    requireTenantOperating(existing.getTenantId());
     existing.setStatus("enabled");
     updateById(existing);
-    jdbcTemplate.update(
-        "UPDATE account_identities SET status = 'enabled' WHERE store_id = ? AND identity_type = 'store_admin'",
-        id);
+    jdbcTemplate.update("UPDATE stores SET archived_by_tenant = 0 WHERE id = ?", id);
     return getById(id);
   }
 
@@ -203,6 +186,16 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     }
   }
 
+  private void requireTenantOperating(Long tenantId) {
+    Integer count = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM tenants WHERE id = ? AND status = 'enabled'",
+        Integer.class,
+        tenantId);
+    if (count == null || count == 0) {
+      throw new IllegalArgumentException("所属租户已归档，不能恢复门店运营");
+    }
+  }
+
   private void normalizeAndValidateName(Store store, Long excludedStoreId) {
     String storeName = store.getName().trim();
     store.setName(storeName);
@@ -237,13 +230,13 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   }
 
   private void requireOperating(Store store) {
-    if ("archived".equals(store.getStatus())) {
+    if (!"enabled".equals(store.getStatus())) {
       throw new IllegalArgumentException("该门店已归档");
     }
   }
 
   private void requireArchived(Store store) {
-    if (!"archived".equals(store.getStatus())) {
+    if (!"disabled".equals(store.getStatus())) {
       throw new IllegalArgumentException("请先归档门店");
     }
   }

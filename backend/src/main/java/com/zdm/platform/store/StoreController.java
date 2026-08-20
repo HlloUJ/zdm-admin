@@ -69,13 +69,6 @@ public class StoreController {
     return ApiResponse.ok(storeService.updateLevel(id, request.storeLevelId()));
   }
 
-  @PatchMapping("/{id}/status")
-  public ApiResponse<Store> updateStatus(
-      @PathVariable Long id, @Valid @RequestBody StoreStatusRequest request) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.toggle-status");
-    return ApiResponse.ok(storeService.updateStatus(id, request.status()));
-  }
-
   @PatchMapping("/{id}/archive")
   public ApiResponse<Store> archive(@PathVariable Long id) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.archive");

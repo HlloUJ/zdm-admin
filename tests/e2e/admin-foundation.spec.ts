@@ -232,6 +232,9 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
   const main = page.getByRole('main');
 
   await expect(main.getByText('租户管理').first()).toBeVisible();
+  await expect(main.getByText('运营中', { exact: true })).toBeVisible();
+  await expect(main.getByText('已归档', { exact: true })).toBeVisible();
+  await expect(main.getByText('状态', { exact: true })).toHaveCount(0);
   await expect(main.getByText('装点猫直营租户')).toBeVisible();
 
   await main.getByRole('button', { name: /新增/ }).click();
@@ -259,15 +262,47 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
   await expect(editDialog).toBeHidden();
 });
 
+test('gates tenant actions by status and requires the exact name before permanent deletion', async ({ page }) => {
+  await page.goto('/tenant-management');
+
+  const enabledRow = page.locator('tbody tr').filter({ hasText: '装点猫直营租户' });
+  await expect(enabledRow.getByText('业务开通', { exact: true })).toBeVisible();
+  await expect(enabledRow.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(enabledRow.getByText('归档', { exact: true })).toBeVisible();
+  await expect(enabledRow.getByText('彻底删除', { exact: true })).toHaveCount(0);
+
+  await page.getByText('已归档', { exact: true }).click();
+  const disabledRow = page.locator('tbody tr').filter({ hasText: '临时归档租户' });
+  await expect(disabledRow.getByText('业务开通', { exact: true })).toHaveCount(0);
+  await expect(disabledRow.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(disabledRow.getByText('恢复运营', { exact: true })).toBeVisible();
+  await disabledRow.getByText('彻底删除', { exact: true }).click();
+
+  const dialog = page.locator('.t-dialog').filter({ hasText: '彻底删除租户' });
+  await expect(dialog).toContainText('门店2');
+  await expect(dialog).toContainText('员工5');
+  await expect(dialog).toContainText('删除独立账号4');
+  await expect(dialog).toContainText('保留共享账号1');
+  const confirmButton = dialog.getByRole('button', { name: '确认彻底删除', exact: true });
+  await expect(confirmButton).toBeDisabled();
+  await dialog.getByPlaceholder('请输入完整租户名称').fill('错误名称');
+  await expect(confirmButton).toBeDisabled();
+  await dialog.getByPlaceholder('请输入完整租户名称').fill('临时归档租户');
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
+  await expect(page.getByText('已彻底删除“临时归档租户”', { exact: true })).toBeVisible();
+});
+
 test('opens store create, level and edit dialogs', async ({ page }) => {
   await page.goto('/tenant-store-management');
   const main = page.getByRole('main');
 
   await expect(main.getByText('门店管理').first()).toBeVisible();
   await expect(main.getByText('杭州体验门店')).toBeVisible();
+  await expect(main.getByText('状态', { exact: true })).toHaveCount(0);
   const tableHeaders = main.locator('thead th');
-  await expect(tableHeaders.nth(8)).toContainText('创建人');
-  await expect(tableHeaders.nth(9)).toContainText('创建时间');
+  await expect(tableHeaders.nth(7)).toContainText('创建人');
+  await expect(tableHeaders.nth(8)).toContainText('创建时间');
   await expect(page.locator('tbody tr').filter({ hasText: '杭州体验门店' }).first()).toContainText('韩健');
 
   await main.getByRole('button', { name: /新增/ }).click();

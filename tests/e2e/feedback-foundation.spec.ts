@@ -233,7 +233,6 @@ test('shows 已新增加名称 after creating an item', async ({ page }) => {
 
 const deletionCases = [
   { path: '/supplier-management', target: '装点猫大板供应商' },
-  { path: '/tenant-management', target: '装点猫直营租户' },
   { path: '/role-management', target: '运营管理平台角色' },
   { path: '/employee-management', target: '测试员工' },
   { path: '/finished-stock-craft', target: 'E2E 边工艺' },
@@ -252,8 +251,8 @@ test('archives an operating store and warns before permanently deleting an archi
   await page.getByRole('main').getByText('已归档', { exact: true }).click();
   const archivedRow = page.locator('tbody tr').filter({ hasText: '已归档门店' });
   await expect(archivedRow.getByText('恢复运营', { exact: true })).toBeVisible();
-  await archivedRow.getByText('删除', { exact: true }).click();
-  await expect(page.getByText('门店删除后，该门店的经营数据永久不可恢复，请谨慎操作', { exact: true })).toBeVisible();
+  await archivedRow.getByText('彻底删除', { exact: true }).click();
+  await expect(page.getByText('彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作', { exact: true })).toBeVisible();
 });
 
 test('shows the duplicate store name error on the edit form', async ({ page }) => {

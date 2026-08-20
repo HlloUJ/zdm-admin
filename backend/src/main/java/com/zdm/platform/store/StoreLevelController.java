@@ -66,4 +66,10 @@ public class StoreLevelController {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
     return ApiResponse.ok(service.deleteLevel(id));
   }
+
+  @GetMapping("/{id}/delete-preview")
+  public ApiResponse<Boolean> previewDelete(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    return ApiResponse.ok(service.previewDelete(id));
+  }
 }
