@@ -697,6 +697,12 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const roleModuleList = permissionDialog.locator('.permission-module-list');
   const roleMatrix = permissionDialog.locator('.permission-matrix');
   await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(4);
+  await expect(roleModuleList.locator('.permission-module-item > span:first-child')).toHaveText([
+    '租户与门店',
+    '商品管理',
+    '供应商管理',
+    '权限管理',
+  ]);
   await expect(roleModuleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('门店分类管理', { exact: true })).toHaveCount(0);
   await expect(roleModuleList.getByText('商品管理', { exact: true })).toBeVisible();
@@ -914,6 +920,13 @@ test('shows the full function catalog for both terminals during development', as
   await expect(main.getByText('城市合伙人门店管理后台', { exact: true })).toBeVisible();
   await expect(main.getByText('大板供应商门店管理后台', { exact: true })).toBeVisible();
   await expect(moduleList.locator('.permission-module-item')).toHaveCount(5);
+  await expect(moduleList.locator('.permission-module-item > span:first-child')).toHaveText([
+    '租户与门店',
+    '商品管理',
+    '供应商管理',
+    '门店分类管理',
+    '权限管理',
+  ]);
   await expect(moduleList.getByText('门店分类管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('商品管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('供应商管理', { exact: true })).toBeVisible();
