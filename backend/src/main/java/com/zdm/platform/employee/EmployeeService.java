@@ -1,6 +1,7 @@
 package com.zdm.platform.employee;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.PermissionGuard;
@@ -23,14 +24,17 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
 
   private final JdbcTemplate jdbcTemplate;
   private final SimpleJdbcInsert accountInsert;
+  private final CreatorOwnershipGuard ownershipGuard;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
 
   public EmployeeService(
       JdbcTemplate jdbcTemplate,
+      CreatorOwnershipGuard ownershipGuard,
       CurrentIdentityProvider identityProvider,
       PermissionGuard permissionGuard) {
     this.jdbcTemplate = jdbcTemplate;
+    this.ownershipGuard = ownershipGuard;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
     this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
@@ -71,7 +75,9 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       throw new IllegalArgumentException("员工不存在");
     }
-    requireAccessibleEmployee(existing);
+    CurrentIdentity identity = requireEmployeeOrganizationScope(existing);
+    requireSelfUpdateAllowed(identity, existing, payload);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
 
     if (payload.getStoreId() != null && !Objects.equals(payload.getStoreId(), existing.getStoreId())) {
       throw new AccessDeniedException("不能将员工转移到其他门店");
@@ -105,7 +111,11 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       throw new IllegalArgumentException("员工不存在");
     }
-    requireAccessibleEmployee(existing);
+    CurrentIdentity identity = requireEmployeeOrganizationScope(existing);
+    if (Objects.equals(existing.getId(), identity.employeeId())) {
+      throw new AccessDeniedException("不能修改当前登录员工的角色");
+    }
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
 
     existing.setRoleIds(request.roleIds());
@@ -122,7 +132,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       return false;
     }
-    requireAccessibleEmployee(existing);
+    requireDeletableEmployee(existing);
     removeAdminRoles(existing);
     jdbcTemplate.update(
         """
@@ -348,12 +358,36 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
   }
 
-  private void requireAccessibleEmployee(Employee employee) {
+  private void requireSelfUpdateAllowed(CurrentIdentity identity, Employee existing, Employee payload) {
+    if (!Objects.equals(existing.getId(), identity.employeeId())) {
+      return;
+    }
+    boolean permissionChanged = !Objects.equals(existing.getRoleIds(), payload.getRoleIds())
+        || !Objects.equals(existing.getDataPermission(), payload.getDataPermission());
+    if (permissionChanged) {
+      throw new AccessDeniedException("不能修改当前登录员工的角色");
+    }
+    if (!Objects.equals(existing.getStatus(), payload.getStatus())) {
+      throw new AccessDeniedException("不能停用当前登录员工");
+    }
+    throw new AccessDeniedException("不能编辑当前登录员工");
+  }
+
+  private void requireDeletableEmployee(Employee employee) {
+    CurrentIdentity identity = requireEmployeeOrganizationScope(employee);
+    if (Objects.equals(employee.getId(), identity.employeeId())) {
+      throw new AccessDeniedException("不能删除当前登录员工");
+    }
+    ownershipGuard.requireCreator(employee.getCreatedByAccountId(), employee.getCreatedByName());
+  }
+
+  private CurrentIdentity requireEmployeeOrganizationScope(Employee employee) {
     CurrentIdentity identity = requireSupportedOrganizationScope();
     if (!Objects.equals(employee.getTenantId(), identity.tenantId())
         || !Objects.equals(employee.getStoreId(), identity.storeId())) {
       throw new AccessDeniedException("当前组织无权操作该员工");
     }
+    return identity;
   }
 
   private CurrentIdentity requireSupportedOrganizationScope() {

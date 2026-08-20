@@ -92,11 +92,16 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="canEditEmployee" theme="primary" hover="color" @click="openProfileDialog(row)">
+                <t-link
+                  v-if="canEditEmployee && row.id !== loginUser.employeeId"
+                  theme="primary"
+                  hover="color"
+                  @click="openProfileDialog(row)"
+                >
                   编辑
                 </t-link>
                 <t-link
-                  v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row)"
+                  v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
                   theme="primary"
                   hover="color"
                   @click="openPermissionDialog(row)"
@@ -104,7 +109,7 @@
                   角色
                 </t-link>
                 <t-link
-                  v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row)"
+                  v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
@@ -112,7 +117,7 @@
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
                 <t-link
-                  v-if="canDeleteEmployee && !isSuperAdminEmployee(row)"
+                  v-if="canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
                   theme="danger"
                   hover="color"
                   @click="openDeleteConfirm(row)"
@@ -121,10 +126,14 @@
                 </t-link>
                 <span
                   v-if="
-                    !canEditEmployee &&
-                    !(canConfigureEmployeePermission && !isSuperAdminEmployee(row)) &&
-                    !(canToggleEmployeeStatus && !isSuperAdminEmployee(row)) &&
-                    !(canDeleteEmployee && !isSuperAdminEmployee(row))
+                    !(canEditEmployee && row.id !== loginUser.employeeId) &&
+                    !(
+                      canConfigureEmployeePermission &&
+                      !isSuperAdminEmployee(row) &&
+                      row.id !== loginUser.employeeId
+                    ) &&
+                    !(canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId) &&
+                    !(canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId)
                   "
                   class="table-action-placeholder"
                 >
@@ -252,6 +261,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
@@ -584,6 +594,11 @@ const copyInviteLink = async () => {
 };
 
 const openProfileDialog = (row: EmployeeItem) => {
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能编辑当前登录员工');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   profileFormData.name = row.name;
   profileFormData.gender = row.gender;
@@ -601,6 +616,11 @@ const openPermissionDialog = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能修改当前登录员工的角色');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   permissionFormData.roleIds = [...row.roleIds];
   permissionFormData.dataPermission = row.dataPermission;
@@ -704,6 +724,11 @@ const openStatusConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员不可停用或启用');
     return;
   }
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能停用当前登录员工');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   const nextType = row.status === 'normal' ? 'disable' : 'enable';
   if (nextType === 'enable' && !validateEmployeeBeforeEnable(row)) return;
 
@@ -717,6 +742,11 @@ const openDeleteConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员不可删除');
     return;
   }
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能删除当前登录员工');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   confirmEmployee.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;

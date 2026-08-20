@@ -534,7 +534,7 @@ test('filters menu and employee actions by logged-in permissions', async ({ page
           'admin.permission-management.employee-management.view',
           'admin.permission-management.employee-management.edit',
         ],
-        employeeId: 2,
+        employeeId: 999,
         tenantId: 1,
         storeId: 1,
         dataPermission: 'self',
@@ -590,6 +590,86 @@ test('shows employee permission action without edit action for permission-only u
   const permissionOnlyEmployeeActions = permissionOnlyEmployeeRow.locator('.table-actions');
   await expect(permissionOnlyEmployeeActions.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(permissionOnlyEmployeeActions.getByText('角色', { exact: true })).toBeVisible();
+});
+
+test('blocks all employee operations for records created by another account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 19,
+        name: '门店店长',
+        phone: '13900000001',
+        roles: ['STORE_MANAGER'],
+        permissions: [
+          'admin.permission-management.employee-management.view',
+          'admin.permission-management.employee-management.edit',
+          'admin.permission-management.employee-management.permission',
+          'admin.permission-management.employee-management.toggle-status',
+          'admin.permission-management.employee-management.delete',
+        ],
+        employeeId: 19,
+        tenantId: 14,
+        storeId: 14,
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/employee-management');
+  const row = page.locator('tbody tr').filter({ hasText: '15926627777' }).first();
+  const actions = row.locator('.table-actions');
+
+  await actions.getByText('编辑', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '编辑资料' })).toHaveCount(0);
+
+  await actions.getByText('角色', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '配置权限' })).toHaveCount(0);
+
+  await actions.getByText(/^(停用|启用)$/).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: /是否(停用|启用)员工/ })).toHaveCount(0);
+
+  await actions.getByText('删除', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '是否删除员工' })).toHaveCount(0);
+});
+
+test('hides all operations for the current employee', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 1,
+        name: '韩健',
+        phone: '15926627777',
+        roles: ['EMPLOYEE_MANAGER'],
+        permissions: [
+          'admin.permission-management.employee-management.view',
+          'admin.permission-management.employee-management.edit',
+          'admin.permission-management.employee-management.permission',
+          'admin.permission-management.employee-management.toggle-status',
+          'admin.permission-management.employee-management.delete',
+        ],
+        employeeId: 3,
+        tenantId: 1,
+        storeId: 1,
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/employee-management');
+  const row = page.locator('tbody tr').filter({ hasText: '15926627777' }).first();
+
+  const actions = row.locator('.table-actions');
+  await expect(actions.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(actions.getByText('角色', { exact: true })).toHaveCount(0);
+  await expect(actions.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(actions.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(actions.locator('.table-action-placeholder')).toHaveText('-');
 });
 
 test('shows current account info and logout on tenant management page', async ({ page }) => {
@@ -686,6 +766,46 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
   await expect(operationRoleRow.getByText('权限', { exact: true })).toBeVisible();
   await expect(operationRoleRow.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(operationRoleRow.getByText('删除', { exact: true })).toHaveCount(0);
+});
+
+test('blocks all role operations for records created by another account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 19,
+        name: '门店店长',
+        phone: '13900000001',
+        roles: ['STORE_MANAGER'],
+        permissions: [
+          'admin.permission-management.role-management.view',
+          'admin.permission-management.role-management.edit',
+          'admin.permission-management.role-management.permission',
+          'admin.permission-management.role-management.delete',
+        ],
+        employeeId: 19,
+        tenantId: 14,
+        storeId: 14,
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/role-management');
+  const row = page.locator('tbody tr').filter({ hasText: '运营管理平台角色' }).first();
+  const actions = row.locator('.table-actions');
+
+  await actions.getByText('编辑', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '编辑' })).toHaveCount(0);
+
+  await actions.getByText('权限', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '权限配置' })).toHaveCount(0);
+
+  await actions.getByText('删除', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '是否删除角色' })).toHaveCount(0);
 });
 
 test('opens role permission configuration dialog', async ({ page }) => {
