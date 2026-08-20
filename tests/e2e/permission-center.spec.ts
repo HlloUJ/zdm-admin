@@ -590,7 +590,7 @@ test('shows current account info and logout on tenant management page', async ({
         roles: ['TENANT_MANAGER'],
         roleNames: ['租户管理员'],
         identityType: 'tenant_admin',
-        permissions: ['admin.tenant.tenant-management.view'],
+        permissions: ['admin.tenant.tenant-management.unarchived.view'],
         employeeId: 4,
         tenantId: 1,
         dataPermission: 'all',
@@ -615,9 +615,9 @@ test('shows only granted store management operations for a restricted account', 
         phone: '15900000012',
         roles: ['STORE_OPERATOR'],
         permissions: [
-          'admin.tenant.tenant-store-management.view',
-          'admin.tenant.tenant-store-management.edit-level',
-          'admin.tenant.tenant-store-management.toggle-status',
+          'admin.tenant.tenant-store-management.operating.view',
+          'admin.tenant.tenant-store-management.operating.edit-level',
+          'admin.tenant.tenant-store-management.operating.archive',
         ],
         dataPermission: 'all',
       }),
@@ -630,7 +630,7 @@ test('shows only granted store management operations for a restricted account', 
 
   await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);
   await expect(row.getByRole('button', { name: '修改门店级别' })).toBeVisible();
-  await expect(row.locator('.table-actions .t-link')).toHaveText(['停用']);
+  await expect(row.locator('.table-actions .t-link')).toHaveText(['归档']);
   await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
 
@@ -708,20 +708,33 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
   await roleModuleList.getByText('租户与门店', { exact: true }).click();
+  const tenantPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '租户管理页' });
+  await expect(tenantPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '业务开通',
+    '编辑',
+    '归档',
+  ]);
+  const archivedTenantPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '已归档' }).first();
+  await expect(archivedTenantPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
+    '彻底删除',
+  ]);
   const storePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店管理页' });
   await expect(storePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
     '修改门店级别',
     '编辑',
-    '停用/启用',
     '归档',
   ]);
-  const archivedStorePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '已归档' });
+  const archivedStorePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '已归档' }).nth(1);
   await expect(archivedStorePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '恢复运营',
-    '删除',
+    '彻底删除',
   ]);
   const storeLevelPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
   await expect(storeLevelPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -907,7 +920,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*20/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*21/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
@@ -923,8 +936,13 @@ test('shows the full function catalog for both terminals during development', as
     '新增',
     '业务开通',
     '编辑',
-    '停用/启用',
-    '删除',
+    '归档',
+  ]);
+  const archivedTenantAllocationRow = matrix.locator('tbody tr').filter({ hasText: '已归档' }).first();
+  await expect(archivedTenantAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
+    '彻底删除',
   ]);
   const storeAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店管理页' });
   await expect(storeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -932,14 +950,13 @@ test('shows the full function catalog for both terminals during development', as
     '新增',
     '修改门店级别',
     '编辑',
-    '停用/启用',
     '归档',
   ]);
-  const archivedStoreAllocationRow = matrix.locator('tbody tr').filter({ hasText: '已归档' });
+  const archivedStoreAllocationRow = matrix.locator('tbody tr').filter({ hasText: '已归档' }).nth(1);
   await expect(archivedStoreAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '恢复运营',
-    '删除',
+    '彻底删除',
   ]);
   const storeLevelAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
   await expect(storeLevelAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -1095,7 +1112,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(matrix.getByText('租户管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('门店管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('门店级别管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(20);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(21);
   await moduleList.getByText('供应商管理', { exact: true }).click();
   await expect(matrix.getByText('供应商管理页', { exact: true })).toBeVisible();
   await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);

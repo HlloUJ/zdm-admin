@@ -10,7 +10,7 @@ export interface StoreRecord {
   region?: string;
   detailAddress?: string;
   address?: string;
-  status: 'enabled' | 'disabled' | 'archived';
+  status: 'enabled' | 'disabled';
   remark?: string;
   createdAt?: string;
   createdBy?: string;
@@ -26,7 +26,6 @@ export interface StorePayload {
   region?: string;
   detailAddress?: string;
   address?: string;
-  status: 'enabled' | 'disabled';
   remark?: string;
   createdBy?: string;
 }
@@ -53,13 +52,6 @@ export function updateStoreLevelSelection(id: number, storeLevelId: number) {
   return request<StoreRecord>(`/admin/stores/${id}/level`, {
     method: 'PATCH',
     body: JSON.stringify({ storeLevelId }),
-  });
-}
-
-export function updateStoreStatus(id: number, status: StorePayload['status']) {
-  return request<StoreRecord>(`/admin/stores/${id}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
   });
 }
 

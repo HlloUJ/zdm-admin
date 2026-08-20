@@ -5,7 +5,10 @@ import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -118,32 +121,87 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     }
     existing.setStatus(status);
     updateById(existing);
-    syncTenantIdentityStatus(id, status);
+    if ("disabled".equals(status)) {
+      jdbcTemplate.update(
+          """
+          UPDATE stores
+          SET status = 'disabled', archived_by_tenant = 1
+          WHERE tenant_id = ? AND status = 'enabled'
+          """,
+          id);
+      jdbcTemplate.update(
+          """
+          UPDATE auth_sessions
+          SET revoked_at = CURRENT_TIMESTAMP
+          WHERE revoked_at IS NULL
+            AND identity_id IN (SELECT id FROM account_identities WHERE tenant_id = ?)
+          """,
+          id);
+    } else {
+      jdbcTemplate.update(
+          """
+          UPDATE stores
+          SET status = 'enabled', archived_by_tenant = 0
+          WHERE tenant_id = ?
+            AND status = 'disabled'
+            AND archived_by_tenant = 1
+          """,
+          id);
+    }
     return getById(id);
   }
 
-  @Transactional
-  public boolean deleteTenant(Long id) {
-    Tenant existing = getById(id);
-    if (existing == null) {
-      return false;
-    }
+  public TenantPurgePreview getPurgePreview(Long id) {
+    Tenant existing = requireTenant(id);
     ownershipGuard.requireCreator(
         existing.getCreatedByAccountId(), existing.getCreatedByName());
-    Integer storeCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM stores WHERE tenant_id = ?", Integer.class, id);
-    Integer employeeCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM employees WHERE tenant_id = ?", Integer.class, id);
-    if ((storeCount != null && storeCount > 0) || (employeeCount != null && employeeCount > 0)) {
-      throw new IllegalArgumentException("该租户已开通门店或存在员工，不能删除，请先停用租户");
+    return buildPurgePreview(existing);
+  }
+
+  @Transactional
+  public TenantPurgeResult purgeTenant(Long id, String confirmationName) {
+    Tenant existing = lockTenant(id);
+    ownershipGuard.requireCreator(
+        existing.getCreatedByAccountId(), existing.getCreatedByName());
+    if (!existing.getName().equals(confirmationName)) {
+      throw new IllegalArgumentException("请输入完整租户名称确认删除");
     }
+    TenantPurgePreview preview = buildPurgePreview(existing);
+    if (!preview.eligible()) {
+      throw new IllegalArgumentException(preview.blockers().getFirst());
+    }
+
+    List<Long> candidateAccountIds = findTenantAccountIds(id);
+    Set<Long> retainedAccountIds = findRetainedAccountIds(id, candidateAccountIds);
+    List<Long> deletedAccountIds = candidateAccountIds.stream()
+        .filter(accountId -> !retainedAccountIds.contains(accountId))
+        .toList();
+
     jdbcTemplate.update(
         "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE tenant_id = ?)",
         id);
+    deleteSessionsForAccounts(deletedAccountIds);
     jdbcTemplate.update("DELETE FROM account_roles WHERE tenant_id = ?", id);
+    jdbcTemplate.update(
+        "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE tenant_id = ?)",
+        id);
     jdbcTemplate.update("DELETE FROM account_identities WHERE tenant_id = ?", id);
+    deleteTenantProductCategories(id);
+    jdbcTemplate.update("DELETE FROM employee_invites WHERE tenant_id = ?", id);
+    int employeeDeleteCount = jdbcTemplate.update("DELETE FROM employees WHERE tenant_id = ?", id);
+    int roleDeleteCount = jdbcTemplate.update("DELETE FROM roles WHERE tenant_id = ?", id);
+    deleteTenantStoreCategories(id);
+    int storeDeleteCount = jdbcTemplate.update("DELETE FROM stores WHERE tenant_id = ?", id);
     jdbcTemplate.update("DELETE FROM tenant_businesses WHERE tenant_id = ?", id);
-    return removeById(id);
+    int tenantDeleteCount = jdbcTemplate.update("DELETE FROM tenants WHERE id = ?", id);
+    deleteAccounts(deletedAccountIds);
+    return new TenantPurgeResult(
+        tenantDeleteCount,
+        storeDeleteCount,
+        employeeDeleteCount,
+        roleDeleteCount,
+        deletedAccountIds.size(),
+        retainedAccountIds.size());
   }
 
   public boolean hasEnabledBusiness(Long tenantId, String businessType) {
@@ -268,14 +326,218 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
         tenant.getStatus());
   }
 
-  private void syncTenantIdentityStatus(Long tenantId, String status) {
+  private Tenant lockTenant(Long id) {
+    return jdbcTemplate.query(
+        "SELECT * FROM tenants WHERE id = ? FOR UPDATE",
+        (rs, rowNum) -> {
+          Tenant tenant = new Tenant();
+          tenant.setId(rs.getLong("id"));
+          tenant.setName(rs.getString("name"));
+          tenant.setContactName(rs.getString("contact_name"));
+          tenant.setContactPhone(rs.getString("contact_phone"));
+          tenant.setStatus(rs.getString("status"));
+          tenant.setCreatedByName(rs.getString("created_by_name"));
+          tenant.setCreatedByAccountId(rs.getObject("created_by_account_id", Long.class));
+          return tenant;
+        },
+        id).stream().findFirst().orElseThrow(() -> new IllegalArgumentException("租户不存在或已删除"));
+  }
+
+  private TenantPurgePreview buildPurgePreview(Tenant tenant) {
+    Long tenantId = tenant.getId();
+    List<String> blockers = new ArrayList<>();
+    if (!"disabled".equals(tenant.getStatus())) {
+      blockers.add("请先归档租户");
+    }
+    if (count(
+        """
+        SELECT COUNT(*)
+        FROM finished_products fp
+        JOIN product_categories pc ON pc.id = fp.category_id
+        WHERE pc.tenant_id = ?
+        """,
+        tenantId) > 0
+        || count(
+            """
+            SELECT COUNT(*)
+            FROM product_categories child
+            JOIN product_categories parent ON parent.id = child.parent_id
+            WHERE parent.tenant_id = ?
+              AND (child.tenant_id IS NULL OR child.tenant_id <> ?)
+            """,
+            tenantId,
+            tenantId) > 0) {
+      blockers.add("该租户存在暂不支持删除的跨组织业务数据");
+    }
+
+    List<Long> candidateAccountIds = findTenantAccountIds(tenantId);
+    Set<Long> retainedAccountIds = findRetainedAccountIds(tenantId, candidateAccountIds);
+    int accountDeleteCount = candidateAccountIds.size() - retainedAccountIds.size();
+    return new TenantPurgePreview(
+        blockers.isEmpty(),
+        tenant.getName(),
+        count("SELECT COUNT(*) FROM stores WHERE tenant_id = ?", tenantId),
+        count("SELECT COUNT(*) FROM employees WHERE tenant_id = ?", tenantId),
+        count("SELECT COUNT(*) FROM roles WHERE tenant_id = ?", tenantId),
+        accountDeleteCount,
+        retainedAccountIds.size(),
+        blockers);
+  }
+
+  private List<Long> findTenantAccountIds(Long tenantId) {
+    return jdbcTemplate.queryForList(
+        """
+        SELECT DISTINCT account_id
+        FROM (
+          SELECT account_id FROM account_identities WHERE tenant_id = ?
+          UNION ALL
+          SELECT account_id FROM employees WHERE tenant_id = ? AND account_id IS NOT NULL
+          UNION ALL
+          SELECT account_id FROM account_roles WHERE tenant_id = ?
+        ) tenant_accounts
+        WHERE account_id IS NOT NULL
+        ORDER BY account_id
+        """,
+        Long.class,
+        tenantId,
+        tenantId,
+        tenantId);
+  }
+
+  private Set<Long> findRetainedAccountIds(Long tenantId, List<Long> accountIds) {
+    Set<Long> retained = new HashSet<>();
+    for (Long accountId : accountIds) {
+      if (hasExternalAccountReference(tenantId, accountId)) {
+        retained.add(accountId);
+      }
+    }
+    return retained;
+  }
+
+  private boolean hasExternalAccountReference(Long tenantId, Long accountId) {
+    if (count(
+        "SELECT COUNT(*) FROM account_identities WHERE account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
+        accountId,
+        tenantId) > 0
+        || count(
+            "SELECT COUNT(*) FROM employees WHERE account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
+            accountId,
+            tenantId) > 0
+        || count(
+            "SELECT COUNT(*) FROM account_roles WHERE account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
+            accountId,
+            tenantId) > 0
+        || count(
+            "SELECT COUNT(*) FROM tenants WHERE created_by_account_id = ? AND id <> ?",
+            accountId,
+            tenantId) > 0
+        || count(
+            "SELECT COUNT(*) FROM employee_invites WHERE created_by_account_id = ? AND tenant_id <> ?",
+            accountId,
+            tenantId) > 0
+        || count(
+            "SELECT COUNT(*) FROM employees WHERE created_by_account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
+            accountId,
+            tenantId) > 0
+        || count(
+            "SELECT COUNT(*) FROM roles WHERE created_by_account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
+            accountId,
+            tenantId) > 0
+        || count(
+            "SELECT COUNT(*) FROM product_categories WHERE created_by_account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
+            accountId,
+            tenantId) > 0) {
+      return true;
+    }
+    for (String table : List.of(
+        "store_levels",
+        "product_attributes",
+        "product_attribute_values",
+        "category_attributes",
+        "crafts",
+        "slab_varieties",
+        "slab_origins",
+        "slab_textures",
+        "slab_colors",
+        "slab_color_categories",
+        "slab_grades",
+        "suppliers")) {
+      if (count("SELECT COUNT(*) FROM " + table + " WHERE created_by_account_id = ?", accountId) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private void deleteTenantProductCategories(Long tenantId) {
+    List<Map<String, Object>> categoryRows = jdbcTemplate.queryForList(
+        "SELECT id, parent_id FROM product_categories WHERE tenant_id = ?",
+        tenantId);
+    Set<Long> remaining = new LinkedHashSet<>();
+    Map<Long, Long> parents = new HashMap<>();
+    for (Map<String, Object> row : categoryRows) {
+      Long id = ((Number) row.get("id")).longValue();
+      remaining.add(id);
+      Object parentId = row.get("parent_id");
+      parents.put(id, parentId == null ? null : ((Number) parentId).longValue());
+    }
+    if (remaining.isEmpty()) {
+      return;
+    }
     jdbcTemplate.update(
         """
-        UPDATE account_identities
-        SET status = ?
-        WHERE tenant_id = ? AND identity_type IN ('tenant_admin', 'store_admin')
+        DELETE cavb FROM category_attribute_value_bindings cavb
+        JOIN category_attributes ca ON ca.id = cavb.category_attribute_id
+        JOIN product_categories pc ON pc.id = ca.category_id
+        WHERE pc.tenant_id = ?
         """,
-        status,
         tenantId);
+    jdbcTemplate.update(
+        "DELETE ca FROM category_attributes ca JOIN product_categories pc ON pc.id = ca.category_id WHERE pc.tenant_id = ?",
+        tenantId);
+    while (!remaining.isEmpty()) {
+      List<Long> leaves = remaining.stream()
+          .filter(id -> remaining.stream().noneMatch(other -> id.equals(parents.get(other))))
+          .toList();
+      if (leaves.isEmpty()) {
+        throw new IllegalStateException("租户商品分类层级异常，无法安全删除");
+      }
+      for (Long categoryId : leaves) {
+        jdbcTemplate.update("DELETE FROM product_categories WHERE id = ?", categoryId);
+        remaining.remove(categoryId);
+      }
+    }
+  }
+
+  private void deleteSessionsForAccounts(List<Long> accountIds) {
+    for (Long accountId : accountIds) {
+      jdbcTemplate.update("DELETE FROM auth_sessions WHERE account_id = ?", accountId);
+    }
+  }
+
+  private void deleteTenantStoreCategories(Long tenantId) {
+    int deletedCount;
+    do {
+      deletedCount = jdbcTemplate.update(
+          """
+          DELETE category
+          FROM store_categories category
+          JOIN stores store ON store.id = category.store_id
+          LEFT JOIN store_categories child ON child.parent_id = category.id
+          WHERE store.tenant_id = ? AND child.id IS NULL
+          """,
+          tenantId);
+    } while (deletedCount > 0);
+  }
+
+  private void deleteAccounts(List<Long> accountIds) {
+    for (Long accountId : accountIds) {
+      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+  }
+
+  private int count(String sql, Object... args) {
+    Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
+    return value == null ? 0 : value;
   }
 }

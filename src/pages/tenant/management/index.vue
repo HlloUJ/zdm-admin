@@ -6,109 +6,96 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>租户与门店</t-breadcrumb-item>
-              <t-breadcrumb-item>租户管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <t-tag theme="primary" variant="light">权限驱动业务入口</t-tag>
-        </header>
+        <AdminPageHeader :breadcrumbs="['租户与门店', '租户管理']" badge="权限驱动业务入口" />
 
-        <section class="filter-card">
-          <t-form :data="searchForm" label-width="84px" colon>
-            <div class="filter-row">
-              <div class="filter-fields">
-                <t-form-item label="租户姓名" name="tenantName">
-                  <t-input v-model="searchForm.tenantName" clearable placeholder="请输入" />
-                </t-form-item>
-                <t-form-item label="联系方式" name="phone">
-                  <t-input v-model="searchForm.phone" clearable placeholder="请输入" />
-                </t-form-item>
-                <t-form-item label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
-                    <t-option label="正常" value="normal" />
-                    <t-option label="停用" value="disabled" />
-                  </t-select>
-                </t-form-item>
-              </div>
+        <AdminListLayout class="tenant-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs v-if="showTenantTabRail" v-model="activeTab" :list="tenantTabs" />
+              <t-form :data="searchForm" label-width="84px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="租户姓名" name="tenantName">
+                      <t-input v-model="searchForm.tenantName" clearable placeholder="请输入" />
+                    </t-form-item>
+                    <t-form-item label="联系方式" name="phone">
+                      <t-input v-model="searchForm.phone" clearable placeholder="请输入" />
+                    </t-form-item>
+                  </div>
 
-              <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
-                  <template #icon><t-icon name="search" /></template>
-                  查询
-                </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
-                  <template #icon><t-icon name="refresh" /></template>
-                  重置
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="handleSearch">
+                      <template #icon><t-icon name="search" /></template>
+                      查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="handleReset">
+                      <template #icon><t-icon name="refresh" /></template>
+                      重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div v-if="activeTab === 'unarchived' && canCreateTenant" class="table-toolbar">
+                <t-button theme="primary" @click="openCreateDialog">
+                  <template #icon><t-icon name="add" /></template>
+                  新增
                 </t-button>
               </div>
             </div>
-          </t-form>
-        </section>
+          </template>
 
-        <section class="table-card">
-          <div class="table-toolbar">
-            <t-button v-if="canCreateTenant" theme="primary" @click="openCreateDialog">
-              <template #icon><t-icon name="add" /></template>
-              新增
-            </t-button>
-          </div>
+          <template #table>
+            <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+              <template #index="{ rowIndex }">
+                {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
+              </template>
+              <template #phone="{ row }">
+                {{ maskPhone(row.phone) }}
+              </template>
+              <template #businesses="{ row }">
+                <div class="business-tags">
+                  <t-tag
+                    v-for="business in row.businesses"
+                    :key="business"
+                    :class="['business-tag', business]"
+                    variant="light"
+                  >
+                    {{ businessLabel(business) }}
+                  </t-tag>
+                  <span v-if="!row.businesses.length" class="empty-business">未开通</span>
+                </div>
+              </template>
+              <template #operation="{ row }">
+                <div v-if="activeTab === 'unarchived'" class="table-actions">
+                  <t-link v-if="canOpenTenantBusiness" theme="primary" hover="color" @click="openBusinessDialog(row)">
+                    业务开通
+                  </t-link>
+                  <t-link v-if="canEditTenant" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                  <t-link v-if="canArchiveTenant" theme="warning" hover="color" @click="openStatusConfirm(row)">
+                    归档
+                  </t-link>
+                </div>
+                <div v-else class="table-actions">
+                  <t-link v-if="canRestoreTenant" theme="success" hover="color" @click="openStatusConfirm(row)">
+                    恢复运营
+                  </t-link>
+                  <t-link v-if="canDeleteTenant" theme="danger" hover="color" @click="openPurgeDialog(row)">
+                    彻底删除
+                  </t-link>
+                </div>
+              </template>
+            </t-table>
+          </template>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
-            <template #index="{ rowIndex }">
-              {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
-            </template>
-            <template #phone="{ row }">
-              {{ maskPhone(row.phone) }}
-            </template>
-            <template #businesses="{ row }">
-              <div class="business-tags">
-                <t-tag
-                  v-for="business in row.businesses"
-                  :key="business"
-                  :class="['business-tag', business]"
-                  variant="light"
-                >
-                  {{ businessLabel(business) }}
-                </t-tag>
-                <span v-if="!row.businesses.length" class="empty-business">未开通</span>
-              </div>
-            </template>
-            <template #status="{ row }">
-              <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'normal' ? '正常' : '停用' }}
-              </t-tag>
-            </template>
-            <template #operation="{ row }">
-              <div class="table-actions">
-                <t-link v-if="canOpenTenantBusiness" theme="primary" hover="color" @click="openBusinessDialog(row)">
-                  业务开通
-                </t-link>
-                <t-link v-if="canEditTenant" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                <t-link
-                  v-if="canToggleTenantStatus"
-                  :theme="row.status === 'normal' ? 'warning' : 'success'"
-                  hover="color"
-                  @click="openStatusConfirm(row)"
-                >
-                  {{ row.status === 'normal' ? '停用' : '启用' }}
-                </t-link>
-                <t-link v-if="canDeleteTenant" theme="danger" hover="color" @click="openDeleteConfirm(row)">
-                  删除
-                </t-link>
-              </div>
-            </template>
-          </t-table>
-
-          <AdminPagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="paginationTotal"
-            :page-size-options="pageSizeOptions"
-          />
-        </section>
+          <template #pagination>
+            <AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
@@ -168,7 +155,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
+      :action="confirmState.type === 'archive' ? '归档' : '恢复运营'"
       object-type="租户"
       :object-name="confirmState.row?.tenantName"
       @confirm="handleConfirm"
@@ -177,34 +164,77 @@
     >
       {{ confirmState.content }}
     </AdminConfirmDialog>
+
+    <AdminDialog
+      v-model:visible="purgeDialogVisible"
+      header="彻底删除租户"
+      width="560px"
+      :confirm-btn="purgeConfirmButton"
+      @confirm="handlePurge"
+      @cancel="closePurgeDialog"
+      @close="closePurgeDialog"
+    >
+      <t-alert theme="error" message="彻底删除后，租户及其独占业务数据无法恢复。请输入租户名称确认删除。" />
+      <t-descriptions v-if="purgePreview" class="purge-summary" bordered :column="2">
+        <t-descriptions-item label="租户名称" :span="2">{{ purgePreview.tenantName }}</t-descriptions-item>
+        <t-descriptions-item label="门店">{{ purgePreview.storeCount }}</t-descriptions-item>
+        <t-descriptions-item label="员工">{{ purgePreview.employeeCount }}</t-descriptions-item>
+        <t-descriptions-item label="角色">{{ purgePreview.roleCount }}</t-descriptions-item>
+        <t-descriptions-item label="删除独立账号">{{ purgePreview.accountDeleteCount }}</t-descriptions-item>
+        <t-descriptions-item label="保留共享账号">{{ purgePreview.accountRetainCount }}</t-descriptions-item>
+      </t-descriptions>
+      <t-alert
+        v-for="blocker in purgePreview?.blockers ?? []"
+        :key="blocker"
+        class="purge-blocker"
+        theme="warning"
+        :message="blocker"
+      />
+      <t-form class="purge-confirm-form" label-width="96px" colon>
+        <t-form-item label="租户名称" required-mark>
+          <t-input v-model="purgeConfirmationName" placeholder="请输入完整租户名称" />
+        </t-form-item>
+      </t-form>
+    </AdminDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import {
+  adminFeedback,
+  AdminConfirmDialog,
+  AdminDialog,
+  AdminListLayout,
+  AdminPageHeader,
+  AdminPagination,
+} from '@/components/foundation';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createTenant,
-  deleteTenant,
+  getTenantPurgePreview,
   listTenants,
+  purgeTenant,
   updateTenant,
   updateTenantBusinesses,
   updateTenantStatus,
   type TenantPayload,
+  type TenantPurgePreview,
   type TenantRecord,
 } from '@/services/tenants';
 
 type BusinessType = 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
 type TenantStatus = 'normal' | 'disabled';
-type ConfirmType = 'enable' | 'disable' | 'delete';
+type TenantTab = 'unarchived' | 'archived';
+type ConfirmType = 'archive' | 'restore';
 
 interface TenantItem {
   id: number;
@@ -237,18 +267,30 @@ const tableData = ref<TenantItem[]>([]);
 const loading = ref(false);
 const currentUser = getLoginUser();
 const permissionPrefix = 'admin.tenant.tenant-management';
-const canCreateTenant = computed(() => hasPermission(currentUser, `${permissionPrefix}.create`));
-const canOpenTenantBusiness = computed(() => hasPermission(currentUser, `${permissionPrefix}.open-business`));
-const canEditTenant = computed(() => hasPermission(currentUser, `${permissionPrefix}.edit`));
-const canToggleTenantStatus = computed(() => hasPermission(currentUser, `${permissionPrefix}.toggle-status`));
-const canDeleteTenant = computed(() => hasPermission(currentUser, `${permissionPrefix}.delete`));
+const activeTab = ref<TenantTab>('unarchived');
+const allTenantTabs: { label: string; value: TenantTab }[] = [
+  { label: '运营中', value: 'unarchived' },
+  { label: '已归档', value: 'archived' },
+];
+const { visibleTabs: tenantTabs, showTabRail: showTenantTabRail } = usePermissionTabs({
+  tabs: allTenantTabs,
+  activeTab,
+  canAccess: (tab) => hasPermission(currentUser, `${permissionPrefix}.${tab.value}.view`),
+});
+const hasTenantAction = (scope: TenantTab, action: string) =>
+  hasPermission(currentUser, `${permissionPrefix}.${scope}.${action}`);
+const canCreateTenant = computed(() => hasTenantAction('unarchived', 'create'));
+const canOpenTenantBusiness = computed(() => hasTenantAction('unarchived', 'open-business'));
+const canEditTenant = computed(() => hasTenantAction('unarchived', 'edit'));
+const canArchiveTenant = computed(() => hasTenantAction('unarchived', 'archive'));
+const canRestoreTenant = computed(() => hasTenantAction('archived', 'restore'));
+const canDeleteTenant = computed(() => hasTenantAction('archived', 'delete'));
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', minWidth: 150, align: 'left' },
   { colKey: 'phone', title: '联系方式', width: 150, align: 'center' },
   { colKey: 'businesses', title: '开通业务', minWidth: 260, align: 'left' },
-  { colKey: 'status', title: '状态', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 280, align: 'left', fixed: 'right' },
@@ -257,7 +299,6 @@ const columns: PrimaryTableCol<TableRowData>[] = [
 const searchForm = reactive({
   tenantName: '',
   phone: '',
-  status: '' as TenantStatus | '',
 });
 const appliedSearchForm = reactive({ ...searchForm });
 
@@ -297,9 +338,21 @@ const confirmState = reactive<{
   row: TenantItem | null;
 }>({
   content: '',
-  type: 'disable',
+  type: 'archive',
   row: null,
 });
+
+const purgeDialogVisible = ref(false);
+const purgeTarget = ref<TenantItem | null>(null);
+const purgePreview = ref<TenantPurgePreview | null>(null);
+const purgeConfirmationName = ref('');
+const purgeSubmitting = ref(false);
+const purgeConfirmButton = computed(() => ({
+  content: '确认彻底删除',
+  theme: 'danger' as const,
+  loading: purgeSubmitting.value,
+  disabled: !purgePreview.value?.eligible || purgeConfirmationName.value !== purgePreview.value.tenantName,
+}));
 
 const filteredData = computed(() => {
   const tenantName = appliedSearchForm.tenantName.trim();
@@ -307,8 +360,8 @@ const filteredData = computed(() => {
   return tableData.value.filter((item) => {
     const nameMatched = !tenantName || item.tenantName.includes(tenantName);
     const phoneMatched = !phone || item.phone.includes(phone);
-    const statusMatched = !appliedSearchForm.status || item.status === appliedSearchForm.status;
-    return nameMatched && phoneMatched && statusMatched;
+    const tabMatched = activeTab.value === 'archived' ? item.status === 'disabled' : item.status === 'normal';
+    return nameMatched && phoneMatched && tabMatched;
   });
 });
 
@@ -403,7 +456,6 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.tenantName = '';
   searchForm.phone = '';
-  searchForm.status = '';
   pagination.pageSize = 10;
   handleSearch();
 };
@@ -480,19 +532,52 @@ const handleBusinessSubmit = async () => {
 
 const openStatusConfirm = (row: TenantItem) => {
   if (!requireCreatorOwnership(row)) return;
-  const isNormal = row.status === 'normal';
-  confirmState.type = isNormal ? 'disable' : 'enable';
+  const isUnarchived = row.status === 'normal';
+  confirmState.type = isUnarchived ? 'archive' : 'restore';
   confirmState.row = row;
-  confirmState.content = `是否${isNormal ? '停用' : '启用'}租户“${row.tenantName}”？`;
+  confirmState.content = isUnarchived
+    ? '归档后，该租户及其全部门店人员将立即无法登录，现有业务数据将保持不变。恢复租户后可继续使用。'
+    : '恢复后，状态正常的门店和员工可重新登录并继续原有工作。原本已停用或归档的数据状态不会改变。';
   confirmDialogVisible.value = true;
 };
 
-const openDeleteConfirm = (row: TenantItem) => {
+const openPurgeDialog = async (row: TenantItem) => {
   if (!requireCreatorOwnership(row)) return;
-  confirmState.type = 'delete';
-  confirmState.row = row;
-  confirmState.content = `是否删除租户“${row.tenantName}”？`;
-  confirmDialogVisible.value = true;
+  purgeTarget.value = row;
+  purgePreview.value = null;
+  purgeConfirmationName.value = '';
+  try {
+    purgePreview.value = await getTenantPurgePreview(row.id);
+    purgeDialogVisible.value = true;
+  } catch (error) {
+    purgeTarget.value = null;
+    adminFeedback.actionError({ action: '加载删除预检', target: row.tenantName, error });
+  }
+};
+
+const closePurgeDialog = () => {
+  if (purgeSubmitting.value) return;
+  purgeDialogVisible.value = false;
+  purgeTarget.value = null;
+  purgePreview.value = null;
+  purgeConfirmationName.value = '';
+};
+
+const handlePurge = async () => {
+  const target = purgeTarget.value;
+  if (!target || !purgePreview.value?.eligible || purgeConfirmationName.value !== target.tenantName) return;
+  purgeSubmitting.value = true;
+  try {
+    await purgeTenant(target.id, purgeConfirmationName.value);
+    tableData.value = tableData.value.filter((item) => item.id !== target.id);
+    ensureCurrentPage();
+    purgeSubmitting.value = false;
+    closePurgeDialog();
+    adminFeedback.actionSuccess({ action: '彻底删除', target: target.tenantName });
+  } catch (error) {
+    purgeSubmitting.value = false;
+    adminFeedback.actionError({ action: '彻底删除', target: target.tenantName, error });
+  }
 };
 
 const closeConfirmDialog = () => {
@@ -503,28 +588,22 @@ const closeConfirmDialog = () => {
 const handleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
-  const action = confirmState.type === 'delete' ? '删除' : confirmState.type === 'enable' ? '启用' : '停用';
+  const action = confirmState.type === 'restore' ? '恢复运营' : '归档';
 
   try {
-    if (confirmState.type === 'delete') {
-      await deleteTenant(target.id);
-      tableData.value = tableData.value.filter((item) => item.id !== target.id);
-      ensureCurrentPage();
-    } else {
-      const updated = await updateTenantStatus(target.id, confirmState.type === 'enable' ? 'enabled' : 'disabled');
-      replaceTenantItem(updated);
-    }
+    const updated = await updateTenantStatus(target.id, confirmState.type === 'restore' ? 'enabled' : 'disabled');
+    replaceTenantItem(updated);
 
     closeConfirmDialog();
-    if (confirmState.type === 'delete') {
-      adminFeedback.deleted(target.tenantName);
-    } else {
-      adminFeedback.actionSuccess({ action, target: target.tenantName });
-    }
+    adminFeedback.actionSuccess({ action, target: target.tenantName });
   } catch (error) {
     adminFeedback.actionError({ action, target: target.tenantName, error });
   }
 };
+
+watch(activeTab, () => {
+  pagination.current = 1;
+});
 
 onMounted(loadTenants);
 
@@ -627,24 +706,24 @@ const toggleBusiness = (business: BusinessType) => {
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.tenant-list-layout {
+  min-width: 0;
+}
+
+.tenant-list-layout :deep(.zdm-admin-list-layout__filters),
+.tenant-list-layout :deep(.zdm-admin-list-layout__content) {
+  min-width: 0;
+}
+
+.list-controls {
+  display: grid;
+  width: 100%;
   gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
 }
 
-.filter-card,
-.table-card {
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  border: 1px solid var(--td-component-border);
-}
-
-.table-card {
-  margin-top: var(--td-comp-margin-l);
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
 }
 
 .filter-row {
@@ -676,7 +755,6 @@ const toggleBusiness = (business: BusinessType) => {
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  margin-bottom: var(--td-comp-margin-l);
 }
 
 .business-tags {
@@ -729,6 +807,12 @@ const toggleBusiness = (business: BusinessType) => {
   width: 100%;
 }
 
+.purge-summary,
+.purge-blocker,
+.purge-confirm-form {
+  margin-top: var(--td-comp-margin-l);
+}
+
 @media (max-width: 960px) {
   .top-nav {
     height: auto;
@@ -757,7 +841,6 @@ const toggleBusiness = (business: BusinessType) => {
     padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
   }
 
-  .page-header,
   .filter-row {
     align-items: flex-start;
     flex-direction: column;

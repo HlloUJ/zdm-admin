@@ -33,6 +33,9 @@ public class AuthService {
     }
     AuthAccount account = authAccountMapper.findByPhone(request.phone());
     if (account == null || !"enabled".equals(account.getStatus())) {
+      if (authAccountMapper.countDisabledTenantIdentitiesByPhone(request.phone()) > 0) {
+        throw new IllegalArgumentException("所属租户已归档，请联系平台运营");
+      }
       if (authAccountMapper.countArchivedStoreIdentitiesByPhone(request.phone()) > 0) {
         throw new IllegalArgumentException("该门店已停止运营");
       }
@@ -58,6 +61,9 @@ public class AuthService {
   public LoginResponse switchIdentity(Long accountId, Long identityId) {
     AuthAccount account = authAccountMapper.findByIdentityId(identityId);
     if (account == null || !accountId.equals(account.getId())) {
+      if (authAccountMapper.countDisabledTenantIdentity(accountId, identityId) > 0) {
+        throw new IllegalArgumentException("所属租户已归档，请联系平台运营");
+      }
       if (authAccountMapper.countArchivedStoreIdentity(accountId, identityId) > 0) {
         throw new IllegalArgumentException("该门店已停止运营");
       }
