@@ -428,7 +428,7 @@ const storeLevelModule: FunctionModule = {
     {
       label: '租户管理',
       value: 'admin.tenant.tenant-management.menu',
-      direct: true,
+      direct: false,
       pages: [
         {
           label: '租户管理页',
@@ -460,7 +460,7 @@ const storeLevelModule: FunctionModule = {
     {
       label: '门店管理',
       value: 'admin.tenant.tenant-store-management.menu',
-      direct: true,
+      direct: false,
       pages: [
         {
           label: '门店管理页',

@@ -70,12 +70,12 @@ describe('full function catalog', () => {
       menus: [
         {
           label: '租户管理',
-          direct: true,
+          direct: false,
           pages: [{ label: '租户管理页', tabs: [{ label: '运营中' }, { label: '已归档' }] }],
         },
         {
           label: '门店管理',
-          direct: true,
+          direct: false,
           pages: [{ label: '门店管理页', tabs: [{ label: '运营中' }, { label: '已归档' }] }],
         },
         {
@@ -171,6 +171,47 @@ describe('full function catalog', () => {
         },
       ],
     });
+    expect(
+      collectFunctionCatalogRows(fullFunctionCatalog[0])
+        .filter((row) => row.showMenu)
+        .map((row) => row.menuLabel),
+    ).toEqual(['租户管理', '门店管理', '门店基础数据']);
+    expect(
+      collectFunctionCatalogRows(fullFunctionCatalog[0])
+        .filter((row) => row.showThirdMenu)
+        .map((row) => row.thirdMenuLabel),
+    ).toEqual([undefined, undefined, '门店级别管理']);
+    expect(
+      collectFunctionCatalogRows(fullFunctionCatalog[1])
+        .filter((row) => row.showMenu)
+        .map((row) => row.menuLabel),
+    ).toEqual(['商品公共基础数据', '成品现货基础数据', '大板基础数据']);
+    expect(
+      collectFunctionCatalogRows(fullFunctionCatalog[1])
+        .filter((row) => row.showThirdMenu)
+        .map((row) => row.thirdMenuLabel),
+    ).toEqual([
+      '商品分类管理',
+      '属性库管理',
+      '属性值管理',
+      '分类属性模板',
+      '工艺管理',
+      '品种管理',
+      '产地管理',
+      '纹理管理',
+      '色系管理',
+      '等级管理',
+    ]);
+    expect(
+      collectFunctionCatalogRows(fullFunctionCatalog[4])
+        .filter((row) => row.showMenu)
+        .map((row) => row.menuLabel),
+    ).toEqual(['员工管理', '角色管理']);
+    expect(
+      collectFunctionCatalogRows(fullFunctionCatalog[4])
+        .filter((row) => row.showThirdMenu)
+        .map((row) => row.thirdMenuLabel),
+    ).toEqual([undefined, undefined]);
     const supplierPage = fullFunctionCatalog[2].menus[0].pages[0];
     expect(supplierPage.actions).toEqual([
       { label: '查看', value: 'admin.supplier-management.view' },
