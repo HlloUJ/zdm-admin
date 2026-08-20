@@ -134,6 +134,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             value: 'admin.supplier-management',
             actions: [
               { label: '新增', value: 'admin.supplier-management.create' },
+              { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
               { label: '编辑', value: 'admin.supplier-management.edit' },
               { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
               { label: '删除', value: 'admin.supplier-management.delete' },
