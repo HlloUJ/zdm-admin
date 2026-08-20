@@ -3613,17 +3613,20 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO roles
           (tenant_id, store_id, name, code, data_scope, status,
-           function_permissions, created_by_name)
+           function_permissions, created_by_name, created_by_account_id)
         VALUES
-          (1, 1, '本门店角色', 'CURRENT_STORE_ROLE', 'all', 'enabled', '', '韩健'),
-          (1, ?, '其他门店角色', 'OTHER_STORE_ROLE', 'all', 'enabled', '', '韩健')
+          (1, 1, '本门店本人角色', 'CURRENT_STORE_ROLE', 'all', 'enabled', '', '角色范围测试管理员', ?),
+          (1, 1, '本门店他人角色', 'SAME_STORE_OTHER_ROLE', 'all', 'enabled', '', '韩健', 1),
+          (1, ?, '其他门店角色', 'OTHER_STORE_ROLE', 'all', 'enabled', '', '韩健', 1)
         """,
+        accountId,
         otherStoreId);
 
     mockMvc.perform(get("/api/admin/roles")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.code == 'CURRENT_STORE_ROLE')].name").value(hasItem("本门店角色")))
+        .andExpect(jsonPath("$.data[?(@.code == 'CURRENT_STORE_ROLE')].name").value(hasItem("本门店本人角色")))
+        .andExpect(jsonPath("$.data[?(@.code == 'SAME_STORE_OTHER_ROLE')].name").value(hasItem("本门店他人角色")))
         .andExpect(jsonPath("$.data[*].code").value(not(hasItem("OTHER_STORE_ROLE"))))
         .andExpect(jsonPath("$.data[*].code").value(not(hasItem("ADMIN_MANAGER"))));
 
@@ -3652,6 +3655,28 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.name").value("本门店角色-已更新"));
 
+    Long sameStoreOtherRoleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code = 'SAME_STORE_OTHER_ROLE'",
+        Long.class);
+    mockMvc.perform(put("/api/admin/roles/{id}", sameStoreOtherRoleId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "不应修改的同门店角色",
+                  "code": "SAME_STORE_OTHER_ROLE",
+                  "dataScope": "all",
+                  "status": "enabled",
+                  "functionPermissions": ""
+                }
+                """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+    mockMvc.perform(delete("/api/admin/roles/{id}", sameStoreOtherRoleId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+
     Long otherStoreRoleId = jdbcTemplate.queryForObject(
         "SELECT id FROM roles WHERE code = 'OTHER_STORE_ROLE'",
         Long.class);
@@ -3670,7 +3695,8 @@ class PlatformApiSmokeTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.message").value("当前组织无权操作该角色"));
 
-    jdbcTemplate.update("DELETE FROM roles WHERE code IN ('CURRENT_STORE_ROLE', 'OTHER_STORE_ROLE')");
+    jdbcTemplate.update(
+        "DELETE FROM roles WHERE code IN ('CURRENT_STORE_ROLE', 'SAME_STORE_OTHER_ROLE', 'OTHER_STORE_ROLE')");
     jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = ?", accountId);
     jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
     jdbcTemplate.update("DELETE FROM stores WHERE id = ?", otherStoreId);
@@ -3805,7 +3831,10 @@ class PlatformApiSmokeTest {
            function_permissions, created_by_name)
         VALUES (?, 1, 1, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'self', 'enabled',
           'admin.permission-management.employee-management.view,'
-          'admin.permission-management.employee-management.permission', '集成测试')
+          'admin.permission-management.employee-management.edit,'
+          'admin.permission-management.employee-management.permission,'
+          'admin.permission-management.employee-management.toggle-status,'
+          'admin.permission-management.employee-management.delete', '集成测试')
         """,
         managerRoleId);
     jdbcTemplate.update(
@@ -3836,6 +3865,70 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.roleIds").value(String.valueOf(managerRoleId)))
         .andExpect(jsonPath("$.data.dataPermission").value("self"));
+
+    mockMvc.perform(put("/api/admin/employees/{id}", managerEmployeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "不应修改的他人创建员工",
+                  "gender": "male",
+                  "phone": "15926629041",
+                  "status": "enabled",
+                  "roleIds": "%d",
+                  "dataPermission": "self",
+                  "remark": ""
+                }
+                """.formatted(managerRoleId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不能编辑当前登录员工"));
+    mockMvc.perform(patch("/api/admin/employees/{id}/permissions", managerEmployeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "roleIds": "%d",
+                  "dataPermission": "self"
+                }
+                """.formatted(managerRoleId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不能修改当前登录员工的角色"));
+    mockMvc.perform(put("/api/admin/employees/{id}", managerEmployeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "权限配置员",
+                  "gender": "male",
+                  "phone": "15926629041",
+                  "status": "enabled",
+                  "roleIds": "2",
+                  "dataPermission": "self",
+                  "remark": ""
+                }
+                """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不能修改当前登录员工的角色"));
+    mockMvc.perform(put("/api/admin/employees/{id}", managerEmployeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))
+            .contentType("application/json")
+            .content("""
+                {
+                  "name": "权限配置员",
+                  "gender": "male",
+                  "phone": "15926629041",
+                  "status": "disabled",
+                  "roleIds": "%d",
+                  "dataPermission": "self",
+                  "remark": ""
+                }
+                """.formatted(managerRoleId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不能停用当前登录员工"));
+    mockMvc.perform(delete("/api/admin/employees/{id}", managerEmployeeId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不能删除当前登录员工"));
 
     mockMvc.perform(patch("/api/admin/employees/{id}/permissions", otherStoreEmployeeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(managerAccountId))

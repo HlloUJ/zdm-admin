@@ -278,6 +278,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import {
   collectFunctionCatalogRows,
   filterFunctionCatalogByAudience,
@@ -525,6 +526,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: RoleItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -579,6 +581,7 @@ const openDeleteConfirm = (row: RoleItem) => {
     adminFeedback.warning('超级管理员角色不可删除');
     return;
   }
+  if (!requireCreatorOwnership(row)) return;
   deletingRole.value = row;
   deleteDialogVisible.value = true;
 };
@@ -608,6 +611,7 @@ const openPermissionDialog = (row: RoleItem) => {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
+  if (!requireCreatorOwnership(row)) return;
   permissionRole.value = row;
   activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
   permissionDraft.functionPermissions = row.functionPermissions.includes('all')
