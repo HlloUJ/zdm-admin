@@ -433,14 +433,27 @@ const storeLevelModule: FunctionModule = {
         {
           label: '租户管理页',
           value: 'admin.tenant.tenant-management',
-          actions: [
-            { label: '新增', value: 'admin.tenant.tenant-management.create' },
-            { label: '业务开通', value: 'admin.tenant.tenant-management.open-business' },
-            { label: '编辑', value: 'admin.tenant.tenant-management.edit' },
-            { label: '停用/启用', value: 'admin.tenant.tenant-management.toggle-status' },
-            { label: '删除', value: 'admin.tenant.tenant-management.delete' },
+          actions: [],
+          tabs: [
+            {
+              label: '运营中',
+              value: 'admin.tenant.tenant-management.unarchived',
+              actions: [
+                { label: '新增', value: 'admin.tenant.tenant-management.unarchived.create' },
+                { label: '业务开通', value: 'admin.tenant.tenant-management.unarchived.open-business' },
+                { label: '编辑', value: 'admin.tenant.tenant-management.unarchived.edit' },
+                { label: '归档', value: 'admin.tenant.tenant-management.unarchived.archive' },
+              ],
+            },
+            {
+              label: '已归档',
+              value: 'admin.tenant.tenant-management.archived',
+              actions: [
+                { label: '恢复运营', value: 'admin.tenant.tenant-management.archived.restore' },
+                { label: '彻底删除', value: 'admin.tenant.tenant-management.archived.delete' },
+              ],
+            },
           ],
-          tabs: [],
         },
       ],
     },
@@ -461,7 +474,6 @@ const storeLevelModule: FunctionModule = {
                 { label: '新增', value: 'admin.tenant.tenant-store-management.operating.create' },
                 { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.operating.edit-level' },
                 { label: '编辑', value: 'admin.tenant.tenant-store-management.operating.edit' },
-                { label: '停用/启用', value: 'admin.tenant.tenant-store-management.operating.toggle-status' },
                 { label: '归档', value: 'admin.tenant.tenant-store-management.operating.archive' },
               ],
             },
@@ -470,7 +482,7 @@ const storeLevelModule: FunctionModule = {
               value: 'admin.tenant.tenant-store-management.archived',
               actions: [
                 { label: '恢复运营', value: 'admin.tenant.tenant-store-management.archived.restore' },
-                { label: '删除', value: 'admin.tenant.tenant-store-management.archived.delete' },
+                { label: '彻底删除', value: 'admin.tenant.tenant-store-management.archived.delete' },
               ],
             },
           ],

@@ -55,7 +55,7 @@ public interface AuthAccountMapper {
       FROM accounts a
       JOIN account_identities ai
         ON ai.account_id = a.id AND ai.client_code = 'admin' AND ai.status = 'enabled'
-      JOIN stores s ON s.id = ai.store_id AND s.status = 'archived'
+      JOIN stores s ON s.id = ai.store_id AND s.status = 'disabled'
       LEFT JOIN employees e
         ON ai.identity_type = 'employee' AND e.id = ai.subject_id
        AND e.account_id = a.id AND e.status = 'enabled'
@@ -64,6 +64,16 @@ public interface AuthAccountMapper {
         AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)
       """)
   int countArchivedStoreIdentitiesByPhone(@Param("phone") String phone);
+
+  @Select("""
+      SELECT COUNT(*)
+      FROM accounts a
+      JOIN account_identities ai
+        ON ai.account_id = a.id AND ai.client_code = 'admin' AND ai.status = 'enabled'
+      JOIN tenants t ON t.id = ai.tenant_id AND t.status = 'disabled'
+      WHERE a.phone = #{phone} AND a.status = 'enabled'
+      """)
+  int countDisabledTenantIdentitiesByPhone(@Param("phone") String phone);
 
   @Select("""
       SELECT
@@ -105,10 +115,20 @@ public interface AuthAccountMapper {
   @Select("""
       SELECT COUNT(*)
       FROM account_identities ai
-      JOIN stores s ON s.id = ai.store_id AND s.status = 'archived'
+      JOIN stores s ON s.id = ai.store_id AND s.status = 'disabled'
       WHERE ai.id = #{identityId} AND ai.account_id = #{accountId}
       """)
   int countArchivedStoreIdentity(
+      @Param("accountId") Long accountId,
+      @Param("identityId") Long identityId);
+
+  @Select("""
+      SELECT COUNT(*)
+      FROM account_identities ai
+      JOIN tenants t ON t.id = ai.tenant_id AND t.status = 'disabled'
+      WHERE ai.id = #{identityId} AND ai.account_id = #{accountId}
+      """)
+  int countDisabledTenantIdentity(
       @Param("accountId") Long accountId,
       @Param("identityId") Long identityId);
 

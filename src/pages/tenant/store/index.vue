@@ -38,12 +38,6 @@
                         />
                       </t-select>
                     </t-form-item>
-                    <t-form-item v-if="activeTab === 'operating'" label="状态" name="status">
-                      <t-select v-model="searchForm.status" clearable placeholder="请选择">
-                        <t-option label="正常" value="normal" />
-                        <t-option label="停用" value="disabled" />
-                      </t-select>
-                    </t-form-item>
                   </div>
 
                   <div class="filter-actions">
@@ -97,35 +91,21 @@
               <template #manager="{ row }">
                 {{ row.manager || '-' }}
               </template>
-              <template #status="{ row }">
-                <t-tag
-                  :theme="row.status === 'normal' ? 'success' : row.status === 'archived' ? 'default' : 'danger'"
-                  variant="light"
-                >
-                  {{ row.status === 'normal' ? '正常' : row.status === 'archived' ? '已归档' : '停用' }}
-                </t-tag>
-              </template>
               <template #createdBy="{ row }">
                 {{ row.createdBy || '-' }}
               </template>
               <template #operation="{ row }">
                 <div v-if="activeTab === 'operating'" class="table-actions">
                   <t-link v-if="canEdit" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                  <t-link
-                    v-if="canToggle"
-                    :theme="row.status === 'normal' ? 'warning' : 'success'"
-                    hover="color"
-                    @click="openStatusConfirm(row)"
-                  >
-                    {{ row.status === 'normal' ? '停用' : '启用' }}
-                  </t-link>
                   <t-link v-if="canArchive" theme="warning" hover="color" @click="openArchiveConfirm(row)">归档</t-link>
                 </div>
                 <div v-else class="table-actions">
                   <t-link v-if="canRestore" theme="success" hover="color" @click="openRestoreConfirm(row)"
                     >恢复运营</t-link
                   >
-                  <t-link v-if="canDelete" theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                  <t-link v-if="canDelete" theme="danger" hover="color" @click="openDeleteConfirm(row)"
+                    >彻底删除</t-link
+                  >
                 </div>
               </template>
             </t-table>
@@ -271,7 +251,6 @@ import {
   restoreStore,
   updateStore,
   updateStoreLevelSelection,
-  updateStoreStatus,
   type StorePayload,
   type StoreRecord,
 } from '@/services/stores';
@@ -286,9 +265,8 @@ import {
 } from '@/utils/chinaRegions';
 
 type ShopType = 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
-type StoreStatus = 'normal' | 'disabled' | 'archived';
 type StoreTab = 'operating' | 'archived';
-type ConfirmType = 'enable' | 'disable' | 'archive' | 'restore' | 'delete';
+type ConfirmType = 'archive' | 'restore' | 'delete';
 const permissionPrefix = 'admin.tenant.tenant-store-management';
 const loginUser = computed(() => getLoginUser());
 const activeTab = ref<StoreTab>('operating');
@@ -306,7 +284,6 @@ const hasStoreAction = (scope: StoreTab, action: string) =>
 const canCreate = computed(() => hasStoreAction('operating', 'create'));
 const canEditLevel = computed(() => hasStoreAction('operating', 'edit-level'));
 const canEdit = computed(() => hasStoreAction('operating', 'edit'));
-const canToggle = computed(() => hasStoreAction('operating', 'toggle-status'));
 const canArchive = computed(() => hasStoreAction('operating', 'archive'));
 const canRestore = computed(() => hasStoreAction('archived', 'restore'));
 const canDelete = computed(() => hasStoreAction('archived', 'delete'));
@@ -327,7 +304,6 @@ interface StoreItem {
   detailAddress: string;
   address: string;
   tenantName: string;
-  status: StoreStatus;
   createdAt: string;
   createdBy: string;
   remark?: string;
@@ -369,7 +345,6 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'manager', title: '店长', width: 110, align: 'center' },
   { colKey: 'address', title: '门店地址', minWidth: 260, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', width: 120, align: 'center' },
-  { colKey: 'status', title: '状态', width: 100, align: 'center' },
   { colKey: 'createdBy', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 170, align: 'center' },
   { colKey: 'operation', title: '操作', width: 190, align: 'left', fixed: 'right' },
@@ -379,7 +354,6 @@ const searchForm = reactive({
   shopName: '',
   shopType: '' as ShopType | '',
   tenantName: '',
-  status: '' as StoreStatus | '',
 });
 const appliedSearchForm = reactive({ ...searchForm });
 
@@ -431,12 +405,10 @@ const confirmState = reactive<{
   row: StoreItem | null;
 }>({
   content: '',
-  type: 'disable',
+  type: 'archive',
   row: null,
 });
-const confirmAction = computed(
-  () => ({ enable: '启用', disable: '停用', archive: '归档', restore: '恢复运营', delete: '删除' })[confirmState.type],
-);
+const confirmAction = computed(() => ({ archive: '归档', restore: '恢复运营', delete: '彻底删除' })[confirmState.type]);
 
 const selectedTenant = computed(() => tenantOptions.value.find((item) => item.name === formData.tenantName));
 const availableShopTypeOptions = computed(() => {
@@ -450,8 +422,7 @@ const filteredData = computed(() => {
     const nameMatched = !shopName || item.shopName.includes(shopName);
     const typeMatched = !appliedSearchForm.shopType || item.shopType === appliedSearchForm.shopType;
     const tenantMatched = !appliedSearchForm.tenantName || item.tenantName === appliedSearchForm.tenantName;
-    const statusMatched = !appliedSearchForm.status || item.status === appliedSearchForm.status;
-    return nameMatched && typeMatched && tenantMatched && statusMatched;
+    return nameMatched && typeMatched && tenantMatched;
   });
 });
 
@@ -464,12 +435,6 @@ const pageData = computed(() => {
 
 const parseBusinessTypes = (value?: string): ShopType[] =>
   (value?.split(',').filter(Boolean) as ShopType[] | undefined) ?? [];
-
-const normalizeStatus = (status: StoreRecord['status']): StoreStatus =>
-  status === 'archived' ? 'archived' : status === 'disabled' ? 'disabled' : 'normal';
-
-const toBackendStatus = (status: StoreStatus): StorePayload['status'] =>
-  status === 'disabled' ? 'disabled' : 'enabled';
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
@@ -503,14 +468,13 @@ const toStoreItem = (record: StoreRecord): StoreItem => {
     detailAddress,
     address: record.address ?? `${getChinaRegionLabel(record.region ?? '')}${detailAddress}`,
     tenantName: tenant?.name ?? `租户#${record.tenantId}`,
-    status: normalizeStatus(record.status),
     createdAt: formatDateTime(record.createdAt),
     createdBy: record.createdBy ?? '',
     remark: record.remark ?? '',
   };
 };
 
-const toStorePayload = (status: StoreStatus, storeLevelId: number, manager = ''): StorePayload => {
+const toStorePayload = (storeLevelId: number, manager = ''): StorePayload => {
   const tenant = selectedTenant.value;
   if (!tenant || !formData.shopType) {
     throw new Error('请选择租户和店铺类型');
@@ -526,7 +490,6 @@ const toStorePayload = (status: StoreStatus, storeLevelId: number, manager = '')
     region: formData.region,
     detailAddress,
     address: `${getChinaRegionLabel(formData.region)}${detailAddress}`,
-    status: toBackendStatus(status),
     remark: formData.remark.trim(),
   };
 };
@@ -585,7 +548,6 @@ const handleReset = () => {
   searchForm.shopName = '';
   searchForm.shopType = '';
   searchForm.tenantName = '';
-  searchForm.status = '';
   pagination.pageSize = 10;
   handleSearch();
 };
@@ -638,15 +600,12 @@ const handleSubmit = async () => {
   try {
     if (dialogMode.value === 'create') {
       if (!formData.storeLevelId) return;
-      await createStore(toStorePayload('normal', formData.storeLevelId));
+      await createStore(toStorePayload(formData.storeLevelId));
       await loadStorePage();
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
-      await updateStore(
-        editingId.value,
-        toStorePayload(current?.status ?? 'normal', current?.storeLevelId ?? 0, current?.manager ?? ''),
-      );
+      await updateStore(editingId.value, toStorePayload(current?.storeLevelId ?? 0, current?.manager ?? ''));
       await loadStorePage();
     }
 
@@ -700,15 +659,6 @@ const handleLevelSubmit = async () => {
   }
 };
 
-const openStatusConfirm = (row: StoreItem) => {
-  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
-  const isNormal = row.status === 'normal';
-  confirmState.type = isNormal ? 'disable' : 'enable';
-  confirmState.row = row;
-  confirmState.content = `是否${isNormal ? '停用' : '启用'}店铺“${row.shopName}”？`;
-  confirmDialogVisible.value = true;
-};
-
 const openArchiveConfirm = (row: StoreItem) => {
   if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   confirmState.type = 'archive';
@@ -729,7 +679,7 @@ const openDeleteConfirm = (row: StoreItem) => {
   if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   confirmState.type = 'delete';
   confirmState.row = row;
-  confirmState.content = '门店删除后，该门店的经营数据永久不可恢复，请谨慎操作';
+  confirmState.content = '彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作';
   confirmDialogVisible.value = true;
 };
 
@@ -753,19 +703,10 @@ const handleConfirm = async () => {
     } else if (confirmState.type === 'restore') {
       await restoreStore(target.id);
       tableData.value = tableData.value.filter((item) => item.id !== target.id);
-    } else {
-      const updated = await updateStoreStatus(
-        confirmState.row.id,
-        toBackendStatus(confirmState.type === 'enable' ? 'normal' : 'disabled'),
-      );
-      const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
-      if (targetIndex !== -1) {
-        tableData.value.splice(targetIndex, 1, toStoreItem(updated));
-      }
     }
 
     closeConfirmDialog();
-    if (action === '删除') {
+    if (action === '彻底删除') {
       adminFeedback.deleted(target.shopName);
     } else {
       adminFeedback.actionSuccess({ action, target: target.shopName });
@@ -777,8 +718,6 @@ const handleConfirm = async () => {
 };
 
 watch(activeTab, () => {
-  searchForm.status = '';
-  appliedSearchForm.status = '';
   pagination.current = 1;
   void loadStorePage();
 });

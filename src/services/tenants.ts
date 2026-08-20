@@ -23,6 +23,26 @@ export interface TenantPayload {
   remark?: string;
 }
 
+export interface TenantPurgePreview {
+  eligible: boolean;
+  tenantName: string;
+  storeCount: number;
+  employeeCount: number;
+  roleCount: number;
+  accountDeleteCount: number;
+  accountRetainCount: number;
+  blockers: string[];
+}
+
+export interface TenantPurgeResult {
+  tenantDeleteCount: number;
+  storeDeleteCount: number;
+  employeeDeleteCount: number;
+  roleDeleteCount: number;
+  accountDeleteCount: number;
+  accountRetainCount: number;
+}
+
 export function listTenants() {
   return request<TenantRecord[]>('/admin/tenants');
 }
@@ -55,8 +75,13 @@ export function updateTenantStatus(id: number, status: TenantRecord['status']) {
   });
 }
 
-export function deleteTenant(id: number) {
-  return request<boolean>(`/admin/tenants/${id}`, {
-    method: 'DELETE',
+export function getTenantPurgePreview(id: number) {
+  return request<TenantPurgePreview>(`/admin/tenants/${id}/purge-preview`);
+}
+
+export function purgeTenant(id: number, confirmationName: string) {
+  return request<TenantPurgeResult>(`/admin/tenants/${id}/purge`, {
+    method: 'POST',
+    body: JSON.stringify({ confirmationName }),
   });
 }

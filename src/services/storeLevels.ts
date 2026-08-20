@@ -28,4 +28,5 @@ export const updateStoreLevelStatus = (id: number, status: StoreLevelPayload['st
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+export const previewStoreLevelDelete = (id: number) => request<boolean>(`/admin/store-levels/${id}/delete-preview`);
 export const deleteStoreLevel = (id: number) => request<boolean>(`/admin/store-levels/${id}`, { method: 'DELETE' });

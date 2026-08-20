@@ -9,6 +9,7 @@ const categoryStatusPermissionPrefixes = [
   'admin.product-data-center.category.accessory',
 ] as const;
 const legacyStorePermissionPrefix = 'admin.tenant.tenant-store-management';
+const legacyTenantPermissionPrefix = 'admin.tenant.tenant-management';
 
 const legacyAttributeActionMap: Record<string, string> = {
   view: 'view',
@@ -26,12 +27,27 @@ export const expandLegacyScopedPermission = (permission: string) => {
   );
   if (legacyCategoryStatusPrefix) return [`${legacyCategoryStatusPrefix}.toggle-status`];
 
+  if (permission.startsWith(`${legacyTenantPermissionPrefix}.`)) {
+    const suffix = permission.slice(legacyTenantPermissionPrefix.length + 1);
+    if (suffix === 'view') {
+      return [`${legacyTenantPermissionPrefix}.unarchived.view`, `${legacyTenantPermissionPrefix}.archived.view`];
+    }
+    if (['create', 'open-business', 'edit'].includes(suffix)) {
+      return [`${legacyTenantPermissionPrefix}.unarchived.${suffix}`];
+    }
+    if (suffix === 'toggle-status') {
+      return [`${legacyTenantPermissionPrefix}.unarchived.archive`, `${legacyTenantPermissionPrefix}.archived.restore`];
+    }
+    if (suffix === 'delete') return [`${legacyTenantPermissionPrefix}.archived.delete`];
+  }
+
   if (permission.startsWith(`${legacyStorePermissionPrefix}.`)) {
     const suffix = permission.slice(legacyStorePermissionPrefix.length + 1);
+    if (suffix === 'toggle-status' || suffix === 'operating.toggle-status') return [];
     const operatingAction =
       suffix === 'view'
         ? 'view'
-        : ['create', 'edit-level', 'edit', 'toggle-status'].includes(suffix)
+        : ['create', 'edit-level', 'edit'].includes(suffix)
           ? suffix
           : suffix === 'delete'
             ? 'archive'

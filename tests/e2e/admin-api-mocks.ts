@@ -23,6 +23,20 @@ const tenants = [
     businessTypes: 'cityPartner,slabSupplier,finishedSupplier,factory',
     remark: '系统内置平台租户',
     createdAt: '2026-07-27T09:00:00',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+  },
+  {
+    id: 2,
+    name: '临时归档租户',
+    contactName: '归档联系人',
+    contactPhone: '15926626949',
+    status: 'disabled',
+    businessTypes: 'cityPartner',
+    remark: '用于租户生命周期交互验证',
+    createdAt: '2026-07-26T09:00:00',
+    createdByAccountId: 1,
+    createdByName: '韩健',
   },
 ];
 
@@ -49,7 +63,7 @@ const archivedStores = [
     ...stores[0],
     id: 2,
     name: '已归档门店',
-    status: 'archived',
+    status: 'disabled',
     createdAt: '2026-07-26T09:00:00',
   },
 ];
@@ -504,6 +518,31 @@ export async function installAdminApiMocks(page: Page) {
     ]);
   });
   await mockCollection(page, '**/api/admin/tenants', tenants);
+  await page.route('**/api/admin/tenants/*/purge-preview', async (route) => {
+    const pathParts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
+    const id = Number(pathParts.at(-2));
+    const tenant = tenants.find((item) => item.id === id) ?? tenants[0];
+    await fulfillJson(route, {
+      eligible: tenant.status === 'disabled',
+      tenantName: tenant.name,
+      storeCount: 2,
+      employeeCount: 5,
+      roleCount: 3,
+      accountDeleteCount: 4,
+      accountRetainCount: 1,
+      blockers: tenant.status === 'disabled' ? [] : ['请先归档租户'],
+    });
+  });
+  await page.route('**/api/admin/tenants/*/purge', async (route) => {
+    await fulfillJson(route, {
+      tenantDeleteCount: 1,
+      storeDeleteCount: 2,
+      employeeDeleteCount: 5,
+      roleDeleteCount: 3,
+      accountDeleteCount: 4,
+      accountRetainCount: 1,
+    });
+  });
   await mockCollection(page, '**/api/admin/stores', stores);
   await page.route('**/api/admin/stores?scope=*', async (route) => {
     const scope = new URL(route.request().url()).searchParams.get('scope');

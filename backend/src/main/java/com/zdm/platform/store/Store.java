@@ -28,7 +28,6 @@ public class Store {
   private String detailAddress;
   private String address;
 
-  @NotBlank
   private String status;
 
   private String remark;

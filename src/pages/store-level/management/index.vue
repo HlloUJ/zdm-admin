@@ -120,6 +120,7 @@ import {
   createStoreLevel,
   deleteStoreLevel,
   listStoreLevels,
+  previewStoreLevelDelete,
   updateStoreLevel,
   updateStoreLevelStatus,
   type StoreLevelPayload,
@@ -239,8 +240,16 @@ const submitLevel = async () => {
 const confirmVisible = ref(false);
 const confirmType = ref<ConfirmType>('disable');
 const confirmRow = ref<LevelItem | null>(null);
-const openConfirm = (row: LevelItem, type: ConfirmType) => {
+const openConfirm = async (row: LevelItem, type: ConfirmType) => {
   if (!requireCreatorOwnership(row)) return;
+  if (type === 'delete') {
+    try {
+      await previewStoreLevelDelete(row.id);
+    } catch (error) {
+      adminFeedback.error(error instanceof Error ? error.message : '删除条件校验失败');
+      return;
+    }
+  }
   confirmRow.value = row;
   confirmType.value = type;
   confirmVisible.value = true;
