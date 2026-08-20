@@ -57,6 +57,13 @@ describe('full function catalog', () => {
     expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual(
       fullFunctionCatalog.map((module) => module.value),
     );
+    expect(fullFunctionCatalog.map((module) => module.label)).toEqual([
+      '租户与门店',
+      '商品管理',
+      '供应商管理',
+      '门店分类管理',
+      '权限管理',
+    ]);
     expect(fullFunctionCatalog[0]).toMatchObject({
       label: '租户与门店',
       value: 'admin.tenant',
@@ -77,7 +84,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[1]).toMatchObject({
+    expect(fullFunctionCatalog[2]).toMatchObject({
       label: '供应商管理',
       value: 'admin.supplier-management',
       menus: [
@@ -87,7 +94,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[2]).toMatchObject({
+    expect(fullFunctionCatalog[3]).toMatchObject({
       label: '门店分类管理',
       value: 'admin.tenant.store-category-management',
       menus: [
@@ -97,7 +104,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[3]).toMatchObject({
+    expect(fullFunctionCatalog[1]).toMatchObject({
       label: '商品管理',
       menus: [
         {
@@ -164,7 +171,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    const supplierPage = fullFunctionCatalog[1].menus[0].pages[0];
+    const supplierPage = fullFunctionCatalog[2].menus[0].pages[0];
     expect(supplierPage.actions).toEqual([
       { label: '查看', value: 'admin.supplier-management.view' },
       { label: '新增', value: 'admin.supplier-management.create' },
@@ -172,7 +179,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
       { label: '删除', value: 'admin.supplier-management.delete' },
     ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[1])).toEqual([
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[2])).toEqual([
       expect.objectContaining({
         direct: true,
         menuLabel: undefined,
@@ -181,7 +188,7 @@ describe('full function catalog', () => {
         actions: supplierPage.actions,
       }),
     ]);
-    const storeCategoryPage = fullFunctionCatalog[2].menus[0].pages[0];
+    const storeCategoryPage = fullFunctionCatalog[3].menus[0].pages[0];
     expect(storeCategoryPage.actions).toEqual([
       { label: '查看', value: 'admin.tenant.store-category-management.view' },
       { label: '新增一级分类', value: 'admin.tenant.store-category-management.create-root' },
@@ -192,7 +199,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: 'admin.tenant.store-category-management.toggle-status' },
       { label: '删除', value: 'admin.tenant.store-category-management.delete' },
     ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[2])).toEqual([
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[3])).toEqual([
       expect.objectContaining({
         direct: true,
         menuLabel: undefined,
@@ -201,7 +208,7 @@ describe('full function catalog', () => {
         actions: storeCategoryPage.actions,
       }),
     ]);
-    const productModule = fullFunctionCatalog[3];
+    const productModule = fullFunctionCatalog[1];
     const productPages = productModule.menus.flatMap((menu) => menu.pages);
     const tenantPage = fullFunctionCatalog[0].menus
       .flatMap((menu) => menu.pages)
@@ -372,19 +379,6 @@ describe('full function catalog', () => {
       'admin.tenant.store-level-management.edit',
       'admin.tenant.store-level-management.toggle-status',
       'admin.tenant.store-level-management.delete',
-      'admin.supplier-management.view',
-      'admin.supplier-management.create',
-      'admin.supplier-management.edit',
-      'admin.supplier-management.toggle-status',
-      'admin.supplier-management.delete',
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.create-root',
-      'admin.tenant.store-category-management.create-child',
-      'admin.tenant.store-category-management.edit',
-      'admin.tenant.store-category-management.move-up',
-      'admin.tenant.store-category-management.move-down',
-      'admin.tenant.store-category-management.toggle-status',
-      'admin.tenant.store-category-management.delete',
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
       'admin.product-data-center.category.finished.create-child',
@@ -473,6 +467,19 @@ describe('full function catalog', () => {
       'admin.product-data-center.slab-grade.edit',
       'admin.product-data-center.slab-grade.toggle-status',
       'admin.product-data-center.slab-grade.delete',
+      'admin.supplier-management.view',
+      'admin.supplier-management.create',
+      'admin.supplier-management.edit',
+      'admin.supplier-management.toggle-status',
+      'admin.supplier-management.delete',
+      'admin.tenant.store-category-management.view',
+      'admin.tenant.store-category-management.create-root',
+      'admin.tenant.store-category-management.create-child',
+      'admin.tenant.store-category-management.edit',
+      'admin.tenant.store-category-management.move-up',
+      'admin.tenant.store-category-management.move-down',
+      'admin.tenant.store-category-management.toggle-status',
+      'admin.tenant.store-category-management.delete',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.create',
       'admin.permission-management.employee-management.edit',
@@ -507,12 +514,12 @@ describe('full function catalog', () => {
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.create-root',
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.edit',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
+      'admin.tenant.store-category-management.view',
+      'admin.tenant.store-category-management.create-root',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.permission',
     ]);
@@ -549,12 +556,12 @@ describe('full function catalog', () => {
         'admin.product-data-center.category.accessory.disable',
       ]),
     ).toEqual([
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.toggle-status',
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.toggle-status',
       'admin.product-data-center.category.accessory.view',
       'admin.product-data-center.category.accessory.toggle-status',
+      'admin.tenant.store-category-management.view',
+      'admin.tenant.store-category-management.toggle-status',
     ]);
   });
 

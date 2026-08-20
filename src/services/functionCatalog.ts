@@ -549,8 +549,25 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
     };
   });
 
+const navigationModuleOrder = [
+  'admin.tenant',
+  'admin.product-data-center',
+  'admin.supplier-management',
+  'admin.tenant.store-category-management',
+  'admin.permission-management',
+];
+
+const orderModulesByNavigation = (modules: FunctionModule[]) => {
+  const orderByValue = new Map(navigationModuleOrder.map((value, index) => [value, index]));
+  return [...modules].sort(
+    (left, right) =>
+      (orderByValue.get(left.value) ?? Number.MAX_SAFE_INTEGER) -
+      (orderByValue.get(right.value) ?? Number.MAX_SAFE_INTEGER),
+  );
+};
+
 export const fullFunctionCatalog = applyConfirmedNavigationStructure(
-  withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog]),
+  orderModulesByNavigation(withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog])),
 );
 
 export const filterFunctionCatalogByAudience = (audience: FunctionAudience) =>
