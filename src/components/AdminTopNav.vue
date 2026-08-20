@@ -9,6 +9,7 @@
           v-model="selectedIdentityId"
           class="brand-context-select"
           size="small"
+          auto-width
           borderless
           :options="identityOptions"
           :loading="switchingIdentity"
@@ -72,7 +73,7 @@ const roleText = computed(() => {
 const identityLabel = (context: IdentityContext) => {
   if (context.identityType === 'platform_admin') return '运营管理平台';
   if (context.storeName) {
-    return `${context.tenantName ?? '租户'} / ${formatStoreLabel(context.storeName, context.storeType)}`;
+    return formatStoreLabel(context.storeName, context.storeType);
   }
   return context.tenantName ?? '租户管理身份';
 };
@@ -123,7 +124,6 @@ onMounted(async () => {
 
 <style scoped>
 .brand-context-select {
-  width: 168px;
   margin-top: 2px;
 }
 

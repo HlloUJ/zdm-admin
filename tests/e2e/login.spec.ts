@@ -134,6 +134,6 @@ test('places the available store switcher under the brand', async ({ page }) => 
   await expect(page.locator('.top-actions .t-select')).toHaveCount(0);
   await page.locator('.brand .brand-context-select').click();
   await expect(page.getByText('运营管理平台', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('华东石材 / 杭州体验门店 · 城市合伙人', { exact: true })).toBeVisible();
-  await expect(page.getByText('华东石材 / 宁波体验门店 · 城市合伙人', { exact: true })).toBeVisible();
+  await expect(page.getByText('杭州体验门店 · 城市合伙人', { exact: true })).toBeVisible();
+  await expect(page.getByText('宁波体验门店 · 城市合伙人', { exact: true })).toBeVisible();
 });
