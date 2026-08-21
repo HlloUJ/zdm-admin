@@ -327,12 +327,22 @@
         <t-tab-panel value="sales" label="销售信息">
           <t-form :data="productForm" label-width="96px" colon>
             <div class="dialog-form-grid">
-              <t-form-item label="供应商" name="supplier">
-                <t-select v-model="productForm.supplier" :disabled="productMode === 'view'" placeholder="请选择">
-                  <t-option v-for="item in tenantOptions" :key="item" :label="item" :value="item" />
+              <t-form-item label="供应商" name="supplier" required-mark>
+                <t-select
+                  v-model="productForm.supplier"
+                  :disabled="productMode === 'view'"
+                  filterable
+                  placeholder="请选择"
+                >
+                  <t-option
+                    v-for="item in publishSupplierOptions"
+                    :key="item.id"
+                    :label="item.name"
+                    :value="item.name"
+                  />
                 </t-select>
               </t-form-item>
-              <t-form-item label="成本价">
+              <t-form-item label="成本价" required-mark>
                 <t-input
                   v-model="productForm.cost"
                   :disabled="productMode === 'view'"
@@ -340,18 +350,18 @@
                   @change="recalculateProductPrices"
                 />
               </t-form-item>
-              <t-form-item label="库存">
+              <t-form-item label="库存" required-mark>
                 <t-input v-model="productForm.stock" :disabled="productMode === 'view'" placeholder="请输入" />
               </t-form-item>
-              <t-form-item label="SKU">
+              <t-form-item label="SKU" required-mark>
                 <t-input v-model="productForm.sku" :disabled="productMode === 'view'" placeholder="请输入" />
               </t-form-item>
             </div>
             <div class="price-editor">
               <div class="price-editor__head">
                 <span>阶梯价格</span>
-                <span>系数</span>
-                <span>价格</span>
+                <span><span class="price-required-star">*</span>系数</span>
+                <span><span class="price-required-star">*</span>价格</span>
               </div>
               <div v-for="item in salesPriceRows" :key="item.key" class="price-editor__row">
                 <span>{{ item.label }}</span>
@@ -715,8 +725,13 @@ const colorFilterCascaderOptions = computed(() =>
     })),
   })),
 );
-const tenantOptions = computed(() =>
-  slabSuppliers.value.filter((item) => item.supplyTypes.some((type) => type.code === 'slab')).map((item) => item.name),
+const suppliesSlabs = (supplier: SupplierRecord) =>
+  supplier.supplyTypes.some(
+    (type) => type.status !== 'disabled' && (type.code === 'slab' || type.name.trim() === '大板'),
+  );
+const tenantOptions = computed(() => slabSuppliers.value.filter(suppliesSlabs).map((item) => item.name));
+const publishSupplierOptions = computed(() =>
+  slabSuppliers.value.filter((item) => item.status !== 'disabled' && suppliesSlabs(item)),
 );
 const storeOptions = computed(() => Array.from(new Set(tableData.value.map((item) => item.store).filter(Boolean))));
 
@@ -763,7 +778,7 @@ const gradeLabelById = (id?: number) => {
   return grade ? formatGradeOption(grade) : '-';
 };
 const varietyIdByName = (name: string) => slabVarieties.value.find((item) => item.name === name)?.id;
-const supplierIdByName = (name: string) => slabSuppliers.value.find((item) => item.name === name)?.id;
+const supplierIdByName = (name: string) => publishSupplierOptions.value.find((item) => item.name === name)?.id;
 
 const formatSize = (record: SlabRecord) => {
   const dimensions = [record.lengthMm, record.widthMm, record.thicknessMm];
@@ -1302,6 +1317,20 @@ const handleProductSubmit = async () => {
     adminFeedback.warning('请完善基础信息');
     return;
   }
+  const hasIncompleteSalesPrice = salesPriceRows.some(
+    (item) => !productForm[ratioKey(item.key)].trim() || !productForm[priceKey(item.key)].trim(),
+  );
+  if (
+    !productForm.supplier.trim() ||
+    !productForm.cost.trim() ||
+    !productForm.stock.trim() ||
+    !productForm.sku.trim() ||
+    hasIncompleteSalesPrice
+  ) {
+    productTab.value = 'sales';
+    adminFeedback.warning('请完善销售信息');
+    return;
+  }
   const targetName = `${productForm.variety}大板`;
   const editingItem =
     editingRowId.value == null ? undefined : tableData.value.find((item) => item.id === editingRowId.value);
@@ -1309,7 +1338,7 @@ const handleProductSubmit = async () => {
   const widthMm = toNumber(productForm.width);
   const thicknessMm = toNumber(productForm.height);
   const payload: SlabPayload = {
-    supplierId: supplierIdByName(productForm.supplier),
+    supplierId: supplierIdByName(productForm.supplier) ?? editingItem?.supplierId,
     varietyId: varietyIdByName(productForm.variety),
     textureId: productForm.textureId,
     colorId: productForm.colorId,
@@ -1887,6 +1916,11 @@ const saveBatchPrice = () => {
   position: absolute;
   top: 12px;
   left: 12px;
+  color: var(--td-error-color);
+}
+
+.price-required-star {
+  margin-right: 2px;
   color: var(--td-error-color);
 }
 
