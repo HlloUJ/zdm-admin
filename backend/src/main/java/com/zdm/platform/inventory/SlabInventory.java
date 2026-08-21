@@ -1,9 +1,12 @@
 package com.zdm.platform.inventory;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
+import java.util.List;
 
 @TableName("slab_inventory")
 public class SlabInventory extends BaseEntity {
@@ -27,6 +30,10 @@ public class SlabInventory extends BaseEntity {
   private BigDecimal areaSquareMeter;
   private BigDecimal costPrice;
   private BigDecimal guidePrice;
+
+  @Valid
+  @TableField(exist = false)
+  private List<ProductMarkupPriceSnapshot> markupPrices;
 
   public Long getSupplierId() {
     return supplierId;
@@ -146,5 +153,13 @@ public class SlabInventory extends BaseEntity {
 
   public void setGuidePrice(BigDecimal guidePrice) {
     this.guidePrice = guidePrice;
+  }
+
+  public List<ProductMarkupPriceSnapshot> getMarkupPrices() {
+    return markupPrices == null ? null : List.copyOf(markupPrices);
+  }
+
+  public void setMarkupPrices(List<ProductMarkupPriceSnapshot> markupPrices) {
+    this.markupPrices = markupPrices == null ? null : List.copyOf(markupPrices);
   }
 }

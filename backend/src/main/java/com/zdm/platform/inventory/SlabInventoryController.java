@@ -4,6 +4,7 @@ import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,14 +33,19 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   }
 
   @Override
+  @GetMapping
+  public ApiResponse<List<SlabInventory>> list() {
+    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requireAllData();
+    return ApiResponse.ok(service.listWithPrices());
+  }
+
+  @Override
   @PostMapping
   public ApiResponse<SlabInventory> create(@Valid @RequestBody SlabInventory inventory) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
     permissionGuard.requireAllData();
-    service.validateReferences(inventory);
-    inventory.setId(null);
-    service.save(inventory);
-    return ApiResponse.ok(inventory);
+    return ApiResponse.ok(service.createWithPrices(inventory));
   }
 
   @Override
@@ -48,9 +54,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
       @PathVariable Long id, @Valid @RequestBody SlabInventory inventory) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
     permissionGuard.requireAllData();
-    service.validateReferences(inventory);
-    inventory.setId(id);
-    service.updateById(inventory);
-    return ApiResponse.ok(service.getById(id));
+    return ApiResponse.ok(service.updateWithPrices(id, inventory));
   }
 }

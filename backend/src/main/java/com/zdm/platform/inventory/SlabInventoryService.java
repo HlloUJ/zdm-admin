@@ -5,20 +5,52 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabInventory> {
   private final SlabTextureService textureService;
   private final SlabColorService colorService;
   private final SlabGradeService gradeService;
+  private final ProductMarkupPriceSnapshotService priceSnapshotService;
 
   public SlabInventoryService(
       SlabTextureService textureService,
       SlabColorService colorService,
-      SlabGradeService gradeService) {
+      SlabGradeService gradeService,
+      ProductMarkupPriceSnapshotService priceSnapshotService) {
     this.textureService = textureService;
     this.colorService = colorService;
     this.gradeService = gradeService;
+    this.priceSnapshotService = priceSnapshotService;
+  }
+
+  public List<SlabInventory> listWithPrices() {
+    List<SlabInventory> inventory = list();
+    inventory.forEach(this::attachPrices);
+    return inventory;
+  }
+
+  @Transactional
+  public SlabInventory createWithPrices(SlabInventory inventory) {
+    validateReferences(inventory);
+    List<ProductMarkupPriceSnapshot> markupPrices = inventory.getMarkupPrices();
+    inventory.setId(null);
+    save(inventory);
+    priceSnapshotService.appendCurrentPrices("slab", inventory.getId(), markupPrices);
+    return attachPrices(inventory);
+  }
+
+  @Transactional
+  public SlabInventory updateWithPrices(Long id, SlabInventory inventory) {
+    validateReferences(inventory);
+    List<ProductMarkupPriceSnapshot> markupPrices = inventory.getMarkupPrices();
+    inventory.setId(id);
+    updateById(inventory);
+    if (markupPrices != null) {
+      priceSnapshotService.appendCurrentPrices("slab", id, markupPrices);
+    }
+    return attachPrices(getById(id));
   }
 
   public SlabPublishOptions listPublishOptions() {
@@ -55,5 +87,10 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if (inventory.getGradeId() != null && gradeService.getById(inventory.getGradeId()) == null) {
       throw new IllegalArgumentException("等级不存在");
     }
+  }
+
+  private SlabInventory attachPrices(SlabInventory inventory) {
+    inventory.setMarkupPrices(priceSnapshotService.listCurrentPrices("slab", inventory.getId()));
+    return inventory;
   }
 }

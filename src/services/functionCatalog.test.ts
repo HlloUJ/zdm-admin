@@ -131,6 +131,11 @@ describe('full function catalog', () => {
               thirdMenuLabel: '分类属性模板',
               tabs: [{ label: '成品现货模板' }, { label: '配件模板' }],
             },
+            {
+              label: '加价配置页',
+              thirdMenuLabel: '加价配置',
+              tabs: [{ label: '成品加价配置' }, { label: '大板加价配置' }],
+            },
           ],
         },
         {
@@ -195,6 +200,7 @@ describe('full function catalog', () => {
       '属性库管理',
       '属性值管理',
       '分类属性模板',
+      '加价配置',
       '工艺管理',
       '品种管理',
       '产地管理',
@@ -477,6 +483,18 @@ describe('full function catalog', () => {
       'admin.product-data-center.category-attribute-template.accessory.bind-values',
       'admin.product-data-center.category-attribute-template.accessory.toggle-publish',
       'admin.product-data-center.category-attribute-template.accessory.delete',
+      'admin.product-data-center.markup-configuration.finished.view',
+      'admin.product-data-center.markup-configuration.finished.create',
+      'admin.product-data-center.markup-configuration.finished.edit',
+      'admin.product-data-center.markup-configuration.finished.sort',
+      'admin.product-data-center.markup-configuration.finished.toggle-status',
+      'admin.product-data-center.markup-configuration.finished.delete',
+      'admin.product-data-center.markup-configuration.slab.view',
+      'admin.product-data-center.markup-configuration.slab.create',
+      'admin.product-data-center.markup-configuration.slab.edit',
+      'admin.product-data-center.markup-configuration.slab.sort',
+      'admin.product-data-center.markup-configuration.slab.toggle-status',
+      'admin.product-data-center.markup-configuration.slab.delete',
       'admin.product-data-center.finished-stock-craft.view',
       'admin.product-data-center.finished-stock-craft.create',
       'admin.product-data-center.finished-stock-craft.edit',
@@ -573,7 +591,21 @@ describe('full function catalog', () => {
     const operationValues = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));
     expect(operationValues).toContain('admin.tenant.tenant-management.unarchived.view');
     expect(operationValues).toContain('admin.tenant.store-level-management.view');
+    expect(operationValues).toContain('admin.product-data-center.markup-configuration.finished.view');
     expect(operationValues).not.toContain('admin.tenant.store-category-management.view');
+
+    expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('store'))).not.toContain(
+      'admin.product-data-center.markup-configuration.finished.view',
+    );
+    expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('supplier'))).not.toContain(
+      'admin.product-data-center.markup-configuration.slab.view',
+    );
+    expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.store)).not.toContain(
+      'admin.product-data-center.markup-configuration.finished.view',
+    );
+    expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.supplier)).not.toContain(
+      'admin.product-data-center.markup-configuration.slab.view',
+    );
 
     expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.store)).toContain(
       'admin.tenant.store-level-management.view',

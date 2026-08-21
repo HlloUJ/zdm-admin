@@ -22,6 +22,7 @@ export interface FunctionPage {
   tabs: FunctionTab[];
   note?: string;
   splitSharedTabs?: boolean;
+  audiences?: FunctionAudience[];
 }
 
 export interface FunctionMenu {
@@ -287,6 +288,49 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
+        label: '加价配置',
+        value: 'admin.product-data-center.markup-configuration.menu',
+        direct: false,
+        pages: [
+          {
+            label: '加价配置页',
+            value: 'admin.product-data-center.markup-configuration',
+            audiences: ['admin'],
+            actions: [],
+            tabs: [
+              {
+                label: '成品加价配置',
+                value: 'admin.product-data-center.markup-configuration.finished',
+                actions: [
+                  { label: '新增', value: 'admin.product-data-center.markup-configuration.finished.create' },
+                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.finished.edit' },
+                  { label: '排序', value: 'admin.product-data-center.markup-configuration.finished.sort' },
+                  {
+                    label: '停用/启用',
+                    value: 'admin.product-data-center.markup-configuration.finished.toggle-status',
+                  },
+                  { label: '删除', value: 'admin.product-data-center.markup-configuration.finished.delete' },
+                ],
+              },
+              {
+                label: '大板加价配置',
+                value: 'admin.product-data-center.markup-configuration.slab',
+                actions: [
+                  { label: '新增', value: 'admin.product-data-center.markup-configuration.slab.create' },
+                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.slab.edit' },
+                  { label: '排序', value: 'admin.product-data-center.markup-configuration.slab.sort' },
+                  {
+                    label: '停用/启用',
+                    value: 'admin.product-data-center.markup-configuration.slab.toggle-status',
+                  },
+                  { label: '删除', value: 'admin.product-data-center.markup-configuration.slab.delete' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
         label: '成品现货工艺管理',
         value: 'admin.product-data-center.finished-stock-craft.menu',
         direct: false,
@@ -521,6 +565,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
       'admin.product-data-center.attribute.menu',
       'admin.product-data-center.attribute-value.menu',
       'admin.product-data-center.category-attribute-template.menu',
+      'admin.product-data-center.markup-configuration.menu',
     ]);
     const commonMenus = module.menus.filter((menu) => commonValues.has(menu.value));
     const craftMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.finished-stock-craft.menu');
@@ -571,15 +616,31 @@ export const fullFunctionCatalog = applyConfirmedNavigationStructure(
   orderModulesByNavigation(withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog])),
 );
 
+const filterCatalogPagesByAudience = (modules: FunctionModule[], audience: FunctionAudience) =>
+  modules
+    .map((module) => ({
+      ...module,
+      menus: module.menus
+        .map((menu) => ({
+          ...menu,
+          pages: menu.pages.filter((page) => !page.audiences || page.audiences.includes(audience)),
+        }))
+        .filter((menu) => menu.pages.length > 0),
+    }))
+    .filter((module) => module.menus.length > 0);
+
 export const filterFunctionCatalogByAudience = (audience: FunctionAudience) =>
-  fullFunctionCatalog.filter((module) => !module.audiences || module.audiences.includes(audience));
+  filterCatalogPagesByAudience(
+    fullFunctionCatalog.filter((module) => !module.audiences || module.audiences.includes(audience)),
+    audience,
+  );
 
 export const getRuntimeFunctionCatalog = (audience: FunctionAudience) =>
   import.meta.env.PROD ? filterFunctionCatalogByAudience(audience) : fullFunctionCatalog;
 
 export const terminalFunctionTrees: Record<TerminalType, FunctionModule[]> = {
-  store: getRuntimeFunctionCatalog('store'),
-  supplier: getRuntimeFunctionCatalog('supplier'),
+  store: filterCatalogPagesByAudience(getRuntimeFunctionCatalog('store'), 'store'),
+  supplier: filterCatalogPagesByAudience(getRuntimeFunctionCatalog('supplier'), 'supplier'),
 };
 
 export const getFunctionModulePermissionValues = (module?: FunctionModule) =>
