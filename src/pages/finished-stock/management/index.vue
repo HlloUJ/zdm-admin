@@ -1547,7 +1547,9 @@ const supplierNameById = (supplierId?: number) =>
 
 const supplierIdByName = (name: string) =>
   productSuppliers.value.find((supplier) => supplier.name === name && supplier.status !== 'disabled')?.id ??
-  productSuppliers.value.find((supplier) => supplier.type === 'finished' && supplier.status !== 'disabled')?.id;
+  productSuppliers.value.find(
+    (supplier) => supplier.supplyTypes.some((type) => type.code === 'finished') && supplier.status !== 'disabled',
+  )?.id;
 
 const formatPriceRange = (guidePrice?: number) => {
   const value = Number(guidePrice ?? 0);

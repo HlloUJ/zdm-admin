@@ -216,6 +216,7 @@ describe('full function catalog', () => {
     expect(supplierPage.actions).toEqual([
       { label: '查看', value: 'admin.supplier-management.view' },
       { label: '新增', value: 'admin.supplier-management.create' },
+      { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
       { label: '编辑', value: 'admin.supplier-management.edit' },
       { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
       { label: '删除', value: 'admin.supplier-management.delete' },
@@ -510,6 +511,7 @@ describe('full function catalog', () => {
       'admin.product-data-center.slab-grade.delete',
       'admin.supplier-management.view',
       'admin.supplier-management.create',
+      'admin.supplier-management.manage-supply-types',
       'admin.supplier-management.edit',
       'admin.supplier-management.toggle-status',
       'admin.supplier-management.delete',
