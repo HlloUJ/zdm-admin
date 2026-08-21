@@ -2,24 +2,28 @@ import { request } from './http';
 
 export interface RoleRecord {
   id: number;
+  tenantId?: number;
+  storeId?: number;
   name: string;
   code: string;
-  category?: 'partner-store' | 'supplier-store' | 'operation-platform' | 'terminal-policy';
-  clientCode?: string;
   dataScope: string;
   status: 'enabled' | 'disabled';
   remark?: string;
   functionPermissions?: string;
   createdByName?: string;
+  createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface RolePermissionScope {
+  audience: 'admin' | 'store' | 'supplier';
+  functionPermissions: string;
 }
 
 export interface RolePayload {
   name: string;
   code: string;
-  category: 'partner-store' | 'supplier-store' | 'operation-platform' | 'terminal-policy';
-  clientCode: string;
   dataScope: string;
   status: 'enabled' | 'disabled';
   remark?: string;
@@ -28,6 +32,10 @@ export interface RolePayload {
 
 export function listRoles() {
   return request<RoleRecord[]>('/admin/roles');
+}
+
+export function getRolePermissionScope() {
+  return request<RolePermissionScope>('/admin/roles/permission-scope');
 }
 
 export function createRole(payload: RolePayload) {

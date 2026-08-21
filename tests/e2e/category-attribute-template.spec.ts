@@ -24,6 +24,7 @@ async function installCategoryAttributeMocks(page: Page) {
       status: 'enabled',
       publishStatus: 'unpublished',
       optionCount: 1,
+      createdByAccountId: 1,
       createdByName: '韩健',
       createdAt: '2026-08-04T09:30:00',
     },
@@ -131,6 +132,7 @@ async function installCategoryAttributeMocks(page: Page) {
       status: 'disabled',
       publishStatus: 'unpublished',
       optionCount: 0,
+      createdByAccountId: 1,
       createdByName: '当前操作员',
       createdAt: '2026-08-04T10:00:00',
     }));
@@ -182,6 +184,17 @@ async function installCategoryAttributeMocks(page: Page) {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 1,
+        name: '韩健',
+        phone: '15926626945',
+        roles: ['SUPER_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    );
   });
   await installAdminApiMocks(page);
   await installCategoryAttributeMocks(page);
@@ -614,6 +627,7 @@ test('每个类目最多只能开启4个SKU组合属性', async ({ page }) => {
     sortOrder: index + 1,
     status: 'enabled',
     publishStatus: 'unpublished',
+    createdByAccountId: 1,
     createdByName: '韩健',
     createdAt: '2026-08-04T09:30:00',
   }));

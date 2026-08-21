@@ -6,6 +6,7 @@ import com.zdm.platform.security.CurrentIdentityProvider;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,8 +16,6 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
   private static final String EXPIRED = "expired";
   private static final String USED = "used";
   private static final String DEV_VERIFY_CODE = "888888";
-  private static final Long DEFAULT_TENANT_ID = 1L;
-  private static final Long DEFAULT_STORE_ID = 1L;
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private final EmployeeService employeeService;
@@ -29,11 +28,14 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
 
   @Transactional
   public EmployeeInviteResponse createInvite() {
+    CurrentIdentity identity = identityProvider.require();
+    if (identity.tenantId() == null || identity.storeId() == null) {
+      throw new AccessDeniedException("当前身份未关联门店");
+    }
     EmployeeInvite invite = new EmployeeInvite();
     invite.setToken(generateToken());
-    invite.setTenantId(DEFAULT_TENANT_ID);
-    invite.setStoreId(DEFAULT_STORE_ID);
-    CurrentIdentity identity = identityProvider.require();
+    invite.setTenantId(identity.tenantId());
+    invite.setStoreId(identity.storeId());
     invite.setCreatedByAccountId(identity.accountId());
     invite.setCreatedByName(identity.displayName());
     invite.setStatus(ACTIVE);

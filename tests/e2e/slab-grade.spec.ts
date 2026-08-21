@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 test('manages slab grades below color management', async ({ page }) => {
   await page.goto('/slab-grade');
   const main = page.getByRole('main');
-  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
+  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据' });
 
   await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText([
     '品种管理',
@@ -37,7 +37,7 @@ test('manages slab grades below color management', async ({ page }) => {
       .locator('[data-menu-path="/slab-grade"]')
       .evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
   ).toBe('/slab-color');
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品基础数据中心.*大板基础数据管理.*等级管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*等级管理/);
   await expect(main.getByRole('row', { name: /^1 A\+ 超精品料 / })).toBeVisible();
   await expect(main.getByRole('row', { name: /^2 A 精品料 / })).toBeVisible();
   await expect(main.getByRole('row', { name: /^3 B 标准料 / })).toBeVisible();
@@ -93,7 +93,7 @@ test('hides grade operations without their permissions', async ({ page }) => {
   );
   await page.goto('/slab-grade');
   const main = page.getByRole('main');
-  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据管理' });
+  const slabBaseDataMenu = page.locator('.menu-level-two').filter({ hasText: '大板基础数据' });
   await expect(slabBaseDataMenu.locator('.menu-level-three-item')).toHaveText(['等级管理']);
   await expect(main.getByText('超精品料', { exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);

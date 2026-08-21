@@ -233,8 +233,6 @@ test('shows 已新增加名称 after creating an item', async ({ page }) => {
 
 const deletionCases = [
   { path: '/supplier-management', target: '装点猫大板供应商' },
-  { path: '/tenant-management', target: '装点猫直营租户' },
-  { path: '/tenant-store-management', target: '杭州体验门店' },
   { path: '/role-management', target: '运营管理平台角色' },
   { path: '/employee-management', target: '测试员工' },
   { path: '/finished-stock-craft', target: 'E2E 边工艺' },
@@ -242,6 +240,45 @@ const deletionCases = [
   { path: '/product-attribute', target: 'E2E 共享属性', targetPattern: /E2E (?:全局)?共享属性/ },
   { path: '/product-attribute-value', target: 'E2E 共享属性值', targetPattern: /E2E (?:全局)?共享属性值/ },
 ];
+
+test('archives an operating store and warns before permanently deleting an archived store', async ({ page }) => {
+  await page.goto('/tenant-store-management');
+  const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
+  await row.getByText('归档', { exact: true }).click();
+  await expect(page.getByText('归档后，该门店的全部员工将无法登录或切换到该门店。', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+
+  await page.getByRole('main').getByText('已归档', { exact: true }).click();
+  const archivedRow = page.locator('tbody tr').filter({ hasText: '已归档门店' });
+  await expect(archivedRow.getByText('恢复运营', { exact: true })).toBeVisible();
+  await archivedRow.getByText('彻底删除', { exact: true }).click();
+  await expect(page.getByText('彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作', { exact: true })).toBeVisible();
+});
+
+test('shows the duplicate store name error on the edit form', async ({ page }) => {
+  await page.route('**/api/admin/stores/1', async (route) => {
+    if (route.request().method() !== 'PUT') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 400, message: '店铺名称已存在', data: null }),
+    });
+  });
+
+  await page.goto('/tenant-store-management');
+  const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
+  await row.getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
+  await dialog.locator('.t-form__item').filter({ hasText: '店铺名称' }).getByPlaceholder('请输入').fill('已归档门店');
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+
+  await expect(dialog.locator('.t-form__item').filter({ hasText: '店铺名称' })).toContainText('店铺名称已存在');
+  await expect(page.getByText('编辑“已归档门店”失败：店铺名称已存在', { exact: true })).toBeVisible();
+  await expect(dialog).toBeVisible();
+});
 
 for (const item of deletionCases) {
   test(`shows 已删除加名称 after deleting ${item.target}`, async ({ page }) => {

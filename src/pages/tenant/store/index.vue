@@ -6,136 +6,127 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>租户管理</t-breadcrumb-item>
-              <t-breadcrumb-item>门店管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <t-tag theme="primary" variant="light">租户业务开通后生成店铺</t-tag>
-        </header>
+        <AdminPageHeader :breadcrumbs="['租户与门店', '门店管理']" badge="租户业务开通后生成店铺" />
 
-        <section class="filter-card">
-          <t-form :data="searchForm" label-width="84px" colon>
-            <div class="filter-row">
-              <div class="filter-fields">
-                <t-form-item label="店铺名称" name="shopName">
-                  <t-input v-model="searchForm.shopName" clearable placeholder="请输入" />
-                </t-form-item>
-                <t-form-item label="店铺类型" name="shopType">
-                  <t-select v-model="searchForm.shopType" clearable placeholder="请选择">
-                    <t-option
-                      v-for="item in shopTypeOptions"
-                      :key="item.value"
-                      :label="item.label"
-                      :value="item.value"
-                    />
-                  </t-select>
-                </t-form-item>
-                <t-form-item label="租户姓名" name="tenantName">
-                  <t-select v-model="searchForm.tenantName" clearable filterable placeholder="请选择">
-                    <t-option v-for="item in tenantOptions" :key="item.name" :label="item.name" :value="item.name" />
-                  </t-select>
-                </t-form-item>
-                <t-form-item label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
-                    <t-option label="正常" value="normal" />
-                    <t-option label="停用" value="disabled" />
-                  </t-select>
-                </t-form-item>
-              </div>
+        <AdminListLayout class="store-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs v-if="showStoreTabRail" v-model="activeTab" :list="storeTabs" />
+              <t-form :data="searchForm" label-width="84px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="店铺名称" name="shopName">
+                      <t-input v-model="searchForm.shopName" clearable placeholder="请输入" />
+                    </t-form-item>
+                    <t-form-item label="店铺类型" name="shopType">
+                      <t-select v-model="searchForm.shopType" clearable placeholder="请选择">
+                        <t-option
+                          v-for="item in shopTypeOptions"
+                          :key="item.value"
+                          :label="item.label"
+                          :value="item.value"
+                        />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item label="租户姓名" name="tenantName">
+                      <t-select v-model="searchForm.tenantName" clearable filterable placeholder="请选择">
+                        <t-option
+                          v-for="item in tenantOptions"
+                          :key="item.name"
+                          :label="item.name"
+                          :value="item.name"
+                        />
+                      </t-select>
+                    </t-form-item>
+                  </div>
 
-              <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
-                  <template #icon><t-icon name="search" /></template>
-                  查询
-                </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
-                  <template #icon><t-icon name="refresh" /></template>
-                  重置
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="handleSearch">
+                      <template #icon><t-icon name="search" /></template>
+                      查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="handleReset">
+                      <template #icon><t-icon name="refresh" /></template>
+                      重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div v-if="activeTab === 'operating' && canCreate" class="table-toolbar">
+                <t-button theme="primary" @click="openCreateDialog">
+                  <template #icon><t-icon name="add" /></template>
+                  新增
                 </t-button>
               </div>
             </div>
-          </t-form>
-        </section>
+          </template>
 
-        <section class="table-card">
-          <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
-              <template #icon><t-icon name="add" /></template>
-              新增
-            </t-button>
-          </div>
+          <template #table>
+            <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+              <template #index="{ rowIndex }">
+                {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
+              </template>
+              <template #shopType="{ row }">
+                <t-tag :class="['shop-type-tag', row.shopType]" variant="light">
+                  {{ shopTypeLabel(row.shopType) }}
+                </t-tag>
+              </template>
+              <template #storeLevelId="{ row }">
+                <div class="level-cell">
+                  <span>{{ shopLevelLabel(row.storeLevelId) }}</span>
+                  <t-button
+                    v-if="activeTab === 'operating' && canEditLevel"
+                    class="level-edit-button"
+                    shape="square"
+                    size="small"
+                    variant="text"
+                    theme="primary"
+                    aria-label="修改门店级别"
+                    @click="openLevelDialog(row)"
+                  >
+                    <t-icon name="check-circle" />
+                  </t-button>
+                </div>
+              </template>
+              <template #manager="{ row }">
+                {{ row.manager || '-' }}
+              </template>
+              <template #createdBy="{ row }">
+                {{ row.createdBy || '-' }}
+              </template>
+              <template #operation="{ row }">
+                <div v-if="activeTab === 'operating'" class="table-actions">
+                  <t-link v-if="canEdit" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                  <t-link v-if="canArchive" theme="warning" hover="color" @click="openArchiveConfirm(row)">归档</t-link>
+                </div>
+                <div v-else class="table-actions">
+                  <t-link v-if="canRestore" theme="success" hover="color" @click="openRestoreConfirm(row)"
+                    >恢复运营</t-link
+                  >
+                  <t-link v-if="canDelete" theme="danger" hover="color" @click="openDeleteConfirm(row)"
+                    >彻底删除</t-link
+                  >
+                </div>
+              </template>
+            </t-table>
+          </template>
 
-          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
-            <template #index="{ rowIndex }">
-              {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
-            </template>
-            <template #shopType="{ row }">
-              <t-tag :class="['shop-type-tag', row.shopType]" variant="light">
-                {{ shopTypeLabel(row.shopType) }}
-              </t-tag>
-            </template>
-            <template #shopLevel="{ row }">
-              <div class="level-cell">
-                <span>{{ shopLevelLabel(row.shopLevel) }}</span>
-                <t-button
-                  class="level-edit-button"
-                  shape="square"
-                  size="small"
-                  variant="text"
-                  theme="primary"
-                  aria-label="快速编辑店铺级别"
-                  @click="openLevelDialog(row)"
-                >
-                  <t-icon name="check-circle" />
-                </t-button>
-              </div>
-            </template>
-            <template #manager="{ row }">
-              {{ row.manager || '-' }}
-            </template>
-            <template #status="{ row }">
-              <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'normal' ? '正常' : '停用' }}
-              </t-tag>
-            </template>
-            <template #createdBy="{ row }">
-              {{ row.createdBy || '-' }}
-            </template>
-            <template #operation="{ row }">
-              <div class="table-actions">
-                <t-link theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                <t-link
-                  :theme="row.status === 'normal' ? 'warning' : 'success'"
-                  hover="color"
-                  @click="openStatusConfirm(row)"
-                >
-                  {{ row.status === 'normal' ? '停用' : '启用' }}
-                </t-link>
-                <t-link theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
-              </div>
-            </template>
-          </t-table>
-
-          <AdminPagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="paginationTotal"
-            :page-size-options="pageSizeOptions"
-          />
-        </section>
+          <template #pagination>
+            <AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
-    <t-dialog
+    <AdminDialog
       v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
       width="620px"
-      placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
       @close="closeFormDialog"
@@ -154,7 +145,13 @@
             </t-select>
           </t-form-item>
           <t-form-item label="店铺类型" name="shopType" required-mark>
-            <t-select v-model="formData.shopType" clearable placeholder="请选择">
+            <t-select
+              v-model="formData.shopType"
+              :popup-visible="shopTypePopupVisible"
+              clearable
+              placeholder="请选择"
+              @popup-visible-change="handleShopTypePopupVisibleChange"
+            >
               <t-option
                 v-for="item in availableShopTypeOptions"
                 :key="item.value"
@@ -168,13 +165,20 @@
           <t-input v-model="formData.shopName" clearable placeholder="请输入" />
         </t-form-item>
         <t-form-item label="门店地址" name="region" required-mark>
-          <t-cascader v-model="formData.region" :options="regionOptions" clearable placeholder="请选择" />
+          <t-cascader
+            v-model="formData.region"
+            :options="chinaRegionOptions"
+            :keys="chinaRegionKeys"
+            clearable
+            filterable
+            placeholder="请选择省 / 市 / 区"
+          />
         </t-form-item>
         <t-form-item label="详细地址" name="detailAddress" required-mark>
           <t-input v-model="formData.detailAddress" clearable placeholder="请输入" />
         </t-form-item>
-        <t-form-item v-if="dialogMode === 'create'" label="店铺级别" name="shopLevel" required-mark>
-          <t-select v-model="formData.shopLevel" clearable placeholder="请选择">
+        <t-form-item v-if="dialogMode === 'create'" label="店铺级别" name="storeLevelId" required-mark>
+          <t-select v-model="formData.storeLevelId" clearable filterable placeholder="请选择">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
@@ -187,32 +191,30 @@
           />
         </t-form-item>
       </t-form>
-    </t-dialog>
+    </AdminDialog>
 
-    <t-dialog
+    <AdminDialog
       v-model:visible="levelDialogVisible"
       header="店铺级别"
       width="420px"
-      placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
       @confirm="handleLevelSubmit"
       @cancel="closeLevelDialog"
       @close="closeLevelDialog"
     >
       <t-form ref="levelFormRef" :data="levelFormData" :rules="levelFormRules" label-width="96px" colon>
-        <t-form-item label="店铺级别" name="shopLevel" required-mark>
-          <t-select v-model="levelFormData.shopLevel" clearable placeholder="请选择">
+        <t-form-item label="店铺级别" name="storeLevelId" required-mark>
+          <t-select v-model="levelFormData.storeLevelId" clearable filterable placeholder="请选择">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
       </t-form>
-    </t-dialog>
+    </AdminDialog>
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
-      :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
-      object-type="店铺"
+      :action="confirmAction"
+      :danger="confirmState.type === 'delete'"
+      object-type="门店"
       :object-name="confirmState.row?.shopName"
       @confirm="handleConfirm"
       @cancel="closeConfirmDialog"
@@ -225,25 +227,66 @@
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
+  adminFeedback,
+  AdminConfirmDialog,
+  AdminDialog,
+  AdminListLayout,
+  AdminPageHeader,
+  AdminPagination,
+} from '@/components/foundation';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
+import {
+  archiveStore,
   createStore,
   deleteStore,
   listStores,
+  restoreStore,
   updateStore,
+  updateStoreLevelSelection,
   type StorePayload,
   type StoreRecord,
 } from '@/services/stores';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import { listTenants, type TenantRecord } from '@/services/tenants';
+import { listStoreLevelOptions, type StoreLevelRecord } from '@/services/storeLevels';
+import {
+  chinaRegionKeys,
+  chinaRegionOptions,
+  getChinaRegionLabel,
+  normalizeChinaRegionCode,
+} from '@/utils/chinaRegions';
 
 type ShopType = 'cityPartner' | 'slabSupplier' | 'finishedSupplier' | 'factory';
-type ShopLevel = 'level1' | 'level2' | 'level3';
-type StoreStatus = 'normal' | 'disabled';
-type ConfirmType = 'enable' | 'disable' | 'delete';
+type StoreTab = 'operating' | 'archived';
+type ConfirmType = 'archive' | 'restore' | 'delete';
+const permissionPrefix = 'admin.tenant.tenant-store-management';
+const loginUser = computed(() => getLoginUser());
+const activeTab = ref<StoreTab>('operating');
+const allStoreTabs: { label: string; value: StoreTab }[] = [
+  { label: '运营中', value: 'operating' },
+  { label: '已归档', value: 'archived' },
+];
+const { visibleTabs: storeTabs, showTabRail: showStoreTabRail } = usePermissionTabs({
+  tabs: allStoreTabs,
+  activeTab,
+  canAccess: (tab) => hasPermission(loginUser.value, `${permissionPrefix}.${tab.value}.view`),
+});
+const hasStoreAction = (scope: StoreTab, action: string) =>
+  hasPermission(loginUser.value, `${permissionPrefix}.${scope}.${action}`);
+const canCreate = computed(() => hasStoreAction('operating', 'create'));
+const canEditLevel = computed(() => hasStoreAction('operating', 'edit-level'));
+const canEdit = computed(() => hasStoreAction('operating', 'edit'));
+const canArchive = computed(() => hasStoreAction('operating', 'archive'));
+const canRestore = computed(() => hasStoreAction('archived', 'restore'));
+const canDelete = computed(() => hasStoreAction('archived', 'delete'));
 
 interface TenantOption {
   id: number;
@@ -255,13 +298,12 @@ interface StoreItem {
   id: number;
   shopName: string;
   shopType: ShopType;
-  shopLevel: ShopLevel;
+  storeLevelId: number;
   manager: string;
   region: string;
   detailAddress: string;
   address: string;
   tenantName: string;
-  status: StoreStatus;
   createdAt: string;
   createdBy: string;
   remark?: string;
@@ -273,7 +315,7 @@ interface StoreForm {
   shopName: string;
   region: string;
   detailAddress: string;
-  shopLevel: ShopLevel | '';
+  storeLevelId: number | undefined;
   remark: string;
 }
 
@@ -284,96 +326,14 @@ const shopTypeOptions: { label: string; value: ShopType }[] = [
   { label: '工厂', value: 'factory' },
 ];
 
-const shopLevelOptions: { label: string; value: ShopLevel }[] = [
-  { label: '1级', value: 'level1' },
-  { label: '2级', value: 'level2' },
-  { label: '3级', value: 'level3' },
-];
+const storeLevelRecords = ref<StoreLevelRecord[]>([]);
+const shopLevelOptions = computed(() => storeLevelRecords.value.map((item) => ({ label: item.name, value: item.id })));
 
 const tenantOptions = ref<TenantOption[]>([]);
 
-const regionOptions = [
-  {
-    label: '广东省',
-    value: 'guangdong',
-    children: [
-      {
-        label: '广州市',
-        value: 'guangzhou',
-        children: [
-          { label: '天河区', value: 'tianhe' },
-          { label: '番禺区', value: 'panyu' },
-        ],
-      },
-      {
-        label: '佛山市',
-        value: 'foshan',
-        children: [
-          { label: '禅城区', value: 'chancheng' },
-          { label: '南海区', value: 'nanhai' },
-        ],
-      },
-    ],
-  },
-  {
-    label: '浙江省',
-    value: 'zhejiang',
-    children: [
-      {
-        label: '杭州市',
-        value: 'hangzhou',
-        children: [
-          { label: '西湖区', value: 'xihu' },
-          { label: '滨江区', value: 'binjiang' },
-        ],
-      },
-      {
-        label: '宁波市',
-        value: 'ningbo',
-        children: [
-          { label: '鄞州区', value: 'yinzhou' },
-          { label: '海曙区', value: 'haishu' },
-        ],
-      },
-    ],
-  },
-  {
-    label: '江苏省',
-    value: 'jiangsu',
-    children: [
-      {
-        label: '苏州市',
-        value: 'suzhou',
-        children: [
-          { label: '工业园区', value: 'sip' },
-          { label: '吴中区', value: 'wuzhong' },
-        ],
-      },
-      {
-        label: '南京市',
-        value: 'nanjing',
-        children: [
-          { label: '建邺区', value: 'jianye' },
-          { label: '秦淮区', value: 'qinhuai' },
-        ],
-      },
-    ],
-  },
-];
-
 const shopTypeLabel = (type: ShopType) => shopTypeOptions.find((item) => item.value === type)?.label ?? '';
-const shopLevelLabel = (level: ShopLevel) => shopLevelOptions.find((item) => item.value === level)?.label ?? '';
-
-const regionLabel = (value: string) => {
-  for (const province of regionOptions) {
-    for (const city of province.children) {
-      const district = city.children.find((item) => item.value === value);
-      if (district) return `${province.label}${city.label}${district.label}`;
-    }
-  }
-  return '';
-};
-
+const shopLevelLabel = (levelId: number) =>
+  shopLevelOptions.value.find((item) => item.value === levelId)?.label ?? `级别#${levelId}`;
 const tableData = ref<StoreItem[]>([]);
 const loading = ref(false);
 
@@ -381,11 +341,10 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'shopName', title: '店铺名称', minWidth: 180, align: 'left' },
   { colKey: 'shopType', title: '店铺类型', width: 130, align: 'center' },
-  { colKey: 'shopLevel', title: '店铺级别', width: 140, align: 'center' },
+  { colKey: 'storeLevelId', title: '店铺级别', width: 140, align: 'center' },
   { colKey: 'manager', title: '店长', width: 110, align: 'center' },
   { colKey: 'address', title: '门店地址', minWidth: 260, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', width: 120, align: 'center' },
-  { colKey: 'status', title: '状态', width: 100, align: 'center' },
   { colKey: 'createdBy', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 170, align: 'center' },
   { colKey: 'operation', title: '操作', width: 190, align: 'left', fixed: 'right' },
@@ -395,7 +354,6 @@ const searchForm = reactive({
   shopName: '',
   shopType: '' as ShopType | '',
   tenantName: '',
-  status: '' as StoreStatus | '',
 });
 const appliedSearchForm = reactive({ ...searchForm });
 
@@ -407,6 +365,7 @@ const pagination = reactive({
 
 const formRef = ref<FormInstanceFunctions>();
 const formDialogVisible = ref(false);
+const shopTypePopupVisible = ref(false);
 const dialogMode = ref<'create' | 'edit'>('create');
 const editingId = ref<number | null>(null);
 const formData = reactive<StoreForm>({
@@ -415,7 +374,7 @@ const formData = reactive<StoreForm>({
   shopName: '',
   region: '',
   detailAddress: '',
-  shopLevel: '',
+  storeLevelId: undefined,
   remark: '',
 });
 
@@ -425,7 +384,7 @@ const formRules: Record<string, FormRule[]> = {
   shopName: [{ required: true, message: '请输入店铺名称', type: 'error' }],
   region: [{ required: true, message: '请选择门店地址', type: 'error' }],
   detailAddress: [{ required: true, message: '请输入详细地址', type: 'error' }],
-  shopLevel: [{ required: true, message: '请选择店铺级别', type: 'error' }],
+  storeLevelId: [{ required: true, message: '请选择店铺级别', type: 'error' }],
   remark: [{ max: 100, message: '备注最多可输入100个字符', type: 'error' }],
 };
 
@@ -433,10 +392,10 @@ const levelFormRef = ref<FormInstanceFunctions>();
 const levelDialogVisible = ref(false);
 const levelEditingId = ref<number | null>(null);
 const levelFormData = reactive({
-  shopLevel: '' as ShopLevel | '',
+  storeLevelId: undefined as number | undefined,
 });
 const levelFormRules: Record<string, FormRule[]> = {
-  shopLevel: [{ required: true, message: '请选择店铺级别', type: 'error' }],
+  storeLevelId: [{ required: true, message: '请选择店铺级别', type: 'error' }],
 };
 
 const confirmDialogVisible = ref(false);
@@ -446,13 +405,14 @@ const confirmState = reactive<{
   row: StoreItem | null;
 }>({
   content: '',
-  type: 'disable',
+  type: 'archive',
   row: null,
 });
+const confirmAction = computed(() => ({ archive: '归档', restore: '恢复运营', delete: '彻底删除' })[confirmState.type]);
 
 const selectedTenant = computed(() => tenantOptions.value.find((item) => item.name === formData.tenantName));
 const availableShopTypeOptions = computed(() => {
-  if (!selectedTenant.value) return shopTypeOptions;
+  if (!selectedTenant.value) return [];
   return shopTypeOptions.filter((item) => selectedTenant.value?.businesses.includes(item.value));
 });
 
@@ -462,8 +422,7 @@ const filteredData = computed(() => {
     const nameMatched = !shopName || item.shopName.includes(shopName);
     const typeMatched = !appliedSearchForm.shopType || item.shopType === appliedSearchForm.shopType;
     const tenantMatched = !appliedSearchForm.tenantName || item.tenantName === appliedSearchForm.tenantName;
-    const statusMatched = !appliedSearchForm.status || item.status === appliedSearchForm.status;
-    return nameMatched && typeMatched && tenantMatched && statusMatched;
+    return nameMatched && typeMatched && tenantMatched;
   });
 });
 
@@ -476,11 +435,6 @@ const pageData = computed(() => {
 
 const parseBusinessTypes = (value?: string): ShopType[] =>
   (value?.split(',').filter(Boolean) as ShopType[] | undefined) ?? [];
-
-const normalizeStatus = (status: StoreRecord['status']): StoreStatus => (status === 'disabled' ? 'disabled' : 'normal');
-
-const toBackendStatus = (status: StoreStatus): StorePayload['status'] =>
-  status === 'disabled' ? 'disabled' : 'enabled';
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
@@ -500,9 +454,6 @@ const toTenantOption = (record: TenantRecord): TenantOption => ({
 const normalizeShopType = (value: string): ShopType =>
   shopTypeOptions.some((item) => item.value === value) ? (value as ShopType) : 'cityPartner';
 
-const normalizeShopLevel = (value?: string): ShopLevel =>
-  shopLevelOptions.some((item) => item.value === value) ? (value as ShopLevel) : 'level1';
-
 const toStoreItem = (record: StoreRecord): StoreItem => {
   const tenant = tenantOptions.value.find((item) => item.id === record.tenantId);
   const detailAddress = record.detailAddress ?? record.address ?? '';
@@ -511,20 +462,19 @@ const toStoreItem = (record: StoreRecord): StoreItem => {
     id: record.id,
     shopName: record.name,
     shopType: normalizeShopType(record.type),
-    shopLevel: normalizeShopLevel(record.shopLevel),
+    storeLevelId: record.storeLevelId ?? 0,
     manager: record.manager ?? '',
-    region: record.region ?? '',
+    region: normalizeChinaRegionCode(record.region ?? ''),
     detailAddress,
-    address: record.address ?? `${regionLabel(record.region ?? '')}${detailAddress}`,
+    address: record.address ?? `${getChinaRegionLabel(record.region ?? '')}${detailAddress}`,
     tenantName: tenant?.name ?? `租户#${record.tenantId}`,
-    status: normalizeStatus(record.status),
     createdAt: formatDateTime(record.createdAt),
     createdBy: record.createdBy ?? '',
     remark: record.remark ?? '',
   };
 };
 
-const toStorePayload = (status: StoreStatus, shopLevel: ShopLevel, manager = ''): StorePayload => {
+const toStorePayload = (storeLevelId: number, manager = ''): StorePayload => {
   const tenant = selectedTenant.value;
   if (!tenant || !formData.shopType) {
     throw new Error('请选择租户和店铺类型');
@@ -535,43 +485,26 @@ const toStorePayload = (status: StoreStatus, shopLevel: ShopLevel, manager = '')
     tenantId: tenant.id,
     name: formData.shopName.trim(),
     type: formData.shopType,
-    shopLevel,
+    storeLevelId,
     manager,
     region: formData.region,
     detailAddress,
-    address: `${regionLabel(formData.region)}${detailAddress}`,
-    status: toBackendStatus(status),
+    address: `${getChinaRegionLabel(formData.region)}${detailAddress}`,
     remark: formData.remark.trim(),
-  };
-};
-
-const toStorePayloadFromItem = (item: StoreItem): StorePayload => {
-  const tenant = tenantOptions.value.find((option) => option.name === item.tenantName);
-  if (!tenant) {
-    throw new Error('未找到门店所属租户');
-  }
-
-  return {
-    tenantId: tenant.id,
-    name: item.shopName,
-    type: item.shopType,
-    shopLevel: item.shopLevel,
-    manager: item.manager,
-    region: item.region,
-    detailAddress: item.detailAddress,
-    address: item.address,
-    status: toBackendStatus(item.status),
-    remark: item.remark ?? '',
-    createdBy: item.createdBy,
   };
 };
 
 const loadStorePage = async () => {
   loading.value = true;
   try {
-    const [tenants, stores] = await Promise.all([listTenants(), listStores()]);
+    const [tenants, levels, stores] = await Promise.all([
+      listTenants(),
+      activeTab.value === 'operating' ? listStoreLevelOptions() : Promise.resolve([]),
+      listStores(activeTab.value),
+    ]);
     tenantOptions.value = tenants.map(toTenantOption);
-    tableData.value = stores.map(toStoreItem);
+    storeLevelRecords.value = levels;
+    tableData.value = sortByCreatedAtDesc(stores).map(toStoreItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '门店列表加载失败');
@@ -586,7 +519,7 @@ const resetFormData = () => {
   formData.shopName = '';
   formData.region = '';
   formData.detailAddress = '';
-  formData.shopLevel = '';
+  formData.storeLevelId = undefined;
   formData.remark = '';
 };
 
@@ -596,7 +529,7 @@ const fillFormData = (row: StoreItem) => {
   formData.shopName = row.shopName;
   formData.region = row.region;
   formData.detailAddress = row.detailAddress;
-  formData.shopLevel = row.shopLevel;
+  formData.storeLevelId = row.storeLevelId;
   formData.remark = row.remark ?? '';
 };
 
@@ -615,15 +548,25 @@ const handleReset = () => {
   searchForm.shopName = '';
   searchForm.shopType = '';
   searchForm.tenantName = '';
-  searchForm.status = '';
   pagination.pageSize = 10;
   handleSearch();
 };
 
 const handleTenantChange = () => {
+  shopTypePopupVisible.value = false;
   if (formData.shopType && !availableShopTypeOptions.value.some((item) => item.value === formData.shopType)) {
     formData.shopType = '';
   }
+};
+
+const handleShopTypePopupVisibleChange = (visible: boolean) => {
+  if (visible && !selectedTenant.value) {
+    shopTypePopupVisible.value = false;
+    adminFeedback.warning('请先选择租户');
+    return;
+  }
+
+  shopTypePopupVisible.value = visible;
 };
 
 const openCreateDialog = () => {
@@ -634,6 +577,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: StoreItem) => {
+  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -642,6 +586,7 @@ const openEditDialog = (row: StoreItem) => {
 
 const closeFormDialog = () => {
   formDialogVisible.value = false;
+  shopTypePopupVisible.value = false;
   formRef.value?.clearValidate();
 };
 
@@ -650,35 +595,40 @@ const handleSubmit = async () => {
   if (result !== true) return;
 
   if (!formData.region) return;
+  const action = dialogMode.value === 'create' ? '新增' : '编辑';
+  const targetName = formData.shopName.trim();
   try {
     if (dialogMode.value === 'create') {
-      if (!formData.shopLevel) return;
-      await createStore(toStorePayload('normal', formData.shopLevel));
+      if (!formData.storeLevelId) return;
+      await createStore(toStorePayload(formData.storeLevelId));
       await loadStorePage();
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
-      await updateStore(
-        editingId.value,
-        toStorePayload(current?.status ?? 'normal', current?.shopLevel ?? 'level1', current?.manager ?? ''),
-      );
+      await updateStore(editingId.value, toStorePayload(current?.storeLevelId ?? 0, current?.manager ?? ''));
       await loadStorePage();
     }
 
     closeFormDialog();
     if (dialogMode.value === 'create') {
-      adminFeedback.created(formData.shopName.trim());
+      adminFeedback.created(targetName);
     } else {
-      adminFeedback.success('已保存店铺');
+      adminFeedback.actionSuccess({ action, target: targetName });
     }
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+    if (error instanceof Error && error.message === '店铺名称已存在') {
+      formRef.value?.setValidateMessage({
+        shopName: [{ type: 'error', message: error.message }],
+      });
+    }
+    adminFeedback.actionError({ action, target: targetName, error, fallback: '请稍后重试' });
   }
 };
 
 const openLevelDialog = (row: StoreItem) => {
+  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   levelEditingId.value = row.id;
-  levelFormData.shopLevel = row.shopLevel;
+  levelFormData.storeLevelId = row.storeLevelId;
   levelDialogVisible.value = true;
 };
 
@@ -690,16 +640,13 @@ const closeLevelDialog = () => {
 
 const handleLevelSubmit = async () => {
   const result = await levelFormRef.value?.validate();
-  if (result !== true || !levelFormData.shopLevel) return;
+  if (result !== true || !levelFormData.storeLevelId) return;
 
   const target = tableData.value.find((item) => item.id === levelEditingId.value);
   if (!target) return;
 
   try {
-    const updated = await updateStore(
-      target.id,
-      toStorePayloadFromItem({ ...target, shopLevel: levelFormData.shopLevel }),
-    );
+    const updated = await updateStoreLevelSelection(target.id, levelFormData.storeLevelId);
     const targetIndex = tableData.value.findIndex((item) => item.id === target.id);
     if (targetIndex !== -1) {
       tableData.value.splice(targetIndex, 1, toStoreItem(updated));
@@ -712,18 +659,27 @@ const handleLevelSubmit = async () => {
   }
 };
 
-const openStatusConfirm = (row: StoreItem) => {
-  const isNormal = row.status === 'normal';
-  confirmState.type = isNormal ? 'disable' : 'enable';
+const openArchiveConfirm = (row: StoreItem) => {
+  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
+  confirmState.type = 'archive';
   confirmState.row = row;
-  confirmState.content = `是否${isNormal ? '停用' : '启用'}店铺“${row.shopName}”？`;
+  confirmState.content = '归档后，该门店的全部员工将无法登录或切换到该门店。';
+  confirmDialogVisible.value = true;
+};
+
+const openRestoreConfirm = (row: StoreItem) => {
+  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
+  confirmState.type = 'restore';
+  confirmState.row = row;
+  confirmState.content = `是否恢复门店“${row.shopName}”运营？`;
   confirmDialogVisible.value = true;
 };
 
 const openDeleteConfirm = (row: StoreItem) => {
+  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   confirmState.type = 'delete';
   confirmState.row = row;
-  confirmState.content = `是否删除店铺“${row.shopName}”？`;
+  confirmState.content = '彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作';
   confirmDialogVisible.value = true;
 };
 
@@ -735,59 +691,59 @@ const closeConfirmDialog = () => {
 const handleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
+  const action = confirmAction.value;
 
   try {
     if (confirmState.type === 'delete') {
       await deleteStore(target.id);
       tableData.value = tableData.value.filter((item) => item.id !== target.id);
-    } else {
-      const updated = await updateStore(
-        confirmState.row.id,
-        toStorePayloadFromItem({
-          ...confirmState.row,
-          status: confirmState.type === 'enable' ? 'normal' : 'disabled',
-        }),
-      );
-      const targetIndex = tableData.value.findIndex((item) => item.id === confirmState.row?.id);
-      if (targetIndex !== -1) {
-        tableData.value.splice(targetIndex, 1, toStoreItem(updated));
-      }
+    } else if (confirmState.type === 'archive') {
+      await archiveStore(target.id);
+      tableData.value = tableData.value.filter((item) => item.id !== target.id);
+    } else if (confirmState.type === 'restore') {
+      await restoreStore(target.id);
+      tableData.value = tableData.value.filter((item) => item.id !== target.id);
     }
 
     closeConfirmDialog();
-    if (confirmState.type === 'delete') {
+    if (action === '彻底删除') {
       adminFeedback.deleted(target.shopName);
     } else {
-      adminFeedback.success(confirmState.type === 'enable' ? '已启用店铺' : '已停用店铺');
+      adminFeedback.actionSuccess({ action, target: target.shopName });
     }
     ensureCurrentPage();
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+    adminFeedback.actionError({ action, target: target.shopName, error, fallback: '请稍后重试' });
   }
 };
+
+watch(activeTab, () => {
+  pagination.current = 1;
+  void loadStorePage();
+});
 
 onMounted(loadStorePage);
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.store-list-layout {
+  min-width: 0;
+}
+
+.store-list-layout :deep(.zdm-admin-list-layout__filters),
+.store-list-layout :deep(.zdm-admin-list-layout__content) {
+  min-width: 0;
+}
+
+.list-controls {
+  display: grid;
+  width: 100%;
   gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
 }
 
-.filter-card,
-.table-card {
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  border: 1px solid var(--td-component-border);
-}
-
-.table-card {
-  margin-top: var(--td-comp-margin-l);
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
 }
 
 .filter-row {
@@ -817,9 +773,7 @@ onMounted(loadStorePage);
 
 .table-toolbar {
   display: flex;
-  justify-content: flex-start;
   align-items: center;
-  margin-bottom: var(--td-comp-margin-l);
 }
 
 .shop-type-tag.cityPartner {

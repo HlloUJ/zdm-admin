@@ -106,7 +106,7 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     requireScopedPermission(getExisting(id).getCategoryId(), "delete", "delete");
-    return ApiResponse.ok(service.removeById(id));
+    return ApiResponse.ok(service.deleteCategoryAttribute(id));
   }
 
   @GetMapping("/{id}/values")
@@ -122,6 +122,7 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
       @Valid @RequestBody CategoryAttributeValueBindingRequest request) {
     CategoryAttribute existing = getExisting(id);
     requireScopedPermission(existing.getCategoryId(), "bind-values", "edit");
+    service.requireCreator(id);
     return ApiResponse.ok(valueBindingService.replaceBindings(id, request));
   }
 

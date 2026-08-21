@@ -6,7 +6,7 @@
       <main class="page">
         <header class="page-header">
           <t-breadcrumb
-            ><t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item
+            ><t-breadcrumb-item>商品管理</t-breadcrumb-item
             ><t-breadcrumb-item>{{ config.title }}</t-breadcrumb-item></t-breadcrumb
           ><t-tag theme="primary" variant="light">平台主数据</t-tag>
         </header>

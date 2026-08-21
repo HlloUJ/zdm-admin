@@ -1,6 +1,7 @@
 import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 
 export type TerminalType = 'store' | 'supplier';
+export type FunctionAudience = 'admin' | TerminalType;
 
 export interface FunctionAction {
   label: string;
@@ -33,6 +34,7 @@ export interface FunctionMenu {
 export interface FunctionModule {
   label: string;
   value: string;
+  audiences?: FunctionAudience[];
   menus: FunctionMenu[];
 }
 
@@ -132,6 +134,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             value: 'admin.supplier-management',
             actions: [
               { label: '新增', value: 'admin.supplier-management.create' },
+              { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
               { label: '编辑', value: 'admin.supplier-management.edit' },
               { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
               { label: '删除', value: 'admin.supplier-management.delete' },
@@ -145,6 +148,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   {
     label: '门店分类管理',
     value: 'admin.tenant.store-category-management',
+    audiences: ['store'],
     menus: [
       {
         value: 'admin.tenant.store-category-management.menu',
@@ -169,7 +173,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
     ],
   },
   {
-    label: '商品基础数据中心',
+    label: '商品管理',
     value: 'admin.product-data-center',
     menus: [
       {
@@ -301,7 +305,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
-        label: '大板基础数据管理',
+        label: '大板基础数据',
         value: 'admin.product-data-center.slab-base-data.menu',
         direct: false,
         pages: [
@@ -374,6 +378,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   {
     label: '权限管理',
     value: 'admin.permission-management',
+    audiences: ['admin', 'store', 'supplier'],
     menus: [
       {
         label: '员工管理',
@@ -402,67 +407,13 @@ const verifiedFunctionCatalog: FunctionModule[] = [
           {
             label: '角色管理页',
             value: 'admin.permission-management.role-management',
-            actions: [],
-            tabs: [
-              {
-                label: '运营管理平台角色',
-                value: 'admin.permission-management.role-management.operation-platform',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.operation-platform.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.operation-platform.edit',
-                  },
-                  {
-                    label: '权限',
-                    value: 'admin.permission-management.role-management.operation-platform.permission',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.operation-platform.delete',
-                  },
-                ],
-              },
-              {
-                label: '城市合伙人门店角色',
-                value: 'admin.permission-management.role-management.partner-store',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.partner-store.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.partner-store.edit',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.partner-store.delete',
-                  },
-                ],
-              },
-              {
-                label: '大板供应商门店角色',
-                value: 'admin.permission-management.role-management.supplier-store',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.supplier-store.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.supplier-store.edit',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.supplier-store.delete',
-                  },
-                ],
-              },
+            actions: [
+              { label: '新增', value: 'admin.permission-management.role-management.create' },
+              { label: '编辑', value: 'admin.permission-management.role-management.edit' },
+              { label: '权限', value: 'admin.permission-management.role-management.permission' },
+              { label: '删除', value: 'admin.permission-management.role-management.delete' },
             ],
+            tabs: [],
           },
         ],
       },
@@ -470,11 +421,165 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   },
 ];
 
-export const fullFunctionCatalog = withDefaultViewPermissions(verifiedFunctionCatalog);
+const storeLevelModule: FunctionModule = {
+  label: '租户与门店',
+  value: 'admin.tenant',
+  audiences: ['admin'],
+  menus: [
+    {
+      label: '租户管理',
+      value: 'admin.tenant.tenant-management.menu',
+      direct: false,
+      pages: [
+        {
+          label: '租户管理页',
+          value: 'admin.tenant.tenant-management',
+          actions: [],
+          tabs: [
+            {
+              label: '运营中',
+              value: 'admin.tenant.tenant-management.unarchived',
+              actions: [
+                { label: '新增', value: 'admin.tenant.tenant-management.unarchived.create' },
+                { label: '业务开通', value: 'admin.tenant.tenant-management.unarchived.open-business' },
+                { label: '编辑', value: 'admin.tenant.tenant-management.unarchived.edit' },
+                { label: '归档', value: 'admin.tenant.tenant-management.unarchived.archive' },
+              ],
+            },
+            {
+              label: '已归档',
+              value: 'admin.tenant.tenant-management.archived',
+              actions: [
+                { label: '恢复运营', value: 'admin.tenant.tenant-management.archived.restore' },
+                { label: '彻底删除', value: 'admin.tenant.tenant-management.archived.delete' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      label: '门店管理',
+      value: 'admin.tenant.tenant-store-management.menu',
+      direct: false,
+      pages: [
+        {
+          label: '门店管理页',
+          value: 'admin.tenant.tenant-store-management',
+          actions: [],
+          tabs: [
+            {
+              label: '运营中',
+              value: 'admin.tenant.tenant-store-management.operating',
+              actions: [
+                { label: '新增', value: 'admin.tenant.tenant-store-management.operating.create' },
+                { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.operating.edit-level' },
+                { label: '编辑', value: 'admin.tenant.tenant-store-management.operating.edit' },
+                { label: '归档', value: 'admin.tenant.tenant-store-management.operating.archive' },
+              ],
+            },
+            {
+              label: '已归档',
+              value: 'admin.tenant.tenant-store-management.archived',
+              actions: [
+                { label: '恢复运营', value: 'admin.tenant.tenant-store-management.archived.restore' },
+                { label: '彻底删除', value: 'admin.tenant.tenant-store-management.archived.delete' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      label: '门店基础数据',
+      value: 'admin.tenant.store-base-data.menu',
+      direct: false,
+      pages: [
+        {
+          label: '门店级别管理页',
+          value: 'admin.tenant.store-level-management',
+          thirdMenuLabel: '门店级别管理',
+          actions: [
+            { label: '新增', value: 'admin.tenant.store-level-management.create' },
+            { label: '编辑', value: 'admin.tenant.store-level-management.edit' },
+            { label: '停用/启用', value: 'admin.tenant.store-level-management.toggle-status' },
+            { label: '删除', value: 'admin.tenant.store-level-management.delete' },
+          ],
+          tabs: [],
+        },
+      ],
+    },
+  ],
+};
+
+const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionModule[] =>
+  modules.map((module) => {
+    if (module.value !== 'admin.product-data-center') return module;
+
+    const commonValues = new Set([
+      'admin.product-data-center.category.menu',
+      'admin.product-data-center.attribute.menu',
+      'admin.product-data-center.attribute-value.menu',
+      'admin.product-data-center.category-attribute-template.menu',
+    ]);
+    const commonMenus = module.menus.filter((menu) => commonValues.has(menu.value));
+    const craftMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.finished-stock-craft.menu');
+    const slabMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.slab-base-data.menu');
+
+    return {
+      ...module,
+      label: '商品管理',
+      menus: [
+        {
+          label: '商品公共基础数据',
+          value: 'admin.product-data-center.common-base-data.menu',
+          direct: false,
+          pages: commonMenus.flatMap((menu) => menu.pages.map((page) => ({ ...page, thirdMenuLabel: menu.label }))),
+        },
+        ...(craftMenu
+          ? [
+              {
+                ...craftMenu,
+                label: '成品现货基础数据',
+                pages: craftMenu.pages.map((page) => ({ ...page, thirdMenuLabel: '工艺管理' })),
+              },
+            ]
+          : []),
+        ...(slabMenu ? [{ ...slabMenu, label: '大板基础数据' }] : []),
+      ],
+    };
+  });
+
+const navigationModuleOrder = [
+  'admin.tenant',
+  'admin.product-data-center',
+  'admin.supplier-management',
+  'admin.tenant.store-category-management',
+  'admin.permission-management',
+];
+
+const orderModulesByNavigation = (modules: FunctionModule[]) => {
+  const orderByValue = new Map(navigationModuleOrder.map((value, index) => [value, index]));
+  return [...modules].sort(
+    (left, right) =>
+      (orderByValue.get(left.value) ?? Number.MAX_SAFE_INTEGER) -
+      (orderByValue.get(right.value) ?? Number.MAX_SAFE_INTEGER),
+  );
+};
+
+export const fullFunctionCatalog = applyConfirmedNavigationStructure(
+  orderModulesByNavigation(withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog])),
+);
+
+export const filterFunctionCatalogByAudience = (audience: FunctionAudience) =>
+  fullFunctionCatalog.filter((module) => !module.audiences || module.audiences.includes(audience));
+
+export const getRuntimeFunctionCatalog = (audience: FunctionAudience) =>
+  import.meta.env.PROD ? filterFunctionCatalogByAudience(audience) : fullFunctionCatalog;
 
 export const terminalFunctionTrees: Record<TerminalType, FunctionModule[]> = {
-  store: fullFunctionCatalog,
-  supplier: fullFunctionCatalog,
+  store: getRuntimeFunctionCatalog('store'),
+  supplier: getRuntimeFunctionCatalog('supplier'),
 };
 
 export const getFunctionModulePermissionValues = (module?: FunctionModule) =>
@@ -583,7 +688,35 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
 };
 
 export const normalizeTerminalPermissions = (_terminal: TerminalType, permissions: string[]) =>
-  normalizeFunctionCatalogPermissions(fullFunctionCatalog, permissions).filter((permission) => permission !== 'all');
+  normalizeFunctionCatalogPermissions(terminalFunctionTrees[_terminal], permissions).filter(
+    (permission) => permission !== 'all',
+  );
+
+export const filterFunctionCatalogByPermissions = (
+  modules: FunctionModule[],
+  permissions: string[],
+): FunctionModule[] => {
+  const allowed = new Set(normalizeFunctionCatalogPermissions(modules, permissions));
+  return modules
+    .map((module) => ({
+      ...module,
+      menus: module.menus
+        .map((menu) => ({
+          ...menu,
+          pages: menu.pages
+            .map((page) => ({
+              ...page,
+              actions: page.actions.filter((action) => allowed.has(action.value)),
+              tabs: page.tabs
+                .map((tab) => ({ ...tab, actions: tab.actions.filter((action) => allowed.has(action.value)) }))
+                .filter((tab) => tab.actions.length),
+            }))
+            .filter((page) => page.actions.length || page.tabs.length),
+        }))
+        .filter((menu) => menu.pages.length),
+    }))
+    .filter((module) => module.menus.length);
+};
 
 export const initialAllocationValues: Record<TerminalType, string[]> = {
   store: [],

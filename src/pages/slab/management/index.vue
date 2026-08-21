@@ -716,7 +716,7 @@ const colorFilterCascaderOptions = computed(() =>
   })),
 );
 const tenantOptions = computed(() =>
-  slabSuppliers.value.filter((item) => item.type === 'slab').map((item) => item.name),
+  slabSuppliers.value.filter((item) => item.supplyTypes.some((type) => type.code === 'slab')).map((item) => item.name),
 );
 const storeOptions = computed(() => Array.from(new Set(tableData.value.map((item) => item.store).filter(Boolean))));
 

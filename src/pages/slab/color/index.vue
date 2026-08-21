@@ -6,8 +6,8 @@
       <main class="page">
         <header class="page-header">
           <t-breadcrumb>
-            <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-            <t-breadcrumb-item>大板基础数据管理</t-breadcrumb-item>
+            <t-breadcrumb-item>商品管理</t-breadcrumb-item>
+            <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
             <t-breadcrumb-item>色系管理</t-breadcrumb-item>
           </t-breadcrumb>
           <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
@@ -194,6 +194,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -337,6 +338,7 @@ const openCreate = async () => {
   formVisible.value = true;
 };
 const openEdit = async (row: ColorItem) => {
+  if (!requireCreatorOwnership(row)) return;
   await loadCategories();
   editingId.value = row.id;
   Object.assign(formData, { name: row.name, categoryId: row.categoryId, remark: row.remark ?? '' });
@@ -371,6 +373,7 @@ const colorConfirmVisible = ref(false);
 const colorConfirmType = ref<ConfirmType>('disable');
 const colorConfirmRow = ref<ColorItem | null>(null);
 const openColorConfirm = (row: ColorItem, type: ConfirmType) => {
+  if (!requireCreatorOwnership(row)) return;
   colorConfirmRow.value = row;
   colorConfirmType.value = type;
   colorConfirmVisible.value = true;
@@ -405,6 +408,7 @@ const categoryRules: Record<string, FormRule[]> = {
   remark: [{ max: 100, message: '备注最多输入100个汉字', type: 'error' }],
 };
 const openCategoryForm = (row?: SlabColorCategoryRecord) => {
+  if (row && !requireCreatorOwnership(row)) return;
   editingCategoryId.value = row?.id ?? null;
   Object.assign(categoryForm, { name: row?.name ?? '', remark: row?.remark ?? '' });
   categoryFormVisible.value = true;
@@ -430,6 +434,7 @@ const submitCategory = async () => {
 const categoryDeleteVisible = ref(false);
 const categoryDeleteRow = ref<SlabColorCategoryRecord | null>(null);
 const openCategoryDelete = (row: SlabColorCategoryRecord) => {
+  if (!requireCreatorOwnership(row)) return;
   categoryDeleteRow.value = row;
   categoryDeleteVisible.value = true;
 };

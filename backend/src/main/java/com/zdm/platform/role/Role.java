@@ -1,8 +1,6 @@
 package com.zdm.platform.role;
 
 import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.FieldStrategy;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.NotBlank;
@@ -13,17 +11,14 @@ public class Role {
   @TableId(type = IdType.AUTO)
   private Long id;
 
+  private Long tenantId;
+  private Long storeId;
+
   @NotBlank
   private String name;
 
   @NotBlank
   private String code;
-
-  private String category;
-  private String clientCode;
-
-  @TableField(insertStrategy = FieldStrategy.ALWAYS, updateStrategy = FieldStrategy.ALWAYS)
-  private Long storeId;
 
   @NotBlank
   private String dataScope;
@@ -34,6 +29,7 @@ public class Role {
   private String remark;
   private String functionPermissions;
   private String createdByName;
+  private Long createdByAccountId;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
@@ -43,6 +39,22 @@ public class Role {
 
   public void setId(Long id) {
     this.id = id;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long tenantId) {
+    this.tenantId = tenantId;
+  }
+
+  public Long getStoreId() {
+    return storeId;
+  }
+
+  public void setStoreId(Long storeId) {
+    this.storeId = storeId;
   }
 
   public String getName() {
@@ -59,30 +71,6 @@ public class Role {
 
   public void setCode(String code) {
     this.code = code;
-  }
-
-  public String getCategory() {
-    return category;
-  }
-
-  public void setCategory(String category) {
-    this.category = category;
-  }
-
-  public String getClientCode() {
-    return clientCode;
-  }
-
-  public void setClientCode(String clientCode) {
-    this.clientCode = clientCode;
-  }
-
-  public Long getStoreId() {
-    return storeId;
-  }
-
-  public void setStoreId(Long storeId) {
-    this.storeId = storeId;
   }
 
   public String getDataScope() {
@@ -123,6 +111,14 @@ public class Role {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public LocalDateTime getCreatedAt() {

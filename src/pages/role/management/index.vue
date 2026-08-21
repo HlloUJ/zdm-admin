@@ -16,14 +16,6 @@
         </header>
 
         <section class="table-card">
-          <t-tabs
-            v-if="showRoleTabRail"
-            v-model="activeCategory"
-            class="role-tabs"
-            :list="roleTabs"
-            @change="handleTabChange"
-          />
-
           <div v-if="canCreateRole" class="table-toolbar">
             <t-button theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
@@ -47,7 +39,7 @@
               <div class="table-actions">
                 <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                 <t-link
-                  v-if="isOperationPlatformTab && canManageRolePermission && !isSuperAdminRole(row)"
+                  v-if="canManageRolePermission && !isSuperAdminRole(row)"
                   theme="primary"
                   hover="color"
                   @click="openPermissionDialog(row)"
@@ -66,7 +58,7 @@
                   v-if="
                     !canEditRole &&
                     !(canDeleteRole && !isSuperAdminRole(row)) &&
-                    !(isOperationPlatformTab && canManageRolePermission && !isSuperAdminRole(row))
+                    !(canManageRolePermission && !isSuperAdminRole(row))
                   "
                   class="table-action-placeholder"
                 >
@@ -281,15 +273,16 @@
 
 <script setup lang="ts">
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
-import { usePermissionTabs } from '@/composables/usePermissionTabs';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import {
   collectFunctionCatalogRows,
-  fullFunctionCatalog,
+  filterFunctionCatalogByAudience,
+  filterFunctionCatalogByPermissions,
   getFunctionCatalogPermissionValues,
   getFunctionModulePermissionValues,
   getRowViewPermissionValue,
@@ -298,21 +291,29 @@ import {
   type FunctionModule,
 } from '@/services/functionCatalog';
 import { getLoginUser } from '@/services/auth';
-import { hasAnyPermission, hasPermissionPrefix } from '@/services/adminPermissions';
+import { hasAnyPermission } from '@/services/adminPermissions';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
-import { createRole, deleteRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
+import {
+  createRole,
+  deleteRole,
+  getRolePermissionScope,
+  listRoles,
+  updateRole,
+  type RolePayload,
+  type RolePermissionScope,
+  type RoleRecord,
+} from '@/services/roles';
 
-type RoleCategory = 'partner-store' | 'supplier-store' | 'operation-platform';
 type DialogMode = 'create' | 'edit';
 
 interface RoleItem {
   id: number;
   code: string;
-  category: RoleCategory;
   dataScope: string;
   status: 'enabled' | 'disabled';
   name: string;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
   remark: string;
   functionPermissions: string[];
@@ -327,14 +328,9 @@ interface RolePermissionConfig {
   functionPermissions: string[];
 }
 
-const allRoleTabs: Array<{ label: string; value: RoleCategory }> = [
-  { label: '运营管理平台角色', value: 'operation-platform' },
-  { label: '城市合伙人门店角色', value: 'partner-store' },
-  { label: '大板供应商门店角色', value: 'supplier-store' },
-];
-
 const roles = ref<RoleItem[]>([]);
 const loading = ref(false);
+const parsePermissions = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: '14%', align: 'left' },
@@ -344,33 +340,19 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'operation', title: '操作', width: '22%', align: 'left' },
 ];
 
-const permissionModules = fullFunctionCatalog;
+const rolePermissionScope = ref<RolePermissionScope>({ audience: 'admin', functionPermissions: 'all' });
+const permissionModules = computed(() => {
+  const modules = filterFunctionCatalogByAudience(rolePermissionScope.value.audience);
+  const permissions = parsePermissions(rolePermissionScope.value.functionPermissions);
+  return permissions.includes('all') ? modules : filterFunctionCatalogByPermissions(modules, permissions);
+});
 
 const pageSizeOptions = [10, 20, 50];
-const activeCategory = ref<RoleCategory>('operation-platform');
 const loginUser = computed(() => getLoginUser());
-const rolePagePermissionPrefix = 'admin.permission-management.role-management';
-const hasLegacyRolePagePermission = computed(() =>
-  loginUser.value.permissions.some((permission) => {
-    if (!permission.startsWith(`${rolePagePermissionPrefix}.`)) return permission === rolePagePermissionPrefix;
-    return !permission.slice(rolePagePermissionPrefix.length + 1).includes('.');
-  }),
-);
-const { visibleTabs: roleTabs, showTabRail: showRoleTabRail } = usePermissionTabs({
-  tabs: allRoleTabs,
-  activeTab: activeCategory,
-  canAccess: (tab) =>
-    hasLegacyRolePagePermission.value ||
-    hasPermissionPrefix(loginUser.value, `${rolePagePermissionPrefix}.${tab.value}`),
-});
-const activePermissionModuleValue = ref(permissionModules[0]?.value ?? '');
+const activePermissionModuleValue = ref(permissionModules.value[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
   pageSize: 10,
-});
-
-watch(activeCategory, () => {
-  pagination.current = 1;
 });
 
 const formRef = ref<FormInstanceFunctions>();
@@ -393,28 +375,8 @@ const formRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入角色名称', type: 'error' }],
 };
 
-const currentRoles = computed(() => {
-  if (!roleTabs.value.some((tab) => tab.value === activeCategory.value)) return [];
-  return roles.value.filter((item) => item.category === activeCategory.value);
-});
-const isOperationPlatformTab = computed(() => activeCategory.value === 'operation-platform');
-const currentRolePermissionScope = computed(
-  () => `admin.permission-management.role-management.${activeCategory.value}`,
-);
 const getRoleActionPermissions = (action: 'create' | 'permission' | 'edit' | 'delete') => {
-  const legacyActionMap = {
-    create: '新建',
-    permission: '权限管理',
-    edit: '编辑',
-    delete: '删除',
-  };
-
-  return [
-    `admin.permission-management.role-management.${action}`,
-    `admin.permission-management.role-management.${legacyActionMap[action]}`,
-    `${currentRolePermissionScope.value}.${action}`,
-    `${currentRolePermissionScope.value}.${legacyActionMap[action]}`,
-  ];
+  return [`admin.permission-management.role-management.${action}`];
 };
 const canCreateRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('create')));
 const canManageRolePermission = computed(() =>
@@ -422,27 +384,22 @@ const canManageRolePermission = computed(() =>
 );
 const canEditRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('edit')));
 const canDeleteRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('delete')));
-const paginationTotal = computed(() => currentRoles.value.length);
+const paginationTotal = computed(() => roles.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / pagination.pageSize), 1));
 const pageData = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize;
-  return currentRoles.value.slice(start, start + pagination.pageSize);
+  return roles.value.slice(start, start + pagination.pageSize);
 });
 const deleteConfirmText = computed(
   () =>
     `是否删除角色“${deletingRole.value?.name ?? ''}”？删除后，使用该角色的用户将被清空角色并自动停用账号，无法继续登录。请及时为相关用户重新分配角色。`,
 );
 const activePermissionModule = computed(
-  () => permissionModules.find((module) => module.value === activePermissionModuleValue.value) ?? permissionModules[0],
+  () =>
+    permissionModules.value.find((module) => module.value === activePermissionModuleValue.value) ??
+    permissionModules.value[0],
 );
 const activePermissionRows = computed(() => collectFunctionCatalogRows(activePermissionModule.value));
-
-const normalizeCategory = (value?: string): RoleCategory =>
-  value === 'partner-store' || value === 'supplier-store' || value === 'operation-platform'
-    ? value
-    : 'operation-platform';
-
-const parsePermissions = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
@@ -456,32 +413,21 @@ const formatDateTime = (value?: string) => {
 const toRoleItem = (record: RoleRecord): RoleItem => ({
   id: record.id,
   code: record.code,
-  category: normalizeCategory(record.category),
   dataScope: record.dataScope,
   status: record.status,
   name: record.name,
   createdByName: record.createdByName || '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
   functionPermissions: parsePermissions(record.functionPermissions),
 });
 
-const categoryClientCode = (category: RoleCategory) => {
-  if (category === 'partner-store') return 'store';
-  if (category === 'supplier-store') return 'supplier';
-  return 'admin';
-};
-
-const categoryDataScope = (category: RoleCategory) => (category === 'operation-platform' ? 'all' : 'store');
-
-const createRoleCode = (category: RoleCategory, roleName: string) =>
-  `${category.replace(/-/g, '_')}_${roleName.trim().length}_${Date.now()}`.toUpperCase();
+const createRoleCode = (roleName: string) => `ROLE_${roleName.trim().length}_${Date.now()}`.toUpperCase();
 
 const toRolePayload = (role: RoleItem): RolePayload => ({
   name: role.name,
   code: role.code,
-  category: role.category,
-  clientCode: categoryClientCode(role.category),
   dataScope: role.dataScope,
   status: role.status,
   remark: role.remark,
@@ -493,10 +439,10 @@ const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 const loadRoles = async () => {
   loading.value = true;
   try {
-    const records = await listRoles();
-    roles.value = sortByCreatedAtDesc(
-      records.filter((record) => record.category !== 'terminal-policy' && record.status === 'enabled'),
-    ).map(toRoleItem);
+    const [records, scope] = await Promise.all([listRoles(), getRolePermissionScope()]);
+    rolePermissionScope.value = scope;
+    activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
+    roles.value = sortByCreatedAtDesc(records.filter((record) => record.status === 'enabled')).map(toRoleItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '角色列表加载失败');
@@ -507,7 +453,7 @@ const loadRoles = async () => {
 
 const getModuleActionValues = (module?: FunctionModule) => getFunctionModulePermissionValues(module);
 const getRowActionValues = (row: FunctionCatalogRow) => row.actions.map((action) => action.value);
-const allPermissionValues = getFunctionCatalogPermissionValues(permissionModules);
+const allPermissionValues = computed(() => getFunctionCatalogPermissionValues(permissionModules.value));
 const getSelectedCount = (values: string[]) =>
   values.filter((value) => permissionDraft.functionPermissions.includes(value)).length;
 const getCheckedValue = (checked: unknown) => {
@@ -572,13 +518,6 @@ const ensureCurrentPage = () => {
   }
 };
 
-const handleTabChange = () => {
-  pagination.current = 1;
-  closeFormDialog();
-  closeDeleteDialog();
-  closePermissionDialog();
-};
-
 const openCreateDialog = () => {
   dialogMode.value = 'create';
   editingId.value = null;
@@ -587,6 +526,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: RoleItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -609,10 +549,8 @@ const handleSubmit = async () => {
     if (dialogMode.value === 'create') {
       await createRole({
         name: roleName,
-        code: createRoleCode(activeCategory.value, roleName),
-        category: activeCategory.value,
-        clientCode: categoryClientCode(activeCategory.value),
-        dataScope: categoryDataScope(activeCategory.value),
+        code: createRoleCode(roleName),
+        dataScope: 'all',
         status: 'enabled',
         remark: roleRemark,
         functionPermissions: '',
@@ -620,7 +558,7 @@ const handleSubmit = async () => {
       await loadRoles();
       pagination.current = 1;
     } else if (editingId.value) {
-      const target = currentRoles.value.find((item) => item.id === editingId.value);
+      const target = roles.value.find((item) => item.id === editingId.value);
       if (target) {
         await updateRole(editingId.value, toRolePayload({ ...target, name: roleName, remark: roleRemark }));
         await loadRoles();
@@ -643,6 +581,7 @@ const openDeleteConfirm = (row: RoleItem) => {
     adminFeedback.warning('超级管理员角色不可删除');
     return;
   }
+  if (!requireCreatorOwnership(row)) return;
   deletingRole.value = row;
   deleteDialogVisible.value = true;
 };
@@ -672,11 +611,12 @@ const openPermissionDialog = (row: RoleItem) => {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
+  if (!requireCreatorOwnership(row)) return;
   permissionRole.value = row;
-  activePermissionModuleValue.value = permissionModules[0]?.value ?? '';
+  activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
   permissionDraft.functionPermissions = row.functionPermissions.includes('all')
-    ? [...allPermissionValues]
-    : normalizeFunctionCatalogPermissions(permissionModules, row.functionPermissions);
+    ? [...allPermissionValues.value]
+    : normalizeFunctionCatalogPermissions(permissionModules.value, row.functionPermissions);
   permissionDialogVisible.value = true;
 };
 
@@ -687,7 +627,7 @@ const closePermissionDialog = () => {
 };
 
 const selectAllPermissions = () => {
-  permissionDraft.functionPermissions = [...allPermissionValues];
+  permissionDraft.functionPermissions = [...allPermissionValues.value];
 };
 
 const clearAllPermissions = () => {
@@ -696,7 +636,7 @@ const clearAllPermissions = () => {
 
 const handlePermissionSave = async () => {
   if (!permissionRole.value) return;
-  if (!permissionModules.length) {
+  if (!permissionModules.value.length) {
     adminFeedback.warning('全量功能目录暂未发布，无法保存功能权限');
     return;
   }

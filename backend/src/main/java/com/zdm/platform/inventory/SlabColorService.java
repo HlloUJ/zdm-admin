@@ -4,12 +4,11 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -19,10 +18,15 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private final SlabColorCategoryMapper categoryMapper;
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public SlabColorService(SlabColorCategoryMapper categoryMapper, CurrentIdentityProvider identityProvider) {
+  public SlabColorService(
+      SlabColorCategoryMapper categoryMapper,
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.categoryMapper = categoryMapper;
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   public List<SlabColor> listColors() {
@@ -46,6 +50,7 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     requireCategory(color.getCategoryId());
     normalizeAndValidateColorName(color, null);
     color.setCreatedByName(resolveCreatedByName());
+    color.setCreatedByAccountId(ownershipGuard.currentAccountId());
     save(color);
     return enrich(color);
   }
@@ -58,6 +63,7 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateColorName(payload, id);
     updateById(payload);
     return enrich(requireColor(id));
@@ -89,6 +95,7 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     category.setId(null);
     normalizeAndValidateCategoryName(category, null);
     category.setCreatedByName(resolveCreatedByName());
+    category.setCreatedByAccountId(ownershipGuard.currentAccountId());
     categoryMapper.insert(category);
     return category;
   }
@@ -96,8 +103,10 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
   @Transactional
   public SlabColorCategory updateCategory(Long id, SlabColorCategory payload) {
     SlabColorCategory existing = requireCategory(id);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     payload.setId(id);
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateCategoryName(payload, id);
     categoryMapper.updateById(payload);
     return requireCategory(id);
@@ -105,7 +114,8 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
 
   @Transactional
   public boolean deleteCategory(Long id) {
-    requireCategory(id);
+    SlabColorCategory existing = requireCategory(id);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     if (lambdaQuery().eq(SlabColor::getCategoryId, id).count() > 0) {
       throw new IllegalArgumentException("该色系分类已被色系引用，无法删除");
     }
@@ -164,10 +174,6 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
   }
 
   private void requireAccessibleColor(SlabColor color) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin() && !"all".equals(identity.dataPermission())
-        && !Objects.equals(color.getCreatedByName(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该色系");
-    }
+    ownershipGuard.requireCreator(color.getCreatedByAccountId(), color.getCreatedByName());
   }
 }

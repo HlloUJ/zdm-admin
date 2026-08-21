@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -16,10 +16,15 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private final SlabTextureAliasMapper aliasMapper;
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public SlabTextureService(SlabTextureAliasMapper aliasMapper, CurrentIdentityProvider identityProvider) {
+  public SlabTextureService(
+      SlabTextureAliasMapper aliasMapper,
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.aliasMapper = aliasMapper;
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -27,6 +32,7 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
     texture.setId(null);
     normalizeAndValidateTextureName(texture, null);
     texture.setCreatedByName(resolveCreatedByName());
+    texture.setCreatedByAccountId(ownershipGuard.currentAccountId());
     save(texture);
     return texture;
   }
@@ -38,6 +44,7 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateTextureName(payload, id);
     updateById(payload);
     return getById(id);
@@ -147,10 +154,6 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
   }
 
   private void requireAccessibleTexture(SlabTexture texture) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin() && !"all".equals(identity.dataPermission())
-        && !Objects.equals(texture.getCreatedByName(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该纹理");
-    }
+    ownershipGuard.requireCreator(texture.getCreatedByAccountId(), texture.getCreatedByName());
   }
 }

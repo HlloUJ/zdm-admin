@@ -3,8 +3,7 @@ package com.zdm.platform.inventory;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import java.util.Objects;
-import org.springframework.security.access.AccessDeniedException;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -14,9 +13,13 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
 
   private final CurrentIdentityProvider identityProvider;
+  private final CreatorOwnershipGuard ownershipGuard;
 
-  public SlabGradeService(CurrentIdentityProvider identityProvider) {
+  public SlabGradeService(
+      CurrentIdentityProvider identityProvider,
+      CreatorOwnershipGuard ownershipGuard) {
     this.identityProvider = identityProvider;
+    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -24,6 +27,7 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
     grade.setId(null);
     normalizeAndValidate(grade, null);
     grade.setCreatedByName(resolveCreatedByName());
+    grade.setCreatedByAccountId(ownershipGuard.currentAccountId());
     save(grade);
     return grade;
   }
@@ -38,6 +42,7 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidate(payload, id);
     updateById(payload);
     return getById(id);
@@ -73,12 +78,7 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
   }
 
   private void requireAccessible(SlabGrade grade) {
-    CurrentIdentity identity = identityProvider.require();
-    if (!identity.isSuperAdmin()
-        && !"all".equals(identity.dataPermission())
-        && !Objects.equals(grade.getCreatedByName(), identity.displayName())) {
-      throw new AccessDeniedException("当前数据权限不允许操作该等级");
-    }
+    ownershipGuard.requireCreator(grade.getCreatedByAccountId(), grade.getCreatedByName());
   }
 
   private void normalizeAndValidate(SlabGrade grade, Long excludedId) {

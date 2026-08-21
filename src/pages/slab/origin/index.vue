@@ -9,8 +9,8 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-              <t-breadcrumb-item>大板基础数据管理</t-breadcrumb-item>
+              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
+              <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
               <t-breadcrumb-item>产地管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
@@ -137,6 +137,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -159,6 +160,7 @@ interface OriginItem {
   name: string;
   status: OriginStatus;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
   remark?: string;
 }
@@ -232,6 +234,7 @@ const toOriginItem = (record: SlabOriginRecord): OriginItem => ({
   name: record.name,
   status: normalizeStatus(record.status),
   createdByName: record.createdByName ?? '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
@@ -274,6 +277,7 @@ const openCreateDialog = () => {
   formDialogVisible.value = true;
 };
 const openEditDialog = (row: OriginItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   Object.assign(formData, { name: row.name, remark: row.remark ?? '' });
@@ -302,6 +306,7 @@ const handleSubmit = async () => {
   }
 };
 const openStatusConfirm = (row: OriginItem) => {
+  if (!requireCreatorOwnership(row)) return;
   const enabled = row.status === 'normal';
   confirmState.type = enabled ? 'disable' : 'enable';
   confirmState.row = row;
@@ -309,6 +314,7 @@ const openStatusConfirm = (row: OriginItem) => {
   confirmDialogVisible.value = true;
 };
 const openDeleteConfirm = (row: OriginItem) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除产地“${row.name}”？`;

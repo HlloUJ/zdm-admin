@@ -20,6 +20,7 @@ public class Craft extends BaseEntity {
   private String imageUrl;
   private String pricingMethod;
   private String createdByName;
+  private Long createdByAccountId;
 
   @Size(max = 100, message = "备注最多输入100个字符")
   private String remark;
@@ -78,6 +79,14 @@ public class Craft extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public String getRemark() {

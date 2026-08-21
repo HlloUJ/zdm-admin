@@ -35,6 +35,30 @@ class FunctionPermissionNormalizerTest {
   }
 
   @Test
+  void expandsLegacyTenantPagePermissionsAcrossLifecycleTabs() {
+    assertThat(FunctionPermissionNormalizer.normalize(List.of(
+        "admin.tenant.tenant-management.view",
+        "admin.tenant.tenant-management.create",
+        "admin.tenant.tenant-management.toggle-status",
+        "admin.tenant.tenant-management.delete")))
+        .containsExactly(
+            "admin.tenant.tenant-management.unarchived.view",
+            "admin.tenant.tenant-management.archived.view",
+            "admin.tenant.tenant-management.unarchived.create",
+            "admin.tenant.tenant-management.unarchived.archive",
+            "admin.tenant.tenant-management.archived.restore",
+            "admin.tenant.tenant-management.archived.delete");
+  }
+
+  @Test
+  void dropsRemovedLegacyStoreToggleStatusPermission() {
+    assertThat(FunctionPermissionNormalizer.normalize(List.of(
+        "admin.tenant.tenant-store-management.toggle-status",
+        "admin.tenant.tenant-store-management.operating.toggle-status")))
+        .isEmpty();
+  }
+
+  @Test
   void expandsLegacyAttributePagePermissionsAcrossAllTabs() {
     assertThat(FunctionPermissionNormalizer.normalize(List.of(
         "admin.product-data-center.attribute.view",
