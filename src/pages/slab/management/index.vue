@@ -28,32 +28,46 @@
                     <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/编码" />
                   </t-form-item>
                   <t-form-item label="品种">
-                    <t-select v-model="currentFilter.variety" clearable placeholder="请选择">
+                    <t-select v-model="currentFilter.variety" clearable filterable placeholder="请选择">
                       <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
                     </t-select>
                   </t-form-item>
                   <t-form-item label="产地">
-                    <t-select v-model="currentFilter.origin" clearable placeholder="请选择">
+                    <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择">
                       <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
                     </t-select>
                   </t-form-item>
                   <t-form-item label="纹理">
-                    <t-select v-model="currentFilter.texture" clearable placeholder="请选择">
-                      <t-option v-for="item in textureOptions" :key="item" :label="item" :value="item" />
+                    <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择">
+                      <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
                     </t-select>
                   </t-form-item>
                   <t-form-item label="色系">
-                    <t-select v-model="currentFilter.color" clearable placeholder="请选择">
-                      <t-option v-for="item in colorOptions" :key="item" :label="item" :value="item" />
-                    </t-select>
+                    <t-cascader
+                      v-model="currentFilter.color"
+                      :options="colorFilterCascaderOptions"
+                      :show-all-levels="false"
+                      :check-strictly="false"
+                      clearable
+                      filterable
+                      placeholder="请选择"
+                      trigger="hover"
+                      value-mode="onlyLeaf"
+                      value-type="single"
+                    />
                   </t-form-item>
                   <t-form-item label="等级">
-                    <t-select v-model="currentFilter.grade" clearable placeholder="请选择">
-                      <t-option v-for="item in gradeOptions" :key="item" :label="item" :value="item" />
+                    <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择">
+                      <t-option
+                        v-for="item in gradeFilterOptions"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                      />
                     </t-select>
                   </t-form-item>
                   <t-form-item label="租户" class="tenant-filter">
-                    <t-select v-model="currentFilter.tenant" clearable placeholder="请选择">
+                    <t-select v-model="currentFilter.tenant" clearable filterable placeholder="请选择">
                       <t-option v-for="item in tenantOptions" :key="item" :label="item" :value="item" />
                     </t-select>
                   </t-form-item>
@@ -61,7 +75,7 @@
 
                 <div class="filter-secondary-row">
                   <t-form-item label="门店" class="store-filter">
-                    <t-select v-model="currentFilter.store" clearable placeholder="请选择">
+                    <t-select v-model="currentFilter.store" clearable filterable placeholder="请选择">
                       <t-option v-for="item in storeOptions" :key="item" :label="item" :value="item" />
                     </t-select>
                   </t-form-item>
@@ -240,19 +254,50 @@
                   <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
                 </t-select>
               </t-form-item>
-              <t-form-item label="纹理" name="texture">
-                <t-select v-model="productForm.texture" :disabled="productMode === 'view'" placeholder="请选择">
-                  <t-option v-for="item in textureOptions" :key="item" :label="item" :value="item" />
+              <t-form-item label="纹理" name="textureId">
+                <t-select
+                  v-model="productForm.textureId"
+                  :disabled="productMode === 'view'"
+                  filterable
+                  placeholder="请选择"
+                >
+                  <t-option
+                    v-for="item in publishOptions.textures"
+                    :key="item.id"
+                    :label="item.label"
+                    :value="item.id"
+                    :disabled="item.status === 'disabled'"
+                  />
                 </t-select>
               </t-form-item>
-              <t-form-item label="色系" name="color">
-                <t-select v-model="productForm.color" :disabled="productMode === 'view'" placeholder="请选择">
-                  <t-option v-for="item in colorOptions" :key="item" :label="item" :value="item" />
-                </t-select>
+              <t-form-item label="色系" name="colorId">
+                <t-cascader
+                  v-model="productForm.colorId"
+                  :disabled="productMode === 'view'"
+                  :options="colorCascaderOptions"
+                  :show-all-levels="false"
+                  :check-strictly="false"
+                  filterable
+                  placeholder="请选择"
+                  trigger="hover"
+                  value-mode="onlyLeaf"
+                  value-type="single"
+                />
               </t-form-item>
-              <t-form-item label="等级" name="grade">
-                <t-select v-model="productForm.grade" :disabled="productMode === 'view'" placeholder="请选择">
-                  <t-option v-for="item in gradeOptions" :key="item" :label="item" :value="item" />
+              <t-form-item label="等级" name="gradeId">
+                <t-select
+                  v-model="productForm.gradeId"
+                  :disabled="productMode === 'view'"
+                  filterable
+                  placeholder="请选择"
+                >
+                  <t-option
+                    v-for="item in publishOptions.grades"
+                    :key="item.id"
+                    :label="formatGradeOption(item)"
+                    :value="item.id"
+                    :disabled="item.status === 'disabled'"
+                  />
                 </t-select>
               </t-form-item>
             </div>
@@ -282,12 +327,22 @@
         <t-tab-panel value="sales" label="销售信息">
           <t-form :data="productForm" label-width="96px" colon>
             <div class="dialog-form-grid">
-              <t-form-item label="供应商" name="supplier">
-                <t-select v-model="productForm.supplier" :disabled="productMode === 'view'" placeholder="请选择">
-                  <t-option v-for="item in tenantOptions" :key="item" :label="item" :value="item" />
+              <t-form-item label="供应商" name="supplier" required-mark>
+                <t-select
+                  v-model="productForm.supplier"
+                  :disabled="productMode === 'view'"
+                  filterable
+                  placeholder="请选择"
+                >
+                  <t-option
+                    v-for="item in publishSupplierOptions"
+                    :key="item.id"
+                    :label="item.name"
+                    :value="item.name"
+                  />
                 </t-select>
               </t-form-item>
-              <t-form-item label="成本价">
+              <t-form-item label="成本价" required-mark>
                 <t-input
                   v-model="productForm.cost"
                   :disabled="productMode === 'view'"
@@ -295,18 +350,18 @@
                   @change="recalculateProductPrices"
                 />
               </t-form-item>
-              <t-form-item label="库存">
+              <t-form-item label="库存" required-mark>
                 <t-input v-model="productForm.stock" :disabled="productMode === 'view'" placeholder="请输入" />
               </t-form-item>
-              <t-form-item label="SKU">
+              <t-form-item label="SKU" required-mark>
                 <t-input v-model="productForm.sku" :disabled="productMode === 'view'" placeholder="请输入" />
               </t-form-item>
             </div>
             <div class="price-editor">
               <div class="price-editor__head">
                 <span>阶梯价格</span>
-                <span>系数</span>
-                <span>价格</span>
+                <span><span class="price-required-star">*</span>系数</span>
+                <span><span class="price-required-star">*</span>价格</span>
               </div>
               <div v-for="item in salesPriceRows" :key="item.key" class="price-editor__row">
                 <span>{{ item.label }}</span>
@@ -425,9 +480,11 @@ import { listSlabVarieties, type SlabVarietyRecord } from '@/services/slabVariet
 import {
   createSlab,
   deleteSlab,
+  getSlabPublishOptions,
   listSlabs,
   updateSlab,
   type SlabPayload,
+  type SlabPublishOptions,
   type SlabRecord,
   type SlabStatus,
 } from '@/services/slabs';
@@ -449,6 +506,8 @@ type ConfirmType =
   | 'batchPurge'
   | 'clearRecycle';
 type SalesPriceKey = 'guide' | 'level1' | 'level2' | 'level3';
+type ProductPriceKey = `${SalesPriceKey}Price`;
+type ProductRatioKey = `${SalesPriceKey}Ratio`;
 type UploadItemKey = 'main' | 'scan' | 'design' | 'video';
 
 interface FilterState {
@@ -474,6 +533,9 @@ interface SlabItem {
   id: number;
   supplierId?: number;
   varietyId?: number;
+  textureId?: number;
+  colorId?: number;
+  gradeId?: number;
   code: string;
   image: string;
   name: string;
@@ -498,9 +560,9 @@ interface SlabItem {
 interface ProductForm {
   variety: string;
   origin: string;
-  texture: string;
-  color: string;
-  grade: string;
+  textureId?: number;
+  colorId?: number;
+  gradeId?: number;
   length: string;
   width: string;
   height: string;
@@ -535,8 +597,6 @@ const tabs: { value: SlabStatus; label: string }[] = [
   { value: 'recycle', label: '回收站' },
 ];
 
-const textureOptions = ['细纹', '直纹', '乱纹', '山水纹', '晶体纹'];
-const gradeOptions = ['A+', 'A', 'B', 'C'];
 const pageSizeOptions = [10, 20, 50];
 const rejectReasons = ['图片不清晰', '资料不完整', '规格填写异常', '价格信息缺失'];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
@@ -580,9 +640,9 @@ const makeFilterState = (): FilterState => ({
 const makeProductForm = (): ProductForm => ({
   variety: '',
   origin: '',
-  texture: '',
-  color: '',
-  grade: '',
+  textureId: undefined,
+  colorId: undefined,
+  gradeId: undefined,
   length: '',
   width: '',
   height: '',
@@ -630,14 +690,48 @@ const uploadPreviewUrl = ref('');
 const slabOrigins = ref<SlabOriginRecord[]>([]);
 const slabVarieties = ref<SlabVarietyRecord[]>([]);
 const slabSuppliers = ref<SupplierRecord[]>([]);
+const publishOptions = reactive<SlabPublishOptions>({ textures: [], colorCategories: [], grades: [] });
 
 const varietyOptions = computed(() => slabVarieties.value.map((item) => item.name));
 const originOptions = computed(() => slabOrigins.value.map((item) => item.name));
-const colorOptions = computed(() =>
-  Array.from(new Set(slabVarieties.value.map((item) => item.color).filter((item): item is string => Boolean(item)))),
+const textureFilterOptions = computed(() => publishOptions.textures.map((item) => item.label));
+const colorOptions = computed(() => publishOptions.colorCategories.flatMap((item) => item.children));
+const formatGradeOption = (grade: SlabPublishOptions['grades'][number]) =>
+  grade.description ? `${grade.label}（${grade.description}）` : grade.label;
+const gradeFilterOptions = computed(() =>
+  publishOptions.grades.map((item) => ({ value: formatGradeOption(item), label: formatGradeOption(item) })),
 );
-const tenantOptions = computed(() =>
-  slabSuppliers.value.filter((item) => item.supplyTypes.some((type) => type.code === 'slab')).map((item) => item.name),
+const colorCascaderOptions = computed(() =>
+  publishOptions.colorCategories.map((category) => ({
+    value: `category-${category.id}`,
+    label: category.label,
+    disabled: category.status === 'disabled',
+    children: category.children.map((color) => ({
+      value: color.id,
+      label: color.label,
+      disabled: color.status === 'disabled',
+    })),
+  })),
+);
+const colorFilterCascaderOptions = computed(() =>
+  publishOptions.colorCategories.map((category) => ({
+    value: `filter-category-${category.id}`,
+    label: category.label,
+    disabled: category.status === 'disabled',
+    children: category.children.map((color) => ({
+      value: color.label,
+      label: color.label,
+      disabled: color.status === 'disabled',
+    })),
+  })),
+);
+const suppliesSlabs = (supplier: SupplierRecord) =>
+  supplier.supplyTypes.some(
+    (type) => type.status !== 'disabled' && (type.code === 'slab' || type.name.trim() === '大板'),
+  );
+const tenantOptions = computed(() => slabSuppliers.value.filter(suppliesSlabs).map((item) => item.name));
+const publishSupplierOptions = computed(() =>
+  slabSuppliers.value.filter((item) => item.status !== 'disabled' && suppliesSlabs(item)),
 );
 const storeOptions = computed(() => Array.from(new Set(tableData.value.map((item) => item.store).filter(Boolean))));
 
@@ -677,8 +771,14 @@ const normalizePublisherType = (publisherType?: string): PublisherType =>
 const originById = (id?: number) => slabOrigins.value.find((item) => item.id === id);
 const varietyById = (id?: number) => slabVarieties.value.find((item) => item.id === id);
 const supplierById = (id?: number) => slabSuppliers.value.find((item) => item.id === id);
+const publishOptionLabel = (options: SlabPublishOptions[keyof SlabPublishOptions], id?: number) =>
+  options.find((item) => item.id === id)?.label || '-';
+const gradeLabelById = (id?: number) => {
+  const grade = publishOptions.grades.find((item) => item.id === id);
+  return grade ? formatGradeOption(grade) : '-';
+};
 const varietyIdByName = (name: string) => slabVarieties.value.find((item) => item.name === name)?.id;
-const supplierIdByName = (name: string) => slabSuppliers.value.find((item) => item.name === name)?.id;
+const supplierIdByName = (name: string) => publishSupplierOptions.value.find((item) => item.name === name)?.id;
 
 const formatSize = (record: SlabRecord) => {
   const dimensions = [record.lengthMm, record.widthMm, record.thicknessMm];
@@ -692,14 +792,17 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     id: record.id,
     supplierId: record.supplierId,
     varietyId: record.varietyId,
+    textureId: record.textureId,
+    colorId: record.colorId,
+    gradeId: record.gradeId,
     code: record.serialNo,
     image: createStoneImage(record.id),
     name: record.name,
     size: formatSize(record),
     origin: originById(variety?.originId)?.name || '-',
-    texture: '-',
-    color: variety?.color || '-',
-    grade: '-',
+    texture: publishOptionLabel(publishOptions.textures, record.textureId),
+    color: publishOptionLabel(colorOptions.value, record.colorId),
+    grade: gradeLabelById(record.gradeId),
     tenant: supplier?.name || (record.supplierId ? `供应商 #${record.supplierId}` : '平台自营'),
     store: record.warehouse || '-',
     publisherType: normalizePublisherType(record.publisherType),
@@ -725,6 +828,9 @@ const toSlabPayload = (item: SlabItem, patch: Partial<SlabItem> = {}): SlabPaylo
   return {
     supplierId: next.supplierId,
     varietyId: next.varietyId,
+    textureId: next.textureId,
+    colorId: next.colorId,
+    gradeId: next.gradeId,
     name: next.name,
     serialNo: next.code,
     warehouse: next.store === '-' ? undefined : next.store,
@@ -750,15 +856,17 @@ const upsertSlabItem = (record: SlabRecord) => {
 const loadSlabs = async () => {
   loading.value = true;
   try {
-    const [records, originsResult, varietiesResult, suppliersResult] = await Promise.all([
+    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult] = await Promise.all([
       listSlabs(),
       listSlabOrigins().catch(() => []),
       listSlabVarieties().catch(() => []),
       listSuppliers().catch(() => []),
+      getSlabPublishOptions(),
     ]);
     slabOrigins.value = originsResult;
     slabVarieties.value = varietiesResult;
     slabSuppliers.value = suppliersResult;
+    Object.assign(publishOptions, publishOptionsResult);
     tableData.value = records.map(toSlabItem);
   } catch (error) {
     tableData.value = [];
@@ -844,9 +952,9 @@ const salesPriceRows: { key: SalesPriceKey; label: string }[] = [
 const productRules: Record<string, FormRule[]> = {
   variety: [{ required: true, message: '请选择品种', type: 'error' }],
   origin: [{ required: true, message: '请选择产地', type: 'error' }],
-  texture: [{ required: true, message: '请选择纹理', type: 'error' }],
-  color: [{ required: true, message: '请选择色系', type: 'error' }],
-  grade: [{ required: true, message: '请选择等级', type: 'error' }],
+  textureId: [{ required: true, message: '请选择纹理', type: 'error' }],
+  colorId: [{ required: true, message: '请选择色系', type: 'error' }],
+  gradeId: [{ required: true, message: '请选择等级', type: 'error' }],
   length: [{ required: true, message: '请输入长度', type: 'error' }],
   width: [{ required: true, message: '请输入宽度', type: 'error' }],
   height: [{ required: true, message: '请输入高度', type: 'error' }],
@@ -861,7 +969,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'origin', title: '产地', width: 110 },
     { colKey: 'texture', title: '纹理', width: 110 },
     { colKey: 'color', title: '色系', width: 110 },
-    { colKey: 'grade', title: '等级', width: 88, align: 'center' },
+    { colKey: 'grade', title: '等级', width: 160, align: 'center' },
     { colKey: 'tenant', title: '租户/门店', width: 180 },
     { colKey: 'price', title: '价格', width: 150 },
   ];
@@ -1076,8 +1184,8 @@ const normalizeDecimal = (value: string) => {
   return decimal === undefined ? integer : `${integer}.${decimal}`;
 };
 
-const priceKey = (key: SalesPriceKey) => `${key}Price` as keyof ProductForm;
-const ratioKey = (key: SalesPriceKey) => `${key}Ratio` as keyof ProductForm;
+const priceKey = (key: SalesPriceKey) => `${key}Price` as ProductPriceKey;
+const ratioKey = (key: SalesPriceKey) => `${key}Ratio` as ProductRatioKey;
 
 const calculateProductPrice = (key: SalesPriceKey) => {
   const cost = toNumber(productForm.cost);
@@ -1147,9 +1255,9 @@ const fillProductForm = (row: SlabItem) => {
   Object.assign(productForm, {
     variety: row.variety,
     origin: row.origin,
-    texture: row.texture,
-    color: row.color,
-    grade: row.grade,
+    textureId: row.textureId,
+    colorId: row.colorId,
+    gradeId: row.gradeId,
     length: row.lengthMm == null ? '' : String(row.lengthMm),
     width: row.widthMm == null ? '' : String(row.widthMm),
     height: row.thicknessMm == null ? '' : String(row.thicknessMm),
@@ -1198,9 +1306,29 @@ const handleProductSubmit = async () => {
     closeProductDialog();
     return;
   }
-  if (!productForm.variety || !productForm.origin || !productForm.texture || !productForm.color || !productForm.grade) {
+  if (
+    !productForm.variety ||
+    !productForm.origin ||
+    productForm.textureId == null ||
+    productForm.colorId == null ||
+    productForm.gradeId == null
+  ) {
     productTab.value = 'base';
     adminFeedback.warning('请完善基础信息');
+    return;
+  }
+  const hasIncompleteSalesPrice = salesPriceRows.some(
+    (item) => !productForm[ratioKey(item.key)].trim() || !productForm[priceKey(item.key)].trim(),
+  );
+  if (
+    !productForm.supplier.trim() ||
+    !productForm.cost.trim() ||
+    !productForm.stock.trim() ||
+    !productForm.sku.trim() ||
+    hasIncompleteSalesPrice
+  ) {
+    productTab.value = 'sales';
+    adminFeedback.warning('请完善销售信息');
     return;
   }
   const targetName = `${productForm.variety}大板`;
@@ -1210,8 +1338,11 @@ const handleProductSubmit = async () => {
   const widthMm = toNumber(productForm.width);
   const thicknessMm = toNumber(productForm.height);
   const payload: SlabPayload = {
-    supplierId: supplierIdByName(productForm.supplier),
+    supplierId: supplierIdByName(productForm.supplier) ?? editingItem?.supplierId,
     varietyId: varietyIdByName(productForm.variety),
+    textureId: productForm.textureId,
+    colorId: productForm.colorId,
+    gradeId: productForm.gradeId,
     name: targetName,
     serialNo: productForm.sku.trim() || editingItem?.code || `SLAB-${Date.now()}`,
     warehouse: editingItem?.store && editingItem.store !== '-' ? editingItem.store : '平台仓',
@@ -1785,6 +1916,11 @@ const saveBatchPrice = () => {
   position: absolute;
   top: 12px;
   left: 12px;
+  color: var(--td-error-color);
+}
+
+.price-required-star {
+  margin-right: 2px;
   color: var(--td-error-color);
 }
 

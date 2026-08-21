@@ -9,6 +9,9 @@ import java.math.BigDecimal;
 public class SlabInventory extends BaseEntity {
   private Long supplierId;
   private Long varietyId;
+  private Long textureId;
+  private Long colorId;
+  private Long gradeId;
 
   @NotBlank
   private String name;
@@ -39,6 +42,30 @@ public class SlabInventory extends BaseEntity {
 
   public void setVarietyId(Long varietyId) {
     this.varietyId = varietyId;
+  }
+
+  public Long getTextureId() {
+    return textureId;
+  }
+
+  public void setTextureId(Long textureId) {
+    this.textureId = textureId;
+  }
+
+  public Long getColorId() {
+    return colorId;
+  }
+
+  public void setColorId(Long colorId) {
+    this.colorId = colorId;
+  }
+
+  public Long getGradeId() {
+    return gradeId;
+  }
+
+  public void setGradeId(Long gradeId) {
+    this.gradeId = gradeId;
   }
 
   public String getName() {
