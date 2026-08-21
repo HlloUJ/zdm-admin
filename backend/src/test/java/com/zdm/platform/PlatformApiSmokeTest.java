@@ -4385,6 +4385,18 @@ class PlatformApiSmokeTest {
         "SELECT id FROM slab_grades WHERE code = ?", Long.class, gradeCode);
     Long textureId = jdbcTemplate.queryForObject(
         "SELECT id FROM slab_textures WHERE name = '细纹'", Long.class);
+    Long guideConfigurationId = jdbcTemplate.queryForObject(
+        "SELECT id FROM markup_configurations WHERE product_type = 'slab' AND name = '指导价'",
+        Long.class);
+    Long level1ConfigurationId = jdbcTemplate.queryForObject(
+        "SELECT id FROM markup_configurations WHERE product_type = 'slab' AND name = '1级合伙人价格'",
+        Long.class);
+    Long level2ConfigurationId = jdbcTemplate.queryForObject(
+        "SELECT id FROM markup_configurations WHERE product_type = 'slab' AND name = '2级合伙人价格'",
+        Long.class);
+    Long level3ConfigurationId = jdbcTemplate.queryForObject(
+        "SELECT id FROM markup_configurations WHERE product_type = 'slab' AND name = '3级合伙人价格'",
+        Long.class);
 
     Long slabId = null;
     try {
@@ -4407,9 +4419,25 @@ class PlatformApiSmokeTest {
                     "textureId":%d,
                     "colorId":%d,
                     "gradeId":%d,
+                    "costPrice":100,
+                    "guidePrice":160,
+                    "markupPrices":[
+                      {"markupConfigurationId":%d,"markupRateSnapshot":60,"costPriceSnapshot":100,"salePrice":160},
+                      {"markupConfigurationId":%d,"markupRateSnapshot":45,"costPriceSnapshot":100,"salePrice":145},
+                      {"markupConfigurationId":%d,"markupRateSnapshot":30,"costPriceSnapshot":100,"salePrice":130},
+                      {"markupConfigurationId":%d,"markupRateSnapshot":18,"costPriceSnapshot":100,"salePrice":118}
+                    ],
                     "status":"warehouse"
                   }
-                  """.formatted(serialNo, textureId, colorId, gradeId)))
+                  """.formatted(
+                      serialNo,
+                      textureId,
+                      colorId,
+                      gradeId,
+                      guideConfigurationId,
+                      level1ConfigurationId,
+                      level2ConfigurationId,
+                      level3ConfigurationId)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.textureId").value(textureId))
           .andExpect(jsonPath("$.data.colorId").value(colorId))
@@ -4429,6 +4457,41 @@ class PlatformApiSmokeTest {
           colorId,
           gradeId);
       assertThat(persistedCount).isEqualTo(1);
+      Integer persistedPriceCount = jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM product_markup_price_snapshots WHERE product_type = 'slab' AND product_id = ?",
+          Integer.class,
+          slabId);
+      assertThat(persistedPriceCount).isEqualTo(4);
+
+      String renamedPrice = "指导供货价-" + suffix;
+      mockMvc.perform(put("/api/admin/markup-configurations/{id}", guideConfigurationId)
+              .param("productType", "slab")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
+                  {
+                    "productType":"slab",
+                    "name":"%s",
+                    "markupRate":61
+                  }
+                  """.formatted(renamedPrice)))
+          .andExpect(status().isOk());
+
+      mockMvc.perform(get("/api/admin/slabs")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath(
+              "$.data[?(@.id == " + slabId + ")].markupPrices[0].currentName",
+              hasItem(renamedPrice)));
+      assertThat(jdbcTemplate.queryForObject(
+          """
+          SELECT CONCAT(markup_rate_snapshot, ':', sale_price)
+          FROM product_markup_price_snapshots
+          WHERE product_type = 'slab' AND product_id = ? AND markup_configuration_id = ? AND is_current = 1
+          """,
+          String.class,
+          slabId,
+          guideConfigurationId)).isEqualTo("60.0000:160.00");
 
       mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -4446,7 +4509,13 @@ class PlatformApiSmokeTest {
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.message").value("纹理不存在"));
     } finally {
+      jdbcTemplate.update(
+          "UPDATE markup_configurations SET name = '指导价', markup_rate = 60.0000 WHERE id = ?",
+          guideConfigurationId);
       if (slabId != null) {
+        jdbcTemplate.update(
+            "DELETE FROM product_markup_price_snapshots WHERE product_type = 'slab' AND product_id = ?",
+            slabId);
         jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
       }
       jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", gradeId);

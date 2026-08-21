@@ -363,17 +363,17 @@
                 <span><span class="price-required-star">*</span>系数</span>
                 <span><span class="price-required-star">*</span>价格</span>
               </div>
-              <div v-for="item in salesPriceRows" :key="item.key" class="price-editor__row">
+              <div v-for="item in salesPriceRows" :key="item.id" class="price-editor__row">
                 <span>{{ item.label }}</span>
                 <t-input
-                  v-model="productForm[`${item.key}Ratio`]"
+                  v-model="productForm.markupPrices[item.id].ratio"
                   :disabled="productMode === 'view'"
-                  @change="calculateProductPrice(item.key)"
+                  @change="calculateProductPrice(item.id)"
                 />
                 <t-input
-                  v-model="productForm[`${item.key}Price`]"
+                  v-model="productForm.markupPrices[item.id].price"
                   :disabled="productMode === 'view'"
-                  @change="calculateProductRatio(item.key)"
+                  @change="calculateProductRatio(item.id)"
                 />
               </div>
             </div>
@@ -475,6 +475,7 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { listMarkupConfigurationOptions, type MarkupConfigurationRecord } from '@/services/markupConfigurations';
 import { listSlabOrigins, type SlabOriginRecord } from '@/services/slabOrigins';
 import { listSlabVarieties, type SlabVarietyRecord } from '@/services/slabVarieties';
 import {
@@ -487,6 +488,7 @@ import {
   type SlabPublishOptions,
   type SlabRecord,
   type SlabStatus,
+  type ProductMarkupPriceSnapshot,
 } from '@/services/slabs';
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -505,9 +507,6 @@ type ConfirmType =
   | 'purge'
   | 'batchPurge'
   | 'clearRecycle';
-type SalesPriceKey = 'guide' | 'level1' | 'level2' | 'level3';
-type ProductPriceKey = `${SalesPriceKey}Price`;
-type ProductRatioKey = `${SalesPriceKey}Ratio`;
 type UploadItemKey = 'main' | 'scan' | 'design' | 'video';
 
 interface FilterState {
@@ -555,6 +554,7 @@ interface SlabItem {
   widthMm?: number;
   thicknessMm?: number;
   areaSquareMeter?: number;
+  markupPrices?: ProductMarkupPriceSnapshot[];
 }
 
 interface ProductForm {
@@ -587,6 +587,7 @@ interface ProductForm {
   level2Price: string;
   level3Ratio: string;
   level3Price: string;
+  markupPrices: Record<number, { ratio: string; price: string }>;
 }
 
 const tabs: { value: SlabStatus; label: string }[] = [
@@ -667,6 +668,7 @@ const makeProductForm = (): ProductForm => ({
   level2Price: '',
   level3Ratio: '1.18',
   level3Price: '',
+  markupPrices: {},
 });
 
 const activeTab = ref<SlabStatus>('warehouse');
@@ -690,6 +692,7 @@ const uploadPreviewUrl = ref('');
 const slabOrigins = ref<SlabOriginRecord[]>([]);
 const slabVarieties = ref<SlabVarietyRecord[]>([]);
 const slabSuppliers = ref<SupplierRecord[]>([]);
+const markupConfigurations = ref<MarkupConfigurationRecord[]>([]);
 const publishOptions = reactive<SlabPublishOptions>({ textures: [], colorCategories: [], grades: [] });
 
 const varietyOptions = computed(() => slabVarieties.value.map((item) => item.name));
@@ -820,6 +823,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     widthMm: record.widthMm,
     thicknessMm: record.thicknessMm,
     areaSquareMeter: record.areaSquareMeter,
+    markupPrices: record.markupPrices,
   };
 };
 
@@ -856,17 +860,20 @@ const upsertSlabItem = (record: SlabRecord) => {
 const loadSlabs = async () => {
   loading.value = true;
   try {
-    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult] = await Promise.all([
-      listSlabs(),
-      listSlabOrigins().catch(() => []),
-      listSlabVarieties().catch(() => []),
-      listSuppliers().catch(() => []),
-      getSlabPublishOptions(),
-    ]);
+    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult, markupResult] =
+      await Promise.all([
+        listSlabs(),
+        listSlabOrigins().catch(() => []),
+        listSlabVarieties().catch(() => []),
+        listSuppliers().catch(() => []),
+        getSlabPublishOptions(),
+        listMarkupConfigurationOptions('slab'),
+      ]);
     slabOrigins.value = originsResult;
     slabVarieties.value = varietiesResult;
     slabSuppliers.value = suppliersResult;
     Object.assign(publishOptions, publishOptionsResult);
+    markupConfigurations.value = markupResult;
     tableData.value = records.map(toSlabItem);
   } catch (error) {
     tableData.value = [];
@@ -942,12 +949,9 @@ const cornerFields: { key: keyof ProductForm; label: string }[] = [
   { key: 'corner4Width', label: '扣角4宽' },
 ];
 
-const salesPriceRows: { key: SalesPriceKey; label: string }[] = [
-  { key: 'guide', label: '指导价' },
-  { key: 'level1', label: '1级合伙人' },
-  { key: 'level2', label: '2级合伙人' },
-  { key: 'level3', label: '3级合伙人' },
-];
+const salesPriceRows = computed(() =>
+  markupConfigurations.value.map((item) => ({ id: item.id, label: item.name, markupRate: Number(item.markupRate) })),
+);
 
 const productRules: Record<string, FormRule[]> = {
   variety: [{ required: true, message: '请选择品种', type: 'error' }],
@@ -1174,6 +1178,7 @@ const toNumber = (value: string) => {
 };
 
 const formatPrice = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
+const formatRatio = (value: number) => value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
 const normalizeDecimal = (value: string) => {
   const match = String(value)
     .replace(/[^\d.]/g, '')
@@ -1184,25 +1189,35 @@ const normalizeDecimal = (value: string) => {
   return decimal === undefined ? integer : `${integer}.${decimal}`;
 };
 
-const priceKey = (key: SalesPriceKey) => `${key}Price` as ProductPriceKey;
-const ratioKey = (key: SalesPriceKey) => `${key}Ratio` as ProductRatioKey;
-
-const calculateProductPrice = (key: SalesPriceKey) => {
+const calculateProductPrice = (configurationId: number) => {
   const cost = toNumber(productForm.cost);
-  const ratio = toNumber(productForm[ratioKey(key)]);
-  if (!cost || !ratio) return;
-  productForm[priceKey(key)] = formatPrice(cost * ratio);
+  const editor = productForm.markupPrices[configurationId];
+  const ratio = toNumber(editor?.ratio ?? '');
+  if (!editor || !cost || ratio < 1) return;
+  editor.price = formatPrice(cost * ratio);
 };
 
-const calculateProductRatio = (key: SalesPriceKey) => {
+const calculateProductRatio = (configurationId: number) => {
   const cost = toNumber(productForm.cost);
-  const price = toNumber(productForm[priceKey(key)]);
-  if (!cost || !price) return;
-  productForm[ratioKey(key)] = (price / cost).toFixed(2);
+  const editor = productForm.markupPrices[configurationId];
+  const price = toNumber(editor?.price ?? '');
+  if (!editor || !cost || price < cost) return;
+  editor.ratio = (price / cost).toFixed(4);
 };
 
 const recalculateProductPrices = () => {
-  salesPriceRows.forEach((item) => calculateProductPrice(item.key));
+  salesPriceRows.value.forEach((item) => calculateProductPrice(item.id));
+};
+
+const initializeProductMarkupPrices = (prices: ProductMarkupPriceSnapshot[] = []) => {
+  const existingById = new Map(prices.map((item) => [item.markupConfigurationId, item]));
+  productForm.markupPrices = Object.fromEntries(
+    salesPriceRows.value.map((item) => {
+      const existing = existingById.get(item.id);
+      const ratio = existing ? 1 + Number(existing.markupRateSnapshot) / 100 : 1 + item.markupRate / 100;
+      return [item.id, { ratio: formatRatio(ratio), price: existing ? String(existing.salePrice) : '' }];
+    }),
+  );
 };
 
 const calculateBatchPrice = (row: { label: string; ratio: string; price: string }) => {
@@ -1249,6 +1264,7 @@ const openPriceDrawer = (row: SlabItem) => {
 
 const resetProductForm = () => {
   Object.assign(productForm, makeProductForm());
+  initializeProductMarkupPrices();
 };
 
 const fillProductForm = (row: SlabItem) => {
@@ -1283,7 +1299,7 @@ const fillProductForm = (row: SlabItem) => {
     level3Ratio: '1.18',
     level3Price: row.price.level3,
   });
-  salesPriceRows.forEach((item) => calculateProductRatio(item.key));
+  initializeProductMarkupPrices(row.markupPrices);
 };
 
 const openProductDialog = (mode: ProductMode, row?: SlabItem) => {
@@ -1317,8 +1333,8 @@ const handleProductSubmit = async () => {
     adminFeedback.warning('请完善基础信息');
     return;
   }
-  const hasIncompleteSalesPrice = salesPriceRows.some(
-    (item) => !productForm[ratioKey(item.key)].trim() || !productForm[priceKey(item.key)].trim(),
+  const hasIncompleteSalesPrice = salesPriceRows.value.some(
+    (item) => !productForm.markupPrices[item.id]?.ratio.trim() || !productForm.markupPrices[item.id]?.price.trim(),
   );
   if (
     !productForm.supplier.trim() ||
@@ -1352,7 +1368,14 @@ const handleProductSubmit = async () => {
     thicknessMm,
     areaSquareMeter: lengthMm && widthMm ? Number(((lengthMm * widthMm) / 1_000_000).toFixed(2)) : undefined,
     costPrice: toNumber(productForm.cost),
-    guidePrice: toNumber(productForm.guidePrice),
+    guidePrice: toNumber(productForm.markupPrices[salesPriceRows.value[0]?.id]?.price ?? ''),
+    markupPrices: salesPriceRows.value.map((item) => ({
+      markupConfigurationId: item.id,
+      markupRateSnapshot: Number(((toNumber(productForm.markupPrices[item.id].ratio) - 1) * 100).toFixed(4)),
+      costPriceSnapshot: toNumber(productForm.cost),
+      salePrice: toNumber(productForm.markupPrices[item.id].price),
+      variantKey: '',
+    })),
     status: editingItem?.status || 'warehouse',
   };
 

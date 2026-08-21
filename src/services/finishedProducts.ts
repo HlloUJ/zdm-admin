@@ -1,4 +1,5 @@
 import { request } from './http';
+import type { ProductMarkupPriceSnapshot } from './slabs';
 
 export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 
@@ -12,6 +13,7 @@ export interface FinishedProductRecord {
   publisherType?: string;
   totalStock?: number;
   guidePrice?: number;
+  markupPrices?: ProductMarkupPriceSnapshot[];
   status?: FinishedProductStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -26,6 +28,7 @@ export interface FinishedProductPayload {
   publisherType?: string;
   totalStock?: number;
   guidePrice?: number;
+  markupPrices?: ProductMarkupPriceSnapshot[];
   status: FinishedProductStatus;
 }
 

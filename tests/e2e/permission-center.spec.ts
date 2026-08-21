@@ -16,6 +16,11 @@ const productThirdMenuLabels = [
   '色系管理',
   '等级管理',
 ];
+const adminProductThirdMenuLabels = [
+  ...productThirdMenuLabels.slice(0, 4),
+  '加价配置',
+  ...productThirdMenuLabels.slice(4),
+];
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -886,9 +891,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('商品管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(16);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(18);
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(productSecondMenuLabels);
-  await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(productThirdMenuLabels);
+  await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -939,6 +944,14 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(accessoryTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     templateActionLabels,
   );
+  const markupActionLabels = ['查看', '新增', '编辑', '排序', '停用/启用', '删除'];
+  const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品加价配置' });
+  const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板加价配置' });
+  await expect(finishedMarkupPermissionRow.getByText('加价配置', { exact: true })).toBeVisible();
+  await expect(finishedMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    markupActionLabels,
+  );
+  await expect(slabMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(markupActionLabels);
   const slabVarietyPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '品种管理页' });
   await expect(slabVarietyPermissionRow.getByText('大板基础数据', { exact: true })).toBeVisible();
   await expect(slabVarietyPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([

@@ -132,6 +132,11 @@ const router = createRouter({
       name: 'categoryAttributeTemplate',
       component: () => import('@/pages/product/category-attribute-template/index.vue'),
     },
+    {
+      path: '/markup-configuration',
+      name: 'markupConfiguration',
+      component: () => import('@/pages/product/markup-configuration/index.vue'),
+    },
     { path: '/finished-stock-category', redirect: '/product-category' },
     { path: '/accessory-category', redirect: '/category-attribute-template' },
     { path: '/finished-stock-attribute', redirect: '/product-attribute' },
