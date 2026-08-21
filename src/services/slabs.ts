@@ -2,6 +2,17 @@ import { request } from './http';
 
 export type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 
+export interface ProductMarkupPriceSnapshot {
+  markupConfigurationId: number;
+  currentName?: string;
+  markupNameSnapshot?: string;
+  markupRateSnapshot: number;
+  costPriceSnapshot: number;
+  salePrice: number;
+  variantKey?: string;
+  variantLabel?: string;
+}
+
 export interface SlabRecord {
   id: number;
   supplierId?: number;
@@ -19,6 +30,7 @@ export interface SlabRecord {
   areaSquareMeter?: number;
   costPrice?: number;
   guidePrice?: number;
+  markupPrices?: ProductMarkupPriceSnapshot[];
   status?: SlabStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -40,6 +52,7 @@ export interface SlabPayload {
   areaSquareMeter?: number;
   costPrice?: number;
   guidePrice?: number;
+  markupPrices?: ProductMarkupPriceSnapshot[];
   status: SlabStatus;
 }
 

@@ -73,6 +73,11 @@ export const adminMenuEntries: AdminMenuEntry[] = [
             path: '/category-attribute-template',
             permissionPrefix: 'admin.product-data-center.category-attribute-template',
           },
+          {
+            label: '加价配置',
+            path: '/markup-configuration',
+            permissionPrefix: 'admin.product-data-center.markup-configuration',
+          },
         ],
       },
       {

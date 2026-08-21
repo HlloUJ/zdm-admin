@@ -278,7 +278,7 @@
                       <t-form-item label="总库存">
                         <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
                       </t-form-item>
-                      <t-form-item label="商家编码">
+                      <t-form-item label="商家编码" required-mark>
                         <t-input v-model="productForm.merchantCode" clearable placeholder="请输入" :maxlength="60" />
                       </t-form-item>
                       <t-form-item label="上架" required-mark>
@@ -373,6 +373,24 @@
                           @change="handleSpecCostChange(row, $event)"
                           @blur="formatDecimalValue(row, 'cost')"
                         />
+                      </template>
+                      <template
+                        v-for="configuration in markupConfigurations"
+                        #[`markup-${configuration.id}`]="{ row }"
+                        :key="configuration.id"
+                      >
+                        <div class="price-pair">
+                          <t-input
+                            v-model="row.markupPrices[configuration.id].coefficient"
+                            placeholder="系数"
+                            @change="handleMarkupCoefficientChange(row, configuration.id, $event)"
+                          />
+                          <t-input
+                            v-model="row.markupPrices[configuration.id].price"
+                            placeholder="价格"
+                            @change="handleMarkupPriceChange(row, configuration.id, $event)"
+                          />
+                        </div>
                       </template>
                       <template #guide="{ row }">
                         <div class="price-pair">
@@ -970,6 +988,7 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { listMarkupConfigurationOptions, type MarkupConfigurationRecord } from '@/services/markupConfigurations';
 import {
   createFinishedProduct,
   deleteFinishedProduct,
@@ -978,6 +997,7 @@ import {
   type FinishedProductPayload,
   type FinishedProductRecord,
 } from '@/services/finishedProducts';
+import type { ProductMarkupPriceSnapshot } from '@/services/slabs';
 import {
   createInventoryMovement,
   listInventoryMovements,
@@ -1049,6 +1069,7 @@ interface StockItem {
   priceRange: string;
   status: StockStatus;
   offShelfReason?: string;
+  markupPrices?: ProductMarkupPriceSnapshot[];
 }
 
 interface ProductForm {
@@ -1098,6 +1119,7 @@ interface SpecRow extends TableRowData {
   level3: string;
   quantity: number;
   merchantCode: string;
+  markupPrices: Record<number, { coefficient: string; price: string }>;
 }
 
 interface PriceRow extends TableRowData {
@@ -1315,6 +1337,7 @@ const uploadState = reactive({
 });
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productSuppliers = ref<SupplierRecord[]>([]);
+const markupConfigurations = ref<MarkupConfigurationRecord[]>([]);
 const dataItems = ref<StockItem[]>([]);
 
 const defaultFilter = (): FilterState => ({
@@ -1573,6 +1596,7 @@ const toStockItem = (record: FinishedProductRecord, index: number): StockItem =>
     publisherType,
     isExternalSupplier: Boolean(record.supplierId),
     guidePrice: record.guidePrice,
+    markupPrices: record.markupPrices,
     priceRange: formatPriceRange(record.guidePrice),
     status,
   };
@@ -1615,13 +1639,15 @@ const createMovement = async (
 const loadInventoryData = async () => {
   loading.value = true;
   try {
-    const [categories, suppliers, products] = await Promise.all([
+    const [categories, suppliers, products, markupResult] = await Promise.all([
       listProductCategories(),
       listSuppliers(),
       listFinishedProducts(),
+      listMarkupConfigurationOptions('finished'),
     ]);
     productCategories.value = categories;
     productSuppliers.value = suppliers;
+    markupConfigurations.value = markupResult;
     dataItems.value = products.map(toStockItem);
     selectedKeys.value = [];
   } catch (error) {
@@ -1732,10 +1758,11 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
 const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'cost', title: '成本价*', width: 110 },
-    { colKey: 'guide', title: '指导价*', width: 150 },
-    { colKey: 'level1', title: '1级合伙人价格*', width: 160 },
-    { colKey: 'level2', title: '2级合伙人价格*', width: 160 },
-    { colKey: 'level3', title: '3级合伙人价格*', width: 160 },
+    ...markupConfigurations.value.map((item) => ({
+      colKey: `markup-${item.id}`,
+      title: `${item.name}*`,
+      width: 170,
+    })),
     { colKey: 'quantity', title: '数量*', width: 96 },
   ];
   const tailColumns: PrimaryTableCol<TableRowData>[] = [
@@ -2088,6 +2115,25 @@ const createSpecValue = (value = '', imageUploaded = false): SpecValue => ({
   imageUploaded,
 });
 
+const createMarkupEditors = (prices: ProductMarkupPriceSnapshot[] = []) => {
+  const existingById = new Map(prices.map((item) => [item.markupConfigurationId, item]));
+  return Object.fromEntries(
+    markupConfigurations.value.map((configuration) => {
+      const existing = existingById.get(configuration.id);
+      const coefficient = existing
+        ? 1 + Number(existing.markupRateSnapshot) / 100
+        : 1 + Number(configuration.markupRate) / 100;
+      return [
+        configuration.id,
+        {
+          coefficient: coefficient.toFixed(4).replace(/0+$/, '').replace(/\.$/, ''),
+          price: existing ? String(existing.salePrice) : '',
+        },
+      ];
+    }),
+  );
+};
+
 const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
   id: createDraftId(),
   mode: confirmedSpecMode.value,
@@ -2113,51 +2159,73 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
   level3: '',
   quantity: 0,
   merchantCode: '',
+  markupPrices: createMarkupEditors(),
   ...partial,
 });
 
-const createEditSpecRows = (row: StockItem): SpecRow[] => [
-  createBaseSpecRow({
-    id: row.id * 10 + 1,
-    mode: 'layered',
-    material: '鱼肚白',
-    length: '1200mm',
-    color: '白色系',
-    size: '1500*800*750mm',
-    costCoefficient: '1',
-    cost: '1800',
-    guideCoefficient: '1.2',
-    guide: '2680',
-    level1Coefficient: '1.1',
-    level1: '2480',
-    level2Coefficient: '1.05',
-    level2: '2280',
-    level3Coefficient: '1',
-    level3: '2080',
-    quantity: Math.max(0, Math.ceil(row.stock / 2)),
-    merchantCode: `${row.code}-01`,
-  }),
-  createBaseSpecRow({
-    id: row.id * 10 + 2,
-    mode: 'layered',
-    material: '雪花白',
-    length: '1400mm',
-    color: '浅灰系',
-    size: '1600*850*750mm',
-    costCoefficient: '1',
-    cost: '2200',
-    guideCoefficient: '1.2',
-    guide: '3280',
-    level1Coefficient: '1.1',
-    level1: '3080',
-    level2Coefficient: '1.05',
-    level2: '2880',
-    level3Coefficient: '1',
-    level3: '2680',
-    quantity: Math.max(0, row.stock - Math.ceil(row.stock / 2)),
-    merchantCode: `${row.code}-02`,
-  }),
-];
+const createEditSpecRows = (row: StockItem): SpecRow[] => {
+  if (row.markupPrices?.length) {
+    const byVariant = new Map<string, ProductMarkupPriceSnapshot[]>();
+    row.markupPrices.forEach((price) => {
+      const key = price.variantKey || row.code;
+      byVariant.set(key, [...(byVariant.get(key) ?? []), price]);
+    });
+    return Array.from(byVariant.entries()).map(([variantKey, prices], index) =>
+      createBaseSpecRow({
+        id: row.id * 100 + index + 1,
+        mode: 'single',
+        specText: prices[0]?.variantLabel || variantKey,
+        costCoefficient: '1',
+        cost: String(prices[0]?.costPriceSnapshot ?? ''),
+        quantity: index === 0 ? row.stock : 0,
+        merchantCode: variantKey,
+        markupPrices: createMarkupEditors(prices),
+      }),
+    );
+  }
+  return [
+    createBaseSpecRow({
+      id: row.id * 10 + 1,
+      mode: 'layered',
+      material: '鱼肚白',
+      length: '1200mm',
+      color: '白色系',
+      size: '1500*800*750mm',
+      costCoefficient: '1',
+      cost: '1800',
+      guideCoefficient: '1.2',
+      guide: '2680',
+      level1Coefficient: '1.1',
+      level1: '2480',
+      level2Coefficient: '1.05',
+      level2: '2280',
+      level3Coefficient: '1',
+      level3: '2080',
+      quantity: Math.max(0, Math.ceil(row.stock / 2)),
+      merchantCode: `${row.code}-01`,
+    }),
+    createBaseSpecRow({
+      id: row.id * 10 + 2,
+      mode: 'layered',
+      material: '雪花白',
+      length: '1400mm',
+      color: '浅灰系',
+      size: '1600*850*750mm',
+      costCoefficient: '1',
+      cost: '2200',
+      guideCoefficient: '1.2',
+      guide: '3280',
+      level1Coefficient: '1.1',
+      level1: '3080',
+      level2Coefficient: '1.05',
+      level2: '2880',
+      level3Coefficient: '1',
+      level3: '2680',
+      quantity: Math.max(0, row.stock - Math.ceil(row.stock / 2)),
+      merchantCode: `${row.code}-02`,
+    }),
+  ];
+};
 
 const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
   formPageMode.value = mode;
@@ -2276,6 +2344,12 @@ const syncAllSpecPricesByCost = (row: SpecRow) => {
   ).forEach(([coefficientField, priceField]) => {
     syncSpecPriceByCoefficient(row, coefficientField, priceField);
   });
+  markupConfigurations.value.forEach((configuration) => {
+    const editor = row.markupPrices[configuration.id];
+    const cost = decimalNumber(row.cost);
+    const coefficient = decimalNumber(editor?.coefficient);
+    if (editor && cost !== null && coefficient !== null) editor.price = (cost * coefficient).toFixed(2);
+  });
 };
 
 const handleSpecCostChange = (row: SpecRow, value: unknown) => {
@@ -2301,6 +2375,24 @@ const handleSpecPriceChange = (
 ) => {
   limitDecimalInput(row, priceField, value);
   syncSpecCoefficientByPrice(row, priceField, coefficientField);
+};
+
+const handleMarkupCoefficientChange = (row: SpecRow, configurationId: number, value: unknown) => {
+  const editor = row.markupPrices[configurationId];
+  if (!editor) return;
+  editor.coefficient = normalizeDecimalInput(value);
+  const cost = decimalNumber(row.cost);
+  const coefficient = decimalNumber(editor.coefficient);
+  if (cost !== null && coefficient !== null && coefficient >= 1) editor.price = (cost * coefficient).toFixed(2);
+};
+
+const handleMarkupPriceChange = (row: SpecRow, configurationId: number, value: unknown) => {
+  const editor = row.markupPrices[configurationId];
+  if (!editor) return;
+  editor.price = normalizeDecimalInput(value);
+  const cost = decimalNumber(row.cost);
+  const price = decimalNumber(editor.price);
+  if (cost !== null && cost > 0 && price !== null && price >= cost) editor.coefficient = (price / cost).toFixed(4);
 };
 
 const syncBatchPriceByCoefficient = (coefficientField: DecimalField, priceField: DecimalField) => {
@@ -2645,12 +2737,24 @@ const deleteSpec = (id: number) => {
 };
 
 const validateProductForm = () => {
+  const pricesComplete = specRows.value.every(
+    (row) =>
+      Boolean(row.cost.trim()) &&
+      Boolean(row.merchantCode.trim()) &&
+      markupConfigurations.value.every((configuration) => {
+        const editor = row.markupPrices[configuration.id];
+        return Boolean(editor?.coefficient.trim()) && Boolean(editor?.price.trim());
+      }),
+  );
   const checks: { valid: boolean; tab: FormTabKey; message: string }[] = [
     { valid: uploadState.mainImage, tab: 'description', message: '请上传商品主图' },
     { valid: uploadState.video, tab: 'description', message: '请上传商品视频' },
     { valid: Boolean(productForm.detail.trim()), tab: 'description', message: '请输入宝贝详情' },
     { valid: Boolean(productForm.name.trim()), tab: 'base', message: '请输入商品名称' },
     { valid: specRows.value.length > 0, tab: 'sales', message: '请创建销售规格' },
+    { valid: markupConfigurations.value.length > 0, tab: 'sales', message: '请先配置并启用成品加价规则' },
+    { valid: pricesComplete, tab: 'sales', message: '请完善每条规格的成本价、供货价和商家编码' },
+    { valid: Boolean(productForm.merchantCode.trim()), tab: 'sales', message: '请输入商家编码' },
     { valid: Boolean(productForm.shelfNow), tab: 'sales', message: '请选择上架方式' },
   ];
   const failed = checks.find((item) => !item.valid);
@@ -2664,7 +2768,10 @@ const validateProductForm = () => {
 
 const buildProductPayloadFromForm = (): FinishedProductPayload => {
   const stock = totalStock.value || Number(productForm.totalStock || 0);
-  const guidePrice = Number(specRows.value.find((row) => row.guide)?.guide || 0);
+  const firstConfiguration = markupConfigurations.value[0];
+  const guidePrice = Number(
+    firstConfiguration ? specRows.value[0]?.markupPrices[firstConfiguration.id]?.price || 0 : 0,
+  );
   const status = productForm.shelfNow === 'now' ? 'selling' : 'warehouse';
   return {
     categoryId: categoryIdByPath(selectedCategoryPath.value),
@@ -2675,6 +2782,22 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
     publisherType: '平台发布',
     totalStock: stock,
     guidePrice: guidePrice > 0 ? guidePrice : undefined,
+    markupPrices: specRows.value.flatMap((row) =>
+      markupConfigurations.value.map((configuration) => {
+        const editor = row.markupPrices[configuration.id];
+        return {
+          markupConfigurationId: configuration.id,
+          markupRateSnapshot: Number(((Number(editor.coefficient) - 1) * 100).toFixed(4)),
+          costPriceSnapshot: Number(row.cost),
+          salePrice: Number(editor.price),
+          variantKey: row.merchantCode.trim(),
+          variantLabel:
+            row.specText ||
+            [row.material, row.length, row.color, row.size].filter(Boolean).join(' / ') ||
+            row.merchantCode,
+        };
+      }),
+    ),
     status,
   };
 };
