@@ -342,7 +342,7 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   const createDialog = page.locator('.t-dialog').filter({ hasText: '新增' });
   await expect(createDialog).toBeVisible();
   await expect(createDialog.getByText('供应商名称')).toBeVisible();
-  await expect(createDialog.getByText('供应商类型')).toBeVisible();
+  await expect(createDialog.getByText('供货类型')).toBeVisible();
   await expect(createDialog.getByText('联系电话')).toBeVisible();
   await createDialog.getByRole('button', { name: '取消' }).click();
   await expect(createDialog).toBeHidden();

@@ -99,7 +99,8 @@ const suppliers = [
   {
     id: 1,
     name: '装点猫大板供应商',
-    type: 'slab',
+    supplyTypeIds: [1],
+    supplyTypes: [{ id: 1, code: 'slab', name: '大板', status: 'enabled' }],
     contactName: '供应商联系人',
     contactPhone: '15926626946',
     qualificationStatus: 'approved',
@@ -112,7 +113,8 @@ const suppliers = [
   {
     id: 2,
     name: '装点猫成品供应商',
-    type: 'finished',
+    supplyTypeIds: [2],
+    supplyTypes: [{ id: 2, code: 'finished', name: '成品现货', status: 'enabled' }],
     contactName: '成品联系人',
     contactPhone: '15926626947',
     qualificationStatus: 'approved',
@@ -121,6 +123,27 @@ const suppliers = [
     createdByAccountId: 1,
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const supplierSupplyTypes = [
+  {
+    id: 2,
+    code: 'finished',
+    name: '成品现货',
+    status: 'enabled',
+    referenced: true,
+    createdByName: '系统初始化',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 1,
+    code: 'slab',
+    name: '大板',
+    status: 'enabled',
+    referenced: true,
+    createdByName: '系统初始化',
+    createdAt: '2026-07-27T08:00:00',
   },
 ];
 
@@ -556,6 +579,7 @@ export async function installAdminApiMocks(page: Page) {
     );
   });
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
+  await mockCollection(page, '**/api/admin/supplier-supply-types', supplierSupplyTypes);
   await mockCollection(page, '**/api/admin/roles', roles);
   await page.route('**/api/admin/roles/permission-scope', async (route) => {
     await fulfillJson(route, { audience: 'admin', functionPermissions: 'all' });

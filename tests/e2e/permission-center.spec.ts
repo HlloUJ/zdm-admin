@@ -1001,6 +1001,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(supplierPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
+    '供货类型配置',
     '编辑',
     '停用/启用',
     '删除',
@@ -1237,11 +1238,12 @@ test('shows the full function catalog for both terminals during development', as
     '删除',
   ]);
   await moduleList.getByText('供应商管理', { exact: true }).click();
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*5/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*6/);
   const supplierAllocationRow = matrix.locator('tbody tr').filter({ hasText: '供应商管理页' });
   await expect(supplierAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
+    '供货类型配置',
     '编辑',
     '停用/启用',
     '删除',
@@ -1269,7 +1271,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(21);
   await moduleList.getByText('供应商管理', { exact: true }).click();
   await expect(matrix.getByText('供应商管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(5);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(6);
   await moduleList.getByText('商品管理', { exact: true }).click();
   await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('属性库管理页', { exact: true })).toBeVisible();
