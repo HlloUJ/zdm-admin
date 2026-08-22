@@ -1,14 +1,12 @@
 package com.zdm.platform.inventory;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
-public record MarkupConfigurationReorderRequest(
-    @NotBlank String productType,
+public record SlabMarkupConfigurationReorderRequest(
     @NotEmpty List<@NotNull Long> orderedIds) {
-  public MarkupConfigurationReorderRequest {
+  public SlabMarkupConfigurationReorderRequest {
     orderedIds = orderedIds == null ? null : List.copyOf(orderedIds);
   }
 

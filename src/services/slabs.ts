@@ -1,36 +1,58 @@
 import { request } from './http';
+import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
 export type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
-
-export interface ProductMarkupPriceSnapshot {
+export type SlabPublisherType = '平台发布' | '接口获取';
+export interface SlabPrice {
   markupConfigurationId: number;
-  currentName?: string;
-  markupNameSnapshot?: string;
-  markupRateSnapshot: number;
-  costPriceSnapshot: number;
-  salePrice: number;
-  variantKey?: string;
-  variantLabel?: string;
+  markupRate: number;
+  costPrice: number;
+  price: number;
 }
 
 export interface SlabRecord {
   id: number;
   supplierId?: number;
   varietyId?: number;
+  originId?: number;
   textureId?: number;
   colorId?: number;
   gradeId?: number;
   name: string;
   serialNo: string;
   warehouse?: string;
-  publisherType?: string;
+  publisherType?: SlabPublisherType;
+  mainImageMediaId?: number;
+  scanImageMediaId?: number;
+  designImageMediaId?: number;
+  videoMediaId?: number;
+  videoCoverMediaId?: number;
+  mainImageUrl?: string;
+  scanImageUrl?: string;
+  designImageUrl?: string;
+  videoUrl?: string;
+  videoCoverUrl?: string;
+  createdByName?: string;
+  createdByAccountId?: number;
+  originName?: string;
+  varietyName?: string;
+  supplierName?: string;
   lengthMm?: number;
   widthMm?: number;
   thicknessMm?: number;
+  toleranceMm?: number;
+  corner1LengthMm?: number;
+  corner1WidthMm?: number;
+  corner2LengthMm?: number;
+  corner2WidthMm?: number;
+  corner3LengthMm?: number;
+  corner3WidthMm?: number;
+  corner4LengthMm?: number;
+  corner4WidthMm?: number;
   areaSquareMeter?: number;
   costPrice?: number;
   guidePrice?: number;
-  markupPrices?: ProductMarkupPriceSnapshot[];
+  markupPrices?: SlabPrice[];
   status?: SlabStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -39,20 +61,35 @@ export interface SlabRecord {
 export interface SlabPayload {
   supplierId?: number;
   varietyId?: number;
+  originId?: number;
   textureId?: number;
   colorId?: number;
   gradeId?: number;
   name: string;
   serialNo: string;
   warehouse?: string;
-  publisherType?: string;
+  publisherType?: SlabPublisherType;
+  mainImageMediaId?: number;
+  scanImageMediaId?: number;
+  designImageMediaId?: number;
+  videoMediaId?: number;
+  videoCoverMediaId?: number;
   lengthMm?: number;
   widthMm?: number;
   thicknessMm?: number;
+  toleranceMm?: number;
+  corner1LengthMm?: number;
+  corner1WidthMm?: number;
+  corner2LengthMm?: number;
+  corner2WidthMm?: number;
+  corner3LengthMm?: number;
+  corner3WidthMm?: number;
+  corner4LengthMm?: number;
+  corner4WidthMm?: number;
   areaSquareMeter?: number;
   costPrice?: number;
   guidePrice?: number;
-  markupPrices?: ProductMarkupPriceSnapshot[];
+  markupPrices?: SlabPrice[];
   status: SlabStatus;
 }
 
@@ -88,10 +125,25 @@ export function createSlab(payload: SlabPayload) {
   });
 }
 
+export function uploadSlabImage(file: File) {
+  return uploadMedia('/admin/slabs/images', file);
+}
+
+export function releaseTemporarySlabMedia(mediaId: MediaResource['id']) {
+  return releaseTemporaryMedia('/admin/slabs/images', mediaId);
+}
+
 export function updateSlab(id: number, payload: SlabPayload) {
   return request<SlabRecord>(`/admin/slabs/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateSlabStatuses(ids: number[], status: SlabStatus) {
+  return request<boolean>('/admin/slabs/batch-status', {
+    method: 'PUT',
+    body: JSON.stringify({ ids, status }),
   });
 }
 

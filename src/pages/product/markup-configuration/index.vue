@@ -148,16 +148,26 @@ import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard'
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
-  createMarkupConfiguration,
-  deleteMarkupConfiguration,
-  listMarkupConfigurations,
-  reorderMarkupConfigurations,
-  updateMarkupConfiguration,
-  updateMarkupConfigurationStatus,
-  type MarkupConfigurationPayload,
-  type MarkupConfigurationRecord,
-  type MarkupProductType,
-} from '@/services/markupConfigurations';
+  createFinishedMarkupConfiguration,
+  deleteFinishedMarkupConfiguration,
+  listFinishedMarkupConfigurations,
+  reorderFinishedMarkupConfigurations,
+  updateFinishedMarkupConfiguration,
+  updateFinishedMarkupConfigurationStatus,
+  type FinishedMarkupConfigurationRecord,
+} from '@/services/finishedMarkupConfigurations';
+import {
+  createSlabMarkupConfiguration,
+  deleteSlabMarkupConfiguration,
+  listSlabMarkupConfigurations,
+  reorderSlabMarkupConfigurations,
+  updateSlabMarkupConfiguration,
+  updateSlabMarkupConfigurationStatus,
+  type SlabMarkupConfigurationRecord,
+} from '@/services/slabMarkupConfigurations';
+
+type PriceConfigurationTab = 'finished' | 'slab';
+type MarkupConfigurationRecord = FinishedMarkupConfigurationRecord | SlabMarkupConfigurationRecord;
 
 type ConfirmType = 'enable' | 'disable' | 'delete';
 
@@ -167,7 +177,7 @@ const tabs = [
 ] as const;
 const prefix = 'admin.product-data-center.markup-configuration';
 const loginUser = computed(() => getLoginUser());
-const activeType = ref<MarkupProductType>('finished');
+const activeType = ref<PriceConfigurationTab>('finished');
 const { visibleTabs, showTabRail } = usePermissionTabs({
   tabs,
   activeTab: activeType,
@@ -212,7 +222,9 @@ const formatDateTime = (value?: string) => (value ? value.replace(/-/g, '/').rep
 const loadData = async () => {
   loading.value = true;
   try {
-    tableData.value = (await listMarkupConfigurations(activeType.value)).map((item) => ({
+    const rows =
+      activeType.value === 'finished' ? await listFinishedMarkupConfigurations() : await listSlabMarkupConfigurations();
+    tableData.value = rows.map((item) => ({
       ...item,
       createdByName: item.createdByName ?? '-',
       createdAt: formatDateTime(item.createdAt),
@@ -281,10 +293,9 @@ const handleDragSort = async (context: { current: MarkupConfigurationRecord; tar
   orderedRows.splice(targetIndex, 0, currentRow);
   sorting.value = true;
   try {
-    await reorderMarkupConfigurations(
-      activeType.value,
-      orderedRows.map((item) => item.id),
-    );
+    const orderedIds = orderedRows.map((item) => item.id);
+    if (activeType.value === 'finished') await reorderFinishedMarkupConfigurations(orderedIds);
+    else await reorderSlabMarkupConfigurations(orderedIds);
     await loadData();
     adminFeedback.actionSuccess({ action: '更新排序', target: context.current.name });
   } catch (error) {
@@ -296,14 +307,16 @@ const handleDragSort = async (context: { current: MarkupConfigurationRecord; tar
 };
 const submitForm = async () => {
   if ((await formRef.value?.validate()) !== true) return;
-  const payload: MarkupConfigurationPayload = {
-    productType: activeType.value,
+  const payload = {
     name: formData.name.trim(),
     markupRate: formData.markupRate ?? 0,
   };
   try {
-    if (editingId.value) await updateMarkupConfiguration(editingId.value, payload);
-    else await createMarkupConfiguration(payload);
+    if (activeType.value === 'finished') {
+      if (editingId.value) await updateFinishedMarkupConfiguration(editingId.value, payload);
+      else await createFinishedMarkupConfiguration(payload);
+    } else if (editingId.value) await updateSlabMarkupConfiguration(editingId.value, payload);
+    else await createSlabMarkupConfiguration(payload);
     const wasEditing = Boolean(editingId.value);
     await loadData();
     closeForm();
@@ -328,13 +341,12 @@ const submitConfirm = async () => {
   const row = confirmRow.value;
   const action = confirmType.value === 'delete' ? '删除' : confirmType.value === 'enable' ? '启用' : '停用';
   try {
-    if (confirmType.value === 'delete') await deleteMarkupConfiguration(row.id, activeType.value);
-    else
-      await updateMarkupConfigurationStatus(
-        row.id,
-        activeType.value,
-        confirmType.value === 'enable' ? 'enabled' : 'disabled',
-      );
+    const status = confirmType.value === 'enable' ? 'enabled' : 'disabled';
+    if (activeType.value === 'finished') {
+      if (confirmType.value === 'delete') await deleteFinishedMarkupConfiguration(row.id);
+      else await updateFinishedMarkupConfigurationStatus(row.id, status);
+    } else if (confirmType.value === 'delete') await deleteSlabMarkupConfiguration(row.id);
+    else await updateSlabMarkupConfigurationStatus(row.id, status);
     await loadData();
     confirmVisible.value = false;
     if (confirmType.value === 'delete') adminFeedback.deleted(row.name);

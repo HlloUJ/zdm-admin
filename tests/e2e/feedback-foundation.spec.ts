@@ -102,7 +102,11 @@ test('places clear recycle after batch purge and permanently deletes every recyc
   await page.goto('/slab-management');
   await page.getByText('回收站 2', { exact: true }).click();
 
-  await expect(page.locator('.toolbar-buttons button')).toHaveText(['批量放回到仓库', '批量彻底删除', '清空回收站']);
+  expect((await page.locator('.toolbar-buttons button').allTextContents()).map((text) => text.trim())).toEqual([
+    '批量放回仓库',
+    '批量彻底删除',
+    '清空回收站',
+  ]);
   await page.getByRole('button', { name: '清空回收站', exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
     action: '清空回收站',
@@ -116,15 +120,30 @@ test('places clear recycle after batch purge and permanently deletes every recyc
   await page.getByRole('button', { name: '确认清空回收站', exact: true }).click();
   await Promise.all(deleteRequests);
   await expect(page.getByRole('row', { name: /回收站大板/ })).toHaveCount(0);
-  await expect(page.getByText('已删除“2 个回收站大板”', { exact: true })).toBeVisible();
+  await expect(page.getByText('已清空回收站“2 个大板”', { exact: true })).toBeVisible();
 });
 
 test('opens the file chooser directly, shows a thumbnail, and previews the uploaded image', async ({ page }) => {
+  const previewDataUrl =
+    'data:image/svg+xml;base64,' +
+    Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#567"/></svg>',
+    ).toString('base64');
+  await page.route('**/api/admin/slabs/images', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: { id: 9001, url: previewDataUrl, mediaType: 'image', mimeType: 'image/svg+xml' },
+      }),
+    });
+  });
   await page.goto('/slab-management');
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
 
   const chooserPromise = page.waitForEvent('filechooser');
-  await page.getByText('点击上传图片', { exact: true }).first().click();
+  await page.locator('input[type="file"]').first().click();
   const chooser = await chooserPromise;
   await chooser.setFiles({
     name: 'slab-preview.svg',
@@ -134,11 +153,11 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
     ),
   });
 
-  await expect(page.getByText('上传成功', { exact: true })).toBeVisible();
+  await expect(page.getByText('已上传“1:1主图”', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '提交', exact: true })).toHaveCount(0);
-  const preview = page.locator('.upload-preview[alt="1:1主图"]');
+  const preview = page.locator('.admin-media-upload__preview[alt="1:1主图"]');
   await expect(preview).toBeVisible();
-  await expect(preview).toHaveAttribute('src', /^data:image\/svg\+xml;base64,/);
+  await expect(preview).toHaveAttribute('src', previewDataUrl);
   await preview.click();
   await expect(page.locator('.upload-large-preview[alt="1:1主图"]')).toBeVisible();
 });
@@ -151,9 +170,10 @@ test('filters slab varieties and origins by search text when publishing a produc
   const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
   const varietyInput = productDialog.locator('.t-form__item').filter({ hasText: '品种' }).getByRole('textbox');
   await varietyInput.fill('潘多');
-  await expect(page.getByText('潘多拉', { exact: true })).toBeVisible();
+  const varietyDropdown = page.locator('.t-select__dropdown:visible');
+  await expect(varietyDropdown.getByText('潘多拉', { exact: true })).toBeVisible();
   await varietyInput.fill('不存在的品种');
-  await expect(page.getByText('潘多拉', { exact: true })).toHaveCount(0);
+  await expect(varietyDropdown.getByText('潘多拉', { exact: true })).toHaveCount(0);
 
   const originInput = productDialog.locator('.t-form__item').filter({ hasText: '产地' }).getByRole('textbox');
   await originInput.fill('巴');

@@ -45,7 +45,7 @@ class CategoryAttributeApiTest {
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
     registry.add(
-        "zdm.craft-image.storage-path",
+        "zdm.media.storage-path",
         () -> System.getProperty("java.io.tmpdir") + "/zdm-category-attribute-images-smoke");
   }
 
