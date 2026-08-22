@@ -988,7 +988,10 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
-import { listMarkupConfigurationOptions, type MarkupConfigurationRecord } from '@/services/markupConfigurations';
+import {
+  listFinishedMarkupConfigurationOptions,
+  type FinishedMarkupConfigurationRecord,
+} from '@/services/finishedMarkupConfigurations';
 import {
   createFinishedProduct,
   deleteFinishedProduct,
@@ -997,7 +1000,7 @@ import {
   type FinishedProductPayload,
   type FinishedProductRecord,
 } from '@/services/finishedProducts';
-import type { ProductMarkupPriceSnapshot } from '@/services/slabs';
+import type { FinishedProductPrice } from '@/services/finishedProducts';
 import {
   createInventoryMovement,
   listInventoryMovements,
@@ -1069,7 +1072,7 @@ interface StockItem {
   priceRange: string;
   status: StockStatus;
   offShelfReason?: string;
-  markupPrices?: ProductMarkupPriceSnapshot[];
+  markupPrices?: FinishedProductPrice[];
 }
 
 interface ProductForm {
@@ -1337,7 +1340,7 @@ const uploadState = reactive({
 });
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productSuppliers = ref<SupplierRecord[]>([]);
-const markupConfigurations = ref<MarkupConfigurationRecord[]>([]);
+const markupConfigurations = ref<FinishedMarkupConfigurationRecord[]>([]);
 const dataItems = ref<StockItem[]>([]);
 
 const defaultFilter = (): FilterState => ({
@@ -1643,7 +1646,7 @@ const loadInventoryData = async () => {
       listProductCategories(),
       listSuppliers(),
       listFinishedProducts(),
-      listMarkupConfigurationOptions('finished'),
+        listFinishedMarkupConfigurationOptions(),
     ]);
     productCategories.value = categories;
     productSuppliers.value = suppliers;
@@ -2115,19 +2118,19 @@ const createSpecValue = (value = '', imageUploaded = false): SpecValue => ({
   imageUploaded,
 });
 
-const createMarkupEditors = (prices: ProductMarkupPriceSnapshot[] = []) => {
+const createMarkupEditors = (prices: FinishedProductPrice[] = []) => {
   const existingById = new Map(prices.map((item) => [item.markupConfigurationId, item]));
   return Object.fromEntries(
     markupConfigurations.value.map((configuration) => {
       const existing = existingById.get(configuration.id);
       const coefficient = existing
-        ? 1 + Number(existing.markupRateSnapshot) / 100
+        ? 1 + Number(existing.markupRate) / 100
         : 1 + Number(configuration.markupRate) / 100;
       return [
         configuration.id,
         {
           coefficient: coefficient.toFixed(4).replace(/0+$/, '').replace(/\.$/, ''),
-          price: existing ? String(existing.salePrice) : '',
+          price: existing ? String(existing.price) : '',
         },
       ];
     }),
@@ -2165,7 +2168,7 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
 
 const createEditSpecRows = (row: StockItem): SpecRow[] => {
   if (row.markupPrices?.length) {
-    const byVariant = new Map<string, ProductMarkupPriceSnapshot[]>();
+    const byVariant = new Map<string, FinishedProductPrice[]>();
     row.markupPrices.forEach((price) => {
       const key = price.variantKey || row.code;
       byVariant.set(key, [...(byVariant.get(key) ?? []), price]);
@@ -2176,7 +2179,7 @@ const createEditSpecRows = (row: StockItem): SpecRow[] => {
         mode: 'single',
         specText: prices[0]?.variantLabel || variantKey,
         costCoefficient: '1',
-        cost: String(prices[0]?.costPriceSnapshot ?? ''),
+        cost: String(prices[0]?.costPrice ?? ''),
         quantity: index === 0 ? row.stock : 0,
         merchantCode: variantKey,
         markupPrices: createMarkupEditors(prices),
@@ -2787,9 +2790,9 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
         const editor = row.markupPrices[configuration.id];
         return {
           markupConfigurationId: configuration.id,
-          markupRateSnapshot: Number(((Number(editor.coefficient) - 1) * 100).toFixed(4)),
-          costPriceSnapshot: Number(row.cost),
-          salePrice: Number(editor.price),
+          markupRate: Number(((Number(editor.coefficient) - 1) * 100).toFixed(4)),
+          costPrice: Number(row.cost),
+          price: Number(editor.price),
           variantKey: row.merchantCode.trim(),
           variantLabel:
             row.specText ||

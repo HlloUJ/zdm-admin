@@ -1,7 +1,15 @@
 import { request } from './http';
-import type { ProductMarkupPriceSnapshot } from './slabs';
 
 export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+
+export interface FinishedProductPrice {
+  markupConfigurationId: number;
+  markupRate: number;
+  costPrice: number;
+  price: number;
+  variantKey: string;
+  variantLabel?: string;
+}
 
 export interface FinishedProductRecord {
   id: number;
@@ -13,7 +21,7 @@ export interface FinishedProductRecord {
   publisherType?: string;
   totalStock?: number;
   guidePrice?: number;
-  markupPrices?: ProductMarkupPriceSnapshot[];
+  markupPrices?: FinishedProductPrice[];
   status?: FinishedProductStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -28,7 +36,7 @@ export interface FinishedProductPayload {
   publisherType?: string;
   totalStock?: number;
   guidePrice?: number;
-  markupPrices?: ProductMarkupPriceSnapshot[];
+  markupPrices?: FinishedProductPrice[];
   status: FinishedProductStatus;
 }
 

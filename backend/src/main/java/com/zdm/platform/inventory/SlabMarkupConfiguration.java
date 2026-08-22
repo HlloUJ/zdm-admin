@@ -10,11 +10,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
-@TableName("markup_configurations")
-public class MarkupConfiguration extends BaseEntity {
-  @NotBlank
-  private String productType;
-
+@TableName("slab_markup_configurations")
+public class SlabMarkupConfiguration extends BaseEntity {
   @NotBlank
   @Size(max = 20)
   private String name;
@@ -31,14 +28,6 @@ public class MarkupConfiguration extends BaseEntity {
 
   @TableField(exist = false)
   private boolean referenced;
-
-  public String getProductType() {
-    return productType;
-  }
-
-  public void setProductType(String productType) {
-    this.productType = productType;
-  }
 
   public String getName() {
     return name;

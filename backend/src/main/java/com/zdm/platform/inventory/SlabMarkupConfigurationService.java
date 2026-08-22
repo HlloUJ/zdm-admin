@@ -16,15 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class MarkupConfigurationService {
-  private static final String DUPLICATE_NAME_MESSAGE = "当前商品类型下的加价名称已存在";
+public class SlabMarkupConfigurationService {
+  private static final String DUPLICATE_NAME_MESSAGE = "大板价格层级名称已存在";
 
-  private final MarkupConfigurationMapper mapper;
+  private final SlabMarkupConfigurationMapper mapper;
   private final CurrentIdentityProvider identityProvider;
   private final CreatorOwnershipGuard ownershipGuard;
 
-  public MarkupConfigurationService(
-      MarkupConfigurationMapper mapper,
+  public SlabMarkupConfigurationService(
+      SlabMarkupConfigurationMapper mapper,
       CurrentIdentityProvider identityProvider,
       CreatorOwnershipGuard ownershipGuard) {
     this.mapper = mapper;
@@ -32,107 +32,99 @@ public class MarkupConfigurationService {
     this.ownershipGuard = ownershipGuard;
   }
 
-  public List<MarkupConfiguration> listConfigurations(String productType, boolean enabledOnly) {
+  public List<SlabMarkupConfiguration> listConfigurations(boolean enabledOnly) {
     requirePlatformScope();
-    String normalizedType = MarkupProductType.require(productType).value();
-    var query = Wrappers.<MarkupConfiguration>lambdaQuery()
-        .eq(MarkupConfiguration::getProductType, normalizedType);
+    var query = Wrappers.<SlabMarkupConfiguration>lambdaQuery();
     if (enabledOnly) {
-      query.eq(MarkupConfiguration::getStatus, "enabled");
+      query.eq(SlabMarkupConfiguration::getStatus, "enabled");
     }
-    List<MarkupConfiguration> configurations = mapper.selectList(query
-        .orderByAsc(MarkupConfiguration::getSortOrder)
-        .orderByDesc(MarkupConfiguration::getCreatedAt)
-        .orderByDesc(MarkupConfiguration::getId));
+    List<SlabMarkupConfiguration> configurations = mapper.selectList(query
+        .orderByAsc(SlabMarkupConfiguration::getSortOrder)
+        .orderByDesc(SlabMarkupConfiguration::getCreatedAt)
+        .orderByDesc(SlabMarkupConfiguration::getId));
     configurations.forEach(item -> item.setReferenced(mapper.countProductReferences(item.getId()) > 0));
     return configurations;
   }
 
   @Transactional
-  public MarkupConfiguration createConfiguration(MarkupConfiguration payload) {
+  public SlabMarkupConfiguration createConfiguration(SlabMarkupConfiguration payload) {
     CurrentIdentity identity = requirePlatformScope();
     payload.setId(null);
-    payload.setProductType(MarkupProductType.require(payload.getProductType()).value());
     payload.setName(normalizedName(payload.getName()));
     payload.setStatus("enabled");
-    payload.setSortOrder(nextSortOrder(payload.getProductType()));
+    payload.setSortOrder(nextSortOrder());
     payload.setCreatedByName(identity.displayName());
     payload.setCreatedByAccountId(identity.accountId());
-    validateUniqueName(payload.getProductType(), payload.getName(), null);
+    validateUniqueName(payload.getName(), null);
     try {
       mapper.insert(payload);
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
     }
-    return requireConfiguration(payload.getId(), payload.getProductType());
+    return requireConfiguration(payload.getId());
   }
 
   @Transactional
-  public MarkupConfiguration updateConfiguration(
+  public SlabMarkupConfiguration updateConfiguration(
       Long id,
-      String productType,
-      MarkupConfiguration payload) {
+      SlabMarkupConfiguration payload) {
     requirePlatformScope();
-    String normalizedType = MarkupProductType.require(productType).value();
-    MarkupConfiguration existing = requireConfiguration(id, normalizedType);
+    SlabMarkupConfiguration existing = requireConfiguration(id);
     ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     payload.setId(id);
-    payload.setProductType(normalizedType);
     payload.setName(normalizedName(payload.getName()));
     payload.setStatus(existing.getStatus());
     payload.setSortOrder(existing.getSortOrder());
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
-    validateUniqueName(normalizedType, payload.getName(), id);
+    validateUniqueName(payload.getName(), id);
     try {
       mapper.updateById(payload);
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
     }
-    return requireConfiguration(id, normalizedType);
+    return requireConfiguration(id);
   }
 
   @Transactional
-  public MarkupConfiguration updateStatus(Long id, String productType, String status) {
+  public SlabMarkupConfiguration updateStatus(Long id, String status) {
     requirePlatformScope();
-    MarkupConfiguration existing = requireConfiguration(id, MarkupProductType.require(productType).value());
+    SlabMarkupConfiguration existing = requireConfiguration(id);
     ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     mapper.updateById(existing);
-    return requireConfiguration(id, existing.getProductType());
+    return requireConfiguration(id);
   }
 
   @Transactional
-  public List<MarkupConfiguration> reorderConfigurations(String productType, List<Long> orderedIds) {
+  public List<SlabMarkupConfiguration> reorderConfigurations(List<Long> orderedIds) {
     requirePlatformScope();
-    String normalizedType = MarkupProductType.require(productType).value();
-    List<MarkupConfiguration> configurations = mapper.selectList(
-        Wrappers.<MarkupConfiguration>lambdaQuery()
-            .eq(MarkupConfiguration::getProductType, normalizedType));
+    List<SlabMarkupConfiguration> configurations = mapper.selectList(
+        Wrappers.<SlabMarkupConfiguration>lambdaQuery());
     if (orderedIds == null
         || orderedIds.size() != configurations.size()
         || new HashSet<>(orderedIds).size() != configurations.size()) {
       throw new IllegalArgumentException("请提交当前商品类型的全部加价配置");
     }
-    Map<Long, MarkupConfiguration> configurationsById = configurations.stream()
-        .collect(Collectors.toMap(MarkupConfiguration::getId, Function.identity()));
+    Map<Long, SlabMarkupConfiguration> configurationsById = configurations.stream()
+        .collect(Collectors.toMap(SlabMarkupConfiguration::getId, Function.identity()));
     if (!configurationsById.keySet().equals(new HashSet<>(orderedIds))) {
       throw new IllegalArgumentException("加价配置顺序与当前数据不一致");
     }
     configurations.forEach(item ->
         ownershipGuard.requireCreator(item.getCreatedByAccountId(), item.getCreatedByName()));
     for (int index = 0; index < orderedIds.size(); index += 1) {
-      MarkupConfiguration configuration = configurationsById.get(orderedIds.get(index));
+      SlabMarkupConfiguration configuration = configurationsById.get(orderedIds.get(index));
       configuration.setSortOrder(index + 1);
       mapper.updateById(configuration);
     }
-    return listConfigurations(normalizedType, false);
+    return listConfigurations(false);
   }
 
   @Transactional
-  public void deleteConfiguration(Long id, String productType) {
+  public void deleteConfiguration(Long id) {
     requirePlatformScope();
-    MarkupConfiguration existing = requireConfiguration(id, MarkupProductType.require(productType).value());
+    SlabMarkupConfiguration existing = requireConfiguration(id);
     ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     if (mapper.countProductReferences(id) > 0) {
       throw new IllegalArgumentException("加价配置“" + existing.getName() + "”已被商品使用，只能停用");
@@ -140,10 +132,8 @@ public class MarkupConfigurationService {
     mapper.deleteById(id);
   }
 
-  public MarkupConfiguration requireConfiguration(Long id, String productType) {
-    MarkupConfiguration configuration = mapper.selectOne(Wrappers.<MarkupConfiguration>lambdaQuery()
-        .eq(MarkupConfiguration::getId, id)
-        .eq(MarkupConfiguration::getProductType, MarkupProductType.require(productType).value()));
+  public SlabMarkupConfiguration requireConfiguration(Long id) {
+    SlabMarkupConfiguration configuration = mapper.selectById(id);
     if (configuration == null) {
       throw new IllegalArgumentException("加价配置不存在");
     }
@@ -159,23 +149,21 @@ public class MarkupConfigurationService {
     return identity;
   }
 
-  private void validateUniqueName(String productType, String name, Long excludedId) {
-    var query = Wrappers.<MarkupConfiguration>lambdaQuery()
-        .eq(MarkupConfiguration::getProductType, productType)
-        .eq(MarkupConfiguration::getName, name);
+  private void validateUniqueName(String name, Long excludedId) {
+    var query = Wrappers.<SlabMarkupConfiguration>lambdaQuery()
+        .eq(SlabMarkupConfiguration::getName, name);
     if (excludedId != null) {
-      query.ne(MarkupConfiguration::getId, excludedId);
+      query.ne(SlabMarkupConfiguration::getId, excludedId);
     }
     if (mapper.selectCount(query) > 0) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
     }
   }
 
-  private int nextSortOrder(String productType) {
-    MarkupConfiguration lastConfiguration = mapper.selectOne(
-        Wrappers.<MarkupConfiguration>lambdaQuery()
-            .eq(MarkupConfiguration::getProductType, productType)
-            .orderByDesc(MarkupConfiguration::getSortOrder)
+  private int nextSortOrder() {
+    SlabMarkupConfiguration lastConfiguration = mapper.selectOne(
+        Wrappers.<SlabMarkupConfiguration>lambdaQuery()
+            .orderByDesc(SlabMarkupConfiguration::getSortOrder)
             .last("LIMIT 1"));
     return lastConfiguration == null || lastConfiguration.getSortOrder() == null
         ? 1

@@ -6,8 +6,8 @@ spring:
     name: zdm-platform-backend
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      max-file-size: 100MB
+      max-request-size: 100MB
   datasource:
     url: ${ZDM_DB_URL:jdbc:mysql://127.0.0.1:3306/zdm_admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
     username: ${ZDM_DB_USERNAME:zdm_admin}
@@ -39,3 +39,5 @@ zdm:
     session-duration: ${ZDM_SECURITY_SESSION_DURATION:PT12H}
   craft-image:
     storage-path: ${ZDM_CRAFT_IMAGE_DIR:./data/craft-images}
+  slab-image:
+    storage-path: ${ZDM_SLAB_IMAGE_DIR:/data/zdm/craft-images/slabs}

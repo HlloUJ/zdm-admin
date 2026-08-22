@@ -10,6 +10,7 @@ services:
       ZDM_SECURITY_DEV_TOKENS_ENABLED: 'true'
       ZDM_SECURITY_VERIFICATION_CODE: '888888'
       ZDM_CRAFT_IMAGE_DIR: /data/zdm/craft-images
+      ZDM_SLAB_IMAGE_DIR: /data/zdm/craft-images/slabs
       SPRING_FLYWAY_LOCATIONS: filesystem:/task-migrations
     ports:
       - '127.0.0.1:${ZDM_TASK_BACKEND_PORT:?set ZDM_TASK_BACKEND_PORT}:8080'
