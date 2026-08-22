@@ -141,9 +141,10 @@
         <t-form-item label="工艺图片" name="image">
           <AdminMediaUpload
             v-model="formData.image"
+            class="craft-media-upload"
             title="工艺图片"
             accept="image/*"
-            required
+            :show-title="false"
             label="点击上传图片"
             :upload="uploadCraftMedia"
             @uploaded="formRef?.clearValidate(['image'])"
@@ -801,6 +802,10 @@ onMounted(loadCrafts);
 
 .craft-image__empty {
   font-size: 12px;
+}
+
+.craft-media-upload {
+  width: 168px;
 }
 
 .image-preview {

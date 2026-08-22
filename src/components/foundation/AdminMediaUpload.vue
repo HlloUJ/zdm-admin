@@ -3,7 +3,7 @@
     class="admin-media-upload"
     :class="{ 'is-disabled': disabled, 'is-error': Boolean(errorMessage), 'is-loading': loading }"
   >
-    <span v-if="required" class="admin-media-upload__required">*</span>
+    <span v-if="required && showTitle" class="admin-media-upload__required">*</span>
     <t-button
       v-if="modelValue && !disabled"
       class="admin-media-upload__delete"
@@ -14,7 +14,7 @@
     >
       删除
     </t-button>
-    <strong>{{ title }}</strong>
+    <strong v-if="showTitle">{{ title }}</strong>
     <img
       v-if="previewUrl"
       class="admin-media-upload__preview"
@@ -60,6 +60,7 @@ const props = withDefaults(
     label?: string;
     accept?: string;
     required?: boolean;
+    showTitle?: boolean;
     disabled?: boolean;
     errorMessage?: string;
     upload: (file: File) => Promise<AdminMediaValue>;
@@ -69,6 +70,7 @@ const props = withDefaults(
     label: '点击上传',
     accept: 'image/*',
     required: false,
+    showTitle: true,
     disabled: false,
     errorMessage: '',
   },
