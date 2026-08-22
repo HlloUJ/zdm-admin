@@ -79,18 +79,18 @@ test('searches slabs by name, id, or code with the shared filter on every status
   const keywordInput = page.getByPlaceholder('大板名称/ID/编码', { exact: true });
   await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
   const primaryLabels = await page.locator('.filter-primary-row .t-form__label').allTextContents();
-  expect(primaryLabels.slice(-2)).toEqual(['等级：', '租户：']);
+  expect(primaryLabels.slice(-2)).toEqual(['色系：', '等级：']);
   const primaryGap = await page.locator('.filter-primary-row').evaluate((element) => {
     const styles = getComputedStyle(element);
     return { columnGap: styles.columnGap, rowGap: styles.rowGap };
   });
   expect(primaryGap.columnGap).toBe(primaryGap.rowGap);
   const keywordBox = await page.locator('.slab-keyword-filter').boundingBox();
-  const storeBox = await page.locator('.store-filter').boundingBox();
+  const supplierBox = await page.locator('.supplier-filter').boundingBox();
   const searchBox = await page.getByRole('button', { name: '查询', exact: true }).boundingBox();
-  expect(storeBox?.x).toBe(keywordBox?.x);
-  expect(searchBox?.y).toBe(storeBox?.y);
-  expect(searchBox?.x).toBeGreaterThan((storeBox?.x ?? 0) + (storeBox?.width ?? 0));
+  expect(supplierBox?.x).toBe(keywordBox?.x);
+  expect(searchBox?.y).toBe(supplierBox?.y);
+  expect(searchBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
 
   for (const tabLabel of ['仓库中 1', '出售中', '已下架', '已售完', '回收站 2']) {
     await page.getByText(tabLabel, { exact: true }).click();
@@ -111,7 +111,7 @@ test('searches slabs by name, id, or code with the shared filter on every status
   await expect(page.getByRole('row', { name: /回收站大板 07/ })).toHaveCount(0);
 });
 
-test('aligns tenant and reset on the right while distributing slab filters evenly', async ({ page }) => {
+test('aligns supplier with the slab filter while keeping actions on the right', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/slab-management');
 
@@ -125,12 +125,11 @@ test('aligns tenant and reset on the right while distributing slab filters evenl
   const gaps = itemBoxes.slice(1).map((box, index) => Math.round(box.left - itemBoxes[index].right));
   expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
 
-  const tenantBox = await page.locator('.tenant-filter').boundingBox();
+  const supplierBox = await page.locator('.supplier-filter').boundingBox();
   const resetBox = await page.locator('.reset-filter-button').boundingBox();
-  expect(Math.round((tenantBox?.x ?? 0) + (tenantBox?.width ?? 0))).toBe(
-    Math.round((resetBox?.x ?? 0) + (resetBox?.width ?? 0)),
-  );
-  await expect(page.locator('.store-filter')).toHaveCSS('width', '234px');
+  expect(supplierBox?.x).toBe((await page.locator('.slab-keyword-filter').boundingBox())?.x);
+  expect(resetBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
+  await expect(page.locator('.supplier-filter')).toHaveCSS('width', '234px');
   await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
 });
 

@@ -36,7 +36,7 @@ class MarkupConfigurationServiceTest {
 
   @Test
   void storeIdentityCannotReadPlatformMarkupConfiguration() {
-    MarkupConfigurationMapper mapper = Mockito.mock(MarkupConfigurationMapper.class);
+    SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     CreatorOwnershipGuard ownershipGuard = Mockito.mock(CreatorOwnershipGuard.class);
     when(identityProvider.require()).thenReturn(new CurrentIdentity(
@@ -51,9 +51,9 @@ class MarkupConfigurationServiceTest {
         "all",
         List.of("STORE_ADMIN"),
         List.of("all")));
-    MarkupConfigurationService service = new MarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
 
-    assertThatThrownBy(() -> service.listConfigurations("finished", false))
+    assertThatThrownBy(() -> service.listConfigurations(false))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessage("仅运营管理平台可以维护加价配置");
     verifyNoInteractions(mapper);
@@ -61,48 +61,46 @@ class MarkupConfigurationServiceTest {
 
   @Test
   void selfDataPermissionStillReadsConfigurationsCreatedByOtherAccounts() {
-    MarkupConfigurationMapper mapper = Mockito.mock(MarkupConfigurationMapper.class);
+    SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     CreatorOwnershipGuard ownershipGuard = Mockito.mock(CreatorOwnershipGuard.class);
-    MarkupConfiguration otherCreatorConfiguration = new MarkupConfiguration();
+    SlabMarkupConfiguration otherCreatorConfiguration = new SlabMarkupConfiguration();
     otherCreatorConfiguration.setId(21L);
-    otherCreatorConfiguration.setProductType("finished");
     otherCreatorConfiguration.setName("其他员工添加");
     otherCreatorConfiguration.setCreatedByAccountId(99L);
     when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
     when(mapper.selectList(any())).thenReturn(List.of(otherCreatorConfiguration));
-    MarkupConfigurationService service = new MarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
 
-    assertThat(service.listConfigurations("finished", false))
-        .extracting(MarkupConfiguration::getCreatedByAccountId)
+    assertThat(service.listConfigurations(false))
+        .extracting(SlabMarkupConfiguration::getCreatedByAccountId)
         .containsExactly(99L);
     verifyNoInteractions(ownershipGuard);
   }
 
   @Test
   void operationsRequireCreatorOwnership() {
-    MarkupConfigurationMapper mapper = Mockito.mock(MarkupConfigurationMapper.class);
+    SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     CreatorOwnershipGuard ownershipGuard = Mockito.mock(CreatorOwnershipGuard.class);
-    MarkupConfiguration otherCreatorConfiguration = new MarkupConfiguration();
+    SlabMarkupConfiguration otherCreatorConfiguration = new SlabMarkupConfiguration();
     otherCreatorConfiguration.setId(21L);
-    otherCreatorConfiguration.setProductType("finished");
     otherCreatorConfiguration.setName("其他员工添加");
     otherCreatorConfiguration.setCreatedByAccountId(99L);
     when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
-    when(mapper.selectOne(any())).thenReturn(otherCreatorConfiguration);
+    when(mapper.selectById(21L)).thenReturn(otherCreatorConfiguration);
     doThrow(new AccessDeniedException(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE))
         .when(ownershipGuard)
         .requireCreator(99L, null);
-    MarkupConfigurationService service = new MarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
 
-    assertThatThrownBy(() -> service.updateConfiguration(21L, "finished", new MarkupConfiguration()))
+    assertThatThrownBy(() -> service.updateConfiguration(21L, new SlabMarkupConfiguration()))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessage(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE);
-    assertThatThrownBy(() -> service.updateStatus(21L, "finished", "disabled"))
+    assertThatThrownBy(() -> service.updateStatus(21L, "disabled"))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessage(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE);
-    assertThatThrownBy(() -> service.deleteConfiguration(21L, "finished"))
+    assertThatThrownBy(() -> service.deleteConfiguration(21L))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessage(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE);
     verify(ownershipGuard, times(3)).requireCreator(99L, null);
@@ -110,27 +108,25 @@ class MarkupConfigurationServiceTest {
 
   @Test
   void reorderRequiresOwnershipOfEveryConfiguration() {
-    MarkupConfigurationMapper mapper = Mockito.mock(MarkupConfigurationMapper.class);
+    SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     CreatorOwnershipGuard ownershipGuard = Mockito.mock(CreatorOwnershipGuard.class);
-    MarkupConfiguration ownConfiguration = new MarkupConfiguration();
+    SlabMarkupConfiguration ownConfiguration = new SlabMarkupConfiguration();
     ownConfiguration.setId(21L);
-    ownConfiguration.setProductType("finished");
     ownConfiguration.setCreatedByAccountId(11L);
-    MarkupConfiguration otherConfiguration = new MarkupConfiguration();
+    SlabMarkupConfiguration otherConfiguration = new SlabMarkupConfiguration();
     otherConfiguration.setId(22L);
-    otherConfiguration.setProductType("finished");
     otherConfiguration.setCreatedByAccountId(99L);
     when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
     when(mapper.selectList(any())).thenReturn(List.of(ownConfiguration, otherConfiguration));
     doThrow(new AccessDeniedException(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE))
         .when(ownershipGuard)
         .requireCreator(99L, null);
-    MarkupConfigurationService service = new MarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
 
-    assertThatThrownBy(() -> service.reorderConfigurations("finished", List.of(22L, 21L)))
+    assertThatThrownBy(() -> service.reorderConfigurations(List.of(22L, 21L)))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessage(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE);
-    verify(mapper, never()).updateById(any(MarkupConfiguration.class));
+    verify(mapper, never()).updateById(any(SlabMarkupConfiguration.class));
   }
 }
