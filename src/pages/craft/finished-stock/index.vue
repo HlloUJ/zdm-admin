@@ -139,15 +139,16 @@
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
         <t-form-item label="工艺图片" name="image">
-          <t-upload
+          <AdminMediaUpload
             v-model="formData.image"
-            theme="image"
+            title="工艺图片"
             accept="image/*"
-            :auto-upload="false"
-            :multiple="false"
-            :max="1"
-            :size-limit="{ size: 5, unit: 'MB' }"
-            tips="点击上传图片"
+            required
+            label="点击上传图片"
+            :upload="uploadCraftMedia"
+            @uploaded="formRef?.clearValidate(['image'])"
+            @removed="releasePendingCraftMedia"
+            @preview="openFormImagePreview"
           />
         </t-form-item>
         <t-form-item label="工艺名称" name="name">
@@ -212,7 +213,13 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, Up
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import {
+  adminFeedback,
+  AdminConfirmDialog,
+  AdminMediaUpload,
+  AdminPagination,
+  type AdminMediaValue,
+} from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
@@ -222,6 +229,7 @@ import {
   listCrafts,
   updateCraft,
   updateCraftStatus,
+  releaseTemporaryCraftImage,
   uploadCraftImage,
   type CraftPayload,
   type CraftRecord,
@@ -232,6 +240,7 @@ type ConfirmType = 'enable' | 'disable' | 'delete';
 
 interface CraftItem {
   id: number;
+  imageMediaId?: number;
   image: UploadFile[];
   name: string;
   type: string;
@@ -244,7 +253,7 @@ interface CraftItem {
 }
 
 interface CraftForm {
-  image: UploadFile[];
+  image?: AdminMediaValue;
   name: string;
   type: string;
   width: string;
@@ -298,7 +307,7 @@ const formDialogVisible = ref(false);
 const dialogMode = ref<'create' | 'edit'>('create');
 const editingId = ref<number | null>(null);
 const formData = reactive<CraftForm>({
-  image: [],
+  image: undefined,
   name: '',
   type: '',
   width: '',
@@ -370,6 +379,7 @@ const toUploadFiles = (record: CraftRecord): UploadFile[] => {
 
 const toCraftItem = (record: CraftRecord): CraftItem => ({
   id: record.id,
+  imageMediaId: record.imageMediaId,
   image: toUploadFiles(record),
   name: record.name,
   type: record.type,
@@ -381,11 +391,11 @@ const toCraftItem = (record: CraftRecord): CraftItem => ({
   remark: record.remark ?? '',
 });
 
-const toCraftPayload = (status: CraftStatus, imageUrl?: string): CraftPayload => ({
+const toCraftPayload = (status: CraftStatus, imageMediaId?: number): CraftPayload => ({
   name: formData.name.trim(),
   type: formData.type,
   width: formData.width,
-  imageUrl,
+  imageMediaId,
   description: formData.remark.trim(),
   pricingMethod: formData.width ? 'width' : undefined,
   remark: formData.remark.trim(),
@@ -406,7 +416,7 @@ const loadCrafts = async () => {
 };
 
 const resetFormData = () => {
-  formData.image = [];
+  formData.image = undefined;
   formData.name = '';
   formData.type = '';
   formData.width = '';
@@ -414,7 +424,10 @@ const resetFormData = () => {
 };
 
 const fillFormData = (row: CraftItem) => {
-  formData.image = [...row.image];
+  formData.image =
+    row.imageMediaId && row.image[0]?.url
+      ? { name: `${row.name || 'craft'}.png`, mediaId: row.imageMediaId, url: row.image[0].url }
+      : undefined;
   formData.name = row.name;
   formData.type = row.type;
   formData.width = row.width.replace(/\D/g, '');
@@ -461,17 +474,33 @@ const openEditDialog = (row: CraftItem) => {
 const closeFormDialog = () => {
   formDialogVisible.value = false;
   formRef.value?.clearValidate();
+  if (pendingUploadedMediaIds.size) {
+    const mediaIds = [...pendingUploadedMediaIds];
+    pendingUploadedMediaIds.clear();
+    mediaIds.forEach((mediaId) => void releaseTemporaryCraftImage(mediaId));
+  }
 };
 
-const resolveFormImageUrl = async () => {
-  const image = formData.image[0];
-  if (!image) return undefined;
-  if (!image.raw) return image.url;
+const pendingUploadedMediaIds = new Set<number>();
 
-  const uploaded = await uploadCraftImage(image.raw);
-  image.url = uploaded.url;
-  image.status = 'success';
-  return uploaded.url;
+const uploadCraftMedia = async (file: File): Promise<AdminMediaValue> => {
+  const uploaded = await uploadCraftImage(file);
+  pendingUploadedMediaIds.add(uploaded.id);
+  return { name: file.name, mediaId: uploaded.id, url: uploaded.url };
+};
+
+const releasePendingCraftMedia = (media: AdminMediaValue) => {
+  const mediaId = media.mediaId;
+  if (!mediaId || !pendingUploadedMediaIds.has(mediaId)) return;
+  pendingUploadedMediaIds.delete(mediaId);
+  void releaseTemporaryCraftImage(mediaId);
+};
+
+const openFormImagePreview = () => {
+  if (!formData.image?.url) return;
+  previewCraftName.value = formData.name.trim() || '工艺图片';
+  previewImageUrl.value = formData.image.url;
+  imagePreviewVisible.value = true;
 };
 
 const handleSubmit = async () => {
@@ -488,17 +517,18 @@ const handleSubmit = async () => {
   }
 
   try {
-    const imageUrl = await resolveFormImageUrl();
+    const imageMediaId = formData.image?.mediaId;
     if (dialogMode.value === 'create') {
-      await createCraft(toCraftPayload('normal', imageUrl));
+      await createCraft(toCraftPayload('normal', imageMediaId));
       await loadCrafts();
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
-      await updateCraft(editingId.value, toCraftPayload(current?.status ?? 'normal', imageUrl));
+      await updateCraft(editingId.value, toCraftPayload(current?.status ?? 'normal', imageMediaId));
       await loadCrafts();
     }
 
+    pendingUploadedMediaIds.clear();
     closeFormDialog();
     if (dialogMode.value === 'create') {
       adminFeedback.created(normalizedName);

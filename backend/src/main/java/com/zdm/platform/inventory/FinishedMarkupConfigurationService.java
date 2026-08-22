@@ -32,7 +32,9 @@ public class FinishedMarkupConfigurationService {
   public List<FinishedMarkupConfiguration> listConfigurations(boolean enabledOnly) {
     requirePlatformScope();
     var query = Wrappers.<FinishedMarkupConfiguration>lambdaQuery();
-    if (enabledOnly) query.eq(FinishedMarkupConfiguration::getStatus, "enabled");
+    if (enabledOnly) {
+      query.eq(FinishedMarkupConfiguration::getStatus, "enabled");
+    }
     List<FinishedMarkupConfiguration> result = mapper.selectList(query
         .orderByAsc(FinishedMarkupConfiguration::getSortOrder)
         .orderByDesc(FinishedMarkupConfiguration::getCreatedAt)
@@ -122,7 +124,9 @@ public class FinishedMarkupConfigurationService {
 
   public FinishedMarkupConfiguration requireConfiguration(Long id) {
     FinishedMarkupConfiguration configuration = mapper.selectById(id);
-    if (configuration == null) throw new IllegalArgumentException("成品现货价格层级不存在");
+    if (configuration == null) {
+      throw new IllegalArgumentException("成品现货价格层级不存在");
+    }
     configuration.setReferenced(mapper.countProductReferences(id) > 0);
     return configuration;
   }
@@ -138,8 +142,12 @@ public class FinishedMarkupConfigurationService {
   private void validateUniqueName(String name, Long excludedId) {
     var query = Wrappers.<FinishedMarkupConfiguration>lambdaQuery()
         .eq(FinishedMarkupConfiguration::getName, name);
-    if (excludedId != null) query.ne(FinishedMarkupConfiguration::getId, excludedId);
-    if (mapper.selectCount(query) > 0) throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
+    if (excludedId != null) {
+      query.ne(FinishedMarkupConfiguration::getId, excludedId);
+    }
+    if (mapper.selectCount(query) > 0) {
+      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
+    }
   }
 
   private int nextSortOrder() {
@@ -150,9 +158,13 @@ public class FinishedMarkupConfigurationService {
   }
 
   private String normalizedName(String value) {
-    if (!StringUtils.hasText(value)) throw new IllegalArgumentException("请输入价格层级名称");
+    if (!StringUtils.hasText(value)) {
+      throw new IllegalArgumentException("请输入价格层级名称");
+    }
     String name = value.trim();
-    if (name.length() > 20) throw new IllegalArgumentException("价格层级名称最多20个字");
+    if (name.length() > 20) {
+      throw new IllegalArgumentException("价格层级名称最多20个字");
+    }
     return name;
   }
 }

@@ -8,4 +8,11 @@
     <Class name="~com\.zdm\.platform\..*Service"/>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
+  <Match>
+    <Or>
+      <Class name="com.zdm.platform.media.MediaCleanupScheduler"/>
+      <Class name="com.zdm.platform.media.MediaCleanupWorker"/>
+    </Or>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
 </FindBugsFilter>

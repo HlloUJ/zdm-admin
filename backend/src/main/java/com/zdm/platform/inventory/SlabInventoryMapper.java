@@ -17,13 +17,4 @@ public interface SlabInventoryMapper extends BaseMapper<SlabInventory> {
       """)
   List<SlabInventory> selectListWithDetails();
 
-  @Select("""
-      SELECT COUNT(*) FROM slab_inventory
-      WHERE main_image_url = #{url}
-         OR scan_image_url = #{url}
-         OR design_image_url = #{url}
-         OR video_url = #{url}
-         OR video_cover_url = #{url}
-      """)
-  long countMediaReferences(String url);
 }

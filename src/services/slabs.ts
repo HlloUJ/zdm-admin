@@ -1,4 +1,5 @@
 import { request } from './http';
+import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
 export type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 export type SlabPublisherType = '平台发布' | '接口获取';
@@ -21,6 +22,11 @@ export interface SlabRecord {
   serialNo: string;
   warehouse?: string;
   publisherType?: SlabPublisherType;
+  mainImageMediaId?: number;
+  scanImageMediaId?: number;
+  designImageMediaId?: number;
+  videoMediaId?: number;
+  videoCoverMediaId?: number;
   mainImageUrl?: string;
   scanImageUrl?: string;
   designImageUrl?: string;
@@ -63,11 +69,11 @@ export interface SlabPayload {
   serialNo: string;
   warehouse?: string;
   publisherType?: SlabPublisherType;
-  mainImageUrl?: string;
-  scanImageUrl?: string;
-  designImageUrl?: string;
-  videoUrl?: string;
-  videoCoverUrl?: string;
+  mainImageMediaId?: number;
+  scanImageMediaId?: number;
+  designImageMediaId?: number;
+  videoMediaId?: number;
+  videoCoverMediaId?: number;
   lengthMm?: number;
   widthMm?: number;
   thicknessMm?: number;
@@ -120,18 +126,11 @@ export function createSlab(payload: SlabPayload) {
 }
 
 export function uploadSlabImage(file: File) {
-  const body = new FormData();
-  body.append('file', file);
-  return request<{ url: string }>('/admin/slabs/images', {
-    method: 'POST',
-    body,
-  });
+  return uploadMedia('/admin/slabs/images', file);
 }
 
-export function deleteUnreferencedSlabImage(url: string) {
-  return request<boolean>(`/admin/slabs/images?url=${encodeURIComponent(url)}`, {
-    method: 'DELETE',
-  });
+export function releaseTemporarySlabMedia(mediaId: MediaResource['id']) {
+  return releaseTemporaryMedia('/admin/slabs/images', mediaId);
 }
 
 export function updateSlab(id: number, payload: SlabPayload) {

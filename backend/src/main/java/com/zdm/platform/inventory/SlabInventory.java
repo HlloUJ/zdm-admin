@@ -25,10 +25,25 @@ public class SlabInventory extends BaseEntity {
 
   private String warehouse;
   private String publisherType;
+  private Long mainImageMediaId;
+  private Long scanImageMediaId;
+  private Long designImageMediaId;
+  private Long videoMediaId;
+  private Long videoCoverMediaId;
+
+  @TableField(exist = false)
   private String mainImageUrl;
+
+  @TableField(exist = false)
   private String scanImageUrl;
+
+  @TableField(exist = false)
   private String designImageUrl;
+
+  @TableField(exist = false)
   private String videoUrl;
+
+  @TableField(exist = false)
   private String videoCoverUrl;
   private String createdByName;
   private Long createdByAccountId;
@@ -139,6 +154,46 @@ public class SlabInventory extends BaseEntity {
 
   public void setPublisherType(String publisherType) {
     this.publisherType = publisherType;
+  }
+
+  public Long getMainImageMediaId() {
+    return mainImageMediaId;
+  }
+
+  public void setMainImageMediaId(Long mainImageMediaId) {
+    this.mainImageMediaId = mainImageMediaId;
+  }
+
+  public Long getScanImageMediaId() {
+    return scanImageMediaId;
+  }
+
+  public void setScanImageMediaId(Long scanImageMediaId) {
+    this.scanImageMediaId = scanImageMediaId;
+  }
+
+  public Long getDesignImageMediaId() {
+    return designImageMediaId;
+  }
+
+  public void setDesignImageMediaId(Long designImageMediaId) {
+    this.designImageMediaId = designImageMediaId;
+  }
+
+  public Long getVideoMediaId() {
+    return videoMediaId;
+  }
+
+  public void setVideoMediaId(Long videoMediaId) {
+    this.videoMediaId = videoMediaId;
+  }
+
+  public Long getVideoCoverMediaId() {
+    return videoCoverMediaId;
+  }
+
+  public void setVideoCoverMediaId(Long videoCoverMediaId) {
+    this.videoCoverMediaId = videoCoverMediaId;
   }
 
   public String getMainImageUrl() {

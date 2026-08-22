@@ -1,11 +1,16 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.media.MediaAsset;
+import com.zdm.platform.media.MediaAssetService;
+import com.zdm.platform.media.MediaCleanupService;
+import com.zdm.platform.media.MediaReferenceService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +33,9 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   private final SlabGradeService gradeService;
   private final SlabOriginService originService;
   private final SlabPriceService priceService;
-  private final SlabMediaCleanupService mediaCleanupService;
+  private final MediaAssetService mediaAssetService;
+  private final MediaCleanupService mediaCleanupService;
+  private final MediaReferenceService mediaReferenceService;
   private final CurrentIdentityProvider identityProvider;
 
   public SlabInventoryService(
@@ -37,14 +44,18 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       SlabGradeService gradeService,
       SlabOriginService originService,
       SlabPriceService priceService,
-      SlabMediaCleanupService mediaCleanupService,
+      MediaAssetService mediaAssetService,
+      MediaCleanupService mediaCleanupService,
+      MediaReferenceService mediaReferenceService,
       CurrentIdentityProvider identityProvider) {
     this.textureService = textureService;
     this.colorService = colorService;
     this.gradeService = gradeService;
     this.originService = originService;
     this.priceService = priceService;
+    this.mediaAssetService = mediaAssetService;
     this.mediaCleanupService = mediaCleanupService;
+    this.mediaReferenceService = mediaReferenceService;
     this.identityProvider = identityProvider;
   }
 
@@ -66,6 +77,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       throw new IllegalArgumentException(DUPLICATE_SERIAL_MESSAGE, exception);
     }
     priceService.replacePrices(inventory.getId(), markupPrices);
+    syncMediaReferences(inventory);
     return attachPrices(inventory);
   }
 
@@ -90,14 +102,14 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if (markupPrices != null) {
       priceService.replacePrices(id, markupPrices);
     }
-    List<String> retainedMedia = mediaCleanupService.mediaUrls(inventory);
-    mediaCleanupService.cleanupAfterCommit(mediaCleanupService.mediaUrls(existing).stream()
-        .filter(url -> !retainedMedia.contains(url)).toList());
+    syncMediaReferences(inventory);
     return attachPrices(getById(id));
   }
 
-  public boolean cleanupTemporaryMedia(String url) {
-    return mediaCleanupService.cleanupIfUnreferenced(url);
+  public boolean cleanupTemporaryMedia(Long mediaId) {
+    mediaAssetService.requireAvailable(mediaId);
+    mediaCleanupService.enqueueAfterCommit(List.of(mediaId), "取消未保存的大板媒体");
+    return true;
   }
 
   @Override
@@ -106,7 +118,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     SlabInventory existing = getById(id);
     boolean removed = super.removeById(id);
     if (removed && existing != null) {
-      mediaCleanupService.cleanupAfterCommit(mediaCleanupService.mediaUrls(existing));
+      mediaReferenceService.removeBusiness("SLAB", existing.getId(), "大板被彻底删除");
     }
     return removed;
   }
@@ -179,6 +191,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
 
   public void validateReferences(SlabInventory inventory) {
     validateMeasurements(inventory);
+    validateMedia(inventory);
     if (inventory.getTextureId() != null && textureService.getById(inventory.getTextureId()) == null) {
       throw new IllegalArgumentException("纹理不存在");
     }
@@ -217,7 +230,52 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   }
 
   private SlabInventory attachPrices(SlabInventory inventory) {
+    attachMediaUrls(inventory);
     inventory.setMarkupPrices(priceService.listPrices(inventory.getId()));
     return inventory;
+  }
+
+  private void validateMedia(SlabInventory inventory) {
+    requireMediaType(inventory.getMainImageMediaId(), "image", "请上传商品主图");
+    requireMediaType(inventory.getScanImageMediaId(), "image", "请上传扫描图");
+    requireMediaType(inventory.getDesignImageMediaId(), "image", "请上传设计图");
+    if (inventory.getVideoMediaId() != null) {
+      requireMediaType(inventory.getVideoMediaId(), "video", "商品视频格式不正确");
+      requireMediaType(inventory.getVideoCoverMediaId(), "image", "商品视频封面不存在");
+    } else if (inventory.getVideoCoverMediaId() != null) {
+      throw new IllegalArgumentException("商品视频不存在");
+    }
+  }
+
+  private void requireMediaType(Long mediaId, String mediaType, String emptyMessage) {
+    if (mediaId == null) {
+      throw new IllegalArgumentException(emptyMessage);
+    }
+    MediaAsset asset = mediaAssetService.requireAvailable(mediaId);
+    if (!mediaType.equals(asset.getMediaType())) {
+      throw new IllegalArgumentException("媒体文件类型不正确");
+    }
+  }
+
+  private void syncMediaReferences(SlabInventory inventory) {
+    Map<String, Long> references = new LinkedHashMap<>();
+    references.put("mainImage", inventory.getMainImageMediaId());
+    references.put("scanImage", inventory.getScanImageMediaId());
+    references.put("designImage", inventory.getDesignImageMediaId());
+    references.put("video", inventory.getVideoMediaId());
+    references.put("videoCover", inventory.getVideoCoverMediaId());
+    mediaReferenceService.replace("SLAB", inventory.getId(), references);
+    mediaAssetService.linkDerivedMedia(inventory.getVideoCoverMediaId(), inventory.getVideoMediaId());
+  }
+
+  private void attachMediaUrls(SlabInventory inventory) {
+    if (inventory == null) {
+      return;
+    }
+    inventory.setMainImageUrl(mediaAssetService.publicUrl(inventory.getMainImageMediaId()));
+    inventory.setScanImageUrl(mediaAssetService.publicUrl(inventory.getScanImageMediaId()));
+    inventory.setDesignImageUrl(mediaAssetService.publicUrl(inventory.getDesignImageMediaId()));
+    inventory.setVideoUrl(mediaAssetService.publicUrl(inventory.getVideoMediaId()));
+    inventory.setVideoCoverUrl(mediaAssetService.publicUrl(inventory.getVideoCoverMediaId()));
   }
 }

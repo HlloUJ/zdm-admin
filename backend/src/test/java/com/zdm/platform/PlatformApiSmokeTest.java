@@ -16,6 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.zdm.platform.security.TokenAuthenticationFilter;
+import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 class PlatformApiSmokeTest {
+  private static final Path MEDIA_ROOT = Path.of(
+      System.getProperty("java.io.tmpdir"), "zdm-media-smoke-" + UUID.randomUUID());
+
   @Container
   private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
       .withDatabaseName("zdm_admin_test")
@@ -59,11 +64,40 @@ class PlatformApiSmokeTest {
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
     registry.add(
-        "zdm.craft-image.storage-path",
-        () -> System.getProperty("java.io.tmpdir") + "/zdm-craft-images-smoke");
-    registry.add(
-        "zdm.slab-image.storage-path",
-        () -> System.getProperty("java.io.tmpdir") + "/zdm-slab-images-smoke");
+        "zdm.media.storage-path",
+        MEDIA_ROOT::toString);
+  }
+
+  @Test
+  void expiredTemporaryMediaIsCleanedAndAudited() throws Exception {
+    MockMultipartFile image = new MockMultipartFile(
+        "file",
+        "temporary.png",
+        "image/png",
+        new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47});
+    MvcResult uploadResult = mockMvc.perform(multipart("/api/admin/crafts/images")
+            .file(image)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andReturn();
+    Integer mediaId = com.jayway.jsonpath.JsonPath.read(
+        uploadResult.getResponse().getContentAsString(), "$.data.id");
+    String mediaUrl = com.jayway.jsonpath.JsonPath.read(
+        uploadResult.getResponse().getContentAsString(), "$.data.url");
+    jdbcTemplate.update(
+        "UPDATE media_assets SET created_at = DATE_SUB(NOW(), INTERVAL 2 DAY) WHERE id = ?",
+        mediaId);
+
+    mockMvc.perform(post("/api/admin/media/cleanup")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletedCount", greaterThanOrEqualTo(1)));
+    mockMvc.perform(get(mediaUrl)).andExpect(status().is4xxClientError());
+    mockMvc.perform(get("/api/admin/media/audit")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.unregisteredPhysicalFiles.length()").value(0))
+        .andExpect(jsonPath("$.data.missingPhysicalFiles.length()").value(0));
   }
 
   @Test
@@ -78,7 +112,7 @@ class PlatformApiSmokeTest {
             .file(image)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.url", containsString("/api/open/slab-images/")))
+        .andExpect(jsonPath("$.data.url", containsString("/api/open/media/")))
         .andReturn();
     String imageUrl = com.jayway.jsonpath.JsonPath.read(
         uploadResult.getResponse().getContentAsString(), "$.data.url");
@@ -95,7 +129,7 @@ class PlatformApiSmokeTest {
             .file(video)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.url", containsString("/api/open/slab-images/")))
+        .andExpect(jsonPath("$.data.url", containsString("/api/open/media/")))
         .andReturn();
     String videoUrl = com.jayway.jsonpath.JsonPath.read(
         videoUploadResult.getResponse().getContentAsString(), "$.data.url");
@@ -2976,6 +3010,9 @@ class PlatformApiSmokeTest {
     String imageUrl = com.jayway.jsonpath.JsonPath.read(
         uploadResult.getResponse().getContentAsString(),
         "$.data.url");
+    Long imageMediaId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
+        uploadResult.getResponse().getContentAsString(),
+        "$.data.id").toString());
 
     mockMvc.perform(get(imageUrl))
         .andExpect(status().isOk())
@@ -2990,12 +3027,12 @@ class PlatformApiSmokeTest {
                   "name": "%s",
                   "type": "边工艺",
                   "width": "12",
-                  "imageUrl": "%s",
+                  "imageMediaId": %d,
                   "remark": "新增备注",
                   "status": "enabled",
                   "createdByName": "不应覆盖"
                 }
-                """.formatted(craftName, imageUrl)))
+                """.formatted(craftName, imageMediaId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
         .andExpect(jsonPath("$.data.createdByName").value(creatorName))
@@ -3012,9 +3049,10 @@ class PlatformApiSmokeTest {
                 {
                   "name": "%s",
                   "type": "边工艺",
+                  "imageMediaId": %d,
                   "status": "enabled"
                 }
-                """.formatted(craftName)))
+                """.formatted(craftName, imageMediaId)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("工艺名称已存在"));
 
@@ -3026,9 +3064,10 @@ class PlatformApiSmokeTest {
                   "name": "%s-非法宽度",
                   "type": "边工艺",
                   "width": "12mm",
+                  "imageMediaId": %d,
                   "status": "enabled"
                 }
-                """.formatted(craftName)))
+                """.formatted(craftName, imageMediaId)))
         .andExpect(status().isBadRequest());
 
     mockMvc.perform(put("/api/admin/crafts/{id}", craftId)
@@ -3039,12 +3078,12 @@ class PlatformApiSmokeTest {
                   "name": "%s",
                   "type": "面工艺",
                   "width": "18",
-                  "imageUrl": "%s",
+                  "imageMediaId": %d,
                   "remark": "编辑备注",
                   "status": "enabled",
                   "createdByName": "不应覆盖"
                 }
-                """.formatted(craftName, imageUrl)))
+                """.formatted(craftName, imageMediaId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.imageUrl").value(imageUrl))
         .andExpect(jsonPath("$.data.remark").value("编辑备注"))
@@ -4440,6 +4479,11 @@ class PlatformApiSmokeTest {
     Long level3ConfigurationId = jdbcTemplate.queryForObject(
         "SELECT id FROM slab_markup_configurations WHERE name = '3级合伙人价格'",
         Long.class);
+    Long mainImageMediaId = uploadSlabMedia("main.png", "image/png");
+    Long scanImageMediaId = uploadSlabMedia("scan.png", "image/png");
+    Long designImageMediaId = uploadSlabMedia("design.png", "image/png");
+    Long videoMediaId = uploadSlabMedia("product.mp4", "video/mp4");
+    Long videoCoverMediaId = uploadSlabMedia("video-cover.jpg", "image/jpeg");
 
     Long slabId = null;
     Long interfaceSlabId = null;
@@ -4460,11 +4504,11 @@ class PlatformApiSmokeTest {
                   {
                     "name":"大板发布选项测试",
                     "serialNo":"%s",
-                    "mainImageUrl":"/api/open/slab-images/example.jpg",
-                    "scanImageUrl":"/api/open/slab-images/scan.jpg",
-                    "designImageUrl":"/api/open/slab-images/design.jpg",
-                    "videoUrl":"/api/open/slab-images/example.mp4",
-                    "videoCoverUrl":"/api/open/slab-images/video-cover.jpg",
+                    "mainImageMediaId":%d,
+                    "scanImageMediaId":%d,
+                    "designImageMediaId":%d,
+                    "videoMediaId":%d,
+                    "videoCoverMediaId":%d,
                     "varietyId":1,
                     "originId":1,
                     "textureId":%d,
@@ -4494,6 +4538,11 @@ class PlatformApiSmokeTest {
                   }
                   """.formatted(
                       serialNo,
+                      mainImageMediaId,
+                      scanImageMediaId,
+                      designImageMediaId,
+                      videoMediaId,
+                      videoCoverMediaId,
                       textureId,
                       colorId,
                       gradeId,
@@ -4505,11 +4554,12 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.textureId").value(textureId))
           .andExpect(jsonPath("$.data.colorId").value(colorId))
           .andExpect(jsonPath("$.data.gradeId").value(gradeId))
-          .andExpect(jsonPath("$.data.mainImageUrl").value("/api/open/slab-images/example.jpg"))
-          .andExpect(jsonPath("$.data.scanImageUrl").value("/api/open/slab-images/scan.jpg"))
-          .andExpect(jsonPath("$.data.designImageUrl").value("/api/open/slab-images/design.jpg"))
-          .andExpect(jsonPath("$.data.videoUrl").value("/api/open/slab-images/example.mp4"))
-          .andExpect(jsonPath("$.data.videoCoverUrl").value("/api/open/slab-images/video-cover.jpg"))
+          .andExpect(jsonPath("$.data.mainImageMediaId").value(mainImageMediaId))
+          .andExpect(jsonPath("$.data.scanImageMediaId").value(scanImageMediaId))
+          .andExpect(jsonPath("$.data.designImageMediaId").value(designImageMediaId))
+          .andExpect(jsonPath("$.data.videoMediaId").value(videoMediaId))
+          .andExpect(jsonPath("$.data.videoCoverMediaId").value(videoCoverMediaId))
+          .andExpect(jsonPath("$.data.mainImageUrl", containsString("/api/open/media/")))
           .andExpect(jsonPath("$.data.originId").value(1))
           .andExpect(jsonPath("$.data.publisherType").value("平台发布"))
           .andExpect(jsonPath("$.data.createdByName").value("超级管理员"))
@@ -4526,9 +4576,12 @@ class PlatformApiSmokeTest {
                   {
                     "name":"重复编码大板",
                     "serialNo":"%s",
+                    "mainImageMediaId":%d,
+                    "scanImageMediaId":%d,
+                    "designImageMediaId":%d,
                     "status":"warehouse"
                   }
-                  """.formatted(serialNo)))
+                  """.formatted(serialNo, mainImageMediaId, scanImageMediaId, designImageMediaId)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.message").value("大板编码已存在"));
 
@@ -4540,6 +4593,9 @@ class PlatformApiSmokeTest {
                     "name":"接口获取大板",
                     "serialNo":"%s-interface",
                     "publisherType":"接口获取",
+                    "mainImageMediaId":%d,
+                    "scanImageMediaId":%d,
+                    "designImageMediaId":%d,
                     "costPrice":100,
                     "guidePrice":160,
                     "markupPrices":[
@@ -4552,6 +4608,9 @@ class PlatformApiSmokeTest {
                   }
                   """.formatted(
                       serialNo,
+                      mainImageMediaId,
+                      scanImageMediaId,
+                      designImageMediaId,
                       guideConfigurationId,
                       level1ConfigurationId,
                       level2ConfigurationId,
@@ -4599,11 +4658,8 @@ class PlatformApiSmokeTest {
           SELECT COUNT(*) FROM slab_inventory
           WHERE id = ? AND texture_id = ? AND color_id = ? AND grade_id = ?
             AND origin_id = 1 AND created_by_name = '超级管理员'
-            AND main_image_url = '/api/open/slab-images/example.jpg'
-            AND scan_image_url = '/api/open/slab-images/scan.jpg'
-            AND design_image_url = '/api/open/slab-images/design.jpg'
-            AND video_url = '/api/open/slab-images/example.mp4'
-            AND video_cover_url = '/api/open/slab-images/video-cover.jpg'
+            AND main_image_media_id = ? AND scan_image_media_id = ? AND design_image_media_id = ?
+            AND video_media_id = ? AND video_cover_media_id = ?
             AND length_mm = 3200.50 AND width_mm = 1800.25 AND thickness_mm = 18.50
             AND tolerance_mm = 2.25
             AND corner1_length_mm = 100.50 AND corner1_width_mm = 80.25
@@ -4615,7 +4671,12 @@ class PlatformApiSmokeTest {
           slabId,
           textureId,
           colorId,
-          gradeId);
+          gradeId,
+          mainImageMediaId,
+          scanImageMediaId,
+          designImageMediaId,
+          videoMediaId,
+          videoCoverMediaId);
       assertThat(persistedCount).isEqualTo(1);
       Integer persistedPriceCount = jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM slab_prices WHERE slab_id = ?",
@@ -4658,12 +4719,21 @@ class PlatformApiSmokeTest {
                   {
                     "name":"大板发布选项测试",
                     "serialNo":"%s",
+                    "mainImageMediaId":%d,
+                    "scanImageMediaId":%d,
+                    "designImageMediaId":%d,
                     "textureId":999999999,
                     "colorId":%d,
                     "gradeId":%d,
                     "status":"warehouse"
                   }
-                  """.formatted(serialNo, colorId, gradeId)))
+                  """.formatted(
+                      serialNo,
+                      mainImageMediaId,
+                      scanImageMediaId,
+                      designImageMediaId,
+                      colorId,
+                      gradeId)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.message").value("纹理不存在"));
     } finally {
@@ -4940,5 +5010,19 @@ class PlatformApiSmokeTest {
     jdbcTemplate.update("DELETE FROM roles WHERE id = ?", id);
     jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", id);
     jdbcTemplate.update("DELETE FROM stores WHERE id = ?", id);
+  }
+
+  private Long uploadSlabMedia(String filename, String mimeType) throws Exception {
+    MockMultipartFile file = new MockMultipartFile(
+        "file", filename, mimeType, new byte[] {0x01, 0x02, 0x03, 0x04});
+    MvcResult result = mockMvc.perform(multipart("/api/admin/slabs/images")
+            .file(file)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.id").isNumber())
+        .andExpect(jsonPath("$.data.url", containsString("/api/open/media/")))
+        .andReturn();
+    return Long.valueOf(com.jayway.jsonpath.JsonPath.read(
+        result.getResponse().getContentAsString(), "$.data.id").toString());
   }
 }

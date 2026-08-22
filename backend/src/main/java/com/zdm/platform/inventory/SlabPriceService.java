@@ -29,8 +29,12 @@ public class SlabPriceService {
   @Transactional
   public void replacePrices(Long slabId, List<SlabPrice> requestedPrices) {
     List<SlabMarkupConfiguration> configurations = configurationService.listConfigurations(true);
-    if (configurations.isEmpty()) throw new IllegalArgumentException("请先配置并启用至少一条大板价格层级");
-    if (requestedPrices == null || requestedPrices.isEmpty()) throw new IllegalArgumentException("请完善全部大板价格");
+    if (configurations.isEmpty()) {
+      throw new IllegalArgumentException("请先配置并启用至少一条大板价格层级");
+    }
+    if (requestedPrices == null || requestedPrices.isEmpty()) {
+      throw new IllegalArgumentException("请完善全部大板价格");
+    }
     Map<Long, SlabMarkupConfiguration> byId = configurations.stream()
         .collect(Collectors.toMap(SlabMarkupConfiguration::getId, item -> item));
     Set<Long> actualIds = requestedPrices.stream().map(SlabPrice::getMarkupConfigurationId)
@@ -45,7 +49,9 @@ public class SlabPriceService {
   }
 
   private SlabPrice normalize(Long slabId, SlabPrice price, SlabMarkupConfiguration configuration) {
-    if (configuration == null) throw new IllegalArgumentException("大板价格层级不存在或已停用");
+    if (configuration == null) {
+      throw new IllegalArgumentException("大板价格层级不存在或已停用");
+    }
     BigDecimal rate = price.getMarkupRate();
     BigDecimal cost = price.getCostPrice();
     BigDecimal value = price.getPrice();

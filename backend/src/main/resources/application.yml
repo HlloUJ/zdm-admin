@@ -37,7 +37,8 @@ zdm:
     dev-tokens-enabled: ${ZDM_SECURITY_DEV_TOKENS_ENABLED:false}
     verification-code: ${ZDM_SECURITY_VERIFICATION_CODE:}
     session-duration: ${ZDM_SECURITY_SESSION_DURATION:PT12H}
-  craft-image:
-    storage-path: ${ZDM_CRAFT_IMAGE_DIR:./data/craft-images}
-  slab-image:
-    storage-path: ${ZDM_SLAB_IMAGE_DIR:/data/zdm/craft-images/slabs}
+  media:
+    storage-path: ${ZDM_MEDIA_DIR:/data/zdm/craft-images}
+    cleanup-cron: ${ZDM_MEDIA_CLEANUP_CRON:0 0 0 * * *}
+    retry-delay-ms: ${ZDM_MEDIA_RETRY_DELAY_MS:60000}
+    time-zone: Asia/Shanghai

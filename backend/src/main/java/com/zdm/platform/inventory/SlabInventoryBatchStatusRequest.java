@@ -7,4 +7,7 @@ import java.util.List;
 public record SlabInventoryBatchStatusRequest(
     @NotEmpty List<Long> ids,
     @NotBlank String status) {
+  public SlabInventoryBatchStatusRequest {
+    ids = List.copyOf(ids);
+  }
 }

@@ -34,8 +34,12 @@ public class FinishedProductPriceService {
   @Transactional
   public void replacePrices(Long productId, List<FinishedProductPrice> requestedPrices) {
     List<FinishedMarkupConfiguration> configurations = configurationService.listConfigurations(true);
-    if (configurations.isEmpty()) throw new IllegalArgumentException("请先配置并启用至少一条成品现货价格层级");
-    if (requestedPrices == null || requestedPrices.isEmpty()) throw new IllegalArgumentException("请完善全部成品现货价格");
+    if (configurations.isEmpty()) {
+      throw new IllegalArgumentException("请先配置并启用至少一条成品现货价格层级");
+    }
+    if (requestedPrices == null || requestedPrices.isEmpty()) {
+      throw new IllegalArgumentException("请完善全部成品现货价格");
+    }
     Map<Long, FinishedMarkupConfiguration> byId = configurations.stream()
         .collect(Collectors.toMap(FinishedMarkupConfiguration::getId, item -> item));
     Map<String, List<FinishedProductPrice>> byVariant = requestedPrices.stream().collect(Collectors.groupingBy(
@@ -57,7 +61,9 @@ public class FinishedProductPriceService {
 
   private FinishedProductPrice normalize(Long productId, String variantKey, FinishedProductPrice price,
       FinishedMarkupConfiguration configuration) {
-    if (configuration == null) throw new IllegalArgumentException("成品现货价格层级不存在或已停用");
+    if (configuration == null) {
+      throw new IllegalArgumentException("成品现货价格层级不存在或已停用");
+    }
     BigDecimal rate = price.getMarkupRate();
     BigDecimal cost = price.getCostPrice();
     BigDecimal value = price.getPrice();
@@ -81,7 +87,9 @@ public class FinishedProductPriceService {
   }
 
   private String normalizedVariantKey(String value) {
-    if (!StringUtils.hasText(value)) throw new IllegalArgumentException("成品规格编码不能为空");
+    if (!StringUtils.hasText(value)) {
+      throw new IllegalArgumentException("成品规格编码不能为空");
+    }
     return value.trim();
   }
 }

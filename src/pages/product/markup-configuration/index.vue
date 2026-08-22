@@ -222,9 +222,8 @@ const formatDateTime = (value?: string) => (value ? value.replace(/-/g, '/').rep
 const loadData = async () => {
   loading.value = true;
   try {
-    const rows = activeType.value === 'finished'
-      ? await listFinishedMarkupConfigurations()
-      : await listSlabMarkupConfigurations();
+    const rows =
+      activeType.value === 'finished' ? await listFinishedMarkupConfigurations() : await listSlabMarkupConfigurations();
     tableData.value = rows.map((item) => ({
       ...item,
       createdByName: item.createdByName ?? '-',

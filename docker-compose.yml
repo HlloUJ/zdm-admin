@@ -33,8 +33,7 @@ services:
       ZDM_DB_PASSWORD: zdm_admin_pwd
       ZDM_SECURITY_DEV_TOKENS_ENABLED: 'true'
       ZDM_SECURITY_VERIFICATION_CODE: '888888'
-      ZDM_CRAFT_IMAGE_DIR: /data/zdm/craft-images
-      ZDM_SLAB_IMAGE_DIR: /data/zdm/craft-images/slabs
+      ZDM_MEDIA_DIR: /data/zdm/craft-images
     ports:
       - '8080:8080'
     volumes:

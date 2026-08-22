@@ -2,6 +2,9 @@ package com.zdm.platform.inventory;
 
 import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
+import com.zdm.platform.media.MediaAssetService;
+import com.zdm.platform.media.MediaStorageService;
+import com.zdm.platform.media.MediaUploadResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -22,31 +25,31 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   private static final String PERMISSION_PREFIX = "admin.slab-management";
   private final SlabInventoryService service;
   private final PermissionGuard permissionGuard;
-  private final SlabImageStorageService imageStorageService;
+  private final MediaAssetService mediaAssetService;
 
   public SlabInventoryController(
       SlabInventoryService service,
       PermissionGuard permissionGuard,
-      SlabImageStorageService imageStorageService) {
+      MediaAssetService mediaAssetService) {
     super(service, permissionGuard, PERMISSION_PREFIX);
     this.service = service;
     this.permissionGuard = permissionGuard;
-    this.imageStorageService = imageStorageService;
+    this.mediaAssetService = mediaAssetService;
   }
 
   @PostMapping("/images")
-  public ApiResponse<SlabImageUploadResponse> uploadImage(@RequestParam("file") MultipartFile file) {
+  public ApiResponse<MediaUploadResponse> uploadImage(@RequestParam("file") MultipartFile file) {
     permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
     permissionGuard.requireAllData();
-    return ApiResponse.ok(new SlabImageUploadResponse(imageStorageService.store(file)));
+    return ApiResponse.ok(mediaAssetService.upload(file, MediaStorageService.defaultImageSizeLimit()));
   }
 
   @DeleteMapping("/images")
-  public ApiResponse<Boolean> deleteUnreferencedImage(@RequestParam String url) {
+  public ApiResponse<Boolean> deleteUnreferencedImage(@RequestParam Long mediaId) {
     permissionGuard.requireAnyPermission(
         PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit", PERMISSION_PREFIX + ".delete");
     permissionGuard.requireAllData();
-    return ApiResponse.ok(service.cleanupTemporaryMedia(url));
+    return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
   }
 
   @GetMapping("/publish-options")

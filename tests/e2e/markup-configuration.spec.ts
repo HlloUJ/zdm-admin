@@ -20,57 +20,50 @@ const seedLogin = async (page: import('@playwright/test').Page, permissions: str
 };
 
 const mockMarkupConfigurations = async (page: import('@playwright/test').Page) => {
-  await page.route('**/api/admin/markup-configurations/reorder', async (route) => {
+  const finished = [
+    {
+      id: 1,
+      name: '指导价',
+      markupRate: 0,
+      sortOrder: 1,
+      status: 'enabled',
+      createdByAccountId: 99,
+      createdByName: '其他运营员工',
+      referenced: false,
+    },
+    {
+      id: 3,
+      name: '1级合伙人价格',
+      markupRate: 30,
+      sortOrder: 2,
+      status: 'enabled',
+      createdByAccountId: 99,
+      createdByName: '其他运营员工',
+      referenced: false,
+    },
+  ];
+  const slabs = [
+    {
+      id: 2,
+      name: '1级合伙人价格',
+      markupRate: 60,
+      sortOrder: 1,
+      status: 'enabled',
+      createdByAccountId: 99,
+      createdByName: '其他运营员工',
+      referenced: false,
+    },
+  ];
+  await page.route('**/api/admin/finished-markup-configurations**', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, message: 'ok', data: [] }),
+      body: JSON.stringify({ code: 0, message: 'ok', data: finished }),
     });
   });
-  await page.route('**/api/admin/markup-configurations?productType=*', async (route) => {
-    const productType = new URL(route.request().url()).searchParams.get('productType');
-    const data =
-      productType === 'slab'
-        ? [
-            {
-              id: 2,
-              productType: 'slab',
-              name: '1级合伙人价格',
-              markupRate: 60,
-              sortOrder: 1,
-              status: 'enabled',
-              createdByAccountId: 99,
-              createdByName: '其他运营员工',
-              referenced: false,
-            },
-          ]
-        : [
-            {
-              id: 1,
-              productType: 'finished',
-              name: '指导价',
-              markupRate: 0,
-              sortOrder: 1,
-              status: 'enabled',
-              createdByAccountId: 99,
-              createdByName: '其他运营员工',
-              referenced: false,
-            },
-            {
-              id: 3,
-              productType: 'finished',
-              name: '1级合伙人价格',
-              markupRate: 30,
-              sortOrder: 2,
-              status: 'enabled',
-              createdByAccountId: 99,
-              createdByName: '其他运营员工',
-              referenced: false,
-            },
-          ];
-
+  await page.route('**/api/admin/slab-markup-configurations**', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, message: 'ok', data }),
+      body: JSON.stringify({ code: 0, message: 'ok', data: slabs }),
     });
   });
 };
@@ -91,10 +84,11 @@ test('运营平台可按成品和大板分别管理加价配置', async ({ page 
   const guideRow = page.getByRole('row').filter({ hasText: '指导价' });
   const partnerRow = page.getByRole('row').filter({ hasText: '1级合伙人价格' });
   const reorderRequest = page.waitForRequest(
-    (request) => request.method() === 'PATCH' && request.url().endsWith('/api/admin/markup-configurations/reorder'),
+    (request) =>
+      request.method() === 'PATCH' && request.url().endsWith('/api/admin/finished-markup-configurations/reorder'),
   );
   await guideRow.locator('.t-table__handle-draggable').dragTo(partnerRow.locator('.t-table__handle-draggable'));
-  expect((await reorderRequest).postDataJSON()).toEqual({ productType: 'finished', orderedIds: [3, 1] });
+  expect((await reorderRequest).postDataJSON()).toEqual({ orderedIds: [3, 1] });
   await expect(page.getByText('已更新排序“指导价”', { exact: true }).last()).toBeVisible();
 
   await page.getByRole('button', { name: '新增' }).click();

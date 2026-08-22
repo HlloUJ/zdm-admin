@@ -1,5 +1,6 @@
 package com.zdm.platform.craft;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
@@ -17,6 +18,9 @@ public class Craft extends BaseEntity {
   @Pattern(regexp = "\\d*", message = "工艺宽度仅支持数字")
   private String width;
   private String description;
+  private Long imageMediaId;
+
+  @TableField(exist = false)
   private String imageUrl;
   private String pricingMethod;
   private String createdByName;
@@ -63,6 +67,14 @@ public class Craft extends BaseEntity {
 
   public void setImageUrl(String imageUrl) {
     this.imageUrl = imageUrl;
+  }
+
+  public Long getImageMediaId() {
+    return imageMediaId;
+  }
+
+  public void setImageMediaId(Long imageMediaId) {
+    this.imageMediaId = imageMediaId;
   }
 
   public String getPricingMethod() {

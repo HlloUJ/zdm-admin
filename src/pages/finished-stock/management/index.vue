@@ -1646,7 +1646,7 @@ const loadInventoryData = async () => {
       listProductCategories(),
       listSuppliers(),
       listFinishedProducts(),
-        listFinishedMarkupConfigurationOptions(),
+      listFinishedMarkupConfigurationOptions(),
     ]);
     productCategories.value = categories;
     productSuppliers.value = suppliers;
@@ -2123,9 +2123,7 @@ const createMarkupEditors = (prices: FinishedProductPrice[] = []) => {
   return Object.fromEntries(
     markupConfigurations.value.map((configuration) => {
       const existing = existingById.get(configuration.id);
-      const coefficient = existing
-        ? 1 + Number(existing.markupRate) / 100
-        : 1 + Number(configuration.markupRate) / 100;
+      const coefficient = existing ? 1 + Number(existing.markupRate) / 100 : 1 + Number(configuration.markupRate) / 100;
       return [
         configuration.id,
         {
