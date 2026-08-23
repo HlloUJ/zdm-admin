@@ -2,7 +2,6 @@ package com.zdm.platform.security;
 
 import com.zdm.platform.auth.AuthAccount;
 import com.zdm.platform.auth.AuthAccountMapper;
-import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.config.SecurityProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -28,14 +27,17 @@ public class SessionTokenService {
   private final JdbcTemplate jdbcTemplate;
   private final AuthAccountMapper authAccountMapper;
   private final SecurityProperties securityProperties;
+  private final EffectivePermissionResolver effectivePermissionResolver;
 
   public SessionTokenService(
       JdbcTemplate jdbcTemplate,
       AuthAccountMapper authAccountMapper,
-      SecurityProperties securityProperties) {
+      SecurityProperties securityProperties,
+      EffectivePermissionResolver effectivePermissionResolver) {
     this.jdbcTemplate = jdbcTemplate;
     this.authAccountMapper = authAccountMapper;
     this.securityProperties = securityProperties;
+    this.effectivePermissionResolver = effectivePermissionResolver;
   }
 
   @Transactional
@@ -77,14 +79,20 @@ public class SessionTokenService {
          AND ai.account_id = s.account_id
          AND ai.client_code = s.client_code
          AND ai.status = 'enabled'
-        JOIN employees e
-          ON e.id = ai.subject_id
+        LEFT JOIN employees e
+          ON ai.identity_type = 'employee'
+         AND e.id = ai.subject_id
          AND e.account_id = a.id
          AND e.status = 'enabled'
+        LEFT JOIN tenants t ON t.id = ai.tenant_id
+        LEFT JOIN stores st ON st.id = ai.store_id
         WHERE s.token_hash = ?
           AND s.client_code = 'admin'
           AND s.revoked_at IS NULL
           AND s.expires_at > CURRENT_TIMESTAMP
+          AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)
+          AND (ai.tenant_id IS NULL OR t.status = 'enabled')
+          AND (ai.store_id IS NULL OR st.status = 'enabled')
         LIMIT 1
         """,
         (rs, rowNum) -> new SessionRecord(rs.getLong("id"), rs.getLong("identity_id")),
@@ -127,12 +135,17 @@ public class SessionTokenService {
   }
 
   private CurrentIdentity toCurrentIdentity(Long sessionId, AuthAccount account) {
-    List<String> roles = authAccountMapper.findAdminRoleCodes(account.getId(), account.getIdentityId());
+    String identityType = StringUtils.hasText(account.getIdentityType()) ? account.getIdentityType() : "employee";
+    List<String> roles = switch (identityType) {
+      case "platform_admin" -> List.of("SUPER_ADMIN");
+      case "tenant_admin" -> List.of("TENANT_ADMIN");
+      case "store_admin" -> List.of("STORE_ADMIN");
+      default -> authAccountMapper.findAdminRoleCodes(account.getId(), account.getIdentityId());
+    };
     if (roles.isEmpty()) {
       return null;
     }
-    List<String> permissions = FunctionPermissionNormalizer.normalize(
-        authAccountMapper.findAdminPermissionValues(account.getId(), account.getIdentityId()));
+    List<String> permissions = effectivePermissionResolver.resolve(account);
     return new CurrentIdentity(
         sessionId,
         account.getId(),

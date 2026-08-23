@@ -85,6 +85,7 @@
                     <thead>
                       <tr>
                         <th class="permission-menu-column">二级菜单</th>
+                        <th class="permission-third-menu-column">三级菜单</th>
                         <th class="permission-page-column">页面</th>
                         <th class="permission-tab-column">Tab</th>
                         <th class="permission-action-column">操作权限</th>
@@ -95,6 +96,12 @@
                         <td v-if="row.showMenu" class="permission-menu-cell" :rowspan="row.menuRowspan">
                           <t-tag v-if="row.direct" class="permission-level-tag" variant="light">一级菜单直达</t-tag>
                           <span v-else class="permission-menu-name">{{ row.menuLabel }}</span>
+                        </td>
+                        <td v-if="row.showThirdMenu" class="permission-third-menu-cell" :rowspan="row.thirdMenuRowspan">
+                          <span v-if="row.thirdMenuLabel" class="permission-third-menu-name">{{
+                            row.thirdMenuLabel
+                          }}</span>
+                          <span v-else class="permission-empty-value">—</span>
                         </td>
                         <td v-if="row.showPage" class="permission-page-cell" :rowspan="row.pageRowspan">
                           <div class="permission-page-name">{{ row.pageLabel }}</div>
@@ -131,7 +138,7 @@
                         </td>
                       </tr>
                       <tr v-if="!activeRows.length" class="permission-matrix-empty-row">
-                        <td colspan="4">
+                        <td colspan="5">
                           <div class="permission-matrix-empty">
                             <strong>暂无功能目录数据</strong>
                             <span>完成一个业务模块的梳理、实现和验证后，再将该模块加入全量功能目录</span>
@@ -164,31 +171,21 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import {
+  collectFunctionCatalogRows,
   getRowViewPermissionValue,
   initialAllocationValues,
   normalizeTerminalPermissions,
   terminalFunctionTrees,
   terminalTabs,
-  type FunctionAction,
+  type FunctionCatalogRow,
   type FunctionModule,
   type TerminalType,
 } from '@/services/functionCatalog';
-import { createRole, listRoles, updateRole, type RolePayload, type RoleRecord } from '@/services/roles';
-
-interface FunctionRow {
-  key: string;
-  menuLabel?: string;
-  direct: boolean;
-  showMenu: boolean;
-  menuRowspan: number;
-  pageLabel: string;
-  pageNote?: string;
-  showPage: boolean;
-  pageRowspan: number;
-  tabLabels: string[];
-  actions: FunctionAction[];
-  selectionLabel: string;
-}
+import {
+  listTerminalFunctionPolicies,
+  saveTerminalFunctionPolicy,
+  type TerminalFunctionPolicyRecord,
+} from '@/services/terminalFunctionPolicies';
 
 const activeTerminal = ref<TerminalType>('store');
 const activeModuleValue = ref(terminalFunctionTrees.store[0]?.value ?? '');
@@ -198,7 +195,7 @@ const savedAllocationValues = reactive<Record<TerminalType, string[]>>({
   store: [...initialAllocationValues.store],
   supplier: [...initialAllocationValues.supplier],
 });
-const terminalPolicyRoles = reactive<Partial<Record<TerminalType, RoleRecord>>>({});
+const terminalPolicies = reactive<Partial<Record<TerminalType, TerminalFunctionPolicyRecord>>>({});
 
 const currentTree = computed(() => terminalFunctionTrees[activeTerminal.value]);
 
@@ -228,52 +225,9 @@ const getModuleActionValues = (module?: FunctionModule) =>
     ),
   );
 
-const collectFunctionRows = (module?: FunctionModule): FunctionRow[] =>
-  module?.menus.flatMap((menu) => {
-    const menuRows: Omit<FunctionRow, 'showMenu' | 'menuRowspan'>[] = menu.pages.flatMap((page) => {
-      const actionTabs = page.tabs.filter((tab) => tab.actions.length);
-      const rowTabs = actionTabs.length ? actionTabs : page.splitSharedTabs ? page.tabs : [];
-      if (rowTabs.length) {
-        return rowTabs.map((tab, index) => ({
-          key: `${menu.value}.${page.value}.${tab.value}`,
-          menuLabel: menu.label,
-          direct: menu.direct,
-          pageLabel: page.label,
-          pageNote: page.note,
-          showPage: index === 0,
-          pageRowspan: rowTabs.length,
-          tabLabels: [tab.label],
-          actions: tab.actions.length ? tab.actions : page.actions,
-          selectionLabel: tab.actions.length ? '当前 Tab 权限' : '整页权限（全部 Tab 共用）',
-        }));
-      }
-
-      return [
-        {
-          key: `${menu.value}.${page.value}`,
-          menuLabel: menu.label,
-          direct: menu.direct,
-          pageLabel: page.label,
-          pageNote: page.note,
-          showPage: true,
-          pageRowspan: 1,
-          tabLabels: page.tabs.map((tab) => tab.label),
-          actions: page.actions,
-          selectionLabel: page.tabs.length ? '整页权限（包含全部 Tab）' : '整页权限',
-        },
-      ];
-    });
-
-    return menuRows.map((row, index) => ({
-      ...row,
-      showMenu: index === 0,
-      menuRowspan: menuRows.length,
-    }));
-  }) ?? [];
-
-const activeRows = computed(() => collectFunctionRows(activeModule.value));
+const activeRows = computed(() => collectFunctionCatalogRows(activeModule.value));
 const allLeafValues = computed(() => Array.from(new Set(currentTree.value.flatMap(getModuleActionValues))));
-const getRowActionValues = (row: FunctionRow) => row.actions.map((action) => action.value);
+const getRowActionValues = (row: FunctionCatalogRow) => row.actions.map((action) => action.value);
 const getSelectedCount = (values: string[]) => values.filter((value) => checkedValues.value.includes(value)).length;
 
 const setCheckedValues = (values: string[]) => {
@@ -295,11 +249,11 @@ const isIndeterminate = (values: string[]) => {
   const selectedCount = getSelectedCount(values);
   return selectedCount > 0 && selectedCount < values.length;
 };
-const isRowAllSelected = (row: FunctionRow) => isAllSelected(getRowActionValues(row));
-const isRowIndeterminate = (row: FunctionRow) => isIndeterminate(getRowActionValues(row));
+const isRowAllSelected = (row: FunctionCatalogRow) => isAllSelected(getRowActionValues(row));
+const isRowIndeterminate = (row: FunctionCatalogRow) => isIndeterminate(getRowActionValues(row));
 const isModuleAllSelected = (module?: FunctionModule) => isAllSelected(getModuleActionValues(module));
 const isModuleIndeterminate = (module?: FunctionModule) => isIndeterminate(getModuleActionValues(module));
-const togglePermission = (row: FunctionRow, value: string, checked: unknown) => {
+const togglePermission = (row: FunctionCatalogRow, value: string, checked: unknown) => {
   const isChecked = getCheckedValue(checked);
   const viewPermission = getRowViewPermissionValue(row);
   if (!isChecked && value === viewPermission) {
@@ -308,7 +262,7 @@ const togglePermission = (row: FunctionRow, value: string, checked: unknown) => 
   }
   setPermissionRange(isChecked && viewPermission ? [viewPermission, value] : [value], isChecked);
 };
-const toggleRow = (row: FunctionRow, checked: unknown) => setPermissionRange(getRowActionValues(row), checked);
+const toggleRow = (row: FunctionCatalogRow, checked: unknown) => setPermissionRange(getRowActionValues(row), checked);
 const toggleModule = (module: FunctionModule | undefined, checked: unknown) =>
   setPermissionRange(getModuleActionValues(module), checked);
 
@@ -327,30 +281,14 @@ const clearAllNodes = () => {
 
 const parsePermissions = (value?: string) => value?.split(',').filter(Boolean) ?? [];
 
-const terminalCode = (terminal: TerminalType) =>
-  terminal === 'store' ? 'TERMINAL_STORE_POLICY' : 'TERMINAL_SUPPLIER_POLICY';
-
-const terminalName = (terminal: TerminalType) => (terminal === 'store' ? '门店后台功能配置' : '供应商后台功能配置');
-
-const toPolicyPayload = (terminal: TerminalType, permissions: string[]): RolePayload => ({
-  name: terminalName(terminal),
-  code: terminalCode(terminal),
-  category: 'terminal-policy',
-  clientCode: terminal,
-  dataScope: 'store',
-  status: 'enabled',
-  remark: `系统配置：${terminal === 'store' ? '门店后台' : '供应商后台'}可下放功能范围`,
-  functionPermissions: permissions.join(','),
-});
-
 const loadAllocation = async () => {
   loading.value = true;
   try {
-    const roles = await listRoles();
+    const policies = await listTerminalFunctionPolicies();
     (['store', 'supplier'] as TerminalType[]).forEach((terminal) => {
-      const policy = roles.find((role) => role.code === terminalCode(terminal));
+      const policy = policies.find((item) => item.terminal === terminal);
       if (policy) {
-        terminalPolicyRoles[terminal] = policy;
+        terminalPolicies[terminal] = policy;
         savedAllocationValues[terminal] = normalizeTerminalPermissions(
           terminal,
           parsePermissions(policy.functionPermissions),
@@ -372,12 +310,10 @@ const resetAllocation = () => {
 
 const saveAllocation = async () => {
   const terminal = activeTerminal.value;
-  const payload = toPolicyPayload(terminal, checkedValues.value);
   loading.value = true;
   try {
-    const policy = terminalPolicyRoles[terminal];
-    const saved = policy ? await updateRole(policy.id, payload) : await createRole(payload);
-    terminalPolicyRoles[terminal] = saved;
+    const saved = await saveTerminalFunctionPolicy(terminal, checkedValues.value.join(','));
+    terminalPolicies[terminal] = saved;
     savedAllocationValues[terminal] = normalizeTerminalPermissions(
       terminal,
       parsePermissions(saved.functionPermissions),
@@ -595,13 +531,19 @@ onMounted(loadAllocation);
 
 .permission-menu-column,
 .permission-menu-cell {
-  width: 14.5363%;
+  width: 12%;
+  border-right: 1px solid var(--td-component-border);
+}
+
+.permission-third-menu-column,
+.permission-third-menu-cell {
+  width: 12%;
   border-right: 1px solid var(--td-component-border);
 }
 
 .permission-page-column,
 .permission-page-cell {
-  width: 18.375%;
+  width: 16%;
   border-right: 1px solid var(--td-component-border);
 }
 
@@ -613,10 +555,11 @@ onMounted(loadAllocation);
 
 .permission-action-column,
 .permission-action-cell {
-  width: 55.5125%;
+  width: 48.4238%;
 }
 
-.permission-menu-name {
+.permission-menu-name,
+.permission-third-menu-name {
   color: var(--td-text-color-primary);
   font: var(--td-font-body-medium);
 }

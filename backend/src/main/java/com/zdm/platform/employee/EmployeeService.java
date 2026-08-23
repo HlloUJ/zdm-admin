@@ -1,6 +1,7 @@
 package com.zdm.platform.employee;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.PermissionGuard;
@@ -19,20 +20,21 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
-  private static final Long DEFAULT_TENANT_ID = 1L;
-  private static final Long DEFAULT_STORE_ID = 1L;
   private static final String PERMISSION_PREFIX = "admin.permission-management.employee-management";
 
   private final JdbcTemplate jdbcTemplate;
   private final SimpleJdbcInsert accountInsert;
+  private final CreatorOwnershipGuard ownershipGuard;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
 
   public EmployeeService(
       JdbcTemplate jdbcTemplate,
+      CreatorOwnershipGuard ownershipGuard,
       CurrentIdentityProvider identityProvider,
       PermissionGuard permissionGuard) {
     this.jdbcTemplate = jdbcTemplate;
+    this.ownershipGuard = ownershipGuard;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
     this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
@@ -42,16 +44,24 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   public List<Employee> listForCurrentAdmin() {
-    return lambdaQuery().eq(Employee::getStoreId, requireStoreId()).list();
+    CurrentIdentity identity = requireSupportedOrganizationScope();
+    if (identity.storeId() == null) {
+      return lambdaQuery().isNull(Employee::getTenantId).isNull(Employee::getStoreId).list();
+    }
+    return lambdaQuery()
+        .eq(Employee::getTenantId, identity.tenantId())
+        .eq(Employee::getStoreId, identity.storeId())
+        .list();
   }
 
   @Transactional
   public Employee createEmployee(Employee employee) {
     authorizeCreate(employee);
-    applyCurrentStoreScope(employee);
+    applyCurrentOrganizationScope(employee);
     Long accountId = findOrCreateAccount(employee.getPhone(), employee.getName());
     employee.setAccountId(accountId);
     employee.setCreatedByName(currentEmployeeName());
+    employee.setCreatedByAccountId(identityProvider.require().accountId());
     validateBeforeEnabled(employee);
     save(employee);
     syncAdminIdentity(employee);
@@ -65,7 +75,9 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       throw new IllegalArgumentException("员工不存在");
     }
-    requireAccessibleEmployee(existing);
+    CurrentIdentity identity = requireEmployeeOrganizationScope(existing);
+    requireSelfUpdateAllowed(identity, existing, payload);
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
 
     if (payload.getStoreId() != null && !Objects.equals(payload.getStoreId(), existing.getStoreId())) {
       throw new AccessDeniedException("不能将员工转移到其他门店");
@@ -77,9 +89,8 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     payload.setTenantId(existing.getTenantId());
     payload.setStoreId(existing.getStoreId());
-    if (!StringUtils.hasText(payload.getCreatedByName())) {
-      payload.setCreatedByName(existing.getCreatedByName());
-    }
+    payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     authorizeUpdate(existing, payload);
 
     if (payload.getAccountId() == null) {
@@ -100,7 +111,11 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       throw new IllegalArgumentException("员工不存在");
     }
-    requireAccessibleEmployee(existing);
+    CurrentIdentity identity = requireEmployeeOrganizationScope(existing);
+    if (Objects.equals(existing.getId(), identity.employeeId())) {
+      throw new AccessDeniedException("不能修改当前登录员工的角色");
+    }
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
 
     existing.setRoleIds(request.roleIds());
@@ -117,7 +132,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       return false;
     }
-    requireAccessibleEmployee(existing);
+    requireDeletableEmployee(existing);
     removeAdminRoles(existing);
     jdbcTemplate.update(
         """
@@ -149,6 +164,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     employee.setPhone(request.phone());
     employee.setStatus("disabled");
     employee.setCreatedByName(invite.getCreatedByName());
+    employee.setCreatedByAccountId(invite.getCreatedByAccountId());
     save(employee);
     syncAdminIdentity(employee);
     return new EmployeeInviteRegisterResponse(employee.getId(), employee.getStatus());
@@ -173,17 +189,16 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
   }
 
-  private void applyCurrentStoreScope(Employee employee) {
-    CurrentIdentity identity = identityProvider.require();
-    Long storeId = requireStoreId();
-    if (employee.getStoreId() != null && !Objects.equals(employee.getStoreId(), storeId)) {
+  private void applyCurrentOrganizationScope(Employee employee) {
+    CurrentIdentity identity = requireSupportedOrganizationScope();
+    if (employee.getStoreId() != null && !Objects.equals(employee.getStoreId(), identity.storeId())) {
       throw new AccessDeniedException("不能为其他门店创建员工");
     }
     if (employee.getTenantId() != null && !Objects.equals(employee.getTenantId(), identity.tenantId())) {
       throw new AccessDeniedException("不能为其他租户创建员工");
     }
     employee.setTenantId(identity.tenantId());
-    employee.setStoreId(storeId);
+    employee.setStoreId(identity.storeId());
   }
 
   private void validateBeforeEnabled(Employee employee) {
@@ -198,12 +213,19 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     for (Long roleId : parseRoleIds(employee.getRoleIds())) {
       Integer roleCount = jdbcTemplate.queryForObject(
-          "SELECT COUNT(*) FROM roles WHERE id = ? AND store_id = ?",
+          """
+          SELECT COUNT(*)
+          FROM roles
+          WHERE id = ?
+            AND tenant_id <=> ?
+            AND store_id <=> ?
+          """,
           Integer.class,
           roleId,
+          employee.getTenantId(),
           employee.getStoreId());
       if (roleCount == null || roleCount == 0) {
-        throw new AccessDeniedException("只能配置当前门店的角色");
+        throw new AccessDeniedException("只能配置当前组织的角色");
       }
     }
   }
@@ -282,12 +304,12 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         DELETE FROM account_roles
         WHERE account_id = ?
           AND client_code = 'admin'
-          AND tenant_id = ?
-          AND store_id = ?
+          AND tenant_id <=> ?
+          AND store_id <=> ?
         """,
         employee.getAccountId(),
-        Objects.requireNonNullElse(employee.getTenantId(), DEFAULT_TENANT_ID),
-        Objects.requireNonNullElse(employee.getStoreId(), DEFAULT_STORE_ID));
+        employee.getTenantId(),
+        employee.getStoreId());
   }
 
   private List<Long> parseRoleIds(String value) {
@@ -336,18 +358,46 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
   }
 
-  private void requireAccessibleEmployee(Employee employee) {
-    if (!Objects.equals(employee.getStoreId(), requireStoreId())) {
-      throw new AccessDeniedException("不能操作其他门店的员工");
+  private void requireSelfUpdateAllowed(CurrentIdentity identity, Employee existing, Employee payload) {
+    if (!Objects.equals(existing.getId(), identity.employeeId())) {
+      return;
     }
+    boolean permissionChanged = !Objects.equals(existing.getRoleIds(), payload.getRoleIds())
+        || !Objects.equals(existing.getDataPermission(), payload.getDataPermission());
+    if (permissionChanged) {
+      throw new AccessDeniedException("不能修改当前登录员工的角色");
+    }
+    if (!Objects.equals(existing.getStatus(), payload.getStatus())) {
+      throw new AccessDeniedException("不能停用当前登录员工");
+    }
+    throw new AccessDeniedException("不能编辑当前登录员工");
   }
 
-  private Long requireStoreId() {
-    CurrentIdentity identity = identityProvider.require();
-    if (identity.storeId() == null) {
-      throw new AccessDeniedException("当前身份未关联门店");
+  private void requireDeletableEmployee(Employee employee) {
+    CurrentIdentity identity = requireEmployeeOrganizationScope(employee);
+    if (Objects.equals(employee.getId(), identity.employeeId())) {
+      throw new AccessDeniedException("不能删除当前登录员工");
     }
-    return identity.storeId();
+    ownershipGuard.requireCreator(employee.getCreatedByAccountId(), employee.getCreatedByName());
+  }
+
+  private CurrentIdentity requireEmployeeOrganizationScope(Employee employee) {
+    CurrentIdentity identity = requireSupportedOrganizationScope();
+    if (!Objects.equals(employee.getTenantId(), identity.tenantId())
+        || !Objects.equals(employee.getStoreId(), identity.storeId())) {
+      throw new AccessDeniedException("当前组织无权操作该员工");
+    }
+    return identity;
+  }
+
+  private CurrentIdentity requireSupportedOrganizationScope() {
+    CurrentIdentity identity = identityProvider.require();
+    boolean platformScope = identity.tenantId() == null && identity.storeId() == null;
+    boolean storeScope = identity.tenantId() != null && identity.storeId() != null;
+    if (!platformScope && !storeScope) {
+      throw new AccessDeniedException("请先切换到具体门店身份");
+    }
+    return identity;
   }
 
   private String currentEmployeeName() {

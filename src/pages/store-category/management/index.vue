@@ -487,7 +487,6 @@ const handleSubmit = async () => {
     return;
   }
   try {
-    const action = formMode.value === 'create' ? '新增' : '保存';
     if (formMode.value === 'create') {
       await createStoreCategory({ parentId: formData.parentId, name, status: formData.status });
     } else {
@@ -495,7 +494,11 @@ const handleSubmit = async () => {
     }
     closeFormDialog();
     await loadCategories();
-    adminFeedback.actionSuccess({ action, target: name });
+    if (formMode.value === 'create') {
+      adminFeedback.created(name);
+    } else {
+      adminFeedback.actionSuccess({ action: '保存', target: name });
+    }
   } catch (error) {
     showError(error, '分类保存失败');
   }
@@ -559,7 +562,7 @@ const handleDeleteConfirm = async () => {
     deleteVisible.value = false;
     deleteTarget.value = null;
     await loadCategories();
-    adminFeedback.actionSuccess({ action: '删除', target: target.name });
+    adminFeedback.deleted(target.name);
   } catch (error) {
     showError(error, '分类删除失败');
     return;

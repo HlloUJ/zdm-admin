@@ -45,7 +45,7 @@ class CategoryAttributeApiTest {
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
     registry.add(
-        "zdm.craft-image.storage-path",
+        "zdm.media.storage-path",
         () -> System.getProperty("java.io.tmpdir") + "/zdm-category-attribute-images-smoke");
   }
 
@@ -74,7 +74,8 @@ class CategoryAttributeApiTest {
                   "valueType":"select",
                   "attributeRole":"basic",
                   "status":"enabled",
-                  "createdByName":"不应覆盖"
+                  "createdByName":"不应覆盖",
+                  "createdByAccountId":999
                 }
                 """.formatted(suffix)))
         .andExpect(status().isOk())
@@ -96,7 +97,8 @@ class CategoryAttributeApiTest {
                   "value":"创建信息测试属性值-%s",
                   "code":"creator-metadata-%s",
                   "status":"enabled",
-                  "createdByName":"不应覆盖"
+                  "createdByName":"不应覆盖",
+                  "createdByAccountId":999
                 }
                 """.formatted(attributeId, suffix, suffix)))
         .andExpect(status().isOk())
@@ -116,6 +118,14 @@ class CategoryAttributeApiTest {
         "SELECT created_by_name FROM product_attribute_values WHERE id = ?",
         String.class,
         Long.valueOf(valueId))).isEqualTo(creatorName);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT created_by_account_id FROM product_attributes WHERE id = ?",
+        Long.class,
+        Long.valueOf(attributeId))).isEqualTo(1L);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT created_by_account_id FROM product_attribute_values WHERE id = ?",
+        Long.class,
+        Long.valueOf(valueId))).isEqualTo(1L);
 
     mockMvc.perform(delete("/api/admin/product-attribute-values/{id}", valueId)
             .header("Authorization", "Bearer " + token))
@@ -379,8 +389,9 @@ class CategoryAttributeApiTest {
     jdbcTemplate.update(
         """
         INSERT INTO category_attributes
-          (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
-        VALUES (9930, 9934, 0, 0, 5, 'enabled', '韩健')
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name,
+           created_by_account_id)
+        VALUES (9930, 9934, 0, 0, 5, 'enabled', '超级管理员', 1)
         """);
     Long fifthBindingId = jdbcTemplate.queryForObject(
         "SELECT id FROM category_attributes WHERE category_id = 9930 AND attribute_id = 9934",
@@ -423,7 +434,7 @@ class CategoryAttributeApiTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '模板绑定操作员', '15926629920', 'enabled', 'self', '韩健')
+        VALUES (?, ?, NULL, NULL, '模板绑定操作员', '15926629920', 'enabled', 'self', '韩健')
         """,
         employeeId,
         accountId);
@@ -431,16 +442,15 @@ class CategoryAttributeApiTest {
         """
         INSERT INTO account_identities
           (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
-        VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')
+        VALUES (?, 'admin', 'employee', ?, NULL, NULL, 'enabled')
         """,
         accountId,
         employeeId);
     jdbcTemplate.update(
         """
         INSERT INTO roles
-          (id, name, code, category, client_code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, '类目属性模板操作角色', 'CATEGORY_ATTRIBUTE_OPERATOR_TEST', 'operation-platform',
-          'admin', 'self', 'enabled',
+          (id, name, code, data_scope, status, function_permissions, created_by_name)
+        VALUES (?, '类目属性模板操作角色', 'CATEGORY_ATTRIBUTE_OPERATOR_TEST', 'self', 'enabled',
           'admin.product-data-center.category-attribute-template.finished.view,'
           'admin.product-data-center.category-attribute-template.finished.create,'
           'admin.product-data-center.category-attribute-template.finished.delete', '集成测试')
@@ -449,7 +459,7 @@ class CategoryAttributeApiTest {
     jdbcTemplate.update(
         """
         INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
-        VALUES (?, ?, 'admin', 1, 1)
+        VALUES (?, ?, 'admin', NULL, NULL)
         """,
         accountId,
         roleId);
@@ -666,9 +676,8 @@ class CategoryAttributeApiTest {
                   "status":"enabled"
                 }
                 """))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.createdByName").value("其他绑定人"))
-        .andExpect(jsonPath("$.data.skuFlag").value(true));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}", otherCreatorBindingId)
             .header("Authorization", "Bearer " + token)
@@ -709,12 +718,12 @@ class CategoryAttributeApiTest {
                   "status":"enabled"
                 }
                 """))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.requiredFlag").value(false));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
 
     mockMvc.perform(delete("/api/admin/category-attributes/{id}", otherCreatorBindingId)
             .header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").value(true));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
   }
 }

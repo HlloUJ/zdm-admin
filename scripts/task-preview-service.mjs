@@ -16,11 +16,14 @@ import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { homedir } from 'node:os';
 import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const SERVICE_LABEL = 'com.zdm.admin.task-preview';
 export const CURRENT_TASK_PREVIEW_URL = 'http://127.0.0.1:5175/';
+export const INTEGRATION_PREVIEW_URL = 'http://127.0.0.1:5173/';
+export const MANAGED_TASK_PREVIEW_PORT = 5176;
 const CONTROL_PATH = '/__zdm_task_preview__';
 const CONTROL_TIMEOUT_MS = 300_000;
 const DOCKER_START_TIMEOUT_MS = 180_000;
@@ -80,10 +83,16 @@ export function shouldRunForeground(taskArgs) {
   return taskArgs.includes('--temporary') || taskArgs.includes('--port');
 }
 
-export function previewCommand({ nodePath, launcherPath, worktree, taskArgs = [] }) {
+export function previewCommand({
+  nodePath,
+  launcherPath,
+  worktree,
+  taskArgs = [],
+  managedPort = MANAGED_TASK_PREVIEW_PORT,
+}) {
   return {
     command: nodePath,
-    args: [launcherPath, '--worktree', worktree, ...taskArgs],
+    args: [launcherPath, '--worktree', worktree, '--port', String(managedPort), ...taskArgs],
   };
 }
 
@@ -288,9 +297,9 @@ function requestJson({ paths, method = 'GET', requestPath = '/status', payload =
   });
 }
 
-function requestPreviewMetadata(timeoutMs = 1_000) {
+function requestPreviewMetadata(baseUrl = CURRENT_TASK_PREVIEW_URL, timeoutMs = 1_000) {
   return new Promise((resolve) => {
-    const request = http.get(`http://127.0.0.1:5175${CONTROL_PATH}`, { timeout: timeoutMs }, (response) => {
+    const request = http.get(new URL(CONTROL_PATH, baseUrl), { timeout: timeoutMs }, (response) => {
       const chunks = [];
       response.on('data', (chunk) => chunks.push(chunk));
       response.on('end', () => {
@@ -354,13 +363,17 @@ async function waitForService(paths, timeoutMs = 20_000) {
   throw new Error(`等待预览守护服务启动超时：${lastError?.message || paths.socketFile}`);
 }
 
-async function waitForPreview(worktree, child, timeoutMs = CONTROL_TIMEOUT_MS) {
+async function waitForPreview(
+  worktree,
+  child,
+  { baseUrl = CURRENT_TASK_PREVIEW_URL, timeoutMs = CONTROL_TIMEOUT_MS } = {},
+) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     if (child.exitCode !== null || child.signalCode) {
       throw new Error(`任务预览进程已退出：${child.exitCode ?? child.signalCode}`);
     }
-    const metadata = await requestPreviewMetadata();
+    const metadata = await requestPreviewMetadata(baseUrl);
     if (metadata && path.resolve(metadata.workspaceRoot) === path.resolve(worktree)) return metadata;
     await sleep(1_000);
   }
@@ -378,10 +391,153 @@ async function stopChild(child) {
   }
 }
 
+const HOP_BY_HOP_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'proxy-connection',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+]);
+
+function proxyHeaders(headers, target, forwardedHost) {
+  const result = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) continue;
+    result[name] = value;
+  }
+  result.host = target.host;
+  result['x-forwarded-host'] = forwardedHost || target.host;
+  result['x-forwarded-proto'] = 'http';
+  return result;
+}
+
+function writeUnavailableResponse(response, target, error) {
+  if (response.headersSent) {
+    response.destroy(error);
+    return;
+  }
+  const acceptsHtml = `${response.req?.headers?.accept || ''}`.includes('text/html');
+  response.statusCode = 503;
+  response.setHeader('cache-control', 'no-store');
+  if (acceptsHtml) {
+    response.setHeader('content-type', 'text/html; charset=utf-8');
+    response.end(`<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>5175 预览入口</title></head>
+  <body><main><h1>集成环境暂不可用</h1><p>5175 入口运行正常，正在等待上游 ${target.origin} 恢复。</p></main></body>
+</html>`);
+    return;
+  }
+  response.setHeader('content-type', 'application/json; charset=utf-8');
+  response.end(`${JSON.stringify({ error: 'preview upstream unavailable', upstream: target.origin })}\n`);
+}
+
+export class PreviewGateway {
+  constructor({ host = '127.0.0.1', port = 5175, integrationUrl = INTEGRATION_PREVIEW_URL } = {}) {
+    this.host = host;
+    this.port = port;
+    this.integrationUrl = new URL(integrationUrl);
+    this.upstream = this.integrationUrl;
+    this.mode = 'integration-fallback';
+    this.server = null;
+    this.sockets = new Set();
+  }
+
+  status() {
+    return {
+      mode: this.mode,
+      upstream: this.upstream.origin,
+      listening: Boolean(this.server?.listening),
+    };
+  }
+
+  useIntegration() {
+    this.mode = 'integration-fallback';
+    this.upstream = this.integrationUrl;
+  }
+
+  useTask(port = MANAGED_TASK_PREVIEW_PORT) {
+    this.mode = 'task';
+    this.upstream = new URL(`http://127.0.0.1:${port}/`);
+  }
+
+  proxyRequest(request, response) {
+    const target = this.upstream;
+    const upstreamRequest = http.request(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        method: request.method,
+        path: request.url,
+        headers: proxyHeaders(request.headers, target, request.headers.host),
+      },
+      (upstreamResponse) => {
+        response.statusCode = upstreamResponse.statusCode ?? 502;
+        for (const [name, value] of Object.entries(upstreamResponse.headers)) {
+          if (value === undefined || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) continue;
+          response.setHeader(name, value);
+        }
+        upstreamResponse.pipe(response);
+      },
+    );
+    upstreamRequest.once('error', (error) => writeUnavailableResponse(response, target, error));
+    request.pipe(upstreamRequest);
+  }
+
+  proxyUpgrade(request, socket, head) {
+    const target = this.upstream;
+    const upstreamSocket = net.connect(Number(target.port || 80), target.hostname);
+    upstreamSocket.once('connect', () => {
+      const headers = { ...request.headers, host: target.host };
+      const headerLines = [];
+      for (const [name, value] of Object.entries(headers)) {
+        if (value === undefined) continue;
+        for (const item of Array.isArray(value) ? value : [value]) headerLines.push(`${name}: ${item}`);
+      }
+      upstreamSocket.write(
+        `${request.method} ${request.url} HTTP/${request.httpVersion}\r\n${headerLines.join('\r\n')}\r\n\r\n`,
+      );
+      if (head.length) upstreamSocket.write(head);
+      socket.pipe(upstreamSocket).pipe(socket);
+    });
+    upstreamSocket.once('error', () => socket.destroy());
+    socket.once('error', () => upstreamSocket.destroy());
+  }
+
+  async start() {
+    if (this.server?.listening) return;
+    const server = http.createServer((request, response) => this.proxyRequest(request, response));
+    server.on('upgrade', (request, socket, head) => this.proxyUpgrade(request, socket, head));
+    server.on('connection', (socket) => {
+      this.sockets.add(socket);
+      socket.once('close', () => this.sockets.delete(socket));
+    });
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(this.port, this.host, resolve);
+    });
+    this.server = server;
+  }
+
+  async stop() {
+    const server = this.server;
+    if (!server) return;
+    this.server = null;
+    for (const socket of this.sockets) socket.destroy();
+    this.sockets.clear();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
 class PreviewSupervisor {
-  constructor(paths, config) {
+  constructor(paths, config, gateway) {
     this.paths = paths;
     this.config = config;
+    this.gateway = gateway;
     this.child = null;
     this.currentWorktree = null;
     this.currentTaskArgs = [];
@@ -395,14 +551,17 @@ class PreviewSupervisor {
   }
 
   status() {
+    const gateway = this.gateway.status();
     return {
       type: 'zdm-task-preview-service',
       servicePid: process.pid,
       childPid: this.child?.pid ?? null,
       phase: this.phase,
+      mode: gateway.mode,
+      upstream: gateway.upstream,
       worktree: this.config.selectedWorktree ?? null,
       taskArgs: this.config.taskArgs ?? [],
-      url: this.phase === 'running' ? CURRENT_TASK_PREVIEW_URL : null,
+      url: gateway.listening ? CURRENT_TASK_PREVIEW_URL : null,
       lastError: this.lastError,
       lastTransitionAt: this.lastTransitionAt,
       restartAttempts: this.restartAttempts,
@@ -439,6 +598,7 @@ class PreviewSupervisor {
 
   scheduleRestart() {
     if (!this.config.selectedWorktree || this.restartTimer) return;
+    this.gateway.useIntegration();
     this.restartAttempts += 1;
     const delay = restartDelay(this.restartAttempts);
     this.transition('retrying', this.lastError);
@@ -463,7 +623,8 @@ class PreviewSupervisor {
   async launchSelected() {
     const worktree = this.config.selectedWorktree;
     if (!worktree) {
-      this.transition('idle');
+      this.gateway.useIntegration();
+      this.transition('integration-fallback');
       return this.status();
     }
     const resolved = resolveTaskWorktree(worktree);
@@ -472,10 +633,12 @@ class PreviewSupervisor {
       this.child &&
       this.currentWorktree === resolved.root &&
       taskArgsEqual(this.currentTaskArgs, taskArgs) &&
-      this.phase === 'running'
+      this.phase === 'running' &&
+      this.gateway.mode === 'task'
     ) {
       return this.status();
     }
+    this.gateway.useIntegration();
     await ensureDockerReady(this.config);
     if (this.child) await this.stopOwnedChild();
 
@@ -491,7 +654,11 @@ class PreviewSupervisor {
     console.log(`启动当前任务预览：${resolved.branch} (${resolved.root})`);
     const child = spawn(command.command, command.args, {
       cwd: resolved.root,
-      env: { ...process.env, PATH: this.config.pathValue || process.env.PATH },
+      env: {
+        ...process.env,
+        PATH: this.config.pathValue || process.env.PATH,
+        ZDM_TASK_PUBLIC_ORIGIN: new URL(CURRENT_TASK_PREVIEW_URL).origin,
+      },
       stdio: ['ignore', 'inherit', 'inherit'],
     });
     this.child = child;
@@ -503,11 +670,15 @@ class PreviewSupervisor {
       if (this.child !== child) return;
       this.child = null;
       if (this.intentionalStop || !this.config.selectedWorktree) return;
+      this.gateway.useIntegration();
       this.transition('error', `任务预览进程退出：${code ?? signal}`);
       this.scheduleRestart();
     });
 
     try {
+      const taskUrl = `http://127.0.0.1:${MANAGED_TASK_PREVIEW_PORT}/`;
+      await waitForPreview(resolved.root, child, { baseUrl: taskUrl });
+      this.gateway.useTask();
       const metadata = await waitForPreview(resolved.root, child);
       this.restartAttempts = 0;
       this.transition('running');
@@ -515,6 +686,7 @@ class PreviewSupervisor {
       return this.status();
     } catch (error) {
       if (this.child === child) await this.stopOwnedChild();
+      this.gateway.useIntegration();
       this.transition('error', error instanceof Error ? error.message : `${error}`);
       this.scheduleRestart();
       throw error;
@@ -535,10 +707,11 @@ class PreviewSupervisor {
       const worktree = this.config.selectedWorktree;
       this.clearRestart();
       this.saveSelection(null, []);
+      this.gateway.useIntegration();
       await this.stopOwnedChild();
       this.currentWorktree = null;
       this.currentTaskArgs = [];
-      this.transition('idle');
+      this.transition('integration-fallback');
       if (worktree) {
         const result = run(this.config.nodePath, [this.config.launcherPath, '--worktree', worktree, '--stop'], {
           cwd: worktree,
@@ -547,7 +720,7 @@ class PreviewSupervisor {
         });
         if (result.status !== 0) throw new Error(`任务前端已停止，但后端停止失败：${worktree}`);
       }
-      console.log('当前任务预览已停止；守护服务继续运行。');
+      console.log('当前任务预览已停止；5175 已回退到集成环境。');
       return this.status();
     });
   }
@@ -555,6 +728,7 @@ class PreviewSupervisor {
   async shutdown() {
     this.clearRestart();
     await this.stopOwnedChild();
+    await this.gateway.stop();
   }
 }
 
@@ -593,7 +767,10 @@ async function runService(paths) {
     }
   }
 
-  const supervisor = new PreviewSupervisor(paths, readConfig(paths));
+  const config = readConfig(paths);
+  const gateway = new PreviewGateway({ integrationUrl: config.integrationUrl || INTEGRATION_PREVIEW_URL });
+  await gateway.start();
+  const supervisor = new PreviewSupervisor(paths, config, gateway);
   const server = http.createServer(async (request, response) => {
     try {
       if (request.method === 'GET' && request.url === '/status') {
@@ -635,6 +812,12 @@ async function runService(paths) {
     void supervisor.switch(supervisor.config.selectedWorktree, supervisor.config.taskArgs ?? []).catch((error) => {
       console.error(error instanceof Error ? error.message : error);
     });
+  } else {
+    void supervisor
+      .enqueue(() => supervisor.launchSelected())
+      .catch((error) => {
+        console.error(error instanceof Error ? error.message : error);
+      });
   }
 }
 
@@ -666,10 +849,11 @@ async function installService({ paths, worktree, taskArgs = [] }) {
   chmodSync(paths.runtimeScript, 0o700);
 
   const config = {
-    version: 1,
+    version: 2,
     nodePath: process.execPath,
     launcherPath,
     pathValue: normalizedPath(),
+    integrationUrl: INTEGRATION_PREVIEW_URL,
     selectedWorktree: selected,
     taskArgs,
     installedAt: new Date().toISOString(),
@@ -702,7 +886,8 @@ async function installService({ paths, worktree, taskArgs = [] }) {
     });
   }
   console.log(`预览守护服务已安装：${paths.launchAgentFile}`);
-  console.log(`当前任务预览：${selected ? CURRENT_TASK_PREVIEW_URL : '尚未选择任务'}`);
+  console.log(`5175 页面入口：${CURRENT_TASK_PREVIEW_URL}`);
+  console.log(`当前模式：${selected ? '任务预览' : '集成回退'}`);
 }
 
 async function ensureService(paths) {
@@ -726,6 +911,8 @@ function resolveLauncher(paths) {
 
 function printStatus(status) {
   console.log(`服务状态：${status.phase}`);
+  console.log(`入口模式：${status.mode ?? '-'}`);
+  console.log(`实际上游：${status.upstream ?? '-'}`);
   console.log(`服务 PID：${status.servicePid ?? '-'}`);
   console.log(`预览 PID：${status.childPid ?? '-'}`);
   console.log(`当前任务：${status.worktree ?? '-'}`);
@@ -741,7 +928,7 @@ Commands:
   install                 安装或更新 macOS 登录常驻服务，并选择当前任务
   switch                  把 5175 切换到当前任务（默认命令）
   status                  查看守护服务和当前任务状态
-  stop                    停止当前任务前后端，守护服务保持空闲
+  stop                    停止当前任务前后端，5175 回退到集成环境
   logs                    查看服务日志
 
 Options:

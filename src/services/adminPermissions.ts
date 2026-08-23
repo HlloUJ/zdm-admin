@@ -7,11 +7,19 @@ export interface AdminMenuItem {
   permissionPrefix?: string;
 }
 
+export interface AdminMenuSubgroup {
+  label: string;
+  value: string;
+  children: AdminMenuItem[];
+}
+
+export type AdminMenuChild = AdminMenuItem | AdminMenuSubgroup;
+
 export interface AdminMenuGroup {
   label: string;
   value: string;
   icon: string;
-  children: AdminMenuItem[];
+  children: AdminMenuChild[];
 }
 
 export type AdminMenuEntry = AdminMenuItem | AdminMenuGroup;
@@ -25,19 +33,76 @@ export const adminMenuEntries: AdminMenuEntry[] = [
     children: [
       { label: '租户管理', path: '/tenant-management', permissionPrefix: 'admin.tenant.tenant-management' },
       { label: '门店管理', path: '/tenant-store-management', permissionPrefix: 'admin.tenant.tenant-store-management' },
+      {
+        label: '门店基础数据',
+        value: 'store-base-data-management',
+        children: [
+          {
+            label: '门店级别管理',
+            path: '/store-level-management',
+            permissionPrefix: 'admin.tenant.store-level-management',
+          },
+        ],
+      },
     ],
   },
   {
-    label: '成品现货管理',
-    path: '/finished-stock-management',
-    icon: 'shop',
-    permissionPrefix: 'admin.finished-stock-management',
-  },
-  {
-    label: '大板管理',
-    path: '/slab-management',
-    icon: 'image',
-    permissionPrefix: 'admin.slab-management',
+    label: '商品管理',
+    value: 'product-management',
+    icon: 'layers',
+    children: [
+      {
+        label: '成品现货管理',
+        path: '/finished-stock-management',
+        permissionPrefix: 'admin.finished-stock-management',
+      },
+      { label: '大板管理', path: '/slab-management', permissionPrefix: 'admin.slab-management' },
+      {
+        label: '商品公共基础数据',
+        value: 'product-common-base-data',
+        children: [
+          { label: '商品分类管理', path: '/product-category', permissionPrefix: 'admin.product-data-center.category' },
+          { label: '属性库管理', path: '/product-attribute', permissionPrefix: 'admin.product-data-center.attribute' },
+          {
+            label: '属性值管理',
+            path: '/product-attribute-value',
+            permissionPrefix: 'admin.product-data-center.attribute-value',
+          },
+          {
+            label: '分类属性模板',
+            path: '/category-attribute-template',
+            permissionPrefix: 'admin.product-data-center.category-attribute-template',
+          },
+          {
+            label: '加价配置',
+            path: '/markup-configuration',
+            permissionPrefix: 'admin.product-data-center.markup-configuration',
+          },
+        ],
+      },
+      {
+        label: '成品现货基础数据',
+        value: 'finished-stock-base-data',
+        children: [
+          {
+            label: '工艺管理',
+            path: '/finished-stock-craft',
+            permissionPrefix: 'admin.product-data-center.finished-stock-craft',
+          },
+        ],
+      },
+      {
+        label: '大板基础数据',
+        value: 'slab-base-data-management',
+        children: [
+          { label: '品种管理', path: '/slab-variety', permissionPrefix: 'admin.product-data-center.slab-variety' },
+          { label: '产地管理', path: '/slab-origin', permissionPrefix: 'admin.product-data-center.slab-origin' },
+          { label: '纹理管理', path: '/slab-texture', permissionPrefix: 'admin.product-data-center.slab-texture' },
+          { label: '色系管理', path: '/slab-color', permissionPrefix: 'admin.product-data-center.slab-color' },
+          { label: '等级管理', path: '/slab-grade', permissionPrefix: 'admin.product-data-center.slab-grade' },
+        ],
+      },
+    ],
   },
   {
     label: '供应商管理',
@@ -50,31 +115,6 @@ export const adminMenuEntries: AdminMenuEntry[] = [
     path: '/store-category-management',
     icon: 'folder',
     permissionPrefix: 'admin.tenant.store-category-management',
-  },
-  {
-    label: '商品基础数据中心',
-    value: 'product-data-center',
-    icon: 'layers',
-    children: [
-      { label: '商品分类管理', path: '/product-category', permissionPrefix: 'admin.product-data-center.category' },
-      { label: '属性库管理', path: '/product-attribute', permissionPrefix: 'admin.product-data-center.attribute' },
-      {
-        label: '属性值管理',
-        path: '/product-attribute-value',
-        permissionPrefix: 'admin.product-data-center.attribute-value',
-      },
-      {
-        label: '分类属性模板',
-        path: '/category-attribute-template',
-        permissionPrefix: 'admin.product-data-center.category-attribute-template',
-      },
-      { label: '大板品种管理', path: '/slab-variety', permissionPrefix: 'admin.product-data-center.slab-variety' },
-      {
-        label: '成品现货工艺管理',
-        path: '/finished-stock-craft',
-        permissionPrefix: 'admin.product-data-center.finished-stock-craft',
-      },
-    ],
   },
   {
     label: '权限管理',
@@ -102,7 +142,13 @@ export const adminMenuEntries: AdminMenuEntry[] = [
 
 export const routePermissionPrefixMap = Object.fromEntries(
   adminMenuEntries.flatMap((entry) => {
-    if ('children' in entry) return entry.children.map((item) => [item.path, item.permissionPrefix]);
+    if ('children' in entry) {
+      return entry.children.flatMap((item) =>
+        'path' in item
+          ? [[item.path, item.permissionPrefix]]
+          : item.children.map((child) => [child.path, child.permissionPrefix]),
+      );
+    }
     return [[entry.path, entry.permissionPrefix]];
   }),
 );
@@ -138,7 +184,9 @@ export function hasMenuPermission(user: LoginUser, prefix?: string) {
 export function getFirstAccessiblePath(user: LoginUser) {
   for (const entry of adminMenuEntries) {
     if ('children' in entry) {
-      const firstChild = entry.children.find((item) => hasMenuPermission(user, item.permissionPrefix));
+      const firstChild = entry.children
+        .flatMap((item) => ('path' in item ? [item] : item.children))
+        .find((item) => hasMenuPermission(user, item.permissionPrefix));
       if (firstChild) return firstChild.path;
     } else if (hasMenuPermission(user, entry.permissionPrefix)) {
       return entry.path;

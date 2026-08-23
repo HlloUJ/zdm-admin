@@ -9,8 +9,9 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-              <t-breadcrumb-item>大板品种管理</t-breadcrumb-item>
+              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
+              <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
+              <t-breadcrumb-item>品种管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
           <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
@@ -138,8 +139,10 @@ import { adminFeedback, AdminConfirmDialog } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createSlabVariety,
   deleteSlabVariety,
@@ -155,10 +158,10 @@ type ConfirmType = 'enable' | 'disable' | 'delete';
 
 interface VarietyItem {
   id: number;
-  code: string;
   name: string;
   status: VarietyStatus;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
   remark?: string;
 }
@@ -260,21 +263,18 @@ const formatDateTime = (value?: string) => {
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const createCode = (name: string) => `slab-variety-${name.trim().length}-${Date.now()}`;
-
 const toVarietyItem = (record: SlabVarietyRecord): VarietyItem => ({
   id: record.id,
-  code: record.code,
   name: record.name,
   status: normalizeStatus(record.status),
   createdByName: record.createdByName ?? '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
 
-const toVarietyPayload = (status: VarietyStatus, code?: string): SlabVarietyPayload => ({
+const toVarietyPayload = (status: VarietyStatus): SlabVarietyPayload => ({
   name: formData.name.trim(),
-  code: code ?? createCode(formData.name),
   status: toBackendStatus(status),
   remark: formData.remark.trim(),
 });
@@ -283,7 +283,7 @@ const loadVarieties = async () => {
   loading.value = true;
   try {
     const records = await listSlabVarieties();
-    tableData.value = records.map(toVarietyItem);
+    tableData.value = sortByCreatedAtDesc(records).map(toVarietyItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '品种列表加载失败');
@@ -327,6 +327,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: VarietyItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -349,20 +350,24 @@ const handleSubmit = async () => {
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
-      await updateSlabVariety(editingId.value, toVarietyPayload(current?.status ?? 'normal', current?.code));
+      await updateSlabVariety(editingId.value, toVarietyPayload(current?.status ?? 'normal'));
       await loadVarieties();
     }
 
-    const action = dialogMode.value === 'create' ? '新增' : '保存';
     const target = formData.name.trim();
     closeFormDialog();
-    adminFeedback.actionSuccess({ action, target });
+    if (dialogMode.value === 'create') {
+      adminFeedback.created(target);
+    } else {
+      adminFeedback.actionSuccess({ action: '保存', target });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
 const openStatusConfirm = (row: VarietyItem) => {
+  if (!requireCreatorOwnership(row)) return;
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
@@ -371,6 +376,7 @@ const openStatusConfirm = (row: VarietyItem) => {
 };
 
 const openDeleteConfirm = (row: VarietyItem) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除品种“${row.name}”？`;
@@ -411,7 +417,11 @@ const handleConfirm = async () => {
     }
 
     closeConfirmDialog();
-    adminFeedback.actionSuccess({ action, target: target.name });
+    if (confirmState.type === 'delete') {
+      adminFeedback.deleted(target.name);
+    } else {
+      adminFeedback.actionSuccess({ action, target: target.name });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

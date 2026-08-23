@@ -3,10 +3,41 @@ import { expect, test } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
 const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '上移', '下移', '停用/启用', '删除'];
+const productSecondMenuLabels = ['商品公共基础数据', '成品现货基础数据', '大板基础数据'];
+const adminProductSecondMenuLabels = ['大板管理', ...productSecondMenuLabels];
+const productThirdMenuLabels = [
+  '商品分类管理',
+  '属性库管理',
+  '属性值管理',
+  '分类属性模板',
+  '工艺管理',
+  '品种管理',
+  '产地管理',
+  '纹理管理',
+  '色系管理',
+  '等级管理',
+];
+const adminProductThirdMenuLabels = [
+  '—',
+  ...productThirdMenuLabels.slice(0, 4),
+  '加价配置',
+  ...productThirdMenuLabels.slice(4),
+];
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 1,
+        name: '韩健',
+        phone: '15926626945',
+        roles: ['SUPER_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    );
   });
   await installAdminApiMocks(page);
 });
@@ -34,10 +65,10 @@ test('allows account 15900000001 to operate the granted attribute tab', async ({
   await page.goto('/product-attribute');
   const main = page.getByRole('main');
   const row = main.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
+  const actions = row.locator('.table-actions');
 
   await expect(main.getByRole('button', { name: '新增' })).toBeVisible();
-  await expect(row.getByText('停用', { exact: true })).toBeVisible();
-  await expect(row.getByText('删除', { exact: true })).toBeVisible();
+  await expect(actions.locator('.t-link')).toHaveText([/^(停用|启用)$/, '删除']);
   await expect(row).toContainText('韩健');
   await expect(row).toContainText('2026/08/04 09:00');
   await expect(main.locator('thead th')).toContainText([
@@ -76,10 +107,10 @@ test('allows account 15900000001 to operate the granted attribute-value tab', as
   await page.goto('/product-attribute-value');
   const main = page.getByRole('main');
   const row = main.locator('tbody tr').filter({ hasText: 'E2E 共享属性值' });
+  const actions = row.locator('.table-actions');
 
   await expect(main.getByRole('button', { name: '新增' })).toBeVisible();
-  await expect(row.getByText('停用', { exact: true })).toBeVisible();
-  await expect(row.getByText('删除', { exact: true })).toBeVisible();
+  await expect(actions.locator('.t-link')).toHaveText([/^(停用|启用)$/, '删除']);
   await expect(row).toContainText('韩健');
   await expect(row).toContainText('2026/08/04 09:20');
   await expect(main.locator('thead th')).toContainText([
@@ -116,12 +147,14 @@ test('shows only granted craft operation buttons for a restricted account', asyn
   await page.goto('/finished-stock-craft');
   const main = page.getByRole('main');
   const craftRow = main.locator('tbody tr').filter({ hasText: 'E2E 边工艺' });
+  const craftActions = craftRow.locator('.table-actions');
 
   await expect(craftRow).toBeVisible();
   await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
-  await expect(craftRow.getByText('编辑', { exact: true })).toBeVisible();
-  await expect(craftRow.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(craftRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(craftActions.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(craftActions.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(craftActions.getByText('启用', { exact: true })).toHaveCount(0);
+  await expect(craftActions.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
 test('shows only granted category operation buttons for a restricted account', async ({ page }) => {
@@ -149,15 +182,16 @@ test('shows only granted category operation buttons for a restricted account', a
   await page.goto('/product-category');
   const main = page.getByRole('main');
   const categoryRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
+  const categoryActions = categoryRow.locator('.table-actions');
 
   await expect(categoryRow).toBeVisible();
   await expect(main.getByRole('button', { name: '新增一级分类' })).toHaveCount(0);
-  await expect(categoryRow.getByText('新增下级', { exact: true })).toHaveCount(0);
-  await expect(categoryRow.getByText('编辑', { exact: true })).toBeVisible();
-  await expect(categoryRow.getByText('上移', { exact: true })).toBeVisible();
-  await expect(categoryRow.getByText('下移', { exact: true })).toBeVisible();
-  await expect(categoryRow.getByText('停用', { exact: true })).toBeVisible();
-  await expect(categoryRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(categoryActions.getByText('新增下级', { exact: true })).toHaveCount(0);
+  await expect(categoryActions.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(categoryActions.getByText('上移', { exact: true })).toBeVisible();
+  await expect(categoryActions.getByText('下移', { exact: true })).toBeVisible();
+  await expect(categoryActions.locator('.t-link').filter({ hasText: /^(停用|启用)$/ })).toBeVisible();
+  await expect(categoryActions.getByText('删除', { exact: true })).toHaveCount(0);
   await expect(main.locator('.scope-tabs')).toContainText('成品现货分类');
   await expect(main.locator('.scope-tabs')).toContainText('配件分类');
 });
@@ -186,19 +220,20 @@ test('shows the finished category buttons granted to account 15900000001', async
   await page.goto('/product-category');
   const main = page.getByRole('main');
   const rootRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
+  const rootActions = rootRow.locator('.table-actions');
 
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
   await expect(main.getByRole('button', { name: '新增一级分类' })).toBeVisible();
-  await expect(rootRow.getByText('新增下级', { exact: true })).toHaveCount(0);
-  await expect(rootRow.getByText('编辑', { exact: true })).toHaveCount(0);
-  await expect(rootRow.getByText('上移', { exact: true })).toHaveCount(0);
-  await expect(rootRow.getByText('下移', { exact: true })).toHaveCount(0);
-  await expect(rootRow.getByText('停用', { exact: true })).toBeVisible();
-  await expect(rootRow.getByText('删除', { exact: true })).toBeVisible();
+  await expect(rootActions.getByText('新增下级', { exact: true })).toHaveCount(0);
+  await expect(rootActions.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(rootActions.getByText('上移', { exact: true })).toHaveCount(0);
+  await expect(rootActions.getByText('下移', { exact: true })).toHaveCount(0);
+  await expect(rootActions.locator('.t-link').filter({ hasText: /^(停用|启用)$/ })).toBeVisible();
+  await expect(rootActions.getByText('删除', { exact: true })).toBeVisible();
 
   await rootRow.getByRole('button', { name: '展开下级分类' }).click();
   const childRow = main.locator('tbody tr').filter({ hasText: '岩板餐桌' });
-  await expect(childRow.getByText('启用', { exact: true })).toBeVisible();
+  await expect(childRow.locator('.table-actions .t-link').filter({ hasText: /^(停用|启用)$/ })).toBeVisible();
 });
 
 test('shows only the granted product category tab', async ({ page }) => {
@@ -265,14 +300,15 @@ test('shows slab variety edit without status operation for an edit-only account'
   await page.goto('/slab-variety');
   const main = page.getByRole('main');
   const varietyRow = main.locator('tbody tr').filter({ hasText: '潘多拉' });
+  const varietyActions = varietyRow.locator('.table-actions');
 
   await expect(varietyRow).toBeVisible();
   await expect(main.locator('thead')).toContainText('创建人');
   await expect(varietyRow).toContainText('韩健');
   await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
-  await expect(varietyRow.getByText('编辑', { exact: true })).toBeVisible();
-  await expect(varietyRow.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(varietyRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(varietyActions.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(varietyActions.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(varietyActions.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
 test('shows slab variety status without edit operation for a status-only account', async ({ page }) => {
@@ -296,12 +332,66 @@ test('shows slab variety status without edit operation for a status-only account
   await page.goto('/slab-variety');
   const main = page.getByRole('main');
   const varietyRow = main.locator('tbody tr').filter({ hasText: '潘多拉' });
+  const varietyActions = varietyRow.locator('.table-actions');
 
   await expect(varietyRow).toBeVisible();
   await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
-  await expect(varietyRow.getByText('编辑', { exact: true })).toHaveCount(0);
-  await expect(varietyRow.getByText('停用', { exact: true })).toBeVisible();
-  await expect(varietyRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(varietyActions.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(varietyActions.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(varietyActions.locator('.t-link')).toHaveCount(1);
+  await expect(varietyActions.locator('.t-link')).toHaveText(/^(停用|启用)$/);
+});
+
+test('shows supplier status without unrelated operations for a status-only account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 13,
+        name: '受限供应商管理员',
+        phone: '15926620013',
+        roles: ['SUPPLIER_STATUS_MANAGER'],
+        permissions: ['admin.supplier-management.view', 'admin.supplier-management.toggle-status'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/supplier-management');
+  const main = page.getByRole('main');
+  const supplierRow = main.locator('tbody tr').filter({ hasText: '装点猫大板供应商' }).first();
+  const supplierActions = supplierRow.locator('.table-actions');
+
+  await expect(supplierRow).toBeVisible();
+  await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
+  await expect(supplierActions.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(supplierActions.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(supplierActions.locator('.t-link')).toHaveCount(1);
+  await expect(supplierActions.locator('.t-link')).toHaveText(/^(停用|启用)$/);
+});
+
+test('allows account 15900000002 with self data scope to view all suppliers', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 4,
+        name: '张飞',
+        phone: '15900000002',
+        roles: ['OPERATION_MANAGER'],
+        permissions: ['admin.supplier-management.view'],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/supplier-management');
+  const main = page.getByRole('main');
+
+  await expect(main.getByText('装点猫大板供应商', { exact: true })).toBeVisible();
+  await expect(main.getByText('装点猫成品供应商', { exact: true })).toBeVisible();
+  await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
+  await expect(main.locator('.table-actions .t-link')).toHaveCount(0);
 });
 
 test('opens employee invite and edit dialogs', async ({ page }) => {
@@ -346,10 +436,11 @@ test('opens employee invite and edit dialogs', async ({ page }) => {
   await expect(page.getByText('备注最多输入100个字符')).toHaveCount(0);
   await expect(profileDialog).toBeHidden();
 
-  await expect(firstEmployeeRow.getByText('角色', { exact: true })).toHaveCount(0);
-  await expect(firstEmployeeRow.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(firstEmployeeRow.getByText('启用', { exact: true })).toHaveCount(0);
-  await expect(firstEmployeeRow.getByText('删除', { exact: true })).toHaveCount(0);
+  const firstEmployeeActions = firstEmployeeRow.locator('.table-actions');
+  await expect(firstEmployeeActions.getByText('角色', { exact: true })).toHaveCount(0);
+  await expect(firstEmployeeActions.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(firstEmployeeActions.getByText('启用', { exact: true })).toHaveCount(0);
+  await expect(firstEmployeeActions.getByText('删除', { exact: true })).toHaveCount(0);
 
   const pendingEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
   await expect(pendingEmployeeRow).toBeVisible();
@@ -450,7 +541,7 @@ test('filters menu and employee actions by logged-in permissions', async ({ page
           'admin.permission-management.employee-management.view',
           'admin.permission-management.employee-management.edit',
         ],
-        employeeId: 2,
+        employeeId: 999,
         tenantId: 1,
         storeId: 1,
         dataPermission: 'self',
@@ -461,20 +552,23 @@ test('filters menu and employee actions by logged-in permissions', async ({ page
   await page.goto('/employee-management');
   const sideNav = page.locator('.side-nav');
   const firstEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926626945' }).first();
+  const firstEmployeeActions = firstEmployeeRow.locator('.table-actions');
 
   await expect(sideNav.getByText('工作台')).toHaveCount(0);
   await expect(sideNav.getByText('员工管理')).toBeVisible();
   await expect(sideNav.getByText('角色管理')).toHaveCount(0);
   await expect(sideNav.getByText('商品分类管理')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /邀请员工/ })).toHaveCount(0);
-  await expect(firstEmployeeRow.getByText('编辑', { exact: true })).toBeVisible();
-  await expect(firstEmployeeRow.getByText('角色', { exact: true })).toHaveCount(0);
-  await expect(firstEmployeeRow.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(firstEmployeeRow.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(firstEmployeeActions.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(firstEmployeeActions.getByText('角色', { exact: true })).toHaveCount(0);
+  await expect(firstEmployeeActions.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(firstEmployeeActions.getByText('启用', { exact: true })).toHaveCount(0);
+  await expect(firstEmployeeActions.getByText('删除', { exact: true })).toHaveCount(0);
 
   const pendingEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
-  await expect(pendingEmployeeRow.getByText('编辑', { exact: true })).toBeVisible();
-  await expect(pendingEmployeeRow.getByText('角色', { exact: true })).toHaveCount(0);
+  const pendingEmployeeActions = pendingEmployeeRow.locator('.table-actions');
+  await expect(pendingEmployeeActions.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(pendingEmployeeActions.getByText('角色', { exact: true })).toHaveCount(0);
 });
 
 test('shows employee permission action without edit action for permission-only users', async ({ page }) => {
@@ -500,8 +594,89 @@ test('shows employee permission action without edit action for permission-only u
 
   await page.goto('/employee-management');
   const permissionOnlyEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
-  await expect(permissionOnlyEmployeeRow.getByText('编辑', { exact: true })).toHaveCount(0);
-  await expect(permissionOnlyEmployeeRow.getByText('角色', { exact: true })).toBeVisible();
+  const permissionOnlyEmployeeActions = permissionOnlyEmployeeRow.locator('.table-actions');
+  await expect(permissionOnlyEmployeeActions.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(permissionOnlyEmployeeActions.getByText('角色', { exact: true })).toBeVisible();
+});
+
+test('blocks all employee operations for records created by another account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 19,
+        name: '门店店长',
+        phone: '13900000001',
+        roles: ['STORE_MANAGER'],
+        permissions: [
+          'admin.permission-management.employee-management.view',
+          'admin.permission-management.employee-management.edit',
+          'admin.permission-management.employee-management.permission',
+          'admin.permission-management.employee-management.toggle-status',
+          'admin.permission-management.employee-management.delete',
+        ],
+        employeeId: 19,
+        tenantId: 14,
+        storeId: 14,
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/employee-management');
+  const row = page.locator('tbody tr').filter({ hasText: '15926627777' }).first();
+  const actions = row.locator('.table-actions');
+
+  await actions.getByText('编辑', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '编辑资料' })).toHaveCount(0);
+
+  await actions.getByText('角色', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '配置权限' })).toHaveCount(0);
+
+  await actions.getByText(/^(停用|启用)$/).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: /是否(停用|启用)员工/ })).toHaveCount(0);
+
+  await actions.getByText('删除', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '是否删除员工' })).toHaveCount(0);
+});
+
+test('hides all operations for the current employee', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 1,
+        name: '韩健',
+        phone: '15926627777',
+        roles: ['EMPLOYEE_MANAGER'],
+        permissions: [
+          'admin.permission-management.employee-management.view',
+          'admin.permission-management.employee-management.edit',
+          'admin.permission-management.employee-management.permission',
+          'admin.permission-management.employee-management.toggle-status',
+          'admin.permission-management.employee-management.delete',
+        ],
+        employeeId: 3,
+        tenantId: 1,
+        storeId: 1,
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/employee-management');
+  const row = page.locator('tbody tr').filter({ hasText: '15926627777' }).first();
+
+  const actions = row.locator('.table-actions');
+  await expect(actions.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(actions.getByText('角色', { exact: true })).toHaveCount(0);
+  await expect(actions.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(actions.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(actions.locator('.table-action-placeholder')).toHaveText('-');
 });
 
 test('shows current account info and logout on tenant management page', async ({ page }) => {
@@ -514,10 +689,10 @@ test('shows current account info and logout on tenant management page', async ({
         phone: '15900000004',
         roles: ['TENANT_MANAGER'],
         roleNames: ['租户管理员'],
-        permissions: ['admin.tenant.tenant-management.view'],
+        identityType: 'tenant_admin',
+        permissions: ['admin.tenant.tenant-management.unarchived.view'],
         employeeId: 4,
         tenantId: 1,
-        storeId: 1,
         dataPermission: 'all',
       }),
     );
@@ -530,6 +705,40 @@ test('shows current account info and logout on tenant management page', async ({
   await expect(page.getByRole('button', { name: /退出登录/ })).toBeVisible();
 });
 
+test('shows only granted store management operations for a restricted account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 12,
+        name: '门店受限管理员',
+        phone: '15900000012',
+        roles: ['STORE_OPERATOR'],
+        permissions: [
+          'admin.tenant.tenant-store-management.operating.view',
+          'admin.tenant.tenant-store-management.operating.edit-level',
+          'admin.tenant.tenant-store-management.operating.archive',
+        ],
+        dataPermission: 'all',
+      }),
+    );
+  });
+
+  await page.goto('/tenant-store-management');
+  const main = page.getByRole('main');
+  const row = main.locator('tbody tr').filter({ hasText: '杭州体验门店' });
+
+  await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);
+  await expect(row.getByRole('button', { name: '修改门店级别' })).toBeVisible();
+  await expect(row.locator('.table-actions .t-link')).toHaveText(['归档']);
+  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
+
+  await row.getByRole('button', { name: '修改门店级别' }).click({ force: true });
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '店铺级别' })).toHaveCount(0);
+});
+
 test('filters role actions by logged-in permissions', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -539,14 +748,13 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
         name: '角色权限员工',
         phone: '15900000002',
         roles: ['ROLE_PERMISSION_MANAGER'],
+        identityType: 'platform_admin',
         permissions: [
           'admin.permission-management.employee-management.view',
-          'admin.permission-management.role-management.operation-platform.view',
-          'admin.permission-management.role-management.operation-platform.permission',
+          'admin.permission-management.role-management.view',
+          'admin.permission-management.role-management.permission',
         ],
         employeeId: 3,
-        tenantId: 1,
-        storeId: 1,
         dataPermission: 'all',
       }),
     );
@@ -567,14 +775,51 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
   await expect(operationRoleRow.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
+test('blocks all role operations for records created by another account', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 19,
+        name: '门店店长',
+        phone: '13900000001',
+        roles: ['STORE_MANAGER'],
+        permissions: [
+          'admin.permission-management.role-management.view',
+          'admin.permission-management.role-management.edit',
+          'admin.permission-management.role-management.permission',
+          'admin.permission-management.role-management.delete',
+        ],
+        employeeId: 19,
+        tenantId: 14,
+        storeId: 14,
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/role-management');
+  const row = page.locator('tbody tr').filter({ hasText: '运营管理平台角色' }).first();
+  const actions = row.locator('.table-actions');
+
+  await actions.getByText('编辑', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '编辑' })).toHaveCount(0);
+
+  await actions.getByText('权限', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '权限配置' })).toHaveCount(0);
+
+  await actions.getByText('删除', { exact: true }).click();
+  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  await expect(page.locator('.t-dialog').filter({ hasText: '是否删除角色' })).toHaveCount(0);
+});
+
 test('opens role permission configuration dialog', async ({ page }) => {
   await page.goto('/role-management');
   const main = page.getByRole('main');
-  const roleTabs = main.locator('.role-tabs .t-tabs__nav-item');
-
   await expect(main.getByText('角色管理')).toBeVisible();
-  await expect(roleTabs).toHaveText(['运营管理平台角色', '城市合伙人门店角色', '大板供应商门店角色']);
-  await expect(roleTabs.filter({ hasText: '运营管理平台角色' })).toHaveClass(/t-is-active/);
+  await expect(main.locator('.role-tabs')).toHaveCount(0);
 
   const superAdminRoleRow = page.locator('tbody tr').filter({ hasText: '超级管理员' }).first();
   await expect(superAdminRoleRow).toBeVisible();
@@ -591,20 +836,66 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(permissionDialog.getByRole('heading', { name: '功能权限', exact: true })).toBeVisible();
   const roleModuleList = permissionDialog.locator('.permission-module-list');
   const roleMatrix = permissionDialog.locator('.permission-matrix');
-  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(3);
-  await expect(roleModuleList.getByText('门店分类管理', { exact: true })).toBeVisible();
-  await expect(roleModuleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
+  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(4);
+  await expect(roleModuleList.locator('.permission-module-item > span:first-child')).toHaveText([
+    '租户与门店',
+    '商品管理',
+    '供应商管理',
+    '权限管理',
+  ]);
+  await expect(roleModuleList.getByText('租户与门店', { exact: true })).toBeVisible();
+  await expect(roleModuleList.getByText('门店分类管理', { exact: true })).toHaveCount(0);
+  await expect(roleModuleList.getByText('商品管理', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('权限管理', { exact: true })).toBeVisible();
+  await expect(roleModuleList.getByText('供应商管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.locator('thead')).toContainText('二级菜单');
+  await expect(roleMatrix.locator('thead')).toContainText('三级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('页面');
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
-  const storeCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店分类管理页' });
-  await expect(storeCategoryPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
-    categoryCatalogActionLabels,
-  );
-  await roleModuleList.getByText('商品基础数据中心', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(12);
+  await roleModuleList.getByText('租户与门店', { exact: true }).click();
+  await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(['租户管理', '门店管理', '门店基础数据']);
+  await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(['—', '—', '门店级别管理']);
+  const tenantPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '租户管理页' });
+  await expect(tenantPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '业务开通',
+    '编辑',
+    '归档',
+  ]);
+  const archivedTenantPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '已归档' }).first();
+  await expect(archivedTenantPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
+    '彻底删除',
+  ]);
+  const storePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店管理页' });
+  await expect(storePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '修改门店级别',
+    '编辑',
+    '归档',
+  ]);
+  const archivedStorePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '已归档' }).nth(1);
+  await expect(archivedStorePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
+    '彻底删除',
+  ]);
+  const storeLevelPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
+  await expect(storeLevelPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  await roleModuleList.getByText('商品管理', { exact: true }).click();
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(24);
+  await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
+  await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -655,8 +946,16 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(accessoryTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     templateActionLabels,
   );
-  const slabVarietyPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
-  await expect(slabVarietyPermissionRow.getByText('大板品种管理', { exact: true })).toBeVisible();
+  const markupActionLabels = ['查看', '新增', '编辑', '排序', '停用/启用', '删除'];
+  const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品加价配置' });
+  const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板加价配置' });
+  await expect(finishedMarkupPermissionRow.getByText('加价配置', { exact: true })).toBeVisible();
+  await expect(finishedMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    markupActionLabels,
+  );
+  await expect(slabMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(markupActionLabels);
+  const slabVarietyPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '品种管理页' });
+  await expect(slabVarietyPermissionRow.getByText('大板基础数据', { exact: true })).toBeVisible();
   await expect(slabVarietyPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
@@ -664,7 +963,45 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '停用/启用',
     '删除',
   ]);
-  await expect(roleMatrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
+  const slabOriginPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '产地管理页' });
+  await expect(slabOriginPermissionRow.getByText('产地管理', { exact: true })).toBeVisible();
+  await expect(slabOriginPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const slabTexturePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '纹理管理页' });
+  await expect(slabTexturePermissionRow.getByText('纹理管理', { exact: true })).toBeVisible();
+  await expect(slabTexturePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '别名',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const slabColorPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '色系管理页' });
+  await expect(slabColorPermissionRow.getByText('色系管理', { exact: true })).toBeVisible();
+  await expect(slabColorPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '色系分类管理',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const slabGradePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '等级管理页' });
+  await expect(slabGradePermissionRow.getByText('等级管理', { exact: true })).toBeVisible();
+  await expect(slabGradePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  await expect(roleMatrix.getByText('成品现货基础数据', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
   const craftPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货工艺管理页' });
   await expect(craftPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -674,8 +1011,18 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '停用/启用',
     '删除',
   ]);
+  await roleModuleList.getByText('供应商管理', { exact: true }).click();
+  const supplierPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '供应商管理页' });
+  await expect(supplierPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '供货类型配置',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
   await roleModuleList.getByText('权限管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(4);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(2);
   await expect(roleMatrix.getByText('员工管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('员工管理页', { exact: true })).toBeVisible();
   const employeePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '员工管理页' });
@@ -692,28 +1039,17 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(employeeViewPermission).toBeChecked();
   await employeePermissionRow.getByText('查看', { exact: true }).click();
   await expect(employeePermissionRow.locator('.permission-action-grid input[type="checkbox"]:checked')).toHaveCount(0);
-  const operationRolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '运营管理平台角色' });
-  const partnerRolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '城市合伙人门店角色' });
-  const supplierRolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板供应商门店角色' });
-  await expect(operationRolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+  const rolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '角色管理页' });
+  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('—');
+  await expect(rolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
     '编辑',
     '权限',
     '删除',
   ]);
-  await expect(partnerRolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
-    '查看',
-    '新增',
-    '编辑',
-    '删除',
-  ]);
-  await expect(supplierRolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
-    '查看',
-    '新增',
-    '编辑',
-    '删除',
-  ]);
+  await expect(roleMatrix.getByText('城市合伙人门店角色', { exact: true })).toHaveCount(0);
+  await expect(roleMatrix.getByText('大板供应商门店角色', { exact: true })).toHaveCount(0);
   await expect(permissionDialog.getByRole('button', { name: '全选全部' })).toBeEnabled();
   await expect(permissionDialog.getByRole('button', { name: '清空全部' })).toBeEnabled();
   await expect(permissionDialog.getByRole('checkbox', { name: '全选当前模块' })).toBeEnabled();
@@ -727,9 +1063,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await deleteDialog.getByRole('button', { name: '取消' }).click();
 });
 
-test('shows verified store-category, product-data and permission-management resources in both terminal allocations', async ({
-  page,
-}) => {
+test('shows the full function catalog for both terminals during development', async ({ page }) => {
   await page.goto('/terminal-function-allocation');
   const main = page.getByRole('main');
   const moduleList = main.locator('.permission-module-list');
@@ -738,27 +1072,79 @@ test('shows verified store-category, product-data and permission-management reso
 
   await expect(main.getByText('城市合伙人门店管理后台', { exact: true })).toBeVisible();
   await expect(main.getByText('大板供应商门店管理后台', { exact: true })).toBeVisible();
-  await expect(moduleList.locator('.permission-module-item')).toHaveCount(3);
+  await expect(moduleList.locator('.permission-module-item')).toHaveCount(5);
+  await expect(moduleList.locator('.permission-module-item > span:first-child')).toHaveText([
+    '租户与门店',
+    '商品管理',
+    '供应商管理',
+    '门店分类管理',
+    '权限管理',
+  ]);
   await expect(moduleList.getByText('门店分类管理', { exact: true })).toBeVisible();
-  await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
+  await expect(moduleList.getByText('商品管理', { exact: true })).toBeVisible();
+  await expect(moduleList.getByText('供应商管理', { exact: true })).toBeVisible();
   await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
+  await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(matrixToolbar.locator('h4')).toHaveCount(0);
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*8/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*21/);
   await expect(matrixToolbar.locator('.matrix-toolbar-right')).toHaveCSS('flex-wrap', 'nowrap');
   await expect(matrixToolbar).toHaveCSS('min-height', '48px');
   await expect(matrix.locator('.permission-matrix__table-wrap')).toHaveCSS('max-height', '472px');
 
   await expect(matrix.locator('thead')).toContainText('二级菜单');
+  await expect(matrix.locator('thead')).toContainText('三级菜单');
   await expect(matrix.locator('thead')).toContainText('页面');
   await expect(matrix.locator('th.permission-tab-column')).toHaveText('Tab');
   await expect(matrix.locator('thead')).toContainText('操作权限');
+  await expect(matrix.locator('tbody .permission-menu-cell')).toHaveText(['租户管理', '门店管理', '门店基础数据']);
+  await expect(matrix.locator('tbody .permission-third-menu-cell')).toHaveText(['—', '—', '门店级别管理']);
+  const tenantAllocationRow = matrix.locator('tbody tr').filter({ hasText: '租户管理页' });
+  await expect(tenantAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '业务开通',
+    '编辑',
+    '归档',
+  ]);
+  const archivedTenantAllocationRow = matrix.locator('tbody tr').filter({ hasText: '已归档' }).first();
+  await expect(archivedTenantAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
+    '彻底删除',
+  ]);
+  const storeAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店管理页' });
+  await expect(storeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '修改门店级别',
+    '编辑',
+    '归档',
+  ]);
+  const archivedStoreAllocationRow = matrix.locator('tbody tr').filter({ hasText: '已归档' }).nth(1);
+  await expect(archivedStoreAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '恢复运营',
+    '彻底删除',
+  ]);
+  const storeLevelAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店级别管理页' });
+  await expect(storeLevelAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  await moduleList.getByText('门店分类管理', { exact: true }).click();
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*8/);
   const storeCategoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '门店分类管理页' });
   await expect(storeCategoryAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     categoryCatalogActionLabels,
   );
-  await moduleList.getByText('商品基础数据中心', { exact: true }).click();
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*66/);
-  await expect(matrix.locator('tbody tr')).toHaveCount(12);
+  await moduleList.getByText('商品管理', { exact: true }).click();
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*88/);
+  await expect(matrix.locator('tbody tr')).toHaveCount(16);
+  await expect(matrix.locator('tbody .permission-menu-cell')).toHaveText(productSecondMenuLabels);
+  await expect(matrix.locator('tbody .permission-third-menu-cell')).toHaveText(productThirdMenuLabels);
   await expect(matrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -809,8 +1195,8 @@ test('shows verified store-category, product-data and permission-management reso
   await expect(accessoryTemplateAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     templateAllocationActionLabels,
   );
-  const slabVarietyAllocationRow = matrix.locator('tbody tr').filter({ hasText: '大板品种管理页' });
-  await expect(slabVarietyAllocationRow.getByText('大板品种管理', { exact: true })).toBeVisible();
+  const slabVarietyAllocationRow = matrix.locator('tbody tr').filter({ hasText: '品种管理页' });
+  await expect(slabVarietyAllocationRow.getByText('大板基础数据', { exact: true })).toBeVisible();
   await expect(slabVarietyAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
@@ -818,7 +1204,45 @@ test('shows verified store-category, product-data and permission-management reso
     '停用/启用',
     '删除',
   ]);
-  await expect(matrix.getByText('成品现货工艺管理', { exact: true })).toBeVisible();
+  const slabOriginAllocationRow = matrix.locator('tbody tr').filter({ hasText: '产地管理页' });
+  await expect(slabOriginAllocationRow.getByText('产地管理', { exact: true })).toBeVisible();
+  await expect(slabOriginAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const slabTextureAllocationRow = matrix.locator('tbody tr').filter({ hasText: '纹理管理页' });
+  await expect(slabTextureAllocationRow.getByText('纹理管理', { exact: true })).toBeVisible();
+  await expect(slabTextureAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '别名',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const slabColorAllocationRow = matrix.locator('tbody tr').filter({ hasText: '色系管理页' });
+  await expect(slabColorAllocationRow.getByText('色系管理', { exact: true })).toBeVisible();
+  await expect(slabColorAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '色系分类管理',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  const slabGradeAllocationRow = matrix.locator('tbody tr').filter({ hasText: '等级管理页' });
+  await expect(slabGradeAllocationRow.getByText('等级管理', { exact: true })).toBeVisible();
+  await expect(slabGradeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
+  await expect(matrix.getByText('成品现货基础数据', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
   const craftAllocationRow = matrix.locator('tbody tr').filter({ hasText: '成品现货工艺管理页' });
   await expect(craftAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
@@ -828,45 +1252,55 @@ test('shows verified store-category, product-data and permission-management reso
     '停用/启用',
     '删除',
   ]);
-  await moduleList.getByText('权限管理', { exact: true }).click();
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*19/);
-  await expect(matrix.locator('tbody tr')).toHaveCount(4);
-  await expect(matrix.getByText('员工管理', { exact: true })).toBeVisible();
-  await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
-  const employeeAllocationRow = matrix.locator('tbody tr').filter({ hasText: '员工管理页' });
-  await expect(employeeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+  await moduleList.getByText('供应商管理', { exact: true }).click();
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*6/);
+  const supplierAllocationRow = matrix.locator('tbody tr').filter({ hasText: '供应商管理页' });
+  await expect(supplierAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
-    '邀请员工',
+    '新增',
+    '供货类型配置',
     '编辑',
-    '角色',
     '停用/启用',
     '删除',
   ]);
-  await expect(matrix.getByText('角色管理', { exact: true })).toBeVisible();
+  await moduleList.getByText('权限管理', { exact: true }).click();
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*11/);
+  await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();
-  await expect(matrix.getByText('运营管理平台角色', { exact: true })).toBeVisible();
-  await expect(matrix.getByText('城市合伙人门店角色', { exact: true })).toBeVisible();
-  await expect(matrix.getByText('大板供应商门店角色', { exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '全选全部' })).toBeEnabled();
   await expect(main.getByRole('button', { name: '清空全部' })).toBeEnabled();
   await expect(main.getByRole('button', { name: '保存' })).toBeEnabled();
   await expect(main.getByRole('button', { name: '重置' })).toBeVisible();
 
   await main.locator('.terminal-tabs').getByText('大板供应商门店管理后台', { exact: true }).click();
-  await expect(moduleList.locator('.permission-module-item')).toHaveCount(3);
+  await expect(moduleList.locator('.permission-module-item')).toHaveCount(5);
   await expect(moduleList.getByText('门店分类管理', { exact: true })).toBeVisible();
-  await expect(moduleList.getByText('商品基础数据中心', { exact: true })).toBeVisible();
-  await moduleList.getByText('商品基础数据中心', { exact: true }).click();
+  await expect(moduleList.getByText('商品管理', { exact: true })).toBeVisible();
+  await expect(moduleList.getByText('供应商管理', { exact: true })).toBeVisible();
+  await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
+  await expect(moduleList.getByText('租户与门店', { exact: true })).toBeVisible();
+  await moduleList.getByText('租户与门店', { exact: true }).click();
+  await expect(matrix.getByText('租户管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('门店管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('门店级别管理页', { exact: true })).toBeVisible();
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(21);
+  await moduleList.getByText('供应商管理', { exact: true }).click();
+  await expect(matrix.getByText('供应商管理页', { exact: true })).toBeVisible();
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(6);
+  await moduleList.getByText('商品管理', { exact: true }).click();
   await expect(matrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('属性库管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('属性值管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('分类属性模板页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('成品现货工艺管理页', { exact: true })).toBeVisible();
-  await expect(matrix.getByText('大板品种管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(66);
+  await expect(matrix.getByText('品种管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('产地管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('纹理管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('色系管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('等级管理页', { exact: true })).toBeVisible();
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(88);
   await moduleList.getByText('权限管理', { exact: true }).click();
-  await expect(moduleList.getByText('权限管理', { exact: true })).toBeVisible();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(19);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(11);
 });

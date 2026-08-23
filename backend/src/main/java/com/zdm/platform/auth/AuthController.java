@@ -4,6 +4,8 @@ import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.SessionTokenService;
 import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,5 +36,18 @@ public class AuthController {
   public ApiResponse<Boolean> logout() {
     sessionTokenService.revoke(identityProvider.require().sessionId());
     return ApiResponse.ok(true);
+  }
+
+  @GetMapping("/contexts")
+  public ApiResponse<List<IdentityContextResponse>> contexts() {
+    return ApiResponse.ok(authService.listContexts(identityProvider.require().accountId()));
+  }
+
+  @PostMapping("/switch-identity")
+  public ApiResponse<LoginResponse> switchIdentity(@Valid @RequestBody SwitchIdentityRequest request) {
+    var current = identityProvider.require();
+    LoginResponse response = authService.switchIdentity(current.accountId(), request.identityId());
+    sessionTokenService.revoke(current.sessionId());
+    return ApiResponse.ok(response);
   }
 }

@@ -9,8 +9,9 @@
         <header class="page-header">
           <div>
             <t-breadcrumb>
-              <t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item>
-              <t-breadcrumb-item>成品现货工艺管理</t-breadcrumb-item>
+              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
+              <t-breadcrumb-item>成品现货基础数据</t-breadcrumb-item>
+              <t-breadcrumb-item>工艺管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
           <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
@@ -138,15 +139,17 @@
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
         <t-form-item label="工艺图片" name="image">
-          <t-upload
+          <AdminMediaUpload
             v-model="formData.image"
-            theme="image"
+            class="craft-media-upload"
+            title="工艺图片"
             accept="image/*"
-            :auto-upload="false"
-            :multiple="false"
-            :max="1"
-            :size-limit="{ size: 5, unit: 'MB' }"
-            tips="点击上传图片"
+            :show-title="false"
+            label="点击上传图片"
+            :upload="uploadCraftMedia"
+            @uploaded="formRef?.clearValidate(['image'])"
+            @removed="releasePendingCraftMedia"
+            @preview="openFormImagePreview"
           />
         </t-form-item>
         <t-form-item label="工艺名称" name="name">
@@ -210,15 +213,24 @@
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, UploadFile } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
+import {
+  adminFeedback,
+  AdminConfirmDialog,
+  AdminMediaUpload,
+  AdminPagination,
+  type AdminMediaValue,
+} from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createCraft,
   deleteCraft,
   listCrafts,
   updateCraft,
   updateCraftStatus,
+  releaseTemporaryCraftImage,
   uploadCraftImage,
   type CraftPayload,
   type CraftRecord,
@@ -229,18 +241,20 @@ type ConfirmType = 'enable' | 'disable' | 'delete';
 
 interface CraftItem {
   id: number;
+  imageMediaId?: number;
   image: UploadFile[];
   name: string;
   type: string;
   width: string;
   status: CraftStatus;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
   remark?: string;
 }
 
 interface CraftForm {
-  image: UploadFile[];
+  image?: AdminMediaValue;
   name: string;
   type: string;
   width: string;
@@ -294,7 +308,7 @@ const formDialogVisible = ref(false);
 const dialogMode = ref<'create' | 'edit'>('create');
 const editingId = ref<number | null>(null);
 const formData = reactive<CraftForm>({
-  image: [],
+  image: undefined,
   name: '',
   type: '',
   width: '',
@@ -366,21 +380,23 @@ const toUploadFiles = (record: CraftRecord): UploadFile[] => {
 
 const toCraftItem = (record: CraftRecord): CraftItem => ({
   id: record.id,
+  imageMediaId: record.imageMediaId,
   image: toUploadFiles(record),
   name: record.name,
   type: record.type,
   width: record.width ?? '',
   status: normalizeStatus(record.status),
   createdByName: record.createdByName || '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
   remark: record.remark ?? '',
 });
 
-const toCraftPayload = (status: CraftStatus, imageUrl?: string): CraftPayload => ({
+const toCraftPayload = (status: CraftStatus, imageMediaId?: number): CraftPayload => ({
   name: formData.name.trim(),
   type: formData.type,
   width: formData.width,
-  imageUrl,
+  imageMediaId,
   description: formData.remark.trim(),
   pricingMethod: formData.width ? 'width' : undefined,
   remark: formData.remark.trim(),
@@ -391,7 +407,7 @@ const loadCrafts = async () => {
   loading.value = true;
   try {
     const records = await listCrafts();
-    tableData.value = records.map(toCraftItem);
+    tableData.value = sortByCreatedAtDesc(records).map(toCraftItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '工艺列表加载失败');
@@ -401,7 +417,7 @@ const loadCrafts = async () => {
 };
 
 const resetFormData = () => {
-  formData.image = [];
+  formData.image = undefined;
   formData.name = '';
   formData.type = '';
   formData.width = '';
@@ -409,7 +425,10 @@ const resetFormData = () => {
 };
 
 const fillFormData = (row: CraftItem) => {
-  formData.image = [...row.image];
+  formData.image =
+    row.imageMediaId && row.image[0]?.url
+      ? { name: `${row.name || 'craft'}.png`, mediaId: row.imageMediaId, url: row.image[0].url }
+      : undefined;
   formData.name = row.name;
   formData.type = row.type;
   formData.width = row.width.replace(/\D/g, '');
@@ -446,6 +465,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: CraftItem) => {
+  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -455,17 +475,33 @@ const openEditDialog = (row: CraftItem) => {
 const closeFormDialog = () => {
   formDialogVisible.value = false;
   formRef.value?.clearValidate();
+  if (pendingUploadedMediaIds.size) {
+    const mediaIds = [...pendingUploadedMediaIds];
+    pendingUploadedMediaIds.clear();
+    mediaIds.forEach((mediaId) => void releaseTemporaryCraftImage(mediaId));
+  }
 };
 
-const resolveFormImageUrl = async () => {
-  const image = formData.image[0];
-  if (!image) return undefined;
-  if (!image.raw) return image.url;
+const pendingUploadedMediaIds = new Set<number>();
 
-  const uploaded = await uploadCraftImage(image.raw);
-  image.url = uploaded.url;
-  image.status = 'success';
-  return uploaded.url;
+const uploadCraftMedia = async (file: File): Promise<AdminMediaValue> => {
+  const uploaded = await uploadCraftImage(file);
+  pendingUploadedMediaIds.add(uploaded.id);
+  return { name: file.name, mediaId: uploaded.id, url: uploaded.url };
+};
+
+const releasePendingCraftMedia = (media: AdminMediaValue) => {
+  const mediaId = media.mediaId;
+  if (!mediaId || !pendingUploadedMediaIds.has(mediaId)) return;
+  pendingUploadedMediaIds.delete(mediaId);
+  void releaseTemporaryCraftImage(mediaId);
+};
+
+const openFormImagePreview = () => {
+  if (!formData.image?.url) return;
+  previewCraftName.value = formData.name.trim() || '工艺图片';
+  previewImageUrl.value = formData.image.url;
+  imagePreviewVisible.value = true;
 };
 
 const handleSubmit = async () => {
@@ -482,26 +518,31 @@ const handleSubmit = async () => {
   }
 
   try {
-    const imageUrl = await resolveFormImageUrl();
+    const imageMediaId = formData.image?.mediaId;
     if (dialogMode.value === 'create') {
-      await createCraft(toCraftPayload('normal', imageUrl));
+      await createCraft(toCraftPayload('normal', imageMediaId));
       await loadCrafts();
       pagination.current = 1;
     } else if (editingId.value) {
       const current = tableData.value.find((item) => item.id === editingId.value);
-      await updateCraft(editingId.value, toCraftPayload(current?.status ?? 'normal', imageUrl));
+      await updateCraft(editingId.value, toCraftPayload(current?.status ?? 'normal', imageMediaId));
       await loadCrafts();
     }
 
-    const action = dialogMode.value === 'create' ? '新增' : '保存';
+    pendingUploadedMediaIds.clear();
     closeFormDialog();
-    adminFeedback.actionSuccess({ action, target: normalizedName });
+    if (dialogMode.value === 'create') {
+      adminFeedback.created(normalizedName);
+    } else {
+      adminFeedback.actionSuccess({ action: '保存', target: normalizedName });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 
 const openStatusConfirm = (row: CraftItem) => {
+  if (!requireCreatorOwnership(row)) return;
   const isNormal = row.status === 'normal';
   confirmState.type = isNormal ? 'disable' : 'enable';
   confirmState.row = row;
@@ -510,6 +551,7 @@ const openStatusConfirm = (row: CraftItem) => {
 };
 
 const openDeleteConfirm = (row: CraftItem) => {
+  if (!requireCreatorOwnership(row)) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除工艺“${row.name}”？`;
@@ -556,7 +598,11 @@ const handleConfirm = async () => {
     }
 
     closeConfirmDialog();
-    adminFeedback.actionSuccess({ action, target: target.name });
+    if (confirmState.type === 'delete') {
+      adminFeedback.deleted(target.name);
+    } else {
+      adminFeedback.actionSuccess({ action, target: target.name });
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
@@ -756,6 +802,10 @@ onMounted(loadCrafts);
 
 .craft-image__empty {
   font-size: 12px;
+}
+
+.craft-media-upload {
+  width: 168px;
 }
 
 .image-preview {

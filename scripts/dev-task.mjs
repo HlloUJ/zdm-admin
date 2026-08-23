@@ -24,7 +24,7 @@ import { branchKind, DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from '
 export const CURRENT_TASK_FRONTEND_PORT = 5175;
 const FRONTEND_PORT_START = 5175;
 const FRONTEND_PORT_END = 5199;
-const TEMPORARY_FRONTEND_PORT_START = 5176;
+const TEMPORARY_FRONTEND_PORT_START = 5177;
 const BACKEND_PORT_START = 8081;
 const BACKEND_PORT_END = 8099;
 const SHARED_API_TARGET = 'http://127.0.0.1:8080';
@@ -126,6 +126,13 @@ export function parseTaskPreviewArgs(args) {
     throw new Error(`未知参数：${value}`);
   }
   return result;
+}
+
+export function taskPublicOrigin(port, override = process.env.ZDM_TASK_PUBLIC_ORIGIN) {
+  if (!override) return `http://127.0.0.1:${port}`;
+  const parsed = new URL(override);
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('ZDM_TASK_PUBLIC_ORIGIN 只支持 http 或 https');
+  return parsed.origin;
 }
 
 export function taskPreviewErrors({ branch }) {
@@ -926,7 +933,7 @@ function spawnFrontend({ root, branch, port, apiTarget, mode }) {
         ZDM_TASK_WORKSPACE: root,
         ZDM_TASK_BRANCH: branch,
         ZDM_TASK_MODE: mode,
-        VITE_PUBLIC_APP_ORIGIN: `http://127.0.0.1:${port}`,
+        VITE_PUBLIC_APP_ORIGIN: taskPublicOrigin(port),
         ZDM_TASK_PREVIEW: '1',
         ZDM_FRONTEND_PORT: String(port),
         ZDM_API_PROXY_TARGET: apiTarget,
@@ -977,7 +984,7 @@ function printHelp() {
 Options:
   --mode auto|frontend|full  自动识别（默认）、只用共享后端或完整任务环境
   --port 5176               指定临时任务前端端口（5175-5199）
-  --temporary               从 5176-5199 自动选择临时端口，不切换固定入口
+  --temporary               从 5177-5199 自动选择临时端口，不切换固定入口
   --backend-port 8081       指定任务后端端口（8081-8099）
   --api http://...          显式使用指定 API，并进入前端模式
   --database-risk           将非 Flyway 的破坏性数据任务纳入备份与写入锁

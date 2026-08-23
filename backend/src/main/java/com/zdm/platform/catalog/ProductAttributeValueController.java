@@ -71,16 +71,14 @@ public class ProductAttributeValueController {
       @Valid @RequestBody ProductAttributeStatusRequest request) {
     ProductAttributeValue existing = requireValue(id);
     requireValuePermission(existing.getScope(), "toggle-status");
-    existing.setStatus(request.status());
-    service.updateById(existing);
-    return ApiResponse.ok(service.getById(id));
+    return ApiResponse.ok(service.updateStatus(id, request.status()));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     ProductAttributeValue existing = requireValue(id);
     requireValuePermission(existing.getScope(), "delete");
-    return ApiResponse.ok(service.removeById(id));
+    return ApiResponse.ok(service.deleteValue(id));
   }
 
   private List<String> visibleScopes() {

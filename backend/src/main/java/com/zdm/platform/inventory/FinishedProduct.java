@@ -1,9 +1,12 @@
 package com.zdm.platform.inventory;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
+import java.util.List;
 
 @TableName("finished_products")
 public class FinishedProduct extends BaseEntity {
@@ -20,6 +23,10 @@ public class FinishedProduct extends BaseEntity {
   private String publisherType;
   private Integer totalStock;
   private BigDecimal guidePrice;
+
+  @Valid
+  @TableField(exist = false)
+  private List<FinishedProductPrice> markupPrices;
 
   public Long getCategoryId() {
     return categoryId;
@@ -83,5 +90,13 @@ public class FinishedProduct extends BaseEntity {
 
   public void setGuidePrice(BigDecimal guidePrice) {
     this.guidePrice = guidePrice;
+  }
+
+  public List<FinishedProductPrice> getMarkupPrices() {
+    return markupPrices == null ? null : List.copyOf(markupPrices);
+  }
+
+  public void setMarkupPrices(List<FinishedProductPrice> markupPrices) {
+    this.markupPrices = markupPrices == null ? null : List.copyOf(markupPrices);
   }
 }

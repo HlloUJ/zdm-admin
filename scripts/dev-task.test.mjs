@@ -23,10 +23,17 @@ import {
   previewServiceOwnsWorktree,
   selectSharedNodeModules,
   selectTaskPreviewMode,
+  taskPublicOrigin,
   taskPreviewReadinessErrors,
   taskPreviewErrors,
   taskProjectName,
 } from './dev-task.mjs';
+
+test('keeps the public task origin separate from the internal managed port', () => {
+  assert.equal(taskPublicOrigin(5176, ''), 'http://127.0.0.1:5176');
+  assert.equal(taskPublicOrigin(5176, 'http://127.0.0.1:5175/'), 'http://127.0.0.1:5175');
+  assert.throws(() => taskPublicOrigin(5176, 'file:///tmp/task'), /只支持 http 或 https/);
+});
 
 test('parses task preview mode, ports, target worktree, and stop options', () => {
   assert.deepEqual(

@@ -16,6 +16,7 @@ public interface ProductAttributeValueMapper extends BaseMapper<ProductAttribute
         attribute_value.code,
         attribute_value.status,
         attribute_value.created_by_name,
+        attribute_value.created_by_account_id,
         attribute_value.created_at,
         attribute_value.updated_at,
         COUNT(binding.id) AS use_count
@@ -30,6 +31,7 @@ public interface ProductAttributeValueMapper extends BaseMapper<ProductAttribute
         attribute_value.code,
         attribute_value.status,
         attribute_value.created_by_name,
+        attribute_value.created_by_account_id,
         attribute_value.created_at,
         attribute_value.updated_at
       ORDER BY attribute_value.created_at DESC, attribute_value.id DESC

@@ -9,12 +9,10 @@ public class SlabVariety extends BaseEntity {
   @NotBlank
   private String name;
 
-  @NotBlank
-  private String code;
-
-  private String origin;
+  private Long originId;
   private String color;
   private String createdByName;
+  private Long createdByAccountId;
   private String remark;
 
   public String getName() {
@@ -25,20 +23,12 @@ public class SlabVariety extends BaseEntity {
     this.name = name;
   }
 
-  public String getCode() {
-    return code;
+  public Long getOriginId() {
+    return originId;
   }
 
-  public void setCode(String code) {
-    this.code = code;
-  }
-
-  public String getOrigin() {
-    return origin;
-  }
-
-  public void setOrigin(String origin) {
-    this.origin = origin;
+  public void setOriginId(Long originId) {
+    this.originId = originId;
   }
 
   public String getColor() {
@@ -55,6 +45,14 @@ public class SlabVariety extends BaseEntity {
 
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
   }
 
   public String getRemark() {

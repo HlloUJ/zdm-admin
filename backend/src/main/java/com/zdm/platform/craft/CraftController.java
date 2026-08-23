@@ -2,6 +2,8 @@ package com.zdm.platform.craft;
 
 import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
+import com.zdm.platform.media.MediaAssetService;
+import com.zdm.platform.media.MediaUploadResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -26,17 +28,17 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/admin/crafts")
 public class CraftController extends AdminCrudController<Craft> {
   private final CraftService service;
-  private final CraftImageStorageService imageStorageService;
+  private final MediaAssetService mediaAssetService;
   private final CraftPermissionGuard permissionGuard;
 
   public CraftController(
       CraftService service,
-      CraftImageStorageService imageStorageService,
+      MediaAssetService mediaAssetService,
       CraftPermissionGuard permissionGuard,
       PermissionGuard securityPermissionGuard) {
     super(service, securityPermissionGuard, CraftPermissionGuard.PREFIX);
     this.service = service;
-    this.imageStorageService = imageStorageService;
+    this.mediaAssetService = mediaAssetService;
     this.permissionGuard = permissionGuard;
   }
 
@@ -44,7 +46,7 @@ public class CraftController extends AdminCrudController<Craft> {
   @GetMapping
   public ApiResponse<List<Craft>> list() {
     permissionGuard.requireView();
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(service.listCrafts());
   }
 
   @Override
@@ -66,9 +68,15 @@ public class CraftController extends AdminCrudController<Craft> {
   }
 
   @PostMapping("/images")
-  public ApiResponse<CraftImageUploadResponse> uploadImage(@RequestParam("file") MultipartFile file) {
+  public ApiResponse<MediaUploadResponse> uploadImage(@RequestParam("file") MultipartFile file) {
     permissionGuard.requireImageUpload();
-    return ApiResponse.ok(new CraftImageUploadResponse(imageStorageService.store(file)));
+    return ApiResponse.ok(mediaAssetService.upload(file, 5L * 1024 * 1024));
+  }
+
+  @DeleteMapping("/images")
+  public ApiResponse<Boolean> deleteTemporaryImage(@RequestParam Long mediaId) {
+    permissionGuard.requireImageUpload();
+    return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
   }
 
   @PatchMapping("/{id}/status")
@@ -76,21 +84,18 @@ public class CraftController extends AdminCrudController<Craft> {
       @PathVariable Long id,
       @Valid @RequestBody CraftStatusRequest request) {
     permissionGuard.requireToggleStatus();
-    Craft craft = service.getById(id);
+    Craft craft = service.updateStatus(id, request.status());
     if (craft == null) {
       throw new IllegalArgumentException("工艺不存在");
     }
-
-    craft.setStatus(request.status());
-    service.updateById(craft);
-    return ApiResponse.ok(service.getById(id));
+    return ApiResponse.ok(craft);
   }
 
   @Override
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requireDelete();
-    return ApiResponse.ok(service.removeById(id));
+    return ApiResponse.ok(service.deleteCraft(id));
   }
 
   @ExceptionHandler(DuplicateKeyException.class)

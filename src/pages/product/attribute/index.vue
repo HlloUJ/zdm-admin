@@ -4,7 +4,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品基础数据中心', '属性库管理']" :badge="pageTitle" />
+        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '属性库管理']" :badge="pageTitle" />
         <t-alert theme="info" class="page-tip"
           >属性库仅维护属性定义和值类型；必填及 SKU 规则统一在类目属性模板中配置。</t-alert
         >
@@ -115,6 +115,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import {
   adminFeedback,
   AdminConfirmDialog,
@@ -147,6 +148,7 @@ interface Attribute {
   templateCount: number;
   status: Status;
   createdByName: string;
+  createdByAccountId?: number;
   createdAt: string;
 }
 
@@ -243,6 +245,7 @@ const toAttribute = (record: ProductAttributeRecord): Attribute => ({
   templateCount: record.templateCount ?? 0,
   status: normalizeStatus(record.status),
   createdByName: record.createdByName || '-',
+  createdByAccountId: record.createdByAccountId,
   createdAt: formatDateTime(record.createdAt),
 });
 const loadAttributes = async () => {
@@ -309,19 +312,21 @@ const submit = async () => {
     pagination.current = 1;
     dialogVisible.value = false;
     formRef.value?.clearValidate();
-    adminFeedback.actionSuccess({ action: '新增', target: name });
+    adminFeedback.created(name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
 const openStatusConfirm = (row: Attribute) => {
   if (!canToggleAttributeStatus.value) return;
+  if (!requireCreatorOwnership(row)) return;
   confirmTarget.value = row;
   confirmType.value = row.status === 'enabled' ? 'disable' : 'enable';
   confirmDialogVisible.value = true;
 };
 const openDeleteConfirm = (row: Attribute) => {
   if (!canDeleteAttribute.value) return;
+  if (!requireCreatorOwnership(row)) return;
   confirmTarget.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;
@@ -354,7 +359,11 @@ const handleConfirm = async () => {
         data.value.splice(targetIndex, 1, toAttribute(updated));
       }
     }
-    adminFeedback.actionSuccess({ action, target: target.name });
+    if (confirmType.value === 'delete') {
+      adminFeedback.deleted(target.name);
+    } else {
+      adminFeedback.actionSuccess({ action, target: target.name });
+    }
     closeConfirmDialog();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

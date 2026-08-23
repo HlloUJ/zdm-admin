@@ -57,7 +57,8 @@ preview:
     playwright: http://127.0.0.1:5174
   frontend_ports:
     current_task: 5175
-    temporary_range: 5176-5199
+    managed_task_upstream: 5176
+    temporary_range: 5177-5199
     playwright: 5174
   backend:
     integration_port: 8080
