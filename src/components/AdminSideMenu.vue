@@ -24,15 +24,27 @@
           <template #icon>
             <t-icon :name="entry.icon" />
           </template>
-          <t-menu-item
-            v-for="child in entry.children"
-            :key="child.path"
-            :value="child.path"
-            :data-menu-path="child.path"
-            class="menu-level-two-item"
-          >
-            {{ child.label }}
-          </t-menu-item>
+          <template v-for="child in entry.children" :key="'path' in child ? child.path : child.value">
+            <t-menu-item
+              v-if="'path' in child"
+              :value="child.path"
+              :data-menu-path="child.path"
+              class="menu-level-two-item"
+            >
+              {{ child.label }}
+            </t-menu-item>
+            <t-submenu v-else :value="child.value" :title="child.label" class="menu-level-two">
+              <t-menu-item
+                v-for="grandchild in child.children"
+                :key="grandchild.path"
+                :value="grandchild.path"
+                :data-menu-path="grandchild.path"
+                class="menu-level-three-item"
+              >
+                {{ grandchild.label }}
+              </t-menu-item>
+            </t-submenu>
+          </template>
         </t-submenu>
       </template>
     </t-menu>
@@ -45,7 +57,12 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { useSideMenuState } from '@/composables/useSideMenuState';
 import { getLoginUser } from '@/services/auth';
-import { adminMenuEntries, hasMenuPermission, type AdminMenuEntry } from '@/services/adminPermissions';
+import {
+  adminMenuEntries,
+  hasMenuPermission,
+  type AdminMenuChild,
+  type AdminMenuEntry,
+} from '@/services/adminPermissions';
 
 const route = useRoute();
 const router = useRouter();
@@ -59,13 +76,25 @@ const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
       if (!('children' in entry)) {
         return hasMenuPermission(loginUser.value, entry.permissionPrefix) ? entry : null;
       }
-      const children = entry.children.filter((child) => hasMenuPermission(loginUser.value, child.permissionPrefix));
+      const children = entry.children.reduce<AdminMenuChild[]>((visibleChildren, child) => {
+        if ('path' in child) {
+          if (hasMenuPermission(loginUser.value, child.permissionPrefix)) visibleChildren.push(child);
+          return visibleChildren;
+        }
+        const grandchildren = child.children.filter((item) =>
+          hasMenuPermission(loginUser.value, item.permissionPrefix),
+        );
+        if (grandchildren.length) visibleChildren.push({ ...child, children: grandchildren });
+        return visibleChildren;
+      }, []);
       return children.length ? { ...entry, children } : null;
     })
     .filter((entry): entry is AdminMenuEntry => Boolean(entry)),
 );
 
 const baseInfoPaths = new Set([
+  '/finished-stock-management',
+  '/slab-management',
   '/product-category',
   '/product-attribute',
   '/product-attribute-value',
@@ -76,10 +105,14 @@ const baseInfoPaths = new Set([
   '/finished-stock-attribute',
   '/accessory-attribute',
   '/slab-variety',
+  '/slab-origin',
+  '/slab-texture',
+  '/slab-color',
+  '/slab-grade',
   '/finished-stock-craft',
 ]);
 
-const tenantManagementPaths = new Set(['/tenant-management', '/tenant-store-management']);
+const tenantManagementPaths = new Set(['/tenant-management', '/tenant-store-management', '/store-level-management']);
 const permissionManagementPaths = new Set([
   '/employee-management',
   '/role-management',
@@ -91,7 +124,26 @@ watch(
   () => {
     const requiredExpandedMenus = [];
     if (tenantManagementPaths.has(route.path)) requiredExpandedMenus.push('tenant-management');
-    if (baseInfoPaths.has(route.path)) requiredExpandedMenus.push('product-data-center');
+    if (route.path === '/store-level-management') requiredExpandedMenus.push('store-base-data-management');
+    if (baseInfoPaths.has(route.path)) requiredExpandedMenus.push('product-management');
+    if (
+      route.path === '/product-category' ||
+      route.path === '/product-attribute' ||
+      route.path === '/product-attribute-value' ||
+      route.path === '/category-attribute-template'
+    ) {
+      requiredExpandedMenus.push('product-common-base-data');
+    }
+    if (route.path === '/finished-stock-craft') requiredExpandedMenus.push('finished-stock-base-data');
+    if (
+      route.path === '/slab-variety' ||
+      route.path === '/slab-origin' ||
+      route.path === '/slab-texture' ||
+      route.path === '/slab-color' ||
+      route.path === '/slab-grade'
+    ) {
+      requiredExpandedMenus.push('slab-base-data-management');
+    }
     if (permissionManagementPaths.has(route.path)) requiredExpandedMenus.push('permission-management');
 
     const missingExpandedMenus = requiredExpandedMenus.filter((item) => !expandedMenus.value.includes(item));
@@ -163,6 +215,14 @@ const handleSideNavClick = (event: MouseEvent) => {
 
 .menu :deep(.menu-level-two-item) {
   padding-left: 40px !important;
+}
+
+.menu :deep(.menu-level-two > .t-submenu__title) {
+  padding-left: 40px !important;
+}
+
+.menu :deep(.menu-level-three-item) {
+  padding-left: 64px !important;
 }
 
 .menu :deep(.t-icon) {

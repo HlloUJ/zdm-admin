@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,14 +21,17 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
   private final CurrentIdentityProvider identityProvider;
   private final JdbcTemplate jdbcTemplate;
   private final CategoryAttributeMapper categoryAttributeMapper;
+  private final CreatorOwnershipGuard ownershipGuard;
 
   public ProductCategoryService(
       CurrentIdentityProvider identityProvider,
       JdbcTemplate jdbcTemplate,
-      CategoryAttributeMapper categoryAttributeMapper) {
+      CategoryAttributeMapper categoryAttributeMapper,
+      CreatorOwnershipGuard ownershipGuard) {
     this.identityProvider = identityProvider;
     this.jdbcTemplate = jdbcTemplate;
     this.categoryAttributeMapper = categoryAttributeMapper;
+    this.ownershipGuard = ownershipGuard;
   }
 
   public List<ProductCategory> listNewestFirst() {
@@ -53,6 +57,7 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     category.setId(null);
     normalizeAndValidateCategory(category, null);
     category.setCreatedByName(resolveCreatedByName());
+    category.setCreatedByAccountId(ownershipGuard.currentAccountId());
     try {
       save(category);
     } catch (DuplicateKeyException exception) {
@@ -67,8 +72,10 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     if (existing == null) {
       throw new IllegalArgumentException("分类不存在");
     }
+    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     payload.setId(id);
     payload.setCreatedByName(existing.getCreatedByName());
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     payload.setCreatedAt(existing.getCreatedAt());
     normalizeAndValidateCategory(payload, id);
     try {
@@ -85,6 +92,7 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     if (category == null) {
       throw new IllegalArgumentException("分类不存在或已被删除");
     }
+    ownershipGuard.requireCreator(category.getCreatedByAccountId(), category.getCreatedByName());
     if (lambdaQuery().eq(ProductCategory::getParentId, id).count() > 0) {
       throw new IllegalArgumentException("该分类包含下级分类，请先删除或转移下级分类");
     }

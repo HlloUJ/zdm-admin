@@ -14,6 +14,8 @@ public final class FunctionPermissionNormalizer {
       "admin.product-data-center.attribute.",
       "admin.product-data-center.attribute-value.");
   private static final List<String> ATTRIBUTE_SCOPES = List.of("shared", "finished", "accessory");
+  private static final String LEGACY_STORE_PERMISSION_PREFIX = "admin.tenant.tenant-store-management";
+  private static final String LEGACY_TENANT_PERMISSION_PREFIX = "admin.tenant.tenant-management";
   private static final List<String> CATEGORY_STATUS_PERMISSION_PREFIXES = List.of(
       "admin.tenant.store-category-management",
       "admin.product-data-center.category.finished",
@@ -75,6 +77,46 @@ public final class FunctionPermissionNormalizer {
         .orElse(null);
     if (legacyCategoryStatusPrefix != null) {
       return Stream.of(legacyCategoryStatusPrefix + ".toggle-status");
+    }
+
+    if (permission.startsWith(LEGACY_TENANT_PERMISSION_PREFIX + ".")) {
+      String legacyAction = permission.substring(LEGACY_TENANT_PERMISSION_PREFIX.length() + 1);
+      if ("view".equals(legacyAction)) {
+        return Stream.of(
+            LEGACY_TENANT_PERMISSION_PREFIX + ".unarchived.view",
+            LEGACY_TENANT_PERMISSION_PREFIX + ".archived.view");
+      }
+      if (Set.of("create", "open-business", "edit").contains(legacyAction)) {
+        return Stream.of(LEGACY_TENANT_PERMISSION_PREFIX + ".unarchived." + legacyAction);
+      }
+      if ("toggle-status".equals(legacyAction)) {
+        return Stream.of(
+            LEGACY_TENANT_PERMISSION_PREFIX + ".unarchived.archive",
+            LEGACY_TENANT_PERMISSION_PREFIX + ".archived.restore");
+      }
+      if ("delete".equals(legacyAction)) {
+        return Stream.of(LEGACY_TENANT_PERMISSION_PREFIX + ".archived.delete");
+      }
+    }
+
+    if (permission.startsWith(LEGACY_STORE_PERMISSION_PREFIX + ".")) {
+      String legacyAction = permission.substring(LEGACY_STORE_PERMISSION_PREFIX.length() + 1);
+      if (Set.of("toggle-status", "operating.toggle-status").contains(legacyAction)) {
+        return Stream.empty();
+      }
+      if ("view".equals(legacyAction)) {
+        return Stream.of(
+            LEGACY_STORE_PERMISSION_PREFIX + ".operating.view",
+            LEGACY_STORE_PERMISSION_PREFIX + ".archived.view");
+      }
+      String operatingAction = switch (legacyAction) {
+        case "create", "edit-level", "edit" -> legacyAction;
+        case "delete" -> "archive";
+        default -> null;
+      };
+      if (operatingAction != null) {
+        return Stream.of(LEGACY_STORE_PERMISSION_PREFIX + ".operating." + operatingAction);
+      }
     }
 
     String legacyPermissionPrefix = LEGACY_SCOPED_PERMISSION_PREFIXES.stream()

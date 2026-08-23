@@ -1,14 +1,22 @@
 package com.zdm.platform.inventory;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @TableName("slab_inventory")
 public class SlabInventory extends BaseEntity {
   private Long supplierId;
   private Long varietyId;
+  private Long originId;
+  private Long textureId;
+  private Long colorId;
+  private Long gradeId;
 
   @NotBlank
   private String name;
@@ -18,12 +26,64 @@ public class SlabInventory extends BaseEntity {
 
   private String warehouse;
   private String publisherType;
-  private Integer lengthMm;
-  private Integer widthMm;
-  private Integer thicknessMm;
+  private Long mainImageMediaId;
+  private Long scanImageMediaId;
+  private Long designImageMediaId;
+  private Long videoMediaId;
+  private Long videoCoverMediaId;
+
+  @TableField(exist = false)
+  private String mainImageUrl;
+
+  @TableField(exist = false)
+  private String scanImageUrl;
+
+  @TableField(exist = false)
+  private String designImageUrl;
+
+  @TableField(exist = false)
+  private String videoUrl;
+
+  @TableField(exist = false)
+  private String videoCoverUrl;
+  private String createdByName;
+  private Long createdByAccountId;
+  private String rejectionReason;
+  private String rejectionDetail;
+  private String rejectedByName;
+  private Long rejectedByAccountId;
+  private LocalDateTime rejectedAt;
+
+  @TableField(exist = false)
+  private String originName;
+
+  @TableField(exist = false)
+  private String varietyName;
+
+  @TableField(exist = false)
+  private String supplierName;
+  private BigDecimal lengthMm;
+  private BigDecimal widthMm;
+  private BigDecimal thicknessMm;
+  private BigDecimal toleranceMm;
+  private BigDecimal corner1LengthMm;
+  private BigDecimal corner1WidthMm;
+  private BigDecimal corner2LengthMm;
+  private BigDecimal corner2WidthMm;
+  private BigDecimal corner3LengthMm;
+  private BigDecimal corner3WidthMm;
+  private BigDecimal corner4LengthMm;
+  private BigDecimal corner4WidthMm;
   private BigDecimal areaSquareMeter;
   private BigDecimal costPrice;
   private BigDecimal guidePrice;
+
+  @TableField(exist = false)
+  private List<SlabOffShelfRecord> offShelfRecords;
+
+  @Valid
+  @TableField(exist = false)
+  private List<SlabPrice> markupPrices;
 
   public Long getSupplierId() {
     return supplierId;
@@ -39,6 +99,38 @@ public class SlabInventory extends BaseEntity {
 
   public void setVarietyId(Long varietyId) {
     this.varietyId = varietyId;
+  }
+
+  public Long getOriginId() {
+    return originId;
+  }
+
+  public void setOriginId(Long originId) {
+    this.originId = originId;
+  }
+
+  public Long getTextureId() {
+    return textureId;
+  }
+
+  public void setTextureId(Long textureId) {
+    this.textureId = textureId;
+  }
+
+  public Long getColorId() {
+    return colorId;
+  }
+
+  public void setColorId(Long colorId) {
+    this.colorId = colorId;
+  }
+
+  public Long getGradeId() {
+    return gradeId;
+  }
+
+  public void setGradeId(Long gradeId) {
+    this.gradeId = gradeId;
   }
 
   public String getName() {
@@ -73,28 +165,260 @@ public class SlabInventory extends BaseEntity {
     this.publisherType = publisherType;
   }
 
-  public Integer getLengthMm() {
+  public Long getMainImageMediaId() {
+    return mainImageMediaId;
+  }
+
+  public void setMainImageMediaId(Long mainImageMediaId) {
+    this.mainImageMediaId = mainImageMediaId;
+  }
+
+  public Long getScanImageMediaId() {
+    return scanImageMediaId;
+  }
+
+  public void setScanImageMediaId(Long scanImageMediaId) {
+    this.scanImageMediaId = scanImageMediaId;
+  }
+
+  public Long getDesignImageMediaId() {
+    return designImageMediaId;
+  }
+
+  public void setDesignImageMediaId(Long designImageMediaId) {
+    this.designImageMediaId = designImageMediaId;
+  }
+
+  public Long getVideoMediaId() {
+    return videoMediaId;
+  }
+
+  public void setVideoMediaId(Long videoMediaId) {
+    this.videoMediaId = videoMediaId;
+  }
+
+  public Long getVideoCoverMediaId() {
+    return videoCoverMediaId;
+  }
+
+  public void setVideoCoverMediaId(Long videoCoverMediaId) {
+    this.videoCoverMediaId = videoCoverMediaId;
+  }
+
+  public String getMainImageUrl() {
+    return mainImageUrl;
+  }
+
+  public void setMainImageUrl(String mainImageUrl) {
+    this.mainImageUrl = mainImageUrl;
+  }
+
+  public String getScanImageUrl() {
+    return scanImageUrl;
+  }
+
+  public void setScanImageUrl(String scanImageUrl) {
+    this.scanImageUrl = scanImageUrl;
+  }
+
+  public String getDesignImageUrl() {
+    return designImageUrl;
+  }
+
+  public void setDesignImageUrl(String designImageUrl) {
+    this.designImageUrl = designImageUrl;
+  }
+
+  public String getVideoUrl() {
+    return videoUrl;
+  }
+
+  public void setVideoUrl(String videoUrl) {
+    this.videoUrl = videoUrl;
+  }
+
+  public String getVideoCoverUrl() {
+    return videoCoverUrl;
+  }
+
+  public void setVideoCoverUrl(String videoCoverUrl) {
+    this.videoCoverUrl = videoCoverUrl;
+  }
+
+  public String getCreatedByName() {
+    return createdByName;
+  }
+
+  public void setCreatedByName(String createdByName) {
+    this.createdByName = createdByName;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
+  }
+
+  public void setCreatedByAccountId(Long createdByAccountId) {
+    this.createdByAccountId = createdByAccountId;
+  }
+
+  public String getRejectionReason() {
+    return rejectionReason;
+  }
+
+  public void setRejectionReason(String rejectionReason) {
+    this.rejectionReason = rejectionReason;
+  }
+
+  public String getRejectionDetail() {
+    return rejectionDetail;
+  }
+
+  public void setRejectionDetail(String rejectionDetail) {
+    this.rejectionDetail = rejectionDetail;
+  }
+
+  public String getRejectedByName() {
+    return rejectedByName;
+  }
+
+  public void setRejectedByName(String rejectedByName) {
+    this.rejectedByName = rejectedByName;
+  }
+
+  public Long getRejectedByAccountId() {
+    return rejectedByAccountId;
+  }
+
+  public void setRejectedByAccountId(Long rejectedByAccountId) {
+    this.rejectedByAccountId = rejectedByAccountId;
+  }
+
+  public LocalDateTime getRejectedAt() {
+    return rejectedAt;
+  }
+
+  public void setRejectedAt(LocalDateTime rejectedAt) {
+    this.rejectedAt = rejectedAt;
+  }
+
+  public String getOriginName() {
+    return originName;
+  }
+
+  public void setOriginName(String originName) {
+    this.originName = originName;
+  }
+
+  public String getVarietyName() {
+    return varietyName;
+  }
+
+  public void setVarietyName(String varietyName) {
+    this.varietyName = varietyName;
+  }
+
+  public String getSupplierName() {
+    return supplierName;
+  }
+
+  public void setSupplierName(String supplierName) {
+    this.supplierName = supplierName;
+  }
+
+  public BigDecimal getLengthMm() {
     return lengthMm;
   }
 
-  public void setLengthMm(Integer lengthMm) {
+  public void setLengthMm(BigDecimal lengthMm) {
     this.lengthMm = lengthMm;
   }
 
-  public Integer getWidthMm() {
+  public BigDecimal getWidthMm() {
     return widthMm;
   }
 
-  public void setWidthMm(Integer widthMm) {
+  public void setWidthMm(BigDecimal widthMm) {
     this.widthMm = widthMm;
   }
 
-  public Integer getThicknessMm() {
+  public BigDecimal getThicknessMm() {
     return thicknessMm;
   }
 
-  public void setThicknessMm(Integer thicknessMm) {
+  public void setThicknessMm(BigDecimal thicknessMm) {
     this.thicknessMm = thicknessMm;
+  }
+
+  public BigDecimal getToleranceMm() {
+    return toleranceMm;
+  }
+
+  public void setToleranceMm(BigDecimal toleranceMm) {
+    this.toleranceMm = toleranceMm;
+  }
+
+  public BigDecimal getCorner1LengthMm() {
+    return corner1LengthMm;
+  }
+
+  public void setCorner1LengthMm(BigDecimal value) {
+    this.corner1LengthMm = value;
+  }
+
+  public BigDecimal getCorner1WidthMm() {
+    return corner1WidthMm;
+  }
+
+  public void setCorner1WidthMm(BigDecimal value) {
+    this.corner1WidthMm = value;
+  }
+
+  public BigDecimal getCorner2LengthMm() {
+    return corner2LengthMm;
+  }
+
+  public void setCorner2LengthMm(BigDecimal value) {
+    this.corner2LengthMm = value;
+  }
+
+  public BigDecimal getCorner2WidthMm() {
+    return corner2WidthMm;
+  }
+
+  public void setCorner2WidthMm(BigDecimal value) {
+    this.corner2WidthMm = value;
+  }
+
+  public BigDecimal getCorner3LengthMm() {
+    return corner3LengthMm;
+  }
+
+  public void setCorner3LengthMm(BigDecimal value) {
+    this.corner3LengthMm = value;
+  }
+
+  public BigDecimal getCorner3WidthMm() {
+    return corner3WidthMm;
+  }
+
+  public void setCorner3WidthMm(BigDecimal value) {
+    this.corner3WidthMm = value;
+  }
+
+  public BigDecimal getCorner4LengthMm() {
+    return corner4LengthMm;
+  }
+
+  public void setCorner4LengthMm(BigDecimal value) {
+    this.corner4LengthMm = value;
+  }
+
+  public BigDecimal getCorner4WidthMm() {
+    return corner4WidthMm;
+  }
+
+  public void setCorner4WidthMm(BigDecimal value) {
+    this.corner4WidthMm = value;
   }
 
   public BigDecimal getAreaSquareMeter() {
@@ -119,5 +443,21 @@ public class SlabInventory extends BaseEntity {
 
   public void setGuidePrice(BigDecimal guidePrice) {
     this.guidePrice = guidePrice;
+  }
+
+  public List<SlabOffShelfRecord> getOffShelfRecords() {
+    return offShelfRecords == null ? List.of() : List.copyOf(offShelfRecords);
+  }
+
+  public void setOffShelfRecords(List<SlabOffShelfRecord> offShelfRecords) {
+    this.offShelfRecords = offShelfRecords == null ? List.of() : List.copyOf(offShelfRecords);
+  }
+
+  public List<SlabPrice> getMarkupPrices() {
+    return markupPrices == null ? null : List.copyOf(markupPrices);
+  }
+
+  public void setMarkupPrices(List<SlabPrice> markupPrices) {
+    this.markupPrices = markupPrices == null ? null : List.copyOf(markupPrices);
   }
 }

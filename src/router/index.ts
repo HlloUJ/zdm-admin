@@ -73,6 +73,26 @@ const router = createRouter({
       component: () => import('@/pages/slab/variety/index.vue'),
     },
     {
+      path: '/slab-origin',
+      name: 'slabOrigin',
+      component: () => import('@/pages/slab/origin/index.vue'),
+    },
+    {
+      path: '/slab-texture',
+      name: 'slabTexture',
+      component: () => import('@/pages/slab/texture/index.vue'),
+    },
+    {
+      path: '/slab-color',
+      name: 'slabColor',
+      component: () => import('@/pages/slab/color/index.vue'),
+    },
+    {
+      path: '/slab-grade',
+      name: 'slabGrade',
+      component: () => import('@/pages/slab/grade/index.vue'),
+    },
+    {
       path: '/slab-management',
       name: 'slabManagement',
       component: () => import('@/pages/slab/management/index.vue'),
@@ -93,6 +113,11 @@ const router = createRouter({
       component: () => import('@/pages/tenant/store/index.vue'),
     },
     {
+      path: '/store-level-management',
+      name: 'storeLevelManagement',
+      component: () => import('@/pages/store-level/management/index.vue'),
+    },
+    {
       path: '/store-category-management',
       name: 'storeCategoryManagement',
       component: () => import('@/pages/store-category/management/index.vue'),
@@ -106,6 +131,11 @@ const router = createRouter({
       path: '/category-attribute-template',
       name: 'categoryAttributeTemplate',
       component: () => import('@/pages/product/category-attribute-template/index.vue'),
+    },
+    {
+      path: '/markup-configuration',
+      name: 'markupConfiguration',
+      component: () => import('@/pages/product/markup-configuration/index.vue'),
     },
     { path: '/finished-stock-category', redirect: '/product-category' },
     { path: '/accessory-category', redirect: '/category-attribute-template' },

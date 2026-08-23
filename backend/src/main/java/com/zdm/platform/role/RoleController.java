@@ -26,6 +26,11 @@ public class RoleController {
     return ApiResponse.ok(roleService.listForCurrentAdmin());
   }
 
+  @GetMapping("/permission-scope")
+  public ApiResponse<RolePermissionScope> permissionScope() {
+    return ApiResponse.ok(roleService.permissionScopeForCurrentAdmin());
+  }
+
   @PostMapping
   public ApiResponse<Role> create(@Valid @RequestBody Role role) {
     roleService.createRole(role);

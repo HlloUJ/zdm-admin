@@ -1,6 +1,7 @@
 import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 
 export type TerminalType = 'store' | 'supplier';
+export type FunctionAudience = 'admin' | TerminalType;
 
 export interface FunctionAction {
   label: string;
@@ -16,10 +17,12 @@ export interface FunctionTab {
 export interface FunctionPage {
   label: string;
   value: string;
+  thirdMenuLabel?: string;
   actions: FunctionAction[];
   tabs: FunctionTab[];
   note?: string;
   splitSharedTabs?: boolean;
+  audiences?: FunctionAudience[];
 }
 
 export interface FunctionMenu {
@@ -32,6 +35,7 @@ export interface FunctionMenu {
 export interface FunctionModule {
   label: string;
   value: string;
+  audiences?: FunctionAudience[];
   menus: FunctionMenu[];
 }
 
@@ -41,6 +45,9 @@ export interface FunctionCatalogRow {
   direct: boolean;
   showMenu: boolean;
   menuRowspan: number;
+  thirdMenuLabel?: string;
+  showThirdMenu: boolean;
+  thirdMenuRowspan: number;
   pageLabel: string;
   pageNote?: string;
   showPage: boolean;
@@ -116,8 +123,33 @@ export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionM
 // 终端功能分配和角色管理共同消费此目录，禁止在各页面内维护功能数据副本。
 const verifiedFunctionCatalog: FunctionModule[] = [
   {
+    label: '供应商管理',
+    value: 'admin.supplier-management',
+    menus: [
+      {
+        value: 'admin.supplier-management.menu',
+        direct: true,
+        pages: [
+          {
+            label: '供应商管理页',
+            value: 'admin.supplier-management',
+            actions: [
+              { label: '新增', value: 'admin.supplier-management.create' },
+              { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
+              { label: '编辑', value: 'admin.supplier-management.edit' },
+              { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
+              { label: '删除', value: 'admin.supplier-management.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
+    ],
+  },
+  {
     label: '门店分类管理',
     value: 'admin.tenant.store-category-management',
+    audiences: ['store'],
     menus: [
       {
         value: 'admin.tenant.store-category-management.menu',
@@ -142,9 +174,80 @@ const verifiedFunctionCatalog: FunctionModule[] = [
     ],
   },
   {
-    label: '商品基础数据中心',
+    label: '商品管理',
     value: 'admin.product-data-center',
     menus: [
+      {
+        label: '大板管理',
+        value: 'admin.slab-management.menu',
+        direct: false,
+        pages: [
+          {
+            label: '大板管理页',
+            value: 'admin.slab-management',
+            audiences: ['admin'],
+            actions: [],
+            tabs: [
+              {
+                label: '仓库中',
+                value: 'admin.slab-management.warehouse',
+                actions: [
+                  { label: '发布商品', value: 'admin.slab-management.warehouse.publish' },
+                  { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
+                  { label: '价格', value: 'admin.slab-management.warehouse.price' },
+                  { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
+                  { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
+                  { label: '驳回', value: 'admin.slab-management.warehouse.reject' },
+                  { label: '删除', value: 'admin.slab-management.warehouse.delete' },
+                ],
+              },
+              {
+                label: '出售中',
+                value: 'admin.slab-management.selling',
+                actions: [
+                  { label: '发布商品', value: 'admin.slab-management.selling.publish' },
+                  { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
+                  { label: '价格', value: 'admin.slab-management.selling.price' },
+                  { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
+                  { label: '编辑', value: 'admin.slab-management.selling.edit' },
+                  { label: '删除', value: 'admin.slab-management.selling.delete' },
+                ],
+              },
+              {
+                label: '已下架',
+                value: 'admin.slab-management.off-shelf',
+                actions: [
+                  { label: '批量放回仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
+                  { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },
+                  { label: '删除', value: 'admin.slab-management.off-shelf.delete' },
+                ],
+              },
+              {
+                label: '已售完',
+                value: 'admin.slab-management.sold-out',
+                actions: [{ label: '价格', value: 'admin.slab-management.sold-out.price' }],
+              },
+              {
+                label: '回收站',
+                value: 'admin.slab-management.recycle',
+                actions: [
+                  { label: '批量放回仓库', value: 'admin.slab-management.recycle.batch-restore' },
+                  { label: '批量彻底删除', value: 'admin.slab-management.recycle.batch-purge' },
+                  { label: '清空回收站', value: 'admin.slab-management.recycle.clear' },
+                  { label: '价格', value: 'admin.slab-management.recycle.price' },
+                  { label: '放回仓库', value: 'admin.slab-management.recycle.restore' },
+                  { label: '彻底删除', value: 'admin.slab-management.recycle.purge' },
+                ],
+              },
+              {
+                label: '已驳回',
+                value: 'admin.slab-management.rejected',
+                actions: [],
+              },
+            ],
+          },
+        ],
+      },
       {
         label: '商品分类管理',
         value: 'admin.product-data-center.category.menu',
@@ -256,20 +359,45 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
-        label: '大板品种管理',
-        value: 'admin.product-data-center.slab-variety.menu',
+        label: '加价配置',
+        value: 'admin.product-data-center.markup-configuration.menu',
         direct: false,
         pages: [
           {
-            label: '大板品种管理页',
-            value: 'admin.product-data-center.slab-variety',
-            actions: [
-              { label: '新增', value: 'admin.product-data-center.slab-variety.create' },
-              { label: '编辑', value: 'admin.product-data-center.slab-variety.edit' },
-              { label: '停用/启用', value: 'admin.product-data-center.slab-variety.toggle-status' },
-              { label: '删除', value: 'admin.product-data-center.slab-variety.delete' },
+            label: '加价配置页',
+            value: 'admin.product-data-center.markup-configuration',
+            audiences: ['admin'],
+            actions: [],
+            tabs: [
+              {
+                label: '成品加价配置',
+                value: 'admin.product-data-center.markup-configuration.finished',
+                actions: [
+                  { label: '新增', value: 'admin.product-data-center.markup-configuration.finished.create' },
+                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.finished.edit' },
+                  { label: '排序', value: 'admin.product-data-center.markup-configuration.finished.sort' },
+                  {
+                    label: '停用/启用',
+                    value: 'admin.product-data-center.markup-configuration.finished.toggle-status',
+                  },
+                  { label: '删除', value: 'admin.product-data-center.markup-configuration.finished.delete' },
+                ],
+              },
+              {
+                label: '大板加价配置',
+                value: 'admin.product-data-center.markup-configuration.slab',
+                actions: [
+                  { label: '新增', value: 'admin.product-data-center.markup-configuration.slab.create' },
+                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.slab.edit' },
+                  { label: '排序', value: 'admin.product-data-center.markup-configuration.slab.sort' },
+                  {
+                    label: '停用/启用',
+                    value: 'admin.product-data-center.markup-configuration.slab.toggle-status',
+                  },
+                  { label: '删除', value: 'admin.product-data-center.markup-configuration.slab.delete' },
+                ],
+              },
             ],
-            tabs: [],
           },
         ],
       },
@@ -291,11 +419,81 @@ const verifiedFunctionCatalog: FunctionModule[] = [
           },
         ],
       },
+      {
+        label: '大板基础数据',
+        value: 'admin.product-data-center.slab-base-data.menu',
+        direct: false,
+        pages: [
+          {
+            label: '品种管理页',
+            value: 'admin.product-data-center.slab-variety',
+            thirdMenuLabel: '品种管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-variety.create' },
+              { label: '编辑', value: 'admin.product-data-center.slab-variety.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-variety.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-variety.delete' },
+            ],
+            tabs: [],
+          },
+          {
+            label: '产地管理页',
+            value: 'admin.product-data-center.slab-origin',
+            thirdMenuLabel: '产地管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-origin.create' },
+              { label: '编辑', value: 'admin.product-data-center.slab-origin.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-origin.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-origin.delete' },
+            ],
+            tabs: [],
+          },
+          {
+            label: '纹理管理页',
+            value: 'admin.product-data-center.slab-texture',
+            thirdMenuLabel: '纹理管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-texture.create' },
+              { label: '别名', value: 'admin.product-data-center.slab-texture.manage-aliases' },
+              { label: '编辑', value: 'admin.product-data-center.slab-texture.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-texture.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-texture.delete' },
+            ],
+            tabs: [],
+          },
+          {
+            label: '色系管理页',
+            value: 'admin.product-data-center.slab-color',
+            thirdMenuLabel: '色系管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-color.create' },
+              { label: '色系分类管理', value: 'admin.product-data-center.slab-color.manage-categories' },
+              { label: '编辑', value: 'admin.product-data-center.slab-color.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-color.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-color.delete' },
+            ],
+            tabs: [],
+          },
+          {
+            label: '等级管理页',
+            value: 'admin.product-data-center.slab-grade',
+            thirdMenuLabel: '等级管理',
+            actions: [
+              { label: '新增', value: 'admin.product-data-center.slab-grade.create' },
+              { label: '编辑', value: 'admin.product-data-center.slab-grade.edit' },
+              { label: '停用/启用', value: 'admin.product-data-center.slab-grade.toggle-status' },
+              { label: '删除', value: 'admin.product-data-center.slab-grade.delete' },
+            ],
+            tabs: [],
+          },
+        ],
+      },
     ],
   },
   {
     label: '权限管理',
     value: 'admin.permission-management',
+    audiences: ['admin', 'store', 'supplier'],
     menus: [
       {
         label: '员工管理',
@@ -324,67 +522,13 @@ const verifiedFunctionCatalog: FunctionModule[] = [
           {
             label: '角色管理页',
             value: 'admin.permission-management.role-management',
-            actions: [],
-            tabs: [
-              {
-                label: '运营管理平台角色',
-                value: 'admin.permission-management.role-management.operation-platform',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.operation-platform.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.operation-platform.edit',
-                  },
-                  {
-                    label: '权限',
-                    value: 'admin.permission-management.role-management.operation-platform.permission',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.operation-platform.delete',
-                  },
-                ],
-              },
-              {
-                label: '城市合伙人门店角色',
-                value: 'admin.permission-management.role-management.partner-store',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.partner-store.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.partner-store.edit',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.partner-store.delete',
-                  },
-                ],
-              },
-              {
-                label: '大板供应商门店角色',
-                value: 'admin.permission-management.role-management.supplier-store',
-                actions: [
-                  {
-                    label: '新增',
-                    value: 'admin.permission-management.role-management.supplier-store.create',
-                  },
-                  {
-                    label: '编辑',
-                    value: 'admin.permission-management.role-management.supplier-store.edit',
-                  },
-                  {
-                    label: '删除',
-                    value: 'admin.permission-management.role-management.supplier-store.delete',
-                  },
-                ],
-              },
+            actions: [
+              { label: '新增', value: 'admin.permission-management.role-management.create' },
+              { label: '编辑', value: 'admin.permission-management.role-management.edit' },
+              { label: '权限', value: 'admin.permission-management.role-management.permission' },
+              { label: '删除', value: 'admin.permission-management.role-management.delete' },
             ],
+            tabs: [],
           },
         ],
       },
@@ -392,11 +536,184 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   },
 ];
 
-export const fullFunctionCatalog = withDefaultViewPermissions(verifiedFunctionCatalog);
+const storeLevelModule: FunctionModule = {
+  label: '租户与门店',
+  value: 'admin.tenant',
+  audiences: ['admin'],
+  menus: [
+    {
+      label: '租户管理',
+      value: 'admin.tenant.tenant-management.menu',
+      direct: false,
+      pages: [
+        {
+          label: '租户管理页',
+          value: 'admin.tenant.tenant-management',
+          actions: [],
+          tabs: [
+            {
+              label: '运营中',
+              value: 'admin.tenant.tenant-management.unarchived',
+              actions: [
+                { label: '新增', value: 'admin.tenant.tenant-management.unarchived.create' },
+                { label: '业务开通', value: 'admin.tenant.tenant-management.unarchived.open-business' },
+                { label: '编辑', value: 'admin.tenant.tenant-management.unarchived.edit' },
+                { label: '归档', value: 'admin.tenant.tenant-management.unarchived.archive' },
+              ],
+            },
+            {
+              label: '已归档',
+              value: 'admin.tenant.tenant-management.archived',
+              actions: [
+                { label: '恢复运营', value: 'admin.tenant.tenant-management.archived.restore' },
+                { label: '彻底删除', value: 'admin.tenant.tenant-management.archived.delete' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      label: '门店管理',
+      value: 'admin.tenant.tenant-store-management.menu',
+      direct: false,
+      pages: [
+        {
+          label: '门店管理页',
+          value: 'admin.tenant.tenant-store-management',
+          actions: [],
+          tabs: [
+            {
+              label: '运营中',
+              value: 'admin.tenant.tenant-store-management.operating',
+              actions: [
+                { label: '新增', value: 'admin.tenant.tenant-store-management.operating.create' },
+                { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.operating.edit-level' },
+                { label: '编辑', value: 'admin.tenant.tenant-store-management.operating.edit' },
+                { label: '归档', value: 'admin.tenant.tenant-store-management.operating.archive' },
+              ],
+            },
+            {
+              label: '已归档',
+              value: 'admin.tenant.tenant-store-management.archived',
+              actions: [
+                { label: '恢复运营', value: 'admin.tenant.tenant-store-management.archived.restore' },
+                { label: '彻底删除', value: 'admin.tenant.tenant-store-management.archived.delete' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      label: '门店基础数据',
+      value: 'admin.tenant.store-base-data.menu',
+      direct: false,
+      pages: [
+        {
+          label: '门店级别管理页',
+          value: 'admin.tenant.store-level-management',
+          thirdMenuLabel: '门店级别管理',
+          actions: [
+            { label: '新增', value: 'admin.tenant.store-level-management.create' },
+            { label: '编辑', value: 'admin.tenant.store-level-management.edit' },
+            { label: '停用/启用', value: 'admin.tenant.store-level-management.toggle-status' },
+            { label: '删除', value: 'admin.tenant.store-level-management.delete' },
+          ],
+          tabs: [],
+        },
+      ],
+    },
+  ],
+};
+
+const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionModule[] =>
+  modules.map((module) => {
+    if (module.value !== 'admin.product-data-center') return module;
+
+    const commonValues = new Set([
+      'admin.product-data-center.category.menu',
+      'admin.product-data-center.attribute.menu',
+      'admin.product-data-center.attribute-value.menu',
+      'admin.product-data-center.category-attribute-template.menu',
+      'admin.product-data-center.markup-configuration.menu',
+    ]);
+    const commonMenus = module.menus.filter((menu) => commonValues.has(menu.value));
+    const craftMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.finished-stock-craft.menu');
+    const slabMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.slab-base-data.menu');
+    const slabManagementMenu = module.menus.find((menu) => menu.value === 'admin.slab-management.menu');
+
+    return {
+      ...module,
+      label: '商品管理',
+      menus: [
+        ...(slabManagementMenu ? [slabManagementMenu] : []),
+        {
+          label: '商品公共基础数据',
+          value: 'admin.product-data-center.common-base-data.menu',
+          direct: false,
+          pages: commonMenus.flatMap((menu) => menu.pages.map((page) => ({ ...page, thirdMenuLabel: menu.label }))),
+        },
+        ...(craftMenu
+          ? [
+              {
+                ...craftMenu,
+                label: '成品现货基础数据',
+                pages: craftMenu.pages.map((page) => ({ ...page, thirdMenuLabel: '工艺管理' })),
+              },
+            ]
+          : []),
+        ...(slabMenu ? [{ ...slabMenu, label: '大板基础数据' }] : []),
+      ],
+    };
+  });
+
+const navigationModuleOrder = [
+  'admin.tenant',
+  'admin.product-data-center',
+  'admin.supplier-management',
+  'admin.tenant.store-category-management',
+  'admin.permission-management',
+];
+
+const orderModulesByNavigation = (modules: FunctionModule[]) => {
+  const orderByValue = new Map(navigationModuleOrder.map((value, index) => [value, index]));
+  return [...modules].sort(
+    (left, right) =>
+      (orderByValue.get(left.value) ?? Number.MAX_SAFE_INTEGER) -
+      (orderByValue.get(right.value) ?? Number.MAX_SAFE_INTEGER),
+  );
+};
+
+export const fullFunctionCatalog = applyConfirmedNavigationStructure(
+  orderModulesByNavigation(withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog])),
+);
+
+const filterCatalogPagesByAudience = (modules: FunctionModule[], audience: FunctionAudience) =>
+  modules
+    .map((module) => ({
+      ...module,
+      menus: module.menus
+        .map((menu) => ({
+          ...menu,
+          pages: menu.pages.filter((page) => !page.audiences || page.audiences.includes(audience)),
+        }))
+        .filter((menu) => menu.pages.length > 0),
+    }))
+    .filter((module) => module.menus.length > 0);
+
+export const filterFunctionCatalogByAudience = (audience: FunctionAudience) =>
+  filterCatalogPagesByAudience(
+    fullFunctionCatalog.filter((module) => !module.audiences || module.audiences.includes(audience)),
+    audience,
+  );
+
+export const getRuntimeFunctionCatalog = (audience: FunctionAudience) =>
+  import.meta.env.PROD ? filterFunctionCatalogByAudience(audience) : fullFunctionCatalog;
 
 export const terminalFunctionTrees: Record<TerminalType, FunctionModule[]> = {
-  store: fullFunctionCatalog,
-  supplier: fullFunctionCatalog,
+  store: filterCatalogPagesByAudience(getRuntimeFunctionCatalog('store'), 'store'),
+  supplier: filterCatalogPagesByAudience(getRuntimeFunctionCatalog('supplier'), 'supplier'),
 };
 
 export const getFunctionModulePermissionValues = (module?: FunctionModule) =>
@@ -428,6 +745,9 @@ export const collectFunctionCatalogRows = (module?: FunctionModule): FunctionCat
             key: `${menu.value}.${page.value}.${tab.value}`,
             menuLabel: menu.label,
             direct: menu.direct,
+            thirdMenuLabel: page.thirdMenuLabel,
+            showThirdMenu: index === 0,
+            thirdMenuRowspan: rowTabs.length,
             pageLabel: page.label,
             pageNote: page.note,
             showPage: index === 0,
@@ -444,6 +764,9 @@ export const collectFunctionCatalogRows = (module?: FunctionModule): FunctionCat
           key: `${menu.value}.${page.value}`,
           menuLabel: menu.label,
           direct: menu.direct,
+          thirdMenuLabel: page.thirdMenuLabel,
+          showThirdMenu: true,
+          thirdMenuRowspan: 1,
           pageLabel: page.label,
           pageNote: page.note,
           showPage: true,
@@ -499,7 +822,35 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
 };
 
 export const normalizeTerminalPermissions = (_terminal: TerminalType, permissions: string[]) =>
-  normalizeFunctionCatalogPermissions(fullFunctionCatalog, permissions).filter((permission) => permission !== 'all');
+  normalizeFunctionCatalogPermissions(terminalFunctionTrees[_terminal], permissions).filter(
+    (permission) => permission !== 'all',
+  );
+
+export const filterFunctionCatalogByPermissions = (
+  modules: FunctionModule[],
+  permissions: string[],
+): FunctionModule[] => {
+  const allowed = new Set(normalizeFunctionCatalogPermissions(modules, permissions));
+  return modules
+    .map((module) => ({
+      ...module,
+      menus: module.menus
+        .map((menu) => ({
+          ...menu,
+          pages: menu.pages
+            .map((page) => ({
+              ...page,
+              actions: page.actions.filter((action) => allowed.has(action.value)),
+              tabs: page.tabs
+                .map((tab) => ({ ...tab, actions: tab.actions.filter((action) => allowed.has(action.value)) }))
+                .filter((tab) => tab.actions.length),
+            }))
+            .filter((page) => page.actions.length || page.tabs.length),
+        }))
+        .filter((menu) => menu.pages.length),
+    }))
+    .filter((module) => module.menus.length);
+};
 
 export const initialAllocationValues: Record<TerminalType, string[]> = {
   store: [],

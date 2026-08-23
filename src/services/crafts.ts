@@ -1,4 +1,5 @@
 import { request } from './http';
+import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
 export interface CraftRecord {
   id: number;
@@ -6,11 +7,13 @@ export interface CraftRecord {
   type: string;
   width?: string;
   description?: string;
+  imageMediaId?: number;
   imageUrl?: string;
   pricingMethod?: string;
   remark?: string;
   status?: 'enabled' | 'disabled';
   createdByName?: string;
+  createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -20,14 +23,10 @@ export interface CraftPayload {
   type: string;
   width?: string;
   description?: string;
-  imageUrl?: string;
+  imageMediaId?: number;
   pricingMethod?: string;
   remark?: string;
   status: 'enabled' | 'disabled';
-}
-
-export interface CraftImageUploadResponse {
-  url: string;
 }
 
 export function listCrafts() {
@@ -56,12 +55,11 @@ export function updateCraftStatus(id: number, status: CraftPayload['status']) {
 }
 
 export function uploadCraftImage(file: File) {
-  const body = new FormData();
-  body.append('file', file);
-  return request<CraftImageUploadResponse>('/admin/crafts/images', {
-    method: 'POST',
-    body,
-  });
+  return uploadMedia('/admin/crafts/images', file);
+}
+
+export function releaseTemporaryCraftImage(mediaId: MediaResource['id']) {
+  return releaseTemporaryMedia('/admin/crafts/images', mediaId);
 }
 
 export function deleteCraft(id: number) {

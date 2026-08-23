@@ -443,7 +443,7 @@ const handleSubmit = async () => {
 
   pagination.current = 1;
   closeFormDialog();
-  adminFeedback.actionSuccess({ action: '新增', target: formData.name.trim() });
+  adminFeedback.created(formData.name.trim());
 };
 
 const openOptionDialog = (row: AttributeItem) => {
@@ -526,6 +526,7 @@ const ensureCurrentPage = () => {
 
 const handleConfirm = () => {
   if (!confirmState.row) return;
+  const target = confirmState.row;
 
   if (confirmState.type === 'delete') {
     if (confirmState.row.options.length) {
@@ -540,9 +541,11 @@ const handleConfirm = () => {
   }
 
   closeConfirmDialog();
-  adminFeedback.success(
-    confirmState.type === 'delete' ? '已删除属性' : confirmState.type === 'enable' ? '已启用属性' : '已停用属性',
-  );
+  if (confirmState.type === 'delete') {
+    adminFeedback.deleted(target.name);
+  } else {
+    adminFeedback.success(confirmState.type === 'enable' ? '已启用属性' : '已停用属性');
+  }
 };
 </script>
 

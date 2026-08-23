@@ -43,7 +43,7 @@
                 </t-form-item>
                 <t-form-item label="状态" name="status">
                   <t-select v-model="filterDraft.status" clearable placeholder="请选择">
-                    <t-option label="正常" value="normal" />
+                    <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
                 </t-form-item>
@@ -82,7 +82,7 @@
             </template>
             <template #status="{ row }">
               <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'normal' ? '正常' : '停用' }}
+                {{ row.status === 'normal' ? '启用' : '停用' }}
               </t-tag>
             </template>
             <template #remark="{ row }">
@@ -92,11 +92,16 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="canEditEmployee" theme="primary" hover="color" @click="openProfileDialog(row)">
+                <t-link
+                  v-if="canEditEmployee && row.id !== loginUser.employeeId"
+                  theme="primary"
+                  hover="color"
+                  @click="openProfileDialog(row)"
+                >
                   编辑
                 </t-link>
                 <t-link
-                  v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row)"
+                  v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
                   theme="primary"
                   hover="color"
                   @click="openPermissionDialog(row)"
@@ -104,7 +109,7 @@
                   角色
                 </t-link>
                 <t-link
-                  v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row)"
+                  v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
                   :theme="row.status === 'normal' ? 'warning' : 'success'"
                   hover="color"
                   @click="openStatusConfirm(row)"
@@ -112,7 +117,7 @@
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
                 <t-link
-                  v-if="canDeleteEmployee && !isSuperAdminEmployee(row)"
+                  v-if="canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
                   theme="danger"
                   hover="color"
                   @click="openDeleteConfirm(row)"
@@ -121,10 +126,14 @@
                 </t-link>
                 <span
                   v-if="
-                    !canEditEmployee &&
-                    !(canConfigureEmployeePermission && !isSuperAdminEmployee(row)) &&
-                    !(canToggleEmployeeStatus && !isSuperAdminEmployee(row)) &&
-                    !(canDeleteEmployee && !isSuperAdminEmployee(row))
+                    !(canEditEmployee && row.id !== loginUser.employeeId) &&
+                    !(
+                      canConfigureEmployeePermission &&
+                      !isSuperAdminEmployee(row) &&
+                      row.id !== loginUser.employeeId
+                    ) &&
+                    !(canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId) &&
+                    !(canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId)
                   "
                   class="table-action-placeholder"
                 >
@@ -213,7 +222,7 @@
     >
       <t-form ref="permissionFormRef" :data="permissionFormData" :rules="permissionFormRules" label-width="96px" colon>
         <t-form-item label="角色" name="roleIds" required-mark>
-          <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择运营管理平台角色">
+          <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择当前组织角色">
             <t-option
               v-for="role in configurableOperationRoleOptions"
               :key="role.value"
@@ -252,6 +261,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
@@ -268,6 +278,7 @@ import {
   type EmployeeRecord,
 } from '@/services/employees';
 import { createEmployeeInvite } from '@/services/employeeInvites';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import { listRoles, type RoleRecord } from '@/services/roles';
 
 type EmployeeStatus = 'normal' | 'disabled';
@@ -284,6 +295,7 @@ interface EmployeeItem {
   status: EmployeeStatus;
   remark: string;
   createdByName: string;
+  createdByAccountId?: number;
   registeredAt: string;
   functionPermissions: string[];
   dataPermission: '' | DataPermission;
@@ -496,6 +508,7 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
     status: normalizeStatus(record.status),
     remark: record.remark ?? '',
     createdByName: record.createdByName?.trim() || '-',
+    createdByAccountId: record.createdByAccountId,
     registeredAt: formatDateTime(record.createdAt),
     functionPermissions: expandRolePermissions(roleIds),
     dataPermission: record.dataPermission ?? '',
@@ -516,8 +529,8 @@ const loadPermissionCenter = async () => {
   loading.value = true;
   try {
     const [roles, records] = await Promise.all([listRoles(), listEmployees()]);
-    operationRoles.value = roles.filter((role) => role.category === 'operation-platform' && role.status === 'enabled');
-    employees.value = records.map(toEmployeeItem);
+    operationRoles.value = roles.filter((role) => role.status === 'enabled');
+    employees.value = sortByCreatedAtDesc(records).map(toEmployeeItem);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '员工列表加载失败');
   } finally {
@@ -581,6 +594,11 @@ const copyInviteLink = async () => {
 };
 
 const openProfileDialog = (row: EmployeeItem) => {
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能编辑当前登录员工');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   profileFormData.name = row.name;
   profileFormData.gender = row.gender;
@@ -598,6 +616,11 @@ const openPermissionDialog = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能修改当前登录员工的角色');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   permissionFormData.roleIds = [...row.roleIds];
   permissionFormData.dataPermission = row.dataPermission;
@@ -701,6 +724,11 @@ const openStatusConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员不可停用或启用');
     return;
   }
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能停用当前登录员工');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   const nextType = row.status === 'normal' ? 'disable' : 'enable';
   if (nextType === 'enable' && !validateEmployeeBeforeEnable(row)) return;
 
@@ -714,6 +742,11 @@ const openDeleteConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员不可删除');
     return;
   }
+  if (row.id === loginUser.value.employeeId) {
+    adminFeedback.warning('不能删除当前登录员工');
+    return;
+  }
+  if (!requireCreatorOwnership(row)) return;
   confirmEmployee.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;
@@ -739,7 +772,7 @@ const handleConfirmSubmit = async () => {
       await deleteEmployee(confirmEmployee.value.id);
       employees.value = employees.value.filter((employee) => employee.id !== confirmEmployee.value?.id);
       if (pagination.current > pageCount.value) pagination.current = pageCount.value;
-      adminFeedback.actionSuccess({ action: '删除', target: confirmEmployee.value.name });
+      adminFeedback.deleted(confirmEmployee.value.name);
     } else {
       const updated = await updateEmployee(
         confirmEmployee.value.id,

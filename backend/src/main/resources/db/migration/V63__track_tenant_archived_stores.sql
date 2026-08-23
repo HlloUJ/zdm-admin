@@ -1,0 +1,2 @@
+ALTER TABLE stores
+ADD COLUMN archived_by_tenant TINYINT(1) NOT NULL DEFAULT 0 AFTER status;

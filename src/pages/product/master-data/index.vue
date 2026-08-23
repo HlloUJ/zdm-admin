@@ -6,7 +6,7 @@
       <main class="page">
         <header class="page-header">
           <t-breadcrumb
-            ><t-breadcrumb-item>商品基础数据中心</t-breadcrumb-item
+            ><t-breadcrumb-item>商品管理</t-breadcrumb-item
             ><t-breadcrumb-item>{{ config.title }}</t-breadcrumb-item></t-breadcrumb
           ><t-tag theme="primary" variant="light">平台主数据</t-tag>
         </header>
@@ -203,7 +203,11 @@ const submit = async () => {
     }
     await loadData();
     dialogVisible.value = false;
-    adminFeedback.success(editingRow.value ? '已保存修改' : `已新增${config.value.entityName}`);
+    if (editingRow.value) {
+      adminFeedback.success('已保存修改');
+    } else {
+      adminFeedback.created(form.name.trim());
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

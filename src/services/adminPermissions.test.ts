@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LoginUser } from './auth';
-import { getFirstAccessiblePath, hasMenuPermission, hasPermission } from './adminPermissions';
+import { adminMenuEntries, getFirstAccessiblePath, hasMenuPermission, hasPermission } from './adminPermissions';
 
 function createUser(permissions: string[]): LoginUser {
   return {
@@ -15,14 +15,14 @@ function createUser(permissions: string[]): LoginUser {
 
 describe('admin menu permissions', () => {
   it('shows the parent page when the user owns a descendant view permission', () => {
-    const user = createUser(['admin.permission-management.role-management.operation-platform.view']);
+    const user = createUser(['admin.permission-management.role-management.view']);
 
     expect(hasMenuPermission(user, 'admin.permission-management.role-management')).toBe(true);
     expect(getFirstAccessiblePath(user)).toBe('/role-management');
   });
 
   it('does not infer page access from a mutating action without view', () => {
-    const user = createUser(['admin.permission-management.role-management.operation-platform.permission']);
+    const user = createUser(['admin.permission-management.role-management.permission']);
 
     expect(hasMenuPermission(user, 'admin.permission-management.role-management')).toBe(false);
     expect(getFirstAccessiblePath(user)).toBe('');
@@ -42,6 +42,26 @@ describe('admin menu permissions', () => {
     expect(getFirstAccessiblePath(viewUser)).toBe('/store-category-management');
     expect(hasMenuPermission(actionOnlyUser, 'admin.tenant.store-category-management')).toBe(false);
     expect(getFirstAccessiblePath(actionOnlyUser)).toBe('');
+  });
+
+  it('places store levels below tenant store base data and keeps store categories direct', () => {
+    const user = createUser(['admin.tenant.store-level-management.view']);
+    expect(getFirstAccessiblePath(user)).toBe('/store-level-management');
+
+    expect(adminMenuEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: '门店分类管理', path: '/store-category-management' }),
+        expect.objectContaining({
+          label: '租户与门店',
+          children: expect.arrayContaining([
+            expect.objectContaining({
+              label: '门店基础数据',
+              children: [expect.objectContaining({ label: '门店级别管理', path: '/store-level-management' })],
+            }),
+          ]),
+        }),
+      ]),
+    );
   });
 
   it('accepts legacy category enable and disable permissions for the merged toggle action', () => {
