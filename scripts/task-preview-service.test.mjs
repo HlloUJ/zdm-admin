@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import test from 'node:test';
 
 import {
   dockerDesktopLaunchCommand,
+  INTEGRATION_PREVIEW_URL,
   launchAgentPlist,
+  MANAGED_TASK_PREVIEW_PORT,
   normalizedPath,
   parseServiceArgs,
+  PreviewGateway,
   previewCommand,
   restartDelay,
   SERVICE_LABEL,
@@ -55,9 +61,121 @@ test('builds the existing task launcher command without a shell', () => {
     }),
     {
       command: '/opt/node',
-      args: ['/repo/scripts/dev-task.mjs', '--worktree', '/repo task', '--mode', 'frontend'],
+      args: [
+        '/repo/scripts/dev-task.mjs',
+        '--worktree',
+        '/repo task',
+        '--port',
+        String(MANAGED_TASK_PREVIEW_PORT),
+        '--mode',
+        'frontend',
+      ],
     },
   );
+});
+
+function listen(server) {
+  server.listen(0, '127.0.0.1');
+  return once(server, 'listening');
+}
+
+function serverUrl(server) {
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  return `http://127.0.0.1:${address.port}/`;
+}
+
+function requestText(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const request = http.get(url, options, (response) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    request.once('error', reject);
+  });
+}
+
+function closeServer(server) {
+  return new Promise((resolve) => server.close(resolve));
+}
+
+function requestUpgrade(url) {
+  const target = new URL(url);
+  return new Promise((resolve, reject) => {
+    const socket = net.connect(Number(target.port), target.hostname);
+    socket.once('connect', () => {
+      socket.write(
+        `GET /hmr HTTP/1.1\r\nHost: ${target.host}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Key: dGVzdC1nYXRld2F5\r\nSec-WebSocket-Version: 13\r\n\r\n`,
+      );
+    });
+    socket.once('data', (chunk) => {
+      socket.destroy();
+      resolve(chunk.toString('utf8').split('\r\n', 1)[0]);
+    });
+    socket.once('error', reject);
+  });
+}
+
+test('keeps one gateway online while switching between integration and task upstreams', async (context) => {
+  const integration = http.createServer((request, response) => response.end(`integration:${request.url}`));
+  const task = http.createServer((request, response) => response.end(`task:${request.url}`));
+  task.on('upgrade', (request, socket) => {
+    socket.end('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n');
+  });
+  await Promise.all([listen(integration), listen(task)]);
+  const taskAddress = task.address();
+  assert.ok(taskAddress && typeof taskAddress === 'object');
+
+  const gateway = new PreviewGateway({ port: 0, integrationUrl: serverUrl(integration) });
+  await gateway.start();
+  context.after(async () => {
+    await gateway.stop();
+    await Promise.all([closeServer(integration), closeServer(task)]);
+  });
+
+  assert.equal(gateway.status().mode, 'integration-fallback');
+  assert.deepEqual(await requestText(new URL('/category', serverUrl(gateway.server))), {
+    status: 200,
+    body: 'integration:/category',
+  });
+
+  gateway.useTask(taskAddress.port);
+  assert.equal(gateway.status().mode, 'task');
+  assert.deepEqual(await requestText(new URL('/category', serverUrl(gateway.server))), {
+    status: 200,
+    body: 'task:/category',
+  });
+  assert.equal(await requestUpgrade(serverUrl(gateway.server)), 'HTTP/1.1 101 Switching Protocols');
+
+  gateway.useIntegration();
+  assert.equal(gateway.status().mode, 'integration-fallback');
+  assert.deepEqual(await requestText(new URL('/again', serverUrl(gateway.server))), {
+    status: 200,
+    body: 'integration:/again',
+  });
+});
+
+test('keeps the gateway reachable when the integration upstream is unavailable', async (context) => {
+  const unavailable = http.createServer();
+  await listen(unavailable);
+  const unavailableUrl = serverUrl(unavailable);
+  await closeServer(unavailable);
+
+  const gateway = new PreviewGateway({ port: 0, integrationUrl: unavailableUrl });
+  await gateway.start();
+  context.after(() => gateway.stop());
+
+  const response = await requestText(new URL('/', serverUrl(gateway.server)), {
+    headers: { accept: 'text/html' },
+  });
+  assert.equal(response.status, 503);
+  assert.match(response.body, /5175 入口运行正常/);
+});
+
+test('uses stable public and internal preview endpoints', () => {
+  assert.equal(INTEGRATION_PREVIEW_URL, 'http://127.0.0.1:5173/');
+  assert.equal(MANAGED_TASK_PREVIEW_PORT, 5176);
 });
 
 test('restarts the same task only when its launcher options change', () => {
