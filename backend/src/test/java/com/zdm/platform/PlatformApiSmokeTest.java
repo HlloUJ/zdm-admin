@@ -17,6 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.zdm.platform.security.TokenAuthenticationFilter;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -4447,6 +4449,17 @@ class PlatformApiSmokeTest {
     String gradeCode = "P" + suffix.substring(Math.max(0, suffix.length() - 6));
     String gradeName = "大板发布等级-" + suffix;
     String serialNo = "SLAB-PUBLISH-" + suffix;
+    String supplierName = "大板审核供应商-" + suffix;
+
+    jdbcTemplate.update(
+        """
+        INSERT INTO suppliers
+          (owner_scope, owner_id, tenant_id, store_id, name, status, created_by_name, created_by_account_id)
+        VALUES ('platform', 0, NULL, NULL, ?, 'enabled', '超级管理员', 1)
+        """,
+        supplierName);
+    Long supplierId = jdbcTemplate.queryForObject(
+        "SELECT id FROM suppliers WHERE name = ?", Long.class, supplierName);
 
     jdbcTemplate.update(
         "INSERT INTO slab_color_categories (name, status) VALUES (?, 'enabled')",
@@ -4487,6 +4500,7 @@ class PlatformApiSmokeTest {
 
     Long slabId = null;
     Long interfaceSlabId = null;
+    Long rejectedInterfaceSlabId = null;
     try {
       mockMvc.perform(get("/api/admin/slabs/publish-options")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -4504,6 +4518,7 @@ class PlatformApiSmokeTest {
                   {
                     "name":"大板发布选项测试",
                     "serialNo":"%s",
+                    "supplierId":%d,
                     "mainImageMediaId":%d,
                     "scanImageMediaId":%d,
                     "designImageMediaId":%d,
@@ -4538,6 +4553,7 @@ class PlatformApiSmokeTest {
                   }
                   """.formatted(
                       serialNo,
+                      supplierId,
                       mainImageMediaId,
                       scanImageMediaId,
                       designImageMediaId,
@@ -4593,9 +4609,18 @@ class PlatformApiSmokeTest {
                     "name":"接口获取大板",
                     "serialNo":"%s-interface",
                     "publisherType":"接口获取",
+                    "supplierId":%d,
+                    "varietyId":1,
+                    "originId":1,
+                    "textureId":%d,
+                    "colorId":%d,
+                    "gradeId":%d,
                     "mainImageMediaId":%d,
                     "scanImageMediaId":%d,
                     "designImageMediaId":%d,
+                    "lengthMm":3200,
+                    "widthMm":1800,
+                    "thicknessMm":18,
                     "costPrice":100,
                     "guidePrice":160,
                     "markupPrices":[
@@ -4608,6 +4633,10 @@ class PlatformApiSmokeTest {
                   }
                   """.formatted(
                       serialNo,
+                      supplierId,
+                      textureId,
+                      colorId,
+                      gradeId,
                       mainImageMediaId,
                       scanImageMediaId,
                       designImageMediaId,
@@ -4619,9 +4648,72 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.publisherType").value("接口获取"))
           .andExpect(jsonPath("$.data.createdByName").value("接口获取"))
           .andExpect(jsonPath("$.data.createdByAccountId").doesNotExist())
+          .andExpect(jsonPath("$.data.status").value("pendingReview"))
           .andReturn();
       interfaceSlabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
           interfaceSlabResult.getResponse().getContentAsString(), "$.data.id").toString());
+
+      MvcResult rejectedInterfaceSlabResult = mockMvc.perform(post("/api/admin/slabs")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
+                  {
+                    "name":"待驳回接口大板",
+                    "serialNo":"%s-rejected-interface",
+                    "publisherType":"接口获取",
+                    "supplierId":%d,
+                    "varietyId":1,
+                    "originId":1,
+                    "textureId":%d,
+                    "colorId":%d,
+                    "gradeId":%d,
+                    "mainImageMediaId":%d,
+                    "scanImageMediaId":%d,
+                    "designImageMediaId":%d,
+                    "lengthMm":3200,
+                    "widthMm":1800,
+                    "thicknessMm":18,
+                    "costPrice":100,
+                    "guidePrice":160,
+                    "markupPrices":[
+                      {"markupConfigurationId":%d,"markupRate":60,"costPrice":100,"price":160},
+                      {"markupConfigurationId":%d,"markupRate":45,"costPrice":100,"price":145},
+                      {"markupConfigurationId":%d,"markupRate":30,"costPrice":100,"price":130},
+                      {"markupConfigurationId":%d,"markupRate":18,"costPrice":100,"price":118}
+                    ],
+                    "status":"selling"
+                  }
+                  """.formatted(
+                      serialNo,
+                      supplierId,
+                      textureId,
+                      colorId,
+                      gradeId,
+                      mainImageMediaId,
+                      scanImageMediaId,
+                      designImageMediaId,
+                      guideConfigurationId,
+                      level1ConfigurationId,
+                      level2ConfigurationId,
+                      level3ConfigurationId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("pendingReview"))
+          .andReturn();
+      rejectedInterfaceSlabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
+          rejectedInterfaceSlabResult.getResponse().getContentAsString(), "$.data.id").toString());
+
+      mockMvc.perform(put("/api/admin/slabs/{id}/reject", rejectedInterfaceSlabId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
+                  {"reason":"资料不完整","detail":"缺少供应商提供的批次证明"}
+                  """))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("rejected"))
+          .andExpect(jsonPath("$.data.rejectionReason").value("资料不完整"))
+          .andExpect(jsonPath("$.data.rejectionDetail").value("缺少供应商提供的批次证明"))
+          .andExpect(jsonPath("$.data.rejectedByName").value("超级管理员"))
+          .andExpect(jsonPath("$.data.rejectedAt").isNotEmpty());
 
       mockMvc.perform(put("/api/admin/slabs/batch-status")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -4646,9 +4738,59 @@ class PlatformApiSmokeTest {
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("""
+                  {"ids":[%d,%d],"status":"offShelf","reason":"价格调整","detail":"批量调整指导价"}
+                  """.formatted(slabId, interfaceSlabId)))
+          .andExpect(status().isOk());
+      Map<String, Object> offShelfRecord = jdbcTemplate.queryForMap(
+          """
+          SELECT inventory.status, record.standard_reason, record.detail_reason, record.off_shelved_by_name
+          FROM slab_inventory inventory
+          INNER JOIN slab_off_shelf_records record ON record.slab_id = inventory.id
+          WHERE inventory.id = ?
+          """,
+          slabId);
+      assertThat(offShelfRecord.get("status")).isEqualTo("offShelf");
+      assertThat(offShelfRecord.get("standard_reason")).isEqualTo("价格调整");
+      assertThat(offShelfRecord.get("detail_reason")).isEqualTo("批量调整指导价");
+      assertThat(offShelfRecord.get("off_shelved_by_name")).isEqualTo("超级管理员");
+      mockMvc.perform(put("/api/admin/slabs/batch-status")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
                   {"ids":[%d,%d],"status":"warehouse"}
                   """.formatted(slabId, interfaceSlabId)))
           .andExpect(status().isOk());
+      Integer retainedHistoryCount = jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_off_shelf_records WHERE slab_id = ?",
+          Integer.class,
+          slabId);
+      assertThat(retainedHistoryCount).isEqualTo(1);
+      mockMvc.perform(put("/api/admin/slabs/batch-status")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
+                  {"ids":[%d],"status":"selling"}
+                  """.formatted(slabId)))
+          .andExpect(status().isOk());
+      mockMvc.perform(put("/api/admin/slabs/batch-status")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("""
+                  {"ids":[%d],"status":"offShelf","reason":"库存异常","detail":"盘点数量不一致"}
+                  """.formatted(slabId)))
+          .andExpect(status().isOk());
+      List<Map<String, Object>> offShelfHistory = jdbcTemplate.queryForList(
+          """
+          SELECT standard_reason, detail_reason, off_shelved_by_name
+          FROM slab_off_shelf_records
+          WHERE slab_id = ?
+          ORDER BY off_shelved_at DESC, id DESC
+          """,
+          slabId);
+      assertThat(offShelfHistory).hasSize(2);
+      assertThat(offShelfHistory.get(0).get("standard_reason")).isEqualTo("库存异常");
+      assertThat(offShelfHistory.get(0).get("detail_reason")).isEqualTo("盘点数量不一致");
+      assertThat(offShelfHistory.get(1).get("standard_reason")).isEqualTo("价格调整");
 
       jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", interfaceSlabId);
       interfaceSlabId = null;
@@ -4699,8 +4841,15 @@ class PlatformApiSmokeTest {
       mockMvc.perform(get("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data[0].id").value(slabId))
-          .andExpect(jsonPath("$.data[0].originName").value("巴西"))
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].originName", hasItem("巴西")))
+          .andExpect(jsonPath(
+              "$.data[?(@.id == " + slabId + ")].offShelfRecords[0].standardReason", hasItem("库存异常")))
+          .andExpect(jsonPath(
+              "$.data[?(@.id == " + slabId + ")].offShelfRecords[0].detailReason", hasItem("盘点数量不一致")))
+          .andExpect(jsonPath(
+              "$.data[?(@.id == " + slabId + ")].offShelfRecords[0].offShelvedByName", hasItem("超级管理员")))
+          .andExpect(jsonPath(
+              "$.data[?(@.id == " + slabId + ")].offShelfRecords[1].standardReason", hasItem("价格调整")))
           .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0].price", hasItem(160.00)));
       assertThat(jdbcTemplate.queryForObject(
           """
@@ -4749,9 +4898,13 @@ class PlatformApiSmokeTest {
       if (interfaceSlabId != null) {
         jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", interfaceSlabId);
       }
+      if (rejectedInterfaceSlabId != null) {
+        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", rejectedInterfaceSlabId);
+      }
       jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", gradeId);
       jdbcTemplate.update("DELETE FROM slab_colors WHERE id = ?", colorId);
       jdbcTemplate.update("DELETE FROM slab_color_categories WHERE id = ?", colorCategoryId);
+      jdbcTemplate.update("DELETE FROM suppliers WHERE id = ?", supplierId);
     }
   }
 
