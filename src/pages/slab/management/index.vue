@@ -16,8 +16,8 @@
         </header>
 
         <section class="filter-card">
-          <t-tabs v-model="activeTab" class="status-tabs" @change="handleTabChange">
-            <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
+          <t-tabs v-if="showTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
+            <t-tab-panel v-for="tab in visibleTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
           </t-tabs>
 
           <t-form :data="currentFilter" label-width="44px" colon>
@@ -95,7 +95,7 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
+          <div v-if="activeTab !== 'rejected'" class="table-toolbar">
             <div class="toolbar-buttons">
               <t-button
                 v-for="button in batchButtons"
@@ -143,9 +143,20 @@
             </template>
             <template #slab="{ row }">
               <div class="slab-meta">
-                <div class="slab-name">{{ row.name }}</div>
+                <div class="slab-name">
+                  {{ row.name }}
+                  <t-tag v-if="row.status === 'pendingReview'" size="small" theme="warning" variant="light">
+                    待审核
+                  </t-tag>
+                </div>
                 <div class="slab-code">ID：{{ row.id }}</div>
                 <div class="slab-code">编码：{{ row.code }}</div>
+              </div>
+            </template>
+            <template #rejection="{ row }">
+              <div class="slab-meta">
+                <div class="slab-name">{{ row.rejectionReason || '-' }}</div>
+                <div class="slab-code">{{ row.rejectionDetail || '-' }}</div>
               </div>
             </template>
             <template #tenant="{ row }">
@@ -645,8 +656,8 @@
       @cancel="closeReasonDialog"
       @close="closeReasonDialog"
     >
-      <t-form :data="reasonForm" label-width="96px" colon>
-        <t-form-item :label="reasonState.type === 'reject' ? '驳回原因' : '下架原因'" required-mark>
+      <t-form ref="reasonFormRef" :data="reasonForm" :rules="reasonRules" label-width="96px" colon>
+        <t-form-item :label="reasonState.type === 'reject' ? '驳回原因' : '下架原因'" name="reason" required-mark>
           <t-select v-model="reasonForm.reason" placeholder="请选择">
             <t-option
               v-for="item in reasonState.type === 'reject' ? rejectReasons : offShelfReasons"
@@ -656,7 +667,7 @@
             />
           </t-select>
         </t-form-item>
-        <t-form-item label="详细说明">
+        <t-form-item label="详细说明" name="detail" :required-mark="reasonState.type === 'reject'">
           <t-textarea v-model="reasonForm.detail" placeholder="请输入" :autosize="{ minRows: 4, maxRows: 6 }" />
         </t-form-item>
       </t-form>
@@ -682,12 +693,16 @@ import {
 import { listSlabOrigins, type SlabOriginRecord } from '@/services/slabOrigins';
 import { listSlabVarieties, type SlabVarietyRecord } from '@/services/slabVarieties';
 import { createVideoFirstFrame } from '@/services/media';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
+import { getLoginUser } from '@/services/auth';
+import { hasPermission } from '@/services/adminPermissions';
 import {
   createSlab,
   deleteSlab,
   getSlabPublishOptions,
   listSlabs,
   releaseTemporarySlabMedia,
+  rejectSlab,
   uploadSlabImage,
   updateSlab,
   updateSlabStatuses,
@@ -701,14 +716,14 @@ import {
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 type PublisherType = SlabPublisherType;
+type SlabTab = Exclude<SlabStatus, 'pendingReview'>;
 type ProductMode = 'create' | 'edit' | 'view';
-type RowAction = 'price' | 'shelf' | 'edit' | 'reject' | 'delete' | 'offShelf' | 'restore' | 'purge';
+type RowAction = 'view' | 'price' | 'shelf' | 'edit' | 'reject' | 'delete' | 'offShelf' | 'restore' | 'purge';
 type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type ConfirmType =
   | 'shelf'
   | 'delete'
   | 'restore'
-  | 'reject'
   | 'savePrice'
   | 'batchShelf'
   | 'batchRestore'
@@ -773,6 +788,10 @@ interface SlabItem {
   publisherType: PublisherType;
   createdByName: string;
   createdAt: string;
+  rejectionReason: string;
+  rejectionDetail: string;
+  rejectedByName: string;
+  rejectedAt: string;
   price: PriceGroup;
   status: SlabStatus;
   variety: string;
@@ -836,12 +855,13 @@ type CornerFieldKey =
   | 'corner4Length'
   | 'corner4Width';
 type MeasurementField = 'length' | 'width' | 'height' | 'tolerance' | CornerFieldKey;
-const tabs: { value: SlabStatus; label: string }[] = [
+const tabs: { value: SlabTab; label: string }[] = [
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '出售中' },
   { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
+  { value: 'rejected', label: '已驳回' },
 ];
 
 const pageSizeOptions = [10, 20, 50];
@@ -891,7 +911,14 @@ const makeProductForm = (): ProductForm => ({
   markupPrices: {},
 });
 
-const activeTab = ref<SlabStatus>('warehouse');
+const activeTab = ref<SlabTab>('warehouse');
+const permissionPrefix = 'admin.slab-management';
+const loginUser = computed(getLoginUser);
+const { visibleTabs, showTabRail } = usePermissionTabs({
+  tabs,
+  activeTab,
+  canAccess: (tab) => hasPermission(loginUser.value, `${permissionPrefix}.${tab.value}.view`),
+});
 const loading = ref(false);
 const saving = ref(false);
 const selectedKeys = ref<number[]>([]);
@@ -902,6 +929,7 @@ const editingRowId = ref<number | null>(null);
 const productFormRef = ref<FormInstanceFunctions>();
 const salesFormRef = ref<FormInstanceFunctions>();
 const priceDrawerFormRef = ref<FormInstanceFunctions>();
+const reasonFormRef = ref<FormInstanceFunctions>();
 const productForm = reactive<ProductForm>(makeProductForm());
 const priceDrawerVisible = ref(false);
 const priceDrawerRowId = ref<number | null>(null);
@@ -964,33 +992,44 @@ const publishSupplierOptions = computed(() =>
 );
 const supplierFilterOptions = computed(() => slabSuppliers.value.filter((item) => suppliesSlabs(item)));
 
-const filters = reactive<Record<SlabStatus, FilterState>>({
+const filters = reactive<Record<SlabTab, FilterState>>({
   warehouse: makeFilterState(),
   selling: makeFilterState(),
   offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
+  rejected: makeFilterState(),
 });
-const appliedFilters = reactive<Record<SlabStatus, FilterState>>({
+const appliedFilters = reactive<Record<SlabTab, FilterState>>({
   warehouse: makeFilterState(),
   selling: makeFilterState(),
   offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
+  rejected: makeFilterState(),
 });
 
-const paginations = reactive<Record<SlabStatus, { current: number; pageSize: number }>>({
+const paginations = reactive<Record<SlabTab, { current: number; pageSize: number }>>({
   warehouse: { current: 1, pageSize: 10 },
   selling: { current: 1, pageSize: 10 },
   offShelf: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
   recycle: { current: 1, pageSize: 10 },
+  rejected: { current: 1, pageSize: 10 },
 });
 
 const tableData = ref<SlabItem[]>([]);
 
 const normalizeStatus = (status?: string): SlabStatus => {
-  if (status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle') return status;
+  if (
+    status === 'pendingReview' ||
+    status === 'selling' ||
+    status === 'offShelf' ||
+    status === 'soldOut' ||
+    status === 'recycle' ||
+    status === 'rejected'
+  )
+    return status;
   return 'warehouse';
 };
 
@@ -1065,6 +1104,10 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     publisherType: normalizePublisherType(record.publisherType),
     createdByName: record.createdByName?.trim() || '-',
     createdAt: formatDateTime(record.createdAt),
+    rejectionReason: record.rejectionReason?.trim() || '',
+    rejectionDetail: record.rejectionDetail?.trim() || '',
+    rejectedByName: record.rejectedByName?.trim() || '-',
+    rejectedAt: formatDateTime(record.rejectedAt),
     price: {
       cost: record.costPrice == null ? '' : String(record.costPrice),
       guide: record.guidePrice == null ? '' : String(record.guidePrice),
@@ -1180,7 +1223,6 @@ const confirmAction = computed(() => {
     shelf: '上架',
     delete: '删除',
     restore: '放回',
-    reject: '驳回',
     savePrice: '保存价格',
     batchShelf: '批量上架',
     batchRestore: '批量放回',
@@ -1208,6 +1250,14 @@ const reasonForm = reactive({
   reason: '',
   detail: '',
 });
+
+const reasonRules = computed<Record<string, FormRule[]>>(() => ({
+  reason: [{ required: true, message: '请选择原因', type: 'error', trigger: 'submit' }],
+  detail:
+    reasonState.type === 'reject'
+      ? [{ required: true, message: '请输入详细说明', type: 'error', trigger: 'submit' }]
+      : [],
+}));
 
 const batchPriceRows = reactive<DrawerPriceRow[]>([]);
 const priceDrawerForm = reactive({ rows: batchPriceRows });
@@ -1393,6 +1443,18 @@ const productRules: Record<string, FormRule[]> = {
 };
 
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
+  if (activeTab.value === 'rejected') {
+    return [
+      { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
+      { colKey: 'slab', title: '大板名称/ID/编码', minWidth: 220 },
+      { colKey: 'variety', title: '品种', width: 140 },
+      { colKey: 'tenant', title: '供应商', width: 180 },
+      { colKey: 'rejection', title: '驳回原因/详细说明', minWidth: 260 },
+      { colKey: 'rejectedByName', title: '驳回人', width: 120, align: 'center' },
+      { colKey: 'rejectedAt', title: '驳回时间', width: 180, align: 'center' },
+      { colKey: 'operation', title: '操作', width: 90, align: 'left', fixed: 'right' },
+    ];
+  }
   const baseColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
     { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
@@ -1424,7 +1486,7 @@ const pageAllSelected = computed(
 const pagePartiallySelected = computed(
   () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,
 );
-const priceDrawerReadonly = computed(() => activeTab.value === 'soldOut');
+const priceDrawerReadonly = computed(() => activeTab.value === 'soldOut' || activeTab.value === 'rejected');
 const productDialogTitle = computed(() => {
   if (productMode.value === 'create') return '发布商品';
   if (productMode.value === 'edit') return '编辑商品';
@@ -1434,7 +1496,10 @@ const productDialogTitle = computed(() => {
 const filteredData = computed(() => {
   const filter = currentAppliedFilter.value;
   return tableData.value.filter((item) => {
-    const statusMatched = item.status === activeTab.value;
+    const statusMatched =
+      activeTab.value === 'warehouse'
+        ? item.status === 'warehouse' || item.status === 'pendingReview'
+        : item.status === activeTab.value;
     const keyword = filter.keyword.trim().toLowerCase();
     const keywordMatched =
       !keyword ||
@@ -1470,7 +1535,7 @@ const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
 const batchButtons = computed(() => {
   const map: Record<
-    SlabStatus,
+    SlabTab,
     { label: string; action: BatchAction; theme: 'primary' | 'danger' | 'default'; icon: string; className?: string }[]
   > = {
     warehouse: [
@@ -1488,70 +1553,89 @@ const batchButtons = computed(() => {
       { label: '批量彻底删除', action: 'batchPurge', theme: 'danger', icon: 'delete', className: 'dark-red-button' },
       { label: '清空回收站', action: 'clearRecycle', theme: 'danger', icon: 'clear' },
     ],
+    rejected: [],
   };
-  return map[activeTab.value];
+  const permissionByAction: Record<BatchAction, string> = {
+    publish: 'publish',
+    batchShelf: 'batch-shelf',
+    batchOffShelf: 'batch-off-shelf',
+    batchRestore: 'batch-restore',
+    batchPurge: 'batch-purge',
+    clearRecycle: 'clear-recycle',
+  };
+  return map[activeTab.value].filter((button) =>
+    hasPermission(loginUser.value, `${permissionPrefix}.${activeTab.value}.${permissionByAction[button.action]}`),
+  );
 });
 
-const tabLabel = (tab: { label: string; value: SlabStatus }) => {
-  const count = tableData.value.filter((item) => item.status === tab.value).length;
+const tabLabel = (tab: { label: string; value: SlabTab }) => {
+  const count = tableData.value.filter((item) =>
+    tab.value === 'warehouse'
+      ? item.status === 'warehouse' || item.status === 'pendingReview'
+      : item.status === tab.value,
+  ).length;
   return count ? `${tab.label} ${count}` : tab.label;
 };
 
 const rowActions = (
   row: SlabItem,
 ): { label: string; action: RowAction; theme: 'primary' | 'warning' | 'danger' | 'default' }[] => {
+  let actions: { label: string; action: RowAction; theme: 'primary' | 'warning' | 'danger' | 'default' }[];
   if (activeTab.value === 'warehouse') {
     if (row.publisherType === '接口获取') {
-      return [
+      actions = [
         { label: '价格', action: 'price', theme: 'primary' },
         { label: '上架', action: 'shelf', theme: 'primary' },
         { label: '编辑', action: 'edit', theme: 'primary' },
         { label: '驳回', action: 'reject', theme: 'warning' },
       ];
+    } else {
+      actions = [
+        { label: '价格', action: 'price', theme: 'primary' },
+        { label: '上架', action: 'shelf', theme: 'primary' },
+        { label: '编辑', action: 'edit', theme: 'primary' },
+        { label: '删除', action: 'delete', theme: 'danger' },
+      ];
     }
-    return [
+  } else if (activeTab.value === 'selling') {
+    actions = [
       { label: '价格', action: 'price', theme: 'primary' },
-      { label: '上架', action: 'shelf', theme: 'primary' },
+      { label: '下架', action: 'offShelf', theme: 'warning' },
       { label: '编辑', action: 'edit', theme: 'primary' },
       { label: '删除', action: 'delete', theme: 'danger' },
     ];
-  }
-  if (activeTab.value === 'selling') {
-    const actions: { label: string; action: RowAction; theme: 'primary' | 'warning' | 'danger' | 'default' }[] =
-      row.publisherType === '接口获取'
-        ? [
-            { label: '价格', action: 'price', theme: 'primary' },
-            { label: '编辑', action: 'edit', theme: 'primary' },
-            { label: '驳回', action: 'reject', theme: 'warning' },
-          ]
-        : [
-            { label: '价格', action: 'price', theme: 'primary' },
-            { label: '下架', action: 'offShelf', theme: 'warning' },
-          ];
-    if (row.publisherType === '平台发布') {
-      actions.push(
-        { label: '编辑', action: 'edit', theme: 'primary' },
-        { label: '删除', action: 'delete', theme: 'danger' },
-      );
-    }
-    return actions;
-  }
-  if (activeTab.value === 'offShelf') {
-    return [
+  } else if (activeTab.value === 'offShelf') {
+    actions = [
       { label: '价格', action: 'price', theme: 'primary' },
       { label: '放回仓库', action: 'restore', theme: 'primary' },
       { label: '编辑', action: 'edit', theme: 'primary' },
       { label: '删除', action: 'delete', theme: 'danger' },
     ];
+  } else if (activeTab.value === 'soldOut') {
+    actions = [{ label: '价格', action: 'price', theme: 'primary' }];
+  } else if (activeTab.value === 'rejected') {
+    actions = [{ label: '查看', action: 'view', theme: 'primary' }];
+  } else {
+    actions = [
+      { label: '价格', action: 'price', theme: 'primary' },
+      { label: '放回仓库', action: 'restore', theme: 'primary' },
+      { label: '彻底删除', action: 'purge', theme: 'danger' },
+    ];
   }
-  if (activeTab.value === 'soldOut') {
-    return [{ label: '价格', action: 'price', theme: 'primary' }];
-  }
-  return [
-    { label: '价格', action: 'price', theme: 'primary' },
-    { label: '放回仓库', action: 'restore', theme: 'primary' },
-    { label: '彻底删除', action: 'purge', theme: 'danger' },
-  ];
+  const permissionByAction: Record<RowAction, string> = {
+    view: 'view',
+    price: 'price',
+    shelf: 'shelf',
+    edit: 'edit',
+    reject: 'reject',
+    delete: 'delete',
+    offShelf: 'off-shelf',
+    restore: 'restore',
+    purge: 'purge',
+  };
+  return actions.filter((action) =>
+    hasPermission(loginUser.value, `${permissionPrefix}.${activeTab.value}.${permissionByAction[action.action]}`),
+  );
 };
 
 const handleTabChange = () => {
@@ -2268,6 +2352,7 @@ const handleBatchAction = async (action: BatchAction) => {
 };
 
 const handleRowAction = (action: RowAction, row: SlabItem) => {
+  if (action === 'view') openProductDialog('view', row);
   if (action === 'price') openPriceDrawer(row);
   if (action === 'edit') openProductDialog('edit', row);
   if (action === 'shelf') openConfirm('shelf', row, `是否上架大板“${row.name}”？`);
@@ -2300,7 +2385,6 @@ const handleConfirmSubmit = async () => {
     if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');
     if (type === 'delete' && row) await updateSlabStatus(row.id, 'recycle');
     if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');
-    if (type === 'reject' && row) await updateSlabStatus(row.id, 'recycle');
     if (type === 'savePrice' && row) {
       const costPrice = toNumber(batchPriceRows[0]?.price ?? '');
       const nextMarkupPrices: SlabPrice[] = batchPriceRows
@@ -2354,7 +2438,6 @@ const handleConfirmSubmit = async () => {
     if (type === 'delete' && row) adminFeedback.deleted(row.name);
     else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });
     else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });
-    else if (type === 'reject' && row) adminFeedback.actionSuccess({ action: '驳回', target: row.name });
     else if (type === 'savePrice' && row) adminFeedback.actionSuccess({ action: '保存价格', target: row.name });
     else if (type === 'batchShelf') {
       adminFeedback.actionSuccess({ action: '批量上架', target: `${selectedCount} 个大板` });
@@ -2392,11 +2475,18 @@ const openReasonDialog = (type: 'reject' | 'offShelf', row: SlabItem) => {
 const closeReasonDialog = () => {
   reasonDialogVisible.value = false;
   reasonState.row = null;
+  reasonFormRef.value?.clearValidate();
 };
 
 const handleReasonSubmit = async () => {
   if (!reasonForm.reason) {
-    adminFeedback.warning('请选择原因');
+    await reasonFormRef.value?.validate({ trigger: 'submit', showErrorMessage: true });
+    adminFeedback.warning(reasonState.type === 'reject' ? '请选择驳回原因' : '请选择下架原因');
+    return;
+  }
+  const validation = await reasonFormRef.value?.validate({ trigger: 'submit', showErrorMessage: true });
+  if (validation !== true) {
+    adminFeedback.warning(reasonState.type === 'reject' ? '请完善驳回信息' : '请选择原因');
     return;
   }
   if (reasonState.type === 'offShelf' && reasonState.row) {
@@ -2421,9 +2511,22 @@ const handleReasonSubmit = async () => {
   }
   if (reasonState.type === 'reject' && reasonState.row) {
     const row = reasonState.row;
-    closeReasonDialog();
-    openConfirm('reject', row, `是否驳回大板“${row.name}”？`);
-    return;
+    saving.value = true;
+    try {
+      upsertSlabItem(
+        await rejectSlab(row.id, {
+          reason: reasonForm.reason.trim(),
+          detail: reasonForm.detail.trim(),
+        }),
+      );
+      ensureCurrentPage();
+      closeReasonDialog();
+      adminFeedback.actionSuccess({ action: '驳回', target: row.name });
+    } catch (error) {
+      adminFeedback.actionError({ action: '驳回', error, fallback: '请稍后重试', target: row.name });
+    } finally {
+      saving.value = false;
+    }
   }
 };
 

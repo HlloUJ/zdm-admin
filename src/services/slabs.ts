@@ -1,7 +1,7 @@
 import { request } from './http';
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
-export type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type SlabStatus = 'pendingReview' | 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'rejected';
 export type SlabPublisherType = '平台发布' | '接口获取';
 export interface SlabPrice {
   markupConfigurationId: number;
@@ -34,6 +34,11 @@ export interface SlabRecord {
   videoCoverUrl?: string;
   createdByName?: string;
   createdByAccountId?: number;
+  rejectionReason?: string;
+  rejectionDetail?: string;
+  rejectedByName?: string;
+  rejectedByAccountId?: number;
+  rejectedAt?: string;
   originName?: string;
   varietyName?: string;
   supplierName?: string;
@@ -144,6 +149,13 @@ export function updateSlabStatuses(ids: number[], status: SlabStatus) {
   return request<boolean>('/admin/slabs/batch-status', {
     method: 'PUT',
     body: JSON.stringify({ ids, status }),
+  });
+}
+
+export function rejectSlab(id: number, payload: { reason: string; detail: string }) {
+  return request<SlabRecord>(`/admin/slabs/${id}/reject`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   });
 }
 

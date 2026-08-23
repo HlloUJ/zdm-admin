@@ -63,6 +63,76 @@ test('uses the same action-specific confirmation foundation across modules', asy
   });
 });
 
+test('rejects an interface slab directly and keeps the rejection outside the recycle tab', async ({ page }) => {
+  const pendingSlab = {
+    id: 9,
+    supplierId: 1,
+    varietyId: 1,
+    originId: 1,
+    textureId: 1,
+    colorId: 1,
+    gradeId: 1,
+    name: '接口待审核大板 09',
+    serialNo: 'SLAB-E2E-009',
+    warehouse: '接口仓',
+    publisherType: '接口获取',
+    lengthMm: 3200,
+    widthMm: 1800,
+    thicknessMm: 18,
+    costPrice: 6800,
+    guidePrice: 9800,
+    status: 'pendingReview',
+    createdAt: '2026-08-23T09:00:00',
+  };
+  await page.route('**/api/admin/slabs', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 0, message: 'ok', data: [pendingSlab] }),
+    });
+  });
+  let rejectionPayload: { reason: string; detail: string } | undefined;
+  await page.route('**/api/admin/slabs/9/reject', async (route) => {
+    rejectionPayload = route.request().postDataJSON() as { reason: string; detail: string };
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: {
+          ...pendingSlab,
+          status: 'rejected',
+          rejectionReason: rejectionPayload.reason,
+          rejectionDetail: rejectionPayload.detail,
+          rejectedByName: '韩健',
+          rejectedAt: '2026-08-23T10:00:00',
+        },
+      }),
+    });
+  });
+
+  await page.goto('/slab-management');
+  const row = page.getByRole('row', { name: /接口待审核大板 09/ });
+  await expect(row.getByText('待审核', { exact: true })).toBeVisible();
+  await row.getByText('驳回', { exact: true }).click();
+  const dialog = page.locator('.t-dialog').filter({ hasText: '驳回原因' });
+  await dialog.getByText('请选择', { exact: true }).click();
+  await page.getByText('资料不完整', { exact: true }).click();
+  await dialog.getByPlaceholder('请输入').fill('缺少供应商提供的批次证明');
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+
+  expect(rejectionPayload).toEqual({ reason: '资料不完整', detail: '缺少供应商提供的批次证明' });
+  await expect(page.locator('.zdm-admin-confirm-dialog')).toHaveCount(0);
+  await expect(page.getByText('已驳回“接口待审核大板 09”', { exact: true })).toBeVisible();
+  await expect(row).toHaveCount(0);
+  await page.getByText('已驳回 1', { exact: true }).click();
+  const rejectedRow = page.getByRole('row', { name: /接口待审核大板 09/ });
+  await expect(rejectedRow).toContainText('资料不完整');
+  await expect(rejectedRow).toContainText('缺少供应商提供的批次证明');
+  await expect(page.getByText('回收站', { exact: true })).toBeVisible();
+});
+
 test('permanently deletes one or multiple slabs from the recycle tab after confirmation', async ({ page }) => {
   await page.goto('/slab-management');
   await page.getByText('回收站 2', { exact: true }).click();

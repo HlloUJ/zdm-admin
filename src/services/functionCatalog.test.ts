@@ -108,6 +108,23 @@ describe('full function catalog', () => {
       label: '商品管理',
       menus: [
         {
+          label: '大板管理',
+          direct: false,
+          pages: [
+            {
+              label: '大板管理页',
+              tabs: [
+                { label: '仓库中' },
+                { label: '出售中' },
+                { label: '已下架' },
+                { label: '已售完' },
+                { label: '回收站' },
+                { label: '已驳回' },
+              ],
+            },
+          ],
+        },
+        {
           label: '商品公共基础数据',
           direct: false,
           pages: [
@@ -258,6 +275,68 @@ describe('full function catalog', () => {
     ]);
     const productModule = fullFunctionCatalog[1];
     const productPages = productModule.menus.flatMap((menu) => menu.pages);
+    const slabManagementPage = productPages.find((page) => page.value === 'admin.slab-management');
+    expect(slabManagementPage?.tabs.map((tab) => ({ label: tab.label, actions: tab.actions }))).toEqual([
+      {
+        label: '仓库中',
+        actions: [
+          { label: '查看', value: 'admin.slab-management.warehouse.view' },
+          { label: '发布商品', value: 'admin.slab-management.warehouse.publish' },
+          { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
+          { label: '价格', value: 'admin.slab-management.warehouse.price' },
+          { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
+          { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
+          { label: '驳回', value: 'admin.slab-management.warehouse.reject' },
+          { label: '删除', value: 'admin.slab-management.warehouse.delete' },
+        ],
+      },
+      {
+        label: '出售中',
+        actions: [
+          { label: '查看', value: 'admin.slab-management.selling.view' },
+          { label: '发布商品', value: 'admin.slab-management.selling.publish' },
+          { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
+          { label: '价格', value: 'admin.slab-management.selling.price' },
+          { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
+          { label: '编辑', value: 'admin.slab-management.selling.edit' },
+          { label: '删除', value: 'admin.slab-management.selling.delete' },
+        ],
+      },
+      {
+        label: '已下架',
+        actions: [
+          { label: '查看', value: 'admin.slab-management.offShelf.view' },
+          { label: '批量放回仓库', value: 'admin.slab-management.offShelf.batch-restore' },
+          { label: '价格', value: 'admin.slab-management.offShelf.price' },
+          { label: '放回仓库', value: 'admin.slab-management.offShelf.restore' },
+          { label: '编辑', value: 'admin.slab-management.offShelf.edit' },
+          { label: '删除', value: 'admin.slab-management.offShelf.delete' },
+        ],
+      },
+      {
+        label: '已售完',
+        actions: [
+          { label: '查看', value: 'admin.slab-management.soldOut.view' },
+          { label: '价格', value: 'admin.slab-management.soldOut.price' },
+        ],
+      },
+      {
+        label: '回收站',
+        actions: [
+          { label: '查看', value: 'admin.slab-management.recycle.view' },
+          { label: '批量放回仓库', value: 'admin.slab-management.recycle.batch-restore' },
+          { label: '批量彻底删除', value: 'admin.slab-management.recycle.batch-purge' },
+          { label: '清空回收站', value: 'admin.slab-management.recycle.clear-recycle' },
+          { label: '价格', value: 'admin.slab-management.recycle.price' },
+          { label: '放回仓库', value: 'admin.slab-management.recycle.restore' },
+          { label: '彻底删除', value: 'admin.slab-management.recycle.purge' },
+        ],
+      },
+      {
+        label: '已驳回',
+        actions: [{ label: '查看', value: 'admin.slab-management.rejected.view' }],
+      },
+    ]);
     const tenantPage = fullFunctionCatalog[0].menus
       .flatMap((menu) => menu.pages)
       .find((page) => page.value === 'admin.tenant.tenant-management');
@@ -427,6 +506,37 @@ describe('full function catalog', () => {
       'admin.tenant.store-level-management.edit',
       'admin.tenant.store-level-management.toggle-status',
       'admin.tenant.store-level-management.delete',
+      'admin.slab-management.warehouse.view',
+      'admin.slab-management.warehouse.publish',
+      'admin.slab-management.warehouse.batch-shelf',
+      'admin.slab-management.warehouse.price',
+      'admin.slab-management.warehouse.shelf',
+      'admin.slab-management.warehouse.edit',
+      'admin.slab-management.warehouse.reject',
+      'admin.slab-management.warehouse.delete',
+      'admin.slab-management.selling.view',
+      'admin.slab-management.selling.publish',
+      'admin.slab-management.selling.batch-off-shelf',
+      'admin.slab-management.selling.price',
+      'admin.slab-management.selling.off-shelf',
+      'admin.slab-management.selling.edit',
+      'admin.slab-management.selling.delete',
+      'admin.slab-management.offShelf.view',
+      'admin.slab-management.offShelf.batch-restore',
+      'admin.slab-management.offShelf.price',
+      'admin.slab-management.offShelf.restore',
+      'admin.slab-management.offShelf.edit',
+      'admin.slab-management.offShelf.delete',
+      'admin.slab-management.soldOut.view',
+      'admin.slab-management.soldOut.price',
+      'admin.slab-management.recycle.view',
+      'admin.slab-management.recycle.batch-restore',
+      'admin.slab-management.recycle.batch-purge',
+      'admin.slab-management.recycle.clear-recycle',
+      'admin.slab-management.recycle.price',
+      'admin.slab-management.recycle.restore',
+      'admin.slab-management.recycle.purge',
+      'admin.slab-management.rejected.view',
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
       'admin.product-data-center.category.finished.create-child',

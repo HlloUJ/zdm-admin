@@ -6,6 +6,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @TableName("slab_inventory")
@@ -47,6 +48,11 @@ public class SlabInventory extends BaseEntity {
   private String videoCoverUrl;
   private String createdByName;
   private Long createdByAccountId;
+  private String rejectionReason;
+  private String rejectionDetail;
+  private String rejectedByName;
+  private Long rejectedByAccountId;
+  private LocalDateTime rejectedAt;
 
   @TableField(exist = false)
   private String originName;
@@ -250,6 +256,46 @@ public class SlabInventory extends BaseEntity {
 
   public void setCreatedByAccountId(Long createdByAccountId) {
     this.createdByAccountId = createdByAccountId;
+  }
+
+  public String getRejectionReason() {
+    return rejectionReason;
+  }
+
+  public void setRejectionReason(String rejectionReason) {
+    this.rejectionReason = rejectionReason;
+  }
+
+  public String getRejectionDetail() {
+    return rejectionDetail;
+  }
+
+  public void setRejectionDetail(String rejectionDetail) {
+    this.rejectionDetail = rejectionDetail;
+  }
+
+  public String getRejectedByName() {
+    return rejectedByName;
+  }
+
+  public void setRejectedByName(String rejectedByName) {
+    this.rejectedByName = rejectedByName;
+  }
+
+  public Long getRejectedByAccountId() {
+    return rejectedByAccountId;
+  }
+
+  public void setRejectedByAccountId(Long rejectedByAccountId) {
+    this.rejectedByAccountId = rejectedByAccountId;
+  }
+
+  public LocalDateTime getRejectedAt() {
+    return rejectedAt;
+  }
+
+  public void setRejectedAt(LocalDateTime rejectedAt) {
+    this.rejectedAt = rejectedAt;
   }
 
   public String getOriginName() {

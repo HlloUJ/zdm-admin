@@ -92,7 +92,7 @@ test('searches slabs by name, id, or code with the shared filter on every status
   expect(searchBox?.y).toBe(supplierBox?.y);
   expect(searchBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
 
-  for (const tabLabel of ['仓库中 1', '出售中', '已下架', '已售完', '回收站 2']) {
+  for (const tabLabel of ['仓库中 1', '出售中', '已下架', '已售完', '回收站 2', '已驳回']) {
     await page.getByText(tabLabel, { exact: true }).click();
     await expect(keywordInput).toBeVisible();
   }
