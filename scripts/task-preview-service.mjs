@@ -45,6 +45,7 @@ export function servicePaths(home = homedir()) {
 export function parseServiceArgs(args) {
   const values = [...args];
   let command = 'switch';
+  let json = false;
   if (values[0] === '--help' || values[0] === '-h') {
     values.shift();
     command = 'help';
@@ -68,9 +69,14 @@ export function parseServiceArgs(args) {
       index += 1;
       continue;
     }
+    if (value === '--json') {
+      json = true;
+      continue;
+    }
     taskArgs.push(value);
   }
-  return { command, worktree, lines, taskArgs };
+  if (json && command !== 'status') throw new Error('--json 只能用于 status');
+  return { command, worktree, lines, json, taskArgs };
 }
 
 export function shouldRunForeground(taskArgs) {
@@ -928,6 +934,7 @@ Commands:
 Options:
   --worktree /path        指定普通 codex/* 任务 Worktree
   --lines 120             logs 返回的末尾行数
+  --json                  status 输出机器可读 JSON
   --temporary             前台运行临时预览，不改变固定入口
   --port 5176             前台运行指定端口预览
 
@@ -954,7 +961,9 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   if (options.command === 'status') {
-    printStatus(await ensureService(paths));
+    const status = await ensureService(paths);
+    if (options.json) console.log(JSON.stringify(status));
+    else printStatus(status);
     return;
   }
   if (options.command === 'stop') {
