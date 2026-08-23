@@ -26,6 +26,18 @@ public class SlabPriceService {
         .eq(SlabPrice::getSlabId, slabId).orderByAsc(SlabPrice::getId));
   }
 
+  public void requireCompletePrices(Long slabId) {
+    Set<Long> expectedIds = configurationService.listConfigurations(true).stream()
+        .map(SlabMarkupConfiguration::getId)
+        .collect(Collectors.toSet());
+    Set<Long> actualIds = listPrices(slabId).stream()
+        .map(SlabPrice::getMarkupConfigurationId)
+        .collect(Collectors.toSet());
+    if (expectedIds.isEmpty() || !actualIds.equals(expectedIds)) {
+      throw new IllegalArgumentException("请完善全部大板价格");
+    }
+  }
+
   @Transactional
   public void replacePrices(Long slabId, List<SlabPrice> requestedPrices) {
     List<SlabMarkupConfiguration> configurations = configurationService.listConfigurations(true);

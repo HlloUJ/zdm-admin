@@ -4,6 +4,7 @@ import { installAdminApiMocks } from './admin-api-mocks';
 
 const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '上移', '下移', '停用/启用', '删除'];
 const productSecondMenuLabels = ['商品公共基础数据', '成品现货基础数据', '大板基础数据'];
+const adminProductSecondMenuLabels = ['大板管理', ...productSecondMenuLabels];
 const productThirdMenuLabels = [
   '商品分类管理',
   '属性库管理',
@@ -17,6 +18,7 @@ const productThirdMenuLabels = [
   '等级管理',
 ];
 const adminProductThirdMenuLabels = [
+  '—',
   ...productThirdMenuLabels.slice(0, 4),
   '加价配置',
   ...productThirdMenuLabels.slice(4),
@@ -891,8 +893,8 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('商品管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(18);
-  await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(productSecondMenuLabels);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(24);
+  await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
