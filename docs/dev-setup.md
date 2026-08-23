@@ -64,14 +64,14 @@ npm run dev:task:install
 npm run dev:task
 ```
 
-- `http://127.0.0.1:5175` 永远是当前任务预览；切换任务不需要更换地址。
+- `http://127.0.0.1:5175` 永远是统一预览入口；有任务时显示当前任务，无任务时自动回退到 `5173` 集成环境。
 - 预览由当前用户的 `launchd` 托管，关闭终端不会停止；下次登录会恢复上次选择的任务。Docker Desktop 未运行时，守护服务会在后台启动并等待就绪，不依赖 Docker 自身的登录项。
 - `npm run dev:task:status` 查看当前任务和进程，`npm run dev:task:logs -- --lines 200` 查看日志；更新守护脚本后重新运行一次 `dev:task:install` 即可原位升级。
 - 纯前端任务复用集成后端；后端、API、Flyway 或运行配置任务启动该 Worktree 的任务后端。
 - 两种模式都使用唯一的集成 MySQL 和 `zdm_admin`，所以 5175 手工验收产生的数据会永久保留并被后续任务复用。
-- 只有并行对比时使用 `npm run dev:task -- --temporary`，该模式仍在当前终端前台运行，临时端口为 `5176-5199`；Playwright 固定使用 `5174`。
+- 常驻服务内部使用 `5176` 承载当前任务前端；只有并行对比时使用 `npm run dev:task -- --temporary`，该模式仍在当前终端前台运行，临时端口为 `5177-5199`；Playwright 固定使用 `5174`。
 - `npm run dev:task:foreground` 仅用于调试启动器；日常验收不使用。
-- `npm run dev:task:stop` 停止当前任务前后端并让守护服务保持空闲，不删除共享数据库或备份；再次运行 `npm run dev:task` 即可恢复。
+- `npm run dev:task:stop` 停止当前任务前后端并让 `5175` 回退到集成环境，不删除共享数据库或备份；再次运行 `npm run dev:task` 即可切换到新任务。
 
 Flyway 迁移会自动检查其他共享数据库任务后端、暂停当前任务与集成后端、备份数据库并锁定任务切换；存在其他任务写入者时停止并报告，不会批量停止。非迁移但会批量删除、清空或破坏性导入数据时运行 `npm run dev:task -- --database-risk`。任务正式提交、推送并同步集成分支后运行：
 
