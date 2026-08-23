@@ -26,22 +26,27 @@ test('parses service commands while preserving task launcher options', () => {
     command: 'switch',
     worktree: null,
     lines: 120,
+    json: false,
     taskArgs: [],
   });
   assert.deepEqual(parseServiceArgs(['install', '--worktree', '/tmp/task', '--mode', 'full']), {
     command: 'install',
     worktree: '/tmp/task',
     lines: 120,
+    json: false,
     taskArgs: ['--mode', 'full'],
   });
   assert.deepEqual(parseServiceArgs(['logs', '--lines', '25']), {
     command: 'logs',
     worktree: null,
     lines: 25,
+    json: false,
     taskArgs: [],
   });
+  assert.equal(parseServiceArgs(['status', '--json']).json, true);
   assert.equal(parseServiceArgs(['--help']).command, 'help');
   assert.throws(() => parseServiceArgs(['logs', '--lines', '0']), /1 至 1000/);
+  assert.throws(() => parseServiceArgs(['switch', '--json']), /只能用于 status/);
 });
 
 test('keeps temporary and explicitly ported previews in the foreground', () => {
