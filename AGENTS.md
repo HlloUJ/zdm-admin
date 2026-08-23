@@ -16,8 +16,9 @@
 ## 验证分级
 
 - 后端启动和验证统一使用 `npm run backend:*` 命令，默认由 Docker 提供 JDK/Maven；不得因本机未安装 `mvn` 跳过后端验证。
-- Docker/本地服务授权按复合命令的实际调用链判断，不按入口命令名判断：`dev:task` 会按改动确保集成后端或任务后端及共享开发数据库；`check:changed`、`check:fast` 在变更包含 `backend/**` 时会调用 `backend:test`；`check:full`、`verify`、`verify:local`、`integration:verify` 会调用 Docker 和/或本地监听服务。以上场景首次实际执行即使用当前有效的最小授权通道；允许先用 `check:changed --list` 做只读计划确认，但不得先用普通沙箱运行必然进入受限资源的实际检查。
+- Docker/本地服务授权按复合命令的实际调用链判断，不按入口命令名判断：`task:micro` 会访问远程 Git、创建 Worktree 并切换本地预览；`dev:task` 会按改动确保集成后端或任务后端及共享开发数据库；`check:changed`、`check:fast` 在变更包含 `backend/**` 时会调用 `backend:test`；`check:full`、`verify`、`verify:local`、`integration:verify` 会调用 Docker 和/或本地监听服务。以上场景首次实际执行即使用当前有效的最小授权通道；允许先用 `check:changed --list` 做只读计划确认，但不得先用普通沙箱运行必然进入受限资源的实际检查。
 - 纯文案、规则或脚本别名：检查 diff 和文件格式。
+- 明确指定页面和目标文案的微改，当前代码足以确定语义时不检索历史 Rollout 或 Notion，不展开无关项目 Skill；任务环境就绪后用一次精准定位、一次修改和一次差异检查收敛，发现权限、API、后端或数据层影响时再退出微改路径。
 - 低风险样式、小交互：`npm run check:changed -- <本次文件>`。
 - 中风险页面、表单、路由、服务层：变更文件检查加受影响单测或 E2E。
 - 高风险登录、权限、API、后端、数据状态：相关前后端测试；边界不明时运行 `npm run check:full`。
@@ -26,7 +27,9 @@
 ## Worktree 与预览
 
 - 每个任务在自己的任务分支和 Worktree 修改；固定项目目录作为 `main` 基线锚点，不在其中继续已合并的旧任务。Agent 基建、规则或工具优化也必须使用独立 Worktree。
+- 用户可见的纯文案、列顺序、字段位置和局部样式等微改，新任务使用 `npm run task:micro -- --slug <task-slug>` 从最新 `origin/main` 一次性创建任务 Worktree、切换 `5175` 并校验预览身份；同一任务恢复使用 `--resume`。若 `5175` 尚属于另一未交接任务，命令必须停止，不自动覆盖。
 - macOS 首次在任一任务 Worktree 运行一次 `npm run dev:task:install` 安装用户级常驻预览服务；以后在当前任务 Worktree 运行 `npm run dev:task` 即可把固定入口 `127.0.0.1:5175` 切换到当前任务。切换成功必须同时满足 Worktree、分支、运行模式、API 目标和代理健康检查一致，不能只凭端口存活判断。
+- “无需浏览器验收”只表示不运行 E2E 或人工点击，不表示可以不提供任务预览。用户可见的前端改动在首次结果回复前，必须通过 `dev:task:check` 证明 `5175` 指向当前任务 Worktree 和分支，且 API 代理健康。
 - 纯前端改动使用任务前端、集成后端和唯一的集成 MySQL；后端、API、迁移或 Docker 改动使用任务前端、任务后端和同一个集成 MySQL。不得把需要任务后端的任务静默降级到集成后端。
 - 只有需要并行对比时才使用 `npm run dev:task -- --temporary`；固定集成 Worktree 继续使用 `5173`，只运行已正式汇入的组合。
 - Flyway 或显式数据库高风险任务必须走启动器保护流程；共享数据库、备份、容器和日志的清理与 Git 交付分开授权。
