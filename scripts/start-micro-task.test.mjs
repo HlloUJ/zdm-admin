@@ -35,14 +35,12 @@ test('derives the managed branch and worktree from a safe slug', () => {
   );
 });
 
-test('allows an idle, fallback, or same-task preview without replacing another task', () => {
+test('allows an idle or same-task preview without replacing another task', () => {
   const values = {
     targetWorktree: '/repo-worktrees/status-copy',
-    fallbackWorktree: '/repo-worktrees/persistent-5175-fallback',
   };
   assert.equal(previewConflictError({ ...values, currentWorktree: null }), null);
   assert.equal(previewConflictError({ ...values, currentWorktree: values.targetWorktree }), null);
-  assert.equal(previewConflictError({ ...values, currentWorktree: values.fallbackWorktree }), null);
   assert.match(previewConflictError({ ...values, currentWorktree: '/repo-worktrees/another-task' }), /其他未交接任务/);
 });
 

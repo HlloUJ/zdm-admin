@@ -8,7 +8,6 @@ import { DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from './git-workfl
 const MAIN_BRANCH = 'main';
 const REMOTE = 'origin';
 const TASK_BRANCH_PREFIX = 'codex/';
-const FALLBACK_BRANCH = 'codex/persistent-5175-fallback';
 const sourceFile = fileURLToPath(import.meta.url);
 
 export function parseMicroTaskArgs(args) {
@@ -52,11 +51,10 @@ export function microTaskGitCommands({ branch, targetWorktree }) {
   };
 }
 
-export function previewConflictError({ currentWorktree, targetWorktree, fallbackWorktree = null }) {
+export function previewConflictError({ currentWorktree, targetWorktree }) {
   if (!currentWorktree) return null;
   const current = path.resolve(currentWorktree);
   if (current === path.resolve(targetWorktree)) return null;
-  if (fallbackWorktree && current === path.resolve(fallbackWorktree)) return null;
   return `5175 当前仍由其他未交接任务使用：${currentWorktree}`;
 }
 
@@ -130,10 +128,9 @@ function findManagedWorktrees(root) {
   const worktrees = parseWorktreePorcelain(captureGit(root, ['worktree', 'list', '--porcelain']));
   const main = worktrees.find((worktree) => worktree.branch === MAIN_BRANCH);
   const integration = worktrees.find((worktree) => worktree.branch === DEFAULT_INTEGRATION_BRANCH);
-  const fallback = worktrees.find((worktree) => worktree.branch === FALLBACK_BRANCH) ?? null;
   if (!main) throw new Error(`未找到 ${MAIN_BRANCH} 固定 Worktree`);
   if (!integration) throw new Error(`未找到 ${DEFAULT_INTEGRATION_BRANCH} 固定 Worktree`);
-  return { worktrees, main, integration, fallback };
+  return { worktrees, main, integration };
 }
 
 function printHelp() {
@@ -155,7 +152,7 @@ export function main(args = process.argv.slice(2)) {
   }
 
   const invocationRoot = captureGit(process.cwd(), ['rev-parse', '--show-toplevel']);
-  const { worktrees, main: mainWorktree, integration, fallback } = findManagedWorktrees(invocationRoot);
+  const { worktrees, main: mainWorktree, integration } = findManagedWorktrees(invocationRoot);
   const taskParent = path.dirname(integration.path);
   assertSafeDirectory(taskParent, '任务 Worktree 父目录');
 
@@ -172,7 +169,6 @@ export function main(args = process.argv.slice(2)) {
   const conflict = previewConflictError({
     currentWorktree: previewStatus.worktree,
     targetWorktree,
-    fallbackWorktree: fallback?.path,
   });
   if (conflict) throw new Error(`${conflict}\n请先验收或交接当前任务，不自动覆盖其预览。`);
 
