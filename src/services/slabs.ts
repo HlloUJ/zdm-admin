@@ -1,13 +1,24 @@
 import { request } from './http';
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
-export type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type SlabStatus = 'pendingReview' | 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'rejected';
+export type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling'>;
 export type SlabPublisherType = '平台发布' | '接口获取';
 export interface SlabPrice {
   markupConfigurationId: number;
   markupRate: number;
   costPrice: number;
   price: number;
+}
+
+export interface SlabOffShelfRecord {
+  id: number;
+  slabId: number;
+  standardReason: string;
+  detailReason?: string;
+  offShelvedAt: string;
+  offShelvedByName: string;
+  offShelvedByAccountId?: number;
 }
 
 export interface SlabRecord {
@@ -34,6 +45,11 @@ export interface SlabRecord {
   videoCoverUrl?: string;
   createdByName?: string;
   createdByAccountId?: number;
+  rejectionReason?: string;
+  rejectionDetail?: string;
+  rejectedByName?: string;
+  rejectedByAccountId?: number;
+  rejectedAt?: string;
   originName?: string;
   varietyName?: string;
   supplierName?: string;
@@ -53,6 +69,7 @@ export interface SlabRecord {
   costPrice?: number;
   guidePrice?: number;
   markupPrices?: SlabPrice[];
+  offShelfRecords?: SlabOffShelfRecord[];
   status?: SlabStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -110,6 +127,10 @@ export interface SlabPublishOptions {
   grades: SlabPublishOption[];
 }
 
+export function resolveSlabPublishTargetStatus(activeStatus: SlabStatus): SlabPublishTargetStatus {
+  return activeStatus === 'selling' ? 'selling' : 'warehouse';
+}
+
 export function listSlabs() {
   return request<SlabRecord[]>('/admin/slabs');
 }
@@ -140,10 +161,17 @@ export function updateSlab(id: number, payload: SlabPayload) {
   });
 }
 
-export function updateSlabStatuses(ids: number[], status: SlabStatus) {
+export function updateSlabStatuses(ids: number[], status: SlabStatus, reason?: string, detail?: string) {
   return request<boolean>('/admin/slabs/batch-status', {
     method: 'PUT',
-    body: JSON.stringify({ ids, status }),
+    body: JSON.stringify({ ids, status, reason, detail }),
+  });
+}
+
+export function rejectSlab(id: number, payload: { reason: string; detail: string }) {
+  return request<SlabRecord>(`/admin/slabs/${id}/reject`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   });
 }
 

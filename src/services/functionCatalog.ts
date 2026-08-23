@@ -178,6 +178,77 @@ const verifiedFunctionCatalog: FunctionModule[] = [
     value: 'admin.product-data-center',
     menus: [
       {
+        label: '大板管理',
+        value: 'admin.slab-management.menu',
+        direct: false,
+        pages: [
+          {
+            label: '大板管理页',
+            value: 'admin.slab-management',
+            audiences: ['admin'],
+            actions: [],
+            tabs: [
+              {
+                label: '仓库中',
+                value: 'admin.slab-management.warehouse',
+                actions: [
+                  { label: '发布商品', value: 'admin.slab-management.warehouse.publish' },
+                  { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
+                  { label: '价格', value: 'admin.slab-management.warehouse.price' },
+                  { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
+                  { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
+                  { label: '驳回', value: 'admin.slab-management.warehouse.reject' },
+                  { label: '删除', value: 'admin.slab-management.warehouse.delete' },
+                ],
+              },
+              {
+                label: '出售中',
+                value: 'admin.slab-management.selling',
+                actions: [
+                  { label: '发布商品', value: 'admin.slab-management.selling.publish' },
+                  { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
+                  { label: '价格', value: 'admin.slab-management.selling.price' },
+                  { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
+                  { label: '编辑', value: 'admin.slab-management.selling.edit' },
+                  { label: '删除', value: 'admin.slab-management.selling.delete' },
+                ],
+              },
+              {
+                label: '已下架',
+                value: 'admin.slab-management.off-shelf',
+                actions: [
+                  { label: '批量放回仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
+                  { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },
+                  { label: '删除', value: 'admin.slab-management.off-shelf.delete' },
+                ],
+              },
+              {
+                label: '已售完',
+                value: 'admin.slab-management.sold-out',
+                actions: [{ label: '价格', value: 'admin.slab-management.sold-out.price' }],
+              },
+              {
+                label: '回收站',
+                value: 'admin.slab-management.recycle',
+                actions: [
+                  { label: '批量放回仓库', value: 'admin.slab-management.recycle.batch-restore' },
+                  { label: '批量彻底删除', value: 'admin.slab-management.recycle.batch-purge' },
+                  { label: '清空回收站', value: 'admin.slab-management.recycle.clear' },
+                  { label: '价格', value: 'admin.slab-management.recycle.price' },
+                  { label: '放回仓库', value: 'admin.slab-management.recycle.restore' },
+                  { label: '彻底删除', value: 'admin.slab-management.recycle.purge' },
+                ],
+              },
+              {
+                label: '已驳回',
+                value: 'admin.slab-management.rejected',
+                actions: [],
+              },
+            ],
+          },
+        ],
+      },
+      {
         label: '商品分类管理',
         value: 'admin.product-data-center.category.menu',
         direct: false,
@@ -570,11 +641,13 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
     const commonMenus = module.menus.filter((menu) => commonValues.has(menu.value));
     const craftMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.finished-stock-craft.menu');
     const slabMenu = module.menus.find((menu) => menu.value === 'admin.product-data-center.slab-base-data.menu');
+    const slabManagementMenu = module.menus.find((menu) => menu.value === 'admin.slab-management.menu');
 
     return {
       ...module,
       label: '商品管理',
       menus: [
+        ...(slabManagementMenu ? [slabManagementMenu] : []),
         {
           label: '商品公共基础数据',
           value: 'admin.product-data-center.common-base-data.menu',

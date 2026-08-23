@@ -37,8 +37,9 @@ public class SlabMarkupConfigurationController {
 
   @GetMapping("/options")
   public ApiResponse<List<SlabMarkupConfiguration>> options() {
-    permissionGuard.requireAnyPermission(permission("view"), "admin.slab-management.view",
-        "admin.slab-management.create", "admin.slab-management.edit");
+    if (!permissionGuard.hasPermission(permission("view"))) {
+      permissionGuard.requireView("admin.slab-management");
+    }
     return ApiResponse.ok(service.listConfigurations(true));
   }
 
