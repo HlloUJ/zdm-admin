@@ -4544,10 +4544,10 @@ class PlatformApiSmokeTest {
                     "costPrice":100,
                     "guidePrice":160,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"markupRate":60,"costPrice":100,"price":160},
-                      {"markupConfigurationId":%d,"markupRate":45,"costPrice":100,"price":145},
-                      {"markupConfigurationId":%d,"markupRate":30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"markupRate":18,"costPrice":100,"price":118}
+                      {"markupConfigurationId":%d,"priceCoefficient":1.60,"costPrice":100,"price":160},
+                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -4624,10 +4624,10 @@ class PlatformApiSmokeTest {
                     "costPrice":100,
                     "guidePrice":160,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"markupRate":60,"costPrice":100,"price":160},
-                      {"markupConfigurationId":%d,"markupRate":45,"costPrice":100,"price":145},
-                      {"markupConfigurationId":%d,"markupRate":30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"markupRate":18,"costPrice":100,"price":118}
+                      {"markupConfigurationId":%d,"priceCoefficient":1.60,"costPrice":100,"price":160},
+                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -4676,10 +4676,10 @@ class PlatformApiSmokeTest {
                     "costPrice":100,
                     "guidePrice":160,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"markupRate":60,"costPrice":100,"price":160},
-                      {"markupConfigurationId":%d,"markupRate":45,"costPrice":100,"price":145},
-                      {"markupConfigurationId":%d,"markupRate":30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"markupRate":18,"costPrice":100,"price":118}
+                      {"markupConfigurationId":%d,"priceCoefficient":1.60,"costPrice":100,"price":160},
+                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -4845,7 +4845,7 @@ class PlatformApiSmokeTest {
               .content("""
                   {
                     "name":"%s",
-                    "markupRate":61
+                    "priceCoefficient":1.61
                   }
                   """.formatted(renamedPrice)))
           .andExpect(status().isOk());
@@ -4865,13 +4865,13 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0].price", hasItem(160.00)));
       assertThat(jdbcTemplate.queryForObject(
           """
-          SELECT CONCAT(markup_rate, ':', price)
+          SELECT CONCAT(price_coefficient, ':', price)
           FROM slab_prices
           WHERE slab_id = ? AND markup_configuration_id = ?
           """,
           String.class,
           slabId,
-          guideConfigurationId)).isEqualTo("60.0000:160.00");
+          guideConfigurationId)).isEqualTo("1.6000:160.00");
 
       mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -4916,7 +4916,7 @@ class PlatformApiSmokeTest {
           "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id = ?", Integer.class, slabId)).isGreaterThan(2);
     } finally {
       jdbcTemplate.update(
-          "UPDATE slab_markup_configurations SET name = '指导价', markup_rate = 60.0000 WHERE id = ?",
+          "UPDATE slab_markup_configurations SET name = '指导价', price_coefficient = 1.6000 WHERE id = ?",
           guideConfigurationId);
       if (slabId != null) {
         jdbcTemplate.update(

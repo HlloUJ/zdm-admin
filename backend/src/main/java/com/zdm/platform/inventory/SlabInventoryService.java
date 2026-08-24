@@ -378,7 +378,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         .map(price -> {
           Map<String, Object> value = new LinkedHashMap<>();
           value.put("configurationId", price.getMarkupConfigurationId());
-          value.put("markupRate", price.getMarkupRate());
+          value.put("priceCoefficient", price.getPriceCoefficient());
           value.put("costPrice", price.getCostPrice());
           value.put("price", price.getPrice());
           return value;

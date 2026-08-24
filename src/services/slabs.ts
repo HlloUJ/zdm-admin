@@ -6,7 +6,7 @@ export type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling
 export type SlabPublisherType = '平台发布' | '接口获取';
 export interface SlabPrice {
   markupConfigurationId: number;
-  markupRate: number;
+  priceCoefficient: number;
   costPrice: number;
   price: number;
 }

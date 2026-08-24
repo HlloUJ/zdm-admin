@@ -472,7 +472,7 @@
             <div class="price-editor">
               <div class="price-editor__head">
                 <span>价格层级</span>
-                <span><span class="price-required-star">*</span>系数</span>
+                <span><span class="price-required-star">*</span>价格系数</span>
                 <span><span class="price-required-star">*</span>价格</span>
               </div>
               <div class="price-editor__row">
@@ -496,7 +496,7 @@
                 <t-form-item
                   class="price-form-item"
                   :name="guideRatioFieldName"
-                  :rules="salesNumberFieldRules('指导价系数', 0)"
+                  :rules="salesNumberFieldRules('指导价的价格系数', 0)"
                   label-width="0"
                   :required-mark="false"
                 >
@@ -555,7 +555,7 @@
                 <t-form-item
                   class="price-form-item"
                   :name="`markupPrices.${item.id}.ratio`"
-                  :rules="salesNumberFieldRules(`${item.label}系数`, 0)"
+                  :rules="salesNumberFieldRules(`${item.label}的价格系数`, 0)"
                   label-width="0"
                   :required-mark="false"
                 >
@@ -661,7 +661,7 @@
           <div class="price-table detail-price-table">
             <div class="price-table__head">
               <span>价格层级</span>
-              <span>系数</span>
+              <span>价格系数</span>
               <span>价格</span>
             </div>
             <div
@@ -819,7 +819,7 @@
           <div class="price-table">
             <div class="price-table__head">
               <span>价格层级</span>
-              <span><span class="price-required-star">*</span>系数</span>
+              <span><span class="price-required-star">*</span>价格系数</span>
               <span><span class="price-required-star">*</span>价格</span>
             </div>
             <div v-for="(row, index) in batchPriceRows" :key="row.label" class="price-table__row">
@@ -829,7 +829,7 @@
                 v-else
                 class="price-form-item"
                 :name="`rows.${index}.ratio`"
-                :rules="salesNumberFieldRules(`${row.label}系数`, 0)"
+                :rules="salesNumberFieldRules(`${row.label}的价格系数`, 0)"
                 label-width="0"
                 :required-mark="false"
               >
@@ -1349,15 +1349,21 @@ const formatPriceTierChanges = (value: unknown): string | null => {
       if (!item || typeof item !== 'object') return String(item ?? '-');
       const price = item as {
         configurationId?: number;
+        priceCoefficient?: number;
         markupRate?: number;
         price?: number;
       };
       const label =
         markupConfigurations.value.find((configuration) => configuration.id === price.configurationId)?.name ||
         `价格层级 ${price.configurationId ?? '-'}`;
-      const ratio = price.markupRate == null ? '-' : (1 + Number(price.markupRate) / 100).toFixed(2);
+      const coefficient =
+        price.priceCoefficient == null
+          ? price.markupRate == null
+            ? '-'
+            : (1 + Number(price.markupRate) / 100).toFixed(2)
+          : Number(price.priceCoefficient).toFixed(2);
       const formattedPrice = price.price == null ? '-' : Number(price.price).toFixed(2);
-      return `${label}：系数 ${ratio}，价格 ${formattedPrice}`;
+      return `${label}：价格系数 ${coefficient}，价格 ${formattedPrice}`;
     })
     .join('；');
 };
@@ -1764,7 +1770,11 @@ const cornerFields: { key: CornerFieldKey; label: string }[] = [
 ];
 
 const salesPriceRows = computed(() =>
-  markupConfigurations.value.map((item) => ({ id: item.id, label: item.name, markupRate: Number(item.markupRate) })),
+  markupConfigurations.value.map((item) => ({
+    id: item.id,
+    label: item.name,
+    priceCoefficient: Number(item.priceCoefficient),
+  })),
 );
 const guidePriceRow = computed(() => salesPriceRows.value.find((item) => item.label === '指导价'));
 const partnerPriceRows = computed(() => salesPriceRows.value.filter((item) => item.label !== '指导价'));
@@ -2223,7 +2233,7 @@ const initializeProductMarkupPrices = (prices: SlabPrice[] = []) => {
   productForm.markupPrices = Object.fromEntries(
     salesPriceRows.value.map((item) => {
       const existing = existingById.get(item.id);
-      const ratio = existing ? 1 + Number(existing.markupRate) / 100 : 1 + item.markupRate / 100;
+      const ratio = existing ? Number(existing.priceCoefficient) : item.priceCoefficient;
       return [item.id, { ratio: formatRatio(ratio), price: existing ? String(existing.price) : '' }];
     }),
   );
@@ -2304,7 +2314,7 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
   const cost = toNumber(row.price.cost);
   const guidePrice = guideSnapshot ? String(guideSnapshot.price) : row.price.guide;
   const guideRatio = guideSnapshot
-    ? formatRatio(1 + Number(guideSnapshot.markupRate) / 100)
+    ? formatRatio(Number(guideSnapshot.priceCoefficient))
     : cost && guidePrice
       ? formatRatio(toNumber(guidePrice) / cost)
       : '1.60';
@@ -2316,12 +2326,12 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
         configurationId: configuration.id,
         label: configuration.name,
         ratio: snapshot
-          ? formatRatio(1 + Number(snapshot.markupRate) / 100)
-          : formatRatio(1 + Number(configuration.markupRate) / 100),
+          ? formatRatio(Number(snapshot.priceCoefficient))
+          : formatRatio(Number(configuration.priceCoefficient)),
         price: snapshot
           ? String(snapshot.price)
           : cost
-            ? formatPrice(cost * (1 + Number(configuration.markupRate) / 100))
+            ? formatPrice(cost * Number(configuration.priceCoefficient))
             : '',
       };
     });
@@ -2334,7 +2344,7 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
     .map((snapshot) => ({
       configurationId: snapshot.markupConfigurationId,
       label: `价格项 #${snapshot.markupConfigurationId}`,
-      ratio: formatRatio(1 + Number(snapshot.markupRate) / 100),
+      ratio: formatRatio(Number(snapshot.priceCoefficient)),
       price: String(snapshot.price),
     }));
   return [
@@ -2704,7 +2714,7 @@ const handleProductSubmit = async () => {
       : toNumber(productForm.guidePrice),
     markupPrices: salesPriceRows.value.map((item) => ({
       markupConfigurationId: item.id,
-      markupRate: Number(((toNumber(productForm.markupPrices[item.id].ratio) - 1) * 100).toFixed(4)),
+      priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
       costPrice: toNumber(productForm.cost),
       price: toNumber(productForm.markupPrices[item.id].price),
       variantKey: '',
@@ -2987,7 +2997,7 @@ const handleConfirmSubmit = async () => {
         .filter((item): item is DrawerPriceRow & { configurationId: number } => item.configurationId != null)
         .map((item) => ({
           markupConfigurationId: item.configurationId,
-          markupRate: Number(((toNumber(item.ratio) - 1) * 100).toFixed(4)),
+          priceCoefficient: Number(toNumber(item.ratio).toFixed(4)),
           costPrice,
           price: toNumber(item.price),
           variantKey: '',

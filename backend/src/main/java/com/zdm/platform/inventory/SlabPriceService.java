@@ -64,21 +64,25 @@ public class SlabPriceService {
     if (configuration == null) {
       throw new IllegalArgumentException("大板价格层级不存在或已停用");
     }
-    BigDecimal rate = price.getMarkupRate();
+    BigDecimal coefficient = price.getPriceCoefficient();
     BigDecimal cost = price.getCostPrice();
     BigDecimal value = price.getPrice();
-    if (rate == null || rate.signum() < 0 || cost == null || cost.signum() < 0 || value == null) {
-      throw new IllegalArgumentException("加价率、成本价和价格不能为空且不能小于0");
+    if (coefficient == null
+        || coefficient.signum() < 0
+        || cost == null
+        || cost.signum() < 0
+        || value == null
+        || value.signum() < 0) {
+      throw new IllegalArgumentException("价格系数、成本价和价格不能为空且不能小于0");
     }
-    BigDecimal expected = cost.multiply(BigDecimal.ONE.add(
-        rate.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP))).setScale(2, RoundingMode.HALF_UP);
+    BigDecimal expected = cost.multiply(coefficient).setScale(2, RoundingMode.HALF_UP);
     if (value.setScale(2, RoundingMode.HALF_UP).compareTo(expected) != 0) {
-      throw new IllegalArgumentException("价格必须等于成本价按加价率计算后的结果");
+      throw new IllegalArgumentException("价格必须等于成本价按价格系数计算后的结果");
     }
     SlabPrice normalized = new SlabPrice();
     normalized.setSlabId(slabId);
     normalized.setMarkupConfigurationId(configuration.getId());
-    normalized.setMarkupRate(rate.setScale(4, RoundingMode.HALF_UP));
+    normalized.setPriceCoefficient(coefficient.setScale(4, RoundingMode.HALF_UP));
     normalized.setCostPrice(cost.setScale(2, RoundingMode.HALF_UP));
     normalized.setPrice(expected);
     return normalized;

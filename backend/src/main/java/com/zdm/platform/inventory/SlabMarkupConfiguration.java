@@ -19,7 +19,7 @@ public class SlabMarkupConfiguration extends BaseEntity {
   @NotNull
   @DecimalMin("0.0000")
   @Digits(integer = 3, fraction = 4)
-  private BigDecimal markupRate;
+  private BigDecimal priceCoefficient;
 
   private Integer sortOrder;
 
@@ -37,12 +37,12 @@ public class SlabMarkupConfiguration extends BaseEntity {
     this.name = name;
   }
 
-  public BigDecimal getMarkupRate() {
-    return markupRate;
+  public BigDecimal getPriceCoefficient() {
+    return priceCoefficient;
   }
 
-  public void setMarkupRate(BigDecimal markupRate) {
-    this.markupRate = markupRate;
+  public void setPriceCoefficient(BigDecimal priceCoefficient) {
+    this.priceCoefficient = priceCoefficient;
   }
 
   public Integer getSortOrder() {

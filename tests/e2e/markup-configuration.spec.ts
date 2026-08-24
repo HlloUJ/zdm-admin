@@ -46,7 +46,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
     {
       id: 2,
       name: '1级合伙人价格',
-      markupRate: 60,
+      priceCoefficient: 0.5,
       sortOrder: 1,
       status: 'enabled',
       createdByAccountId: 99,
@@ -110,7 +110,9 @@ test('运营平台可按成品和大板分别管理加价配置', async ({ page 
 
   await page.getByText('大板加价配置', { exact: true }).click();
   await expect(page.getByRole('cell', { name: '1级合伙人价格', exact: true })).toBeVisible();
-  await expect(page.getByText('60%')).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '价格系数' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '0.5', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '加价率' })).toHaveCount(0);
 });
 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {

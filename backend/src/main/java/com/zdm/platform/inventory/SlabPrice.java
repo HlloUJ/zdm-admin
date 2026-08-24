@@ -17,7 +17,7 @@ public class SlabPrice {
   @NotNull
   @DecimalMin("0.0000")
   @Digits(integer = 3, fraction = 4)
-  private BigDecimal markupRate;
+  private BigDecimal priceCoefficient;
 
   @NotNull
   @DecimalMin("0.00")
@@ -33,8 +33,8 @@ public class SlabPrice {
   public void setSlabId(Long slabId) { this.slabId = slabId; }
   public Long getMarkupConfigurationId() { return markupConfigurationId; }
   public void setMarkupConfigurationId(Long markupConfigurationId) { this.markupConfigurationId = markupConfigurationId; }
-  public BigDecimal getMarkupRate() { return markupRate; }
-  public void setMarkupRate(BigDecimal markupRate) { this.markupRate = markupRate; }
+  public BigDecimal getPriceCoefficient() { return priceCoefficient; }
+  public void setPriceCoefficient(BigDecimal priceCoefficient) { this.priceCoefficient = priceCoefficient; }
   public BigDecimal getCostPrice() { return costPrice; }
   public void setCostPrice(BigDecimal costPrice) { this.costPrice = costPrice; }
   public BigDecimal getPrice() { return price; }

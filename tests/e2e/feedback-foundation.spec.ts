@@ -250,8 +250,8 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
         index === 0
           ? JSON.stringify({
               价格层级: {
-                before: [{ configurationId: 2, markupRate: 40, price: 140 }],
-                after: [{ configurationId: 2, markupRate: 45, price: 145 }],
+                before: [{ configurationId: 2, priceCoefficient: 1.4, price: 140 }],
+                after: [{ configurationId: 2, priceCoefficient: 1.45, price: 145 }],
               },
             })
           : undefined,
@@ -309,8 +309,8 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   const priceOperationRow = logDrawer.getByRole('row', { name: /历史操作大板 1/ });
   await priceOperationRow.getByText('详情', { exact: true }).click();
   const detailDialog = page.locator('.t-dialog').filter({ hasText: '操作详情' });
-  await expect(detailDialog).toContainText('价格层级 2：系数 1.40，价格 140.00');
-  await expect(detailDialog).toContainText('价格层级 2：系数 1.45，价格 145.00');
+  await expect(detailDialog).toContainText('价格层级 2：价格系数 1.40，价格 140.00');
+  await expect(detailDialog).toContainText('价格层级 2：价格系数 1.45，价格 145.00');
   await expect(detailDialog).not.toContainText('"configurationId"');
   await detailDialog.getByRole('button', { name: '关闭', exact: true }).click();
   const operationLogPagination = logDrawer.locator('.zdm-admin-pagination .t-pagination');

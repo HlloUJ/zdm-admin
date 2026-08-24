@@ -4,7 +4,7 @@ export type SlabMarkupConfigurationStatus = 'enabled' | 'disabled';
 export interface SlabMarkupConfigurationRecord {
   id: number;
   name: string;
-  markupRate: number;
+  priceCoefficient: number;
   sortOrder: number;
   status: SlabMarkupConfigurationStatus;
   createdByName?: string;
@@ -15,7 +15,7 @@ export interface SlabMarkupConfigurationRecord {
 }
 export interface SlabMarkupConfigurationPayload {
   name: string;
-  markupRate: number;
+  priceCoefficient: number;
 }
 
 export const listSlabMarkupConfigurations = () =>

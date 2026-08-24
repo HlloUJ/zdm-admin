@@ -17,7 +17,7 @@
           <t-tabs v-if="showTabRail" v-model="activeType" :list="visibleTabs" />
           <t-alert
             theme="info"
-            message="供货价 = 成本价 ×（1 + 加价率）；加价率可设为 0%，但不能小于 0%。调整加价率不会改变已发布商品的历史价格。"
+            :message="pricingRuleMessage"
           />
           <t-form :data="searchForm" label-width="72px" colon>
             <div class="filter-row">
@@ -68,6 +68,7 @@
             </template>
             <template #markupRate="{ row }">{{ formatNumber(row.markupRate) }}%</template>
             <template #coefficient="{ row }">{{ formatNumber(1 + Number(row.markupRate) / 100, 4) }}</template>
+            <template #priceCoefficient="{ row }">{{ formatNumber(row.priceCoefficient, 4) }}</template>
             <template #status="{ row }">
               <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
                 {{ row.status === 'enabled' ? '启用' : '停用' }}
@@ -109,7 +110,7 @@
         <t-form-item label="加价名称" name="name">
           <t-input v-model="formData.name" :maxlength="20" clearable placeholder="例如：1级合伙人价格" />
         </t-form-item>
-        <t-form-item label="加价率" name="markupRate">
+        <t-form-item v-if="activeType === 'finished'" label="加价率" name="markupRate">
           <t-input-number
             v-model="formData.markupRate"
             class="markup-rate-input"
@@ -119,6 +120,17 @@
             suffix="%"
             @focus="handleMarkupRateFocus"
             @blur="handleMarkupRateBlur"
+          />
+        </t-form-item>
+        <t-form-item v-else label="价格系数" name="priceCoefficient">
+          <t-input-number
+            v-model="formData.priceCoefficient"
+            class="price-coefficient-input"
+            :min="0"
+            :max="999.99"
+            :decimal-places="2"
+            @focus="handlePriceCoefficientFocus"
+            @blur="handlePriceCoefficientBlur"
           />
         </t-form-item>
       </t-form>
@@ -189,6 +201,11 @@ const canEdit = computed(() => hasPermission(loginUser.value, `${activePrefix.va
 const canSort = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.sort`));
 const canToggle = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.toggle-status`));
 const canDelete = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.delete`));
+const pricingRuleMessage = computed(() =>
+  activeType.value === 'finished'
+    ? '供货价 = 成本价 ×（1 + 加价率）；加价率可设为 0%，但不能小于 0%。调整加价率不会改变已发布商品的历史价格。'
+    : '大板价格 = 成本价 × 价格系数；价格系数可以小于 1，但不能小于 0。调整价格系数不会改变已发布大板的现有价格。',
+);
 
 const loading = ref(false);
 const tableData = ref<MarkupConfigurationRecord[]>([]);
@@ -199,8 +216,12 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 52, align: 'center' as const }] : []),
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'name', title: '加价名称', minWidth: 200, align: 'left' },
-  { colKey: 'markupRate', title: '加价率', width: 130, align: 'right' },
-  { colKey: 'coefficient', title: '换算系数', width: 130, align: 'right' },
+  ...(activeType.value === 'finished'
+    ? [
+        { colKey: 'markupRate', title: '加价率', width: 130, align: 'right' as const },
+        { colKey: 'coefficient', title: '换算系数', width: 130, align: 'right' as const },
+      ]
+    : [{ colKey: 'priceCoefficient', title: '价格系数', width: 130, align: 'right' as const }]),
   { colKey: 'status', title: '状态', width: 110, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
@@ -248,23 +269,32 @@ const handleReset = () => {
 const formRef = ref<FormInstanceFunctions>();
 const formVisible = ref(false);
 const editingId = ref<number | null>(null);
-const formData = reactive<{ name: string; markupRate: number | undefined }>({ name: '', markupRate: 0 });
+const formData = reactive<{
+  name: string;
+  markupRate: number | undefined;
+  priceCoefficient: number | undefined;
+}>({ name: '', markupRate: 0, priceCoefficient: 1 });
 const formRules: Record<string, FormRule[]> = {
   name: [
     { required: true, message: '请输入加价名称', type: 'error' },
     { max: 20, message: '加价名称最多20个字', type: 'error' },
   ],
   markupRate: [{ required: true, message: '请输入加价率', type: 'error' }],
+  priceCoefficient: [{ required: true, message: '请输入价格系数', type: 'error' }],
 };
 const openCreate = () => {
   editingId.value = null;
-  Object.assign(formData, { name: '', markupRate: 0 });
+  Object.assign(formData, { name: '', markupRate: 0, priceCoefficient: 1 });
   formVisible.value = true;
 };
 const openEdit = (row: MarkupConfigurationRecord) => {
   if (!requireCreatorOwnership(row)) return;
   editingId.value = row.id;
-  Object.assign(formData, { name: row.name, markupRate: Number(row.markupRate) });
+  Object.assign(formData, {
+    name: row.name,
+    markupRate: 'markupRate' in row ? Number(row.markupRate) : 0,
+    priceCoefficient: 'priceCoefficient' in row ? Number(row.priceCoefficient) : 1,
+  });
   formVisible.value = true;
 };
 const closeForm = () => {
@@ -276,6 +306,12 @@ const handleMarkupRateFocus = () => {
 };
 const handleMarkupRateBlur = () => {
   if (formData.markupRate == null || !Number.isFinite(formData.markupRate)) formData.markupRate = 0;
+};
+const handlePriceCoefficientFocus = () => {
+  if (editingId.value == null) formData.priceCoefficient = undefined;
+};
+const handlePriceCoefficientBlur = () => {
+  if (formData.priceCoefficient == null || !Number.isFinite(formData.priceCoefficient)) formData.priceCoefficient = 1;
 };
 const sorting = ref(false);
 const handleDragSort = async (context: { current: MarkupConfigurationRecord; target: MarkupConfigurationRecord }) => {
@@ -307,21 +343,22 @@ const handleDragSort = async (context: { current: MarkupConfigurationRecord; tar
 };
 const submitForm = async () => {
   if ((await formRef.value?.validate()) !== true) return;
-  const payload = {
-    name: formData.name.trim(),
-    markupRate: formData.markupRate ?? 0,
-  };
+  const name = formData.name.trim();
   try {
     if (activeType.value === 'finished') {
+      const payload = { name, markupRate: formData.markupRate ?? 0 };
       if (editingId.value) await updateFinishedMarkupConfiguration(editingId.value, payload);
       else await createFinishedMarkupConfiguration(payload);
-    } else if (editingId.value) await updateSlabMarkupConfiguration(editingId.value, payload);
-    else await createSlabMarkupConfiguration(payload);
+    } else {
+      const payload = { name, priceCoefficient: formData.priceCoefficient ?? 1 };
+      if (editingId.value) await updateSlabMarkupConfiguration(editingId.value, payload);
+      else await createSlabMarkupConfiguration(payload);
+    }
     const wasEditing = Boolean(editingId.value);
     await loadData();
     closeForm();
-    if (wasEditing) adminFeedback.actionSuccess({ action: '保存', target: payload.name });
-    else adminFeedback.created(payload.name);
+    if (wasEditing) adminFeedback.actionSuccess({ action: '保存', target: name });
+    else adminFeedback.created(name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
@@ -424,7 +461,8 @@ onMounted(loadData);
   min-height: 32px;
   margin-bottom: var(--td-comp-margin-l);
 }
-.markup-rate-input {
+.markup-rate-input,
+.price-coefficient-input {
   width: 50%;
 }
 </style>
