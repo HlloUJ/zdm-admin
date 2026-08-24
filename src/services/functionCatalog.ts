@@ -186,7 +186,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             label: '大板管理页',
             value: 'admin.slab-management',
             audiences: ['admin'],
-            actions: [],
+            actions: [{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }],
             tabs: [
               {
                 label: '仓库中',
@@ -197,7 +197,6 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                   { label: '价格', value: 'admin.slab-management.warehouse.price' },
                   { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
                   { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
-                  { label: '驳回', value: 'admin.slab-management.warehouse.reject' },
                   { label: '删除', value: 'admin.slab-management.warehouse.delete' },
                 ],
               },
@@ -210,7 +209,6 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                   { label: '价格', value: 'admin.slab-management.selling.price' },
                   { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
                   { label: '编辑', value: 'admin.slab-management.selling.edit' },
-                  { label: '删除', value: 'admin.slab-management.selling.delete' },
                 ],
               },
               {
@@ -218,6 +216,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 value: 'admin.slab-management.off-shelf',
                 actions: [
                   { label: '批量放回仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
+                  { label: '详情', value: 'admin.slab-management.off-shelf.detail' },
                   { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },
                   { label: '删除', value: 'admin.slab-management.off-shelf.delete' },
                 ],
@@ -238,11 +237,6 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                   { label: '放回仓库', value: 'admin.slab-management.recycle.restore' },
                   { label: '彻底删除', value: 'admin.slab-management.recycle.purge' },
                 ],
-              },
-              {
-                label: '已驳回',
-                value: 'admin.slab-management.rejected',
-                actions: [],
               },
             ],
           },
@@ -737,24 +731,35 @@ export const collectFunctionCatalogRows = (module?: FunctionModule): FunctionCat
       const actionTabs = page.tabs.filter((tab) => tab.actions.length);
       const rowTabs = actionTabs.length ? actionTabs : page.splitSharedTabs ? page.tabs : [];
       if (rowTabs.length) {
-        return rowTabs.map((tab, index) => {
-          const actions = Array.from(
-            new Map([...tab.actions, ...page.actions].map((action) => [action.value, action])).values(),
-          );
+        const globalRows = page.actions.length
+          ? [
+              {
+                key: `${menu.value}.${page.value}.global`,
+                tabLabels: ['页面全局'],
+                actions: page.actions,
+                selectionLabel: '页面全局权限',
+              },
+            ]
+          : [];
+        const tabRows = rowTabs.map((tab) => ({
+          key: `${menu.value}.${page.value}.${tab.value}`,
+          tabLabels: [tab.label],
+          actions: tab.actions,
+          selectionLabel: '当前 Tab 权限',
+        }));
+        const rows = [...globalRows, ...tabRows];
+        return rows.map((row, index) => {
           return {
-            key: `${menu.value}.${page.value}.${tab.value}`,
+            ...row,
             menuLabel: menu.label,
             direct: menu.direct,
             thirdMenuLabel: page.thirdMenuLabel,
             showThirdMenu: index === 0,
-            thirdMenuRowspan: rowTabs.length,
+            thirdMenuRowspan: rows.length,
             pageLabel: page.label,
             pageNote: page.note,
             showPage: index === 0,
-            pageRowspan: rowTabs.length,
-            tabLabels: [tab.label],
-            actions,
-            selectionLabel: '当前 Tab 权限',
+            pageRowspan: rows.length,
           };
         });
       }

@@ -74,7 +74,7 @@ test('uses the official TDesign pagination controls on routed list pages', async
   }
 });
 
-test('searches slabs by name, id, or code with the shared filter on every status tab', async ({ page }) => {
+test('searches slabs by name, id, or SKU with the shared filter on every status tab', async ({ page }) => {
   await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -82,7 +82,7 @@ test('searches slabs by name, id, or code with the shared filter on every status
     });
   });
   await page.goto('/slab-management');
-  const keywordInput = page.getByPlaceholder('大板名称/ID/编码', { exact: true });
+  const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('大板名称/ID/SKU', { exact: true });
   await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
   const primaryLabels = await page.locator('.filter-primary-row .t-form__label').allTextContents();
   expect(primaryLabels.slice(-2)).toEqual(['色系：', '等级：']);
@@ -98,7 +98,7 @@ test('searches slabs by name, id, or code with the shared filter on every status
   expect(searchBox?.y).toBe(supplierBox?.y);
   expect(searchBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
 
-  for (const tabLabel of ['仓库中 1', '出售中', '已下架', '已售完', '回收站 2', '已驳回']) {
+  for (const tabLabel of ['仓库中 1', '出售中', '已下架', '已售完', '回收站 2']) {
     await page.getByText(tabLabel, { exact: true }).click();
     await expect(keywordInput).toBeVisible();
   }

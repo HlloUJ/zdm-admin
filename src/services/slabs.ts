@@ -1,7 +1,7 @@
 import { request } from './http';
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
-export type SlabStatus = 'pendingReview' | 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'rejected';
+export type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 export type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling'>;
 export type SlabPublisherType = '平台发布' | '接口获取';
 export interface SlabPrice {
@@ -45,11 +45,6 @@ export interface SlabRecord {
   videoCoverUrl?: string;
   createdByName?: string;
   createdByAccountId?: number;
-  rejectionReason?: string;
-  rejectionDetail?: string;
-  rejectedByName?: string;
-  rejectedByAccountId?: number;
-  rejectedAt?: string;
   originName?: string;
   varietyName?: string;
   supplierName?: string;
@@ -127,6 +122,61 @@ export interface SlabPublishOptions {
   grades: SlabPublishOption[];
 }
 
+export type SlabOperationType =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'PRICE_UPDATE'
+  | 'SHELF'
+  | 'OFF_SHELF'
+  | 'RESTORE_WAREHOUSE'
+  | 'RESTORE_RECYCLE'
+  | 'DELETE_TO_RECYCLE'
+  | 'PHYSICAL_DELETE'
+  | 'PURGE'
+  | 'STATUS_UPDATE';
+
+export interface SlabOperationChange {
+  before?: unknown;
+  after?: unknown;
+}
+
+export interface SlabOperationLogRecord {
+  id: number;
+  slabId: number;
+  slabSerialNo: string;
+  slabName: string;
+  publisherType: SlabPublisherType;
+  operationType: SlabOperationType;
+  operationSummary: string;
+  beforeStatus?: SlabStatus;
+  afterStatus?: SlabStatus;
+  standardReason?: string;
+  detailReason?: string;
+  changeDetails?: string;
+  operationSource: 'MANUAL' | 'EXTERNAL_API' | 'SYSTEM';
+  batchNo?: string;
+  operatorName: string;
+  operatorAccountId?: number;
+  operatedAt: string;
+}
+
+export interface SlabOperationLogPage {
+  records: SlabOperationLogRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface SlabOperationLogQuery {
+  keyword?: string;
+  operationType?: SlabOperationType | '';
+  operatorName?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 export function resolveSlabPublishTargetStatus(activeStatus: SlabStatus): SlabPublishTargetStatus {
   return activeStatus === 'selling' ? 'selling' : 'warehouse';
 }
@@ -168,15 +218,32 @@ export function updateSlabStatuses(ids: number[], status: SlabStatus, reason?: s
   });
 }
 
-export function rejectSlab(id: number, payload: { reason: string; detail: string }) {
-  return request<SlabRecord>(`/admin/slabs/${id}/reject`, {
-    method: 'PUT',
+export function removeSlab(id: number, payload: { reason?: string; detail?: string } = {}) {
+  return request<boolean>(`/admin/slabs/${id}/delete`, {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export function listSlabOperationLogs(query: SlabOperationLogQuery = {}) {
+  const search = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') search.set(key, String(value));
+  });
+  const queryString = search.toString();
+  const suffix = queryString ? `?${queryString}` : '';
+  return request<SlabOperationLogPage>(`/admin/slabs/operation-logs${suffix}`);
 }
 
 export function deleteSlab(id: number) {
   return request<boolean>(`/admin/slabs/${id}`, {
     method: 'DELETE',
+  });
+}
+
+export function deleteSlabs(ids: number[]) {
+  return request<boolean>('/admin/slabs/batch-purge', {
+    method: 'DELETE',
+    body: JSON.stringify(ids),
   });
 }

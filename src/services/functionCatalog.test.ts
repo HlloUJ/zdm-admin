@@ -119,7 +119,6 @@ describe('full function catalog', () => {
                 { label: '已下架' },
                 { label: '已售完' },
                 { label: '回收站' },
-                { label: '已驳回' },
               ],
             },
           ],
@@ -277,7 +276,9 @@ describe('full function catalog', () => {
     const productModule = fullFunctionCatalog[1];
     const productPages = productModule.menus.flatMap((menu) => menu.pages);
     const slabPage = productPages.find((page) => page.value === 'admin.slab-management');
-    expect(slabPage?.actions).toEqual([]);
+    expect(slabPage?.actions).toEqual([
+      { label: '操作日志', value: 'admin.slab-management.operation-log.view' },
+    ]);
     expect(slabPage?.tabs).toEqual([
       {
         label: '仓库中',
@@ -289,7 +290,6 @@ describe('full function catalog', () => {
           { label: '价格', value: 'admin.slab-management.warehouse.price' },
           { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
           { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
-          { label: '驳回', value: 'admin.slab-management.warehouse.reject' },
           { label: '删除', value: 'admin.slab-management.warehouse.delete' },
         ],
       },
@@ -303,7 +303,6 @@ describe('full function catalog', () => {
           { label: '价格', value: 'admin.slab-management.selling.price' },
           { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
           { label: '编辑', value: 'admin.slab-management.selling.edit' },
-          { label: '删除', value: 'admin.slab-management.selling.delete' },
         ],
       },
       {
@@ -312,6 +311,7 @@ describe('full function catalog', () => {
         actions: [
           { label: '查看', value: 'admin.slab-management.off-shelf.view' },
           { label: '批量放回仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
+          { label: '详情', value: 'admin.slab-management.off-shelf.detail' },
           { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },
           { label: '删除', value: 'admin.slab-management.off-shelf.delete' },
         ],
@@ -337,12 +337,29 @@ describe('full function catalog', () => {
           { label: '彻底删除', value: 'admin.slab-management.recycle.purge' },
         ],
       },
-      {
-        label: '已驳回',
-        value: 'admin.slab-management.rejected',
-        actions: [{ label: '查看', value: 'admin.slab-management.rejected.view' }],
-      },
     ]);
+    const slabRows = collectFunctionCatalogRows(productModule).filter((row) => row.pageLabel === '大板管理页');
+    expect(slabRows.map((row) => row.tabLabels)).toEqual([
+      ['页面全局'],
+      ['仓库中'],
+      ['出售中'],
+      ['已下架'],
+      ['已售完'],
+      ['回收站'],
+    ]);
+    expect(slabRows[0]).toEqual(
+      expect.objectContaining({
+        showPage: true,
+        pageRowspan: 6,
+        selectionLabel: '页面全局权限',
+        actions: [{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }],
+      }),
+    );
+    slabRows.slice(1).forEach((row) => {
+      expect(row.actions).not.toContainEqual(
+        expect.objectContaining({ value: 'admin.slab-management.operation-log.view' }),
+      );
+    });
     const tenantPage = fullFunctionCatalog[0].menus
       .flatMap((menu) => menu.pages)
       .find((page) => page.value === 'admin.tenant.tenant-management');
@@ -512,13 +529,13 @@ describe('full function catalog', () => {
       'admin.tenant.store-level-management.edit',
       'admin.tenant.store-level-management.toggle-status',
       'admin.tenant.store-level-management.delete',
+      'admin.slab-management.operation-log.view',
       'admin.slab-management.warehouse.view',
       'admin.slab-management.warehouse.publish',
       'admin.slab-management.warehouse.batch-shelf',
       'admin.slab-management.warehouse.price',
       'admin.slab-management.warehouse.shelf',
       'admin.slab-management.warehouse.edit',
-      'admin.slab-management.warehouse.reject',
       'admin.slab-management.warehouse.delete',
       'admin.slab-management.selling.view',
       'admin.slab-management.selling.publish',
@@ -526,9 +543,9 @@ describe('full function catalog', () => {
       'admin.slab-management.selling.price',
       'admin.slab-management.selling.off-shelf',
       'admin.slab-management.selling.edit',
-      'admin.slab-management.selling.delete',
       'admin.slab-management.off-shelf.view',
       'admin.slab-management.off-shelf.batch-restore',
+      'admin.slab-management.off-shelf.detail',
       'admin.slab-management.off-shelf.restore',
       'admin.slab-management.off-shelf.delete',
       'admin.slab-management.sold-out.view',
@@ -540,7 +557,6 @@ describe('full function catalog', () => {
       'admin.slab-management.recycle.price',
       'admin.slab-management.recycle.restore',
       'admin.slab-management.recycle.purge',
-      'admin.slab-management.rejected.view',
       'admin.product-data-center.category.finished.view',
       'admin.product-data-center.category.finished.create-root',
       'admin.product-data-center.category.finished.create-child',
@@ -704,6 +720,7 @@ describe('full function catalog', () => {
   it('keeps production audience filters available and limits store roles to terminal grants', () => {
     const operationValues = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));
     expect(operationValues).toContain('admin.slab-management.warehouse.view');
+    expect(operationValues).toContain('admin.slab-management.off-shelf.detail');
     expect(operationValues).toContain('admin.slab-management.recycle.price');
     expect(operationValues).toContain('admin.tenant.tenant-management.unarchived.view');
     expect(operationValues).toContain('admin.tenant.store-level-management.view');
@@ -724,6 +741,9 @@ describe('full function catalog', () => {
     );
     expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.store)).not.toContain(
       'admin.slab-management.warehouse.view',
+    );
+    expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.store)).not.toContain(
+      'admin.slab-management.off-shelf.detail',
     );
     expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.supplier)).not.toContain(
       'admin.slab-management.recycle.price',

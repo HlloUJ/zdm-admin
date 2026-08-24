@@ -76,6 +76,21 @@ public class MediaAssetService extends ServiceImpl<MediaAssetMapper, MediaAsset>
     return asset;
   }
 
+  /**
+   * Loads media that is already linked to a trusted business record.
+   * Callers must prove the requested media id is the record's current reference.
+   */
+  public MediaAsset requireReferencedAvailableForUpdate(Long mediaId) {
+    if (mediaId == null) {
+      return null;
+    }
+    MediaAsset asset = baseMapper.selectByIdForUpdate(mediaId);
+    if (asset == null || "deleted".equals(asset.getStatus())) {
+      throw new IllegalArgumentException("媒体资源不存在");
+    }
+    return asset;
+  }
+
   public String publicUrl(Long mediaId) {
     if (mediaId == null) {
       return null;
