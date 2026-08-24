@@ -71,6 +71,7 @@ public class SlabInventory extends BaseEntity {
   private BigDecimal areaSquareMeter;
   private BigDecimal costPrice;
   private BigDecimal guidePrice;
+  private BigDecimal guidePriceCoefficient;
 
   @TableField(exist = false)
   private List<SlabOffShelfRecord> offShelfRecords;
@@ -397,6 +398,14 @@ public class SlabInventory extends BaseEntity {
 
   public void setGuidePrice(BigDecimal guidePrice) {
     this.guidePrice = guidePrice;
+  }
+
+  public BigDecimal getGuidePriceCoefficient() {
+    return guidePriceCoefficient;
+  }
+
+  public void setGuidePriceCoefficient(BigDecimal guidePriceCoefficient) {
+    this.guidePriceCoefficient = guidePriceCoefficient;
   }
 
   public List<SlabOffShelfRecord> getOffShelfRecords() {

@@ -13,12 +13,7 @@
             </t-breadcrumb>
           </div>
           <div class="page-header-actions">
-            <t-link
-              v-if="canViewOperationLogs"
-              theme="primary"
-              hover="color"
-              @click="openOperationLogDrawer"
-            >
+            <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="openOperationLogDrawer">
               操作日志
             </t-link>
           </div>
@@ -501,17 +496,6 @@
                   :required-mark="false"
                 >
                   <t-input-number
-                    v-if="guidePriceRow"
-                    v-model="productForm.markupPrices[guidePriceRow.id].ratio"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="handleGuideRatioChange"
-                  />
-                  <t-input-number
-                    v-else
                     v-model="productForm.guideRatio"
                     class="price-input"
                     large-number
@@ -529,17 +513,6 @@
                   :required-mark="false"
                 >
                   <t-input-number
-                    v-if="guidePriceRow"
-                    v-model="productForm.markupPrices[guidePriceRow.id].price"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="handleGuidePriceChange"
-                  />
-                  <t-input-number
-                    v-else
                     v-model="productForm.guidePrice"
                     class="price-input"
                     large-number
@@ -779,11 +752,15 @@
           </t-descriptions-item>
           <t-descriptions-item label="操作内容">{{ operationLogDetail.operationSummary || '-' }}</t-descriptions-item>
           <t-descriptions-item label="操作人">{{ operationLogDetail.operatorName }}</t-descriptions-item>
-          <t-descriptions-item label="操作时间">{{ formatDateTime(operationLogDetail.operatedAt) }}</t-descriptions-item>
+          <t-descriptions-item label="操作时间">{{
+            formatDateTime(operationLogDetail.operatedAt)
+          }}</t-descriptions-item>
           <t-descriptions-item label="状态变化">
             {{ formatStatusChange(operationLogDetail) }}
           </t-descriptions-item>
-          <t-descriptions-item label="操作来源">{{ operationSourceLabel(operationLogDetail.operationSource) }}</t-descriptions-item>
+          <t-descriptions-item label="操作来源">{{
+            operationSourceLabel(operationLogDetail.operationSource)
+          }}</t-descriptions-item>
           <t-descriptions-item label="原因">{{ operationLogDetail.standardReason || '-' }}</t-descriptions-item>
           <t-descriptions-item label="详细说明">{{ operationLogDetail.detailReason || '-' }}</t-descriptions-item>
           <t-descriptions-item label="批次号" :span="2">{{ operationLogDetail.batchNo || '-' }}</t-descriptions-item>
@@ -982,6 +959,7 @@ import {
   type AdminMediaValue,
 } from '@/components/foundation';
 import {
+  getSlabGuidePriceSetting,
   listSlabMarkupConfigurationOptions,
   type SlabMarkupConfigurationRecord,
 } from '@/services/slabMarkupConfigurations';
@@ -1129,6 +1107,7 @@ interface SlabItem {
   corner4LengthMm?: number;
   corner4WidthMm?: number;
   areaSquareMeter?: number;
+  guidePriceCoefficient?: number;
   markupPrices?: SlabPrice[];
   offShelfRecords: SlabOffShelfRecord[];
 }
@@ -1223,7 +1202,7 @@ const makeProductForm = (): ProductForm => ({
   cost: '',
   stock: '',
   sku: '',
-  guideRatio: '1.60',
+  guideRatio: '',
   guidePrice: '',
   level1Ratio: '1.45',
   level1Price: '',
@@ -1247,9 +1226,7 @@ const slabPermission = (status: SlabTab, action: string) =>
   `admin.slab-management.${slabPermissionScope[status]}.${action}`;
 const hasSlabAction = (status: SlabTab, action: string) =>
   hasPermission(loginUser.value, slabPermission(status, action));
-const canViewOperationLogs = computed(() =>
-  hasPermission(loginUser.value, 'admin.slab-management.operation-log.view'),
-);
+const canViewOperationLogs = computed(() => hasPermission(loginUser.value, 'admin.slab-management.operation-log.view'));
 const { visibleTabs: slabTabs, showTabRail: showSlabTabRail } = usePermissionTabs({
   tabs,
   activeTab,
@@ -1415,6 +1392,7 @@ const slabOrigins = ref<SlabOriginRecord[]>([]);
 const slabVarieties = ref<SlabVarietyRecord[]>([]);
 const slabSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<SlabMarkupConfigurationRecord[]>([]);
+const guidePriceSettingCoefficient = ref<number>();
 const publishOptions = reactive<SlabPublishOptions>({ textures: [], colorCategories: [], grades: [] });
 
 const varietyOptions = computed(() => slabVarieties.value.map((item) => item.name));
@@ -1485,13 +1463,7 @@ const paginations = reactive<Record<SlabTab, { current: number; pageSize: number
 const tableData = ref<SlabItem[]>([]);
 
 const normalizeStatus = (status?: string): SlabStatus => {
-  if (
-    status === 'selling' ||
-    status === 'offShelf' ||
-    status === 'soldOut' ||
-    status === 'recycle'
-  )
-    return status;
+  if (status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle') return status;
   return 'warehouse';
 };
 
@@ -1595,6 +1567,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
       level2: '',
       level3: '',
     },
+    guidePriceCoefficient: record.guidePriceCoefficient,
     status: normalizeStatus(record.status),
     variety: record.varietyName || variety?.name || (record.varietyId ? `品种 #${record.varietyId}` : '-'),
     sku: record.serialNo,
@@ -1649,6 +1622,7 @@ const toSlabPayload = (item: SlabItem, patch: Partial<SlabItem> = {}): SlabPaylo
     areaSquareMeter: next.areaSquareMeter,
     costPrice: toNumber(next.price.cost),
     guidePrice: toNumber(next.price.guide),
+    guidePriceCoefficient: next.guidePriceCoefficient,
     markupPrices: next.markupPrices,
     status: next.status,
   };
@@ -1665,7 +1639,7 @@ const upsertSlabItem = (record: SlabRecord) => {
 const loadSlabs = async () => {
   loading.value = true;
   try {
-    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult, markupResult] =
+    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult, markupResult, guideSetting] =
       await Promise.all([
         listSlabs(),
         listSlabOrigins().catch(() => []),
@@ -1673,12 +1647,14 @@ const loadSlabs = async () => {
         listSuppliers().catch(() => []),
         getSlabPublishOptions(),
         listSlabMarkupConfigurationOptions(),
+        getSlabGuidePriceSetting(),
       ]);
     slabOrigins.value = originsResult;
     slabVarieties.value = varietiesResult;
     slabSuppliers.value = suppliersResult;
     Object.assign(publishOptions, publishOptionsResult);
     markupConfigurations.value = markupResult;
+    guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
     tableData.value = records.map(toSlabItem);
   } catch (error) {
     tableData.value = [];
@@ -1738,9 +1714,7 @@ const reasonForm = reactive({
   detail: '',
 });
 const reasonFormRules = computed<Record<string, FormRule[]>>(() => ({
-  reason: [
-    { required: true, message: reasonState.type === 'deleteExternal' ? '请选择删除原因' : '请选择下架原因' },
-  ],
+  reason: [{ required: true, message: reasonState.type === 'deleteExternal' ? '请选择删除原因' : '请选择下架原因' }],
   detail: [],
 }));
 
@@ -1776,14 +1750,9 @@ const salesPriceRows = computed(() =>
     priceCoefficient: Number(item.priceCoefficient),
   })),
 );
-const guidePriceRow = computed(() => salesPriceRows.value.find((item) => item.label === '指导价'));
-const partnerPriceRows = computed(() => salesPriceRows.value.filter((item) => item.label !== '指导价'));
-const guideRatioFieldName = computed(() =>
-  guidePriceRow.value ? `markupPrices.${guidePriceRow.value.id}.ratio` : 'guideRatio',
-);
-const guidePriceFieldName = computed(() =>
-  guidePriceRow.value ? `markupPrices.${guidePriceRow.value.id}.price` : 'guidePrice',
-);
+const partnerPriceRows = computed(() => salesPriceRows.value);
+const guideRatioFieldName = computed(() => 'guideRatio');
+const guidePriceFieldName = computed(() => 'guidePrice');
 
 const isValidMeasurement = (value: unknown, required: boolean) => {
   const normalizedValue = String(value ?? '').trim();
@@ -1976,9 +1945,7 @@ const pageAllSelected = computed(
 const pagePartiallySelected = computed(
   () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,
 );
-const priceDrawerReadonly = computed(
-  () => activeTab.value === 'soldOut' || activeTab.value === 'recycle',
-);
+const priceDrawerReadonly = computed(() => activeTab.value === 'soldOut' || activeTab.value === 'recycle');
 const productDialogTitle = computed(() => {
   if (productMode.value === 'create') return '发布商品';
   if (productMode.value === 'edit') return '编辑商品';
@@ -2200,10 +2167,6 @@ const calculateProductRatio = (configurationId: number) => {
 };
 
 const calculateGuidePrice = () => {
-  if (guidePriceRow.value) {
-    calculateProductPrice(guidePriceRow.value.id);
-    return;
-  }
   const cost = toNumber(productForm.cost);
   const ratio = toNumber(productForm.guideRatio);
   if (!isValidSalesNumber(productForm.cost, 0) || !isValidSalesNumber(productForm.guideRatio, 0)) return;
@@ -2212,10 +2175,6 @@ const calculateGuidePrice = () => {
 };
 
 const calculateGuideRatio = () => {
-  if (guidePriceRow.value) {
-    calculateProductRatio(guidePriceRow.value.id);
-    return;
-  }
   const cost = toNumber(productForm.cost);
   const price = toNumber(productForm.guidePrice);
   if (!isValidSalesNumber(productForm.cost, 0) || !isValidSalesNumber(productForm.guidePrice, 0)) return;
@@ -2304,59 +2263,33 @@ const handleBatchPriceChange = (index: number, _value?: unknown, context?: Sales
 const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
   const snapshots = row.markupPrices ?? [];
   const snapshotsByConfigurationId = new Map(snapshots.map((item) => [item.markupConfigurationId, item]));
-  const guideConfiguration = markupConfigurations.value.find((configuration) => configuration.name === '指导价');
-  const guideSnapshot = guideConfiguration
-    ? snapshotsByConfigurationId.get(guideConfiguration.id)
-    : snapshots.find(
-        (price) =>
-          markupConfigurations.value.find((item) => item.id === price.markupConfigurationId)?.name === '指导价',
-      );
   const cost = toNumber(row.price.cost);
-  const guidePrice = guideSnapshot ? String(guideSnapshot.price) : row.price.guide;
-  const guideRatio = guideSnapshot
-    ? formatRatio(Number(guideSnapshot.priceCoefficient))
-    : cost && guidePrice
-      ? formatRatio(toNumber(guidePrice) / cost)
-      : '1.60';
-  const configuredRows: DrawerPriceRow[] = markupConfigurations.value
-    .filter((configuration) => configuration.id !== guideConfiguration?.id)
-    .map((configuration) => {
-      const snapshot = snapshotsByConfigurationId.get(configuration.id);
-      return {
-        configurationId: configuration.id,
-        label: configuration.name,
-        ratio: snapshot
-          ? formatRatio(Number(snapshot.priceCoefficient))
-          : formatRatio(Number(configuration.priceCoefficient)),
-        price: snapshot
-          ? String(snapshot.price)
-          : cost
-            ? formatPrice(cost * Number(configuration.priceCoefficient))
-            : '',
-      };
-    });
-  const unconfiguredRows: DrawerPriceRow[] = snapshots
-    .filter(
-      (snapshot) =>
-        snapshot !== guideSnapshot &&
-        !markupConfigurations.value.some((item) => item.id === snapshot.markupConfigurationId),
-    )
-    .map((snapshot) => ({
-      configurationId: snapshot.markupConfigurationId,
-      label: `价格项 #${snapshot.markupConfigurationId}`,
-      ratio: formatRatio(Number(snapshot.priceCoefficient)),
-      price: String(snapshot.price),
-    }));
+  const guidePrice = row.price.guide;
+  const guideRatio =
+    row.guidePriceCoefficient != null
+      ? formatRatio(row.guidePriceCoefficient)
+      : cost > 0 && String(guidePrice).trim()
+        ? formatRatio(toNumber(guidePrice) / cost)
+        : '';
+  const configuredRows: DrawerPriceRow[] = markupConfigurations.value.map((configuration) => {
+    const snapshot = snapshotsByConfigurationId.get(configuration.id);
+    return {
+      configurationId: configuration.id,
+      label: configuration.name,
+      ratio: snapshot
+        ? formatRatio(Number(snapshot.priceCoefficient))
+        : formatRatio(Number(configuration.priceCoefficient)),
+      price: snapshot ? String(snapshot.price) : cost ? formatPrice(cost * Number(configuration.priceCoefficient)) : '',
+    };
+  });
   return [
     { label: '成本价', ratio: '1.00', price: row.price.cost },
     {
-      configurationId: guideConfiguration?.id,
       label: '指导价',
       ratio: guideRatio,
       price: guidePrice,
     },
     ...configuredRows,
-    ...unconfiguredRows,
   ];
 };
 
@@ -2409,9 +2342,7 @@ const resetProductForm = () => {
 };
 
 const fillProductForm = (row: SlabItem) => {
-  const hasSalesInformation = Boolean(
-    row.supplierId || row.sku.trim() || row.price.cost || row.markupPrices?.length,
-  );
+  const hasSalesInformation = Boolean(row.supplierId || row.sku.trim() || row.price.cost || row.markupPrices?.length);
   Object.assign(productForm, {
     variety: row.variety,
     origin: row.origin,
@@ -2434,7 +2365,12 @@ const fillProductForm = (row: SlabItem) => {
     cost: row.price.cost,
     stock: row.status === 'soldOut' ? '0' : hasSalesInformation ? '1' : '',
     sku: row.sku,
-    guideRatio: '1.60',
+    guideRatio:
+      row.guidePriceCoefficient != null
+        ? formatRatio(row.guidePriceCoefficient)
+        : row.price.cost && row.price.guide
+          ? formatRatio(toNumber(row.price.guide) / toNumber(row.price.cost))
+          : '',
     guidePrice: row.price.guide,
     level1Ratio: '1.45',
     level1Price: row.price.level1,
@@ -2459,6 +2395,9 @@ const openProductDialog = (mode: ProductMode, row?: SlabItem) => {
   productTab.value = mode === 'view' ? 'sales' : 'images';
   editingRowId.value = row?.id ?? null;
   resetProductForm();
+  if (mode === 'create' && guidePriceSettingCoefficient.value != null) {
+    productForm.guideRatio = formatRatio(guidePriceSettingCoefficient.value);
+  }
   Object.keys(uploadPreviews).forEach((key) => {
     const uploadKey = key as UploadItemKey;
     const videoUrl = uploadPreviews[uploadKey]?.videoUrl;
@@ -2550,15 +2489,13 @@ const handleCostChange = (_value?: unknown, context?: SalesNumberChangeContext) 
 
 const handleGuideRatioChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
-  const value = guidePriceRow.value ? productForm.markupPrices[guidePriceRow.value.id]?.ratio : productForm.guideRatio;
-  clearSalesNumberFieldError(guideRatioFieldName.value, value, 0);
+  clearSalesNumberFieldError(guideRatioFieldName.value, productForm.guideRatio, 0);
   calculateGuidePrice();
 };
 
 const handleGuidePriceChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
-  const value = guidePriceRow.value ? productForm.markupPrices[guidePriceRow.value.id]?.price : productForm.guidePrice;
-  if (String(value ?? '').trim()) clearSalesFieldError(guidePriceFieldName.value);
+  if (String(productForm.guidePrice ?? '').trim()) clearSalesFieldError(guidePriceFieldName.value);
   calculateGuideRatio();
 };
 
@@ -2644,14 +2581,18 @@ const handleProductSubmit = async () => {
     adminFeedback.warning('请完善基础信息');
     return;
   }
+  if (productMode.value === 'create' && guidePriceSettingCoefficient.value == null) {
+    productTab.value = 'sales';
+    adminFeedback.warning('请先配置大板指导价默认价格系数');
+    return;
+  }
   const normalizedStock = String(productForm.stock ?? '').trim();
   const hasInvalidSalesPrice = salesPriceRows.value.some((item) => {
     const editor = productForm.markupPrices[item.id];
     return !editor || !isValidSalesNumber(editor.ratio, 0) || !isValidSalesNumber(editor.price, 0);
   });
   const hasInvalidGuidePrice =
-    !guidePriceRow.value &&
-    (!isValidSalesNumber(productForm.guideRatio, 0) || !isValidSalesNumber(productForm.guidePrice, 0));
+    !isValidSalesNumber(productForm.guideRatio, 0) || !isValidSalesNumber(productForm.guidePrice, 0);
   const hasInvalidSalesInformation =
     !String(productForm.supplier ?? '').trim() ||
     !String(productForm.sku ?? '').trim() ||
@@ -2709,9 +2650,8 @@ const handleProductSubmit = async () => {
     corner4WidthMm: productForm.corner4Width ? toNumber(productForm.corner4Width) : undefined,
     areaSquareMeter: lengthMm && widthMm ? Number(((lengthMm * widthMm) / 1_000_000).toFixed(2)) : undefined,
     costPrice: toNumber(productForm.cost),
-    guidePrice: guidePriceRow.value
-      ? toNumber(productForm.markupPrices[guidePriceRow.value.id]?.price ?? '')
-      : toNumber(productForm.guidePrice),
+    guidePrice: toNumber(productForm.guidePrice),
+    guidePriceCoefficient: Number(toNumber(productForm.guideRatio).toFixed(4)),
     markupPrices: salesPriceRows.value.map((item) => ({
       markupConfigurationId: item.id,
       priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
@@ -3003,6 +2943,7 @@ const handleConfirmSubmit = async () => {
           variantKey: '',
         }));
       const guidePrice = batchPriceRows.find((item) => item.label === '指导价')?.price;
+      const guidePriceCoefficient = batchPriceRows.find((item) => item.label === '指导价')?.ratio;
       const nextPrice = {
         cost: String(costPrice),
         guide: guidePrice == null ? row.price.guide : String(toNumber(guidePrice)),
@@ -3011,7 +2952,15 @@ const handleConfirmSubmit = async () => {
         level3: row.price.level3,
       };
       upsertSlabItem(
-        await updateSlab(row.id, toSlabPayload(row, { price: nextPrice, markupPrices: nextMarkupPrices })),
+        await updateSlab(
+          row.id,
+          toSlabPayload(row, {
+            price: nextPrice,
+            guidePriceCoefficient:
+              guidePriceCoefficient == null ? row.guidePriceCoefficient : toNumber(guidePriceCoefficient),
+            markupPrices: nextMarkupPrices,
+          }),
+        ),
       );
       closePriceDrawer();
     }

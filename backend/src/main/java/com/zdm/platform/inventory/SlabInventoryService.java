@@ -9,6 +9,7 @@ import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -83,6 +84,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   @Transactional
   public SlabInventory createWithPrices(SlabInventory inventory) {
     validateReferences(inventory);
+    validateGuidePrice(inventory);
     List<SlabPrice> markupPrices = inventory.getMarkupPrices();
     inventory.setId(null);
     applyCreationMetadata(inventory);
@@ -119,6 +121,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     }
     List<SlabPrice> existingPrices = priceService.listPrices(id);
     validateReferencesForUpdate(existing, inventory);
+    validateGuidePrice(inventory);
     List<SlabPrice> markupPrices = inventory.getMarkupPrices();
     inventory.setId(id);
     inventory.setCreatedByName(existing.getCreatedByName());
@@ -365,6 +368,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     addChange(changes, "视频封面", before.getVideoCoverMediaId(), after.getVideoCoverMediaId());
     addChange(changes, "成本价", before.getCostPrice(), after.getCostPrice());
     addChange(changes, "指导价", before.getGuidePrice(), after.getGuidePrice());
+    addChange(changes, "指导价系数", before.getGuidePriceCoefficient(), after.getGuidePriceCoefficient());
     addChange(changes, "价格层级", priceDetails(beforePrices), priceDetails(after.getMarkupPrices()));
     return changes;
   }
@@ -401,7 +405,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   }
 
   private boolean isPriceChange(String field) {
-    return Set.of("成本价", "指导价", "价格层级").contains(field);
+    return Set.of("成本价", "指导价", "指导价系数", "价格层级").contains(field);
   }
 
   private void applyCreationMetadata(SlabInventory inventory) {
@@ -466,10 +470,33 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if (inventory.getCostPrice() == null
         || inventory.getCostPrice().signum() < 0
         || inventory.getGuidePrice() == null
-        || inventory.getGuidePrice().signum() < 0) {
+        || inventory.getGuidePrice().signum() < 0
+        || inventory.getGuidePriceCoefficient() == null
+        || inventory.getGuidePriceCoefficient().signum() < 0) {
       throw new IllegalArgumentException("请完善大板价格后再上架");
     }
     priceService.requireCompletePrices(inventory.getId());
+  }
+
+  private void validateGuidePrice(SlabInventory inventory) {
+    if (inventory.getCostPrice() == null
+        && inventory.getGuidePrice() == null
+        && inventory.getGuidePriceCoefficient() == null) {
+      return;
+    }
+    if (inventory.getCostPrice() == null
+        || inventory.getGuidePrice() == null
+        || inventory.getGuidePriceCoefficient() == null
+        || inventory.getCostPrice().signum() < 0
+        || inventory.getGuidePrice().signum() < 0
+        || inventory.getGuidePriceCoefficient().signum() < 0) {
+      throw new IllegalArgumentException("成本价、指导价系数和指导价不能为空且不能小于0");
+    }
+    var expected = inventory.getCostPrice().multiply(inventory.getGuidePriceCoefficient())
+        .setScale(2, RoundingMode.HALF_UP);
+    if (inventory.getGuidePrice().setScale(2, RoundingMode.HALF_UP).compareTo(expected) != 0) {
+      throw new IllegalArgumentException("指导价必须等于成本价按指导价系数计算后的结果");
+    }
   }
 
   public SlabPublishOptions listPublishOptions() {

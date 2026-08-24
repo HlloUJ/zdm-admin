@@ -353,18 +353,18 @@ const verifiedFunctionCatalog: FunctionModule[] = [
         ],
       },
       {
-        label: '加价配置',
+        label: '价格配置',
         value: 'admin.product-data-center.markup-configuration.menu',
         direct: false,
         pages: [
           {
-            label: '加价配置页',
+            label: '价格配置页',
             value: 'admin.product-data-center.markup-configuration',
             audiences: ['admin'],
             actions: [],
             tabs: [
               {
-                label: '成品加价配置',
+                label: '成品价格配置',
                 value: 'admin.product-data-center.markup-configuration.finished',
                 actions: [
                   { label: '新增', value: 'admin.product-data-center.markup-configuration.finished.create' },
@@ -378,7 +378,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 ],
               },
               {
-                label: '大板加价配置',
+                label: '大板价格配置',
                 value: 'admin.product-data-center.markup-configuration.slab',
                 actions: [
                   { label: '新增', value: 'admin.product-data-center.markup-configuration.slab.create' },

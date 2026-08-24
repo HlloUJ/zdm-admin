@@ -628,6 +628,23 @@ export async function installAdminApiMocks(page: Page) {
   await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
     await fulfillJson(route, []);
   });
+  await page.route('**/api/admin/slab-guide-price-setting', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON() as { priceCoefficient: number };
+      return fulfillJson(route, { id: 1, priceCoefficient: payload.priceCoefficient });
+    }
+    return fulfillJson(route, { id: 1, priceCoefficient: 1.6 });
+  });
+  await page.route('**/api/admin/finished-markup-configurations/options', async (route) => {
+    await fulfillJson(route, []);
+  });
+  await page.route('**/api/admin/finished-guide-price-setting', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON() as { priceCoefficient: number };
+      return fulfillJson(route, { id: 1, priceCoefficient: payload.priceCoefficient });
+    }
+    return fulfillJson(route, { id: 1, priceCoefficient: 1.2 });
+  });
   await page.route('**/api/admin/slab-textures/*/aliases**', async (route) => {
     const parts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
     const textureId = Number(parts[3]);

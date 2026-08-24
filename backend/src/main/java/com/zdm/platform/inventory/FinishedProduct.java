@@ -28,6 +28,10 @@ public class FinishedProduct extends BaseEntity {
   @TableField(exist = false)
   private List<FinishedProductPrice> markupPrices;
 
+  @Valid
+  @TableField(exist = false)
+  private List<FinishedProductGuidePrice> guidePrices;
+
   public Long getCategoryId() {
     return categoryId;
   }
@@ -98,5 +102,13 @@ public class FinishedProduct extends BaseEntity {
 
   public void setMarkupPrices(List<FinishedProductPrice> markupPrices) {
     this.markupPrices = markupPrices == null ? null : List.copyOf(markupPrices);
+  }
+
+  public List<FinishedProductGuidePrice> getGuidePrices() {
+    return guidePrices == null ? null : List.copyOf(guidePrices);
+  }
+
+  public void setGuidePrices(List<FinishedProductGuidePrice> guidePrices) {
+    this.guidePrices = guidePrices == null ? null : List.copyOf(guidePrices);
   }
 }

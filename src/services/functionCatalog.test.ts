@@ -148,9 +148,9 @@ describe('full function catalog', () => {
               tabs: [{ label: '成品现货模板' }, { label: '配件模板' }],
             },
             {
-              label: '加价配置页',
-              thirdMenuLabel: '加价配置',
-              tabs: [{ label: '成品加价配置' }, { label: '大板加价配置' }],
+              label: '价格配置页',
+              thirdMenuLabel: '价格配置',
+              tabs: [{ label: '成品价格配置' }, { label: '大板价格配置' }],
             },
           ],
         },
@@ -217,7 +217,7 @@ describe('full function catalog', () => {
       '属性库管理',
       '属性值管理',
       '分类属性模板',
-      '加价配置',
+      '价格配置',
       '工艺管理',
       '品种管理',
       '产地管理',
@@ -276,9 +276,7 @@ describe('full function catalog', () => {
     const productModule = fullFunctionCatalog[1];
     const productPages = productModule.menus.flatMap((menu) => menu.pages);
     const slabPage = productPages.find((page) => page.value === 'admin.slab-management');
-    expect(slabPage?.actions).toEqual([
-      { label: '操作日志', value: 'admin.slab-management.operation-log.view' },
-    ]);
+    expect(slabPage?.actions).toEqual([{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }]);
     expect(slabPage?.tabs).toEqual([
       {
         label: '仓库中',

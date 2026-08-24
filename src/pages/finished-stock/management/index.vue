@@ -382,7 +382,7 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.markupPrices[configuration.id].coefficient"
-                            placeholder="系数"
+                            placeholder="价格系数"
                             @change="handleMarkupCoefficientChange(row, configuration.id, $event)"
                           />
                           <t-input
@@ -396,7 +396,7 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.guideCoefficient"
-                            placeholder="系数"
+                            placeholder="价格系数"
                             @change="handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)"
                             @blur="formatDecimalValue(row, 'guideCoefficient')"
                           />
@@ -412,7 +412,7 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.level1Coefficient"
-                            placeholder="系数"
+                            placeholder="价格系数"
                             @change="handleSpecCoefficientChange(row, 'level1Coefficient', 'level1', $event)"
                             @blur="formatDecimalValue(row, 'level1Coefficient')"
                           />
@@ -428,7 +428,7 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.level2Coefficient"
-                            placeholder="系数"
+                            placeholder="价格系数"
                             @change="handleSpecCoefficientChange(row, 'level2Coefficient', 'level2', $event)"
                             @blur="formatDecimalValue(row, 'level2Coefficient')"
                           />
@@ -444,7 +444,7 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.level3Coefficient"
-                            placeholder="系数"
+                            placeholder="价格系数"
                             @change="handleSpecCoefficientChange(row, 'level3Coefficient', 'level3', $event)"
                             @blur="formatDecimalValue(row, 'level3Coefficient')"
                           />
@@ -696,7 +696,7 @@
                 <div class="price-pair wide">
                   <t-input
                     v-model="batchFillForm.guideCoefficient"
-                    placeholder="系数"
+                    placeholder="价格系数"
                     @change="handleBatchCoefficientChange('guideCoefficient', 'guide', $event)"
                     @blur="formatDecimalValue(batchFillForm, 'guideCoefficient')"
                   />
@@ -712,7 +712,7 @@
                 <div class="price-pair wide">
                   <t-input
                     v-model="batchFillForm.level1Coefficient"
-                    placeholder="系数"
+                    placeholder="价格系数"
                     @change="handleBatchCoefficientChange('level1Coefficient', 'level1', $event)"
                     @blur="formatDecimalValue(batchFillForm, 'level1Coefficient')"
                   />
@@ -728,7 +728,7 @@
                 <div class="price-pair wide">
                   <t-input
                     v-model="batchFillForm.level2Coefficient"
-                    placeholder="系数"
+                    placeholder="价格系数"
                     @change="handleBatchCoefficientChange('level2Coefficient', 'level2', $event)"
                     @blur="formatDecimalValue(batchFillForm, 'level2Coefficient')"
                   />
@@ -744,7 +744,7 @@
                 <div class="price-pair wide">
                   <t-input
                     v-model="batchFillForm.level3Coefficient"
-                    placeholder="系数"
+                    placeholder="价格系数"
                     @change="handleBatchCoefficientChange('level3Coefficient', 'level3', $event)"
                     @blur="formatDecimalValue(batchFillForm, 'level3Coefficient')"
                   />
@@ -791,7 +791,7 @@
           <div class="price-pair">
             <t-input
               v-model="row.guideCoefficient"
-              placeholder="系数"
+              placeholder="价格系数"
               :disabled="priceDrawerMode === 'view'"
               @change="limitDecimalInput(row, 'guideCoefficient', $event)"
               @blur="formatDecimalValue(row, 'guideCoefficient')"
@@ -809,7 +809,7 @@
           <div class="price-pair">
             <t-input
               v-model="row.level1Coefficient"
-              placeholder="系数"
+              placeholder="价格系数"
               :disabled="priceDrawerMode === 'view'"
               @change="limitDecimalInput(row, 'level1Coefficient', $event)"
               @blur="formatDecimalValue(row, 'level1Coefficient')"
@@ -827,7 +827,7 @@
           <div class="price-pair">
             <t-input
               v-model="row.level2Coefficient"
-              placeholder="系数"
+              placeholder="价格系数"
               :disabled="priceDrawerMode === 'view'"
               @change="limitDecimalInput(row, 'level2Coefficient', $event)"
               @blur="formatDecimalValue(row, 'level2Coefficient')"
@@ -845,7 +845,7 @@
           <div class="price-pair">
             <t-input
               v-model="row.level3Coefficient"
-              placeholder="系数"
+              placeholder="价格系数"
               :disabled="priceDrawerMode === 'view'"
               @change="limitDecimalInput(row, 'level3Coefficient', $event)"
               @blur="formatDecimalValue(row, 'level3Coefficient')"
@@ -989,6 +989,7 @@ import AdminTopNav from '@/components/AdminTopNav.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
 import {
+  getFinishedGuidePriceSetting,
   listFinishedMarkupConfigurationOptions,
   type FinishedMarkupConfigurationRecord,
 } from '@/services/finishedMarkupConfigurations';
@@ -999,8 +1000,9 @@ import {
   updateFinishedProduct,
   type FinishedProductPayload,
   type FinishedProductRecord,
+  type FinishedProductGuidePrice,
+  type FinishedProductPrice,
 } from '@/services/finishedProducts';
-import type { FinishedProductPrice } from '@/services/finishedProducts';
 import {
   createInventoryMovement,
   listInventoryMovements,
@@ -1073,6 +1075,7 @@ interface StockItem {
   status: StockStatus;
   offShelfReason?: string;
   markupPrices?: FinishedProductPrice[];
+  guidePrices?: FinishedProductGuidePrice[];
 }
 
 interface ProductForm {
@@ -1341,6 +1344,7 @@ const uploadState = reactive({
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<FinishedMarkupConfigurationRecord[]>([]);
+const guidePriceSettingCoefficient = ref<number>();
 const dataItems = ref<StockItem[]>([]);
 
 const defaultFilter = (): FilterState => ({
@@ -1599,6 +1603,7 @@ const toStockItem = (record: FinishedProductRecord, index: number): StockItem =>
     publisherType,
     isExternalSupplier: Boolean(record.supplierId),
     guidePrice: record.guidePrice,
+    guidePrices: record.guidePrices,
     markupPrices: record.markupPrices,
     priceRange: formatPriceRange(record.guidePrice),
     status,
@@ -1642,15 +1647,17 @@ const createMovement = async (
 const loadInventoryData = async () => {
   loading.value = true;
   try {
-    const [categories, suppliers, products, markupResult] = await Promise.all([
+    const [categories, suppliers, products, markupResult, guideSetting] = await Promise.all([
       listProductCategories(),
       listSuppliers(),
       listFinishedProducts(),
       listFinishedMarkupConfigurationOptions(),
+      getFinishedGuidePriceSetting(),
     ]);
     productCategories.value = categories;
     productSuppliers.value = suppliers;
     markupConfigurations.value = markupResult;
+    guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
     dataItems.value = products.map(toStockItem);
     selectedKeys.value = [];
   } catch (error) {
@@ -1761,6 +1768,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
 const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'cost', title: '成本价*', width: 110 },
+    { colKey: 'guide', title: '指导价*', width: 170 },
     ...markupConfigurations.value.map((item) => ({
       colKey: `markup-${item.id}`,
       title: `${item.name}*`,
@@ -2123,7 +2131,7 @@ const createMarkupEditors = (prices: FinishedProductPrice[] = []) => {
   return Object.fromEntries(
     markupConfigurations.value.map((configuration) => {
       const existing = existingById.get(configuration.id);
-      const coefficient = existing ? 1 + Number(existing.markupRate) / 100 : 1 + Number(configuration.markupRate) / 100;
+      const coefficient = existing ? Number(existing.priceCoefficient) : Number(configuration.priceCoefficient);
       return [
         configuration.id,
         {
@@ -2134,6 +2142,11 @@ const createMarkupEditors = (prices: FinishedProductPrice[] = []) => {
     }),
   );
 };
+
+const defaultGuideCoefficient = () =>
+  guidePriceSettingCoefficient.value == null
+    ? ''
+    : Number(guidePriceSettingCoefficient.value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 
 const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
   id: createDraftId(),
@@ -2150,7 +2163,7 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
   sizeImage: false,
   costCoefficient: '',
   cost: '',
-  guideCoefficient: '',
+  guideCoefficient: defaultGuideCoefficient(),
   guide: '',
   level1Coefficient: '',
   level1: '',
@@ -2165,65 +2178,47 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
 });
 
 const createEditSpecRows = (row: StockItem): SpecRow[] => {
-  if (row.markupPrices?.length) {
-    const byVariant = new Map<string, FinishedProductPrice[]>();
-    row.markupPrices.forEach((price) => {
+  if (row.markupPrices?.length || row.guidePrices?.length) {
+    const byVariant = new Map<
+      string,
+      { markupPrices: FinishedProductPrice[]; guidePrice?: FinishedProductGuidePrice }
+    >();
+    row.markupPrices?.forEach((price) => {
       const key = price.variantKey || row.code;
-      byVariant.set(key, [...(byVariant.get(key) ?? []), price]);
+      const current = byVariant.get(key) ?? { markupPrices: [] };
+      current.markupPrices.push(price);
+      byVariant.set(key, current);
+    });
+    row.guidePrices?.forEach((price) => {
+      const key = price.variantKey || row.code;
+      const current = byVariant.get(key) ?? { markupPrices: [] };
+      current.guidePrice = price;
+      byVariant.set(key, current);
     });
     return Array.from(byVariant.entries()).map(([variantKey, prices], index) =>
       createBaseSpecRow({
         id: row.id * 100 + index + 1,
         mode: 'single',
-        specText: prices[0]?.variantLabel || variantKey,
+        specText: prices.guidePrice?.variantLabel || prices.markupPrices[0]?.variantLabel || variantKey,
         costCoefficient: '1',
-        cost: String(prices[0]?.costPrice ?? ''),
+        cost: String(prices.guidePrice?.costPrice ?? prices.markupPrices[0]?.costPrice ?? ''),
+        guideCoefficient: prices.guidePrice == null ? '' : String(Number(prices.guidePrice.priceCoefficient)),
+        guide: prices.guidePrice == null ? '' : String(prices.guidePrice.price),
         quantity: index === 0 ? row.stock : 0,
         merchantCode: variantKey,
-        markupPrices: createMarkupEditors(prices),
+        markupPrices: createMarkupEditors(prices.markupPrices),
       }),
     );
   }
   return [
     createBaseSpecRow({
       id: row.id * 10 + 1,
-      mode: 'layered',
-      material: '鱼肚白',
-      length: '1200mm',
-      color: '白色系',
-      size: '1500*800*750mm',
-      costCoefficient: '1',
-      cost: '1800',
-      guideCoefficient: '1.2',
-      guide: '2680',
-      level1Coefficient: '1.1',
-      level1: '2480',
-      level2Coefficient: '1.05',
-      level2: '2280',
-      level3Coefficient: '1',
-      level3: '2080',
-      quantity: Math.max(0, Math.ceil(row.stock / 2)),
-      merchantCode: `${row.code}-01`,
-    }),
-    createBaseSpecRow({
-      id: row.id * 10 + 2,
-      mode: 'layered',
-      material: '雪花白',
-      length: '1400mm',
-      color: '浅灰系',
-      size: '1600*850*750mm',
-      costCoefficient: '1',
-      cost: '2200',
-      guideCoefficient: '1.2',
-      guide: '3280',
-      level1Coefficient: '1.1',
-      level1: '3080',
-      level2Coefficient: '1.05',
-      level2: '2880',
-      level3Coefficient: '1',
-      level3: '2680',
-      quantity: Math.max(0, row.stock - Math.ceil(row.stock / 2)),
-      merchantCode: `${row.code}-02`,
+      mode: 'single',
+      specText: row.name,
+      guideCoefficient: '',
+      guide: row.guidePrice == null ? '' : String(row.guidePrice),
+      quantity: row.stock,
+      merchantCode: row.code,
     }),
   ];
 };
@@ -2384,7 +2379,7 @@ const handleMarkupCoefficientChange = (row: SpecRow, configurationId: number, va
   editor.coefficient = normalizeDecimalInput(value);
   const cost = decimalNumber(row.cost);
   const coefficient = decimalNumber(editor.coefficient);
-  if (cost !== null && coefficient !== null && coefficient >= 1) editor.price = (cost * coefficient).toFixed(2);
+  if (cost !== null && coefficient !== null && coefficient >= 0) editor.price = (cost * coefficient).toFixed(2);
 };
 
 const handleMarkupPriceChange = (row: SpecRow, configurationId: number, value: unknown) => {
@@ -2393,7 +2388,7 @@ const handleMarkupPriceChange = (row: SpecRow, configurationId: number, value: u
   editor.price = normalizeDecimalInput(value);
   const cost = decimalNumber(row.cost);
   const price = decimalNumber(editor.price);
-  if (cost !== null && cost > 0 && price !== null && price >= cost) editor.coefficient = (price / cost).toFixed(4);
+  if (cost !== null && cost > 0 && price !== null && price >= 0) editor.coefficient = (price / cost).toFixed(4);
 };
 
 const syncBatchPriceByCoefficient = (coefficientField: DecimalField, priceField: DecimalField) => {
@@ -2652,29 +2647,7 @@ const specToPriceRow = (row: SpecRow): PriceRow => ({
 const openPriceDrawer = (mode: PriceDrawerMode, row?: StockItem) => {
   priceDrawerMode.value = mode;
   if (mode === 'view' && row) {
-    priceRows.value = [
-      {
-        id: row.id,
-        mode: 'layered',
-        specText: row.name,
-        material: '鱼肚白',
-        length: '1200mm',
-        color: '白色系',
-        size: '1500*800*750mm',
-        merchantCode: row.code,
-        stock: row.stock,
-        costCoefficient: '1',
-        cost: '1800',
-        guideCoefficient: '1.2',
-        guide: '2680',
-        level1Coefficient: '1.1',
-        level1: '2480',
-        level2Coefficient: '1.05',
-        level2: '2280',
-        level3Coefficient: '1',
-        level3: '2080',
-      },
-    ];
+    priceRows.value = createEditSpecRows(row).map(specToPriceRow);
   } else {
     priceRows.value = specRows.value.map(specToPriceRow);
     resetBatchFillState();
@@ -2741,6 +2714,8 @@ const validateProductForm = () => {
   const pricesComplete = specRows.value.every(
     (row) =>
       Boolean(row.cost.trim()) &&
+      Boolean(row.guideCoefficient.trim()) &&
+      Boolean(row.guide.trim()) &&
       Boolean(row.merchantCode.trim()) &&
       markupConfigurations.value.every((configuration) => {
         const editor = row.markupPrices[configuration.id];
@@ -2753,8 +2728,12 @@ const validateProductForm = () => {
     { valid: Boolean(productForm.detail.trim()), tab: 'description', message: '请输入宝贝详情' },
     { valid: Boolean(productForm.name.trim()), tab: 'base', message: '请输入商品名称' },
     { valid: specRows.value.length > 0, tab: 'sales', message: '请创建销售规格' },
-    { valid: markupConfigurations.value.length > 0, tab: 'sales', message: '请先配置并启用成品加价规则' },
-    { valid: pricesComplete, tab: 'sales', message: '请完善每条规格的成本价、供货价和商家编码' },
+    {
+      valid: editingProduct.value != null || guidePriceSettingCoefficient.value != null,
+      tab: 'sales',
+      message: '请先配置成品指导价默认价格系数',
+    },
+    { valid: pricesComplete, tab: 'sales', message: '请完善每条规格的成本价、指导价和商家编码' },
     { valid: Boolean(productForm.merchantCode.trim()), tab: 'sales', message: '请输入商家编码' },
     { valid: Boolean(productForm.shelfNow), tab: 'sales', message: '请选择上架方式' },
   ];
@@ -2769,10 +2748,7 @@ const validateProductForm = () => {
 
 const buildProductPayloadFromForm = (): FinishedProductPayload => {
   const stock = totalStock.value || Number(productForm.totalStock || 0);
-  const firstConfiguration = markupConfigurations.value[0];
-  const guidePrice = Number(
-    firstConfiguration ? specRows.value[0]?.markupPrices[firstConfiguration.id]?.price || 0 : 0,
-  );
+  const guidePrice = Number(specRows.value[0]?.guide || 0);
   const status = productForm.shelfNow === 'now' ? 'selling' : 'warehouse';
   return {
     categoryId: categoryIdByPath(selectedCategoryPath.value),
@@ -2783,12 +2759,20 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
     publisherType: '平台发布',
     totalStock: stock,
     guidePrice: guidePrice > 0 ? guidePrice : undefined,
+    guidePrices: specRows.value.map((row) => ({
+      priceCoefficient: Number(Number(row.guideCoefficient).toFixed(4)),
+      costPrice: Number(row.cost),
+      price: Number(row.guide),
+      variantKey: row.merchantCode.trim(),
+      variantLabel:
+        row.specText || [row.material, row.length, row.color, row.size].filter(Boolean).join(' / ') || row.merchantCode,
+    })),
     markupPrices: specRows.value.flatMap((row) =>
       markupConfigurations.value.map((configuration) => {
         const editor = row.markupPrices[configuration.id];
         return {
           markupConfigurationId: configuration.id,
-          markupRate: Number(((Number(editor.coefficient) - 1) * 100).toFixed(4)),
+          priceCoefficient: Number(Number(editor.coefficient).toFixed(4)),
           costPrice: Number(row.cost),
           price: Number(editor.price),
           variantKey: row.merchantCode.trim(),

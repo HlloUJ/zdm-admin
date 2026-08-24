@@ -4480,9 +4480,15 @@ class PlatformApiSmokeTest {
         "SELECT id FROM slab_grades WHERE code = ?", Long.class, gradeCode);
     Long textureId = jdbcTemplate.queryForObject(
         "SELECT id FROM slab_textures WHERE name = '细纹'", Long.class);
-    Long guideConfigurationId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_markup_configurations WHERE name = '指导价'",
-        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_markup_configurations
+          (name, price_coefficient, sort_order, status, created_by_name, created_by_account_id)
+        VALUES
+          ('1级合伙人价格', 0.5000, 1, 'enabled', '超级管理员', 1),
+          ('2级合伙人价格', 1.3000, 2, 'enabled', '超级管理员', 1),
+          ('3级合伙人价格', 1.1800, 3, 'enabled', '超级管理员', 1)
+        """);
     Long level1ConfigurationId = jdbcTemplate.queryForObject(
         "SELECT id FROM slab_markup_configurations WHERE name = '1级合伙人价格'",
         Long.class);
@@ -4543,8 +4549,8 @@ class PlatformApiSmokeTest {
                     "corner4WidthMm":83.25,
                     "costPrice":100,
                     "guidePrice":160,
+                    "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"priceCoefficient":1.60,"costPrice":100,"price":160},
                       {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
                       {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
                       {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
@@ -4562,7 +4568,6 @@ class PlatformApiSmokeTest {
                       textureId,
                       colorId,
                       gradeId,
-                      guideConfigurationId,
                       level1ConfigurationId,
                       level2ConfigurationId,
                       level3ConfigurationId)))
@@ -4623,8 +4628,8 @@ class PlatformApiSmokeTest {
                     "thicknessMm":18,
                     "costPrice":100,
                     "guidePrice":160,
+                    "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"priceCoefficient":1.60,"costPrice":100,"price":160},
                       {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
                       {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
                       {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
@@ -4640,7 +4645,6 @@ class PlatformApiSmokeTest {
                       mainImageMediaId,
                       scanImageMediaId,
                       designImageMediaId,
-                      guideConfigurationId,
                       level1ConfigurationId,
                       level2ConfigurationId,
                       level3ConfigurationId)))
@@ -4675,8 +4679,8 @@ class PlatformApiSmokeTest {
                     "thicknessMm":18,
                     "costPrice":100,
                     "guidePrice":160,
+                    "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"priceCoefficient":1.60,"costPrice":100,"price":160},
                       {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
                       {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
                       {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
@@ -4692,7 +4696,6 @@ class PlatformApiSmokeTest {
                       mainImageMediaId,
                       scanImageMediaId,
                       designImageMediaId,
-                      guideConfigurationId,
                       level1ConfigurationId,
                       level2ConfigurationId,
                       level3ConfigurationId)))
@@ -4745,7 +4748,7 @@ class PlatformApiSmokeTest {
           "SELECT COUNT(*) FROM slab_prices WHERE slab_id = ?",
           Integer.class,
           slabId);
-      assertThat(unchangedPriceCount).isEqualTo(4);
+      assertThat(unchangedPriceCount).isEqualTo(3);
       mockMvc.perform(put("/api/admin/slabs/batch-status")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
@@ -4836,19 +4839,18 @@ class PlatformApiSmokeTest {
           "SELECT COUNT(*) FROM slab_prices WHERE slab_id = ?",
           Integer.class,
           slabId);
-      assertThat(persistedPriceCount).isEqualTo(4);
+      assertThat(persistedPriceCount).isEqualTo(3);
 
-      String renamedPrice = "指导供货价-" + suffix;
-      mockMvc.perform(put("/api/admin/slab-markup-configurations/{id}", guideConfigurationId)
+      mockMvc.perform(put("/api/admin/slab-guide-price-setting")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("""
                   {
-                    "name":"%s",
                     "priceCoefficient":1.61
                   }
-                  """.formatted(renamedPrice)))
-          .andExpect(status().isOk());
+                  """))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.priceCoefficient").value(1.61));
 
       mockMvc.perform(get("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -4862,16 +4864,16 @@ class PlatformApiSmokeTest {
               "$.data[?(@.id == " + slabId + ")].offShelfRecords[0].offShelvedByName", hasItem("超级管理员")))
           .andExpect(jsonPath(
               "$.data[?(@.id == " + slabId + ")].offShelfRecords[1].standardReason", hasItem("价格调整")))
-          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0].price", hasItem(160.00)));
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].guidePriceCoefficient", hasItem(1.60)))
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0].price", hasItem(50.00)));
       assertThat(jdbcTemplate.queryForObject(
           """
-          SELECT CONCAT(price_coefficient, ':', price)
-          FROM slab_prices
-          WHERE slab_id = ? AND markup_configuration_id = ?
+          SELECT CONCAT(guide_price_coefficient, ':', guide_price)
+          FROM slab_inventory
+          WHERE id = ?
           """,
           String.class,
-          slabId,
-          guideConfigurationId)).isEqualTo("1.6000:160.00");
+          slabId)).isEqualTo("1.6000:160.00");
 
       mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -4915,9 +4917,7 @@ class PlatformApiSmokeTest {
       assertThat(jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id = ?", Integer.class, slabId)).isGreaterThan(2);
     } finally {
-      jdbcTemplate.update(
-          "UPDATE slab_markup_configurations SET name = '指导价', price_coefficient = 1.6000 WHERE id = ?",
-          guideConfigurationId);
+      jdbcTemplate.update("DELETE FROM slab_guide_price_settings WHERE id = 1");
       if (slabId != null) {
         jdbcTemplate.update(
             "DELETE FROM slab_prices WHERE slab_id = ?",
@@ -4932,6 +4932,11 @@ class PlatformApiSmokeTest {
       if (deletedInterfaceSlabId != null) {
         jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", deletedInterfaceSlabId);
       }
+      jdbcTemplate.update(
+          "DELETE FROM slab_markup_configurations WHERE id IN (?, ?, ?)",
+          level1ConfigurationId,
+          level2ConfigurationId,
+          level3ConfigurationId);
       jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", gradeId);
       jdbcTemplate.update("DELETE FROM slab_colors WHERE id = ?", colorId);
       jdbcTemplate.update("DELETE FROM slab_color_categories WHERE id = ?", colorCategoryId);

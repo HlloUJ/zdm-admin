@@ -284,11 +284,11 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   const row = page.getByRole('row', { name: /外部系统大板 09/ });
   await row.getByText('删除', { exact: true }).click();
   const dialog = page.locator('.t-dialog').filter({ hasText: '删除原因' });
-  await expect(dialog).toContainText(
-    '该大板为外部系统创建，删除后将物理移除该大板，且不会进入回收站，操作不可恢复。',
-  );
+  await expect(dialog).toContainText('该大板为外部系统创建，删除后将物理移除该大板，且不会进入回收站，操作不可恢复。');
   await expect(dialog.locator('.external-delete-warning')).toHaveCSS('margin-bottom', '16px');
-  await expect(dialog.locator('.t-form__item').filter({ hasText: '详细说明' }).locator('.t-form__required-mark')).toHaveCount(0);
+  await expect(
+    dialog.locator('.t-form__item').filter({ hasText: '详细说明' }).locator('.t-form__required-mark'),
+  ).toHaveCount(0);
   await dialog.locator('.t-form__item').filter({ hasText: '删除原因' }).getByRole('textbox').click();
   await page.locator('.t-popup__content:visible').getByText('资料不完整', { exact: true }).click();
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
@@ -385,6 +385,59 @@ test('shows recycled slab prices without allowing edits', async ({ page }) => {
   const priceInputs = priceDrawer.getByRole('textbox');
   await expect(priceInputs.first()).toBeDisabled();
   await expect(priceInputs.last()).toBeDisabled();
+});
+
+test('restores the guide price coefficient from the slab independent price', async ({ page }) => {
+  await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [],
+      }),
+    });
+  });
+  await page.route('**/api/admin/slabs', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          {
+            id: 32,
+            supplierId: 1,
+            varietyId: 1,
+            name: '宝格丽黑大板',
+            serialNo: 'SLAB-E2E-032',
+            warehouse: '云浮仓',
+            publisherType: '平台发布',
+            lengthMm: 3200,
+            widthMm: 1800,
+            thicknessMm: 18,
+            costPrice: 2000,
+            guidePrice: 100,
+            guidePriceCoefficient: 0.05,
+            markupPrices: [],
+            status: 'warehouse',
+            createdAt: '2026-08-24T16:06:28',
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto('/slab-management');
+  const slabRow = page.getByRole('row', { name: /宝格丽黑大板/ });
+  await slabRow.getByText('价格', { exact: true }).click();
+
+  const priceDrawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
+  const guideRow = priceDrawer.locator('.price-table__row').filter({ hasText: '指导价' });
+  const guideInputs = guideRow.getByRole('textbox');
+  await expect(guideInputs.nth(0)).toHaveValue('0.05');
+  await expect(guideInputs.nth(1)).toHaveValue('100.00');
 });
 
 test('shows only assigned slab tabs and operations', async ({ page }) => {

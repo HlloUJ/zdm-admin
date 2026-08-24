@@ -25,6 +25,7 @@ public class SlabMarkupConfiguration extends BaseEntity {
 
   private String createdByName;
   private Long createdByAccountId;
+  private Boolean legacySeeded;
 
   @TableField(exist = false)
   private boolean referenced;
@@ -67,6 +68,14 @@ public class SlabMarkupConfiguration extends BaseEntity {
 
   public void setCreatedByAccountId(Long createdByAccountId) {
     this.createdByAccountId = createdByAccountId;
+  }
+
+  public Boolean getLegacySeeded() {
+    return legacySeeded;
+  }
+
+  public void setLegacySeeded(Boolean legacySeeded) {
+    this.legacySeeded = legacySeeded;
   }
 
   public boolean isReferenced() {

@@ -63,6 +63,7 @@ export interface SlabRecord {
   areaSquareMeter?: number;
   costPrice?: number;
   guidePrice?: number;
+  guidePriceCoefficient?: number;
   markupPrices?: SlabPrice[];
   offShelfRecords?: SlabOffShelfRecord[];
   status?: SlabStatus;
@@ -101,6 +102,7 @@ export interface SlabPayload {
   areaSquareMeter?: number;
   costPrice?: number;
   guidePrice?: number;
+  guidePriceCoefficient?: number;
   markupPrices?: SlabPrice[];
   status: SlabStatus;
 }

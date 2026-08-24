@@ -51,7 +51,8 @@ class MarkupConfigurationServiceTest {
         "all",
         List.of("STORE_ADMIN"),
         List.of("all")));
-    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
+        mapper, identityProvider, ownershipGuard, Mockito.mock(PriceConfigurationBackfillService.class));
 
     assertThatThrownBy(() -> service.listConfigurations(false))
         .isInstanceOf(AccessDeniedException.class)
@@ -70,7 +71,8 @@ class MarkupConfigurationServiceTest {
     otherCreatorConfiguration.setCreatedByAccountId(99L);
     when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
     when(mapper.selectList(any())).thenReturn(List.of(otherCreatorConfiguration));
-    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
+        mapper, identityProvider, ownershipGuard, Mockito.mock(PriceConfigurationBackfillService.class));
 
     assertThat(service.listConfigurations(false))
         .extracting(SlabMarkupConfiguration::getCreatedByAccountId)
@@ -92,7 +94,8 @@ class MarkupConfigurationServiceTest {
     doThrow(new AccessDeniedException(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE))
         .when(ownershipGuard)
         .requireCreator(99L, null);
-    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
+        mapper, identityProvider, ownershipGuard, Mockito.mock(PriceConfigurationBackfillService.class));
 
     assertThatThrownBy(() -> service.updateConfiguration(21L, new SlabMarkupConfiguration()))
         .isInstanceOf(AccessDeniedException.class)
@@ -122,7 +125,8 @@ class MarkupConfigurationServiceTest {
     doThrow(new AccessDeniedException(CreatorOwnershipGuard.OTHER_CREATOR_MESSAGE))
         .when(ownershipGuard)
         .requireCreator(99L, null);
-    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(mapper, identityProvider, ownershipGuard);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
+        mapper, identityProvider, ownershipGuard, Mockito.mock(PriceConfigurationBackfillService.class));
 
     assertThatThrownBy(() -> service.reorderConfigurations(List.of(22L, 21L)))
         .isInstanceOf(AccessDeniedException.class)

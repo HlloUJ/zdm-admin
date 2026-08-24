@@ -20,7 +20,7 @@ const productThirdMenuLabels = [
 const adminProductThirdMenuLabels = [
   '—',
   ...productThirdMenuLabels.slice(0, 4),
-  '加价配置',
+  '价格配置',
   ...productThirdMenuLabels.slice(4),
 ];
 
@@ -950,9 +950,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
     templateActionLabels,
   );
   const markupActionLabels = ['查看', '新增', '编辑', '排序', '停用/启用', '删除'];
-  const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品加价配置' });
-  const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板加价配置' });
-  await expect(finishedMarkupPermissionRow.getByText('加价配置', { exact: true })).toBeVisible();
+  const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品价格配置' });
+  const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板价格配置' });
+  await expect(finishedMarkupPermissionRow.getByText('价格配置', { exact: true })).toBeVisible();
   await expect(finishedMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     markupActionLabels,
   );

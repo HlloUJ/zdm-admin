@@ -32,8 +32,9 @@ public class SlabPriceService {
         .collect(Collectors.toSet());
     Set<Long> actualIds = listPrices(slabId).stream()
         .map(SlabPrice::getMarkupConfigurationId)
+        .filter(expectedIds::contains)
         .collect(Collectors.toSet());
-    if (expectedIds.isEmpty() || !actualIds.equals(expectedIds)) {
+    if (!actualIds.equals(expectedIds)) {
       throw new IllegalArgumentException("请完善全部大板价格");
     }
   }
@@ -41,8 +42,8 @@ public class SlabPriceService {
   @Transactional
   public void replacePrices(Long slabId, List<SlabPrice> requestedPrices) {
     List<SlabMarkupConfiguration> configurations = configurationService.listConfigurations(true);
-    if (configurations.isEmpty()) {
-      throw new IllegalArgumentException("请先配置并启用至少一条大板价格层级");
+    if (configurations.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
+      return;
     }
     if (requestedPrices == null || requestedPrices.isEmpty()) {
       throw new IllegalArgumentException("请完善全部大板价格");
@@ -56,7 +57,9 @@ public class SlabPriceService {
     }
     List<SlabPrice> normalized = new ArrayList<>();
     requestedPrices.forEach(price -> normalized.add(normalize(slabId, price, byId.get(price.getMarkupConfigurationId()))));
-    mapper.delete(Wrappers.<SlabPrice>lambdaQuery().eq(SlabPrice::getSlabId, slabId));
+    mapper.delete(Wrappers.<SlabPrice>lambdaQuery()
+        .eq(SlabPrice::getSlabId, slabId)
+        .in(SlabPrice::getMarkupConfigurationId, byId.keySet()));
     normalized.forEach(mapper::insert);
   }
 
