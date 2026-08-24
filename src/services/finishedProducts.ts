@@ -4,7 +4,14 @@ export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'sold
 
 export interface FinishedProductPrice {
   markupConfigurationId: number;
-  markupRate: number;
+  priceCoefficient: number;
+  costPrice: number;
+  price: number;
+  variantKey: string;
+  variantLabel?: string;
+}
+export interface FinishedProductGuidePrice {
+  priceCoefficient: number;
   costPrice: number;
   price: number;
   variantKey: string;
@@ -21,6 +28,7 @@ export interface FinishedProductRecord {
   publisherType?: string;
   totalStock?: number;
   guidePrice?: number;
+  guidePrices?: FinishedProductGuidePrice[];
   markupPrices?: FinishedProductPrice[];
   status?: FinishedProductStatus;
   createdAt?: string;
@@ -36,6 +44,7 @@ export interface FinishedProductPayload {
   publisherType?: string;
   totalStock?: number;
   guidePrice?: number;
+  guidePrices?: FinishedProductGuidePrice[];
   markupPrices?: FinishedProductPrice[];
   status: FinishedProductStatus;
 }

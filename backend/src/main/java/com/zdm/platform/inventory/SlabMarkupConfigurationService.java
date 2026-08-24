@@ -22,19 +22,24 @@ public class SlabMarkupConfigurationService {
   private final SlabMarkupConfigurationMapper mapper;
   private final CurrentIdentityProvider identityProvider;
   private final CreatorOwnershipGuard ownershipGuard;
+  private final PriceConfigurationBackfillService backfillService;
 
   public SlabMarkupConfigurationService(
       SlabMarkupConfigurationMapper mapper,
       CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+      CreatorOwnershipGuard ownershipGuard,
+      PriceConfigurationBackfillService backfillService) {
     this.mapper = mapper;
     this.identityProvider = identityProvider;
     this.ownershipGuard = ownershipGuard;
+    this.backfillService = backfillService;
   }
 
   public List<SlabMarkupConfiguration> listConfigurations(boolean enabledOnly) {
     requirePlatformScope();
     var query = Wrappers.<SlabMarkupConfiguration>lambdaQuery();
+    query.ne(SlabMarkupConfiguration::getName, "指导价")
+        .eq(SlabMarkupConfiguration::getLegacySeeded, false);
     if (enabledOnly) {
       query.eq(SlabMarkupConfiguration::getStatus, "enabled");
     }
@@ -58,6 +63,7 @@ public class SlabMarkupConfigurationService {
     validateUniqueName(payload.getName(), null);
     try {
       mapper.insert(payload);
+      backfillService.backfillSlabs(payload);
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
     }
@@ -93,6 +99,9 @@ public class SlabMarkupConfigurationService {
     ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     mapper.updateById(existing);
+    if ("enabled".equals(status)) {
+      backfillService.backfillSlabs(existing);
+    }
     return requireConfiguration(id);
   }
 
@@ -100,7 +109,8 @@ public class SlabMarkupConfigurationService {
   public List<SlabMarkupConfiguration> reorderConfigurations(List<Long> orderedIds) {
     requirePlatformScope();
     List<SlabMarkupConfiguration> configurations = mapper.selectList(
-        Wrappers.<SlabMarkupConfiguration>lambdaQuery());
+        Wrappers.<SlabMarkupConfiguration>lambdaQuery()
+            .eq(SlabMarkupConfiguration::getLegacySeeded, false));
     if (orderedIds == null
         || orderedIds.size() != configurations.size()
         || new HashSet<>(orderedIds).size() != configurations.size()) {
@@ -163,6 +173,7 @@ public class SlabMarkupConfigurationService {
   private int nextSortOrder() {
     SlabMarkupConfiguration lastConfiguration = mapper.selectOne(
         Wrappers.<SlabMarkupConfiguration>lambdaQuery()
+            .eq(SlabMarkupConfiguration::getLegacySeeded, false)
             .orderByDesc(SlabMarkupConfiguration::getSortOrder)
             .last("LIMIT 1"));
     return lastConfiguration == null || lastConfiguration.getSortOrder() == null
@@ -175,6 +186,9 @@ public class SlabMarkupConfigurationService {
       throw new IllegalArgumentException("请输入加价名称");
     }
     String name = value.trim();
+    if ("指导价".equals(name)) {
+      throw new IllegalArgumentException("指导价请在指导价设置中维护");
+    }
     if (name.length() > 20) {
       throw new IllegalArgumentException("加价名称最多20个字");
     }

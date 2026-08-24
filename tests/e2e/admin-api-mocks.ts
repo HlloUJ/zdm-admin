@@ -652,6 +652,45 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/slab-colors', slabColors);
   await mockCollection(page, '**/api/admin/slab-colors/categories', slabColorCategories);
   await mockCollection(page, '**/api/admin/slab-grades', slabGrades);
+  await page.route('**/api/admin/slabs/publish-options', async (route) => {
+    await fulfillJson(route, {
+      textures: slabTextures.map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      colorCategories: slabColorCategories.map((category) => ({
+        id: category.id,
+        label: category.name,
+        status: 'enabled',
+        children: slabColors
+          .filter((color) => color.categoryId === category.id)
+          .map((color) => ({ id: color.id, label: color.name, status: color.status })),
+      })),
+      grades: slabGrades.map((item) => ({
+        id: item.id,
+        label: item.code,
+        description: item.name,
+        status: item.status,
+      })),
+    });
+  });
+  await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
+    await fulfillJson(route, []);
+  });
+  await page.route('**/api/admin/slab-guide-price-setting', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON() as { priceCoefficient: number };
+      return fulfillJson(route, { id: 1, priceCoefficient: payload.priceCoefficient });
+    }
+    return fulfillJson(route, { id: 1, priceCoefficient: 1.6 });
+  });
+  await page.route('**/api/admin/finished-markup-configurations/options', async (route) => {
+    await fulfillJson(route, []);
+  });
+  await page.route('**/api/admin/finished-guide-price-setting', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON() as { priceCoefficient: number };
+      return fulfillJson(route, { id: 1, priceCoefficient: payload.priceCoefficient });
+    }
+    return fulfillJson(route, { id: 1, priceCoefficient: 1.2 });
+  });
   await page.route('**/api/admin/slab-textures/*/aliases**', async (route) => {
     const parts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
     const textureId = Number(parts[3]);

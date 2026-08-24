@@ -52,8 +52,11 @@ public class MediaReferenceService {
     }
 
     for (Map.Entry<String, Long> entry : desired.entrySet()) {
-      MediaAsset asset = assetService.requireAvailableForUpdate(entry.getValue());
       MediaReference current = existing.get(entry.getKey());
+      boolean retainsCurrentReference = current != null && Objects.equals(current.getMediaId(), entry.getValue());
+      MediaAsset asset = retainsCurrentReference
+          ? assetService.requireReferencedAvailableForUpdate(entry.getValue())
+          : assetService.requireAvailableForUpdate(entry.getValue());
       if (current == null || !Objects.equals(current.getMediaId(), asset.getId())) {
         MediaReference reference = new MediaReference();
         reference.setMediaId(asset.getId());

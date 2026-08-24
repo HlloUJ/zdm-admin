@@ -9,12 +9,15 @@ import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -22,11 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabInventory> {
-  private static final String DUPLICATE_SERIAL_MESSAGE = "大板编码已存在";
+  private static final String DUPLICATE_SKU_MESSAGE = "SKU已存在";
   private static final String PLATFORM_PUBLISHER = "平台发布";
   private static final String API_PUBLISHER = "接口获取";
-  private static final String PENDING_REVIEW_STATUS = "pendingReview";
-  private static final String REJECTED_STATUS = "rejected";
   private static final Set<String> ALLOWED_STATUSES = Set.of(
       "warehouse", "selling", "offShelf", "soldOut", "recycle");
 
@@ -39,6 +40,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   private final MediaAssetService mediaAssetService;
   private final MediaCleanupService mediaCleanupService;
   private final MediaReferenceService mediaReferenceService;
+  private final SlabOperationLogService operationLogService;
   private final CurrentIdentityProvider identityProvider;
 
   public SlabInventoryService(
@@ -51,6 +53,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       MediaAssetService mediaAssetService,
       MediaCleanupService mediaCleanupService,
       MediaReferenceService mediaReferenceService,
+      SlabOperationLogService operationLogService,
       CurrentIdentityProvider identityProvider) {
     this.textureService = textureService;
     this.colorService = colorService;
@@ -61,6 +64,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     this.mediaAssetService = mediaAssetService;
     this.mediaCleanupService = mediaCleanupService;
     this.mediaReferenceService = mediaReferenceService;
+    this.operationLogService = operationLogService;
     this.identityProvider = identityProvider;
   }
 
@@ -80,29 +84,44 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   @Transactional
   public SlabInventory createWithPrices(SlabInventory inventory) {
     validateReferences(inventory);
+    validateGuidePrice(inventory);
     List<SlabPrice> markupPrices = inventory.getMarkupPrices();
     inventory.setId(null);
     applyCreationMetadata(inventory);
     try {
       save(inventory);
     } catch (DuplicateKeyException exception) {
-      throw new IllegalArgumentException(DUPLICATE_SERIAL_MESSAGE, exception);
+      throw new IllegalArgumentException(DUPLICATE_SKU_MESSAGE, exception);
     }
     priceService.replacePrices(inventory.getId(), markupPrices);
     if ("selling".equals(inventory.getStatus())) {
       validateReadyForShelf(inventory);
     }
     syncMediaReferences(inventory);
-    return attachPrices(inventory);
+    SlabInventory created = attachPrices(inventory);
+    operationLogService.record(
+        created,
+        "CREATE",
+        "创建大板",
+        null,
+        created.getStatus(),
+        null,
+        null,
+        API_PUBLISHER.equals(created.getPublisherType()) ? "EXTERNAL_API" : "MANUAL",
+        null,
+        Map.of());
+    return created;
   }
 
   @Transactional
   public SlabInventory updateWithPrices(Long id, SlabInventory inventory) {
-    validateReferences(inventory);
     SlabInventory existing = getById(id);
     if (existing == null) {
       return null;
     }
+    List<SlabPrice> existingPrices = priceService.listPrices(id);
+    validateReferencesForUpdate(existing, inventory);
+    validateGuidePrice(inventory);
     List<SlabPrice> markupPrices = inventory.getMarkupPrices();
     inventory.setId(id);
     inventory.setCreatedByName(existing.getCreatedByName());
@@ -110,21 +129,32 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     inventory.setCreatedAt(existing.getCreatedAt());
     inventory.setPublisherType(existing.getPublisherType());
     inventory.setStatus(existing.getStatus());
-    inventory.setRejectionReason(existing.getRejectionReason());
-    inventory.setRejectionDetail(existing.getRejectionDetail());
-    inventory.setRejectedByName(existing.getRejectedByName());
-    inventory.setRejectedByAccountId(existing.getRejectedByAccountId());
-    inventory.setRejectedAt(existing.getRejectedAt());
     try {
       updateById(inventory);
     } catch (DuplicateKeyException exception) {
-      throw new IllegalArgumentException(DUPLICATE_SERIAL_MESSAGE, exception);
+      throw new IllegalArgumentException(DUPLICATE_SKU_MESSAGE, exception);
     }
     if (markupPrices != null) {
       priceService.replacePrices(id, markupPrices);
     }
-    syncMediaReferences(inventory);
-    return attachPrices(getById(id));
+    syncMediaReferences(inventory, existing);
+    SlabInventory updated = attachPrices(getById(id));
+    Map<String, Object> changes = collectChanges(existing, existingPrices, updated);
+    if (!changes.isEmpty()) {
+      boolean priceOnly = changes.keySet().stream().allMatch(this::isPriceChange);
+      operationLogService.record(
+          updated,
+          priceOnly ? "PRICE_UPDATE" : "UPDATE",
+          priceOnly ? "修改价格" : "编辑大板（修改" + changes.size() + "项）",
+          existing.getStatus(),
+          updated.getStatus(),
+          null,
+          null,
+          "MANUAL",
+          null,
+          changes);
+    }
+    return updated;
   }
 
   public boolean cleanupTemporaryMedia(Long mediaId) {
@@ -142,6 +172,75 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       mediaReferenceService.removeBusiness("SLAB", existing.getId(), "大板被彻底删除");
     }
     return removed;
+  }
+
+  @Transactional
+  public boolean deleteFromManagement(Long id, String reason, String detail) {
+    SlabInventory inventory = requireDeletable(id);
+    String normalizedReason = normalizeOptionalText(reason);
+    String normalizedDetail = normalizeOptionalText(detail);
+    if (API_PUBLISHER.equals(inventory.getPublisherType())) {
+      if (normalizedReason == null) {
+        throw new IllegalArgumentException("请选择删除原因");
+      }
+      operationLogService.record(
+          inventory, "PHYSICAL_DELETE", "物理删除外部大板",
+          inventory.getStatus(), null, normalizedReason, normalizedDetail,
+          "MANUAL", null, Map.of());
+      return removeById(id);
+    }
+    operationLogService.record(
+        inventory, "DELETE_TO_RECYCLE", "删除至回收站",
+        inventory.getStatus(), "recycle", normalizedReason, normalizedDetail,
+        "MANUAL", null, Map.of());
+    inventory.setStatus("recycle");
+    return updateById(inventory);
+  }
+
+  @Transactional
+  public boolean purgeFromRecycle(Long id) {
+    SlabInventory inventory = getById(id);
+    if (inventory == null || !"recycle".equals(inventory.getStatus())) {
+      throw new IllegalArgumentException("只有回收站中的大板可以彻底删除");
+    }
+    operationLogService.record(
+        inventory, "PURGE", "彻底删除大板",
+        inventory.getStatus(), null, null, null,
+        "MANUAL", null, Map.of());
+    return removeById(id);
+  }
+
+  @Transactional
+  public boolean purgeFromRecycleBatch(List<Long> ids) {
+    List<Long> normalizedIds = new LinkedHashSet<>(ids == null ? List.<Long>of() : ids)
+        .stream()
+        .filter(Objects::nonNull)
+        .toList();
+    if (normalizedIds.isEmpty()) {
+      throw new IllegalArgumentException("请选择大板");
+    }
+    List<SlabInventory> inventory = listByIds(normalizedIds);
+    if (inventory.size() != normalizedIds.size()
+        || inventory.stream().anyMatch(item -> !"recycle".equals(item.getStatus()))) {
+      throw new IllegalArgumentException("只有回收站中的大板可以彻底删除");
+    }
+    String batchNo = UUID.randomUUID().toString();
+    inventory.forEach(item -> operationLogService.record(
+        item, "PURGE", "批量彻底删除大板", item.getStatus(), null,
+        null, null, "MANUAL", batchNo, Map.of()));
+    inventory.forEach(item -> removeById(item.getId()));
+    return true;
+  }
+
+  private SlabInventory requireDeletable(Long id) {
+    SlabInventory inventory = getById(id);
+    if (inventory == null) {
+      throw new IllegalArgumentException("大板不存在或已被删除");
+    }
+    if (!Set.of("warehouse", "offShelf").contains(inventory.getStatus())) {
+      throw new IllegalArgumentException("只有仓库中或已下架的大板可以删除");
+    }
+    return inventory;
   }
 
   @Transactional
@@ -173,6 +272,18 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         .in(SlabInventory::getId, normalizedIds)
         .set(SlabInventory::getStatus, status)
         .update();
+    String batchNo = normalizedIds.size() > 1 ? UUID.randomUUID().toString() : null;
+    inventory.forEach(item -> operationLogService.record(
+        item,
+        statusOperationType(item.getStatus(), status),
+        statusOperationSummary(item.getStatus(), status),
+        item.getStatus(),
+        status,
+        normalizedReason,
+        normalizedDetail,
+        "MANUAL",
+        batchNo,
+        Map.of()));
     if ("offShelf".equals(status)) {
       CurrentIdentity identity = identityProvider.require();
       LocalDateTime offShelvedAt = LocalDateTime.now();
@@ -190,29 +301,6 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     }
   }
 
-  @Transactional
-  public SlabInventory reject(Long id, String reason, String detail) {
-    SlabInventory inventory = getById(id);
-    if (inventory == null) {
-      throw new IllegalArgumentException("大板不存在或已被删除");
-    }
-    if (!API_PUBLISHER.equals(inventory.getPublisherType())) {
-      throw new IllegalArgumentException("只有接口获取且待审核的大板可以驳回");
-    }
-    if (!PENDING_REVIEW_STATUS.equals(inventory.getStatus())) {
-      throw new IllegalArgumentException("当前大板状态不允许驳回");
-    }
-    CurrentIdentity identity = identityProvider.require();
-    inventory.setStatus(REJECTED_STATUS);
-    inventory.setRejectionReason(reason.trim());
-    inventory.setRejectionDetail(detail.trim());
-    inventory.setRejectedByName(identity.displayName());
-    inventory.setRejectedByAccountId(identity.accountId());
-    inventory.setRejectedAt(LocalDateTime.now());
-    updateById(inventory);
-    return attachPrices(inventory);
-  }
-
   private String normalizeOptionalText(String value) {
     if (value == null || value.isBlank()) {
       return null;
@@ -220,13 +308,115 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     return value.trim();
   }
 
+  private String statusOperationType(String beforeStatus, String afterStatus) {
+    if ("warehouse".equals(beforeStatus) && "selling".equals(afterStatus)) {
+      return "SHELF";
+    }
+    if ("selling".equals(beforeStatus) && "offShelf".equals(afterStatus)) {
+      return "OFF_SHELF";
+    }
+    if ("offShelf".equals(beforeStatus) && "warehouse".equals(afterStatus)) {
+      return "RESTORE_WAREHOUSE";
+    }
+    if ("recycle".equals(beforeStatus) && "warehouse".equals(afterStatus)) {
+      return "RESTORE_RECYCLE";
+    }
+    return "STATUS_UPDATE";
+  }
+
+  private String statusOperationSummary(String beforeStatus, String afterStatus) {
+    return switch (statusOperationType(beforeStatus, afterStatus)) {
+      case "SHELF" -> "上架大板";
+      case "OFF_SHELF" -> "下架大板";
+      case "RESTORE_WAREHOUSE" -> "放回仓库";
+      case "RESTORE_RECYCLE" -> "从回收站恢复";
+      default -> "修改大板状态";
+    };
+  }
+
+  private Map<String, Object> collectChanges(
+      SlabInventory before,
+      List<SlabPrice> beforePrices,
+      SlabInventory after) {
+    Map<String, Object> changes = new LinkedHashMap<>();
+    addChange(changes, "大板名称", before.getName(), after.getName());
+    addChange(changes, "SKU", before.getSerialNo(), after.getSerialNo());
+    addChange(changes, "供应商ID", before.getSupplierId(), after.getSupplierId());
+    addChange(changes, "品种ID", before.getVarietyId(), after.getVarietyId());
+    addChange(changes, "产地ID", before.getOriginId(), after.getOriginId());
+    addChange(changes, "纹理ID", before.getTextureId(), after.getTextureId());
+    addChange(changes, "色系ID", before.getColorId(), after.getColorId());
+    addChange(changes, "等级ID", before.getGradeId(), after.getGradeId());
+    addChange(changes, "仓库", before.getWarehouse(), after.getWarehouse());
+    addChange(changes, "长度", before.getLengthMm(), after.getLengthMm());
+    addChange(changes, "宽度", before.getWidthMm(), after.getWidthMm());
+    addChange(changes, "高度", before.getThicknessMm(), after.getThicknessMm());
+    addChange(changes, "误差", before.getToleranceMm(), after.getToleranceMm());
+    addChange(changes, "扣角1长", before.getCorner1LengthMm(), after.getCorner1LengthMm());
+    addChange(changes, "扣角1宽", before.getCorner1WidthMm(), after.getCorner1WidthMm());
+    addChange(changes, "扣角2长", before.getCorner2LengthMm(), after.getCorner2LengthMm());
+    addChange(changes, "扣角2宽", before.getCorner2WidthMm(), after.getCorner2WidthMm());
+    addChange(changes, "扣角3长", before.getCorner3LengthMm(), after.getCorner3LengthMm());
+    addChange(changes, "扣角3宽", before.getCorner3WidthMm(), after.getCorner3WidthMm());
+    addChange(changes, "扣角4长", before.getCorner4LengthMm(), after.getCorner4LengthMm());
+    addChange(changes, "扣角4宽", before.getCorner4WidthMm(), after.getCorner4WidthMm());
+    addChange(changes, "面积", before.getAreaSquareMeter(), after.getAreaSquareMeter());
+    addChange(changes, "1:1主图", before.getMainImageMediaId(), after.getMainImageMediaId());
+    addChange(changes, "扫描图", before.getScanImageMediaId(), after.getScanImageMediaId());
+    addChange(changes, "设计图", before.getDesignImageMediaId(), after.getDesignImageMediaId());
+    addChange(changes, "商品视频", before.getVideoMediaId(), after.getVideoMediaId());
+    addChange(changes, "视频封面", before.getVideoCoverMediaId(), after.getVideoCoverMediaId());
+    addChange(changes, "成本价", before.getCostPrice(), after.getCostPrice());
+    addChange(changes, "指导价", before.getGuidePrice(), after.getGuidePrice());
+    addChange(changes, "指导价系数", before.getGuidePriceCoefficient(), after.getGuidePriceCoefficient());
+    addChange(changes, "价格层级", priceDetails(beforePrices), priceDetails(after.getMarkupPrices()));
+    return changes;
+  }
+
+  private List<Map<String, Object>> priceDetails(List<SlabPrice> prices) {
+    if (prices == null) {
+      return List.of();
+    }
+    return prices.stream()
+        .sorted(java.util.Comparator.comparing(SlabPrice::getMarkupConfigurationId))
+        .map(price -> {
+          Map<String, Object> value = new LinkedHashMap<>();
+          value.put("configurationId", price.getMarkupConfigurationId());
+          value.put("priceCoefficient", price.getPriceCoefficient());
+          value.put("costPrice", price.getCostPrice());
+          value.put("price", price.getPrice());
+          return value;
+        })
+        .toList();
+  }
+
+  private void addChange(
+      Map<String, Object> changes,
+      String field,
+      Object before,
+      Object after) {
+    if (Objects.deepEquals(before, after)) {
+      return;
+    }
+    Map<String, Object> values = new LinkedHashMap<>();
+    values.put("before", before);
+    values.put("after", after);
+    changes.put(field, values);
+  }
+
+  private boolean isPriceChange(String field) {
+    return Set.of("成本价", "指导价", "指导价系数", "价格层级").contains(field);
+  }
+
   private void applyCreationMetadata(SlabInventory inventory) {
     String publisherType = normalizePublisherType(inventory.getPublisherType());
     inventory.setPublisherType(publisherType);
     inventory.setCreatedAt(LocalDateTime.now());
     if (API_PUBLISHER.equals(publisherType)) {
-      inventory.setStatus(PENDING_REVIEW_STATUS);
-      inventory.setCreatedByName("接口获取");
+      if (!"selling".equals(inventory.getStatus())) {
+        inventory.setStatus("warehouse");
+      }
+      inventory.setCreatedByName("外部系统");
       inventory.setCreatedByAccountId(null);
       return;
     }
@@ -251,11 +441,9 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   private void validateStatusTransition(SlabInventory inventory, String targetStatus) {
     String currentStatus = inventory.getStatus();
     boolean allowed = switch (currentStatus) {
-      case PENDING_REVIEW_STATUS -> "selling".equals(targetStatus);
-      case "warehouse" -> Set.of("selling", "recycle").contains(targetStatus);
-      case "selling" -> Set.of("offShelf", "recycle").contains(targetStatus);
-      case "offShelf" -> Set.of("warehouse", "recycle").contains(targetStatus);
-      case "recycle" -> "warehouse".equals(targetStatus);
+      case "warehouse" -> "selling".equals(targetStatus);
+      case "selling" -> "offShelf".equals(targetStatus);
+      case "offShelf", "recycle" -> "warehouse".equals(targetStatus);
       default -> false;
     };
     if (!allowed) {
@@ -282,10 +470,33 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if (inventory.getCostPrice() == null
         || inventory.getCostPrice().signum() < 0
         || inventory.getGuidePrice() == null
-        || inventory.getGuidePrice().signum() < 0) {
+        || inventory.getGuidePrice().signum() < 0
+        || inventory.getGuidePriceCoefficient() == null
+        || inventory.getGuidePriceCoefficient().signum() < 0) {
       throw new IllegalArgumentException("请完善大板价格后再上架");
     }
     priceService.requireCompletePrices(inventory.getId());
+  }
+
+  private void validateGuidePrice(SlabInventory inventory) {
+    if (inventory.getCostPrice() == null
+        && inventory.getGuidePrice() == null
+        && inventory.getGuidePriceCoefficient() == null) {
+      return;
+    }
+    if (inventory.getCostPrice() == null
+        || inventory.getGuidePrice() == null
+        || inventory.getGuidePriceCoefficient() == null
+        || inventory.getCostPrice().signum() < 0
+        || inventory.getGuidePrice().signum() < 0
+        || inventory.getGuidePriceCoefficient().signum() < 0) {
+      throw new IllegalArgumentException("成本价、指导价系数和指导价不能为空且不能小于0");
+    }
+    var expected = inventory.getCostPrice().multiply(inventory.getGuidePriceCoefficient())
+        .setScale(2, RoundingMode.HALF_UP);
+    if (inventory.getGuidePrice().setScale(2, RoundingMode.HALF_UP).compareTo(expected) != 0) {
+      throw new IllegalArgumentException("指导价必须等于成本价按指导价系数计算后的结果");
+    }
   }
 
   public SlabPublishOptions listPublishOptions() {
@@ -314,7 +525,24 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
 
   public void validateReferences(SlabInventory inventory) {
     validateMeasurements(inventory);
-    validateMedia(inventory);
+    validateMedia(inventory, null);
+    if (inventory.getTextureId() != null && textureService.getById(inventory.getTextureId()) == null) {
+      throw new IllegalArgumentException("纹理不存在");
+    }
+    if (inventory.getColorId() != null && colorService.getById(inventory.getColorId()) == null) {
+      throw new IllegalArgumentException("色系不存在");
+    }
+    if (inventory.getGradeId() != null && gradeService.getById(inventory.getGradeId()) == null) {
+      throw new IllegalArgumentException("等级不存在");
+    }
+    if (inventory.getOriginId() != null && originService.getById(inventory.getOriginId()) == null) {
+      throw new IllegalArgumentException("产地不存在");
+    }
+  }
+
+  private void validateReferencesForUpdate(SlabInventory existing, SlabInventory inventory) {
+    validateMeasurements(inventory);
+    validateMedia(inventory, existing);
     if (inventory.getTextureId() != null && textureService.getById(inventory.getTextureId()) == null) {
       throw new IllegalArgumentException("纹理不存在");
     }
@@ -358,29 +586,46 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     return inventory;
   }
 
-  private void validateMedia(SlabInventory inventory) {
-    requireMediaType(inventory.getMainImageMediaId(), "image", "请上传商品主图");
-    requireMediaType(inventory.getScanImageMediaId(), "image", "请上传扫描图");
-    requireMediaType(inventory.getDesignImageMediaId(), "image", "请上传设计图");
+  private void validateMedia(SlabInventory inventory, SlabInventory existing) {
+    requireMediaType(
+        inventory.getMainImageMediaId(), existing == null ? null : existing.getMainImageMediaId(),
+        "image", "请上传商品主图");
+    requireMediaType(
+        inventory.getScanImageMediaId(), existing == null ? null : existing.getScanImageMediaId(),
+        "image", "请上传扫描图");
+    requireMediaType(
+        inventory.getDesignImageMediaId(), existing == null ? null : existing.getDesignImageMediaId(),
+        "image", "请上传设计图");
     if (inventory.getVideoMediaId() != null) {
-      requireMediaType(inventory.getVideoMediaId(), "video", "商品视频格式不正确");
-      requireMediaType(inventory.getVideoCoverMediaId(), "image", "商品视频封面不存在");
+      requireMediaType(
+          inventory.getVideoMediaId(), existing == null ? null : existing.getVideoMediaId(),
+          "video", "商品视频格式不正确");
+      requireMediaType(
+          inventory.getVideoCoverMediaId(), existing == null ? null : existing.getVideoCoverMediaId(),
+          "image", "商品视频封面不存在");
     } else if (inventory.getVideoCoverMediaId() != null) {
       throw new IllegalArgumentException("商品视频不存在");
     }
   }
 
-  private void requireMediaType(Long mediaId, String mediaType, String emptyMessage) {
+  private void requireMediaType(
+      Long mediaId, Long existingMediaId, String mediaType, String emptyMessage) {
     if (mediaId == null) {
       throw new IllegalArgumentException(emptyMessage);
     }
-    MediaAsset asset = mediaAssetService.requireAvailable(mediaId);
+    MediaAsset asset = java.util.Objects.equals(mediaId, existingMediaId)
+        ? mediaAssetService.requireReferencedAvailableForUpdate(mediaId)
+        : mediaAssetService.requireAvailable(mediaId);
     if (!mediaType.equals(asset.getMediaType())) {
       throw new IllegalArgumentException("媒体文件类型不正确");
     }
   }
 
   private void syncMediaReferences(SlabInventory inventory) {
+    syncMediaReferences(inventory, null);
+  }
+
+  private void syncMediaReferences(SlabInventory inventory, SlabInventory existing) {
     Map<String, Long> references = new LinkedHashMap<>();
     references.put("mainImage", inventory.getMainImageMediaId());
     references.put("scanImage", inventory.getScanImageMediaId());
@@ -388,7 +633,12 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     references.put("video", inventory.getVideoMediaId());
     references.put("videoCover", inventory.getVideoCoverMediaId());
     mediaReferenceService.replace("SLAB", inventory.getId(), references);
-    mediaAssetService.linkDerivedMedia(inventory.getVideoCoverMediaId(), inventory.getVideoMediaId());
+    boolean videoReferenceChanged = existing == null
+        || !java.util.Objects.equals(existing.getVideoMediaId(), inventory.getVideoMediaId())
+        || !java.util.Objects.equals(existing.getVideoCoverMediaId(), inventory.getVideoCoverMediaId());
+    if (videoReferenceChanged) {
+      mediaAssetService.linkDerivedMedia(inventory.getVideoCoverMediaId(), inventory.getVideoMediaId());
+    }
   }
 
   private void attachMediaUrls(SlabInventory inventory) {

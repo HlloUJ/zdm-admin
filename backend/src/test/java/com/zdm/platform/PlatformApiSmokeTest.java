@@ -4878,9 +4878,15 @@ class PlatformApiSmokeTest {
         "SELECT id FROM slab_grades WHERE code = ?", Long.class, gradeCode);
     Long textureId = jdbcTemplate.queryForObject(
         "SELECT id FROM slab_textures WHERE name = '细纹'", Long.class);
-    Long guideConfigurationId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_markup_configurations WHERE name = '指导价'",
-        Long.class);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_markup_configurations
+          (name, price_coefficient, sort_order, status, created_by_name, created_by_account_id)
+        VALUES
+          ('1级合伙人价格', 0.5000, 1, 'enabled', '超级管理员', 1),
+          ('2级合伙人价格', 1.3000, 2, 'enabled', '超级管理员', 1),
+          ('3级合伙人价格', 1.1800, 3, 'enabled', '超级管理员', 1)
+        """);
     Long level1ConfigurationId = jdbcTemplate.queryForObject(
         "SELECT id FROM slab_markup_configurations WHERE name = '1级合伙人价格'",
         Long.class);
@@ -4898,7 +4904,7 @@ class PlatformApiSmokeTest {
 
     Long slabId = null;
     Long interfaceSlabId = null;
-    Long rejectedInterfaceSlabId = null;
+    Long deletedInterfaceSlabId = null;
     try {
       mockMvc.perform(get("/api/admin/slabs/publish-options")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -4941,11 +4947,11 @@ class PlatformApiSmokeTest {
                     "corner4WidthMm":83.25,
                     "costPrice":100,
                     "guidePrice":160,
+                    "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"markupRate":60,"costPrice":100,"price":160},
-                      {"markupConfigurationId":%d,"markupRate":45,"costPrice":100,"price":145},
-                      {"markupConfigurationId":%d,"markupRate":30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"markupRate":18,"costPrice":100,"price":118}
+                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -4960,7 +4966,6 @@ class PlatformApiSmokeTest {
                       textureId,
                       colorId,
                       gradeId,
-                      guideConfigurationId,
                       level1ConfigurationId,
                       level2ConfigurationId,
                       level3ConfigurationId)))
@@ -4997,7 +5002,7 @@ class PlatformApiSmokeTest {
                   }
                   """.formatted(serialNo, mainImageMediaId, scanImageMediaId, designImageMediaId)))
           .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.message").value("大板编码已存在"));
+          .andExpect(jsonPath("$.message").value("SKU已存在"));
 
       MvcResult interfaceSlabResult = mockMvc.perform(post("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -5021,11 +5026,11 @@ class PlatformApiSmokeTest {
                     "thicknessMm":18,
                     "costPrice":100,
                     "guidePrice":160,
+                    "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"markupRate":60,"costPrice":100,"price":160},
-                      {"markupConfigurationId":%d,"markupRate":45,"costPrice":100,"price":145},
-                      {"markupConfigurationId":%d,"markupRate":30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"markupRate":18,"costPrice":100,"price":118}
+                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -5038,26 +5043,25 @@ class PlatformApiSmokeTest {
                       mainImageMediaId,
                       scanImageMediaId,
                       designImageMediaId,
-                      guideConfigurationId,
                       level1ConfigurationId,
                       level2ConfigurationId,
                       level3ConfigurationId)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.publisherType").value("接口获取"))
-          .andExpect(jsonPath("$.data.createdByName").value("接口获取"))
+          .andExpect(jsonPath("$.data.createdByName").value("外部系统"))
           .andExpect(jsonPath("$.data.createdByAccountId").doesNotExist())
-          .andExpect(jsonPath("$.data.status").value("pendingReview"))
+          .andExpect(jsonPath("$.data.status").value("warehouse"))
           .andReturn();
       interfaceSlabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
           interfaceSlabResult.getResponse().getContentAsString(), "$.data.id").toString());
 
-      MvcResult rejectedInterfaceSlabResult = mockMvc.perform(post("/api/admin/slabs")
+      MvcResult deletedInterfaceSlabResult = mockMvc.perform(post("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("""
                   {
-                    "name":"待驳回接口大板",
-                    "serialNo":"%s-rejected-interface",
+                    "name":"待删除接口大板",
+                    "serialNo":"%s-deleted-interface",
                     "publisherType":"接口获取",
                     "supplierId":%d,
                     "varietyId":1,
@@ -5073,13 +5077,13 @@ class PlatformApiSmokeTest {
                     "thicknessMm":18,
                     "costPrice":100,
                     "guidePrice":160,
+                    "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"markupRate":60,"costPrice":100,"price":160},
-                      {"markupConfigurationId":%d,"markupRate":45,"costPrice":100,"price":145},
-                      {"markupConfigurationId":%d,"markupRate":30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"markupRate":18,"costPrice":100,"price":118}
+                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
-                    "status":"selling"
+                    "status":"warehouse"
                   }
                   """.formatted(
                       serialNo,
@@ -5090,28 +5094,39 @@ class PlatformApiSmokeTest {
                       mainImageMediaId,
                       scanImageMediaId,
                       designImageMediaId,
-                      guideConfigurationId,
                       level1ConfigurationId,
                       level2ConfigurationId,
                       level3ConfigurationId)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.status").value("pendingReview"))
+          .andExpect(jsonPath("$.data.status").value("warehouse"))
           .andReturn();
-      rejectedInterfaceSlabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
-          rejectedInterfaceSlabResult.getResponse().getContentAsString(), "$.data.id").toString());
+      deletedInterfaceSlabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
+          deletedInterfaceSlabResult.getResponse().getContentAsString(), "$.data.id").toString());
 
-      mockMvc.perform(put("/api/admin/slabs/{id}/reject", rejectedInterfaceSlabId)
+      mockMvc.perform(post("/api/admin/slabs/{id}/delete", deletedInterfaceSlabId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("""
-                  {"reason":"资料不完整","detail":"缺少供应商提供的批次证明"}
+                  {"reason":"资料不完整"}
                   """))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.status").value("rejected"))
-          .andExpect(jsonPath("$.data.rejectionReason").value("资料不完整"))
-          .andExpect(jsonPath("$.data.rejectionDetail").value("缺少供应商提供的批次证明"))
-          .andExpect(jsonPath("$.data.rejectedByName").value("超级管理员"))
-          .andExpect(jsonPath("$.data.rejectedAt").isNotEmpty());
+          .andExpect(jsonPath("$.data").value(true));
+      Integer deletedInterfaceCount = jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_inventory WHERE id = ?", Integer.class, deletedInterfaceSlabId);
+      assertThat(deletedInterfaceCount).isZero();
+      mockMvc.perform(get("/api/admin/slabs/operation-logs")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.records[?(@.slabId == " + deletedInterfaceSlabId
+              + ")].operationType", hasItem("PHYSICAL_DELETE")))
+          .andExpect(jsonPath("$.data.records[?(@.slabId == " + deletedInterfaceSlabId
+              + ")].standardReason", hasItem("资料不完整")))
+          .andExpect(jsonPath("$.data.records[?(@.slabId == " + deletedInterfaceSlabId
+              + ")].operatorName", hasItem("超级管理员")));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT detail_reason FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'PHYSICAL_DELETE'",
+          String.class,
+          deletedInterfaceSlabId)).isNull();
 
       mockMvc.perform(put("/api/admin/slabs/batch-status")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -5131,7 +5146,7 @@ class PlatformApiSmokeTest {
           "SELECT COUNT(*) FROM slab_prices WHERE slab_id = ?",
           Integer.class,
           slabId);
-      assertThat(unchangedPriceCount).isEqualTo(4);
+      assertThat(unchangedPriceCount).isEqualTo(3);
       mockMvc.perform(put("/api/admin/slabs/batch-status")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
@@ -5222,19 +5237,18 @@ class PlatformApiSmokeTest {
           "SELECT COUNT(*) FROM slab_prices WHERE slab_id = ?",
           Integer.class,
           slabId);
-      assertThat(persistedPriceCount).isEqualTo(4);
+      assertThat(persistedPriceCount).isEqualTo(3);
 
-      String renamedPrice = "指导供货价-" + suffix;
-      mockMvc.perform(put("/api/admin/slab-markup-configurations/{id}", guideConfigurationId)
+      mockMvc.perform(put("/api/admin/slab-guide-price-setting")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("""
                   {
-                    "name":"%s",
-                    "markupRate":61
+                    "priceCoefficient":1.61
                   }
-                  """.formatted(renamedPrice)))
-          .andExpect(status().isOk());
+                  """))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.priceCoefficient").value(1.61));
 
       mockMvc.perform(get("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -5248,16 +5262,16 @@ class PlatformApiSmokeTest {
               "$.data[?(@.id == " + slabId + ")].offShelfRecords[0].offShelvedByName", hasItem("超级管理员")))
           .andExpect(jsonPath(
               "$.data[?(@.id == " + slabId + ")].offShelfRecords[1].standardReason", hasItem("价格调整")))
-          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0].price", hasItem(160.00)));
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].guidePriceCoefficient", hasItem(1.60)))
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0].price", hasItem(50.00)));
       assertThat(jdbcTemplate.queryForObject(
           """
-          SELECT CONCAT(markup_rate, ':', price)
-          FROM slab_prices
-          WHERE slab_id = ? AND markup_configuration_id = ?
+          SELECT CONCAT(guide_price_coefficient, ':', guide_price)
+          FROM slab_inventory
+          WHERE id = ?
           """,
           String.class,
-          slabId,
-          guideConfigurationId)).isEqualTo("60.0000:160.00");
+          slabId)).isEqualTo("1.6000:160.00");
 
       mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -5283,26 +5297,163 @@ class PlatformApiSmokeTest {
                       gradeId)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.message").value("纹理不存在"));
+
+      mockMvc.perform(post("/api/admin/slabs/{id}/delete", slabId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT status FROM slab_inventory WHERE id = ?", String.class, slabId)).isEqualTo("recycle");
+      mockMvc.perform(delete("/api/admin/slabs/{id}", slabId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_inventory WHERE id = ?", Integer.class, slabId)).isZero();
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id = ?", Integer.class, slabId)).isGreaterThan(2);
     } finally {
-      jdbcTemplate.update(
-          "UPDATE slab_markup_configurations SET name = '指导价', markup_rate = 60.0000 WHERE id = ?",
-          guideConfigurationId);
+      jdbcTemplate.update("DELETE FROM slab_guide_price_settings WHERE id = 1");
       if (slabId != null) {
         jdbcTemplate.update(
             "DELETE FROM slab_prices WHERE slab_id = ?",
             slabId);
         jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
+        jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", slabId);
       }
       if (interfaceSlabId != null) {
+        jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", interfaceSlabId);
         jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", interfaceSlabId);
       }
-      if (rejectedInterfaceSlabId != null) {
-        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", rejectedInterfaceSlabId);
+      if (deletedInterfaceSlabId != null) {
+        jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", deletedInterfaceSlabId);
       }
+      jdbcTemplate.update(
+          "DELETE FROM slab_markup_configurations WHERE id IN (?, ?, ?)",
+          level1ConfigurationId,
+          level2ConfigurationId,
+          level3ConfigurationId);
       jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", gradeId);
       jdbcTemplate.update("DELETE FROM slab_colors WHERE id = ?", colorId);
       jdbcTemplate.update("DELETE FROM slab_color_categories WHERE id = ?", colorCategoryId);
       jdbcTemplate.update("DELETE FROM suppliers WHERE id = ?", supplierId);
+    }
+  }
+
+  @Test
+  void slabManagementIgnoresDataPermissionAndCreatorForAllOperations() throws Exception {
+    long operatorId = 98996L;
+    String token = createStoreScopedEmployee(
+        operatorId,
+        "15926628996",
+        "大板共享操作员",
+        "admin.slab-management.view,admin.slab-management.warehouse.publish,"
+            + "admin.slab-management.warehouse.edit,admin.slab-management.off-shelf.restore,"
+            + "admin.slab-management.warehouse.delete,admin.slab-management.recycle.purge,"
+            + "admin.slab-management.operation-log.view");
+    jdbcTemplate.update("UPDATE employees SET data_permission = 'self' WHERE id = ?", operatorId);
+    Long mainImageMediaId = uploadSlabMedia("shared-main.png", "image/png");
+    Long scanImageMediaId = uploadSlabMedia("shared-scan.png", "image/png");
+    Long designImageMediaId = uploadSlabMedia("shared-design.png", "image/png");
+    String sku = "SLAB-SHARED-" + System.nanoTime();
+    Long slabId = null;
+
+    try {
+      jdbcTemplate.update(
+          """
+          INSERT INTO slab_inventory
+            (name, serial_no, publisher_type, main_image_media_id, scan_image_media_id,
+             design_image_media_id, status, created_by_name, created_by_account_id)
+          VALUES (?, ?, '平台发布', ?, ?, ?, 'warehouse', '其他用户', 1)
+          """,
+          "共享大板权限测试",
+          sku,
+          mainImageMediaId,
+          scanImageMediaId,
+          designImageMediaId);
+      slabId = jdbcTemplate.queryForObject(
+          "SELECT id FROM slab_inventory WHERE serial_no = ?", Long.class, sku);
+      jdbcTemplate.update(
+          "UPDATE media_assets SET status = 'active', confirmed_at = NOW(), last_referenced_at = NOW() WHERE id IN (?, ?, ?)",
+          mainImageMediaId,
+          scanImageMediaId,
+          designImageMediaId);
+      jdbcTemplate.update(
+          """
+          INSERT INTO media_references
+            (media_id, business_domain, business_id, field_key, owner_client_code)
+          VALUES
+            (?, 'SLAB', ?, 'mainImage', 'ADMIN'),
+            (?, 'SLAB', ?, 'scanImage', 'ADMIN'),
+            (?, 'SLAB', ?, 'designImage', 'ADMIN')
+          """,
+          mainImageMediaId,
+          slabId,
+          scanImageMediaId,
+          slabId,
+          designImageMediaId,
+          slabId);
+
+      mockMvc.perform(get("/api/admin/slabs")
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].createdByName", hasItem("其他用户")));
+
+      mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {
+                    "name":"其他用户大板-已编辑",
+                    "serialNo":"%s",
+                    "mainImageMediaId":%d,
+                    "scanImageMediaId":%d,
+                    "designImageMediaId":%d,
+                    "status":"warehouse"
+                  }
+                  """.formatted(sku, mainImageMediaId, scanImageMediaId, designImageMediaId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.name").value("其他用户大板-已编辑"))
+          .andExpect(jsonPath("$.data.createdByAccountId").value(1));
+
+      jdbcTemplate.update("UPDATE slab_inventory SET status = 'offShelf' WHERE id = ?", slabId);
+      mockMvc.perform(put("/api/admin/slabs/batch-status")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("""
+                  {"ids":[%d],"status":"warehouse"}
+                  """.formatted(slabId)))
+          .andExpect(status().isOk());
+
+      mockMvc.perform(post("/api/admin/slabs/{id}/delete", slabId)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{}"))
+          .andExpect(status().isOk());
+      mockMvc.perform(get("/api/admin/slabs/operation-logs")
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.records[?(@.slabId == " + slabId
+              + ")].operatorName", hasItem("大板共享操作员")))
+          .andExpect(jsonPath("$.data.records[?(@.slabId == " + slabId
+              + ")].operationType", hasItem("UPDATE")));
+      mockMvc.perform(delete("/api/admin/slabs/{id}", slabId)
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk());
+      slabId = null;
+    } finally {
+      if (slabId != null) {
+        jdbcTemplate.update("DELETE FROM slab_prices WHERE slab_id = ?", slabId);
+        jdbcTemplate.update("DELETE FROM slab_off_shelf_records WHERE slab_id = ?", slabId);
+        jdbcTemplate.update(
+            "DELETE FROM media_references WHERE business_domain = 'SLAB' AND business_id = ?",
+            slabId);
+        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
+        jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", slabId);
+      }
+      cleanupStoreScopedEmployee(operatorId);
     }
   }
 

@@ -13,22 +13,25 @@ import java.math.BigDecimal;
 @TableName("finished_markup_configurations")
 public class FinishedMarkupConfiguration extends BaseEntity {
   @NotBlank @Size(max = 20) private String name;
-  @NotNull @DecimalMin("0.0000") @Digits(integer = 3, fraction = 4) private BigDecimal markupRate;
+  @NotNull @DecimalMin("0.0000") @Digits(integer = 3, fraction = 4) private BigDecimal priceCoefficient;
   private Integer sortOrder;
   private String createdByName;
   private Long createdByAccountId;
+  private Boolean legacySeeded;
   @TableField(exist = false) private boolean referenced;
 
   public String getName() { return name; }
   public void setName(String name) { this.name = name; }
-  public BigDecimal getMarkupRate() { return markupRate; }
-  public void setMarkupRate(BigDecimal markupRate) { this.markupRate = markupRate; }
+  public BigDecimal getPriceCoefficient() { return priceCoefficient; }
+  public void setPriceCoefficient(BigDecimal priceCoefficient) { this.priceCoefficient = priceCoefficient; }
   public Integer getSortOrder() { return sortOrder; }
   public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
   public String getCreatedByName() { return createdByName; }
   public void setCreatedByName(String createdByName) { this.createdByName = createdByName; }
   public Long getCreatedByAccountId() { return createdByAccountId; }
   public void setCreatedByAccountId(Long createdByAccountId) { this.createdByAccountId = createdByAccountId; }
+  public Boolean getLegacySeeded() { return legacySeeded; }
+  public void setLegacySeeded(Boolean legacySeeded) { this.legacySeeded = legacySeeded; }
   public boolean isReferenced() { return referenced; }
   public void setReferenced(boolean referenced) { this.referenced = referenced; }
 }
