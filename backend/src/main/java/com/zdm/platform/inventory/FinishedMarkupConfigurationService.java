@@ -21,17 +21,22 @@ public class FinishedMarkupConfigurationService {
   private final FinishedMarkupConfigurationMapper mapper;
   private final CurrentIdentityProvider identityProvider;
   private final CreatorOwnershipGuard ownershipGuard;
+  private final PriceConfigurationBackfillService backfillService;
 
   public FinishedMarkupConfigurationService(FinishedMarkupConfigurationMapper mapper,
-      CurrentIdentityProvider identityProvider, CreatorOwnershipGuard ownershipGuard) {
+      CurrentIdentityProvider identityProvider, CreatorOwnershipGuard ownershipGuard,
+      PriceConfigurationBackfillService backfillService) {
     this.mapper = mapper;
     this.identityProvider = identityProvider;
     this.ownershipGuard = ownershipGuard;
+    this.backfillService = backfillService;
   }
 
   public List<FinishedMarkupConfiguration> listConfigurations(boolean enabledOnly) {
     requirePlatformScope();
     var query = Wrappers.<FinishedMarkupConfiguration>lambdaQuery();
+    query.ne(FinishedMarkupConfiguration::getName, "指导价")
+        .eq(FinishedMarkupConfiguration::getLegacySeeded, false);
     if (enabledOnly) {
       query.eq(FinishedMarkupConfiguration::getStatus, "enabled");
     }
@@ -53,7 +58,10 @@ public class FinishedMarkupConfigurationService {
     payload.setCreatedByName(identity.displayName());
     payload.setCreatedByAccountId(identity.accountId());
     validateUniqueName(payload.getName(), null);
-    try { mapper.insert(payload); } catch (DuplicateKeyException exception) {
+    try {
+      mapper.insert(payload);
+      backfillService.backfillFinishedProducts(payload);
+    } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
     }
     return requireConfiguration(payload.getId());
@@ -84,6 +92,9 @@ public class FinishedMarkupConfigurationService {
     ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     mapper.updateById(existing);
+    if ("enabled".equals(status)) {
+      backfillService.backfillFinishedProducts(existing);
+    }
     return requireConfiguration(id);
   }
 
@@ -91,7 +102,8 @@ public class FinishedMarkupConfigurationService {
   public List<FinishedMarkupConfiguration> reorderConfigurations(List<Long> orderedIds) {
     requirePlatformScope();
     List<FinishedMarkupConfiguration> configurations = mapper.selectList(
-        Wrappers.<FinishedMarkupConfiguration>lambdaQuery());
+        Wrappers.<FinishedMarkupConfiguration>lambdaQuery()
+            .eq(FinishedMarkupConfiguration::getLegacySeeded, false));
     if (orderedIds == null || orderedIds.size() != configurations.size()
         || new HashSet<>(orderedIds).size() != configurations.size()) {
       throw new IllegalArgumentException("请提交成品现货的全部价格层级");
@@ -153,6 +165,7 @@ public class FinishedMarkupConfigurationService {
   private int nextSortOrder() {
     FinishedMarkupConfiguration last = mapper.selectOne(
         Wrappers.<FinishedMarkupConfiguration>lambdaQuery()
+            .eq(FinishedMarkupConfiguration::getLegacySeeded, false)
             .orderByDesc(FinishedMarkupConfiguration::getSortOrder).last("LIMIT 1"));
     return last == null || last.getSortOrder() == null ? 1 : last.getSortOrder() + 1;
   }
@@ -162,6 +175,9 @@ public class FinishedMarkupConfigurationService {
       throw new IllegalArgumentException("请输入价格层级名称");
     }
     String name = value.trim();
+    if ("指导价".equals(name)) {
+      throw new IllegalArgumentException("指导价请在指导价设置中维护");
+    }
     if (name.length() > 20) {
       throw new IllegalArgumentException("价格层级名称最多20个字");
     }

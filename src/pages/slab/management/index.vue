@@ -12,7 +12,11 @@
               <t-breadcrumb-item>大板管理</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
-          <t-tag theme="primary" variant="light">全平台共用大板库</t-tag>
+          <div class="page-header-actions">
+            <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="openOperationLogDrawer">
+              操作日志
+            </t-link>
+          </div>
         </header>
 
         <section class="filter-card">
@@ -25,7 +29,7 @@
               <div class="filter-fields">
                 <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
                   <t-form-item label="大板" class="slab-keyword-filter">
-                    <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/编码" />
+                    <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/SKU" />
                   </t-form-item>
                   <t-form-item label="品种">
                     <t-select v-model="currentFilter.variety" clearable filterable placeholder="请选择">
@@ -123,7 +127,7 @@
         </section>
 
         <section class="table-card">
-          <div v-if="activeTab !== 'rejected'" class="table-toolbar">
+          <div class="table-toolbar">
             <div class="toolbar-buttons">
               <t-button
                 v-for="button in batchButtons"
@@ -171,14 +175,9 @@
             </template>
             <template #slab="{ row }">
               <div class="slab-meta">
-                <div class="slab-name">
-                  {{ row.name }}
-                  <t-tag v-if="row.status === 'pendingReview'" size="small" theme="warning" variant="light">
-                    待审核
-                  </t-tag>
-                </div>
+                <div class="slab-name">{{ row.name }}</div>
                 <div class="slab-code">ID：{{ row.id }}</div>
-                <div class="slab-code">编码：{{ row.code }}</div>
+                <div class="slab-code">SKU：{{ row.code }}</div>
               </div>
             </template>
             <template #tenant="{ row }">
@@ -219,16 +218,10 @@
             <template #offShelvedAt="{ row }">
               {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
             </template>
-            <template #rejectionReason="{ row }">
-              <div class="off-shelf-reason-cell">
-                <span class="off-shelf-reason-primary">{{ row.rejectionReason || '-' }}</span>
-                <span class="off-shelf-reason-secondary">{{ row.rejectionDetail || '-' }}</span>
-              </div>
-            </template>
             <template #operation="{ row }">
               <div class="table-actions">
                 <t-link
-                  v-for="action in rowActions(row)"
+                  v-for="action in rowActions()"
                   :key="action.action"
                   :theme="action.theme"
                   hover="color"
@@ -474,7 +467,7 @@
             <div class="price-editor">
               <div class="price-editor__head">
                 <span>价格层级</span>
-                <span><span class="price-required-star">*</span>系数</span>
+                <span><span class="price-required-star">*</span>价格系数</span>
                 <span><span class="price-required-star">*</span>价格</span>
               </div>
               <div class="price-editor__row">
@@ -498,22 +491,11 @@
                 <t-form-item
                   class="price-form-item"
                   :name="guideRatioFieldName"
-                  :rules="salesNumberFieldRules('指导价系数', 0)"
+                  :rules="salesNumberFieldRules('指导价的价格系数', 0)"
                   label-width="0"
                   :required-mark="false"
                 >
                   <t-input-number
-                    v-if="guidePriceRow"
-                    v-model="productForm.markupPrices[guidePriceRow.id].ratio"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="handleGuideRatioChange"
-                  />
-                  <t-input-number
-                    v-else
                     v-model="productForm.guideRatio"
                     class="price-input"
                     large-number
@@ -531,17 +513,6 @@
                   :required-mark="false"
                 >
                   <t-input-number
-                    v-if="guidePriceRow"
-                    v-model="productForm.markupPrices[guidePriceRow.id].price"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="handleGuidePriceChange"
-                  />
-                  <t-input-number
-                    v-else
                     v-model="productForm.guidePrice"
                     class="price-input"
                     large-number
@@ -557,7 +528,7 @@
                 <t-form-item
                   class="price-form-item"
                   :name="`markupPrices.${item.id}.ratio`"
-                  :rules="salesNumberFieldRules(`${item.label}系数`, 0)"
+                  :rules="salesNumberFieldRules(`${item.label}的价格系数`, 0)"
                   label-width="0"
                   :required-mark="false"
                 >
@@ -635,7 +606,7 @@
           <t-descriptions bordered :column="2">
             <t-descriptions-item label="大板名称" :span="2">{{ detailDrawerRow.name }}</t-descriptions-item>
             <t-descriptions-item label="ID">{{ detailDrawerRow.id }}</t-descriptions-item>
-            <t-descriptions-item label="编码">{{ detailDrawerRow.code }}</t-descriptions-item>
+            <t-descriptions-item label="SKU">{{ detailDrawerRow.code }}</t-descriptions-item>
             <t-descriptions-item label="品种">{{ detailDrawerRow.variety }}</t-descriptions-item>
             <t-descriptions-item label="产地">{{ detailDrawerRow.origin }}</t-descriptions-item>
             <t-descriptions-item label="纹理">{{ detailDrawerRow.texture }}</t-descriptions-item>
@@ -663,7 +634,7 @@
           <div class="price-table detail-price-table">
             <div class="price-table__head">
               <span>价格层级</span>
-              <span>系数</span>
+              <span>价格系数</span>
               <span>价格</span>
             </div>
             <div
@@ -679,6 +650,132 @@
         </section>
       </div>
     </t-drawer>
+
+    <t-drawer
+      v-model:visible="operationLogDrawerVisible"
+      header="操作日志"
+      placement="right"
+      size="min(1240px, 100vw)"
+      :footer="false"
+    >
+      <div class="operation-log-drawer">
+        <t-form :data="operationLogFilter" label-width="44px" colon>
+          <div class="operation-log-filters">
+            <t-form-item label="大板" class="operation-log-keyword-filter">
+              <t-input v-model="operationLogFilter.keyword" clearable placeholder="大板名称/ID/SKU" />
+            </t-form-item>
+            <t-form-item label="操作类型" label-width="72px">
+              <t-select v-model="operationLogFilter.operationType" clearable placeholder="请选择">
+                <t-option v-for="item in operationTypeOptions" :key="item.value" v-bind="item" />
+              </t-select>
+            </t-form-item>
+            <t-form-item label="操作人" label-width="60px" class="operation-log-operator-filter">
+              <t-input v-model="operationLogFilter.operatorName" clearable placeholder="请输入操作人" />
+            </t-form-item>
+            <t-form-item label="操作时间" label-width="72px" class="operation-log-date-filter">
+              <t-date-range-picker
+                v-model="operationLogFilter.dateRange"
+                class="operation-log-date-picker"
+                clearable
+                allow-input
+                value-type="YYYY-MM-DD"
+                :placeholder="['开始日期', '结束日期']"
+              />
+            </t-form-item>
+            <div class="operation-log-filter-actions">
+              <t-button theme="primary" @click="handleOperationLogSearch">
+                <template #icon><t-icon name="search" /></template>
+                查询
+              </t-button>
+              <t-button theme="default" variant="base" @click="handleOperationLogReset">
+                <template #icon><t-icon name="refresh" /></template>
+                重置
+              </t-button>
+            </div>
+          </div>
+        </t-form>
+        <t-table
+          row-key="id"
+          :data="operationLogs"
+          :columns="operationLogColumns"
+          :loading="operationLogLoading"
+          table-layout="fixed"
+          hover
+        >
+          <template #slab="{ row }">
+            <div class="slab-meta">
+              <div class="slab-name">{{ row.slabName }}</div>
+              <div class="slab-code">ID：{{ row.slabId }}</div>
+              <div class="slab-code">SKU：{{ row.slabSerialNo }}</div>
+            </div>
+          </template>
+          <template #operationType="{ row }">{{ operationTypeLabel(row.operationType) }}</template>
+          <template #summary="{ row }">
+            <div class="operation-log-summary">
+              <span>{{ row.operationSummary || '-' }}</span>
+              <span v-if="row.standardReason || row.detailReason" class="slab-code">
+                {{ [row.standardReason, row.detailReason].filter(Boolean).join('：') }}
+              </span>
+            </div>
+          </template>
+          <template #operatedAt="{ row }">{{ formatDateTime(row.operatedAt) }}</template>
+          <template #operation="{ row }">
+            <t-link theme="primary" hover="color" @click="openOperationLogDetail(row)">详情</t-link>
+          </template>
+        </t-table>
+        <t-empty v-if="!operationLogLoading && !operationLogs.length" description="暂无操作日志" />
+        <AdminPagination
+          v-if="operationLogTotal"
+          v-model:current="operationLogPagination.current"
+          v-model:page-size="operationLogPagination.pageSize"
+          :total="operationLogTotal"
+          :page-size-options="pageSizeOptions"
+          @change="loadOperationLogs"
+        />
+      </div>
+    </t-drawer>
+
+    <AdminDialog
+      v-model:visible="operationLogDetailVisible"
+      header="操作详情"
+      width="760px"
+      :cancel-btn="null"
+      confirm-btn="关闭"
+      @confirm="operationLogDetailVisible = false"
+    >
+      <template v-if="operationLogDetail">
+        <t-descriptions bordered :column="2">
+          <t-descriptions-item label="大板名称">{{ operationLogDetail.slabName }}</t-descriptions-item>
+          <t-descriptions-item label="SKU">{{ operationLogDetail.slabSerialNo }}</t-descriptions-item>
+          <t-descriptions-item label="操作类型">
+            {{ operationTypeLabel(operationLogDetail.operationType) }}
+          </t-descriptions-item>
+          <t-descriptions-item label="操作内容">{{ operationLogDetail.operationSummary || '-' }}</t-descriptions-item>
+          <t-descriptions-item label="操作人">{{ operationLogDetail.operatorName }}</t-descriptions-item>
+          <t-descriptions-item label="操作时间">{{
+            formatDateTime(operationLogDetail.operatedAt)
+          }}</t-descriptions-item>
+          <t-descriptions-item label="状态变化">
+            {{ formatStatusChange(operationLogDetail) }}
+          </t-descriptions-item>
+          <t-descriptions-item label="操作来源">{{
+            operationSourceLabel(operationLogDetail.operationSource)
+          }}</t-descriptions-item>
+          <t-descriptions-item label="原因">{{ operationLogDetail.standardReason || '-' }}</t-descriptions-item>
+          <t-descriptions-item label="详细说明">{{ operationLogDetail.detailReason || '-' }}</t-descriptions-item>
+          <t-descriptions-item label="批次号" :span="2">{{ operationLogDetail.batchNo || '-' }}</t-descriptions-item>
+        </t-descriptions>
+        <t-table
+          v-if="operationLogChangeRows.length"
+          class="operation-log-change-table"
+          row-key="field"
+          :data="operationLogChangeRows"
+          :columns="operationLogChangeColumns"
+          table-layout="fixed"
+          bordered
+        />
+      </template>
+    </AdminDialog>
 
     <t-drawer
       v-model:visible="priceDrawerVisible"
@@ -699,7 +796,7 @@
           <div class="price-table">
             <div class="price-table__head">
               <span>价格层级</span>
-              <span><span class="price-required-star">*</span>系数</span>
+              <span><span class="price-required-star">*</span>价格系数</span>
               <span><span class="price-required-star">*</span>价格</span>
             </div>
             <div v-for="(row, index) in batchPriceRows" :key="row.label" class="price-table__row">
@@ -709,7 +806,7 @@
                 v-else
                 class="price-form-item"
                 :name="`rows.${index}.ratio`"
-                :rules="salesNumberFieldRules(`${row.label}系数`, 0)"
+                :rules="salesNumberFieldRules(`${row.label}的价格系数`, 0)"
                 label-width="0"
                 :required-mark="false"
               >
@@ -796,17 +893,27 @@
       @close="closeReasonDialog"
     >
       <t-form ref="reasonFormRef" :data="reasonForm" :rules="reasonFormRules" label-width="96px" colon>
-        <t-form-item name="reason" :label="reasonState.type === 'reject' ? '驳回原因' : '下架原因'" required-mark>
+        <t-alert
+          v-if="reasonState.type === 'deleteExternal'"
+          class="external-delete-warning"
+          theme="warning"
+          message="该大板为外部系统创建，删除后将物理移除该大板，且不会进入回收站，操作不可恢复。"
+        />
+        <t-form-item
+          name="reason"
+          :label="reasonState.type === 'deleteExternal' ? '删除原因' : '下架原因'"
+          required-mark
+        >
           <t-select v-model="reasonForm.reason" placeholder="请选择">
             <t-option
-              v-for="item in reasonState.type === 'reject' ? rejectReasons : offShelfReasons"
+              v-for="item in reasonState.type === 'deleteExternal' ? externalDeleteReasons : offShelfReasons"
               :key="item"
               :label="item"
               :value="item"
             />
           </t-select>
         </t-form-item>
-        <t-form-item name="detail" label="详细说明" :required-mark="reasonState.type === 'reject'">
+        <t-form-item name="detail" label="详细说明">
           <t-textarea v-model="reasonForm.detail" placeholder="请输入" :autosize="{ minRows: 4, maxRows: 6 }" />
         </t-form-item>
       </t-form>
@@ -852,6 +959,7 @@ import {
   type AdminMediaValue,
 } from '@/components/foundation';
 import {
+  getSlabGuidePriceSetting,
   listSlabMarkupConfigurationOptions,
   type SlabMarkupConfigurationRecord,
 } from '@/services/slabMarkupConfigurations';
@@ -863,15 +971,19 @@ import { getLoginUser } from '@/services/auth';
 import {
   createSlab,
   deleteSlab,
+  deleteSlabs,
   getSlabPublishOptions,
+  listSlabOperationLogs,
   listSlabs,
-  rejectSlab,
+  removeSlab,
   releaseTemporarySlabMedia,
   resolveSlabPublishTargetStatus,
   uploadSlabImage,
   updateSlab,
   updateSlabStatuses,
   type SlabPayload,
+  type SlabOperationLogRecord,
+  type SlabOperationType,
   type SlabOffShelfRecord,
   type SlabPublishTargetStatus,
   type SlabPublisherType,
@@ -883,9 +995,9 @@ import {
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 type PublisherType = SlabPublisherType;
-type SlabTab = Exclude<SlabStatus, 'pendingReview'>;
+type SlabTab = SlabStatus;
 type ProductMode = 'create' | 'edit' | 'view';
-type RowAction = 'view' | 'price' | 'shelf' | 'edit' | 'reject' | 'delete' | 'offShelf' | 'restore' | 'purge';
+type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
 type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type ConfirmType =
   | 'shelf'
@@ -911,6 +1023,19 @@ interface FilterState {
   offShelfReason: string;
   offShelvedBy: string;
   offShelfDateRange: string[];
+}
+
+interface OperationLogFilterState {
+  keyword: string;
+  operationType: '' | SlabOperationType;
+  operatorName: string;
+  dateRange: string[];
+}
+
+interface OperationLogChangeRow {
+  field: string;
+  before: string;
+  after: string;
 }
 
 interface PriceGroup {
@@ -965,10 +1090,6 @@ interface SlabItem {
   publisherType: PublisherType;
   createdByName: string;
   createdAt: string;
-  rejectionReason: string;
-  rejectionDetail: string;
-  rejectedByName: string;
-  rejectedAt: string;
   price: PriceGroup;
   status: SlabStatus;
   variety: string;
@@ -986,6 +1107,7 @@ interface SlabItem {
   corner4LengthMm?: number;
   corner4WidthMm?: number;
   areaSquareMeter?: number;
+  guidePriceCoefficient?: number;
   markupPrices?: SlabPrice[];
   offShelfRecords: SlabOffShelfRecord[];
 }
@@ -1039,11 +1161,10 @@ const tabs: { value: SlabTab; label: string }[] = [
   { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
-  { value: 'rejected', label: '已驳回' },
 ];
 
 const pageSizeOptions = [10, 20, 50];
-const rejectReasons = ['图片不清晰', '资料不完整', '规格填写异常', '价格信息缺失'];
+const externalDeleteReasons = ['图片不清晰', '资料不完整', '规格填写异常', '价格信息缺失', '其他'];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
 
 const makeFilterState = (): FilterState => ({
@@ -1081,7 +1202,7 @@ const makeProductForm = (): ProductForm => ({
   cost: '',
   stock: '',
   sku: '',
-  guideRatio: '1.60',
+  guideRatio: '',
   guidePrice: '',
   level1Ratio: '1.45',
   level1Price: '',
@@ -1100,12 +1221,12 @@ const slabPermissionScope: Record<SlabTab, string> = {
   offShelf: 'off-shelf',
   soldOut: 'sold-out',
   recycle: 'recycle',
-  rejected: 'rejected',
 };
 const slabPermission = (status: SlabTab, action: string) =>
   `admin.slab-management.${slabPermissionScope[status]}.${action}`;
 const hasSlabAction = (status: SlabTab, action: string) =>
   hasPermission(loginUser.value, slabPermission(status, action));
+const canViewOperationLogs = computed(() => hasPermission(loginUser.value, 'admin.slab-management.operation-log.view'));
 const { visibleTabs: slabTabs, showTabRail: showSlabTabRail } = usePermissionTabs({
   tabs,
   activeTab,
@@ -1128,6 +1249,21 @@ const priceDrawerVisible = ref(false);
 const priceDrawerRowId = ref<number | null>(null);
 const detailDrawerVisible = ref(false);
 const detailDrawerRow = ref<SlabItem | null>(null);
+const operationLogDrawerVisible = ref(false);
+const operationLogLoading = ref(false);
+const operationLogs = ref<SlabOperationLogRecord[]>([]);
+const operationLogTotal = ref(0);
+const operationLogDetailVisible = ref(false);
+const operationLogDetail = ref<SlabOperationLogRecord | null>(null);
+const makeOperationLogFilter = (): OperationLogFilterState => ({
+  keyword: '',
+  operationType: '',
+  operatorName: '',
+  dateRange: [],
+});
+const operationLogFilter = reactive(makeOperationLogFilter());
+const appliedOperationLogFilter = reactive(makeOperationLogFilter());
+const operationLogPagination = reactive({ current: 1, pageSize: 10 });
 const detailPriceRows = ref<DrawerPriceRow[]>([]);
 const detailMediaItems = computed<DetailMediaItem[]>(() => {
   const row = detailDrawerRow.value;
@@ -1155,6 +1291,94 @@ const offShelfHistoryColumns: PrimaryTableCol<SlabOffShelfRecord>[] = [
   { colKey: 'offShelvedByName', title: '下架人', width: 110 },
   { colKey: 'offShelvedAt', title: '下架时间', width: 170 },
 ];
+const operationTypeOptions: { label: string; value: SlabOperationType }[] = [
+  { label: '创建大板', value: 'CREATE' },
+  { label: '编辑信息', value: 'UPDATE' },
+  { label: '修改价格', value: 'PRICE_UPDATE' },
+  { label: '上架', value: 'SHELF' },
+  { label: '下架', value: 'OFF_SHELF' },
+  { label: '放回仓库', value: 'RESTORE_WAREHOUSE' },
+  { label: '恢复大板', value: 'RESTORE_RECYCLE' },
+  { label: '移入回收站', value: 'DELETE_TO_RECYCLE' },
+  { label: '物理删除', value: 'PHYSICAL_DELETE' },
+  { label: '彻底删除', value: 'PURGE' },
+  { label: '状态变更', value: 'STATUS_UPDATE' },
+];
+const operationTypeLabel = (type: SlabOperationType) =>
+  operationTypeOptions.find((item) => item.value === type)?.label || type;
+const operationLogColumns: PrimaryTableCol<SlabOperationLogRecord>[] = [
+  { colKey: 'slab', title: '大板名称/ID/SKU', minWidth: 220 },
+  { colKey: 'operationType', title: '操作类型', width: 110 },
+  { colKey: 'summary', title: '操作内容', minWidth: 220 },
+  { colKey: 'operatorName', title: '操作人', width: 110 },
+  { colKey: 'operatedAt', title: '操作时间', width: 170 },
+  { colKey: 'operation', title: '操作', width: 72, fixed: 'right' },
+];
+const operationLogChangeColumns: PrimaryTableCol<OperationLogChangeRow>[] = [
+  { colKey: 'field', title: '变更字段', width: 150 },
+  { colKey: 'before', title: '变更前', minWidth: 220 },
+  { colKey: 'after', title: '变更后', minWidth: 220 },
+];
+const formatPriceTierChanges = (value: unknown): string | null => {
+  if (!Array.isArray(value)) return null;
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return String(item ?? '-');
+      const price = item as {
+        configurationId?: number;
+        priceCoefficient?: number;
+        markupRate?: number;
+        price?: number;
+      };
+      const label =
+        markupConfigurations.value.find((configuration) => configuration.id === price.configurationId)?.name ||
+        `价格层级 ${price.configurationId ?? '-'}`;
+      const coefficient =
+        price.priceCoefficient == null
+          ? price.markupRate == null
+            ? '-'
+            : (1 + Number(price.markupRate) / 100).toFixed(2)
+          : Number(price.priceCoefficient).toFixed(2);
+      const formattedPrice = price.price == null ? '-' : Number(price.price).toFixed(2);
+      return `${label}：价格系数 ${coefficient}，价格 ${formattedPrice}`;
+    })
+    .join('；');
+};
+const formatOperationValue = (value: unknown, field?: string): string => {
+  if (value == null || value === '') return '-';
+  if (field === '价格层级') return formatPriceTierChanges(value) || '-';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {
+  const details = operationLogDetail.value?.changeDetails;
+  if (!details) return [];
+  try {
+    const parsed = JSON.parse(details) as Record<string, { before?: unknown; after?: unknown }>;
+    return Object.entries(parsed).map(([field, change]) => ({
+      field,
+      before: formatOperationValue(change.before, field),
+      after: formatOperationValue(change.after, field),
+    }));
+  } catch {
+    return [];
+  }
+});
+const operationSourceLabel = (source: SlabOperationLogRecord['operationSource']) =>
+  ({ MANUAL: '平台操作', EXTERNAL_API: '外部接口', SYSTEM: '系统任务' })[source] || source;
+const operationStatusLabels: Record<SlabStatus, string> = {
+  warehouse: '仓库中',
+  selling: '出售中',
+  offShelf: '已下架',
+  soldOut: '已售完',
+  recycle: '回收站',
+};
+const formatStatusChange = (record: SlabOperationLogRecord) => {
+  if (!record.beforeStatus && !record.afterStatus) return '-';
+  return `${record.beforeStatus ? operationStatusLabels[record.beforeStatus] : '-'} → ${
+    record.afterStatus ? operationStatusLabels[record.afterStatus] : '-'
+  }`;
+};
 const uploadPreviews = reactive<Partial<Record<UploadItemKey, AdminMediaValue>>>({});
 const pendingUploadedMediaIds = new Set<number>();
 const uploadErrors = reactive<Partial<Record<UploadItemKey, boolean>>>({});
@@ -1168,6 +1392,7 @@ const slabOrigins = ref<SlabOriginRecord[]>([]);
 const slabVarieties = ref<SlabVarietyRecord[]>([]);
 const slabSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<SlabMarkupConfigurationRecord[]>([]);
+const guidePriceSettingCoefficient = ref<number>();
 const publishOptions = reactive<SlabPublishOptions>({ textures: [], colorCategories: [], grades: [] });
 
 const varietyOptions = computed(() => slabVarieties.value.map((item) => item.name));
@@ -1218,7 +1443,6 @@ const filters = reactive<Record<SlabTab, FilterState>>({
   offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
-  rejected: makeFilterState(),
 });
 const appliedFilters = reactive<Record<SlabTab, FilterState>>({
   warehouse: makeFilterState(),
@@ -1226,7 +1450,6 @@ const appliedFilters = reactive<Record<SlabTab, FilterState>>({
   offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
-  rejected: makeFilterState(),
 });
 
 const paginations = reactive<Record<SlabTab, { current: number; pageSize: number }>>({
@@ -1235,21 +1458,12 @@ const paginations = reactive<Record<SlabTab, { current: number; pageSize: number
   offShelf: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
   recycle: { current: 1, pageSize: 10 },
-  rejected: { current: 1, pageSize: 10 },
 });
 
 const tableData = ref<SlabItem[]>([]);
 
 const normalizeStatus = (status?: string): SlabStatus => {
-  if (
-    status === 'pendingReview' ||
-    status === 'selling' ||
-    status === 'offShelf' ||
-    status === 'soldOut' ||
-    status === 'recycle' ||
-    status === 'rejected'
-  )
-    return status;
+  if (status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle') return status;
   return 'warehouse';
 };
 
@@ -1346,10 +1560,6 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     publisherType: normalizePublisherType(record.publisherType),
     createdByName: record.createdByName?.trim() || '-',
     createdAt: formatDateTime(record.createdAt),
-    rejectionReason: record.rejectionReason?.trim() || '-',
-    rejectionDetail: record.rejectionDetail?.trim() || '-',
-    rejectedByName: record.rejectedByName?.trim() || '-',
-    rejectedAt: formatDateTime(record.rejectedAt),
     price: {
       cost: record.costPrice == null ? '' : String(record.costPrice),
       guide: record.guidePrice == null ? '' : String(record.guidePrice),
@@ -1357,6 +1567,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
       level2: '',
       level3: '',
     },
+    guidePriceCoefficient: record.guidePriceCoefficient,
     status: normalizeStatus(record.status),
     variety: record.varietyName || variety?.name || (record.varietyId ? `品种 #${record.varietyId}` : '-'),
     sku: record.serialNo,
@@ -1411,6 +1622,7 @@ const toSlabPayload = (item: SlabItem, patch: Partial<SlabItem> = {}): SlabPaylo
     areaSquareMeter: next.areaSquareMeter,
     costPrice: toNumber(next.price.cost),
     guidePrice: toNumber(next.price.guide),
+    guidePriceCoefficient: next.guidePriceCoefficient,
     markupPrices: next.markupPrices,
     status: next.status,
   };
@@ -1427,7 +1639,7 @@ const upsertSlabItem = (record: SlabRecord) => {
 const loadSlabs = async () => {
   loading.value = true;
   try {
-    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult, markupResult] =
+    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult, markupResult, guideSetting] =
       await Promise.all([
         listSlabs(),
         listSlabOrigins().catch(() => []),
@@ -1435,12 +1647,14 @@ const loadSlabs = async () => {
         listSuppliers().catch(() => []),
         getSlabPublishOptions(),
         listSlabMarkupConfigurationOptions(),
+        getSlabGuidePriceSetting(),
       ]);
     slabOrigins.value = originsResult;
     slabVarieties.value = varietiesResult;
     slabSuppliers.value = suppliersResult;
     Object.assign(publishOptions, publishOptionsResult);
     markupConfigurations.value = markupResult;
+    guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
     tableData.value = records.map(toSlabItem);
   } catch (error) {
     tableData.value = [];
@@ -1482,16 +1696,16 @@ const confirmTitle = computed(() => {
 });
 
 const reasonState = reactive<{
-  type: 'reject' | 'offShelf';
+  type: 'deleteExternal' | 'offShelf';
   row: SlabItem | null;
   isBatch: boolean;
 }>({
-  type: 'reject',
+  type: 'offShelf',
   row: null,
   isBatch: false,
 });
 const reasonDialogTitle = computed(() => {
-  if (reasonState.type === 'reject') return '驳回';
+  if (reasonState.type === 'deleteExternal') return '删除大板';
   return reasonState.isBatch ? '批量下架' : '下架';
 });
 
@@ -1500,8 +1714,8 @@ const reasonForm = reactive({
   detail: '',
 });
 const reasonFormRules = computed<Record<string, FormRule[]>>(() => ({
-  reason: [{ required: true, message: reasonState.type === 'reject' ? '请选择驳回原因' : '请选择下架原因' }],
-  detail: reasonState.type === 'reject' ? [{ required: true, message: '请输入详细说明' }] : [],
+  reason: [{ required: true, message: reasonState.type === 'deleteExternal' ? '请选择删除原因' : '请选择下架原因' }],
+  detail: [],
 }));
 
 const batchPriceRows = reactive<DrawerPriceRow[]>([]);
@@ -1530,16 +1744,15 @@ const cornerFields: { key: CornerFieldKey; label: string }[] = [
 ];
 
 const salesPriceRows = computed(() =>
-  markupConfigurations.value.map((item) => ({ id: item.id, label: item.name, markupRate: Number(item.markupRate) })),
+  markupConfigurations.value.map((item) => ({
+    id: item.id,
+    label: item.name,
+    priceCoefficient: Number(item.priceCoefficient),
+  })),
 );
-const guidePriceRow = computed(() => salesPriceRows.value.find((item) => item.label === '指导价'));
-const partnerPriceRows = computed(() => salesPriceRows.value.filter((item) => item.label !== '指导价'));
-const guideRatioFieldName = computed(() =>
-  guidePriceRow.value ? `markupPrices.${guidePriceRow.value.id}.ratio` : 'guideRatio',
-);
-const guidePriceFieldName = computed(() =>
-  guidePriceRow.value ? `markupPrices.${guidePriceRow.value.id}.price` : 'guidePrice',
-);
+const partnerPriceRows = computed(() => salesPriceRows.value);
+const guideRatioFieldName = computed(() => 'guideRatio');
+const guidePriceFieldName = computed(() => 'guidePrice');
 
 const isValidMeasurement = (value: unknown, required: boolean) => {
   const normalizedValue = String(value ?? '').trim();
@@ -1688,23 +1901,11 @@ const productRules: Record<string, FormRule[]> = {
 };
 
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
-  if (activeTab.value === 'rejected') {
-    return [
-      { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-      { colKey: 'slab', title: '大板名称/ID/编码', minWidth: 220 },
-      { colKey: 'variety', title: '品种', width: 140 },
-      { colKey: 'tenant', title: '供应商', width: 180 },
-      { colKey: 'rejectionReason', title: '驳回原因/详细说明', minWidth: 260 },
-      { colKey: 'rejectedByName', title: '驳回人', width: 120, align: 'center' },
-      { colKey: 'rejectedAt', title: '驳回时间', width: 180, align: 'center' },
-      { colKey: 'operation', title: '操作', width: 90, align: 'left', fixed: 'right' },
-    ];
-  }
   if (activeTab.value === 'offShelf') {
     return [
       { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
       { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-      { colKey: 'slab', title: '大板名称/ID/编码', minWidth: 220 },
+      { colKey: 'slab', title: '大板名称/ID/SKU', minWidth: 220 },
       { colKey: 'variety', title: '品种', width: 140 },
       { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },
       { colKey: 'offShelvedByName', title: '下架人', width: 120, align: 'center' },
@@ -1716,7 +1917,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const baseColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
     { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-    { colKey: 'slab', title: '大板名称/ID/编码', minWidth: 220 },
+    { colKey: 'slab', title: '大板名称/ID/SKU', minWidth: 220 },
     { colKey: 'variety', title: '品种', width: 140 },
     { colKey: 'origin', title: '产地', width: 110 },
     { colKey: 'texture', title: '纹理', width: 110 },
@@ -1744,9 +1945,7 @@ const pageAllSelected = computed(
 const pagePartiallySelected = computed(
   () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,
 );
-const priceDrawerReadonly = computed(
-  () => activeTab.value === 'soldOut' || activeTab.value === 'recycle' || activeTab.value === 'rejected',
-);
+const priceDrawerReadonly = computed(() => activeTab.value === 'soldOut' || activeTab.value === 'recycle');
 const productDialogTitle = computed(() => {
   if (productMode.value === 'create') return '发布商品';
   if (productMode.value === 'edit') return '编辑商品';
@@ -1756,10 +1955,7 @@ const productDialogTitle = computed(() => {
 const filteredData = computed(() => {
   const filter = currentAppliedFilter.value;
   const matchedItems = tableData.value.filter((item) => {
-    const statusMatched =
-      activeTab.value === 'warehouse'
-        ? item.status === 'warehouse' || item.status === 'pendingReview'
-        : item.status === activeTab.value;
+    const statusMatched = item.status === activeTab.value;
     const keyword = filter.keyword.trim().toLowerCase();
     const keywordMatched =
       !keyword ||
@@ -1839,7 +2035,6 @@ const batchButtons = computed(() => {
       { label: '批量彻底删除', action: 'batchPurge', theme: 'danger', icon: 'delete', className: 'dark-red-button' },
       { label: '清空回收站', action: 'clearRecycle', theme: 'danger', icon: 'clear' },
     ],
-    rejected: [],
   };
   const actionPermissions: Record<BatchAction, string> = {
     publish: 'publish',
@@ -1853,43 +2048,31 @@ const batchButtons = computed(() => {
 });
 
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
-  const count = tableData.value.filter((item) =>
-    tab.value === 'warehouse'
-      ? item.status === 'warehouse' || item.status === 'pendingReview'
-      : item.status === tab.value,
-  ).length;
+  const count = tableData.value.filter((item) => item.status === tab.value).length;
   return count ? `${tab.label} ${count}` : tab.label;
 };
 
-const rowActions = (
-  row: SlabItem,
-): { label: string; action: RowAction; theme: 'primary' | 'warning' | 'danger' | 'default' }[] => {
+const rowActions = (): {
+  label: string;
+  action: RowAction;
+  theme: 'primary' | 'warning' | 'danger' | 'default';
+}[] => {
   const filterActions = (
     actions: { label: string; action: RowAction; theme: 'primary' | 'warning' | 'danger' | 'default' }[],
   ) => {
     const actionPermissions: Partial<Record<RowAction, string>> = {
+      detail: 'detail',
       price: 'price',
       shelf: 'shelf',
       edit: 'edit',
-      reject: 'reject',
       delete: 'delete',
       offShelf: 'off-shelf',
       restore: 'restore',
       purge: 'purge',
     };
-    return actions.filter(
-      (action) => action.action === 'view' || hasSlabAction(activeTab.value, actionPermissions[action.action]!),
-    );
+    return actions.filter((action) => hasSlabAction(activeTab.value, actionPermissions[action.action]!));
   };
   if (activeTab.value === 'warehouse') {
-    if (row.publisherType === '接口获取') {
-      return filterActions([
-        { label: '价格', action: 'price', theme: 'primary' },
-        { label: '上架', action: 'shelf', theme: 'primary' },
-        { label: '编辑', action: 'edit', theme: 'primary' },
-        { label: '驳回', action: 'reject', theme: 'warning' },
-      ]);
-    }
     return filterActions([
       { label: '价格', action: 'price', theme: 'primary' },
       { label: '上架', action: 'shelf', theme: 'primary' },
@@ -1902,21 +2085,17 @@ const rowActions = (
       { label: '价格', action: 'price', theme: 'primary' },
       { label: '下架', action: 'offShelf', theme: 'warning' },
       { label: '编辑', action: 'edit', theme: 'primary' },
-      { label: '删除', action: 'delete', theme: 'danger' },
     ]);
   }
   if (activeTab.value === 'offShelf') {
     return filterActions([
-      { label: '查看', action: 'view', theme: 'primary' },
+      { label: '详情', action: 'detail', theme: 'primary' },
       { label: '放回仓库', action: 'restore', theme: 'primary' },
       { label: '删除', action: 'delete', theme: 'danger' },
     ]);
   }
   if (activeTab.value === 'soldOut') {
     return filterActions([{ label: '价格', action: 'price', theme: 'primary' }]);
-  }
-  if (activeTab.value === 'rejected') {
-    return filterActions([{ label: '查看', action: 'view', theme: 'primary' }]);
   }
   return filterActions([
     { label: '价格', action: 'price', theme: 'primary' },
@@ -1988,10 +2167,6 @@ const calculateProductRatio = (configurationId: number) => {
 };
 
 const calculateGuidePrice = () => {
-  if (guidePriceRow.value) {
-    calculateProductPrice(guidePriceRow.value.id);
-    return;
-  }
   const cost = toNumber(productForm.cost);
   const ratio = toNumber(productForm.guideRatio);
   if (!isValidSalesNumber(productForm.cost, 0) || !isValidSalesNumber(productForm.guideRatio, 0)) return;
@@ -2000,10 +2175,6 @@ const calculateGuidePrice = () => {
 };
 
 const calculateGuideRatio = () => {
-  if (guidePriceRow.value) {
-    calculateProductRatio(guidePriceRow.value.id);
-    return;
-  }
   const cost = toNumber(productForm.cost);
   const price = toNumber(productForm.guidePrice);
   if (!isValidSalesNumber(productForm.cost, 0) || !isValidSalesNumber(productForm.guidePrice, 0)) return;
@@ -2021,7 +2192,7 @@ const initializeProductMarkupPrices = (prices: SlabPrice[] = []) => {
   productForm.markupPrices = Object.fromEntries(
     salesPriceRows.value.map((item) => {
       const existing = existingById.get(item.id);
-      const ratio = existing ? 1 + Number(existing.markupRate) / 100 : 1 + item.markupRate / 100;
+      const ratio = existing ? Number(existing.priceCoefficient) : item.priceCoefficient;
       return [item.id, { ratio: formatRatio(ratio), price: existing ? String(existing.price) : '' }];
     }),
   );
@@ -2092,59 +2263,33 @@ const handleBatchPriceChange = (index: number, _value?: unknown, context?: Sales
 const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
   const snapshots = row.markupPrices ?? [];
   const snapshotsByConfigurationId = new Map(snapshots.map((item) => [item.markupConfigurationId, item]));
-  const guideConfiguration = markupConfigurations.value.find((configuration) => configuration.name === '指导价');
-  const guideSnapshot = guideConfiguration
-    ? snapshotsByConfigurationId.get(guideConfiguration.id)
-    : snapshots.find(
-        (price) =>
-          markupConfigurations.value.find((item) => item.id === price.markupConfigurationId)?.name === '指导价',
-      );
   const cost = toNumber(row.price.cost);
-  const guidePrice = guideSnapshot ? String(guideSnapshot.price) : row.price.guide;
-  const guideRatio = guideSnapshot
-    ? formatRatio(1 + Number(guideSnapshot.markupRate) / 100)
-    : cost && guidePrice
-      ? formatRatio(toNumber(guidePrice) / cost)
-      : '1.60';
-  const configuredRows: DrawerPriceRow[] = markupConfigurations.value
-    .filter((configuration) => configuration.id !== guideConfiguration?.id)
-    .map((configuration) => {
-      const snapshot = snapshotsByConfigurationId.get(configuration.id);
-      return {
-        configurationId: configuration.id,
-        label: configuration.name,
-        ratio: snapshot
-          ? formatRatio(1 + Number(snapshot.markupRate) / 100)
-          : formatRatio(1 + Number(configuration.markupRate) / 100),
-        price: snapshot
-          ? String(snapshot.price)
-          : cost
-            ? formatPrice(cost * (1 + Number(configuration.markupRate) / 100))
-            : '',
-      };
-    });
-  const unconfiguredRows: DrawerPriceRow[] = snapshots
-    .filter(
-      (snapshot) =>
-        snapshot !== guideSnapshot &&
-        !markupConfigurations.value.some((item) => item.id === snapshot.markupConfigurationId),
-    )
-    .map((snapshot) => ({
-      configurationId: snapshot.markupConfigurationId,
-      label: `价格项 #${snapshot.markupConfigurationId}`,
-      ratio: formatRatio(1 + Number(snapshot.markupRate) / 100),
-      price: String(snapshot.price),
-    }));
+  const guidePrice = row.price.guide;
+  const guideRatio =
+    row.guidePriceCoefficient != null
+      ? formatRatio(row.guidePriceCoefficient)
+      : cost > 0 && String(guidePrice).trim()
+        ? formatRatio(toNumber(guidePrice) / cost)
+        : '';
+  const configuredRows: DrawerPriceRow[] = markupConfigurations.value.map((configuration) => {
+    const snapshot = snapshotsByConfigurationId.get(configuration.id);
+    return {
+      configurationId: configuration.id,
+      label: configuration.name,
+      ratio: snapshot
+        ? formatRatio(Number(snapshot.priceCoefficient))
+        : formatRatio(Number(configuration.priceCoefficient)),
+      price: snapshot ? String(snapshot.price) : cost ? formatPrice(cost * Number(configuration.priceCoefficient)) : '',
+    };
+  });
   return [
     { label: '成本价', ratio: '1.00', price: row.price.cost },
     {
-      configurationId: guideConfiguration?.id,
       label: '指导价',
       ratio: guideRatio,
       price: guidePrice,
     },
     ...configuredRows,
-    ...unconfiguredRows,
   ];
 };
 
@@ -2197,6 +2342,7 @@ const resetProductForm = () => {
 };
 
 const fillProductForm = (row: SlabItem) => {
+  const hasSalesInformation = Boolean(row.supplierId || row.sku.trim() || row.price.cost || row.markupPrices?.length);
   Object.assign(productForm, {
     variety: row.variety,
     origin: row.origin,
@@ -2215,11 +2361,16 @@ const fillProductForm = (row: SlabItem) => {
     corner3Width: row.corner3WidthMm == null ? '' : String(row.corner3WidthMm),
     corner4Length: row.corner4LengthMm == null ? '' : String(row.corner4LengthMm),
     corner4Width: row.corner4WidthMm == null ? '' : String(row.corner4WidthMm),
-    supplier: row.tenant,
+    supplier: row.supplierId ? row.tenant : '',
     cost: row.price.cost,
-    stock: row.status === 'soldOut' ? '0' : '1',
+    stock: row.status === 'soldOut' ? '0' : hasSalesInformation ? '1' : '',
     sku: row.sku,
-    guideRatio: '1.60',
+    guideRatio:
+      row.guidePriceCoefficient != null
+        ? formatRatio(row.guidePriceCoefficient)
+        : row.price.cost && row.price.guide
+          ? formatRatio(toNumber(row.price.guide) / toNumber(row.price.cost))
+          : '',
     guidePrice: row.price.guide,
     level1Ratio: '1.45',
     level1Price: row.price.level1,
@@ -2244,6 +2395,9 @@ const openProductDialog = (mode: ProductMode, row?: SlabItem) => {
   productTab.value = mode === 'view' ? 'sales' : 'images';
   editingRowId.value = row?.id ?? null;
   resetProductForm();
+  if (mode === 'create' && guidePriceSettingCoefficient.value != null) {
+    productForm.guideRatio = formatRatio(guidePriceSettingCoefficient.value);
+  }
   Object.keys(uploadPreviews).forEach((key) => {
     const uploadKey = key as UploadItemKey;
     const videoUrl = uploadPreviews[uploadKey]?.videoUrl;
@@ -2335,15 +2489,13 @@ const handleCostChange = (_value?: unknown, context?: SalesNumberChangeContext) 
 
 const handleGuideRatioChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
-  const value = guidePriceRow.value ? productForm.markupPrices[guidePriceRow.value.id]?.ratio : productForm.guideRatio;
-  clearSalesNumberFieldError(guideRatioFieldName.value, value, 0);
+  clearSalesNumberFieldError(guideRatioFieldName.value, productForm.guideRatio, 0);
   calculateGuidePrice();
 };
 
 const handleGuidePriceChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
-  const value = guidePriceRow.value ? productForm.markupPrices[guidePriceRow.value.id]?.price : productForm.guidePrice;
-  if (String(value ?? '').trim()) clearSalesFieldError(guidePriceFieldName.value);
+  if (String(productForm.guidePrice ?? '').trim()) clearSalesFieldError(guidePriceFieldName.value);
   calculateGuideRatio();
 };
 
@@ -2429,14 +2581,18 @@ const handleProductSubmit = async () => {
     adminFeedback.warning('请完善基础信息');
     return;
   }
+  if (productMode.value === 'create' && guidePriceSettingCoefficient.value == null) {
+    productTab.value = 'sales';
+    adminFeedback.warning('请先配置大板指导价默认价格系数');
+    return;
+  }
   const normalizedStock = String(productForm.stock ?? '').trim();
   const hasInvalidSalesPrice = salesPriceRows.value.some((item) => {
     const editor = productForm.markupPrices[item.id];
     return !editor || !isValidSalesNumber(editor.ratio, 0) || !isValidSalesNumber(editor.price, 0);
   });
   const hasInvalidGuidePrice =
-    !guidePriceRow.value &&
-    (!isValidSalesNumber(productForm.guideRatio, 0) || !isValidSalesNumber(productForm.guidePrice, 0));
+    !isValidSalesNumber(productForm.guideRatio, 0) || !isValidSalesNumber(productForm.guidePrice, 0);
   const hasInvalidSalesInformation =
     !String(productForm.supplier ?? '').trim() ||
     !String(productForm.sku ?? '').trim() ||
@@ -2472,7 +2628,7 @@ const handleProductSubmit = async () => {
     colorId: productForm.colorId,
     gradeId: productForm.gradeId,
     name: targetName,
-    serialNo: productForm.sku.trim() || editingItem?.code || `SLAB-${Date.now()}`,
+    serialNo: productForm.sku.trim(),
     warehouse: editingItem?.store && editingItem.store !== '-' ? editingItem.store : '平台仓',
     publisherType: editingItem?.publisherType || '平台发布',
     mainImageMediaId: uploadPreviews.main?.mediaId,
@@ -2494,12 +2650,11 @@ const handleProductSubmit = async () => {
     corner4WidthMm: productForm.corner4Width ? toNumber(productForm.corner4Width) : undefined,
     areaSquareMeter: lengthMm && widthMm ? Number(((lengthMm * widthMm) / 1_000_000).toFixed(2)) : undefined,
     costPrice: toNumber(productForm.cost),
-    guidePrice: guidePriceRow.value
-      ? toNumber(productForm.markupPrices[guidePriceRow.value.id]?.price ?? '')
-      : toNumber(productForm.guidePrice),
+    guidePrice: toNumber(productForm.guidePrice),
+    guidePriceCoefficient: Number(toNumber(productForm.guideRatio).toFixed(4)),
     markupPrices: salesPriceRows.value.map((item) => ({
       markupConfigurationId: item.id,
-      markupRate: Number(((toNumber(productForm.markupPrices[item.id].ratio) - 1) * 100).toFixed(4)),
+      priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
       costPrice: toNumber(productForm.cost),
       price: toNumber(productForm.markupPrices[item.id].price),
       variantKey: '',
@@ -2610,6 +2765,46 @@ const updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, d
   });
 };
 
+const shelfBlockingMessage = (row: SlabItem) => {
+  if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {
+    return '请完善大板图片后再上架';
+  }
+  if (
+    !row.varietyId ||
+    !row.originId ||
+    !row.textureId ||
+    !row.colorId ||
+    !row.gradeId ||
+    row.lengthMm == null ||
+    row.widthMm == null ||
+    row.thicknessMm == null
+  ) {
+    return '请完善大板基础信息后再上架';
+  }
+  if (!row.supplierId || !row.sku.trim()) return '请完善大板销售信息后再上架';
+  if (!isValidSalesNumber(row.price.cost, 0) || !isValidSalesNumber(row.price.guide, 0)) {
+    return '请完善大板价格后再上架';
+  }
+  const expectedPriceIds = new Set(markupConfigurations.value.map((item) => item.id));
+  const actualPriceIds = new Set((row.markupPrices ?? []).map((item) => item.markupConfigurationId));
+  if (
+    !expectedPriceIds.size ||
+    expectedPriceIds.size !== actualPriceIds.size ||
+    [...expectedPriceIds].some((id) => !actualPriceIds.has(id))
+  ) {
+    return '请完善全部大板价格后再上架';
+  }
+  return '';
+};
+
+const canStartShelf = (rows: SlabItem[]) => {
+  const blockedRow = rows.find((row) => shelfBlockingMessage(row));
+  if (!blockedRow) return true;
+  const message = shelfBlockingMessage(blockedRow);
+  adminFeedback.warning(rows.length > 1 ? `“${blockedRow.name}”：${message}` : message);
+  return false;
+};
+
 const handleBatchAction = async (action: BatchAction) => {
   if (action === 'publish') {
     openProductDialog('create');
@@ -2620,6 +2815,8 @@ const handleBatchAction = async (action: BatchAction) => {
       adminFeedback.warning('请先选择大板');
       return;
     }
+    const selectedKeySet = new Set(selectedKeys.value);
+    if (!canStartShelf(tableData.value.filter((item) => selectedKeySet.has(item.id)))) return;
     openConfirm('batchShelf', null, '是否批量上架所选大板？');
     return;
   }
@@ -2651,15 +2848,61 @@ const handleBatchAction = async (action: BatchAction) => {
 };
 
 const handleRowAction = (action: RowAction, row: SlabItem) => {
-  if (action === 'view') openDetailDrawer(row);
+  if (action === 'detail') openDetailDrawer(row);
   if (action === 'price') openPriceDrawer(row);
   if (action === 'edit') openProductDialog('edit', row);
-  if (action === 'shelf') openConfirm('shelf', row, `是否上架大板“${row.name}”？`);
-  if (action === 'delete') openConfirm('delete', row, `是否删除大板“${row.name}”？`);
+  if (action === 'shelf' && canStartShelf([row])) openConfirm('shelf', row, `是否上架大板“${row.name}”？`);
+  if (action === 'delete') {
+    if (row.publisherType === '接口获取') openReasonDialog('deleteExternal', row);
+    else openConfirm('delete', row, `删除后大板将进入回收站，是否删除大板“${row.name}”？`);
+  }
   if (action === 'restore') openConfirm('restore', row, `是否放回仓库“${row.name}”？`);
   if (action === 'purge') openConfirm('purge', row, `彻底删除后无法恢复，是否彻底删除大板“${row.name}”？`);
-  if (action === 'reject') openReasonDialog('reject', row);
   if (action === 'offShelf') openReasonDialog('offShelf', row);
+};
+
+const loadOperationLogs = async () => {
+  operationLogLoading.value = true;
+  try {
+    const [startDate, endDate] = appliedOperationLogFilter.dateRange;
+    const result = await listSlabOperationLogs({
+      keyword: appliedOperationLogFilter.keyword.trim(),
+      operationType: appliedOperationLogFilter.operationType,
+      operatorName: appliedOperationLogFilter.operatorName.trim(),
+      startDate,
+      endDate,
+      page: operationLogPagination.current,
+      pageSize: operationLogPagination.pageSize,
+    });
+    operationLogs.value = result.records;
+    operationLogTotal.value = result.total;
+  } catch (error) {
+    adminFeedback.actionError({ action: '加载操作日志', error, fallback: '请稍后重试' });
+  } finally {
+    operationLogLoading.value = false;
+  }
+};
+
+const openOperationLogDrawer = async () => {
+  operationLogDrawerVisible.value = true;
+  operationLogPagination.current = 1;
+  await loadOperationLogs();
+};
+
+const handleOperationLogSearch = async () => {
+  Object.assign(appliedOperationLogFilter, operationLogFilter, { dateRange: [...operationLogFilter.dateRange] });
+  operationLogPagination.current = 1;
+  await loadOperationLogs();
+};
+
+const handleOperationLogReset = async () => {
+  Object.assign(operationLogFilter, makeOperationLogFilter());
+  await handleOperationLogSearch();
+};
+
+const openOperationLogDetail = (record: SlabOperationLogRecord) => {
+  operationLogDetail.value = record;
+  operationLogDetailVisible.value = true;
 };
 
 const openConfirm = (type: ConfirmType, row: SlabItem | null, content: string) => {
@@ -2682,7 +2925,10 @@ const handleConfirmSubmit = async () => {
   saving.value = true;
   try {
     if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');
-    if (type === 'delete' && row) await updateSlabStatus(row.id, 'recycle');
+    if (type === 'delete' && row) {
+      await removeSlab(row.id);
+      row.status = 'recycle';
+    }
     if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');
     if (type === 'savePrice' && row) {
       const costPrice = toNumber(batchPriceRows[0]?.price ?? '');
@@ -2691,12 +2937,13 @@ const handleConfirmSubmit = async () => {
         .filter((item): item is DrawerPriceRow & { configurationId: number } => item.configurationId != null)
         .map((item) => ({
           markupConfigurationId: item.configurationId,
-          markupRate: Number(((toNumber(item.ratio) - 1) * 100).toFixed(4)),
+          priceCoefficient: Number(toNumber(item.ratio).toFixed(4)),
           costPrice,
           price: toNumber(item.price),
           variantKey: '',
         }));
       const guidePrice = batchPriceRows.find((item) => item.label === '指导价')?.price;
+      const guidePriceCoefficient = batchPriceRows.find((item) => item.label === '指导价')?.ratio;
       const nextPrice = {
         cost: String(costPrice),
         guide: guidePrice == null ? row.price.guide : String(toNumber(guidePrice)),
@@ -2705,7 +2952,15 @@ const handleConfirmSubmit = async () => {
         level3: row.price.level3,
       };
       upsertSlabItem(
-        await updateSlab(row.id, toSlabPayload(row, { price: nextPrice, markupPrices: nextMarkupPrices })),
+        await updateSlab(
+          row.id,
+          toSlabPayload(row, {
+            price: nextPrice,
+            guidePriceCoefficient:
+              guidePriceCoefficient == null ? row.guidePriceCoefficient : toNumber(guidePriceCoefficient),
+            markupPrices: nextMarkupPrices,
+          }),
+        ),
       );
       closePriceDrawer();
     }
@@ -2721,12 +2976,12 @@ const handleConfirmSubmit = async () => {
     }
     if (type === 'batchPurge') {
       const selectedIds = [...selectedKeys.value];
-      await Promise.all(selectedIds.map((id) => deleteSlab(id)));
+      await deleteSlabs(selectedIds);
       const deletedIds = new Set(selectedIds);
       tableData.value = tableData.value.filter((item) => !deletedIds.has(item.id));
     }
     if (type === 'clearRecycle') {
-      await Promise.all(recycleIds.map((id) => deleteSlab(id)));
+      await deleteSlabs(recycleIds);
       tableData.value = tableData.value.filter((item) => item.status !== 'recycle');
     }
     if (type !== 'savePrice') {
@@ -2763,7 +3018,7 @@ const handleConfirmSubmit = async () => {
   }
 };
 
-const openReasonDialog = (type: 'reject' | 'offShelf', row: SlabItem | null, isBatch = false) => {
+const openReasonDialog = (type: 'deleteExternal' | 'offShelf', row: SlabItem | null, isBatch = false) => {
   reasonState.type = type;
   reasonState.row = row;
   reasonState.isBatch = isBatch;
@@ -2792,12 +3047,12 @@ const closeOffShelfHistory = () => {
 const handleReasonSubmit = async () => {
   if (!reasonForm.reason) {
     await reasonFormRef.value?.validate({ trigger: 'submit', showErrorMessage: true });
-    adminFeedback.warning(reasonState.type === 'reject' ? '请选择驳回原因' : '请选择下架原因');
+    adminFeedback.warning(reasonState.type === 'deleteExternal' ? '请选择删除原因' : '请选择下架原因');
     return;
   }
   const validation = await reasonFormRef.value?.validate({ trigger: 'submit', showErrorMessage: true });
   if (validation !== true) {
-    adminFeedback.warning(reasonState.type === 'reject' ? '请完善驳回信息' : '请选择原因');
+    adminFeedback.warning(reasonState.type === 'deleteExternal' ? '请完善删除信息' : '请选择原因');
     return;
   }
   if (reasonState.type === 'offShelf' && reasonState.isBatch) {
@@ -2843,21 +3098,20 @@ const handleReasonSubmit = async () => {
     }
     return;
   }
-  if (reasonState.type === 'reject' && reasonState.row) {
+  if (reasonState.type === 'deleteExternal' && reasonState.row) {
     const row = reasonState.row;
     saving.value = true;
     try {
-      upsertSlabItem(
-        await rejectSlab(row.id, {
-          reason: reasonForm.reason.trim(),
-          detail: reasonForm.detail.trim(),
-        }),
-      );
+      await removeSlab(row.id, {
+        reason: reasonForm.reason.trim(),
+        detail: reasonForm.detail.trim(),
+      });
+      tableData.value = tableData.value.filter((item) => item.id !== row.id);
       ensureCurrentPage();
       closeReasonDialog();
-      adminFeedback.actionSuccess({ action: '驳回', target: row.name });
+      adminFeedback.actionSuccess({ action: '删除', target: row.name });
     } catch (error) {
-      adminFeedback.actionError({ action: '驳回', error, fallback: '请稍后重试', target: row.name });
+      adminFeedback.actionError({ action: '删除', error, fallback: '请稍后重试', target: row.name });
     } finally {
       saving.value = false;
     }
@@ -2976,6 +3230,63 @@ const saveBatchPrice = async () => {
   align-items: center;
   justify-content: space-between;
   gap: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-l);
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-m);
+}
+
+.operation-log-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--td-comp-margin-l);
+}
+
+.operation-log-filters {
+  display: grid;
+  grid-template-columns: 234px minmax(150px, 180px) minmax(150px, 180px) 332px auto;
+  align-items: center;
+  gap: var(--td-comp-margin-m);
+}
+
+.operation-log-filters :deep(.t-form__item) {
+  margin-bottom: 0;
+}
+
+.operation-log-keyword-filter {
+  width: 234px;
+}
+
+.operation-log-date-filter {
+  width: 332px;
+}
+
+.operation-log-date-picker {
+  width: 260px;
+}
+
+.operation-log-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
+
+.operation-log-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--td-comp-margin-xs);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.operation-log-change-table {
+  margin-top: var(--td-comp-margin-l);
+}
+
+.external-delete-warning {
   margin-bottom: var(--td-comp-margin-l);
 }
 

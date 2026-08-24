@@ -4,7 +4,7 @@ export type SlabMarkupConfigurationStatus = 'enabled' | 'disabled';
 export interface SlabMarkupConfigurationRecord {
   id: number;
   name: string;
-  markupRate: number;
+  priceCoefficient: number;
   sortOrder: number;
   status: SlabMarkupConfigurationStatus;
   createdByName?: string;
@@ -15,7 +15,14 @@ export interface SlabMarkupConfigurationRecord {
 }
 export interface SlabMarkupConfigurationPayload {
   name: string;
-  markupRate: number;
+  priceCoefficient: number;
+}
+export interface SlabGuidePriceSettingRecord {
+  id: number;
+  priceCoefficient: number;
+  updatedByName?: string;
+  updatedByAccountId?: number;
+  updatedAt?: string;
 }
 
 export const listSlabMarkupConfigurations = () =>
@@ -44,3 +51,10 @@ export const reorderSlabMarkupConfigurations = (orderedIds: number[]) =>
   });
 export const deleteSlabMarkupConfiguration = (id: number) =>
   request<boolean>(`/admin/slab-markup-configurations/${id}`, { method: 'DELETE' });
+export const getSlabGuidePriceSetting = () =>
+  request<SlabGuidePriceSettingRecord | null>('/admin/slab-guide-price-setting');
+export const updateSlabGuidePriceSetting = (priceCoefficient: number) =>
+  request<SlabGuidePriceSettingRecord>('/admin/slab-guide-price-setting', {
+    method: 'PUT',
+    body: JSON.stringify({ priceCoefficient }),
+  });

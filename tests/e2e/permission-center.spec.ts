@@ -20,7 +20,7 @@ const productThirdMenuLabels = [
 const adminProductThirdMenuLabels = [
   '—',
   ...productThirdMenuLabels.slice(0, 4),
-  '加价配置',
+  '价格配置',
   ...productThirdMenuLabels.slice(4),
 ];
 
@@ -896,6 +896,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('tbody tr')).toHaveCount(24);
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
+  const slabGlobalPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '页面全局' });
+  await expect(slabGlobalPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(['操作日志']);
+  await expect(roleMatrix.getByText('操作日志', { exact: true })).toHaveCount(1);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -947,9 +950,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
     templateActionLabels,
   );
   const markupActionLabels = ['查看', '新增', '编辑', '排序', '停用/启用', '删除'];
-  const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品加价配置' });
-  const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板加价配置' });
-  await expect(finishedMarkupPermissionRow.getByText('加价配置', { exact: true })).toBeVisible();
+  const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品价格配置' });
+  const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板价格配置' });
+  await expect(finishedMarkupPermissionRow.getByText('价格配置', { exact: true })).toBeVisible();
   await expect(finishedMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     markupActionLabels,
   );

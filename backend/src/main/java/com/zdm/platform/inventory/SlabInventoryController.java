@@ -7,8 +7,10 @@ import com.zdm.platform.media.MediaStorageService;
 import com.zdm.platform.media.MediaUploadResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,15 +29,18 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   private final SlabInventoryService service;
   private final PermissionGuard permissionGuard;
   private final MediaAssetService mediaAssetService;
+  private final SlabOperationLogService operationLogService;
 
   public SlabInventoryController(
       SlabInventoryService service,
       PermissionGuard permissionGuard,
-      MediaAssetService mediaAssetService) {
+      MediaAssetService mediaAssetService,
+      SlabOperationLogService operationLogService) {
     super(service, permissionGuard, PERMISSION_PREFIX);
     this.service = service;
     this.permissionGuard = permissionGuard;
     this.mediaAssetService = mediaAssetService;
+    this.operationLogService = operationLogService;
   }
 
   @PostMapping("/images")
@@ -48,7 +53,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         permission("warehouse", "edit"),
         permission("selling", "edit"),
         permission("off-shelf", "edit"));
-    permissionGuard.requireAllData();
     return ApiResponse.ok(mediaAssetService.upload(file, MediaStorageService.defaultImageSizeLimit()));
   }
 
@@ -63,7 +67,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         permission("warehouse", "edit"),
         permission("selling", "edit"),
         permission("off-shelf", "edit"));
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
   }
 
@@ -77,8 +80,23 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @GetMapping
   public ApiResponse<List<SlabInventory>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.listWithPrices());
+  }
+
+  @GetMapping("/operation-logs")
+  public ApiResponse<SlabOperationLogPage> listOperationLogs(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String operationType,
+      @RequestParam(required = false) String operatorName,
+      @RequestParam(required = false)
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+      @RequestParam(required = false)
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int pageSize) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
+    return ApiResponse.ok(operationLogService.listPage(
+        keyword, operationType, operatorName, startDate, endDate, page, pageSize));
   }
 
   @Override
@@ -92,7 +110,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     } else {
       permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
     }
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.createWithPrices(inventory));
   }
 
@@ -110,7 +127,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
           permission(scope, "edit"),
           permission(scope, "price"));
     }
-    permissionGuard.requireAllData();
     return ApiResponse.ok(service.updateWithPrices(id, inventory));
   }
 
@@ -121,7 +137,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         .filter(Objects::nonNull)
         .distinct()
         .forEach(status -> requireStatusTransition(status, request.status()));
-    permissionGuard.requireAllData();
     service.updateStatuses(request.ids(), request.status(), request.reason(), request.detail());
     return ApiResponse.ok(true);
   }
@@ -134,26 +149,39 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         permission("recycle", "purge"),
         permission("recycle", "batch-purge"),
         permission("recycle", "clear"));
-    permissionGuard.requireAllData();
     SlabInventory inventory = service.getById(id);
     if (inventory == null || !"recycle".equals(inventory.getStatus())) {
       throw new IllegalArgumentException("只有回收站中的大板可以彻底删除");
     }
-    return ApiResponse.ok(service.removeById(id));
+    return ApiResponse.ok(service.purgeFromRecycle(id));
   }
 
-  @PutMapping("/{id}/reject")
-  public ApiResponse<SlabInventory> reject(
-      @PathVariable Long id, @Valid @RequestBody SlabRejectionRequest request) {
+  @DeleteMapping("/batch-purge")
+  public ApiResponse<Boolean> batchPurge(@RequestBody List<Long> ids) {
     permissionGuard.requireAnyPermission(
-        permission("warehouse", "reject"), PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
-    return ApiResponse.ok(service.reject(id, request.reason(), request.detail()));
+        permission("recycle", "batch-purge"),
+        permission("recycle", "clear"));
+    return ApiResponse.ok(service.purgeFromRecycleBatch(ids));
+  }
+
+  @PostMapping("/{id}/delete")
+  public ApiResponse<Boolean> deleteFromManagement(
+      @PathVariable Long id, @Valid @RequestBody(required = false) SlabDeleteRequest request) {
+    SlabInventory inventory = service.getById(id);
+    if (inventory == null) {
+      throw new IllegalArgumentException("大板不存在或已被删除");
+    }
+    String scope = statusScope(inventory.getStatus());
+    if (!"warehouse".equals(scope) && !"off-shelf".equals(scope)) {
+      throw new IllegalArgumentException("只有仓库中或已下架的大板可以删除");
+    }
+    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".delete", permission(scope, "delete"));
+    return ApiResponse.ok(service.deleteFromManagement(
+        id, request == null ? null : request.reason(), request == null ? null : request.detail()));
   }
 
   private void requireStatusTransition(String sourceStatus, String targetStatus) {
-    if (("warehouse".equals(sourceStatus) || "pendingReview".equals(sourceStatus))
-        && "selling".equals(targetStatus)) {
+    if ("warehouse".equals(sourceStatus) && "selling".equals(targetStatus)) {
       requireEditOr(permission("warehouse", "shelf"), permission("warehouse", "batch-shelf"));
       return;
     }
@@ -169,20 +197,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
       requireEditOr(permission("recycle", "restore"), permission("recycle", "batch-restore"));
       return;
     }
-    if ("recycle".equals(targetStatus)) {
-      if ("warehouse".equals(sourceStatus)) {
-        requireEditOr(permission("warehouse", "delete"), permission("warehouse", "reject"));
-        return;
-      }
-      if ("selling".equals(sourceStatus)) {
-        requireEditOr(permission("selling", "delete"), permission("selling", "reject"));
-        return;
-      }
-      if ("offShelf".equals(sourceStatus)) {
-        requireEditOr(permission("off-shelf", "delete"));
-        return;
-      }
-    }
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
   }
 
@@ -196,7 +210,6 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   private String statusScope(String status) {
     return switch (status == null ? "" : status) {
       case "warehouse", "selling", "recycle" -> status;
-      case "pendingReview" -> "warehouse";
       case "offShelf" -> "off-shelf";
       case "soldOut" -> "sold-out";
       default -> null;

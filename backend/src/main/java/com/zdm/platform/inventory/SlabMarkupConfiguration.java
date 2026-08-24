@@ -19,12 +19,13 @@ public class SlabMarkupConfiguration extends BaseEntity {
   @NotNull
   @DecimalMin("0.0000")
   @Digits(integer = 3, fraction = 4)
-  private BigDecimal markupRate;
+  private BigDecimal priceCoefficient;
 
   private Integer sortOrder;
 
   private String createdByName;
   private Long createdByAccountId;
+  private Boolean legacySeeded;
 
   @TableField(exist = false)
   private boolean referenced;
@@ -37,12 +38,12 @@ public class SlabMarkupConfiguration extends BaseEntity {
     this.name = name;
   }
 
-  public BigDecimal getMarkupRate() {
-    return markupRate;
+  public BigDecimal getPriceCoefficient() {
+    return priceCoefficient;
   }
 
-  public void setMarkupRate(BigDecimal markupRate) {
-    this.markupRate = markupRate;
+  public void setPriceCoefficient(BigDecimal priceCoefficient) {
+    this.priceCoefficient = priceCoefficient;
   }
 
   public Integer getSortOrder() {
@@ -67,6 +68,14 @@ public class SlabMarkupConfiguration extends BaseEntity {
 
   public void setCreatedByAccountId(Long createdByAccountId) {
     this.createdByAccountId = createdByAccountId;
+  }
+
+  public Boolean getLegacySeeded() {
+    return legacySeeded;
+  }
+
+  public void setLegacySeeded(Boolean legacySeeded) {
+    this.legacySeeded = legacySeeded;
   }
 
   public boolean isReferenced() {

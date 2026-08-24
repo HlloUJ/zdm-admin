@@ -34,8 +34,8 @@ public class FinishedProductPriceService {
   @Transactional
   public void replacePrices(Long productId, List<FinishedProductPrice> requestedPrices) {
     List<FinishedMarkupConfiguration> configurations = configurationService.listConfigurations(true);
-    if (configurations.isEmpty()) {
-      throw new IllegalArgumentException("请先配置并启用至少一条成品现货价格层级");
+    if (configurations.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
+      return;
     }
     if (requestedPrices == null || requestedPrices.isEmpty()) {
       throw new IllegalArgumentException("请完善全部成品现货价格");
@@ -55,7 +55,8 @@ public class FinishedProductPriceService {
           byId.get(price.getMarkupConfigurationId()))));
     });
     mapper.delete(Wrappers.<FinishedProductPrice>lambdaQuery()
-        .eq(FinishedProductPrice::getFinishedProductId, productId));
+        .eq(FinishedProductPrice::getFinishedProductId, productId)
+        .in(FinishedProductPrice::getMarkupConfigurationId, byId.keySet()));
     normalized.forEach(mapper::insert);
   }
 
@@ -64,23 +65,27 @@ public class FinishedProductPriceService {
     if (configuration == null) {
       throw new IllegalArgumentException("成品现货价格层级不存在或已停用");
     }
-    BigDecimal rate = price.getMarkupRate();
+    BigDecimal coefficient = price.getPriceCoefficient();
     BigDecimal cost = price.getCostPrice();
     BigDecimal value = price.getPrice();
-    if (rate == null || rate.signum() < 0 || cost == null || cost.signum() < 0 || value == null) {
-      throw new IllegalArgumentException("加价率、成本价和价格不能为空且不能小于0");
+    if (coefficient == null
+        || coefficient.signum() < 0
+        || cost == null
+        || cost.signum() < 0
+        || value == null
+        || value.signum() < 0) {
+      throw new IllegalArgumentException("价格系数、成本价和价格不能为空且不能小于0");
     }
-    BigDecimal expected = cost.multiply(BigDecimal.ONE.add(
-        rate.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP))).setScale(2, RoundingMode.HALF_UP);
+    BigDecimal expected = cost.multiply(coefficient).setScale(2, RoundingMode.HALF_UP);
     if (value.setScale(2, RoundingMode.HALF_UP).compareTo(expected) != 0) {
-      throw new IllegalArgumentException("价格必须等于成本价按加价率计算后的结果");
+      throw new IllegalArgumentException("价格必须等于成本价按价格系数计算后的结果");
     }
     FinishedProductPrice normalized = new FinishedProductPrice();
     normalized.setFinishedProductId(productId);
     normalized.setVariantKey(variantKey);
     normalized.setVariantLabel(StringUtils.hasText(price.getVariantLabel()) ? price.getVariantLabel().trim() : null);
     normalized.setMarkupConfigurationId(configuration.getId());
-    normalized.setMarkupRate(rate.setScale(4, RoundingMode.HALF_UP));
+    normalized.setPriceCoefficient(coefficient.setScale(4, RoundingMode.HALF_UP));
     normalized.setCostPrice(cost.setScale(2, RoundingMode.HALF_UP));
     normalized.setPrice(expected);
     return normalized;
