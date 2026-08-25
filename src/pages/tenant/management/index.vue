@@ -214,7 +214,6 @@ import {
   AdminPagination,
 } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
@@ -468,7 +467,6 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: TenantItem) => {
-  if (!requireCreatorOwnership(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -531,7 +529,6 @@ const handleBusinessSubmit = async () => {
 };
 
 const openStatusConfirm = (row: TenantItem) => {
-  if (!requireCreatorOwnership(row)) return;
   const isUnarchived = row.status === 'normal';
   confirmState.type = isUnarchived ? 'archive' : 'restore';
   confirmState.row = row;
@@ -542,7 +539,6 @@ const openStatusConfirm = (row: TenantItem) => {
 };
 
 const openPurgeDialog = async (row: TenantItem) => {
-  if (!requireCreatorOwnership(row)) return;
   purgeTarget.value = row;
   purgePreview.value = null;
   purgeConfirmationName.value = '';
@@ -608,7 +604,6 @@ watch(activeTab, () => {
 onMounted(loadTenants);
 
 const openBusinessDialog = (row: TenantItem) => {
-  if (!requireCreatorOwnership(row)) return;
   businessEditingId.value = row.id;
   businessSelection.value = [...row.businesses];
   businessDialogVisible.value = true;

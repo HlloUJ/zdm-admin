@@ -2108,12 +2108,14 @@ class PlatformApiSmokeTest {
               .contentType("application/json")
               .content("{\"name\":\"本人创建的店铺级别-已编辑\",\"status\":\"enabled\"}"))
           .andExpect(status().isOk());
-      mockMvc.perform(put("/api/admin/store-levels/{id}", 1)
+      jdbcTemplate.update(
+          "UPDATE store_levels SET created_by_account_id = 1, created_by_name = '其他创建人' WHERE id = ?",
+          Long.valueOf(createdLevelId));
+      mockMvc.perform(put("/api/admin/store-levels/{id}", createdLevelId)
               .header("Authorization", "Bearer " + token)
               .contentType("application/json")
-              .content("{\"name\":\"越权修改其他人的级别\",\"status\":\"enabled\"}"))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+              .content("{\"name\":\"其他人创建的店铺级别-已编辑\",\"status\":\"enabled\"}"))
+          .andExpect(status().isOk());
       mockMvc.perform(delete("/api/admin/store-levels/{id}", createdLevelId)
               .header("Authorization", "Bearer " + token))
           .andExpect(status().isOk())
@@ -2336,21 +2338,14 @@ class PlatformApiSmokeTest {
                     "status": "enabled"
                   }
                   """.formatted(originalLevelId)))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+          .andExpect(status().isOk());
       mockMvc.perform(patch("/api/admin/stores/{id}/level", otherStoreId)
               .header("Authorization", "Bearer " + token)
               .contentType("application/json")
               .content("{\"storeLevelId\":" + targetLevelId + "}"))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+          .andExpect(status().isOk());
       mockMvc.perform(patch("/api/admin/stores/{id}/archive", otherStoreId)
               .header("Authorization", "Bearer " + token))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
-
-      mockMvc.perform(patch("/api/admin/stores/{id}/archive", otherStoreId)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.status").value("disabled"));
     } finally {
@@ -2579,19 +2574,19 @@ class PlatformApiSmokeTest {
 
   @Test
   void slabGradeOperationsRequireTheirOwnPermissions() throws Exception {
-    long accountId = 9085L;
-    long employeeId = 9085L;
-    long roleId = 9085L;
+    long accountId = 99085L;
+    long employeeId = 99085L;
+    long roleId = 99085L;
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
         accountId,
-        "15926629085",
+        "15926639085",
         "等级只读操作员");
     jdbcTemplate.update(
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '等级只读操作员', '15926629085', 'enabled', 'all', '韩健')
+        VALUES (?, ?, 1, 1, '等级只读操作员', '15926639085', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -2781,16 +2776,17 @@ class PlatformApiSmokeTest {
       mockMvc.perform(put("/api/admin/slab-origins/9082")
               .header("Authorization", "Bearer " + token)
               .contentType("application/json")
-              .content("{\"name\":\"越权编辑的大板产地\",\"status\":\"enabled\"}"))
-          .andExpect(status().isForbidden());
+              .content("{\"name\":\"他人创建的大板产地-已编辑\",\"status\":\"enabled\"}"))
+          .andExpect(status().isOk());
       mockMvc.perform(patch("/api/admin/slab-origins/9082/status")
               .header("Authorization", "Bearer " + token)
               .contentType("application/json")
               .content("{\"status\":\"disabled\"}"))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isOk());
       mockMvc.perform(delete("/api/admin/slab-origins/9082")
               .header("Authorization", "Bearer " + token))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
       mockMvc.perform(delete("/api/admin/slab-origins/{id}", createdOriginId)
               .header("Authorization", "Bearer " + token))
           .andExpect(status().isOk())
@@ -3062,21 +3058,22 @@ class PlatformApiSmokeTest {
             .contentType("application/json")
             .content("""
                 {
-                  "name":"越权编辑的大板品种",
+                  "name":"他人创建的大板品种-已编辑",
                   "status":"enabled"
                 }
                 """))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk());
     mockMvc.perform(patch("/api/admin/slab-varieties/9032/status")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("""
                 {"status":"disabled"}
                 """))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk());
     mockMvc.perform(delete("/api/admin/slab-varieties/9032")
             .header("Authorization", "Bearer " + token))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
     mockMvc.perform(delete("/api/admin/slab-varieties/{id}", createdVarietyId)
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
@@ -3291,7 +3288,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void tenantPermissionsIgnoreDataScopeButOperationsRequireStrictCreatorOwnership() throws Exception {
+  void tenantPermissionsIgnoreDataScopeAndAllowOperationsOnOtherCreatorsData() throws Exception {
     long accountId = 9012L;
     long employeeId = 9012L;
     jdbcTemplate.update(
@@ -3342,33 +3339,27 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[?(@.id == 1)]").isNotEmpty());
 
-    mockMvc.perform(put("/api/admin/tenants/1")
+    jdbcTemplate.update(
+        "INSERT INTO accounts (id, phone, display_name, account_type, status) VALUES (9013, '15926629012', '测试租户管理员', 'person', 'enabled')");
+    jdbcTemplate.update(
+        "INSERT INTO tenants (id, name, contact_name, contact_phone, status, business_types, created_by_name, created_by_account_id) VALUES (9012, '其他人创建的测试租户', '测试联系人', '15926629012', 'enabled', '', '其他创建人', 1)");
+    jdbcTemplate.update(
+        "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (9013, 'admin', 'tenant_admin', 9012, 9012, NULL, 'enabled')");
+    mockMvc.perform(put("/api/admin/tenants/9012")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("""
                 {
-                  "name":"不应修改的租户",
-                  "contactName":"不应修改",
-                  "contactPhone":"15926626945",
+                  "name":"其他人创建的测试租户-已编辑",
+                  "contactName":"已编辑联系人",
+                  "contactPhone":"15926629012",
                   "status":"enabled",
                   "businessTypes":"",
                   "remark":""
                 }
                 """))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
-    mockMvc.perform(patch("/api/admin/tenants/1/businesses")
-            .header("Authorization", "Bearer " + token)
-            .contentType("application/json")
-            .content("{\"businessTypes\":\"cityPartner\"}"))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
-    mockMvc.perform(patch("/api/admin/tenants/1/status")
-            .header("Authorization", "Bearer " + token)
-            .contentType("application/json")
-            .content("{\"status\":\"disabled\"}"))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("其他人创建的测试租户-已编辑"));
     mockMvc.perform(get("/api/admin/tenants/1/purge-preview")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isForbidden())
@@ -3379,6 +3370,9 @@ class PlatformApiSmokeTest {
             .content("{\"confirmationName\":\"装点猫直营租户\"}"))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.message").value("仅平台身份可执行当前操作"));
+    jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = 9013");
+    jdbcTemplate.update("DELETE FROM tenants WHERE id = 9012");
+    jdbcTemplate.update("DELETE FROM accounts WHERE id = 9013");
   }
 
   @Test
@@ -3975,19 +3969,19 @@ class PlatformApiSmokeTest {
             .contentType("application/json")
             .content("""
                 {
-                  "name": "不应修改的同门店角色",
+                  "name": "其他人创建的同门店角色-已更新",
                   "code": "SAME_STORE_OTHER_ROLE",
                   "dataScope": "all",
                   "status": "enabled",
                   "functionPermissions": ""
                 }
                 """))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("其他人创建的同门店角色-已更新"));
     mockMvc.perform(delete("/api/admin/roles/{id}", sameStoreOtherRoleId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
 
     Long otherStoreRoleId = jdbcTemplate.queryForObject(
         "SELECT id FROM roles WHERE code = 'OTHER_STORE_ROLE'",

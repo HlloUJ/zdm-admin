@@ -3,7 +3,6 @@ package com.zdm.platform.catalog;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -18,13 +17,9 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   private static final String DUPLICATE_NAME_MESSAGE = "属性名称已存在";
 
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
 
-  public ProductAttributeService(
-      CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+  public ProductAttributeService(CurrentIdentityProvider identityProvider) {
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
   }
 
   public List<ProductAttribute> listWithTemplateCounts(Collection<String> scopes) {
@@ -45,7 +40,7 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
     }
     attribute.setCreatedByName(resolveCreatedByName());
-    attribute.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    attribute.setCreatedByAccountId(identityProvider.require().accountId());
     try {
       save(attribute);
     } catch (DuplicateKeyException exception) {
@@ -57,7 +52,6 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   @Transactional
   public ProductAttribute updateStatus(Long id, String status) {
     ProductAttribute existing = requireAttribute(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
@@ -65,8 +59,7 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
 
   @Transactional
   public boolean deleteAttribute(Long id) {
-    ProductAttribute existing = requireAttribute(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
+    requireAttribute(id);
     return removeById(id);
   }
 

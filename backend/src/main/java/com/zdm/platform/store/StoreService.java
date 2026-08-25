@@ -3,7 +3,6 @@ package com.zdm.platform.store;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,17 +16,14 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   private static final String DUPLICATE_NAME_MESSAGE = "店铺名称已存在";
 
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
   private final StoreLevelService storeLevelService;
   private final JdbcTemplate jdbcTemplate;
 
   public StoreService(
       CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard,
       StoreLevelService storeLevelService,
       JdbcTemplate jdbcTemplate) {
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
     this.storeLevelService = storeLevelService;
     this.jdbcTemplate = jdbcTemplate;
   }
@@ -60,7 +56,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return null;
     }
-    requireAccessible(existing);
     requireOperating(existing);
     normalizeAndValidateName(payload, id);
     payload.setTenantId(existing.getTenantId());
@@ -81,7 +76,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return null;
     }
-    requireAccessible(existing);
     requireOperating(existing);
     storeLevelService.requireSelectable(storeLevelId);
     existing.setStoreLevelId(storeLevelId);
@@ -95,7 +89,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return null;
     }
-    requireAccessible(existing);
     requireOperating(existing);
     existing.setStatus("disabled");
     updateById(existing);
@@ -110,7 +103,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return null;
     }
-    requireAccessible(existing);
     requireArchived(existing);
     requireTenantOperating(existing.getTenantId());
     existing.setStatus("enabled");
@@ -125,7 +117,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return false;
     }
-    requireAccessible(existing);
     requireArchived(existing);
     try {
       jdbcTemplate.update(
@@ -223,10 +214,6 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
         store.getId(),
         store.getStatus(),
         store.getTenantId());
-  }
-
-  private void requireAccessible(Store store) {
-    ownershipGuard.requireCreator(null, store.getCreatedBy());
   }
 
   private void requireOperating(Store store) {

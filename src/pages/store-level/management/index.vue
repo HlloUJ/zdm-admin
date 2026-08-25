@@ -111,7 +111,6 @@ import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } f
 import { computed, onMounted, reactive, ref } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -213,7 +212,6 @@ const openCreate = () => {
   formVisible.value = true;
 };
 const openEdit = (row: LevelItem) => {
-  if (!requireCreatorOwnership(row)) return;
   editingId.value = row.id;
   Object.assign(formData, { name: row.name, remark: row.remark ?? '' });
   formVisible.value = true;
@@ -241,7 +239,6 @@ const confirmVisible = ref(false);
 const confirmType = ref<ConfirmType>('disable');
 const confirmRow = ref<LevelItem | null>(null);
 const openConfirm = async (row: LevelItem, type: ConfirmType) => {
-  if (!requireCreatorOwnership(row)) return;
   if (type === 'delete') {
     try {
       await previewStoreLevelDelete(row.id);

@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,15 +18,12 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
 
   private final SlabVarietyMapper slabVarietyMapper;
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
 
   public SlabOriginService(
       SlabVarietyMapper slabVarietyMapper,
-      CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+      CurrentIdentityProvider identityProvider) {
     this.slabVarietyMapper = slabVarietyMapper;
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -35,7 +31,7 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     origin.setId(null);
     normalizeAndValidateName(origin, null);
     origin.setCreatedByName(resolveCreatedByName());
-    origin.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    origin.setCreatedByAccountId(identityProvider.require().accountId());
     save(origin);
     return origin;
   }
@@ -46,7 +42,6 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     if (existing == null) {
       return null;
     }
-    requireAccessibleOrigin(existing);
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
@@ -62,7 +57,6 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     if (existing == null) {
       return null;
     }
-    requireAccessibleOrigin(existing);
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
@@ -74,7 +68,6 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     if (existing == null) {
       return false;
     }
-    requireAccessibleOrigin(existing);
     Long referenceCount = slabVarietyMapper.selectCount(
         Wrappers.<SlabVariety>lambdaQuery().eq(SlabVariety::getOriginId, id));
     if (referenceCount > 0) {
@@ -92,10 +85,6 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
-  }
-
-  private void requireAccessibleOrigin(SlabOrigin origin) {
-    ownershipGuard.requireCreator(origin.getCreatedByAccountId(), origin.getCreatedByName());
   }
 
   private void normalizeAndValidateName(SlabOrigin origin, Long excludedOriginId) {

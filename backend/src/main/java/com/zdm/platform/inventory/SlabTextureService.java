@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
@@ -16,15 +15,12 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private final SlabTextureAliasMapper aliasMapper;
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
 
   public SlabTextureService(
       SlabTextureAliasMapper aliasMapper,
-      CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+      CurrentIdentityProvider identityProvider) {
     this.aliasMapper = aliasMapper;
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -32,7 +28,7 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
     texture.setId(null);
     normalizeAndValidateTextureName(texture, null);
     texture.setCreatedByName(resolveCreatedByName());
-    texture.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    texture.setCreatedByAccountId(identityProvider.require().accountId());
     save(texture);
     return texture;
   }
@@ -40,7 +36,6 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
   @Transactional
   public SlabTexture updateTexture(Long id, SlabTexture payload) {
     SlabTexture existing = requireTexture(id);
-    requireAccessibleTexture(existing);
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
@@ -53,7 +48,6 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
   @Transactional
   public SlabTexture updateStatus(Long id, String status) {
     SlabTexture existing = requireTexture(id);
-    requireAccessibleTexture(existing);
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
@@ -61,8 +55,7 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
 
   @Transactional
   public boolean deleteTexture(Long id) {
-    SlabTexture existing = requireTexture(id);
-    requireAccessibleTexture(existing);
+    requireTexture(id);
     return removeById(id);
   }
 
@@ -75,8 +68,7 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
 
   @Transactional
   public SlabTextureAlias createAlias(Long textureId, SlabTextureAlias alias) {
-    SlabTexture texture = requireTexture(textureId);
-    requireAccessibleTexture(texture);
+    requireTexture(textureId);
     alias.setId(null);
     alias.setTextureId(textureId);
     alias.setStatus("enabled");
@@ -87,8 +79,7 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
 
   @Transactional
   public SlabTextureAlias updateAlias(Long textureId, Long aliasId, SlabTextureAlias payload) {
-    SlabTexture texture = requireTexture(textureId);
-    requireAccessibleTexture(texture);
+    requireTexture(textureId);
     SlabTextureAlias existing = requireAlias(textureId, aliasId);
     payload.setId(aliasId);
     payload.setTextureId(textureId);
@@ -100,8 +91,7 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
 
   @Transactional
   public boolean deleteAlias(Long textureId, Long aliasId) {
-    SlabTexture texture = requireTexture(textureId);
-    requireAccessibleTexture(texture);
+    requireTexture(textureId);
     requireAlias(textureId, aliasId);
     return aliasMapper.deleteById(aliasId) > 0;
   }
@@ -153,7 +143,4 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
         ? identity.displayName() : DEFAULT_CREATED_BY_NAME;
   }
 
-  private void requireAccessibleTexture(SlabTexture texture) {
-    ownershipGuard.requireCreator(texture.getCreatedByAccountId(), texture.getCreatedByName());
-  }
 }

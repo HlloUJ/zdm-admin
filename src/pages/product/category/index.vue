@@ -198,7 +198,6 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -512,7 +511,6 @@ function categoryExists() {
   return siblings.some((node) => node.name === formData.name.trim() && node.id !== formData.id);
 }
 function openCreateDialog(parent?: CategoryRow) {
-  if (parent && !requireCreatorOwnership(parent.node)) return;
   if (parent && parent.level >= maxCategoryLevel) {
     adminFeedback.warning('分类最多支持 4 级，不能继续新增下级分类');
     return;
@@ -524,7 +522,6 @@ function openCreateDialog(parent?: CategoryRow) {
   formVisible.value = true;
 }
 function openEditDialog(row: CategoryRow) {
-  if (!requireCreatorOwnership(row.node)) return;
   formMode.value = 'edit';
   Object.assign(formData, {
     id: row.node.id,
@@ -574,12 +571,10 @@ async function handleSubmit() {
   }
 }
 async function moveCategory(row: CategoryRow, offset: number) {
-  if (!requireCreatorOwnership(row.node)) return;
   const siblings = siblingNodes(row);
   const index = siblingIndex(row);
   const targetIndex = index + offset;
   if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
-  if (!requireCreatorOwnership(siblings[targetIndex])) return;
   rememberPageScroll();
   [siblings[index], siblings[targetIndex]] = [siblings[targetIndex], siblings[index]];
   siblings.forEach((node, nodeIndex) => {
@@ -597,7 +592,6 @@ async function moveCategory(row: CategoryRow, offset: number) {
   }
 }
 function openStatusConfirm(node: CategoryNode) {
-  if (!requireCreatorOwnership(...flattenNode(node))) return;
   statusTarget.value = node;
   rememberPageScroll();
   statusConfirmVisible.value = true;
@@ -633,7 +627,6 @@ async function handleStatusConfirm() {
   closeStatusConfirm();
 }
 function openDeleteDialog(node: CategoryNode) {
-  if (!requireCreatorOwnership(node)) return;
   deleteTarget.value = node;
   rememberPageScroll();
   deleteVisible.value = true;

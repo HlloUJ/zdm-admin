@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,15 +18,12 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
 
   private final SlabInventoryMapper slabInventoryMapper;
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
 
   public SlabVarietyService(
       SlabInventoryMapper slabInventoryMapper,
-      CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+      CurrentIdentityProvider identityProvider) {
     this.slabInventoryMapper = slabInventoryMapper;
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -35,7 +31,7 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     variety.setId(null);
     normalizeAndValidateName(variety, null);
     variety.setCreatedByName(resolveCreatedByName());
-    variety.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    variety.setCreatedByAccountId(identityProvider.require().accountId());
     save(variety);
     return variety;
   }
@@ -46,7 +42,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     if (existing == null) {
       return null;
     }
-    requireAccessibleVariety(existing);
 
     payload.setId(id);
     payload.setStatus(existing.getStatus());
@@ -63,7 +58,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     if (existing == null) {
       return null;
     }
-    requireAccessibleVariety(existing);
 
     existing.setStatus(status);
     updateById(existing);
@@ -76,7 +70,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     if (existing == null) {
       return false;
     }
-    requireAccessibleVariety(existing);
     Long referenceCount = slabInventoryMapper.selectCount(
         Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getVarietyId, id));
     if (referenceCount > 0) {
@@ -95,10 +88,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
-  }
-
-  private void requireAccessibleVariety(SlabVariety variety) {
-    ownershipGuard.requireCreator(variety.getCreatedByAccountId(), variety.getCreatedByName());
   }
 
   private void normalizeAndValidateName(SlabVariety variety, Long excludedVarietyId) {

@@ -3,7 +3,6 @@ package com.zdm.platform.tenant;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,15 +28,12 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   private final JdbcTemplate jdbcTemplate;
   private final SimpleJdbcInsert accountInsert;
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
 
   public TenantService(
       JdbcTemplate jdbcTemplate,
-      CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+      CurrentIdentityProvider identityProvider) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
     this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
         .withTableName("accounts")
         .usingColumns("phone", "display_name", "account_type", "status")
@@ -56,7 +52,7 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     List<String> businesses = List.of();
     tenant.setBusinessTypes("");
     tenant.setCreatedByName(resolveCreatedByName());
-    tenant.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    tenant.setCreatedByAccountId(identityProvider.require().accountId());
     requireAvailableTenantPhone(tenant.getContactPhone(), null);
     Long accountId;
     try {
@@ -76,8 +72,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     if (existing == null) {
       throw new IllegalArgumentException("租户不存在");
     }
-    ownershipGuard.requireCreator(
-        existing.getCreatedByAccountId(), existing.getCreatedByName());
     Long ownerAccountId = requireOwnerAccountId(id);
     requireAvailableTenantPhone(payload.getContactPhone(), id);
     requireAvailablePhone(payload.getContactPhone(), ownerAccountId);
@@ -102,8 +96,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   @Transactional
   public Tenant updateBusinesses(Long id, String businessTypes) {
     Tenant existing = requireTenant(id);
-    ownershipGuard.requireCreator(
-        existing.getCreatedByAccountId(), existing.getCreatedByName());
     List<String> businesses = normalizeBusinesses(businessTypes);
     existing.setBusinessTypes(String.join(",", businesses));
     updateById(existing);
@@ -114,8 +106,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   @Transactional
   public Tenant updateStatus(Long id, String status) {
     Tenant existing = requireTenant(id);
-    ownershipGuard.requireCreator(
-        existing.getCreatedByAccountId(), existing.getCreatedByName());
     if (!Set.of("enabled", "disabled").contains(status)) {
       throw new IllegalArgumentException("存在无效的租户状态");
     }
@@ -153,16 +143,12 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
 
   public TenantPurgePreview getPurgePreview(Long id) {
     Tenant existing = requireTenant(id);
-    ownershipGuard.requireCreator(
-        existing.getCreatedByAccountId(), existing.getCreatedByName());
     return buildPurgePreview(existing);
   }
 
   @Transactional
   public TenantPurgeResult purgeTenant(Long id, String confirmationName) {
     Tenant existing = lockTenant(id);
-    ownershipGuard.requireCreator(
-        existing.getCreatedByAccountId(), existing.getCreatedByName());
     if (!existing.getName().equals(confirmationName)) {
       throw new IllegalArgumentException("请输入完整租户名称确认删除");
     }
