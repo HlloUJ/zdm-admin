@@ -70,8 +70,8 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
   }
 
-  @GetMapping("/publish-options")
-  public ApiResponse<SlabPublishOptions> publishOptions() {
+  @GetMapping("/form-options")
+  public ApiResponse<SlabPublishOptions> formOptions() {
     permissionGuard.requireView(PERMISSION_PREFIX);
     return ApiResponse.ok(service.listPublishOptions());
   }

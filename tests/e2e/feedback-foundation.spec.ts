@@ -754,13 +754,15 @@ for (const scenario of [
   { tab: '出售中', expectedStatus: 'selling', expectedTab: /出售中/ },
 ] as const) {
   test(`publishes a slab into ${scenario.expectedStatus} from its current tab`, async ({ page }) => {
-    await page.route('**/api/admin/slabs/publish-options', async (route) => {
+    await page.route('**/api/admin/slabs/form-options', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
           code: 0,
           message: 'ok',
           data: {
+            varieties: [{ id: 1, label: '潘多拉', status: 'enabled' }],
+            origins: [{ id: 1, label: '巴西', status: 'enabled' }],
             textures: [{ id: 1, label: '细纹', status: 'enabled' }],
             colorCategories: [
               {
@@ -771,6 +773,7 @@ for (const scenario of [
               },
             ],
             grades: [{ id: 1, label: 'A+', status: 'enabled' }],
+            suppliers: [{ id: 1, label: '装点猫大板供应商', status: 'enabled' }],
           },
         }),
       });

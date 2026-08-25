@@ -431,7 +431,6 @@ const slabVarieties = [
     id: 1,
     name: '潘多拉',
     code: 'pandora',
-    originId: 1,
     remark: '按钮权限测试数据',
     status: 'enabled',
     createdByName: '韩健',
@@ -510,7 +509,14 @@ const slabTextures = [
 ];
 
 const slabColorCategories = [
-  { id: 1, name: '白色系', remark: '白色及浅灰色', createdByName: '韩健', createdAt: '2026-08-13T09:00:00' },
+  {
+    id: 1,
+    name: '白色系',
+    remark: '白色及浅灰色',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T09:00:00',
+  },
 ];
 
 const slabColors = [
@@ -652,23 +658,44 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/slab-colors', slabColors);
   await mockCollection(page, '**/api/admin/slab-colors/categories', slabColorCategories);
   await mockCollection(page, '**/api/admin/slab-grades', slabGrades);
-  await page.route('**/api/admin/slabs/publish-options', async (route) => {
+  await page.route('**/api/admin/slabs/form-options', async (route) => {
     await fulfillJson(route, {
-      textures: slabTextures.map((item) => ({ id: item.id, label: item.name, status: item.status })),
-      colorCategories: slabColorCategories.map((category) => ({
-        id: category.id,
-        label: category.name,
-        status: 'enabled',
-        children: slabColors
-          .filter((color) => color.categoryId === category.id)
-          .map((color) => ({ id: color.id, label: color.name, status: color.status })),
-      })),
-      grades: slabGrades.map((item) => ({
-        id: item.id,
-        label: item.code,
-        description: item.name,
-        status: item.status,
-      })),
+      varieties: slabVarieties
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      origins: slabOrigins
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      textures: slabTextures
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      colorCategories: slabColorCategories
+        .filter((category) => category.status === 'enabled')
+        .map((category) => ({
+          id: category.id,
+          label: category.name,
+          status: category.status,
+          children: slabColors
+            .filter((color) => color.categoryId === category.id && color.status === 'enabled')
+            .map((color) => ({ id: color.id, label: color.name, status: color.status })),
+        })),
+      grades: slabGrades
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({
+          id: item.id,
+          label: item.code,
+          description: item.name,
+          status: item.status,
+        })),
+      suppliers: suppliers
+        .filter(
+          (item) =>
+            item.status === 'enabled' &&
+            item.supplyTypes.some(
+              (type) => type.status === 'enabled' && (type.code === 'slab' || type.name.trim() === '大板'),
+            ),
+        )
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
     });
   });
   await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {

@@ -2644,14 +2644,24 @@ class PlatformApiSmokeTest {
         Integer.class);
     assertThat(originColumnCount).isZero();
     assertThat(jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'slab_varieties'
+          AND column_name = 'origin_id'
+        """,
+        Integer.class)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_origins WHERE name = '巴西' AND status = 'enabled'",
         Integer.class)).isEqualTo(1);
     assertThat(jdbcTemplate.queryForObject(
         """
         SELECT COUNT(*)
-        FROM slab_varieties sv
-        JOIN slab_origins so ON so.id = sv.origin_id
-        WHERE sv.name = '潘多拉' AND so.name = '巴西'
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'slab_inventory'
+          AND column_name = 'origin_id'
         """,
         Integer.class)).isEqualTo(1);
 
@@ -2804,11 +2814,19 @@ class PlatformApiSmokeTest {
 
   @Test
   void slabOriginRejectsReferencedDeleteAndUnauthorizedAccess() throws Exception {
-    mockMvc.perform(delete("/api/admin/slab-origins/1")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message")
-            .value("该产地已被大板品种引用，不能删除，请先停用该产地"));
+    String referencedSku = "SLAB-ORIGIN-REFERENCE-" + System.nanoTime();
+    jdbcTemplate.update(
+        "INSERT INTO slab_inventory (name, serial_no, origin_id, status) VALUES ('产地引用测试大板', ?, 1, 'warehouse')",
+        referencedSku);
+    try {
+      mockMvc.perform(delete("/api/admin/slab-origins/1")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message")
+              .value("该产地已被大板库存引用，不能删除，请先停用该产地"));
+    } finally {
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE serial_no = ?", referencedSku);
+    }
 
     long accountId = 9071L;
     long employeeId = 9071L;
@@ -4842,6 +4860,17 @@ class PlatformApiSmokeTest {
     String gradeName = "大板发布等级-" + suffix;
     String serialNo = "SLAB-PUBLISH-" + suffix;
     String supplierName = "大板审核供应商-" + suffix;
+    String enabledVarietyName = "启用品种-" + suffix;
+    String disabledVarietyName = "已停用品种-" + suffix;
+
+    jdbcTemplate.update(
+        "INSERT INTO slab_varieties (name, status) VALUES (?, 'enabled'), (?, 'disabled')",
+        enabledVarietyName,
+        disabledVarietyName);
+    Long enabledVarietyId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_varieties WHERE name = ?", Long.class, enabledVarietyName);
+    Long disabledVarietyId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_varieties WHERE name = ?", Long.class, disabledVarietyName);
 
     jdbcTemplate.update(
         """
@@ -4852,6 +4881,13 @@ class PlatformApiSmokeTest {
         supplierName);
     Long supplierId = jdbcTemplate.queryForObject(
         "SELECT id FROM suppliers WHERE name = ?", Long.class, supplierName);
+    Long slabSupplyTypeId = jdbcTemplate.queryForObject(
+        "SELECT id FROM supplier_supply_types WHERE code = 'slab' OR name = '大板' ORDER BY id LIMIT 1",
+        Long.class);
+    jdbcTemplate.update(
+        "INSERT INTO supplier_supply_type_links (supplier_id, supply_type_id) VALUES (?, ?)",
+        supplierId,
+        slabSupplyTypeId);
 
     jdbcTemplate.update(
         "INSERT INTO slab_color_categories (name, status) VALUES (?, 'enabled')",
@@ -4900,14 +4936,19 @@ class PlatformApiSmokeTest {
     Long interfaceSlabId = null;
     Long deletedInterfaceSlabId = null;
     try {
-      mockMvc.perform(get("/api/admin/slabs/publish-options")
+      mockMvc.perform(get("/api/admin/slabs/form-options")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.varieties[0].id").exists())
+          .andExpect(jsonPath("$.data.varieties[*].label", hasItem(enabledVarietyName)))
+          .andExpect(jsonPath("$.data.varieties[*].label", not(hasItem(disabledVarietyName))))
+          .andExpect(jsonPath("$.data.origins[0].id").exists())
           .andExpect(jsonPath("$.data.textures[*].label", hasItem("细纹")))
           .andExpect(jsonPath("$.data.colorCategories[*].label", hasItem(colorCategoryName)))
           .andExpect(jsonPath("$.data.colorCategories[*].children[*].label", hasItem(colorName)))
           .andExpect(jsonPath("$.data.grades[*].label", hasItem(gradeCode)))
-          .andExpect(jsonPath("$.data.grades[*].description", hasItem(gradeName)));
+          .andExpect(jsonPath("$.data.grades[*].description", hasItem(gradeName)))
+          .andExpect(jsonPath("$.data.suppliers[*].label", hasItem(supplierName)));
 
       MvcResult slabResult = mockMvc.perform(post("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -5332,7 +5373,9 @@ class PlatformApiSmokeTest {
       jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", gradeId);
       jdbcTemplate.update("DELETE FROM slab_colors WHERE id = ?", colorId);
       jdbcTemplate.update("DELETE FROM slab_color_categories WHERE id = ?", colorCategoryId);
+      jdbcTemplate.update("DELETE FROM supplier_supply_type_links WHERE supplier_id = ?", supplierId);
       jdbcTemplate.update("DELETE FROM suppliers WHERE id = ?", supplierId);
+      jdbcTemplate.update("DELETE FROM slab_varieties WHERE id IN (?, ?)", enabledVarietyId, disabledVarietyId);
     }
   }
 
