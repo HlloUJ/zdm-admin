@@ -543,7 +543,8 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         .toList();
     List<SlabPublishOption> grades = gradeService.lambdaQuery()
         .eq(SlabGrade::getStatus, "enabled")
-        .orderByAsc(SlabGrade::getCode)
+        .orderByAsc(SlabGrade::getSortOrder)
+        .orderByAsc(SlabGrade::getId)
         .list().stream()
         .map(item -> new SlabPublishOption(item.getId(), item.getCode(), item.getName(), item.getStatus()))
         .toList();

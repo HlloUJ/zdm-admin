@@ -1008,6 +1008,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(slabGradePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
+    '排序',
     '编辑',
     '停用/启用',
     '删除',
@@ -1152,7 +1153,7 @@ test('shows the full function catalog for both terminals during development', as
     categoryCatalogActionLabels,
   );
   await moduleList.getByText('商品管理', { exact: true }).click();
-  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*88/);
+  await expect(matrixToolbar).toHaveText(/全选当前模块\s*已下放\s*0\s*\/\s*89/);
   await expect(matrix.locator('tbody tr')).toHaveCount(16);
   await expect(matrix.locator('tbody .permission-menu-cell')).toHaveText(productSecondMenuLabels);
   await expect(matrix.locator('tbody .permission-third-menu-cell')).toHaveText(productThirdMenuLabels);
@@ -1249,6 +1250,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(slabGradeAllocationRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
+    '排序',
     '编辑',
     '停用/启用',
     '删除',
@@ -1309,7 +1311,7 @@ test('shows the full function catalog for both terminals during development', as
   await expect(matrix.getByText('纹理管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('色系管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('等级管理页', { exact: true })).toBeVisible();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(88);
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveCount(89);
   await moduleList.getByText('权限管理', { exact: true }).click();
   await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();

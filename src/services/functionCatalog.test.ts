@@ -501,6 +501,7 @@ describe('full function catalog', () => {
     expect(slabGradePage?.actions).toEqual([
       { label: '查看', value: 'admin.product-data-center.slab-grade.view' },
       { label: '新增', value: 'admin.product-data-center.slab-grade.create' },
+      { label: '排序', value: 'admin.product-data-center.slab-grade.sort' },
       { label: '编辑', value: 'admin.product-data-center.slab-grade.edit' },
       { label: '停用/启用', value: 'admin.product-data-center.slab-grade.toggle-status' },
       { label: '删除', value: 'admin.product-data-center.slab-grade.delete' },
@@ -652,6 +653,7 @@ describe('full function catalog', () => {
       'admin.product-data-center.slab-color.delete',
       'admin.product-data-center.slab-grade.view',
       'admin.product-data-center.slab-grade.create',
+      'admin.product-data-center.slab-grade.sort',
       'admin.product-data-center.slab-grade.edit',
       'admin.product-data-center.slab-grade.toggle-status',
       'admin.product-data-center.slab-grade.delete',

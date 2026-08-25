@@ -4,6 +4,7 @@ export interface SlabGradeRecord {
   id: number;
   code: string;
   name: string;
+  sortOrder: number;
   createdByName?: string;
   createdByAccountId?: number;
   remark?: string;
@@ -28,5 +29,10 @@ export const updateSlabGradeStatus = (id: number, status: SlabGradePayload['stat
   request<SlabGradeRecord>(`/admin/slab-grades/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+export const reorderSlabGrades = (orderedIds: number[]) =>
+  request<SlabGradeRecord[]>('/admin/slab-grades/reorder', {
+    method: 'PATCH',
+    body: JSON.stringify({ orderedIds }),
   });
 export const deleteSlabGrade = (id: number) => request<boolean>(`/admin/slab-grades/${id}`, { method: 'DELETE' });

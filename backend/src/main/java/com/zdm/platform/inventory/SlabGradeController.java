@@ -33,7 +33,7 @@ public class SlabGradeController extends AdminCrudController<SlabGrade> {
   @GetMapping
   public ApiResponse<List<SlabGrade>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(service.listGrades());
   }
 
   @Override
@@ -63,6 +63,13 @@ public class SlabGradeController extends AdminCrudController<SlabGrade> {
       throw new IllegalArgumentException("等级不存在");
     }
     return ApiResponse.ok(updated);
+  }
+
+  @PatchMapping("/reorder")
+  public ApiResponse<List<SlabGrade>> reorder(
+      @Valid @RequestBody SlabGradeReorderRequest request) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".sort");
+    return ApiResponse.ok(service.reorderGrades(request.orderedIds()));
   }
 
   @Override
