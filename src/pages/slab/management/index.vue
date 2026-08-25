@@ -738,42 +738,116 @@
     <AdminDialog
       v-model:visible="operationLogDetailVisible"
       header="操作详情"
-      width="760px"
+      width="960px"
+      dialog-class-name="operation-log-detail-dialog"
       :cancel-btn="null"
       confirm-btn="关闭"
       @confirm="operationLogDetailVisible = false"
     >
       <template v-if="operationLogDetail">
-        <t-descriptions bordered :column="2">
-          <t-descriptions-item label="大板名称">{{ operationLogDetail.slabName }}</t-descriptions-item>
-          <t-descriptions-item label="SKU">{{ operationLogDetail.slabSerialNo }}</t-descriptions-item>
-          <t-descriptions-item label="操作类型">
-            {{ operationTypeLabel(operationLogDetail.operationType) }}
-          </t-descriptions-item>
-          <t-descriptions-item label="操作内容">{{ operationLogDetail.operationSummary || '-' }}</t-descriptions-item>
-          <t-descriptions-item label="操作人">{{ operationLogDetail.operatorName }}</t-descriptions-item>
-          <t-descriptions-item label="操作时间">{{
-            formatDateTime(operationLogDetail.operatedAt)
-          }}</t-descriptions-item>
-          <t-descriptions-item label="状态变化">
-            {{ formatStatusChange(operationLogDetail) }}
-          </t-descriptions-item>
-          <t-descriptions-item label="操作来源">{{
-            operationSourceLabel(operationLogDetail.operationSource)
-          }}</t-descriptions-item>
-          <t-descriptions-item label="原因">{{ operationLogDetail.standardReason || '-' }}</t-descriptions-item>
-          <t-descriptions-item label="详细说明">{{ operationLogDetail.detailReason || '-' }}</t-descriptions-item>
-          <t-descriptions-item label="批次号" :span="2">{{ operationLogDetail.batchNo || '-' }}</t-descriptions-item>
-        </t-descriptions>
-        <t-table
-          v-if="operationLogChangeRows.length"
-          class="operation-log-change-table"
-          row-key="field"
-          :data="operationLogChangeRows"
-          :columns="operationLogChangeColumns"
-          table-layout="fixed"
-          bordered
-        />
+        <div class="operation-log-detail">
+          <div class="operation-log-detail__section-title">操作信息</div>
+          <t-descriptions bordered :column="3">
+            <t-descriptions-item label="大板名称">{{ operationLogDetail.slabName }}</t-descriptions-item>
+            <t-descriptions-item label="SKU">{{ operationLogDetail.slabSerialNo }}</t-descriptions-item>
+            <t-descriptions-item label="操作类型">
+              {{ operationTypeLabel(operationLogDetail.operationType) }}
+            </t-descriptions-item>
+            <t-descriptions-item label="操作人">{{ operationLogDetail.operatorName }}</t-descriptions-item>
+            <t-descriptions-item label="操作时间">{{
+              formatDateTime(operationLogDetail.operatedAt)
+            }}</t-descriptions-item>
+            <t-descriptions-item label="操作来源">{{
+              operationSourceLabel(operationLogDetail.operationSource)
+            }}</t-descriptions-item>
+            <t-descriptions-item label="操作内容" :span="2">
+              {{ operationLogDetail.operationSummary || '未填写' }}
+            </t-descriptions-item>
+            <t-descriptions-item label="状态变化">
+              {{ formatStatusChange(operationLogDetail) }}
+            </t-descriptions-item>
+          </t-descriptions>
+
+          <template v-if="operationLogChangeRows.length">
+            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">
+              变更对比
+              <t-tag theme="primary" variant="light">{{ operationLogChangeRows.length }} 项</t-tag>
+            </div>
+            <div class="operation-log-diff-list">
+              <div v-for="row in operationLogChangeRows" :key="row.field" class="operation-log-diff-item">
+                <div class="operation-log-diff-item__field">{{ row.field }}</div>
+                <div v-if="row.mediaType" class="operation-log-media-after">
+                  <div class="operation-log-diff-value operation-log-diff-value--after">
+                    <span class="operation-log-diff-value__label">修改后</span>
+                    <img
+                      v-if="row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'image'"
+                      class="operation-log-media-preview operation-log-media-preview--image"
+                      :src="row.afterMedia.url"
+                      :alt="`${row.field}修改后`"
+                      @click="openOperationLogMediaPreview(row.afterMedia, `${row.field} - 修改后`)"
+                    />
+                    <video
+                      v-else-if="
+                        row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'video'
+                      "
+                      class="operation-log-media-preview operation-log-media-preview--video"
+                      :src="row.afterMedia.url"
+                      preload="metadata"
+                      muted
+                      playsinline
+                      @click="openOperationLogMediaPreview(row.afterMedia, `${row.field} - 修改后`)"
+                    />
+                    <span v-else class="operation-log-media-empty">{{ mediaAfterFallback(row.afterMedia) }}</span>
+                  </div>
+                </div>
+                <div v-else-if="row.priceTiers?.length" class="operation-log-price-diff">
+                  <div class="operation-log-price-diff__header">价格层级</div>
+                  <div class="operation-log-price-diff__header">修改前</div>
+                  <div class="operation-log-price-diff__arrow-placeholder" />
+                  <div class="operation-log-price-diff__header">修改后</div>
+                  <template v-for="tier in row.priceTiers" :key="tier.key">
+                    <div class="operation-log-price-diff__tier">{{ tier.label }}</div>
+                    <div class="operation-log-diff-value operation-log-diff-value--before">
+                      <span>价格系数：{{ tier.beforeCoefficient }}</span>
+                      <span>价格：{{ tier.beforePrice }}</span>
+                    </div>
+                    <t-icon name="arrow-right" class="operation-log-diff-arrow" />
+                    <div class="operation-log-diff-value operation-log-diff-value--after">
+                      <span>价格系数：{{ tier.afterCoefficient }}</span>
+                      <span>价格：{{ tier.afterPrice }}</span>
+                    </div>
+                  </template>
+                </div>
+                <div v-else class="operation-log-diff-comparison">
+                  <div class="operation-log-diff-value operation-log-diff-value--before">
+                    <span class="operation-log-diff-value__label">修改前</span>
+                    <span>{{ row.before }}</span>
+                  </div>
+                  <t-icon name="arrow-right" class="operation-log-diff-arrow" />
+                  <div class="operation-log-diff-value operation-log-diff-value--after">
+                    <span class="operation-log-diff-value__label">修改后</span>
+                    <span>{{ row.after }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template
+            v-if="operationLogDetail.standardReason || operationLogDetail.detailReason || operationLogDetail.batchNo"
+          >
+            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">操作说明</div>
+            <t-descriptions bordered :column="2">
+              <t-descriptions-item label="原因">{{
+                operationLogDetail.standardReason || '未填写'
+              }}</t-descriptions-item>
+              <t-descriptions-item label="批次号">{{ operationLogDetail.batchNo || '未填写' }}</t-descriptions-item>
+              <t-descriptions-item label="详细说明" :span="2">
+                <span class="operation-log-detail__long-text">{{ operationLogDetail.detailReason || '未填写' }}</span>
+              </t-descriptions-item>
+            </t-descriptions>
+          </template>
+        </div>
       </template>
     </AdminDialog>
 
@@ -967,6 +1041,7 @@ import { createVideoFirstFrame } from '@/services/media';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
+  clearRecycleSlabs,
   createSlab,
   deleteSlab,
   deleteSlabs,
@@ -1033,6 +1108,26 @@ interface OperationLogChangeRow {
   field: string;
   before: string;
   after: string;
+  priceTiers?: OperationLogPriceTierRow[];
+  mediaType?: 'image' | 'video';
+  afterMedia?: OperationLogMediaValue;
+}
+
+interface OperationLogPriceTierRow {
+  key: string;
+  label: string;
+  beforeCoefficient: string;
+  beforePrice: string;
+  afterCoefficient: string;
+  afterPrice: string;
+}
+
+interface OperationLogMediaValue {
+  available: boolean;
+  url?: string;
+  mediaType: 'image' | 'video';
+  mimeType?: string;
+  originalName?: string;
 }
 
 interface PriceGroup {
@@ -1311,11 +1406,6 @@ const operationLogColumns: PrimaryTableCol<SlabOperationLogRecord>[] = [
   { colKey: 'operatedAt', title: '操作时间', width: 170 },
   { colKey: 'operation', title: '操作', width: 72, fixed: 'right' },
 ];
-const operationLogChangeColumns: PrimaryTableCol<OperationLogChangeRow>[] = [
-  { colKey: 'field', title: '变更字段', width: 150 },
-  { colKey: 'before', title: '变更前', minWidth: 220 },
-  { colKey: 'after', title: '变更后', minWidth: 220 },
-];
 const formatPriceTierChanges = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null;
   return value
@@ -1342,21 +1432,142 @@ const formatPriceTierChanges = (value: unknown): string | null => {
     .join('；');
 };
 const formatOperationValue = (value: unknown, field?: string): string => {
-  if (value == null || value === '') return '-';
-  if (field === '价格层级') return formatPriceTierChanges(value) || '-';
+  if (value == null || value === '') return '未填写';
+  if (field === '价格层级') return formatPriceTierChanges(value) || '未填写';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 };
+const normalizePriceTierChanges = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const price = item as {
+      configurationId?: number;
+      priceCoefficient?: number;
+      markupRate?: number;
+      price?: number;
+    };
+    const key = String(price.configurationId ?? 'unknown');
+    return [
+      {
+        key,
+        label:
+          markupConfigurations.value.find((configuration) => configuration.id === price.configurationId)?.name ||
+          `价格层级 ${price.configurationId ?? '-'}`,
+        coefficient:
+          price.priceCoefficient == null
+            ? price.markupRate == null
+              ? '未填写'
+              : (1 + Number(price.markupRate) / 100).toFixed(2)
+            : Number(price.priceCoefficient).toFixed(2),
+        price: price.price == null ? '未填写' : Number(price.price).toFixed(2),
+      },
+    ];
+  });
+};
+const buildPriceTierComparison = (before: unknown, after: unknown): OperationLogPriceTierRow[] => {
+  const beforeTiers = normalizePriceTierChanges(before);
+  const afterTiers = normalizePriceTierChanges(after);
+  const keys = [...new Set([...beforeTiers.map((item) => item.key), ...afterTiers.map((item) => item.key)])];
+  return keys.map((key) => {
+    const beforeTier = beforeTiers.find((item) => item.key === key);
+    const afterTier = afterTiers.find((item) => item.key === key);
+    return {
+      key,
+      label: afterTier?.label || beforeTier?.label || `价格层级 ${key}`,
+      beforeCoefficient: beforeTier?.coefficient || '未填写',
+      beforePrice: beforeTier?.price || '未填写',
+      afterCoefficient: afterTier?.coefficient || '未填写',
+      afterPrice: afterTier?.price || '未填写',
+    };
+  });
+};
+const operationLogReferenceLabels: Record<string, string> = {
+  供应商ID: '供应商',
+  品种ID: '品种',
+  产地ID: '产地',
+  纹理ID: '纹理',
+  色系ID: '色系',
+  等级ID: '等级',
+  商品视频: '视频',
+};
+const operationLogMediaTypes: Record<string, 'image' | 'video'> = {
+  '1:1主图': 'image',
+  扫描图: 'image',
+  设计图: 'image',
+  商品视频: 'video',
+};
+const operationLogFieldOrder = [
+  '1:1主图',
+  '扫描图',
+  '设计图',
+  '商品视频',
+  '大板名称',
+  '品种ID',
+  '产地ID',
+  '纹理ID',
+  '色系ID',
+  '等级ID',
+  '长度',
+  '宽度',
+  '高度',
+  '误差',
+  '扣角1长',
+  '扣角1宽',
+  '扣角2长',
+  '扣角2宽',
+  '扣角3长',
+  '扣角3宽',
+  '扣角4长',
+  '扣角4宽',
+  '供应商ID',
+  'SKU',
+  '成本价',
+  '指导价系数',
+  '指导价',
+  '价格层级',
+];
+const operationLogFieldOrderIndex = new Map(operationLogFieldOrder.map((field, index) => [field, index]));
+const normalizeOperationLogMedia = (value: unknown, field: string): OperationLogMediaValue | undefined => {
+  if (value == null || value === '') return undefined;
+  const fallbackType = operationLogMediaTypes[field];
+  if (typeof value !== 'object') {
+    return { available: false, mediaType: fallbackType };
+  }
+  const media = value as Partial<OperationLogMediaValue>;
+  return {
+    available: Boolean(media.available && media.url),
+    url: media.url,
+    mediaType: media.mediaType === 'video' ? 'video' : fallbackType,
+    mimeType: media.mimeType,
+    originalName: media.originalName,
+  };
+};
+const mediaAfterFallback = (media?: OperationLogMediaValue) => (media ? '媒体文件已清理' : '已删除');
 const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {
   const details = operationLogDetail.value?.changeDetails;
   if (!details) return [];
   try {
     const parsed = JSON.parse(details) as Record<string, { before?: unknown; after?: unknown }>;
-    return Object.entries(parsed).map(([field, change]) => ({
-      field,
-      before: formatOperationValue(change.before, field),
-      after: formatOperationValue(change.after, field),
-    }));
+    return Object.entries(parsed)
+      .filter(([field]) => !['面积', '视频封面'].includes(field))
+      .sort(
+        ([leftField], [rightField]) =>
+          (operationLogFieldOrderIndex.get(leftField) ?? Number.MAX_SAFE_INTEGER) -
+          (operationLogFieldOrderIndex.get(rightField) ?? Number.MAX_SAFE_INTEGER),
+      )
+      .map(([field, change]) => {
+        const priceTiers = field === '价格层级' ? buildPriceTierComparison(change.before, change.after) : undefined;
+        const mediaType = operationLogMediaTypes[field];
+        return {
+          field: operationLogReferenceLabels[field] || field,
+          before: formatOperationValue(change.before, field),
+          after: formatOperationValue(change.after, field),
+          priceTiers,
+          mediaType,
+          afterMedia: mediaType ? normalizeOperationLogMedia(change.after, field) : undefined,
+        };
+      });
   } catch {
     return [];
   }
@@ -2303,6 +2514,14 @@ const openMediaPreview = (media: DetailMediaItem) => {
   uploadPreviewDialogVisible.value = true;
 };
 
+const openOperationLogMediaPreview = (media: OperationLogMediaValue, title: string) => {
+  if (!media.url) return;
+  uploadPreviewTitle.value = title;
+  uploadPreviewUrl.value = media.url;
+  uploadPreviewType.value = media.mediaType;
+  uploadPreviewDialogVisible.value = true;
+};
+
 const openDetailDrawer = (row: SlabItem) => {
   detailDrawerRow.value = row;
   detailPriceRows.value = buildPriceRows(row);
@@ -2971,7 +3190,7 @@ const handleConfirmSubmit = async () => {
       tableData.value = tableData.value.filter((item) => !deletedIds.has(item.id));
     }
     if (type === 'clearRecycle') {
-      await deleteSlabs(recycleIds);
+      await clearRecycleSlabs();
       tableData.value = tableData.value.filter((item) => item.status !== 'recycle');
     }
     if (type !== 'savePrice') {
@@ -3272,8 +3491,127 @@ const saveBatchPrice = async () => {
   word-break: break-word;
 }
 
-.operation-log-change-table {
-  margin-top: var(--td-comp-margin-l);
+.operation-log-detail__section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+  margin-bottom: var(--td-comp-margin-m);
+  color: var(--td-text-color-primary);
+  font: var(--td-font-title-medium);
+}
+
+.operation-log-detail__section-title--spaced {
+  margin-top: var(--td-comp-margin-xl);
+}
+
+.operation-log-detail__long-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.operation-log-diff-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--td-comp-margin-m);
+}
+
+.operation-log-diff-item {
+  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
+}
+
+.operation-log-diff-item__field {
+  margin-bottom: var(--td-comp-margin-s);
+  color: var(--td-text-color-primary);
+  font: var(--td-font-body-medium);
+  font-weight: 600;
+}
+
+.operation-log-diff-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+}
+
+.operation-log-diff-value {
+  display: flex;
+  min-height: 64px;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--td-comp-margin-xs);
+  padding: var(--td-comp-paddingTB-m) var(--td-comp-paddingLR-m);
+  border-radius: var(--td-radius-default);
+  color: var(--td-text-color-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.operation-log-diff-value--before {
+  background: var(--td-bg-color-secondarycontainer);
+}
+
+.operation-log-diff-value--after {
+  background: var(--td-brand-color-light);
+}
+
+.operation-log-diff-value__label,
+.operation-log-price-diff__header {
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
+}
+
+.operation-log-diff-arrow {
+  justify-self: center;
+  color: var(--td-brand-color);
+  font-size: var(--td-font-size-title-medium);
+}
+
+.operation-log-media-preview {
+  display: block;
+  width: 180px;
+  height: 108px;
+  max-width: 100%;
+  border-radius: var(--td-radius-default);
+  object-fit: cover;
+}
+
+.operation-log-media-preview--image,
+.operation-log-media-preview--video {
+  cursor: pointer;
+}
+
+.operation-log-media-preview--video {
+  background: var(--td-bg-color-secondarycontainer);
+}
+
+.operation-log-media-after {
+  max-width: calc(50% - 20px);
+}
+
+.operation-log-media-empty {
+  color: var(--td-text-color-placeholder);
+}
+
+.operation-log-price-diff {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 24px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+}
+
+.operation-log-price-diff__header {
+  padding: 0 var(--td-comp-paddingLR-m);
+}
+
+.operation-log-price-diff__tier {
+  color: var(--td-text-color-primary);
+  word-break: break-word;
+}
+
+.operation-log-price-diff__arrow-placeholder {
+  width: 24px;
 }
 
 .external-delete-warning {

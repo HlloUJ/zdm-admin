@@ -249,6 +249,53 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
       changeDetails:
         index === 0
           ? JSON.stringify({
+              大板名称: {
+                before: '历史操作大板',
+                after: '历史操作大板 1',
+              },
+              品种ID: { before: '潘多拉', after: '雅士白' },
+              产地ID: { before: '巴西', after: '意大利' },
+              纹理ID: { before: '细纹', after: '大花纹' },
+              色系ID: { before: '白色系', after: '灰色系' },
+              等级ID: { before: 'B级（二等品）', after: 'A级（优等品）' },
+              供应商ID: { before: '原供应商', after: '新供应商' },
+              面积: { before: 5.76, after: 5.94 },
+              '1:1主图': {
+                before: { available: false, mediaType: 'image' },
+                after: {
+                  available: true,
+                  mediaType: 'image',
+                  url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+                },
+              },
+              扫描图: {
+                before: { available: false, mediaType: 'image' },
+                after: {
+                  available: true,
+                  mediaType: 'image',
+                  url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+                },
+              },
+              设计图: {
+                before: { available: false, mediaType: 'image' },
+                after: {
+                  available: true,
+                  mediaType: 'image',
+                  url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+                },
+              },
+              商品视频: {
+                before: { available: false, mediaType: 'video' },
+                after: { available: true, mediaType: 'video', url: 'data:video/mp4;base64,AAAA' },
+              },
+              视频封面: {
+                before: { available: false, mediaType: 'image' },
+                after: {
+                  available: true,
+                  mediaType: 'image',
+                  url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+                },
+              },
               价格层级: {
                 before: [{ configurationId: 2, priceCoefficient: 1.4, price: 140 }],
                 after: [{ configurationId: 2, priceCoefficient: 1.45, price: 145 }],
@@ -309,8 +356,52 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   const priceOperationRow = logDrawer.getByRole('row', { name: /历史操作大板 1/ });
   await priceOperationRow.getByText('详情', { exact: true }).click();
   const detailDialog = page.locator('.t-dialog').filter({ hasText: '操作详情' });
-  await expect(detailDialog).toContainText('价格层级 2：价格系数 1.40，价格 140.00');
-  await expect(detailDialog).toContainText('价格层级 2：价格系数 1.45，价格 145.00');
+  await expect(detailDialog.locator('.operation-log-diff-item')).toHaveCount(12);
+  await expect(detailDialog.locator('.operation-log-diff-item__field')).toHaveText([
+    '1:1主图',
+    '扫描图',
+    '设计图',
+    '视频',
+    '大板名称',
+    '品种',
+    '产地',
+    '纹理',
+    '色系',
+    '等级',
+    '供应商',
+    '价格层级',
+  ]);
+  const nameComparison = detailDialog.locator('.operation-log-diff-item').filter({ hasText: '大板名称' });
+  await expect(nameComparison.locator('.operation-log-diff-value--before')).toContainText('历史操作大板');
+  await expect(nameComparison.locator('.operation-log-diff-value--after')).toContainText('历史操作大板 1');
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '品种' })).toContainText('雅士白');
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '产地' })).toContainText('意大利');
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '纹理' })).toContainText('大花纹');
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '色系' })).toContainText('灰色系');
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '等级' })).toContainText(
+    'A级（优等品）',
+  );
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '供应商' })).toContainText(
+    '新供应商',
+  );
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '面积' })).toHaveCount(0);
+  await expect(detailDialog.locator('.operation-log-media-preview--image')).toHaveCount(3);
+  await expect(detailDialog.locator('.operation-log-media-preview--video')).toHaveCount(1);
+  await expect(detailDialog.getByText('媒体文件已清理', { exact: true })).toHaveCount(0);
+  await expect(detailDialog.locator('.operation-log-media-after')).toHaveCount(4);
+  await detailDialog.locator('.operation-log-media-preview--image').first().click();
+  const mediaPreviewDialog = page.locator('.t-dialog').filter({ hasText: '1:1主图 - 修改后' });
+  await expect(mediaPreviewDialog.locator('.upload-large-preview')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await detailDialog.locator('.operation-log-media-preview--video').click();
+  const videoPreviewDialog = page.locator('.t-dialog').filter({ hasText: '视频 - 修改后' });
+  await expect(videoPreviewDialog.locator('video.upload-large-preview')).toBeVisible();
+  await page.keyboard.press('Escape');
+  const priceComparison = detailDialog.locator('.operation-log-diff-item').filter({ hasText: '价格层级' });
+  await expect(priceComparison.locator('.operation-log-diff-value--before')).toContainText('价格系数：1.40');
+  await expect(priceComparison.locator('.operation-log-diff-value--before')).toContainText('价格：140.00');
+  await expect(priceComparison.locator('.operation-log-diff-value--after')).toContainText('价格系数：1.45');
+  await expect(priceComparison.locator('.operation-log-diff-value--after')).toContainText('价格：145.00');
   await expect(detailDialog).not.toContainText('"configurationId"');
   await detailDialog.getByRole('button', { name: '关闭', exact: true }).click();
   const operationLogPagination = logDrawer.locator('.zdm-admin-pagination .t-pagination');
@@ -487,10 +578,10 @@ test('places clear recycle after batch purge and permanently deletes every recyc
   });
 
   const clearRequest = page.waitForRequest(
-    (request) => request.method() === 'DELETE' && request.url().endsWith('/api/admin/slabs/batch-purge'),
+    (request) => request.method() === 'DELETE' && request.url().endsWith('/api/admin/slabs/clear-recycle'),
   );
   await page.getByRole('button', { name: '确认清空回收站', exact: true }).click();
-  expect((await clearRequest).postDataJSON()).toEqual([7, 8]);
+  expect((await clearRequest).postData()).toBeNull();
   await expect(page.getByRole('row', { name: /回收站大板/ })).toHaveCount(0);
   await expect(page.getByText('已清空回收站“2 个大板”', { exact: true })).toBeVisible();
 });
