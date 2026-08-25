@@ -175,7 +175,6 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { AdminConfirmDialog, AdminDialog, AdminPagination, adminFeedback } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
@@ -373,7 +372,6 @@ const openCreate = () => {
   formVisible.value = true;
 };
 const openEdit = (row: MarkupConfigurationRecord) => {
-  if (!requireCreatorOwnership(row)) return;
   editingId.value = row.id;
   Object.assign(formData, {
     name: row.name,
@@ -395,10 +393,6 @@ const sorting = ref(false);
 const handleDragSort = async (context: { current: MarkupConfigurationRecord; target: MarkupConfigurationRecord }) => {
   if (!canSort.value || sorting.value) return;
   const orderedRows = tableData.value.map((item) => ({ ...item }));
-  if (!requireCreatorOwnership(...orderedRows)) {
-    await loadData();
-    return;
-  }
   const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
   const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
   if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
@@ -446,7 +440,6 @@ const confirmVisible = ref(false);
 const confirmType = ref<ConfirmType>('disable');
 const confirmRow = ref<MarkupConfigurationRecord | null>(null);
 const openConfirm = (row: MarkupConfigurationRecord, type: ConfirmType) => {
-  if (!requireCreatorOwnership(row)) return;
   confirmRow.value = row;
   confirmType.value = type;
   confirmVisible.value = true;

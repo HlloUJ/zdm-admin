@@ -676,8 +676,8 @@ class CategoryAttributeApiTest {
                   "status":"enabled"
                 }
                 """))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.skuFlag").value(true));
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}", otherCreatorBindingId)
             .header("Authorization", "Bearer " + token)
@@ -718,12 +718,12 @@ class CategoryAttributeApiTest {
                   "status":"enabled"
                 }
                 """))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.requiredFlag").value(false));
 
     mockMvc.perform(delete("/api/admin/category-attributes/{id}", otherCreatorBindingId)
             .header("Authorization", "Bearer " + token))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("不可操作其他用户添加的数据"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
   }
 }

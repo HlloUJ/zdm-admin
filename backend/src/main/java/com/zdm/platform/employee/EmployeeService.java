@@ -1,7 +1,6 @@
 package com.zdm.platform.employee;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.PermissionGuard;
@@ -24,17 +23,14 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
 
   private final JdbcTemplate jdbcTemplate;
   private final SimpleJdbcInsert accountInsert;
-  private final CreatorOwnershipGuard ownershipGuard;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
 
   public EmployeeService(
       JdbcTemplate jdbcTemplate,
-      CreatorOwnershipGuard ownershipGuard,
       CurrentIdentityProvider identityProvider,
       PermissionGuard permissionGuard) {
     this.jdbcTemplate = jdbcTemplate;
-    this.ownershipGuard = ownershipGuard;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
     this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
@@ -77,7 +73,6 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     CurrentIdentity identity = requireEmployeeOrganizationScope(existing);
     requireSelfUpdateAllowed(identity, existing, payload);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
 
     if (payload.getStoreId() != null && !Objects.equals(payload.getStoreId(), existing.getStoreId())) {
       throw new AccessDeniedException("不能将员工转移到其他门店");
@@ -115,7 +110,6 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (Objects.equals(existing.getId(), identity.employeeId())) {
       throw new AccessDeniedException("不能修改当前登录员工的角色");
     }
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
 
     existing.setRoleIds(request.roleIds());
@@ -378,7 +372,6 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (Objects.equals(employee.getId(), identity.employeeId())) {
       throw new AccessDeniedException("不能删除当前登录员工");
     }
-    ownershipGuard.requireCreator(employee.getCreatedByAccountId(), employee.getCreatedByName());
   }
 
   private CurrentIdentity requireEmployeeOrganizationScope(Employee employee) {

@@ -2,7 +2,6 @@ package com.zdm.platform.role;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.common.FunctionPermissionNormalizer;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.PermissionGuard;
@@ -28,17 +27,14 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   private record RoleScope(Long tenantId, Long storeId, String audience) {}
 
   private final JdbcTemplate jdbcTemplate;
-  private final CreatorOwnershipGuard ownershipGuard;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
 
   public RoleService(
       JdbcTemplate jdbcTemplate,
-      CreatorOwnershipGuard ownershipGuard,
       CurrentIdentityProvider identityProvider,
       PermissionGuard permissionGuard) {
     this.jdbcTemplate = jdbcTemplate;
-    this.ownershipGuard = ownershipGuard;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
   }
@@ -165,7 +161,6 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
         || !Objects.equals(role.getStoreId(), scope.storeId())) {
       throw new AccessDeniedException("当前组织无权操作该角色");
     }
-    ownershipGuard.requireCreator(role.getCreatedByAccountId(), role.getCreatedByName());
   }
 
   private void normalizeAndValidateRoleName(Role role, Long excludedRoleId) {

@@ -3,7 +3,6 @@ package com.zdm.platform.catalog;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,17 +22,14 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
   private final CurrentIdentityProvider identityProvider;
   private final ProductAttributeService attributeService;
   private final CategoryAttributeValueBindingService valueBindingService;
-  private final CreatorOwnershipGuard ownershipGuard;
 
   public CategoryAttributeService(
       CurrentIdentityProvider identityProvider,
       ProductAttributeService attributeService,
-      CategoryAttributeValueBindingService valueBindingService,
-      CreatorOwnershipGuard ownershipGuard) {
+      CategoryAttributeValueBindingService valueBindingService) {
     this.identityProvider = identityProvider;
     this.attributeService = attributeService;
     this.valueBindingService = valueBindingService;
-    this.ownershipGuard = ownershipGuard;
   }
 
   @Transactional
@@ -45,7 +41,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     categoryAttribute.setStatus("disabled");
     categoryAttribute.setPublishStatus("unpublished");
     categoryAttribute.setCreatedByName(resolveCreatedByName());
-    categoryAttribute.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    categoryAttribute.setCreatedByAccountId(identityProvider.require().accountId());
     save(categoryAttribute);
     return getById(categoryAttribute.getId());
   }
@@ -70,7 +66,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
         ? 1
         : lastBinding.getSortOrder() + 1;
     String createdByName = resolveCreatedByName();
-    Long createdByAccountId = ownershipGuard.currentAccountId();
+    Long createdByAccountId = identityProvider.require().accountId();
     List<CategoryAttribute> createdBindings = new ArrayList<>();
     for (Long attributeId : attributeIds) {
       CategoryAttribute binding = new CategoryAttribute();
@@ -100,7 +96,6 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     if (existing == null) {
       throw new IllegalArgumentException("类目属性模板不存在");
     }
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     payload.setAttributeRole(normalizeAttributeRole(payload.getAttributeRole()));
     validateAttributeRoleAndSku(payload.getAttributeRole(), payload.getSkuFlag());
     if ("published".equals(existing.getPublishStatus()) && hasConfigurationChanged(existing, payload)) {
@@ -125,7 +120,6 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     if (existing == null) {
       throw new IllegalArgumentException("类目属性模板不存在");
     }
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     if ("published".equals(publishStatus)) {
       validateAttributeRoleAndSku(existing.getAttributeRole(), existing.getSkuFlag());
       if (!StringUtils.hasText(existing.getAttributeRole())) {
@@ -154,14 +148,8 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
 
   @Transactional
   public boolean deleteCategoryAttribute(Long id) {
-    CategoryAttribute existing = requireCategoryAttribute(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
+    requireCategoryAttribute(id);
     return removeById(id);
-  }
-
-  public void requireCreator(Long id) {
-    CategoryAttribute existing = requireCategoryAttribute(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
   }
 
   private CategoryAttribute requireCategoryAttribute(Long id) {

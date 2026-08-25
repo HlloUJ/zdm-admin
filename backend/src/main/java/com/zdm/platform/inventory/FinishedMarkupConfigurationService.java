@@ -3,7 +3,6 @@ package com.zdm.platform.inventory;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -20,15 +19,12 @@ public class FinishedMarkupConfigurationService {
   private static final String DUPLICATE_NAME_MESSAGE = "成品现货价格层级名称已存在";
   private final FinishedMarkupConfigurationMapper mapper;
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
   private final PriceConfigurationBackfillService backfillService;
 
   public FinishedMarkupConfigurationService(FinishedMarkupConfigurationMapper mapper,
-      CurrentIdentityProvider identityProvider, CreatorOwnershipGuard ownershipGuard,
-      PriceConfigurationBackfillService backfillService) {
+      CurrentIdentityProvider identityProvider, PriceConfigurationBackfillService backfillService) {
     this.mapper = mapper;
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
     this.backfillService = backfillService;
   }
 
@@ -71,7 +67,6 @@ public class FinishedMarkupConfigurationService {
   public FinishedMarkupConfiguration updateConfiguration(Long id, FinishedMarkupConfiguration payload) {
     requirePlatformScope();
     FinishedMarkupConfiguration existing = requireConfiguration(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     payload.setId(id);
     payload.setName(normalizedName(payload.getName()));
     payload.setStatus(existing.getStatus());
@@ -89,7 +84,6 @@ public class FinishedMarkupConfigurationService {
   public FinishedMarkupConfiguration updateStatus(Long id, String status) {
     requirePlatformScope();
     FinishedMarkupConfiguration existing = requireConfiguration(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     mapper.updateById(existing);
     if ("enabled".equals(status)) {
@@ -113,8 +107,6 @@ public class FinishedMarkupConfigurationService {
     if (!byId.keySet().equals(new HashSet<>(orderedIds))) {
       throw new IllegalArgumentException("价格层级顺序与当前数据不一致");
     }
-    configurations.forEach(item -> ownershipGuard.requireCreator(
-        item.getCreatedByAccountId(), item.getCreatedByName()));
     for (int index = 0; index < orderedIds.size(); index += 1) {
       FinishedMarkupConfiguration configuration = byId.get(orderedIds.get(index));
       configuration.setSortOrder(index + 1);
@@ -127,7 +119,6 @@ public class FinishedMarkupConfigurationService {
   public void deleteConfiguration(Long id) {
     requirePlatformScope();
     FinishedMarkupConfiguration existing = requireConfiguration(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     if (mapper.countProductReferences(id) > 0) {
       throw new IllegalArgumentException("价格层级“" + existing.getName() + "”已被成品现货使用，只能停用");
     }

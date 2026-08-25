@@ -122,7 +122,6 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
       @Valid @RequestBody CategoryAttributeValueBindingRequest request) {
     CategoryAttribute existing = getExisting(id);
     requireScopedPermission(existing.getCategoryId(), "bind-values", "edit");
-    service.requireCreator(id);
     return ApiResponse.ok(valueBindingService.replaceBindings(id, request));
   }
 

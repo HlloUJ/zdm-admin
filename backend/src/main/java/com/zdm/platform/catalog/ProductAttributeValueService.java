@@ -3,7 +3,6 @@ package com.zdm.platform.catalog;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -17,13 +16,8 @@ public class ProductAttributeValueService
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
 
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
-
-  public ProductAttributeValueService(
-      CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+  public ProductAttributeValueService(CurrentIdentityProvider identityProvider) {
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
   }
 
   public List<ProductAttributeValue> listWithUseCounts(Collection<String> scopes) {
@@ -40,7 +34,7 @@ public class ProductAttributeValueService
   public ProductAttributeValue createValue(ProductAttributeValue value) {
     value.setId(null);
     value.setCreatedByName(resolveCreatedByName());
-    value.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    value.setCreatedByAccountId(identityProvider.require().accountId());
     save(value);
     return getById(value.getId());
   }
@@ -48,7 +42,6 @@ public class ProductAttributeValueService
   @Transactional
   public ProductAttributeValue updateStatus(Long id, String status) {
     ProductAttributeValue existing = requireValue(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
@@ -56,8 +49,7 @@ public class ProductAttributeValueService
 
   @Transactional
   public boolean deleteValue(Long id) {
-    ProductAttributeValue existing = requireValue(id);
-    ownershipGuard.requireCreator(existing.getCreatedByAccountId(), existing.getCreatedByName());
+    requireValue(id);
     return removeById(id);
   }
 

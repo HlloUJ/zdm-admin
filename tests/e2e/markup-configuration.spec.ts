@@ -178,7 +178,7 @@ test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
   await expect(page.locator('.guide-coefficient-input input')).toHaveValue('');
 });
 
-test('忽略数据权限查看全部配置但不能操作他人数据', async ({ page }) => {
+test('忽略数据权限并允许操作他人创建的配置', async ({ page }) => {
   await seedLogin(
     page,
     [
@@ -197,16 +197,22 @@ test('忽略数据权限查看全部配置但不能操作他人数据', async ({
   const otherCreatorRow = page.getByRole('row').filter({ hasText: '1级合伙人价格' });
 
   await otherCreatorRow.getByText('编辑', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '编辑合伙人阶梯价' })).toHaveCount(0);
+  const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑合伙人阶梯价' });
+  await expect(editDialog).toBeVisible();
+  await editDialog.getByRole('button', { name: '取消' }).click();
 
   await otherCreatorRow.getByText('停用', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '停用合伙人阶梯价' })).toHaveCount(0);
+  const disableDialog = page.locator('.t-dialog').filter({ hasText: '停用合伙人阶梯价' });
+  await expect(disableDialog).toBeVisible();
+  await disableDialog.getByRole('button', { name: '取消' }).click();
 
   const secondPartnerRow = page.getByRole('row').filter({ hasText: '2级合伙人价格' });
+  const reorderRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'PATCH' && request.url().endsWith('/api/admin/finished-markup-configurations/reorder'),
+  );
   await otherCreatorRow
     .locator('.t-table__handle-draggable')
     .dragTo(secondPartnerRow.locator('.t-table__handle-draggable'));
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
+  expect((await reorderRequest).postDataJSON()).toEqual({ orderedIds: [4, 3] });
 });

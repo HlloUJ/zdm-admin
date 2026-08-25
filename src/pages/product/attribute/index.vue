@@ -115,7 +115,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import {
   adminFeedback,
   AdminConfirmDialog,
@@ -319,14 +318,12 @@ const submit = async () => {
 };
 const openStatusConfirm = (row: Attribute) => {
   if (!canToggleAttributeStatus.value) return;
-  if (!requireCreatorOwnership(row)) return;
   confirmTarget.value = row;
   confirmType.value = row.status === 'enabled' ? 'disable' : 'enable';
   confirmDialogVisible.value = true;
 };
 const openDeleteConfirm = (row: Attribute) => {
   if (!canDeleteAttribute.value) return;
-  if (!requireCreatorOwnership(row)) return;
   confirmTarget.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;

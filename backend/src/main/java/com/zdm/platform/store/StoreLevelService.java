@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import com.zdm.platform.security.CreatorOwnershipGuard;
 import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -18,15 +17,12 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
 
   private final StoreMapper storeMapper;
   private final CurrentIdentityProvider identityProvider;
-  private final CreatorOwnershipGuard ownershipGuard;
 
   public StoreLevelService(
       StoreMapper storeMapper,
-      CurrentIdentityProvider identityProvider,
-      CreatorOwnershipGuard ownershipGuard) {
+      CurrentIdentityProvider identityProvider) {
     this.storeMapper = storeMapper;
     this.identityProvider = identityProvider;
-    this.ownershipGuard = ownershipGuard;
   }
 
   public List<StoreLevel> listEnabled() {
@@ -39,7 +35,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     normalizeAndValidate(level, null);
     level.setStatus("enabled");
     level.setCreatedByName(resolveCreatedByName());
-    level.setCreatedByAccountId(ownershipGuard.currentAccountId());
+    level.setCreatedByAccountId(identityProvider.require().accountId());
     save(level);
     return level;
   }
@@ -50,7 +46,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (existing == null) {
       return null;
     }
-    requireAccessible(existing);
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setCreatedByName(existing.getCreatedByName());
@@ -66,7 +61,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (existing == null) {
       return null;
     }
-    requireAccessible(existing);
     existing.setStatus(status);
     updateById(existing);
     return getById(id);
@@ -78,7 +72,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (existing == null) {
       return false;
     }
-    requireAccessible(existing);
     requireUnreferenced(id);
     try {
       return removeById(id);
@@ -92,7 +85,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (existing == null) {
       throw new IllegalArgumentException("门店级别不存在");
     }
-    requireAccessible(existing);
     requireUnreferenced(id);
     return true;
   }
@@ -112,10 +104,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
-  }
-
-  private void requireAccessible(StoreLevel level) {
-    ownershipGuard.requireCreator(level.getCreatedByAccountId(), level.getCreatedByName());
   }
 
   private void requireUnreferenced(Long id) {

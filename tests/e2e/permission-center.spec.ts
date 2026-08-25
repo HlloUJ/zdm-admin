@@ -599,7 +599,7 @@ test('shows employee permission action without edit action for permission-only u
   await expect(permissionOnlyEmployeeActions.getByText('角色', { exact: true })).toBeVisible();
 });
 
-test('blocks all employee operations for records created by another account', async ({ page }) => {
+test('allows granted employee operations for records created by another account', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
@@ -628,20 +628,24 @@ test('blocks all employee operations for records created by another account', as
   const actions = row.locator('.table-actions');
 
   await actions.getByText('编辑', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '编辑资料' })).toHaveCount(0);
+  const profileDialog = page.locator('.t-dialog').filter({ hasText: '编辑资料' });
+  await expect(profileDialog).toBeVisible();
+  await profileDialog.getByRole('button', { name: '取消' }).click();
 
   await actions.getByText('角色', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '配置权限' })).toHaveCount(0);
+  const permissionDialog = page.locator('.t-dialog').filter({ hasText: '配置权限' });
+  await expect(permissionDialog).toBeVisible();
+  await permissionDialog.getByRole('button', { name: '取消' }).click();
 
   await actions.getByText(/^(停用|启用)$/).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: /是否(停用|启用)员工/ })).toHaveCount(0);
+  const statusDialog = page.locator('.t-dialog').filter({ hasText: /是否(停用|启用)员工/ });
+  await expect(statusDialog).toBeVisible();
+  await statusDialog.getByRole('button', { name: '取消' }).click();
 
   await actions.getByText('删除', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '是否删除员工' })).toHaveCount(0);
+  const deleteDialog = page.locator('.t-dialog').filter({ hasText: '是否删除员工' });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole('button', { name: '取消' }).click();
 });
 
 test('hides all operations for the current employee', async ({ page }) => {
@@ -735,8 +739,9 @@ test('shows only granted store management operations for a restricted account', 
   await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
 
   await row.getByRole('button', { name: '修改门店级别' }).click({ force: true });
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true })).toBeVisible();
-  await expect(page.getByRole('dialog', { name: '店铺级别' })).toHaveCount(0);
+  const levelDialog = page.locator('.t-dialog').filter({ hasText: '店铺级别' });
+  await expect(levelDialog).toBeVisible();
+  await levelDialog.getByRole('button', { name: '取消' }).click();
 });
 
 test('filters role actions by logged-in permissions', async ({ page }) => {
@@ -775,7 +780,7 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
   await expect(operationRoleRow.getByText('删除', { exact: true })).toHaveCount(0);
 });
 
-test('blocks all role operations for records created by another account', async ({ page }) => {
+test('allows granted role operations for records created by another account', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
@@ -803,16 +808,19 @@ test('blocks all role operations for records created by another account', async 
   const actions = row.locator('.table-actions');
 
   await actions.getByText('编辑', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '编辑' })).toHaveCount(0);
+  const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
+  await expect(editDialog).toBeVisible();
+  await editDialog.getByRole('button', { name: '取消' }).click();
 
   await actions.getByText('权限', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '权限配置' })).toHaveCount(0);
+  const permissionDialog = page.locator('.t-dialog').filter({ hasText: '权限配置' });
+  await expect(permissionDialog).toBeVisible();
+  await permissionDialog.getByRole('button', { name: '取消' }).click();
 
   await actions.getByText('删除', { exact: true }).click();
-  await expect(page.getByText('不可操作其他用户添加的数据', { exact: true }).last()).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '是否删除角色' })).toHaveCount(0);
+  const deleteDialog = page.locator('.t-dialog').filter({ hasText: '是否删除角色' });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole('button', { name: '取消' }).click();
 });
 
 test('opens role permission configuration dialog', async ({ page }) => {

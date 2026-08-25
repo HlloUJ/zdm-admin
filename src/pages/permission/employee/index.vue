@@ -261,7 +261,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
@@ -598,7 +597,6 @@ const openProfileDialog = (row: EmployeeItem) => {
     adminFeedback.warning('不能编辑当前登录员工');
     return;
   }
-  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   profileFormData.name = row.name;
   profileFormData.gender = row.gender;
@@ -620,7 +618,6 @@ const openPermissionDialog = (row: EmployeeItem) => {
     adminFeedback.warning('不能修改当前登录员工的角色');
     return;
   }
-  if (!requireCreatorOwnership(row)) return;
   activeEmployee.value = row;
   permissionFormData.roleIds = [...row.roleIds];
   permissionFormData.dataPermission = row.dataPermission;
@@ -728,7 +725,6 @@ const openStatusConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('不能停用当前登录员工');
     return;
   }
-  if (!requireCreatorOwnership(row)) return;
   const nextType = row.status === 'normal' ? 'disable' : 'enable';
   if (nextType === 'enable' && !validateEmployeeBeforeEnable(row)) return;
 
@@ -746,7 +742,6 @@ const openDeleteConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('不能删除当前登录员工');
     return;
   }
-  if (!requireCreatorOwnership(row)) return;
   confirmEmployee.value = row;
   confirmType.value = 'delete';
   confirmDialogVisible.value = true;

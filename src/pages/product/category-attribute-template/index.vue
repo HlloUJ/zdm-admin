@@ -392,7 +392,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import {
   adminFeedback,
   AdminConfirmDialog,
@@ -879,7 +878,6 @@ async function submitBind() {
     return;
   }
   if (removedBindings.length && !canRemoveBinding.value) return;
-  if (removedBindings.length && !requireCreatorOwnership(...removedBindings)) return;
   if (!newAttributeIds.length && !removedBindings.length) {
     closeBindDialog();
     adminFeedback.info('绑定关系未变更');
@@ -906,7 +904,6 @@ async function submitBind() {
 
 async function openValueBindingDialog(row: BindingRow) {
   if (!canBindOptionValues.value || row.valueType !== 'select' || row.publishStatus === 'published') return;
-  if (!requireCreatorOwnership(row)) return;
   valueBindingTarget.value = row;
   valueSearchKeyword.value = '';
   valueBindingDialogVisible.value = true;
@@ -959,7 +956,6 @@ function closeBoundValueView() {
 
 async function removeBoundValue(row: CategoryAttributeValueOption) {
   if (!canRemoveBoundValue.value || !boundValueViewTarget.value || boundValueRemovingId.value !== null) return;
-  if (!requireCreatorOwnership(boundValueViewTarget.value)) return;
   boundValueRemovingId.value = row.id;
   try {
     const remainingValueIds = boundValueOptions.value
@@ -982,7 +978,6 @@ async function removeBoundValue(row: CategoryAttributeValueOption) {
 async function submitValueBindings() {
   if (!canBindOptionValues.value || !valueBindingTarget.value || valueBindingsSaving.value) return;
   const target = valueBindingTarget.value;
-  if (!requireCreatorOwnership(target)) return;
   valueBindingsSaving.value = true;
   try {
     const updatedOptions = await updateCategoryAttributeValueBindings(target.id, selectedValueIds.value);
@@ -1008,7 +1003,6 @@ async function persistRow(
   if (field === 'requiredFlag' && !canSetRequired.value) return;
   if (field === 'skuFlag' && !canSetSkuCombination.value) return;
   if (field === null && !canBindAttribute.value) return;
-  if (!requireCreatorOwnership(row)) return;
   savingId.value = row.id;
   savingField.value = field;
   const nextRow = { ...row, ...patch };
@@ -1046,7 +1040,6 @@ function getCurrentBindingRow(row: BindingRow) {
 function changeAttributeRole(row: BindingRow, value: unknown) {
   const currentRow = getCurrentBindingRow(row);
   if (!canSetAttributeRole.value || currentRow.publishStatus === 'published') return;
-  if (!requireCreatorOwnership(currentRow)) return;
   const nextRole = getAttributeRoleValue(value);
   if (nextRole === currentRow.attributeRole) return;
   if (currentRow.skuFlag && nextRole !== 'sales') {
@@ -1101,7 +1094,6 @@ function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: u
 async function handleDragSort(context: { current: BindingRow; target: BindingRow }) {
   if (!canBindAttribute.value || savingId.value !== null) return;
   const orderedRows = allBindingRows.value.map((item) => ({ ...item }));
-  if (!requireCreatorOwnership(...orderedRows)) return;
   const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
   const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
   if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
@@ -1128,7 +1120,6 @@ async function handleDragSort(context: { current: BindingRow; target: BindingRow
 
 async function togglePublish(row: BindingRow) {
   if (!canTogglePublish.value || savingId.value !== null) return;
-  if (!requireCreatorOwnership(row)) return;
   savingId.value = row.id;
   savingField.value = null;
   try {
@@ -1151,7 +1142,6 @@ async function togglePublish(row: BindingRow) {
 
 async function openPublishConfirm(row: BindingRow) {
   if (!canTogglePublish.value || savingId.value !== null) return;
-  if (!requireCreatorOwnership(row)) return;
   if (row.publishStatus === 'unpublished' && !row.attributeRole) {
     adminFeedback.error('请先选择属性角色');
     return;
@@ -1185,7 +1175,6 @@ async function handlePublishConfirm() {
 
 function openDeleteConfirm(row: BindingRow) {
   if (!canRemoveBinding.value) return;
-  if (!requireCreatorOwnership(row)) return;
   deleteTarget.value = row;
   deleteConfirmVisible.value = true;
 }

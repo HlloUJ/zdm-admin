@@ -231,7 +231,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { requireCreatorOwnership } from '@/composables/useCreatorOwnershipGuard';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   adminFeedback,
@@ -577,7 +576,6 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: StoreItem) => {
-  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -626,7 +624,6 @@ const handleSubmit = async () => {
 };
 
 const openLevelDialog = (row: StoreItem) => {
-  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   levelEditingId.value = row.id;
   levelFormData.storeLevelId = row.storeLevelId;
   levelDialogVisible.value = true;
@@ -660,7 +657,6 @@ const handleLevelSubmit = async () => {
 };
 
 const openArchiveConfirm = (row: StoreItem) => {
-  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   confirmState.type = 'archive';
   confirmState.row = row;
   confirmState.content = '归档后，该门店的全部员工将无法登录或切换到该门店。';
@@ -668,7 +664,6 @@ const openArchiveConfirm = (row: StoreItem) => {
 };
 
 const openRestoreConfirm = (row: StoreItem) => {
-  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   confirmState.type = 'restore';
   confirmState.row = row;
   confirmState.content = `是否恢复门店“${row.shopName}”运营？`;
@@ -676,7 +671,6 @@ const openRestoreConfirm = (row: StoreItem) => {
 };
 
 const openDeleteConfirm = (row: StoreItem) => {
-  if (!requireCreatorOwnership({ createdByName: row.createdBy })) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = '彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作';
