@@ -436,8 +436,8 @@
                   <t-option
                     v-for="item in publishSupplierOptions"
                     :key="item.id"
-                    :label="item.name"
-                    :value="item.name"
+                    :label="item.label"
+                    :value="item.label"
                   />
                 </t-select>
               </t-form-item>
@@ -963,8 +963,6 @@ import {
   listSlabMarkupConfigurationOptions,
   type SlabMarkupConfigurationRecord,
 } from '@/services/slabMarkupConfigurations';
-import { listSlabOrigins, type SlabOriginRecord } from '@/services/slabOrigins';
-import { listSlabVarieties, type SlabVarietyRecord } from '@/services/slabVarieties';
 import { createVideoFirstFrame } from '@/services/media';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -992,7 +990,6 @@ import {
   type SlabStatus,
   type SlabPrice,
 } from '@/services/slabs';
-import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 type PublisherType = SlabPublisherType;
 type SlabTab = SlabStatus;
@@ -1388,15 +1385,19 @@ const uploadPreviewDialogVisible = ref(false);
 const uploadPreviewTitle = ref('');
 const uploadPreviewUrl = ref('');
 const uploadPreviewType = ref<'image' | 'video'>('image');
-const slabOrigins = ref<SlabOriginRecord[]>([]);
-const slabVarieties = ref<SlabVarietyRecord[]>([]);
-const slabSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<SlabMarkupConfigurationRecord[]>([]);
 const guidePriceSettingCoefficient = ref<number>();
-const publishOptions = reactive<SlabPublishOptions>({ textures: [], colorCategories: [], grades: [] });
+const publishOptions = reactive<SlabPublishOptions>({
+  varieties: [],
+  origins: [],
+  textures: [],
+  colorCategories: [],
+  grades: [],
+  suppliers: [],
+});
 
-const varietyOptions = computed(() => slabVarieties.value.map((item) => item.name));
-const originOptions = computed(() => slabOrigins.value.map((item) => item.name));
+const varietyOptions = computed(() => publishOptions.varieties.map((item) => item.label));
+const originOptions = computed(() => publishOptions.origins.map((item) => item.label));
 const textureFilterOptions = computed(() => publishOptions.textures.map((item) => item.label));
 const colorOptions = computed(() => publishOptions.colorCategories.flatMap((item) => item.children));
 const formatGradeOption = (grade: SlabPublishOptions['grades'][number]) =>
@@ -1428,14 +1429,10 @@ const colorFilterCascaderOptions = computed(() =>
     })),
   })),
 );
-const suppliesSlabs = (supplier: SupplierRecord) =>
-  supplier.supplyTypes.some(
-    (type) => type.status !== 'disabled' && (type.code === 'slab' || type.name.trim() === '大板'),
-  );
-const publishSupplierOptions = computed(() =>
-  slabSuppliers.value.filter((item) => item.status !== 'disabled' && suppliesSlabs(item)),
+const publishSupplierOptions = computed(() => publishOptions.suppliers);
+const supplierFilterOptions = computed(() =>
+  publishOptions.suppliers.map((item) => ({ id: item.id, name: item.label })),
 );
-const supplierFilterOptions = computed(() => slabSuppliers.value.filter((item) => suppliesSlabs(item)));
 
 const filters = reactive<Record<SlabTab, FilterState>>({
   warehouse: makeFilterState(),
@@ -1470,18 +1467,18 @@ const normalizeStatus = (status?: string): SlabStatus => {
 const normalizePublisherType = (publisherType?: string): PublisherType =>
   publisherType === '接口获取' ? '接口获取' : '平台发布';
 
-const originById = (id?: number) => slabOrigins.value.find((item) => item.id === id);
-const varietyById = (id?: number) => slabVarieties.value.find((item) => item.id === id);
-const supplierById = (id?: number) => slabSuppliers.value.find((item) => item.id === id);
+const originById = (id?: number) => publishOptions.origins.find((item) => item.id === id);
+const varietyById = (id?: number) => publishOptions.varieties.find((item) => item.id === id);
+const supplierById = (id?: number) => publishOptions.suppliers.find((item) => item.id === id);
 const publishOptionLabel = (options: SlabPublishOptions[keyof SlabPublishOptions], id?: number) =>
   options.find((item) => item.id === id)?.label || '-';
 const gradeLabelById = (id?: number) => {
   const grade = publishOptions.grades.find((item) => item.id === id);
   return grade ? formatGradeOption(grade) : '-';
 };
-const varietyIdByName = (name: string) => slabVarieties.value.find((item) => item.name === name)?.id;
-const originIdByName = (name: string) => slabOrigins.value.find((item) => item.name === name)?.id;
-const supplierIdByName = (name: string) => publishSupplierOptions.value.find((item) => item.name === name)?.id;
+const varietyIdByName = (name: string) => publishOptions.varieties.find((item) => item.label === name)?.id;
+const originIdByName = (name: string) => publishOptions.origins.find((item) => item.label === name)?.id;
+const supplierIdByName = (name: string) => publishSupplierOptions.value.find((item) => item.label === name)?.id;
 
 const formatSize = (record: SlabRecord) => {
   const dimensions = [record.lengthMm, record.widthMm, record.thicknessMm];
@@ -1551,11 +1548,11 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     videoCoverUrl: record.videoCoverUrl,
     name: record.name,
     size: formatSize(record),
-    origin: record.originName || originById(record.originId)?.name || originById(variety?.originId)?.name || '-',
+    origin: record.originName || originById(record.originId)?.label || '-',
     texture: publishOptionLabel(publishOptions.textures, record.textureId),
     color: publishOptionLabel(colorOptions.value, record.colorId),
     grade: gradeLabelById(record.gradeId),
-    tenant: record.supplierName || supplier?.name || (record.supplierId ? `供应商 #${record.supplierId}` : '平台自营'),
+    tenant: record.supplierName || supplier?.label || (record.supplierId ? `供应商 #${record.supplierId}` : '平台自营'),
     store: record.warehouse || '-',
     publisherType: normalizePublisherType(record.publisherType),
     createdByName: record.createdByName?.trim() || '-',
@@ -1569,7 +1566,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     },
     guidePriceCoefficient: record.guidePriceCoefficient,
     status: normalizeStatus(record.status),
-    variety: record.varietyName || variety?.name || (record.varietyId ? `品种 #${record.varietyId}` : '-'),
+    variety: record.varietyName || variety?.label || (record.varietyId ? `品种 #${record.varietyId}` : '-'),
     sku: record.serialNo,
     lengthMm: record.lengthMm,
     widthMm: record.widthMm,
@@ -1639,19 +1636,12 @@ const upsertSlabItem = (record: SlabRecord) => {
 const loadSlabs = async () => {
   loading.value = true;
   try {
-    const [records, originsResult, varietiesResult, suppliersResult, publishOptionsResult, markupResult, guideSetting] =
-      await Promise.all([
-        listSlabs(),
-        listSlabOrigins().catch(() => []),
-        listSlabVarieties().catch(() => []),
-        listSuppliers().catch(() => []),
-        getSlabPublishOptions(),
-        listSlabMarkupConfigurationOptions(),
-        getSlabGuidePriceSetting(),
-      ]);
-    slabOrigins.value = originsResult;
-    slabVarieties.value = varietiesResult;
-    slabSuppliers.value = suppliersResult;
+    const [records, publishOptionsResult, markupResult, guideSetting] = await Promise.all([
+      listSlabs(),
+      getSlabPublishOptions(),
+      listSlabMarkupConfigurationOptions(),
+      getSlabGuidePriceSetting(),
+    ]);
     Object.assign(publishOptions, publishOptionsResult);
     markupConfigurations.value = markupResult;
     guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;

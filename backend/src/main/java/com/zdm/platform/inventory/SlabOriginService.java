@@ -14,15 +14,15 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private static final String DUPLICATE_NAME_MESSAGE = "产地名称已存在";
   private static final String REFERENCED_MESSAGE =
-      "该产地已被大板品种引用，不能删除，请先停用该产地";
+      "该产地已被大板库存引用，不能删除，请先停用该产地";
 
-  private final SlabVarietyMapper slabVarietyMapper;
+  private final SlabInventoryMapper slabInventoryMapper;
   private final CurrentIdentityProvider identityProvider;
 
   public SlabOriginService(
-      SlabVarietyMapper slabVarietyMapper,
+      SlabInventoryMapper slabInventoryMapper,
       CurrentIdentityProvider identityProvider) {
-    this.slabVarietyMapper = slabVarietyMapper;
+    this.slabInventoryMapper = slabInventoryMapper;
     this.identityProvider = identityProvider;
   }
 
@@ -68,8 +68,8 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     if (existing == null) {
       return false;
     }
-    Long referenceCount = slabVarietyMapper.selectCount(
-        Wrappers.<SlabVariety>lambdaQuery().eq(SlabVariety::getOriginId, id));
+    Long referenceCount = slabInventoryMapper.selectCount(
+        Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getOriginId, id));
     if (referenceCount > 0) {
       throw new IllegalArgumentException(REFERENCED_MESSAGE);
     }

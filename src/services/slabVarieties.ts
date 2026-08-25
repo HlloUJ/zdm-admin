@@ -3,7 +3,6 @@ import { request } from './http';
 export interface SlabVarietyRecord {
   id: number;
   name: string;
-  originId?: number;
   color?: string;
   createdByName?: string;
   createdByAccountId?: number;
@@ -15,7 +14,6 @@ export interface SlabVarietyRecord {
 
 export interface SlabVarietyPayload {
   name: string;
-  originId?: number;
   color?: string;
   remark?: string;
   status: 'enabled' | 'disabled';

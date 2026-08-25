@@ -1,6 +1,7 @@
 package com.zdm.platform.supplier;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.common.SlabSupplierOptionProvider;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.ArrayList;
@@ -18,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
+public class SupplierService extends ServiceImpl<SupplierMapper, Supplier>
+    implements SlabSupplierOptionProvider {
   private static final String DUPLICATE_NAME_MESSAGE = "供应商名称已存在";
   private static final String SLAB_REFERENCED_MESSAGE =
       "该供应商已关联大板库存，不能删除，请先停用该供应商";
@@ -55,6 +57,41 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
         .list();
     enrichSupplyTypes(suppliers);
     return suppliers;
+  }
+
+  /**
+   * Returns suppliers that can be selected by the slab business form.
+   * Business option lookup intentionally ignores the operator's self/all data permission,
+   * while still keeping the current identity's organization ownership boundary.
+   */
+  private List<Supplier> selectableSlabSuppliers() {
+    SupplierScope scope = SupplierScope.from(identityProvider.require());
+    List<Supplier> suppliers = lambdaQuery()
+        .eq(Supplier::getOwnerScope, scope.ownerScope())
+        .eq(Supplier::getOwnerId, scope.ownerId())
+        .eq(Supplier::getStatus, "enabled")
+        .orderByAsc(Supplier::getName)
+        .orderByAsc(Supplier::getId)
+        .list();
+    enrichSupplyTypes(suppliers);
+    return suppliers.stream().filter(this::suppliesSlabs).toList();
+  }
+
+  @Override
+  public List<SlabSupplierOptionProvider.Option> listSelectableSlabSuppliers() {
+    return selectableSlabSuppliers().stream()
+        .map(supplier -> new SlabSupplierOptionProvider.Option(
+            supplier.getId(), supplier.getName(), supplier.getStatus()))
+        .toList();
+  }
+
+  @Override
+  public boolean isSelectableSlabSupplier(Long supplierId) {
+    if (supplierId == null) {
+      return false;
+    }
+    return selectableSlabSuppliers().stream()
+        .anyMatch(supplier -> Objects.equals(supplier.getId(), supplierId));
   }
 
   @Transactional
@@ -277,5 +314,12 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier> {
           supplier.setSupplyTypeIds(typeIds);
         },
         ids);
+  }
+
+  private boolean suppliesSlabs(Supplier supplier) {
+    return supplier.getSupplyTypes() != null && supplier.getSupplyTypes().stream().anyMatch(
+        type -> "enabled".equals(type.getStatus())
+            && ("slab".equals(type.getCode())
+                || "大板".equals(type.getName() == null ? null : type.getName().trim())));
   }
 }

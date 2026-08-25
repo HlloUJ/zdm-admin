@@ -1,6 +1,7 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.common.SlabSupplierOptionProvider;
 import com.zdm.platform.media.MediaAsset;
 import com.zdm.platform.media.MediaAssetService;
 import com.zdm.platform.media.MediaCleanupService;
@@ -35,6 +36,8 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   private final SlabColorService colorService;
   private final SlabGradeService gradeService;
   private final SlabOriginService originService;
+  private final SlabVarietyService varietyService;
+  private final SlabSupplierOptionProvider slabSupplierOptionProvider;
   private final SlabPriceService priceService;
   private final SlabOffShelfRecordService offShelfRecordService;
   private final MediaAssetService mediaAssetService;
@@ -48,6 +51,8 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       SlabColorService colorService,
       SlabGradeService gradeService,
       SlabOriginService originService,
+      SlabVarietyService varietyService,
+      SlabSupplierOptionProvider slabSupplierOptionProvider,
       SlabPriceService priceService,
       SlabOffShelfRecordService offShelfRecordService,
       MediaAssetService mediaAssetService,
@@ -59,6 +64,8 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     this.colorService = colorService;
     this.gradeService = gradeService;
     this.originService = originService;
+    this.varietyService = varietyService;
+    this.slabSupplierOptionProvider = slabSupplierOptionProvider;
     this.priceService = priceService;
     this.offShelfRecordService = offShelfRecordService;
     this.mediaAssetService = mediaAssetService;
@@ -500,16 +507,33 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   }
 
   public SlabPublishOptions listPublishOptions() {
-    List<SlabPublishOption> textures = textureService.list().stream()
+    List<SlabPublishOption> origins = originService.lambdaQuery()
+        .eq(SlabOrigin::getStatus, "enabled")
+        .orderByAsc(SlabOrigin::getName)
+        .list().stream()
+        .map(item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()))
+        .toList();
+    List<SlabPublishOption> varieties = varietyService.lambdaQuery()
+        .eq(SlabVariety::getStatus, "enabled")
+        .orderByAsc(SlabVariety::getName)
+        .list().stream()
+        .map(item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()))
+        .toList();
+    List<SlabPublishOption> textures = textureService.lambdaQuery()
+        .eq(SlabTexture::getStatus, "enabled")
+        .orderByAsc(SlabTexture::getName)
+        .list().stream()
         .map(item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()))
         .toList();
     Map<Long, List<SlabPublishOption>> colorsByCategory = colorService.listColors().stream()
+        .filter(item -> "enabled".equals(item.getStatus()))
         .collect(Collectors.groupingBy(
             SlabColor::getCategoryId,
             Collectors.mapping(
                 item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()),
                 Collectors.toList())));
     List<SlabPublishColorCategoryOption> colorCategories = colorService.listCategories().stream()
+        .filter(category -> "enabled".equals(category.getStatus()))
         .map(category -> new SlabPublishColorCategoryOption(
             category.getId(),
             category.getName(),
@@ -517,44 +541,75 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
             colorsByCategory.getOrDefault(category.getId(), List.of())))
         .filter(category -> !category.children().isEmpty())
         .toList();
-    List<SlabPublishOption> grades = gradeService.list().stream()
+    List<SlabPublishOption> grades = gradeService.lambdaQuery()
+        .eq(SlabGrade::getStatus, "enabled")
+        .orderByAsc(SlabGrade::getCode)
+        .list().stream()
         .map(item -> new SlabPublishOption(item.getId(), item.getCode(), item.getName(), item.getStatus()))
         .toList();
-    return new SlabPublishOptions(textures, colorCategories, grades);
+    List<SlabPublishOption> suppliers = slabSupplierOptionProvider.listSelectableSlabSuppliers().stream()
+        .map(item -> new SlabPublishOption(item.id(), item.label(), null, item.status()))
+        .toList();
+    return new SlabPublishOptions(varieties, origins, textures, colorCategories, grades, suppliers);
   }
 
   public void validateReferences(SlabInventory inventory) {
     validateMeasurements(inventory);
     validateMedia(inventory, null);
-    if (inventory.getTextureId() != null && textureService.getById(inventory.getTextureId()) == null) {
-      throw new IllegalArgumentException("纹理不存在");
-    }
-    if (inventory.getColorId() != null && colorService.getById(inventory.getColorId()) == null) {
-      throw new IllegalArgumentException("色系不存在");
-    }
-    if (inventory.getGradeId() != null && gradeService.getById(inventory.getGradeId()) == null) {
-      throw new IllegalArgumentException("等级不存在");
-    }
-    if (inventory.getOriginId() != null && originService.getById(inventory.getOriginId()) == null) {
-      throw new IllegalArgumentException("产地不存在");
-    }
+    validateSelectableReferences(inventory, null);
   }
 
   private void validateReferencesForUpdate(SlabInventory existing, SlabInventory inventory) {
     validateMeasurements(inventory);
     validateMedia(inventory, existing);
-    if (inventory.getTextureId() != null && textureService.getById(inventory.getTextureId()) == null) {
-      throw new IllegalArgumentException("纹理不存在");
+    validateSelectableReferences(inventory, existing);
+  }
+
+  private void validateSelectableReferences(SlabInventory inventory, SlabInventory existing) {
+    requireEnabledOrUnchanged(
+        inventory.getOriginId(), existing == null ? null : existing.getOriginId(), originService::getById, "产地");
+    requireEnabledOrUnchanged(
+        inventory.getVarietyId(), existing == null ? null : existing.getVarietyId(), varietyService::getById, "品种");
+    requireEnabledOrUnchanged(
+        inventory.getTextureId(), existing == null ? null : existing.getTextureId(), textureService::getById, "纹理");
+    SlabColor color = requireEnabledOrUnchanged(
+        inventory.getColorId(), existing == null ? null : existing.getColorId(), colorService::getById, "色系");
+    requireEnabledOrUnchanged(
+        inventory.getGradeId(), existing == null ? null : existing.getGradeId(), gradeService::getById, "等级");
+
+    if (inventory.getSupplierId() != null
+        && !Objects.equals(inventory.getSupplierId(), existing == null ? null : existing.getSupplierId())
+        && !slabSupplierOptionProvider.isSelectableSlabSupplier(inventory.getSupplierId())) {
+      throw new IllegalArgumentException("供应商不存在、已停用或不支持大板供货");
     }
-    if (inventory.getColorId() != null && colorService.getById(inventory.getColorId()) == null) {
-      throw new IllegalArgumentException("色系不存在");
+    if (color != null) {
+      SlabColorCategory category = colorService.listCategories().stream()
+          .filter(item -> Objects.equals(item.getId(), color.getCategoryId()))
+          .findFirst()
+          .orElse(null);
+      boolean unchanged = existing != null && Objects.equals(color.getId(), existing.getColorId());
+      if ((category == null || !"enabled".equals(category.getStatus())) && !unchanged) {
+        throw new IllegalArgumentException("色系分类已停用，不能选择该色系");
+      }
     }
-    if (inventory.getGradeId() != null && gradeService.getById(inventory.getGradeId()) == null) {
-      throw new IllegalArgumentException("等级不存在");
+  }
+
+  private <T extends com.zdm.platform.common.BaseEntity> T requireEnabledOrUnchanged(
+      Long requestedId,
+      Long existingId,
+      java.util.function.Function<Long, T> finder,
+      String label) {
+    if (requestedId == null) {
+      return null;
     }
-    if (inventory.getOriginId() != null && originService.getById(inventory.getOriginId()) == null) {
-      throw new IllegalArgumentException("产地不存在");
+    T entity = finder.apply(requestedId);
+    if (entity == null) {
+      throw new IllegalArgumentException(label + "不存在");
     }
+    if (!"enabled".equals(entity.getStatus()) && !Objects.equals(requestedId, existingId)) {
+      throw new IllegalArgumentException(label + "已停用，不能选择");
+    }
+    return entity;
   }
 
   private void validateMeasurements(SlabInventory inventory) {
