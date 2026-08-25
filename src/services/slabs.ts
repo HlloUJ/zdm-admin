@@ -119,9 +119,12 @@ export interface SlabPublishColorCategoryOption extends SlabPublishOption {
 }
 
 export interface SlabPublishOptions {
+  varieties: SlabPublishOption[];
+  origins: SlabPublishOption[];
   textures: SlabPublishOption[];
   colorCategories: SlabPublishColorCategoryOption[];
   grades: SlabPublishOption[];
+  suppliers: SlabPublishOption[];
 }
 
 export type SlabOperationType =
@@ -188,7 +191,7 @@ export function listSlabs() {
 }
 
 export function getSlabPublishOptions() {
-  return request<SlabPublishOptions>('/admin/slabs/publish-options');
+  return request<SlabPublishOptions>('/admin/slabs/form-options');
 }
 
 export function createSlab(payload: SlabPayload) {

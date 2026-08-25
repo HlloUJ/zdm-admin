@@ -11,7 +11,7 @@ public interface SlabInventoryMapper extends BaseMapper<SlabInventory> {
       SELECT si.*, variety.name AS variety_name, origin.name AS origin_name, supplier.name AS supplier_name
       FROM slab_inventory si
       LEFT JOIN slab_varieties variety ON variety.id = si.variety_id
-      LEFT JOIN slab_origins origin ON origin.id = COALESCE(si.origin_id, variety.origin_id)
+      LEFT JOIN slab_origins origin ON origin.id = si.origin_id
       LEFT JOIN suppliers supplier ON supplier.id = si.supplier_id
       ORDER BY si.created_at DESC, si.id DESC
       """)
