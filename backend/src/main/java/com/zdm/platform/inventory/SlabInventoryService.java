@@ -231,12 +231,28 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         || inventory.stream().anyMatch(item -> !"recycle".equals(item.getStatus()))) {
       throw new IllegalArgumentException("只有回收站中的大板可以彻底删除");
     }
+    purgeRecycleItems(inventory, "批量彻底删除大板");
+    return true;
+  }
+
+  @Transactional
+  public int clearRecycle() {
+    List<SlabInventory> inventory = lambdaQuery()
+        .eq(SlabInventory::getStatus, "recycle")
+        .list();
+    if (inventory.isEmpty()) {
+      return 0;
+    }
+    purgeRecycleItems(inventory, "清空回收站");
+    return inventory.size();
+  }
+
+  private void purgeRecycleItems(List<SlabInventory> inventory, String operationSummary) {
     String batchNo = UUID.randomUUID().toString();
     inventory.forEach(item -> operationLogService.record(
-        item, "PURGE", "批量彻底删除大板", item.getStatus(), null,
+        item, "PURGE", operationSummary, item.getStatus(), null,
         null, null, "MANUAL", batchNo, Map.of()));
     inventory.forEach(item -> removeById(item.getId()));
-    return true;
   }
 
   private SlabInventory requireDeletable(Long id) {
@@ -367,7 +383,6 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     addChange(changes, "扣角3宽", before.getCorner3WidthMm(), after.getCorner3WidthMm());
     addChange(changes, "扣角4长", before.getCorner4LengthMm(), after.getCorner4LengthMm());
     addChange(changes, "扣角4宽", before.getCorner4WidthMm(), after.getCorner4WidthMm());
-    addChange(changes, "面积", before.getAreaSquareMeter(), after.getAreaSquareMeter());
     addChange(changes, "1:1主图", before.getMainImageMediaId(), after.getMainImageMediaId());
     addChange(changes, "扫描图", before.getScanImageMediaId(), after.getScanImageMediaId());
     addChange(changes, "设计图", before.getDesignImageMediaId(), after.getDesignImageMediaId());
