@@ -252,3 +252,9 @@ export function deleteSlabs(ids: number[]) {
     body: JSON.stringify(ids),
   });
 }
+
+export function clearRecycleSlabs() {
+  return request<number>('/admin/slabs/clear-recycle', {
+    method: 'DELETE',
+  });
+}

@@ -4657,6 +4657,61 @@ class PlatformApiSmokeTest {
       slabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
           slabResult.getResponse().getContentAsString(), "$.data.id").toString());
 
+      String varietyName = jdbcTemplate.queryForObject(
+          "SELECT name FROM slab_varieties WHERE id = 1", String.class);
+      String originName = jdbcTemplate.queryForObject(
+          "SELECT name FROM slab_origins WHERE id = 1", String.class);
+      String textureName = jdbcTemplate.queryForObject(
+          "SELECT name FROM slab_textures WHERE id = ?", String.class, textureId);
+      jdbcTemplate.update(
+          """
+          INSERT INTO slab_operation_logs
+            (slab_id, slab_serial_no, slab_name, publisher_type, operation_type,
+             operation_summary, change_details, operation_source, operator_name, operated_at)
+          VALUES (?, ?, '大板发布选项测试', '平台发布', 'UPDATE', '编辑大板', ?,
+                  'MANUAL', '超级管理员', NOW())
+          """,
+          slabId,
+          serialNo,
+          """
+          {
+            "供应商ID":{"before":%d,"after":%d},
+            "品种ID":{"before":1,"after":1},
+            "产地ID":{"before":1,"after":1},
+            "纹理ID":{"before":%d,"after":%d},
+            "色系ID":{"before":%d,"after":%d},
+            "等级ID":{"before":%d,"after":%d},
+            "1:1主图":{"before":null,"after":%d},
+            "商品视频":{"before":null,"after":%d}
+          }
+          """.formatted(
+              supplierId,
+              supplierId,
+              textureId,
+              textureId,
+              colorId,
+              colorId,
+              gradeId,
+              gradeId,
+              mainImageMediaId,
+              videoMediaId));
+      mockMvc.perform(get("/api/admin/slabs/operation-logs")
+              .param("keyword", serialNo)
+              .param("operationType", "UPDATE")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString(supplierName)))
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString(varietyName)))
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString(originName)))
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString(textureName)))
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString(colorName)))
+          .andExpect(jsonPath(
+              "$.data.records[0].changeDetails",
+              containsString(gradeCode + "（" + gradeName + "）")))
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString("/api/open/media/")))
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString("\"mediaType\":\"image\"")))
+          .andExpect(jsonPath("$.data.records[0].changeDetails", containsString("\"mediaType\":\"video\"")));
+
       mockMvc.perform(post("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
@@ -5010,6 +5065,62 @@ class PlatformApiSmokeTest {
       jdbcTemplate.update("DELETE FROM supplier_supply_type_links WHERE supplier_id = ?", supplierId);
       jdbcTemplate.update("DELETE FROM suppliers WHERE id = ?", supplierId);
       jdbcTemplate.update("DELETE FROM slab_varieties WHERE id IN (?, ?)", enabledVarietyId, disabledVarietyId);
+    }
+  }
+
+  @Test
+  void clearSlabRecycleWritesOneSnapshotLogPerSlab() throws Exception {
+    String suffix = String.valueOf(System.nanoTime());
+    String firstSku = "SLAB-CLEAR-FIRST-" + suffix;
+    String secondSku = "SLAB-CLEAR-SECOND-" + suffix;
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_inventory
+          (name, serial_no, publisher_type, status, created_by_name)
+        VALUES
+          ('清空日志大板一', ?, '平台发布', 'recycle', '超级管理员'),
+          ('清空日志大板二', ?, '平台发布', 'recycle', '超级管理员')
+        """,
+        firstSku,
+        secondSku);
+    Long firstSlabId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_inventory WHERE serial_no = ?", Long.class, firstSku);
+    Long secondSlabId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_inventory WHERE serial_no = ?", Long.class, secondSku);
+
+    try {
+      mockMvc.perform(delete("/api/admin/slabs/clear-recycle")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(2));
+
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_inventory WHERE id IN (?, ?)",
+          Integer.class,
+          firstSlabId,
+          secondSlabId)).isZero();
+      List<Map<String, Object>> clearLogs = jdbcTemplate.queryForList(
+          """
+          SELECT slab_id, slab_name, slab_serial_no, operation_type, operation_summary, batch_no
+          FROM slab_operation_logs
+          WHERE slab_id IN (?, ?)
+          ORDER BY slab_id
+          """,
+          firstSlabId,
+          secondSlabId);
+      assertThat(clearLogs).hasSize(2);
+      assertThat(clearLogs).extracting(row -> row.get("slab_name"))
+          .containsExactly("清空日志大板一", "清空日志大板二");
+      assertThat(clearLogs).extracting(row -> row.get("slab_serial_no"))
+          .containsExactly(firstSku, secondSku);
+      assertThat(clearLogs).extracting(row -> row.get("operation_type"))
+          .containsOnly("PURGE");
+      assertThat(clearLogs).extracting(row -> row.get("operation_summary"))
+          .containsOnly("清空回收站");
+      assertThat(clearLogs.get(0).get("batch_no")).isEqualTo(clearLogs.get(1).get("batch_no"));
+    } finally {
+      jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id IN (?, ?)", firstSlabId, secondSlabId);
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE id IN (?, ?)", firstSlabId, secondSlabId);
     }
   }
 

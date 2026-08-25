@@ -164,6 +164,12 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     return ApiResponse.ok(service.purgeFromRecycleBatch(ids));
   }
 
+  @DeleteMapping("/clear-recycle")
+  public ApiResponse<Integer> clearRecycle() {
+    permissionGuard.requirePermission(permission("recycle", "clear"));
+    return ApiResponse.ok(service.clearRecycle());
+  }
+
   @PostMapping("/{id}/delete")
   public ApiResponse<Boolean> deleteFromManagement(
       @PathVariable Long id, @Valid @RequestBody(required = false) SlabDeleteRequest request) {
