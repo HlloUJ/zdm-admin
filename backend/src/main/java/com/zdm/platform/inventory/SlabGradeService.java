@@ -3,6 +3,11 @@ package com.zdm.platform.inventory;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -16,10 +21,19 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
     this.identityProvider = identityProvider;
   }
 
+  public List<SlabGrade> listGrades() {
+    return lambdaQuery()
+        .orderByAsc(SlabGrade::getSortOrder)
+        .orderByDesc(SlabGrade::getCreatedAt)
+        .orderByDesc(SlabGrade::getId)
+        .list();
+  }
+
   @Transactional
   public SlabGrade createGrade(SlabGrade grade) {
     grade.setId(null);
     normalizeAndValidate(grade, null);
+    grade.setSortOrder(nextSortOrder());
     grade.setCreatedByName(resolveCreatedByName());
     grade.setCreatedByAccountId(identityProvider.require().accountId());
     save(grade);
@@ -34,6 +48,7 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
     }
     payload.setId(id);
     payload.setStatus(existing.getStatus());
+    payload.setSortOrder(existing.getSortOrder());
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidate(payload, id);
@@ -53,6 +68,27 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
   }
 
   @Transactional
+  public List<SlabGrade> reorderGrades(List<Long> orderedIds) {
+    List<SlabGrade> grades = list();
+    if (orderedIds == null
+        || orderedIds.size() != grades.size()
+        || new HashSet<>(orderedIds).size() != grades.size()) {
+      throw new IllegalArgumentException("请提交当前全部等级");
+    }
+    Map<Long, SlabGrade> gradesById = grades.stream()
+        .collect(Collectors.toMap(SlabGrade::getId, Function.identity()));
+    if (!gradesById.keySet().equals(new HashSet<>(orderedIds))) {
+      throw new IllegalArgumentException("等级顺序与当前数据不一致");
+    }
+    for (int index = 0; index < orderedIds.size(); index += 1) {
+      SlabGrade grade = gradesById.get(orderedIds.get(index));
+      grade.setSortOrder(index + 1);
+      updateById(grade);
+    }
+    return listGrades();
+  }
+
+  @Transactional
   public boolean deleteGrade(Long id) {
     SlabGrade existing = getById(id);
     if (existing == null) {
@@ -66,6 +102,14 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
+  }
+
+  private int nextSortOrder() {
+    SlabGrade lastGrade = lambdaQuery()
+        .orderByDesc(SlabGrade::getSortOrder)
+        .last("LIMIT 1")
+        .one();
+    return lastGrade == null ? 1 : lastGrade.getSortOrder() + 1;
   }
 
   private void normalizeAndValidate(SlabGrade grade, Long excludedId) {

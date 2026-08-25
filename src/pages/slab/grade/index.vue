@@ -48,7 +48,19 @@
               <template #icon><t-icon name="add" /></template>新增
             </t-button>
           </div>
-          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+          <t-table
+            row-key="id"
+            :data="pageData"
+            :columns="columns"
+            :loading="loading"
+            :drag-sort="canSort ? 'row-handler' : undefined"
+            :drag-sort-options="{ animation: 200 }"
+            hover
+            table-layout="fixed"
+            @drag-sort="handleDragSort"
+          >
+            <template #dragTitle><t-icon name="move" title="拖拽排序" /></template>
+            <template #drag><t-icon name="move" title="拖拽排序" /></template>
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -128,11 +140,11 @@ import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
-import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createSlabGrade,
   deleteSlabGrade,
   listSlabGrades,
+  reorderSlabGrades,
   updateSlabGrade,
   updateSlabGradeStatus,
   type SlabGradePayload,
@@ -146,6 +158,7 @@ type GradeItem = Omit<SlabGradeRecord, 'status' | 'createdAt'> & { status: Grade
 const permissionPrefix = 'admin.product-data-center.slab-grade';
 const loginUser = computed(() => getLoginUser());
 const canCreate = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.create`));
+const canSort = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.sort`));
 const canEdit = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.edit`));
 const canToggle = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.toggle-status`));
 const canDelete = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
@@ -159,7 +172,8 @@ const searchForm = reactive({
 });
 const appliedSearchForm = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 52, align: 'center' as const }] : []),
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'code', title: '等级', minWidth: 150, align: 'left' },
   { colKey: 'name', title: '等级名称', minWidth: 220, align: 'left' },
@@ -167,7 +181,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
-];
+]);
 
 const filteredData = computed(() => {
   const name = appliedSearchForm.name.trim();
@@ -202,7 +216,7 @@ const ensureCurrentPage = () => {
 const loadGrades = async () => {
   loading.value = true;
   try {
-    tableData.value = sortByCreatedAtDesc(await listSlabGrades()).map(toGradeItem);
+    tableData.value = (await listSlabGrades()).map(toGradeItem);
     ensureCurrentPage();
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '等级列表加载失败');
@@ -246,6 +260,28 @@ const openEdit = (row: GradeItem) => {
 const closeForm = () => {
   formVisible.value = false;
   formRef.value?.clearValidate();
+};
+const sorting = ref(false);
+const handleDragSort = async (context: { current: GradeItem; target: GradeItem }) => {
+  if (!canSort.value || sorting.value) return;
+  const orderedRows = tableData.value.map((item) => ({ ...item }));
+  const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
+  const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
+  if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
+
+  const [currentRow] = orderedRows.splice(currentIndex, 1);
+  orderedRows.splice(targetIndex, 0, currentRow);
+  sorting.value = true;
+  try {
+    await reorderSlabGrades(orderedRows.map((item) => item.id));
+    await loadGrades();
+    adminFeedback.actionSuccess({ action: '更新排序', target: `${context.current.code} ${context.current.name}` });
+  } catch (error) {
+    adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
+    await loadGrades();
+  } finally {
+    sorting.value = false;
+  }
 };
 const submitGrade = async () => {
   if ((await formRef.value?.validate()) !== true || !formData.code) return;

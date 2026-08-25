@@ -2136,10 +2136,12 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.code").value("A+"))
         .andExpect(jsonPath("$.data.name").value("超精品料"))
+        .andExpect(jsonPath("$.data.sortOrder").isNumber())
         .andExpect(jsonPath("$.data.createdByName").value("超级管理员"))
         .andReturn();
     String gradeId = com.jayway.jsonpath.JsonPath.read(
         createdResult.getResponse().getContentAsString(), "$.data.id").toString();
+    String sortableGradeId = null;
 
     try {
       mockMvc.perform(post("/api/admin/slab-grades")
@@ -2165,12 +2167,37 @@ class PlatformApiSmokeTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.status").value("disabled"));
 
+      MvcResult sortableGradeResult = mockMvc.perform(post("/api/admin/slab-grades")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"code\":\"B\",\"name\":\"标准料\",\"status\":\"enabled\"}"))
+          .andExpect(status().isOk())
+          .andReturn();
+      sortableGradeId = com.jayway.jsonpath.JsonPath.read(
+          sortableGradeResult.getResponse().getContentAsString(), "$.data.id").toString();
+
+      List<Long> orderedIds = jdbcTemplate.queryForList(
+          "SELECT id FROM slab_grades ORDER BY sort_order, id", Long.class);
+      java.util.Collections.reverse(orderedIds);
+      String orderedIdJson = orderedIds.stream()
+          .map(String::valueOf)
+          .collect(java.util.stream.Collectors.joining(","));
+      mockMvc.perform(patch("/api/admin/slab-grades/reorder")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"orderedIds\":[" + orderedIdJson + "]}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[0].id").value(orderedIds.get(0)));
+
       mockMvc.perform(delete("/api/admin/slab-grades/{id}", gradeId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").value(true));
     } finally {
       jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", Long.valueOf(gradeId));
+      if (sortableGradeId != null) {
+        jdbcTemplate.update("DELETE FROM slab_grades WHERE id = ?", Long.valueOf(sortableGradeId));
+      }
     }
   }
 
@@ -2223,6 +2250,11 @@ class PlatformApiSmokeTest {
               .header("Authorization", "Bearer " + token)
               .contentType("application/json")
               .content("{\"code\":\"B\",\"name\":\"越权等级\",\"status\":\"enabled\"}"))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(patch("/api/admin/slab-grades/reorder")
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json")
+              .content("{\"orderedIds\":[1]}"))
           .andExpect(status().isForbidden());
     } finally {
       jdbcTemplate.update("DELETE FROM account_roles WHERE account_id = ?", accountId);

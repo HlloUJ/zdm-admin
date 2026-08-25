@@ -11,6 +11,7 @@ public class SlabGrade extends BaseEntity {
 
   @NotBlank
   private String name;
+  private Integer sortOrder;
 
   private String createdByName;
   private Long createdByAccountId;
@@ -30,6 +31,14 @@ public class SlabGrade extends BaseEntity {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public Integer getSortOrder() {
+    return sortOrder;
+  }
+
+  public void setSortOrder(Integer sortOrder) {
+    this.sortOrder = sortOrder;
   }
 
   public String getCreatedByName() {
