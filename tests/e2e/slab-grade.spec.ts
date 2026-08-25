@@ -38,9 +38,22 @@ test('manages slab grades below color management', async ({ page }) => {
       .evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
   ).toBe('/slab-color');
   await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*等级管理/);
-  await expect(main.getByRole('row', { name: /^1 A\+ 超精品料 / })).toBeVisible();
-  await expect(main.getByRole('row', { name: /^2 A 精品料 / })).toBeVisible();
-  await expect(main.getByRole('row', { name: /^3 B 标准料 / })).toBeVisible();
+  const gradeRows = main.locator('tbody tr');
+  await expect(gradeRows.nth(0)).toContainText('A+超精品料');
+  await expect(gradeRows.nth(1)).toContainText('A精品料');
+  await expect(gradeRows.nth(2)).toContainText('B标准料');
+  await expect(main.locator('thead').getByTitle('拖拽排序')).toBeVisible();
+
+  const firstGradeRow = gradeRows.nth(0);
+  const secondGradeRow = gradeRows.nth(1);
+  const reorderRequest = page.waitForRequest(
+    (request) => request.method() === 'PATCH' && request.url().endsWith('/api/admin/slab-grades/reorder'),
+  );
+  await firstGradeRow
+    .locator('.t-table__handle-draggable')
+    .dragTo(secondGradeRow.locator('.t-table__handle-draggable'));
+  expect((await reorderRequest).postDataJSON()).toEqual({ orderedIds: [2, 1, 3] });
+  await expect(page.getByText('已更新排序“A+ 超精品料”', { exact: true })).toBeVisible();
 
   await main
     .locator('.t-form__item')
@@ -98,4 +111,5 @@ test('hides grade operations without their permissions', async ({ page }) => {
   await expect(main.getByText('超精品料', { exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);
   await expect(main.locator('.table-actions .t-link')).toHaveCount(0);
+  await expect(main.locator('.t-table__handle-draggable')).toHaveCount(0);
 });
