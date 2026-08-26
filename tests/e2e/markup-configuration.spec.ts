@@ -131,7 +131,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await expect(page.getByText('价格系数不能小于1.00', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '新增', exact: true }).click();
-  const createDialog = page.locator('.t-dialog').filter({ hasText: '新增价格配置' });
+  const createDialog = page.locator('.t-dialog').filter({ has: page.getByText('新增', { exact: true }) });
   await createDialog.getByPlaceholder('请选择', { exact: true }).click();
   const levelDropdown = page.locator('.t-select__dropdown:visible');
   await expect(levelDropdown.getByText('城市中心店', { exact: true })).toBeVisible();
@@ -141,6 +141,12 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
     'width',
     await createDialog.locator('.price-coefficient-input').evaluate((element) => getComputedStyle(element).width),
   );
+  await createDialog.locator('.price-coefficient-input input').fill('-1');
+  await createDialog.locator('.price-coefficient-input input').blur();
+  await expect(createDialog.getByText('请输入正确的价格系数', { exact: true })).toBeVisible();
+  await createDialog.locator('.price-coefficient-input input').fill('0');
+  await createDialog.locator('.price-coefficient-input input').blur();
+  await expect(createDialog.getByText('请输入正确的价格系数', { exact: true })).toHaveCount(0);
   await createDialog.locator('.price-coefficient-input input').fill('0.50');
   const createRequest = page.waitForRequest(
     (request) => request.method() === 'POST' && request.url().endsWith('/api/admin/finished-markup-configurations'),

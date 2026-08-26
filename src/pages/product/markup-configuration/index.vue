@@ -100,7 +100,8 @@
 
     <AdminDialog
       v-model:visible="formVisible"
-      :header="editingId ? '编辑价格配置' : '新增价格配置'"
+      :header="editingId ? '编辑' : '新增'"
+      width="440px"
       @confirm="submitForm"
       @cancel="closeForm"
       @close="closeForm"
@@ -247,8 +248,8 @@ const guidePriceCoefficientRules: FormRule[] = [
 const configurationPriceCoefficientRules: FormRule[] = [
   ...requiredCoefficientRules,
   {
-    validator: (value) => !String(value ?? '').trim() || (isValidCoefficientFormat(value) && Number(value) > 0),
-    message: '价格系数必须大于0',
+    validator: (value) => !String(value ?? '').trim() || (isValidCoefficientFormat(value) && Number(value) >= 0),
+    message: '请输入正确的价格系数',
     type: 'error',
     trigger: 'blur',
   },
@@ -384,7 +385,7 @@ const handleFormCoefficientChange = (_value?: unknown, context?: PriceCoefficien
   if (context?.type === 'props') return;
   if (
     !String(formData.priceCoefficient ?? '').trim() ||
-    (isValidCoefficientFormat(formData.priceCoefficient) && Number(formData.priceCoefficient) > 0)
+    (isValidCoefficientFormat(formData.priceCoefficient) && Number(formData.priceCoefficient) >= 0)
   ) {
     formRef.value?.clearValidate(['priceCoefficient']);
   }
@@ -541,6 +542,6 @@ onMounted(loadData);
 }
 .price-level-select,
 .price-coefficient-input {
-  width: 50%;
+  width: 100%;
 }
 </style>
