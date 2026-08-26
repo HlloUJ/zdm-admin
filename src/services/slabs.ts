@@ -126,6 +126,7 @@ export interface SlabPublishOptions {
   colorCategories: SlabPublishColorCategoryOption[];
   grades: SlabPublishOption[];
   suppliers: SlabPublishOption[];
+  storeLevels: SlabPublishOption[];
 }
 
 export type SlabOperationType =

@@ -1,9 +1,11 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zdm.platform.common.StoreLevelPricingDirectory;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,11 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SlabPriceService {
   private final SlabPriceMapper mapper;
-  private final SlabMarkupConfigurationService configurationService;
+  private final StoreLevelPricingDirectory storeLevelDirectory;
 
-  public SlabPriceService(SlabPriceMapper mapper, SlabMarkupConfigurationService configurationService) {
+  public SlabPriceService(SlabPriceMapper mapper, StoreLevelPricingDirectory storeLevelDirectory) {
     this.mapper = mapper;
-    this.configurationService = configurationService;
+    this.storeLevelDirectory = storeLevelDirectory;
   }
 
   public List<SlabPrice> listPrices(Long slabId) {
@@ -36,13 +38,9 @@ public class SlabPriceService {
   @Transactional
   public void replacePrices(Long slabId, List<SlabPrice> requestedPrices) {
     List<SlabPrice> existingPrices = listPrices(slabId);
-    Map<Long, String> levelNames = existingPrices.isEmpty()
-        ? configurationService.listConfigurations(true).stream().collect(Collectors.toMap(
-            SlabMarkupConfiguration::getStoreLevelId,
-            SlabMarkupConfiguration::getName))
-        : existingPrices.stream().collect(Collectors.toMap(
-            SlabPrice::getStoreLevelId,
-            SlabPrice::getStoreLevelName));
+    Map<Long, String> levelNames = new LinkedHashMap<>();
+    existingPrices.forEach(price -> levelNames.put(price.getStoreLevelId(), price.getStoreLevelName()));
+    storeLevelDirectory.listEnabledLevels().forEach(level -> levelNames.putIfAbsent(level.id(), level.name()));
     Set<Long> expectedIds = levelNames.keySet();
     if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
       return;
@@ -53,7 +51,7 @@ public class SlabPriceService {
     Set<Long> actualIds = requestedPrices.stream().map(SlabPrice::getStoreLevelId)
         .collect(Collectors.toSet());
     if (!actualIds.equals(expectedIds) || actualIds.size() != requestedPrices.size()) {
-      throw new IllegalArgumentException("必须填写全部启用的大板价格层级");
+      throw new IllegalArgumentException("必须填写全部展示的门店级别价格");
     }
     List<SlabPrice> normalized = new ArrayList<>();
     requestedPrices.forEach(price -> normalized.add(normalize(slabId, price, levelNames)));
@@ -70,12 +68,12 @@ public class SlabPriceService {
     BigDecimal cost = price.getCostPrice();
     BigDecimal value = price.getPrice();
     if (coefficient == null
-        || coefficient.signum() < 0
+        || coefficient.signum() <= 0
         || cost == null
         || cost.signum() < 0
         || value == null
         || value.signum() < 0) {
-      throw new IllegalArgumentException("价格系数、成本价和价格不能为空且不能小于0");
+      throw new IllegalArgumentException("价格系数必须大于0，成本价和价格不能为空且不能小于0");
     }
     BigDecimal expected = cost.multiply(coefficient).setScale(2, RoundingMode.HALF_UP);
     if (value.setScale(2, RoundingMode.HALF_UP).compareTo(expected) != 0) {

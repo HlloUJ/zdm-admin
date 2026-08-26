@@ -246,4 +246,21 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
   await expect(drawer.getByText('历史门店级别', { exact: true })).toBeVisible();
   await expect(drawer.getByText('当前发布模板', { exact: true })).toHaveCount(0);
   await expect(drawer.locator('input[value="175.00"]')).toBeVisible();
+
+  await page.reload();
+  await page
+    .getByRole('row', { name: /独立价格大板/ })
+    .getByText('编辑', { exact: true })
+    .click();
+  const productDialog = page.locator('.t-dialog').filter({ hasText: '编辑商品' });
+  await productDialog.getByText('销售信息', { exact: true }).click();
+  const historicalRow = productDialog.locator('.price-editor__row').filter({ hasText: '历史门店级别' });
+  await expect(historicalRow.getByRole('textbox').first()).toHaveValue('1.75');
+  await expect(historicalRow.getByRole('textbox').last()).toHaveValue('175.00');
+  const configuredCurrentLevel = productDialog.locator('.price-editor__row').filter({ hasText: '1级' });
+  await expect(configuredCurrentLevel.getByRole('textbox').first()).toHaveValue('1.20');
+  await expect(configuredCurrentLevel.getByRole('textbox').last()).toHaveValue('120.00');
+  const unconfiguredCurrentLevel = productDialog.locator('.price-editor__row').filter({ hasText: '2级' });
+  await expect(unconfiguredCurrentLevel.getByRole('textbox').first()).toHaveValue('');
+  await expect(unconfiguredCurrentLevel.getByRole('textbox').last()).toHaveValue('');
 });

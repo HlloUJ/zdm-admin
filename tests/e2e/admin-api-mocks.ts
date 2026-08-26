@@ -659,6 +659,9 @@ export async function installAdminApiMocks(page: Page) {
             ),
         )
         .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      storeLevels: storeLevels
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
     });
   });
   await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {

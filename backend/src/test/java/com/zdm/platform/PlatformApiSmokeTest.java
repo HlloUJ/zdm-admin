@@ -1645,7 +1645,22 @@ class PlatformApiSmokeTest {
       mockMvc.perform(get("/api/admin/stores/level-options")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data[*].name", not(hasItem("4级"))));
+          .andExpect(jsonPath("$.data[*].name", hasItem("4级")));
+
+      Long originalStoreLevelId = jdbcTemplate.queryForObject(
+          "SELECT store_level_id FROM stores WHERE id = 1", Long.class);
+      mockMvc.perform(patch("/api/admin/stores/1/level")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + levelId + "}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.storeLevelId").value(Long.valueOf(levelId)));
+      mockMvc.perform(patch("/api/admin/stores/1/level")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + originalStoreLevelId + "}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.storeLevelId").value(originalStoreLevelId));
 
       mockMvc.perform(post("/api/admin/finished-markup-configurations")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -4761,7 +4776,8 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.colorCategories[*].children[*].label", hasItem(colorName)))
           .andExpect(jsonPath("$.data.grades[*].label", hasItem(gradeCode)))
           .andExpect(jsonPath("$.data.grades[*].description", hasItem(gradeName)))
-          .andExpect(jsonPath("$.data.suppliers[*].label", hasItem(supplierName)));
+          .andExpect(jsonPath("$.data.suppliers[*].label", hasItem(supplierName)))
+          .andExpect(jsonPath("$.data.storeLevels[*].label", hasItem("1级")));
 
       MvcResult slabResult = mockMvc.perform(post("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)

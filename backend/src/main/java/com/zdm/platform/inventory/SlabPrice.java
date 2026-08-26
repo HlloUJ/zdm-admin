@@ -17,7 +17,7 @@ public class SlabPrice {
   private String storeLevelName;
 
   @NotNull
-  @DecimalMin("0.0000")
+  @DecimalMin(value = "0.0000", inclusive = false)
   @Digits(integer = 3, fraction = 4)
   private BigDecimal priceCoefficient;
 

@@ -43,7 +43,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     store.setId(null);
     normalizeAndValidateName(store, null);
     requireOpenedBusiness(store.getTenantId(), store.getType());
-    storeLevelService.requireSelectable(store.getStoreLevelId());
+    storeLevelService.requireEnabled(store.getStoreLevelId());
     store.setStatus("enabled");
     store.setCreatedBy(identity.displayName());
     boolean saved = save(store);
@@ -78,7 +78,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return null;
     }
     requireOperating(existing);
-    storeLevelService.requireSelectable(storeLevelId);
+    storeLevelService.requireEnabled(storeLevelId);
     existing.setStoreLevelId(storeLevelId);
     updateById(existing);
     return getById(id);

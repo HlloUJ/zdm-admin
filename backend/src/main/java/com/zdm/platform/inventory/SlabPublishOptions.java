@@ -8,7 +8,8 @@ public record SlabPublishOptions(
     List<SlabPublishOption> textures,
     List<SlabPublishColorCategoryOption> colorCategories,
     List<SlabPublishOption> grades,
-    List<SlabPublishOption> suppliers) {
+    List<SlabPublishOption> suppliers,
+    List<SlabPublishOption> storeLevels) {
   public SlabPublishOptions {
     varieties = List.copyOf(varieties);
     origins = List.copyOf(origins);
@@ -16,5 +17,6 @@ public record SlabPublishOptions(
     colorCategories = List.copyOf(colorCategories);
     grades = List.copyOf(grades);
     suppliers = List.copyOf(suppliers);
+    storeLevels = List.copyOf(storeLevels);
   }
 }

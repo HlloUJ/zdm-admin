@@ -45,7 +45,7 @@ public class StoreController {
   @GetMapping("/level-options")
   public ApiResponse<List<StoreLevel>> listLevelOptions() {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.view");
-    return ApiResponse.ok(storeLevelService.listSelectable());
+    return ApiResponse.ok(storeLevelService.listEnabled());
   }
 
   @PostMapping

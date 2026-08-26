@@ -46,10 +46,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
         .orderByAsc(StoreLevel::getId).list());
   }
 
-  public List<StoreLevel> listSelectable() {
-    return listEnabled().stream().filter(StoreLevel::isPriceComplete).toList();
-  }
-
   @Transactional
   public StoreLevel createLevel(StoreLevel level) {
     level.setId(null);
@@ -148,14 +144,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     return true;
   }
 
-  public void requireSelectable(Long id) {
-    StoreLevel level = requireEnabled(id);
-    if (!isPriceConfigured("finished_markup_configurations", level.getId())
-        || !isPriceConfigured("slab_markup_configurations", level.getId())) {
-      throw new IllegalArgumentException("请先完善该门店级别的成品和大板价格配置");
-    }
-  }
-
   public StoreLevel requireEnabled(Long id) {
     StoreLevel level = id == null ? null : getById(id);
     if (level == null) {
@@ -176,6 +164,11 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
   public StoreLevelPricingDirectory.Level findLevel(Long id) {
     StoreLevel level = id == null ? null : getById(id);
     return level == null ? null : toPricingLevel(level);
+  }
+
+  @Override
+  public List<StoreLevelPricingDirectory.Level> listEnabledLevels() {
+    return listEnabled().stream().map(this::toPricingLevel).toList();
   }
 
   private String resolveCreatedByName() {
