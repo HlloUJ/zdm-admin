@@ -1,31 +1,28 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zdm.platform.common.StoreLevelPricingDirectory;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 public class FinishedMarkupConfigurationService {
-  private static final String DUPLICATE_NAME_MESSAGE = "成品现货价格层级名称已存在";
+  private static final String DUPLICATE_LEVEL_MESSAGE = "该门店级别已配置成品价格";
   private final FinishedMarkupConfigurationMapper mapper;
   private final CurrentIdentityProvider identityProvider;
-  private final PriceConfigurationBackfillService backfillService;
+  private final StoreLevelPricingDirectory storeLevelDirectory;
 
   public FinishedMarkupConfigurationService(FinishedMarkupConfigurationMapper mapper,
-      CurrentIdentityProvider identityProvider, PriceConfigurationBackfillService backfillService) {
+      CurrentIdentityProvider identityProvider,
+      StoreLevelPricingDirectory storeLevelDirectory) {
     this.mapper = mapper;
     this.identityProvider = identityProvider;
-    this.backfillService = backfillService;
+    this.storeLevelDirectory = storeLevelDirectory;
   }
 
   public List<FinishedMarkupConfiguration> listConfigurations(boolean enabledOnly) {
@@ -33,32 +30,29 @@ public class FinishedMarkupConfigurationService {
     var query = Wrappers.<FinishedMarkupConfiguration>lambdaQuery();
     query.ne(FinishedMarkupConfiguration::getName, "指导价")
         .eq(FinishedMarkupConfiguration::getLegacySeeded, false);
-    if (enabledOnly) {
-      query.eq(FinishedMarkupConfiguration::getStatus, "enabled");
-    }
     List<FinishedMarkupConfiguration> result = mapper.selectList(query
         .orderByAsc(FinishedMarkupConfiguration::getSortOrder)
         .orderByDesc(FinishedMarkupConfiguration::getCreatedAt)
         .orderByDesc(FinishedMarkupConfiguration::getId));
-    result.forEach(item -> item.setReferenced(mapper.countProductReferences(item.getId()) > 0));
+    result.forEach(this::enrich);
     return result;
   }
 
   @Transactional
   public FinishedMarkupConfiguration createConfiguration(FinishedMarkupConfiguration payload) {
     CurrentIdentity identity = requirePlatformScope();
+    StoreLevelPricingDirectory.Level level = storeLevelDirectory.requireEnabledLevel(payload.getStoreLevelId());
     payload.setId(null);
-    payload.setName(normalizedName(payload.getName()));
+    payload.setName(level.name());
     payload.setStatus("enabled");
-    payload.setSortOrder(nextSortOrder());
+    payload.setSortOrder(level.sortOrder());
     payload.setCreatedByName(identity.displayName());
     payload.setCreatedByAccountId(identity.accountId());
-    validateUniqueName(payload.getName(), null);
+    validateUniqueStoreLevel(payload.getStoreLevelId(), null);
     try {
       mapper.insert(payload);
-      backfillService.backfillFinishedProducts(payload);
     } catch (DuplicateKeyException exception) {
-      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
+      throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
     return requireConfiguration(payload.getId());
   }
@@ -68,60 +62,23 @@ public class FinishedMarkupConfigurationService {
     requirePlatformScope();
     FinishedMarkupConfiguration existing = requireConfiguration(id);
     payload.setId(id);
-    payload.setName(normalizedName(payload.getName()));
+    payload.setStoreLevelId(existing.getStoreLevelId());
+    payload.setName(existing.getName());
     payload.setStatus(existing.getStatus());
     payload.setSortOrder(existing.getSortOrder());
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
-    validateUniqueName(payload.getName(), id);
+    validateUniqueStoreLevel(payload.getStoreLevelId(), id);
     try { mapper.updateById(payload); } catch (DuplicateKeyException exception) {
-      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
+      throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
     return requireConfiguration(id);
-  }
-
-  @Transactional
-  public FinishedMarkupConfiguration updateStatus(Long id, String status) {
-    requirePlatformScope();
-    FinishedMarkupConfiguration existing = requireConfiguration(id);
-    existing.setStatus(status);
-    mapper.updateById(existing);
-    if ("enabled".equals(status)) {
-      backfillService.backfillFinishedProducts(existing);
-    }
-    return requireConfiguration(id);
-  }
-
-  @Transactional
-  public List<FinishedMarkupConfiguration> reorderConfigurations(List<Long> orderedIds) {
-    requirePlatformScope();
-    List<FinishedMarkupConfiguration> configurations = mapper.selectList(
-        Wrappers.<FinishedMarkupConfiguration>lambdaQuery()
-            .eq(FinishedMarkupConfiguration::getLegacySeeded, false));
-    if (orderedIds == null || orderedIds.size() != configurations.size()
-        || new HashSet<>(orderedIds).size() != configurations.size()) {
-      throw new IllegalArgumentException("请提交成品现货的全部价格层级");
-    }
-    Map<Long, FinishedMarkupConfiguration> byId = configurations.stream()
-        .collect(Collectors.toMap(FinishedMarkupConfiguration::getId, Function.identity()));
-    if (!byId.keySet().equals(new HashSet<>(orderedIds))) {
-      throw new IllegalArgumentException("价格层级顺序与当前数据不一致");
-    }
-    for (int index = 0; index < orderedIds.size(); index += 1) {
-      FinishedMarkupConfiguration configuration = byId.get(orderedIds.get(index));
-      configuration.setSortOrder(index + 1);
-      mapper.updateById(configuration);
-    }
-    return listConfigurations(false);
   }
 
   @Transactional
   public void deleteConfiguration(Long id) {
     requirePlatformScope();
-    FinishedMarkupConfiguration existing = requireConfiguration(id);
-    if (mapper.countProductReferences(id) > 0) {
-      throw new IllegalArgumentException("价格层级“" + existing.getName() + "”已被成品现货使用，只能停用");
-    }
+    requireConfiguration(id);
     mapper.deleteById(id);
   }
 
@@ -130,7 +87,7 @@ public class FinishedMarkupConfigurationService {
     if (configuration == null) {
       throw new IllegalArgumentException("成品现货价格层级不存在");
     }
-    configuration.setReferenced(mapper.countProductReferences(id) > 0);
+    enrich(configuration);
     return configuration;
   }
 
@@ -142,36 +99,23 @@ public class FinishedMarkupConfigurationService {
     return identity;
   }
 
-  private void validateUniqueName(String name, Long excludedId) {
+  private void validateUniqueStoreLevel(Long storeLevelId, Long excludedId) {
     var query = Wrappers.<FinishedMarkupConfiguration>lambdaQuery()
-        .eq(FinishedMarkupConfiguration::getName, name);
+        .eq(FinishedMarkupConfiguration::getStoreLevelId, storeLevelId);
     if (excludedId != null) {
       query.ne(FinishedMarkupConfiguration::getId, excludedId);
     }
     if (mapper.selectCount(query) > 0) {
-      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
+      throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE);
     }
   }
 
-  private int nextSortOrder() {
-    FinishedMarkupConfiguration last = mapper.selectOne(
-        Wrappers.<FinishedMarkupConfiguration>lambdaQuery()
-            .eq(FinishedMarkupConfiguration::getLegacySeeded, false)
-            .orderByDesc(FinishedMarkupConfiguration::getSortOrder).last("LIMIT 1"));
-    return last == null || last.getSortOrder() == null ? 1 : last.getSortOrder() + 1;
-  }
-
-  private String normalizedName(String value) {
-    if (!StringUtils.hasText(value)) {
-      throw new IllegalArgumentException("请输入价格层级名称");
+  private void enrich(FinishedMarkupConfiguration configuration) {
+    StoreLevelPricingDirectory.Level level = storeLevelDirectory.findLevel(configuration.getStoreLevelId());
+    if (level == null) {
+      throw new IllegalStateException("成品价格配置关联的门店级别不存在");
     }
-    String name = value.trim();
-    if ("指导价".equals(name)) {
-      throw new IllegalArgumentException("指导价请在指导价设置中维护");
-    }
-    if (name.length() > 20) {
-      throw new IllegalArgumentException("价格层级名称最多20个字");
-    }
-    return name;
+    configuration.setName(level.name());
+    configuration.setSortOrder(level.sortOrder());
   }
 }

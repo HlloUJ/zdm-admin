@@ -27,22 +27,19 @@ test('manages store levels under tenant store base data', async ({ page }) => {
 
   await expect(baseDataMenu.locator('.menu-level-three-item')).toHaveText(['门店级别管理']);
   await expect(main.locator('.t-breadcrumb')).toHaveText(/租户与门店.*门店基础数据.*门店级别管理/);
-  await expect(main.getByRole('row', { name: /^1 1级 / })).toBeVisible();
-  await expect(main.getByRole('row', { name: /^2 2级 / })).toBeVisible();
+  await expect(main.getByRole('row').filter({ hasText: '1级' }).first()).toBeVisible();
+  await expect(main.getByRole('row').filter({ hasText: '2级' }).first()).toBeVisible();
   await expect(main.getByText('级别编码', { exact: true })).toHaveCount(0);
 
   await main.getByRole('button', { name: '新增', exact: true }).click();
-  const dialog = page.locator('.t-dialog').filter({ hasText: '新增店铺级别' });
+  const dialog = page.locator('.t-dialog').filter({ hasText: '新增门店级别' });
   await expect(dialog.getByText('级别编码', { exact: true })).toHaveCount(0);
   await dialog.getByPlaceholder('请输入级别名称').fill('4级');
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
   await expect(page.getByText('已新增“4级”', { exact: true })).toBeVisible();
 
-  await main
-    .getByRole('row', { name: /^1 1级 / })
-    .getByText('编辑', { exact: true })
-    .click();
-  const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑店铺级别' });
+  await main.getByRole('row').filter({ hasText: '1级' }).first().getByText('编辑', { exact: true }).click();
+  const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑门店级别' });
   await expect(editDialog.getByText('级别编码', { exact: true })).toHaveCount(0);
 });
 
@@ -68,7 +65,7 @@ test('shows the reference blocker before opening the store level delete confirma
   });
 
   await page.goto('/store-level-management');
-  const row = page.getByRole('main').getByRole('row', { name: /^1 1级 / });
+  const row = page.getByRole('main').getByRole('row').filter({ hasText: '1级' }).first();
   await row.getByText('删除', { exact: true }).click();
 
   await expect(page.getByText('该门店级别已被门店引用，不能删除', { exact: true })).toBeVisible();

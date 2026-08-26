@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.common.StoreLevelPricingDirectory;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -47,7 +48,7 @@ class MarkupConfigurationServiceTest {
         List.of("STORE_ADMIN"),
         List.of("all")));
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
-        mapper, identityProvider, Mockito.mock(PriceConfigurationBackfillService.class));
+        mapper, identityProvider, Mockito.mock(StoreLevelPricingDirectory.class));
 
     assertThatThrownBy(() -> service.listConfigurations(false))
         .isInstanceOf(AccessDeniedException.class)
@@ -61,12 +62,16 @@ class MarkupConfigurationServiceTest {
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     SlabMarkupConfiguration otherCreatorConfiguration = new SlabMarkupConfiguration();
     otherCreatorConfiguration.setId(21L);
+    otherCreatorConfiguration.setStoreLevelId(1L);
     otherCreatorConfiguration.setName("其他员工添加");
     otherCreatorConfiguration.setCreatedByAccountId(99L);
     when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
     when(mapper.selectList(any())).thenReturn(List.of(otherCreatorConfiguration));
+    StoreLevelPricingDirectory storeLevelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
+    StoreLevelPricingDirectory.Level level = new StoreLevelPricingDirectory.Level(1L, "核心合作店", 1);
+    when(storeLevelDirectory.findLevel(1L)).thenReturn(level);
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
-        mapper, identityProvider, Mockito.mock(PriceConfigurationBackfillService.class));
+        mapper, identityProvider, storeLevelDirectory);
 
     assertThat(service.listConfigurations(false))
         .extracting(SlabMarkupConfiguration::getCreatedByAccountId)
@@ -74,20 +79,23 @@ class MarkupConfigurationServiceTest {
   }
 
   @Test
-  void selfDataPermissionCanOperateConfigurationCreatedByAnotherAccount() {
+  void selfDataPermissionCanDeleteConfigurationCreatedByAnotherAccount() {
     SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     SlabMarkupConfiguration otherCreatorConfiguration = new SlabMarkupConfiguration();
     otherCreatorConfiguration.setId(21L);
+    otherCreatorConfiguration.setStoreLevelId(1L);
     otherCreatorConfiguration.setName("其他员工添加");
     otherCreatorConfiguration.setStatus("enabled");
     otherCreatorConfiguration.setCreatedByAccountId(99L);
     when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
     when(mapper.selectById(21L)).thenReturn(otherCreatorConfiguration);
+    StoreLevelPricingDirectory storeLevelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
+    StoreLevelPricingDirectory.Level level = new StoreLevelPricingDirectory.Level(1L, "核心合作店", 1);
+    when(storeLevelDirectory.findLevel(1L)).thenReturn(level);
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
-        mapper, identityProvider, Mockito.mock(PriceConfigurationBackfillService.class));
+        mapper, identityProvider, storeLevelDirectory);
 
-    assertThat(service.updateStatus(21L, "disabled").getStatus()).isEqualTo("disabled");
     service.deleteConfiguration(21L);
     verify(mapper).deleteById(21L);
   }

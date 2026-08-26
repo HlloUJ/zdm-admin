@@ -6,7 +6,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -52,20 +51,6 @@ public class FinishedMarkupConfigurationController {
       @Valid @RequestBody FinishedMarkupConfiguration payload) {
     permissionGuard.requirePermission(permission("edit"));
     return ApiResponse.ok(service.updateConfiguration(id, payload));
-  }
-
-  @PatchMapping("/{id}/status")
-  public ApiResponse<FinishedMarkupConfiguration> updateStatus(@PathVariable Long id,
-      @Valid @RequestBody FinishedMarkupConfigurationStatusRequest request) {
-    permissionGuard.requirePermission(permission("toggle-status"));
-    return ApiResponse.ok(service.updateStatus(id, request.status()));
-  }
-
-  @PatchMapping("/reorder")
-  public ApiResponse<List<FinishedMarkupConfiguration>> reorder(
-      @Valid @RequestBody FinishedMarkupConfigurationReorderRequest request) {
-    permissionGuard.requirePermission(permission("sort"));
-    return ApiResponse.ok(service.reorderConfigurations(request.orderedIds()));
   }
 
   @DeleteMapping("/{id}")

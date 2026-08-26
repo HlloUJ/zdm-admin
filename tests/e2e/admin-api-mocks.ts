@@ -72,6 +72,8 @@ const storeLevels = [
   {
     id: 1,
     name: '1级',
+    sortOrder: 1,
+    priceComplete: true,
     status: 'enabled',
     createdByName: '韩健',
     remark: '历史店铺级别迁移',
@@ -80,6 +82,8 @@ const storeLevels = [
   {
     id: 2,
     name: '2级',
+    sortOrder: 2,
+    priceComplete: true,
     status: 'enabled',
     createdByName: '韩健',
     remark: '历史店铺级别迁移',
@@ -88,6 +92,8 @@ const storeLevels = [
   {
     id: 3,
     name: '3级',
+    sortOrder: 3,
+    priceComplete: false,
     status: 'disabled',
     createdByName: '韩健',
     remark: '已停用级别',

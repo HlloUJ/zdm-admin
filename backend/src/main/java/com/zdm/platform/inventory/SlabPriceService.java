@@ -22,49 +22,48 @@ public class SlabPriceService {
   }
 
   public List<SlabPrice> listPrices(Long slabId) {
-    return mapper.selectList(Wrappers.<SlabPrice>lambdaQuery()
+    List<SlabPrice> prices = mapper.selectList(Wrappers.<SlabPrice>lambdaQuery()
         .eq(SlabPrice::getSlabId, slabId).orderByAsc(SlabPrice::getId));
+    return prices;
   }
 
   public void requireCompletePrices(Long slabId) {
-    Set<Long> expectedIds = configurationService.listConfigurations(true).stream()
-        .map(SlabMarkupConfiguration::getId)
-        .collect(Collectors.toSet());
-    Set<Long> actualIds = listPrices(slabId).stream()
-        .map(SlabPrice::getMarkupConfigurationId)
-        .filter(expectedIds::contains)
-        .collect(Collectors.toSet());
-    if (!actualIds.equals(expectedIds)) {
+    if (listPrices(slabId).isEmpty()) {
       throw new IllegalArgumentException("请完善全部大板价格");
     }
   }
 
   @Transactional
   public void replacePrices(Long slabId, List<SlabPrice> requestedPrices) {
-    List<SlabMarkupConfiguration> configurations = configurationService.listConfigurations(true);
-    if (configurations.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
+    List<SlabPrice> existingPrices = listPrices(slabId);
+    Map<Long, String> levelNames = existingPrices.isEmpty()
+        ? configurationService.listConfigurations(true).stream().collect(Collectors.toMap(
+            SlabMarkupConfiguration::getStoreLevelId,
+            SlabMarkupConfiguration::getName))
+        : existingPrices.stream().collect(Collectors.toMap(
+            SlabPrice::getStoreLevelId,
+            SlabPrice::getStoreLevelName));
+    Set<Long> expectedIds = levelNames.keySet();
+    if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
       return;
     }
     if (requestedPrices == null || requestedPrices.isEmpty()) {
       throw new IllegalArgumentException("请完善全部大板价格");
     }
-    Map<Long, SlabMarkupConfiguration> byId = configurations.stream()
-        .collect(Collectors.toMap(SlabMarkupConfiguration::getId, item -> item));
-    Set<Long> actualIds = requestedPrices.stream().map(SlabPrice::getMarkupConfigurationId)
+    Set<Long> actualIds = requestedPrices.stream().map(SlabPrice::getStoreLevelId)
         .collect(Collectors.toSet());
-    if (!actualIds.equals(byId.keySet()) || actualIds.size() != requestedPrices.size()) {
+    if (!actualIds.equals(expectedIds) || actualIds.size() != requestedPrices.size()) {
       throw new IllegalArgumentException("必须填写全部启用的大板价格层级");
     }
     List<SlabPrice> normalized = new ArrayList<>();
-    requestedPrices.forEach(price -> normalized.add(normalize(slabId, price, byId.get(price.getMarkupConfigurationId()))));
+    requestedPrices.forEach(price -> normalized.add(normalize(slabId, price, levelNames)));
     mapper.delete(Wrappers.<SlabPrice>lambdaQuery()
-        .eq(SlabPrice::getSlabId, slabId)
-        .in(SlabPrice::getMarkupConfigurationId, byId.keySet()));
+        .eq(SlabPrice::getSlabId, slabId));
     normalized.forEach(mapper::insert);
   }
 
-  private SlabPrice normalize(Long slabId, SlabPrice price, SlabMarkupConfiguration configuration) {
-    if (configuration == null) {
+  private SlabPrice normalize(Long slabId, SlabPrice price, Map<Long, String> levelNames) {
+    if (price.getStoreLevelId() == null || !levelNames.containsKey(price.getStoreLevelId())) {
       throw new IllegalArgumentException("大板价格层级不存在或已停用");
     }
     BigDecimal coefficient = price.getPriceCoefficient();
@@ -84,10 +83,12 @@ public class SlabPriceService {
     }
     SlabPrice normalized = new SlabPrice();
     normalized.setSlabId(slabId);
-    normalized.setMarkupConfigurationId(configuration.getId());
+    normalized.setStoreLevelId(price.getStoreLevelId());
+    normalized.setStoreLevelName(levelNames.get(price.getStoreLevelId()));
     normalized.setPriceCoefficient(coefficient.setScale(4, RoundingMode.HALF_UP));
     normalized.setCostPrice(cost.setScale(2, RoundingMode.HALF_UP));
     normalized.setPrice(expected);
     return normalized;
   }
+
 }

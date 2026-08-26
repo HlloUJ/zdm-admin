@@ -25,44 +25,49 @@ public class FinishedProductPriceService {
   }
 
   public List<FinishedProductPrice> listPrices(Long productId) {
-    return mapper.selectList(Wrappers.<FinishedProductPrice>lambdaQuery()
+    List<FinishedProductPrice> prices = mapper.selectList(Wrappers.<FinishedProductPrice>lambdaQuery()
         .eq(FinishedProductPrice::getFinishedProductId, productId)
         .orderByAsc(FinishedProductPrice::getVariantKey)
         .orderByAsc(FinishedProductPrice::getId));
+    return prices;
   }
 
   @Transactional
   public void replacePrices(Long productId, List<FinishedProductPrice> requestedPrices) {
-    List<FinishedMarkupConfiguration> configurations = configurationService.listConfigurations(true);
-    if (configurations.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
+    List<FinishedProductPrice> existingPrices = listPrices(productId);
+    Map<Long, String> levelNames = existingPrices.isEmpty()
+        ? configurationService.listConfigurations(true).stream().collect(Collectors.toMap(
+            FinishedMarkupConfiguration::getStoreLevelId,
+            FinishedMarkupConfiguration::getName))
+        : existingPrices.stream().collect(Collectors.toMap(
+            FinishedProductPrice::getStoreLevelId,
+            FinishedProductPrice::getStoreLevelName));
+    Set<Long> expectedIds = levelNames.keySet();
+    if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
       return;
     }
     if (requestedPrices == null || requestedPrices.isEmpty()) {
       throw new IllegalArgumentException("请完善全部成品现货价格");
     }
-    Map<Long, FinishedMarkupConfiguration> byId = configurations.stream()
-        .collect(Collectors.toMap(FinishedMarkupConfiguration::getId, item -> item));
     Map<String, List<FinishedProductPrice>> byVariant = requestedPrices.stream().collect(Collectors.groupingBy(
         item -> normalizedVariantKey(item.getVariantKey()), LinkedHashMap::new, Collectors.toList()));
     List<FinishedProductPrice> normalized = new ArrayList<>();
     byVariant.forEach((variantKey, prices) -> {
-      Set<Long> actualIds = prices.stream().map(FinishedProductPrice::getMarkupConfigurationId)
+      Set<Long> actualIds = prices.stream().map(FinishedProductPrice::getStoreLevelId)
           .collect(Collectors.toSet());
-      if (!actualIds.equals(byId.keySet()) || actualIds.size() != prices.size()) {
+      if (!actualIds.equals(expectedIds) || actualIds.size() != prices.size()) {
         throw new IllegalArgumentException("每个成品规格都必须填写全部启用的价格层级");
       }
-      prices.forEach(price -> normalized.add(normalize(productId, variantKey, price,
-          byId.get(price.getMarkupConfigurationId()))));
+      prices.forEach(price -> normalized.add(normalize(productId, variantKey, price, levelNames)));
     });
     mapper.delete(Wrappers.<FinishedProductPrice>lambdaQuery()
-        .eq(FinishedProductPrice::getFinishedProductId, productId)
-        .in(FinishedProductPrice::getMarkupConfigurationId, byId.keySet()));
+        .eq(FinishedProductPrice::getFinishedProductId, productId));
     normalized.forEach(mapper::insert);
   }
 
   private FinishedProductPrice normalize(Long productId, String variantKey, FinishedProductPrice price,
-      FinishedMarkupConfiguration configuration) {
-    if (configuration == null) {
+      Map<Long, String> levelNames) {
+    if (price.getStoreLevelId() == null || !levelNames.containsKey(price.getStoreLevelId())) {
       throw new IllegalArgumentException("成品现货价格层级不存在或已停用");
     }
     BigDecimal coefficient = price.getPriceCoefficient();
@@ -84,7 +89,8 @@ public class FinishedProductPriceService {
     normalized.setFinishedProductId(productId);
     normalized.setVariantKey(variantKey);
     normalized.setVariantLabel(StringUtils.hasText(price.getVariantLabel()) ? price.getVariantLabel().trim() : null);
-    normalized.setMarkupConfigurationId(configuration.getId());
+    normalized.setStoreLevelId(price.getStoreLevelId());
+    normalized.setStoreLevelName(levelNames.get(price.getStoreLevelId()));
     normalized.setPriceCoefficient(coefficient.setScale(4, RoundingMode.HALF_UP));
     normalized.setCostPrice(cost.setScale(2, RoundingMode.HALF_UP));
     normalized.setPrice(expected);

@@ -30,7 +30,17 @@ public class StoreLevelController {
   @GetMapping
   public ApiResponse<List<StoreLevel>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(service.listLevels());
+  }
+
+  @GetMapping("/pricing-options")
+  public ApiResponse<List<StoreLevel>> pricingOptions() {
+    permissionGuard.requireAnyPermission(
+        "admin.product-data-center.markup-configuration.finished.view",
+        "admin.product-data-center.markup-configuration.finished.create",
+        "admin.product-data-center.markup-configuration.slab.view",
+        "admin.product-data-center.markup-configuration.slab.create");
+    return ApiResponse.ok(service.listEnabled());
   }
 
   @PostMapping
@@ -45,7 +55,7 @@ public class StoreLevelController {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
     StoreLevel updated = service.updateLevel(id, payload);
     if (updated == null) {
-      throw new IllegalArgumentException("店铺级别不存在");
+      throw new IllegalArgumentException("门店级别不存在");
     }
     return ApiResponse.ok(updated);
   }
@@ -56,9 +66,16 @@ public class StoreLevelController {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
     StoreLevel updated = service.updateStatus(id, request.status());
     if (updated == null) {
-      throw new IllegalArgumentException("店铺级别不存在");
+      throw new IllegalArgumentException("门店级别不存在");
     }
     return ApiResponse.ok(updated);
+  }
+
+  @PatchMapping("/reorder")
+  public ApiResponse<List<StoreLevel>> reorder(
+      @Valid @RequestBody StoreLevelReorderRequest request) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".sort");
+    return ApiResponse.ok(service.reorderLevels(request.orderedIds()));
   }
 
   @DeleteMapping("/{id}")

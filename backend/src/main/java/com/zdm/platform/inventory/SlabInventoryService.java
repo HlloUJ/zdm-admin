@@ -400,10 +400,11 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       return List.of();
     }
     return prices.stream()
-        .sorted(java.util.Comparator.comparing(SlabPrice::getMarkupConfigurationId))
+        .sorted(java.util.Comparator.comparing(SlabPrice::getStoreLevelId))
         .map(price -> {
           Map<String, Object> value = new LinkedHashMap<>();
-          value.put("configurationId", price.getMarkupConfigurationId());
+          value.put("storeLevelId", price.getStoreLevelId());
+          value.put("storeLevelName", price.getStoreLevelName());
           value.put("priceCoefficient", price.getPriceCoefficient());
           value.put("costPrice", price.getCostPrice());
           value.put("price", price.getPrice());
