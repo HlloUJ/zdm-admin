@@ -1057,11 +1057,11 @@ test('shows the duplicate store name error on the edit form', async ({ page }) =
   const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
   await row.getByText('编辑', { exact: true }).click();
   const dialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
-  await dialog.locator('.t-form__item').filter({ hasText: '店铺名称' }).getByPlaceholder('请输入').fill('已归档门店');
+  await dialog.locator('.t-form__item').filter({ hasText: '门店名称' }).getByPlaceholder('请输入').fill('已归档门店');
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
 
-  await expect(dialog.locator('.t-form__item').filter({ hasText: '店铺名称' })).toContainText('店铺名称已存在');
-  await expect(page.getByText('编辑“已归档门店”失败：店铺名称已存在', { exact: true })).toBeVisible();
+  await expect(dialog.locator('.t-form__item').filter({ hasText: '门店名称' })).toContainText('门店名称已存在');
+  await expect(page.getByText('编辑“已归档门店”失败：门店名称已存在', { exact: true })).toBeVisible();
   await expect(dialog).toBeVisible();
 });
 

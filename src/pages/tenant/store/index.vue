@@ -6,7 +6,7 @@
       <AdminSideMenu />
 
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['租户与门店', '门店管理']" badge="租户业务开通后生成店铺" />
+        <AdminPageHeader :breadcrumbs="['租户与门店', '门店管理']" badge="租户业务开通后生成门店" />
 
         <AdminListLayout class="store-list-layout">
           <template #toolbar>
@@ -15,10 +15,10 @@
               <t-form :data="searchForm" label-width="84px" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
-                    <t-form-item label="店铺名称" name="shopName">
+                    <t-form-item label="门店名称" name="shopName">
                       <t-input v-model="searchForm.shopName" clearable placeholder="请输入" />
                     </t-form-item>
-                    <t-form-item label="店铺类型" name="shopType">
+                    <t-form-item label="门店类型" name="shopType">
                       <t-select v-model="searchForm.shopType" clearable placeholder="请选择">
                         <t-option
                           v-for="item in shopTypeOptions"
@@ -144,7 +144,7 @@
               <t-option v-for="item in tenantOptions" :key="item.name" :label="item.name" :value="item.name" />
             </t-select>
           </t-form-item>
-          <t-form-item label="店铺类型" name="shopType" required-mark>
+          <t-form-item label="门店类型" name="shopType" required-mark>
             <t-select
               v-model="formData.shopType"
               :popup-visible="shopTypePopupVisible"
@@ -161,7 +161,7 @@
             </t-select>
           </t-form-item>
         </template>
-        <t-form-item label="店铺名称" name="shopName" required-mark>
+        <t-form-item label="门店名称" name="shopName" required-mark>
           <t-input v-model="formData.shopName" clearable placeholder="请输入" />
         </t-form-item>
         <t-form-item label="门店地址" name="region" required-mark>
@@ -177,7 +177,7 @@
         <t-form-item label="详细地址" name="detailAddress" required-mark>
           <t-input v-model="formData.detailAddress" clearable placeholder="请输入" />
         </t-form-item>
-        <t-form-item v-if="dialogMode === 'create'" label="店铺级别" name="storeLevelId" required-mark>
+        <t-form-item v-if="dialogMode === 'create'" label="门店级别" name="storeLevelId" required-mark>
           <t-select v-model="formData.storeLevelId" clearable filterable placeholder="请选择">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
@@ -195,14 +195,14 @@
 
     <AdminDialog
       v-model:visible="levelDialogVisible"
-      header="店铺级别"
+      header="门店级别"
       width="420px"
       @confirm="handleLevelSubmit"
       @cancel="closeLevelDialog"
       @close="closeLevelDialog"
     >
       <t-form ref="levelFormRef" :data="levelFormData" :rules="levelFormRules" label-width="96px" colon>
-        <t-form-item label="店铺级别" name="storeLevelId" required-mark>
+        <t-form-item label="门店级别" name="storeLevelId" required-mark>
           <t-select v-model="levelFormData.storeLevelId" clearable filterable placeholder="请选择">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
@@ -338,9 +338,9 @@ const loading = ref(false);
 
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
-  { colKey: 'shopName', title: '店铺名称', minWidth: 180, align: 'left' },
-  { colKey: 'shopType', title: '店铺类型', width: 130, align: 'center' },
-  { colKey: 'storeLevelId', title: '店铺级别', width: 140, align: 'center' },
+  { colKey: 'shopName', title: '门店名称', minWidth: 180, align: 'left' },
+  { colKey: 'shopType', title: '门店类型', width: 130, align: 'center' },
+  { colKey: 'storeLevelId', title: '门店级别', width: 140, align: 'center' },
   { colKey: 'manager', title: '店长', width: 110, align: 'center' },
   { colKey: 'address', title: '门店地址', minWidth: 260, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', width: 120, align: 'center' },
@@ -379,11 +379,11 @@ const formData = reactive<StoreForm>({
 
 const formRules: Record<string, FormRule[]> = {
   tenantName: [{ required: true, message: '请选择租户', type: 'error' }],
-  shopType: [{ required: true, message: '请选择店铺类型', type: 'error' }],
-  shopName: [{ required: true, message: '请输入店铺名称', type: 'error' }],
+  shopType: [{ required: true, message: '请选择门店类型', type: 'error' }],
+  shopName: [{ required: true, message: '请输入门店名称', type: 'error' }],
   region: [{ required: true, message: '请选择门店地址', type: 'error' }],
   detailAddress: [{ required: true, message: '请输入详细地址', type: 'error' }],
-  storeLevelId: [{ required: true, message: '请选择店铺级别', type: 'error' }],
+  storeLevelId: [{ required: true, message: '请选择门店级别', type: 'error' }],
   remark: [{ max: 100, message: '备注最多可输入100个字符', type: 'error' }],
 };
 
@@ -394,7 +394,7 @@ const levelFormData = reactive({
   storeLevelId: undefined as number | undefined,
 });
 const levelFormRules: Record<string, FormRule[]> = {
-  storeLevelId: [{ required: true, message: '请选择店铺级别', type: 'error' }],
+  storeLevelId: [{ required: true, message: '请选择门店级别', type: 'error' }],
 };
 
 const confirmDialogVisible = ref(false);
@@ -476,7 +476,7 @@ const toStoreItem = (record: StoreRecord): StoreItem => {
 const toStorePayload = (storeLevelId: number, manager = ''): StorePayload => {
   const tenant = selectedTenant.value;
   if (!tenant || !formData.shopType) {
-    throw new Error('请选择租户和店铺类型');
+    throw new Error('请选择租户和门店类型');
   }
 
   const detailAddress = formData.detailAddress.trim();
@@ -616,8 +616,15 @@ const handleSubmit = async () => {
   } catch (error) {
     if (error instanceof Error && error.message === '店铺名称已存在') {
       formRef.value?.setValidateMessage({
-        shopName: [{ type: 'error', message: error.message }],
+        shopName: [{ type: 'error', message: '门店名称已存在' }],
       });
+      adminFeedback.actionError({
+        action,
+        target: targetName,
+        error: new Error('门店名称已存在'),
+        fallback: '请稍后重试',
+      });
+      return;
     }
     adminFeedback.actionError({ action, target: targetName, error, fallback: '请稍后重试' });
   }
@@ -650,7 +657,7 @@ const handleLevelSubmit = async () => {
     }
 
     closeLevelDialog();
-    adminFeedback.success('已调整店铺等级');
+    adminFeedback.success('已调整门店等级');
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }

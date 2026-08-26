@@ -51,7 +51,7 @@ test('loads only enabled store levels when creating a store', async ({ page }) =
   const main = page.getByRole('main');
   await main.getByRole('button', { name: '新增', exact: true }).click();
   const dialog = page.locator('.t-dialog').filter({ hasText: '新增' });
-  await dialog.locator('.t-form__item').filter({ hasText: '店铺级别' }).getByPlaceholder('请选择').click();
+  await dialog.locator('.t-form__item').filter({ hasText: '门店级别' }).getByPlaceholder('请选择').click();
   const options = page.locator('.t-select__dropdown:visible');
   await expect(options.getByText('1级', { exact: true })).toBeVisible();
   await expect(options.getByText('2级', { exact: true })).toBeVisible();
