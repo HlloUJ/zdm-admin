@@ -83,6 +83,12 @@ async function submitSlabProduct(page: Page) {
     .last();
   await costInput.fill('100');
   await costInput.press('Tab');
+  const partnerRows = productDialog.locator('.price-editor__row').filter({ hasNotText: /成本价|指导价/ });
+  for (let index = 0; index < (await partnerRows.count()); index += 1) {
+    const coefficientInput = partnerRows.nth(index).getByRole('textbox').first();
+    await coefficientInput.fill('0.8');
+    await coefficientInput.press('Tab');
+  }
   await productDialog.getByRole('button', { name: '提交商品信息', exact: true }).click();
 }
 
@@ -925,6 +931,35 @@ test('leaves SKU blank for operations staff when publishing a product', async ({
   const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
   await productDialog.getByText('销售信息', { exact: true }).click();
   await expect(productDialog.locator('.t-form__item').filter({ hasText: 'SKU' }).getByRole('textbox')).toHaveValue('');
+});
+
+test('allows slab prices for enabled store levels without markup configurations', async ({ page }) => {
+  await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 0, message: 'ok', data: [] }),
+    });
+  });
+  await page.goto('/slab-management');
+  await page.getByRole('button', { name: '发布商品', exact: true }).click();
+  const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
+  await productDialog.getByText('销售信息', { exact: true }).click();
+
+  const costInput = productDialog
+    .locator('.price-editor__row')
+    .filter({ hasText: '成本价' })
+    .getByRole('textbox')
+    .last();
+  await costInput.fill('100');
+  await costInput.press('Tab');
+  const storeLevelRow = productDialog.locator('.price-editor__row').filter({ hasText: '1级' });
+  const storeLevelInputs = storeLevelRow.getByRole('textbox');
+  await expect(storeLevelInputs.first()).toHaveValue('');
+  await expect(storeLevelInputs.last()).toHaveValue('');
+
+  await storeLevelInputs.first().fill('0.8');
+  await storeLevelInputs.first().press('Tab');
+  await expect(storeLevelInputs.last()).toHaveValue('80.00');
 });
 
 test('filters slab varieties and origins by search text when publishing a product', async ({ page }) => {

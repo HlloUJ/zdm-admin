@@ -1,23 +1,21 @@
 package com.zdm.platform.inventory;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 @TableName("slab_markup_configurations")
 public class SlabMarkupConfiguration extends BaseEntity {
-  @NotBlank
-  @Size(max = 20)
+  @NotNull
+  private Long storeLevelId;
+
   private String name;
 
   @NotNull
-  @DecimalMin("0.0000")
+  @DecimalMin(value = "0.0000", inclusive = false)
   @Digits(integer = 3, fraction = 4)
   private BigDecimal priceCoefficient;
 
@@ -27,8 +25,14 @@ public class SlabMarkupConfiguration extends BaseEntity {
   private Long createdByAccountId;
   private Boolean legacySeeded;
 
-  @TableField(exist = false)
-  private boolean referenced;
+
+  public Long getStoreLevelId() {
+    return storeLevelId;
+  }
+
+  public void setStoreLevelId(Long storeLevelId) {
+    this.storeLevelId = storeLevelId;
+  }
 
   public String getName() {
     return name;
@@ -78,11 +82,4 @@ public class SlabMarkupConfiguration extends BaseEntity {
     this.legacySeeded = legacySeeded;
   }
 
-  public boolean isReferenced() {
-    return referenced;
-  }
-
-  public void setReferenced(boolean referenced) {
-    this.referenced = referenced;
-  }
 }

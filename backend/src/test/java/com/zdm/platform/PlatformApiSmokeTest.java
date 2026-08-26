@@ -58,6 +58,30 @@ class PlatformApiSmokeTest {
   void exposeAllTerminalFunctionsWithinEachPermissionTest() {
     jdbcTemplate.update(
         "UPDATE terminal_function_policies SET function_permissions = 'all' WHERE terminal IN ('store', 'supplier')");
+    jdbcTemplate.update(
+        """
+        INSERT INTO finished_markup_configurations
+          (store_level_id, name, price_coefficient, sort_order, status, created_by_name, created_by_account_id)
+        SELECT level.id, level.name, 1.1000, level.sort_order, 'enabled', '集成测试', 1
+        FROM store_levels level
+        WHERE level.status = 'enabled'
+          AND NOT EXISTS (
+            SELECT 1 FROM finished_markup_configurations configuration
+            WHERE configuration.store_level_id = level.id
+          )
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO slab_markup_configurations
+          (store_level_id, name, price_coefficient, sort_order, status, created_by_name, created_by_account_id)
+        SELECT level.id, level.name, 1.1000, level.sort_order, 'enabled', '集成测试', 1
+        FROM store_levels level
+        WHERE level.status = 'enabled'
+          AND NOT EXISTS (
+            SELECT 1 FROM slab_markup_configurations configuration
+            WHERE configuration.store_level_id = level.id
+          )
+        """);
   }
 
   @DynamicPropertySource
@@ -1578,6 +1602,15 @@ class PlatformApiSmokeTest {
         Integer.class);
     assertThat(tableCount).isEqualTo(1);
     assertThat(columnCount).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'slab_prices' AND column_name = 'store_level_id'",
+        Integer.class)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'slab_prices' AND column_name = 'markup_configuration_id'",
+        Integer.class)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'slab_prices' AND column_name = 'store_level_name'",
+        Integer.class)).isEqualTo(1);
 
     Long referencedLevelId = jdbcTemplate.queryForObject(
         "SELECT id FROM store_levels WHERE name = '1级'", Long.class);
@@ -1601,7 +1634,59 @@ class PlatformApiSmokeTest {
         .andReturn();
     String levelId = com.jayway.jsonpath.JsonPath.read(
         createdResult.getResponse().getContentAsString(), "$.data.id").toString();
+    Long finishedConfigurationId = null;
+    Long slabConfigurationId = null;
+    Long slabSnapshotId = null;
     try {
+      mockMvc.perform(get("/api/admin/store-levels/pricing-options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].name", hasItem("4级")));
+      mockMvc.perform(get("/api/admin/stores/level-options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].name", hasItem("4级")));
+
+      Long originalStoreLevelId = jdbcTemplate.queryForObject(
+          "SELECT store_level_id FROM stores WHERE id = 1", Long.class);
+      mockMvc.perform(patch("/api/admin/stores/1/level")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + levelId + "}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.storeLevelId").value(Long.valueOf(levelId)));
+      mockMvc.perform(patch("/api/admin/stores/1/level")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + originalStoreLevelId + "}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.storeLevelId").value(originalStoreLevelId));
+
+      mockMvc.perform(post("/api/admin/finished-markup-configurations")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + levelId + ",\"priceCoefficient\":0}"))
+          .andExpect(status().isBadRequest());
+      MvcResult finishedConfigurationResult = mockMvc.perform(post("/api/admin/finished-markup-configurations")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + levelId + ",\"priceCoefficient\":0.50}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.name").value("4级"))
+          .andExpect(jsonPath("$.data.priceCoefficient").value(0.50))
+          .andReturn();
+      finishedConfigurationId = ((Number) com.jayway.jsonpath.JsonPath.read(
+          finishedConfigurationResult.getResponse().getContentAsString(), "$.data.id")).longValue();
+      MvcResult slabConfigurationResult = mockMvc.perform(post("/api/admin/slab-markup-configurations")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"storeLevelId\":" + levelId + ",\"priceCoefficient\":1.20}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.name").value("4级"))
+          .andReturn();
+      slabConfigurationId = ((Number) com.jayway.jsonpath.JsonPath.read(
+          slabConfigurationResult.getResponse().getContentAsString(), "$.data.id")).longValue();
+
       mockMvc.perform(get("/api/admin/stores/level-options")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isOk())
@@ -1615,6 +1700,14 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.code").doesNotExist())
           .andExpect(jsonPath("$.data.name").value("四级门店"))
           .andExpect(jsonPath("$.data.status").value("enabled"));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT name FROM finished_markup_configurations WHERE id = ?",
+          String.class,
+          finishedConfigurationId)).isEqualTo("四级门店");
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT name FROM slab_markup_configurations WHERE id = ?",
+          String.class,
+          slabConfigurationId)).isEqualTo("四级门店");
 
       mockMvc.perform(patch("/api/admin/store-levels/{id}/status", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -1633,25 +1726,65 @@ class PlatformApiSmokeTest {
               .contentType("application/json")
               .content("{\"tenantId\":1,\"name\":\"停用级别门店\",\"type\":\"cityPartner\",\"storeLevelId\":" + levelId + ",\"status\":\"enabled\"}"))
           .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.message").value("店铺级别已停用"));
+          .andExpect(jsonPath("$.message").value("门店级别已停用"));
 
       mockMvc.perform(post("/api/admin/stores")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("{\"tenantId\":1,\"name\":\"无效级别门店\",\"type\":\"cityPartner\",\"storeLevelId\":999999,\"status\":\"enabled\"}"))
           .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.message").value("店铺级别不存在"));
+          .andExpect(jsonPath("$.message").value("门店级别不存在"));
 
       mockMvc.perform(get("/api/admin/store-levels/{id}/delete-preview", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data").value(true));
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("该门店级别已被价格配置引用，不能删除"));
 
+      mockMvc.perform(delete("/api/admin/finished-markup-configurations/{id}", finishedConfigurationId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk());
+      finishedConfigurationId = null;
+
+      String snapshotSerialNo = "snapshot-detached-" + System.nanoTime();
+      jdbcTemplate.update(
+          "INSERT INTO slab_inventory (name, serial_no, publisher_type, status) VALUES ('独立价格快照', ?, '平台发布', 'soldOut')",
+          snapshotSerialNo);
+      slabSnapshotId = jdbcTemplate.queryForObject(
+          "SELECT id FROM slab_inventory WHERE serial_no = ?", Long.class, snapshotSerialNo);
+      jdbcTemplate.update(
+          "INSERT INTO slab_prices (slab_id, store_level_id, store_level_name, price_coefficient, cost_price, price) VALUES (?, ?, '四级门店', 1.2000, 100.00, 120.00)",
+          slabSnapshotId,
+          Long.valueOf(levelId));
+      mockMvc.perform(delete("/api/admin/slab-markup-configurations/{id}", slabConfigurationId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk());
+      slabConfigurationId = null;
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_prices WHERE slab_id = ? AND store_level_id = ?",
+          Integer.class,
+          slabSnapshotId,
+          Long.valueOf(levelId))).isEqualTo(1);
       mockMvc.perform(delete("/api/admin/store-levels/{id}", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").value(true));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT store_level_name FROM slab_prices WHERE slab_id = ? AND store_level_id = ?",
+          String.class,
+          slabSnapshotId,
+          Long.valueOf(levelId))).isEqualTo("四级门店");
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabSnapshotId);
+      slabSnapshotId = null;
     } finally {
+      if (finishedConfigurationId != null) {
+        jdbcTemplate.update("DELETE FROM finished_markup_configurations WHERE id = ?", finishedConfigurationId);
+      }
+      if (slabConfigurationId != null) {
+        jdbcTemplate.update("DELETE FROM slab_markup_configurations WHERE id = ?", slabConfigurationId);
+      }
+      if (slabSnapshotId != null) {
+        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabSnapshotId);
+      }
       jdbcTemplate.update("DELETE FROM store_levels WHERE id = ?", Long.valueOf(levelId));
     }
   }
@@ -1735,7 +1868,7 @@ class PlatformApiSmokeTest {
   @Test
   void superAdminCanOperateStoreLevelCreatedByAnotherAccount() throws Exception {
     jdbcTemplate.update(
-        "INSERT INTO store_levels (name, status, created_by_name, created_by_account_id) VALUES (?, 'enabled', ?, ?)",
+        "INSERT INTO store_levels (name, sort_order, status, created_by_name, created_by_account_id) VALUES (?, 999, 'enabled', ?, ?)",
         "超级管理员跨创建人操作测试",
         "其他管理员",
         99087L);
@@ -2047,6 +2180,8 @@ class PlatformApiSmokeTest {
     long secondCategoryId = 99089L;
     long sameNameChildCategoryId = 99090L;
     long roleId = 99087L;
+    long storeRoleId = 99088L;
+    long supplierId = 99087L;
     jdbcTemplate.update(
         "INSERT INTO stores (id, tenant_id, name, type, status, created_by) VALUES (?, 1, '已归档删除测试门店', 'cityPartner', 'disabled', '韩健')",
         storeId);
@@ -2072,9 +2207,25 @@ class PlatformApiSmokeTest {
         "INSERT INTO roles (id, name, code, data_scope, status) VALUES (?, '门店删除自动清理角色', 'STORE_DELETE_CASCADE_ROLE', 'all', 'enabled')",
         roleId);
     jdbcTemplate.update(
+        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status) VALUES (?, 1, ?, '门店专属删除角色', 'STORE_SCOPED_DELETE_ROLE', 'all', 'enabled')",
+        storeRoleId,
+        storeId);
+    jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (1, ?, 'admin', 1, ?)",
         roleId,
         storeId);
+    jdbcTemplate.update(
+        "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (1, ?, 'admin', 1, ?)",
+        storeRoleId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO suppliers (id, owner_scope, owner_id, tenant_id, store_id, name, status) VALUES (?, 'store', ?, 1, ?, '门店彻底删除供应商', 'enabled')",
+        supplierId,
+        storeId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO supplier_supply_type_links (supplier_id, supply_type_id) VALUES (?, 1)",
+        supplierId);
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, '15926629087', '归档门店员工', 'enabled')",
         storeId);
@@ -2107,7 +2258,13 @@ class PlatformApiSmokeTest {
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM roles WHERE id = ?", Integer.class, roleId)).isEqualTo(1);
     assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM roles WHERE id = ?", Integer.class, storeRoleId)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM account_roles WHERE role_id = ?", Integer.class, roleId)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM suppliers WHERE id = ?", Integer.class, supplierId)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM supplier_supply_type_links WHERE supplier_id = ?", Integer.class, supplierId)).isZero();
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM employees WHERE store_id = ?", Integer.class, storeId)).isZero();
     assertThat(jdbcTemplate.queryForObject(
@@ -2116,6 +2273,40 @@ class PlatformApiSmokeTest {
         "SELECT COUNT(*) FROM accounts WHERE id = ?", Integer.class, storeId)).isEqualTo(1);
     jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
     jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", storeId);
+  }
+
+  @Test
+  void archivedStorePermanentDeleteExplainsReferencedSupplierBlocker() throws Exception {
+    long storeId = 99091L;
+    long supplierId = 99091L;
+    long slabId = 99091L;
+    jdbcTemplate.update(
+        "INSERT INTO stores (id, tenant_id, name, type, status, created_by) VALUES (?, 1, '供应商引用阻断删除门店', 'cityPartner', 'disabled', '韩健')",
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO suppliers (id, owner_scope, owner_id, tenant_id, store_id, name, status) VALUES (?, 'store', ?, 1, ?, '被商品引用的门店供应商', 'enabled')",
+        supplierId,
+        storeId,
+        storeId);
+    jdbcTemplate.update(
+        "INSERT INTO slab_inventory (id, name, serial_no, publisher_type, supplier_id, status) VALUES (?, '供应商引用测试大板', 'STORE-PURGE-SUPPLIER-REF', '平台发布', ?, 'soldOut')",
+        slabId,
+        supplierId);
+
+    try {
+      mockMvc.perform(delete("/api/admin/stores/{id}", storeId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("该门店仍有供应商被商品引用，不能彻底删除"));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM stores WHERE id = ?", Integer.class, storeId)).isEqualTo(1);
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM suppliers WHERE id = ?", Integer.class, supplierId)).isEqualTo(1);
+    } finally {
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
+      jdbcTemplate.update("DELETE FROM suppliers WHERE id = ?", supplierId);
+      jdbcTemplate.update("DELETE FROM stores WHERE id = ?", storeId);
+    }
   }
 
   @Test
@@ -4544,21 +4735,24 @@ class PlatformApiSmokeTest {
         "SELECT id FROM slab_textures WHERE name = '细纹'", Long.class);
     jdbcTemplate.update(
         """
-        INSERT INTO slab_markup_configurations
-          (name, price_coefficient, sort_order, status, created_by_name, created_by_account_id)
-        VALUES
-          ('1级合伙人价格', 0.5000, 1, 'enabled', '超级管理员', 1),
-          ('2级合伙人价格', 1.3000, 2, 'enabled', '超级管理员', 1),
-          ('3级合伙人价格', 1.1800, 3, 'enabled', '超级管理员', 1)
+        UPDATE slab_markup_configurations configuration
+        INNER JOIN store_levels level ON level.id = configuration.store_level_id
+        SET configuration.price_coefficient = CASE level.name
+          WHEN '1级' THEN 0.5000
+          WHEN '2级' THEN 1.3000
+          WHEN '3级' THEN 1.1800
+          ELSE configuration.price_coefficient
+        END
+        WHERE level.name IN ('1级', '2级', '3级')
         """);
     Long level1ConfigurationId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_markup_configurations WHERE name = '1级合伙人价格'",
+        "SELECT configuration.store_level_id FROM slab_markup_configurations configuration INNER JOIN store_levels level ON level.id = configuration.store_level_id WHERE level.name = '1级'",
         Long.class);
     Long level2ConfigurationId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_markup_configurations WHERE name = '2级合伙人价格'",
+        "SELECT configuration.store_level_id FROM slab_markup_configurations configuration INNER JOIN store_levels level ON level.id = configuration.store_level_id WHERE level.name = '2级'",
         Long.class);
     Long level3ConfigurationId = jdbcTemplate.queryForObject(
-        "SELECT id FROM slab_markup_configurations WHERE name = '3级合伙人价格'",
+        "SELECT configuration.store_level_id FROM slab_markup_configurations configuration INNER JOIN store_levels level ON level.id = configuration.store_level_id WHERE level.name = '3级'",
         Long.class);
     Long mainImageMediaId = uploadSlabMedia("main.png", "image/png");
     Long scanImageMediaId = uploadSlabMedia("scan.png", "image/png");
@@ -4582,7 +4776,8 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.colorCategories[*].children[*].label", hasItem(colorName)))
           .andExpect(jsonPath("$.data.grades[*].label", hasItem(gradeCode)))
           .andExpect(jsonPath("$.data.grades[*].description", hasItem(gradeName)))
-          .andExpect(jsonPath("$.data.suppliers[*].label", hasItem(supplierName)));
+          .andExpect(jsonPath("$.data.suppliers[*].label", hasItem(supplierName)))
+          .andExpect(jsonPath("$.data.storeLevels[*].label", hasItem("1级")));
 
       MvcResult slabResult = mockMvc.perform(post("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -4618,9 +4813,9 @@ class PlatformApiSmokeTest {
                     "guidePrice":160,
                     "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
-                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
+                      {"storeLevelId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"storeLevelId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"storeLevelId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -4752,9 +4947,9 @@ class PlatformApiSmokeTest {
                     "guidePrice":160,
                     "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
-                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
+                      {"storeLevelId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"storeLevelId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"storeLevelId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -4803,9 +4998,9 @@ class PlatformApiSmokeTest {
                     "guidePrice":160,
                     "guidePriceCoefficient":1.60,
                     "markupPrices":[
-                      {"markupConfigurationId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
-                      {"markupConfigurationId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
-                      {"markupConfigurationId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
+                      {"storeLevelId":%d,"priceCoefficient":0.50,"costPrice":100,"price":50},
+                      {"storeLevelId":%d,"priceCoefficient":1.30,"costPrice":100,"price":130},
+                      {"storeLevelId":%d,"priceCoefficient":1.18,"costPrice":100,"price":118}
                     ],
                     "status":"warehouse"
                   }
@@ -5055,7 +5250,7 @@ class PlatformApiSmokeTest {
         jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", deletedInterfaceSlabId);
       }
       jdbcTemplate.update(
-          "DELETE FROM slab_markup_configurations WHERE id IN (?, ?, ?)",
+          "UPDATE slab_markup_configurations SET price_coefficient = 1.1000 WHERE id IN (?, ?, ?)",
           level1ConfigurationId,
           level2ConfigurationId,
           level3ConfigurationId);

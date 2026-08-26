@@ -34,7 +34,7 @@ public class SlabGuidePriceSettingController {
   @PutMapping
   public ApiResponse<SlabGuidePriceSetting> update(
       @Valid @RequestBody GuidePriceCoefficientRequest request) {
-    permissionGuard.requirePermission(PREFIX + ".edit");
+    permissionGuard.requirePermission(PREFIX + ".guide-price.edit");
     return ApiResponse.ok(service.saveSetting(request.priceCoefficient()));
   }
 }

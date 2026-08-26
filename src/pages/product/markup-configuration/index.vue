@@ -20,21 +20,21 @@
           <div class="guide-setting-section">
             <div class="guide-setting-copy">
               <strong>指导价设置</strong>
-              <span>不区分合伙人等级，仅用于新商品初始化，不影响已保存商品。</span>
+              <span>不区分门店级别，仅用于新商品初始化，不影响已保存商品。</span>
             </div>
             <t-form ref="guideFormRef" class="guide-setting-form" :data="guideForm" label-width="0">
               <span><span class="required-star">*</span>价格系数</span>
               <t-form-item
                 class="guide-form-item"
                 name="priceCoefficient"
-                :rules="priceCoefficientRules"
+                :rules="guidePriceCoefficientRules"
                 :required-mark="false"
               >
                 <t-input-number
                   v-model="guideForm.priceCoefficient"
                   class="guide-coefficient-input"
                   large-number
-                  :disabled="!canEdit"
+                  :disabled="!canEditGuide"
                   :decimal-places="2"
                   theme="normal"
                   placeholder="请输入"
@@ -42,8 +42,8 @@
                   @keydown="handlePriceCoefficientKeydown"
                 />
               </t-form-item>
-              <t-button v-if="canEdit" theme="primary" :loading="guideSaving" @click="saveGuidePriceSetting">
-                保存
+              <t-button v-if="canEditGuide" theme="primary" :loading="guideSaving" @click="saveGuidePriceSetting">
+                保存指导价
               </t-button>
             </t-form>
           </div>
@@ -52,24 +52,18 @@
         <section class="partner-card">
           <div class="partner-card-header">
             <div class="partner-card-copy">
-              <strong>合伙人阶梯价</strong>
-              <span>按合伙人等级维护价格系数，新增等级会为历史商品补充对应价格。</span>
+              <strong>门店级别价格</strong>
+              <span>引用门店级别管理中的启用级别，并为当前商品类型设置价格系数。</span>
             </div>
             <t-button v-if="canCreate" theme="primary" @click="openCreate">
-              <template #icon><t-icon name="add" /></template>新增阶梯价
+              <template #icon><t-icon name="add" /></template>新增
             </t-button>
           </div>
           <t-form :data="searchForm" label-width="72px" colon>
             <div class="filter-row">
               <div class="filter-fields">
-                <t-form-item label="等级名称" name="name">
+                <t-form-item label="门店级别" name="name">
                   <t-input v-model="searchForm.name" clearable placeholder="请输入" />
-                </t-form-item>
-                <t-form-item label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
-                    <t-option label="启用" value="enabled" />
-                    <t-option label="停用" value="disabled" />
-                  </t-select>
                 </t-form-item>
               </div>
               <div class="filter-actions">
@@ -82,40 +76,15 @@
               </div>
             </div>
           </t-form>
-          <t-table
-            row-key="id"
-            :data="pageData"
-            :columns="columns"
-            :loading="loading"
-            :drag-sort="canSort ? 'row-handler' : undefined"
-            :drag-sort-options="{ animation: 200 }"
-            hover
-            table-layout="fixed"
-            @drag-sort="handleDragSort"
-          >
-            <template #dragTitle><t-icon name="move" title="拖拽排序" /></template>
-            <template #drag><t-icon name="move" title="拖拽排序" /></template>
+          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
             <template #priceCoefficient="{ row }">{{ formatNumber(row.priceCoefficient, 4) }}</template>
-            <template #status="{ row }">
-              <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'enabled' ? '启用' : '停用' }}
-              </t-tag>
-            </template>
             <template #operation="{ row }">
               <div class="table-actions">
                 <t-link v-if="canEdit" theme="primary" hover="color" @click="openEdit(row)">编辑</t-link>
-                <t-link
-                  v-if="canToggle"
-                  :theme="row.status === 'enabled' ? 'warning' : 'success'"
-                  hover="color"
-                  @click="openConfirm(row, row.status === 'enabled' ? 'disable' : 'enable')"
-                >
-                  {{ row.status === 'enabled' ? '停用' : '启用' }}
-                </t-link>
-                <t-link v-if="canDelete" theme="danger" hover="color" @click="openConfirm(row, 'delete')">删除</t-link>
+                <t-link v-if="canDelete" theme="danger" hover="color" @click="openConfirm(row)">删除</t-link>
               </div>
             </template>
           </t-table>
@@ -131,14 +100,28 @@
 
     <AdminDialog
       v-model:visible="formVisible"
-      :header="editingId ? '编辑合伙人阶梯价' : '新增合伙人阶梯价'"
+      :header="editingId ? '编辑价格配置' : '新增价格配置'"
       @confirm="submitForm"
       @cancel="closeForm"
       @close="closeForm"
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
-        <t-form-item label="等级名称" name="name">
-          <t-input v-model="formData.name" :maxlength="20" clearable placeholder="例如：1级合伙人价格" />
+        <t-form-item label="门店级别" name="storeLevelId">
+          <t-select
+            v-model="formData.storeLevelId"
+            class="price-level-select"
+            :disabled="Boolean(editingId)"
+            clearable
+            placeholder="请选择"
+          >
+            <t-option
+              v-for="level in storeLevels"
+              :key="level.id"
+              :label="level.name"
+              :value="level.id"
+              :disabled="isStoreLevelConfigured(level.id)"
+            />
+          </t-select>
         </t-form-item>
         <t-form-item label="价格系数" name="priceCoefficient">
           <t-input-number
@@ -157,8 +140,8 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
-      :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
-      object-type="合伙人阶梯价"
+      action="删除"
+      object-type="价格配置"
       :object-name="confirmRow?.name"
       @confirm="submitConfirm"
       @cancel="confirmVisible = false"
@@ -182,9 +165,7 @@ import {
   deleteFinishedMarkupConfiguration,
   getFinishedGuidePriceSetting,
   listFinishedMarkupConfigurations,
-  reorderFinishedMarkupConfigurations,
   updateFinishedMarkupConfiguration,
-  updateFinishedMarkupConfigurationStatus,
   updateFinishedGuidePriceSetting,
   type FinishedMarkupConfigurationRecord,
 } from '@/services/finishedMarkupConfigurations';
@@ -193,17 +174,14 @@ import {
   deleteSlabMarkupConfiguration,
   getSlabGuidePriceSetting,
   listSlabMarkupConfigurations,
-  reorderSlabMarkupConfigurations,
   updateSlabMarkupConfiguration,
-  updateSlabMarkupConfigurationStatus,
   updateSlabGuidePriceSetting,
   type SlabMarkupConfigurationRecord,
 } from '@/services/slabMarkupConfigurations';
+import { listStoreLevelPricingOptions, type StoreLevelRecord } from '@/services/storeLevels';
 
 type PriceConfigurationTab = 'finished' | 'slab';
 type MarkupConfigurationRecord = FinishedMarkupConfigurationRecord | SlabMarkupConfigurationRecord;
-
-type ConfirmType = 'enable' | 'disable' | 'delete';
 
 const tabs = [
   { label: '成品价格配置', value: 'finished' },
@@ -220,12 +198,11 @@ const { visibleTabs, showTabRail } = usePermissionTabs({
 const activePrefix = computed(() => `${prefix}.${activeType.value}`);
 const canCreate = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.create`));
 const canEdit = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.edit`));
-const canSort = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.sort`));
-const canToggle = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.toggle-status`));
+const canEditGuide = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.guide-price.edit`));
 const canDelete = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.delete`));
 const pricingRuleMessage = computed(
   () =>
-    `${activeType.value === 'finished' ? '成品' : '大板'}价格配置只用于新商品初始化；商品保存后使用自己的价格系数。新增阶梯价会为历史商品补充对应价格。`,
+    `${activeType.value === 'finished' ? '成品' : '大板'}价格配置只用于新商品初始化；商品保存后使用自己的价格系数。新增价格配置会为历史商品补充对应价格。`,
 );
 
 const loading = ref(false);
@@ -245,11 +222,11 @@ const handlePriceCoefficientKeydown = (_value?: unknown, context?: PriceCoeffici
   }
   event.preventDefault();
 };
-const isValidPriceCoefficient = (value: unknown) => {
+const isValidCoefficientFormat = (value: unknown) => {
   const normalizedValue = String(value ?? '').trim();
-  return /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(normalizedValue) && Number(normalizedValue) >= 0;
+  return /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(normalizedValue);
 };
-const priceCoefficientRules: FormRule[] = [
+const requiredCoefficientRules: FormRule[] = [
   { required: true, message: '请输入价格系数', type: 'error', trigger: 'submit' },
   {
     validator: (value) => Boolean(String(value ?? '').trim()),
@@ -257,9 +234,21 @@ const priceCoefficientRules: FormRule[] = [
     type: 'error',
     trigger: 'blur',
   },
+];
+const guidePriceCoefficientRules: FormRule[] = [
+  ...requiredCoefficientRules,
   {
-    validator: (value) => !String(value ?? '').trim() || isValidPriceCoefficient(value),
-    message: '请输入正确的价格系数',
+    validator: (value) => !String(value ?? '').trim() || (isValidCoefficientFormat(value) && Number(value) >= 1),
+    message: '价格系数不能小于1.00',
+    type: 'error',
+    trigger: 'blur',
+  },
+];
+const configurationPriceCoefficientRules: FormRule[] = [
+  ...requiredCoefficientRules,
+  {
+    validator: (value) => !String(value ?? '').trim() || (isValidCoefficientFormat(value) && Number(value) > 0),
+    message: '价格系数必须大于0',
     type: 'error',
     trigger: 'blur',
   },
@@ -268,25 +257,21 @@ const formatPriceCoefficientInput = (value: number) => Number(value).toFixed(2);
 const guideFormRef = ref<FormInstanceFunctions>();
 const guideForm = reactive<{ priceCoefficient: PriceCoefficientValue }>({ priceCoefficient: undefined });
 const tableData = ref<MarkupConfigurationRecord[]>([]);
-const searchForm = reactive({ name: '', status: '' });
+const storeLevels = ref<StoreLevelRecord[]>([]);
+const searchForm = reactive({ name: '' });
 const appliedSearchForm = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 52, align: 'center' as const }] : []),
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
-  { colKey: 'name', title: '合伙人等级', minWidth: 200, align: 'left' },
+  { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },
   { colKey: 'priceCoefficient', title: '价格系数', width: 130, align: 'right' },
-  { colKey: 'status', title: '状态', width: 110, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
 ]);
 const filteredData = computed(() => {
   const name = appliedSearchForm.name.trim();
-  return tableData.value.filter(
-    (item) =>
-      (!name || item.name.includes(name)) && (!appliedSearchForm.status || item.status === appliedSearchForm.status),
-  );
+  return tableData.value.filter((item) => !name || item.name.includes(name));
 });
 const pageData = computed(() =>
   filteredData.value.slice((pagination.current - 1) * pagination.pageSize, pagination.current * pagination.pageSize),
@@ -297,15 +282,24 @@ const formatDateTime = (value?: string) => (value ? value.replace(/-/g, '/').rep
 const loadData = async () => {
   loading.value = true;
   try {
-    const [rows, guideSetting] =
+    const [rows, guideSetting, levels] =
       activeType.value === 'finished'
-        ? await Promise.all([listFinishedMarkupConfigurations(), getFinishedGuidePriceSetting()])
-        : await Promise.all([listSlabMarkupConfigurations(), getSlabGuidePriceSetting()]);
+        ? await Promise.all([
+            listFinishedMarkupConfigurations(),
+            getFinishedGuidePriceSetting(),
+            listStoreLevelPricingOptions(),
+          ])
+        : await Promise.all([
+            listSlabMarkupConfigurations(),
+            getSlabGuidePriceSetting(),
+            listStoreLevelPricingOptions(),
+          ]);
     tableData.value = rows.map((item) => ({
       ...item,
       createdByName: item.createdByName ?? '-',
       createdAt: formatDateTime(item.createdAt),
     }));
+    storeLevels.value = levels;
     guideForm.priceCoefficient =
       guideSetting?.priceCoefficient == null ? undefined : formatPriceCoefficientInput(guideSetting.priceCoefficient);
     guideFormRef.value?.clearValidate();
@@ -338,7 +332,10 @@ const saveGuidePriceSetting = async () => {
 };
 const handleGuideCoefficientChange = (_value?: unknown, context?: PriceCoefficientChangeContext) => {
   if (context?.type === 'props') return;
-  if (!String(guideForm.priceCoefficient ?? '').trim() || isValidPriceCoefficient(guideForm.priceCoefficient)) {
+  if (
+    !String(guideForm.priceCoefficient ?? '').trim() ||
+    (isValidCoefficientFormat(guideForm.priceCoefficient) && Number(guideForm.priceCoefficient) >= 1)
+  ) {
     guideFormRef.value?.clearValidate(['priceCoefficient']);
   }
 };
@@ -347,7 +344,7 @@ const handleSearch = () => {
   pagination.current = 1;
 };
 const handleReset = () => {
-  Object.assign(searchForm, { name: '', status: '' });
+  Object.assign(searchForm, { name: '' });
   pagination.pageSize = 10;
   handleSearch();
 };
@@ -355,69 +352,48 @@ const handleReset = () => {
 const formRef = ref<FormInstanceFunctions>();
 const formVisible = ref(false);
 const editingId = ref<number | null>(null);
-const formData = reactive<{ name: string; priceCoefficient: PriceCoefficientValue }>({
-  name: '',
+const formData = reactive<{ storeLevelId: number | undefined; priceCoefficient: PriceCoefficientValue }>({
+  storeLevelId: undefined,
   priceCoefficient: undefined,
 });
 const formRules: Record<string, FormRule[]> = {
-  name: [
-    { required: true, message: '请输入等级名称', type: 'error' },
-    { max: 20, message: '等级名称最多20个字', type: 'error' },
-  ],
-  priceCoefficient: priceCoefficientRules,
+  storeLevelId: [{ required: true, message: '请选择门店级别', type: 'error' }],
+  priceCoefficient: configurationPriceCoefficientRules,
 };
 const openCreate = () => {
   editingId.value = null;
-  Object.assign(formData, { name: '', priceCoefficient: undefined });
+  Object.assign(formData, { storeLevelId: undefined, priceCoefficient: undefined });
   formVisible.value = true;
 };
 const openEdit = (row: MarkupConfigurationRecord) => {
   editingId.value = row.id;
   Object.assign(formData, {
-    name: row.name,
+    storeLevelId: row.storeLevelId,
     priceCoefficient: formatPriceCoefficientInput(row.priceCoefficient),
   });
   formVisible.value = true;
 };
+const configuredStoreLevelIds = computed(() => new Set(tableData.value.map((item) => item.storeLevelId)));
+const isStoreLevelConfigured = (storeLevelId: number) =>
+  configuredStoreLevelIds.value.has(storeLevelId) && storeLevelId !== formData.storeLevelId;
 const closeForm = () => {
   formVisible.value = false;
   formRef.value?.clearValidate();
 };
 const handleFormCoefficientChange = (_value?: unknown, context?: PriceCoefficientChangeContext) => {
   if (context?.type === 'props') return;
-  if (!String(formData.priceCoefficient ?? '').trim() || isValidPriceCoefficient(formData.priceCoefficient)) {
+  if (
+    !String(formData.priceCoefficient ?? '').trim() ||
+    (isValidCoefficientFormat(formData.priceCoefficient) && Number(formData.priceCoefficient) > 0)
+  ) {
     formRef.value?.clearValidate(['priceCoefficient']);
-  }
-};
-const sorting = ref(false);
-const handleDragSort = async (context: { current: MarkupConfigurationRecord; target: MarkupConfigurationRecord }) => {
-  if (!canSort.value || sorting.value) return;
-  const orderedRows = tableData.value.map((item) => ({ ...item }));
-  const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
-  const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
-  if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
-
-  const [currentRow] = orderedRows.splice(currentIndex, 1);
-  orderedRows.splice(targetIndex, 0, currentRow);
-  sorting.value = true;
-  try {
-    const orderedIds = orderedRows.map((item) => item.id);
-    if (activeType.value === 'finished') await reorderFinishedMarkupConfigurations(orderedIds);
-    else await reorderSlabMarkupConfigurations(orderedIds);
-    await loadData();
-    adminFeedback.actionSuccess({ action: '更新排序', target: context.current.name });
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
-    await loadData();
-  } finally {
-    sorting.value = false;
   }
 };
 const submitForm = async () => {
   if ((await formRef.value?.validate()) !== true) return;
-  const name = formData.name.trim();
-  if (formData.priceCoefficient == null) return;
-  const payload = { name, priceCoefficient: Number(formData.priceCoefficient) };
+  if (formData.storeLevelId == null || formData.priceCoefficient == null) return;
+  const name = storeLevels.value.find((level) => level.id === formData.storeLevelId)?.name ?? '门店级别';
+  const payload = { storeLevelId: formData.storeLevelId, priceCoefficient: Number(formData.priceCoefficient) };
   try {
     if (activeType.value === 'finished') {
       if (editingId.value) await updateFinishedMarkupConfiguration(editingId.value, payload);
@@ -437,28 +413,20 @@ const submitForm = async () => {
 };
 
 const confirmVisible = ref(false);
-const confirmType = ref<ConfirmType>('disable');
 const confirmRow = ref<MarkupConfigurationRecord | null>(null);
-const openConfirm = (row: MarkupConfigurationRecord, type: ConfirmType) => {
+const openConfirm = (row: MarkupConfigurationRecord) => {
   confirmRow.value = row;
-  confirmType.value = type;
   confirmVisible.value = true;
 };
 const submitConfirm = async () => {
   if (!confirmRow.value) return;
   const row = confirmRow.value;
-  const action = confirmType.value === 'delete' ? '删除' : confirmType.value === 'enable' ? '启用' : '停用';
   try {
-    const status = confirmType.value === 'enable' ? 'enabled' : 'disabled';
-    if (activeType.value === 'finished') {
-      if (confirmType.value === 'delete') await deleteFinishedMarkupConfiguration(row.id);
-      else await updateFinishedMarkupConfigurationStatus(row.id, status);
-    } else if (confirmType.value === 'delete') await deleteSlabMarkupConfiguration(row.id);
-    else await updateSlabMarkupConfigurationStatus(row.id, status);
+    if (activeType.value === 'finished') await deleteFinishedMarkupConfiguration(row.id);
+    else await deleteSlabMarkupConfiguration(row.id);
     await loadData();
     confirmVisible.value = false;
-    if (confirmType.value === 'delete') adminFeedback.deleted(row.name);
-    else adminFeedback.actionSuccess({ action, target: row.name });
+    adminFeedback.deleted(row.name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
@@ -571,6 +539,7 @@ onMounted(loadData);
 .table-actions {
   gap: var(--td-comp-margin-m);
 }
+.price-level-select,
 .price-coefficient-input {
   width: 50%;
 }

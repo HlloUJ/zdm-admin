@@ -367,13 +367,12 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '成品价格配置',
                 value: 'admin.product-data-center.markup-configuration.finished',
                 actions: [
+                  {
+                    label: '保存指导价',
+                    value: 'admin.product-data-center.markup-configuration.finished.guide-price.edit',
+                  },
                   { label: '新增', value: 'admin.product-data-center.markup-configuration.finished.create' },
                   { label: '编辑', value: 'admin.product-data-center.markup-configuration.finished.edit' },
-                  { label: '排序', value: 'admin.product-data-center.markup-configuration.finished.sort' },
-                  {
-                    label: '停用/启用',
-                    value: 'admin.product-data-center.markup-configuration.finished.toggle-status',
-                  },
                   { label: '删除', value: 'admin.product-data-center.markup-configuration.finished.delete' },
                 ],
               },
@@ -381,13 +380,12 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '大板价格配置',
                 value: 'admin.product-data-center.markup-configuration.slab',
                 actions: [
+                  {
+                    label: '保存指导价',
+                    value: 'admin.product-data-center.markup-configuration.slab.guide-price.edit',
+                  },
                   { label: '新增', value: 'admin.product-data-center.markup-configuration.slab.create' },
                   { label: '编辑', value: 'admin.product-data-center.markup-configuration.slab.edit' },
-                  { label: '排序', value: 'admin.product-data-center.markup-configuration.slab.sort' },
-                  {
-                    label: '停用/启用',
-                    value: 'admin.product-data-center.markup-configuration.slab.toggle-status',
-                  },
                   { label: '删除', value: 'admin.product-data-center.markup-configuration.slab.delete' },
                 ],
               },
@@ -612,6 +610,7 @@ const storeLevelModule: FunctionModule = {
           actions: [
             { label: '新增', value: 'admin.tenant.store-level-management.create' },
             { label: '编辑', value: 'admin.tenant.store-level-management.edit' },
+            { label: '排序', value: 'admin.tenant.store-level-management.sort' },
             { label: '停用/启用', value: 'admin.tenant.store-level-management.toggle-status' },
             { label: '删除', value: 'admin.tenant.store-level-management.delete' },
           ],

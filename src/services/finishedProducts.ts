@@ -3,7 +3,8 @@ import { request } from './http';
 export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 
 export interface FinishedProductPrice {
-  markupConfigurationId: number;
+  storeLevelId: number;
+  storeLevelName?: string;
   priceCoefficient: number;
   costPrice: number;
   price: number;

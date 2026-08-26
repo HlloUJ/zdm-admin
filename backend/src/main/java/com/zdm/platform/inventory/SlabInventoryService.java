@@ -2,6 +2,7 @@ package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.common.SlabSupplierOptionProvider;
+import com.zdm.platform.common.StoreLevelPricingDirectory;
 import com.zdm.platform.media.MediaAsset;
 import com.zdm.platform.media.MediaAssetService;
 import com.zdm.platform.media.MediaCleanupService;
@@ -38,6 +39,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   private final SlabOriginService originService;
   private final SlabVarietyService varietyService;
   private final SlabSupplierOptionProvider slabSupplierOptionProvider;
+  private final StoreLevelPricingDirectory storeLevelDirectory;
   private final SlabPriceService priceService;
   private final SlabOffShelfRecordService offShelfRecordService;
   private final MediaAssetService mediaAssetService;
@@ -53,6 +55,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       SlabOriginService originService,
       SlabVarietyService varietyService,
       SlabSupplierOptionProvider slabSupplierOptionProvider,
+      StoreLevelPricingDirectory storeLevelDirectory,
       SlabPriceService priceService,
       SlabOffShelfRecordService offShelfRecordService,
       MediaAssetService mediaAssetService,
@@ -66,6 +69,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     this.originService = originService;
     this.varietyService = varietyService;
     this.slabSupplierOptionProvider = slabSupplierOptionProvider;
+    this.storeLevelDirectory = storeLevelDirectory;
     this.priceService = priceService;
     this.offShelfRecordService = offShelfRecordService;
     this.mediaAssetService = mediaAssetService;
@@ -400,10 +404,11 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       return List.of();
     }
     return prices.stream()
-        .sorted(java.util.Comparator.comparing(SlabPrice::getMarkupConfigurationId))
+        .sorted(java.util.Comparator.comparing(SlabPrice::getStoreLevelId))
         .map(price -> {
           Map<String, Object> value = new LinkedHashMap<>();
-          value.put("configurationId", price.getMarkupConfigurationId());
+          value.put("storeLevelId", price.getStoreLevelId());
+          value.put("storeLevelName", price.getStoreLevelName());
           value.put("priceCoefficient", price.getPriceCoefficient());
           value.put("costPrice", price.getCostPrice());
           value.put("price", price.getPrice());
@@ -566,7 +571,10 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     List<SlabPublishOption> suppliers = slabSupplierOptionProvider.listSelectableSlabSuppliers().stream()
         .map(item -> new SlabPublishOption(item.id(), item.label(), null, item.status()))
         .toList();
-    return new SlabPublishOptions(varieties, origins, textures, colorCategories, grades, suppliers);
+    List<SlabPublishOption> storeLevels = storeLevelDirectory.listEnabledLevels().stream()
+        .map(item -> new SlabPublishOption(item.id(), item.name(), null, "enabled"))
+        .toList();
+    return new SlabPublishOptions(varieties, origins, textures, colorCategories, grades, suppliers, storeLevels);
   }
 
   public void validateReferences(SlabInventory inventory) {

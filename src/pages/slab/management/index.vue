@@ -1413,13 +1413,17 @@ const formatPriceTierChanges = (value: unknown): string | null => {
       if (!item || typeof item !== 'object') return String(item ?? '-');
       const price = item as {
         configurationId?: number;
+        storeLevelId?: number;
+        storeLevelName?: string;
         priceCoefficient?: number;
         markupRate?: number;
         price?: number;
       };
+      const levelId = price.storeLevelId ?? price.configurationId;
       const label =
-        markupConfigurations.value.find((configuration) => configuration.id === price.configurationId)?.name ||
-        `价格层级 ${price.configurationId ?? '-'}`;
+        price.storeLevelName ||
+        markupConfigurations.value.find((configuration) => configuration.storeLevelId === levelId)?.name ||
+        `门店级别 ${levelId ?? '-'}`;
       const coefficient =
         price.priceCoefficient == null
           ? price.markupRate == null
@@ -1443,17 +1447,21 @@ const normalizePriceTierChanges = (value: unknown) => {
     if (!item || typeof item !== 'object') return [];
     const price = item as {
       configurationId?: number;
+      storeLevelId?: number;
+      storeLevelName?: string;
       priceCoefficient?: number;
       markupRate?: number;
       price?: number;
     };
-    const key = String(price.configurationId ?? 'unknown');
+    const levelId = price.storeLevelId ?? price.configurationId;
+    const key = String(levelId ?? 'unknown');
     return [
       {
         key,
         label:
-          markupConfigurations.value.find((configuration) => configuration.id === price.configurationId)?.name ||
-          `价格层级 ${price.configurationId ?? '-'}`,
+          price.storeLevelName ||
+          markupConfigurations.value.find((configuration) => configuration.storeLevelId === levelId)?.name ||
+          `门店级别 ${levelId ?? '-'}`,
         coefficient:
           price.priceCoefficient == null
             ? price.markupRate == null
@@ -1605,6 +1613,7 @@ const publishOptions = reactive<SlabPublishOptions>({
   colorCategories: [],
   grades: [],
   suppliers: [],
+  storeLevels: [],
 });
 
 const varietyOptions = computed(() => publishOptions.varieties.map((item) => item.label));
@@ -1944,13 +1953,31 @@ const cornerFields: { key: CornerFieldKey; label: string }[] = [
   { key: 'corner4Width', label: '扣角4宽' },
 ];
 
-const salesPriceRows = computed(() =>
-  markupConfigurations.value.map((item) => ({
-    id: item.id,
-    label: item.name,
-    priceCoefficient: Number(item.priceCoefficient),
-  })),
-);
+const salesPriceRows = computed(() => {
+  const savedPrices =
+    editingRowId.value == null
+      ? []
+      : (tableData.value.find((item) => item.id === editingRowId.value)?.markupPrices ?? []);
+  const rows: { id: number; label: string; priceCoefficient?: number }[] = savedPrices.map((price) => ({
+    id: price.storeLevelId,
+    label:
+      price.storeLevelName ||
+      markupConfigurations.value.find((item) => item.storeLevelId === price.storeLevelId)?.name ||
+      `门店级别${price.storeLevelId}`,
+    priceCoefficient: Number(price.priceCoefficient),
+  }));
+  const savedIds = new Set(rows.map((item) => item.id));
+  publishOptions.storeLevels.forEach((level) => {
+    if (savedIds.has(level.id)) return;
+    const configuration = markupConfigurations.value.find((item) => item.storeLevelId === level.id);
+    rows.push({
+      id: level.id,
+      label: level.label,
+      priceCoefficient: configuration == null ? undefined : Number(configuration.priceCoefficient),
+    });
+  });
+  return rows;
+});
 const partnerPriceRows = computed(() => salesPriceRows.value);
 const guideRatioFieldName = computed(() => 'guideRatio');
 const guidePriceFieldName = computed(() => 'guidePrice');
@@ -2389,12 +2416,19 @@ const recalculateProductPrices = () => {
 };
 
 const initializeProductMarkupPrices = (prices: SlabPrice[] = []) => {
-  const existingById = new Map(prices.map((item) => [item.markupConfigurationId, item]));
+  const existingById = new Map(prices.map((item) => [item.storeLevelId, item]));
+  const cost = toNumber(productForm.cost);
   productForm.markupPrices = Object.fromEntries(
     salesPriceRows.value.map((item) => {
       const existing = existingById.get(item.id);
       const ratio = existing ? Number(existing.priceCoefficient) : item.priceCoefficient;
-      return [item.id, { ratio: formatRatio(ratio), price: existing ? String(existing.price) : '' }];
+      return [
+        item.id,
+        {
+          ratio: ratio == null ? '' : formatRatio(ratio),
+          price: existing ? String(existing.price) : cost && ratio != null ? formatPrice(cost * ratio) : '',
+        },
+      ];
     }),
   );
 };
@@ -2463,7 +2497,6 @@ const handleBatchPriceChange = (index: number, _value?: unknown, context?: Sales
 
 const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
   const snapshots = row.markupPrices ?? [];
-  const snapshotsByConfigurationId = new Map(snapshots.map((item) => [item.markupConfigurationId, item]));
   const cost = toNumber(row.price.cost);
   const guidePrice = row.price.guide;
   const guideRatio =
@@ -2472,16 +2505,26 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
       : cost > 0 && String(guidePrice).trim()
         ? formatRatio(toNumber(guidePrice) / cost)
         : '';
-  const configuredRows: DrawerPriceRow[] = markupConfigurations.value.map((configuration) => {
-    const snapshot = snapshotsByConfigurationId.get(configuration.id);
-    return {
-      configurationId: configuration.id,
-      label: configuration.name,
-      ratio: snapshot
-        ? formatRatio(Number(snapshot.priceCoefficient))
-        : formatRatio(Number(configuration.priceCoefficient)),
-      price: snapshot ? String(snapshot.price) : cost ? formatPrice(cost * Number(configuration.priceCoefficient)) : '',
-    };
+  const configuredRows: DrawerPriceRow[] = snapshots.map((snapshot) => ({
+    configurationId: snapshot.storeLevelId,
+    label:
+      snapshot.storeLevelName ||
+      markupConfigurations.value.find((item) => item.storeLevelId === snapshot.storeLevelId)?.name ||
+      `门店级别${snapshot.storeLevelId}`,
+    ratio: formatRatio(Number(snapshot.priceCoefficient)),
+    price: String(snapshot.price),
+  }));
+  const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.storeLevelId));
+  publishOptions.storeLevels.forEach((level) => {
+    if (snapshotIds.has(level.id)) return;
+    const configuration = markupConfigurations.value.find((item) => item.storeLevelId === level.id);
+    const ratio = configuration == null ? '' : formatRatio(Number(configuration.priceCoefficient));
+    configuredRows.push({
+      configurationId: level.id,
+      label: level.label,
+      ratio,
+      price: cost && ratio ? formatPrice(cost * toNumber(ratio)) : '',
+    });
   });
   return [
     { label: '成本价', ratio: '1.00', price: row.price.cost },
@@ -2862,7 +2905,7 @@ const handleProductSubmit = async () => {
     guidePrice: toNumber(productForm.guidePrice),
     guidePriceCoefficient: Number(toNumber(productForm.guideRatio).toFixed(4)),
     markupPrices: salesPriceRows.value.map((item) => ({
-      markupConfigurationId: item.id,
+      storeLevelId: item.id,
       priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
       costPrice: toNumber(productForm.cost),
       price: toNumber(productForm.markupPrices[item.id].price),
@@ -2994,13 +3037,7 @@ const shelfBlockingMessage = (row: SlabItem) => {
   if (!isValidSalesNumber(row.price.cost, 0) || !isValidSalesNumber(row.price.guide, 0)) {
     return '请完善大板价格后再上架';
   }
-  const expectedPriceIds = new Set(markupConfigurations.value.map((item) => item.id));
-  const actualPriceIds = new Set((row.markupPrices ?? []).map((item) => item.markupConfigurationId));
-  if (
-    !expectedPriceIds.size ||
-    expectedPriceIds.size !== actualPriceIds.size ||
-    [...expectedPriceIds].some((id) => !actualPriceIds.has(id))
-  ) {
+  if (!(row.markupPrices ?? []).length) {
     return '请完善全部大板价格后再上架';
   }
   return '';
@@ -3145,7 +3182,7 @@ const handleConfirmSubmit = async () => {
         .slice(1)
         .filter((item): item is DrawerPriceRow & { configurationId: number } => item.configurationId != null)
         .map((item) => ({
-          markupConfigurationId: item.configurationId,
+          storeLevelId: item.configurationId,
           priceCoefficient: Number(toNumber(item.ratio).toFixed(4)),
           costPrice,
           price: toNumber(item.price),

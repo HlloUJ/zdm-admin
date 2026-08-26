@@ -12,10 +12,12 @@ public class SlabPrice {
   private Long slabId;
 
   @NotNull
-  private Long markupConfigurationId;
+  private Long storeLevelId;
+
+  private String storeLevelName;
 
   @NotNull
-  @DecimalMin("0.0000")
+  @DecimalMin(value = "0.0000", inclusive = false)
   @Digits(integer = 3, fraction = 4)
   private BigDecimal priceCoefficient;
 
@@ -31,8 +33,10 @@ public class SlabPrice {
   public void setId(Long id) { this.id = id; }
   public Long getSlabId() { return slabId; }
   public void setSlabId(Long slabId) { this.slabId = slabId; }
-  public Long getMarkupConfigurationId() { return markupConfigurationId; }
-  public void setMarkupConfigurationId(Long markupConfigurationId) { this.markupConfigurationId = markupConfigurationId; }
+  public Long getStoreLevelId() { return storeLevelId; }
+  public void setStoreLevelId(Long storeLevelId) { this.storeLevelId = storeLevelId; }
+  public String getStoreLevelName() { return storeLevelName; }
+  public void setStoreLevelName(String storeLevelName) { this.storeLevelName = storeLevelName; }
   public BigDecimal getPriceCoefficient() { return priceCoefficient; }
   public void setPriceCoefficient(BigDecimal priceCoefficient) { this.priceCoefficient = priceCoefficient; }
   public BigDecimal getCostPrice() { return costPrice; }
