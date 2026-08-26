@@ -375,7 +375,7 @@
                         />
                       </template>
                       <template
-                        v-for="configuration in markupConfigurations"
+                        v-for="configuration in productPriceLevels"
                         #[`markup-${configuration.id}`]="{ row }"
                         :key="configuration.id"
                       >
@@ -1344,6 +1344,31 @@ const uploadState = reactive({
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<FinishedMarkupConfigurationRecord[]>([]);
+const productPriceLevels = computed(() => {
+  const savedPrices = editingProduct.value?.markupPrices ?? [];
+  if (savedPrices.length) {
+    return Array.from(
+      new Map(
+        savedPrices.map((price) => [
+          price.storeLevelId,
+          {
+            id: price.storeLevelId,
+            name:
+              price.storeLevelName ||
+              markupConfigurations.value.find((item) => item.storeLevelId === price.storeLevelId)?.name ||
+              `门店级别${price.storeLevelId}`,
+            priceCoefficient: Number(price.priceCoefficient),
+          },
+        ]),
+      ).values(),
+    );
+  }
+  return markupConfigurations.value.map((configuration) => ({
+    id: configuration.storeLevelId,
+    name: configuration.name,
+    priceCoefficient: Number(configuration.priceCoefficient),
+  }));
+});
 const guidePriceSettingCoefficient = ref<number>();
 const dataItems = ref<StockItem[]>([]);
 
@@ -1769,7 +1794,7 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'cost', title: '成本价*', width: 110 },
     { colKey: 'guide', title: '指导价*', width: 170 },
-    ...markupConfigurations.value.map((item) => ({
+    ...productPriceLevels.value.map((item) => ({
       colKey: `markup-${item.id}`,
       title: `${item.name}*`,
       width: 170,
@@ -2127,9 +2152,9 @@ const createSpecValue = (value = '', imageUploaded = false): SpecValue => ({
 });
 
 const createMarkupEditors = (prices: FinishedProductPrice[] = []) => {
-  const existingById = new Map(prices.map((item) => [item.markupConfigurationId, item]));
+  const existingById = new Map(prices.map((item) => [item.storeLevelId, item]));
   return Object.fromEntries(
-    markupConfigurations.value.map((configuration) => {
+    productPriceLevels.value.map((configuration) => {
       const existing = existingById.get(configuration.id);
       const coefficient = existing ? Number(existing.priceCoefficient) : Number(configuration.priceCoefficient);
       return [
@@ -2340,7 +2365,7 @@ const syncAllSpecPricesByCost = (row: SpecRow) => {
   ).forEach(([coefficientField, priceField]) => {
     syncSpecPriceByCoefficient(row, coefficientField, priceField);
   });
-  markupConfigurations.value.forEach((configuration) => {
+  productPriceLevels.value.forEach((configuration) => {
     const editor = row.markupPrices[configuration.id];
     const cost = decimalNumber(row.cost);
     const coefficient = decimalNumber(editor?.coefficient);
@@ -2717,7 +2742,7 @@ const validateProductForm = () => {
       Boolean(row.guideCoefficient.trim()) &&
       Boolean(row.guide.trim()) &&
       Boolean(row.merchantCode.trim()) &&
-      markupConfigurations.value.every((configuration) => {
+      productPriceLevels.value.every((configuration) => {
         const editor = row.markupPrices[configuration.id];
         return Boolean(editor?.coefficient.trim()) && Boolean(editor?.price.trim());
       }),
@@ -2768,10 +2793,10 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
         row.specText || [row.material, row.length, row.color, row.size].filter(Boolean).join(' / ') || row.merchantCode,
     })),
     markupPrices: specRows.value.flatMap((row) =>
-      markupConfigurations.value.map((configuration) => {
+      productPriceLevels.value.map((configuration) => {
         const editor = row.markupPrices[configuration.id];
         return {
-          markupConfigurationId: configuration.id,
+          storeLevelId: configuration.id,
           priceCoefficient: Number(Number(editor.coefficient).toFixed(4)),
           costPrice: Number(row.cost),
           price: Number(editor.price),

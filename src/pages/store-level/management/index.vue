@@ -42,7 +42,19 @@
               ><template #icon><t-icon name="add" /></template>新增</t-button
             >
           </div>
-          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+          <t-table
+            row-key="id"
+            :data="pageData"
+            :columns="columns"
+            :loading="loading"
+            :drag-sort="canSort ? 'row-handler' : undefined"
+            :drag-sort-options="{ animation: 200 }"
+            hover
+            table-layout="fixed"
+            @drag-sort="handleDragSort"
+          >
+            <template #dragTitle><t-icon name="move" title="拖拽排序" /></template>
+            <template #drag><t-icon name="move" title="拖拽排序" /></template>
             <template #index="{ rowIndex }">{{
               (pagination.current - 1) * pagination.pageSize + rowIndex + 1
             }}</template>
@@ -50,6 +62,11 @@
               <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">{{
                 row.status === 'normal' ? '启用' : '停用'
               }}</t-tag>
+            </template>
+            <template #priceComplete="{ row }">
+              <t-tag :theme="row.priceComplete ? 'success' : 'warning'" variant="light">
+                {{ row.priceComplete ? '配置完整' : '价格待完善' }}
+              </t-tag>
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
@@ -76,7 +93,7 @@
     </div>
     <AdminDialog
       v-model:visible="formVisible"
-      :header="editingId ? '编辑店铺级别' : '新增店铺级别'"
+      :header="editingId ? '编辑门店级别' : '新增门店级别'"
       @confirm="submitLevel"
       @cancel="closeForm"
       @close="closeForm"
@@ -97,7 +114,7 @@
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
-      object-type="店铺级别"
+      object-type="门店级别"
       :object-name="confirmRow?.name"
       @confirm="submitConfirm"
       @cancel="confirmVisible = false"
@@ -114,12 +131,12 @@ import AdminTopNav from '@/components/AdminTopNav.vue';
 import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminPagination } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
-import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createStoreLevel,
   deleteStoreLevel,
   listStoreLevels,
   previewStoreLevelDelete,
+  reorderStoreLevels,
   updateStoreLevel,
   updateStoreLevelStatus,
   type StoreLevelPayload,
@@ -133,6 +150,7 @@ const permissionPrefix = 'admin.tenant.store-level-management';
 const loginUser = computed(() => getLoginUser());
 const canCreate = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.create`));
 const canEdit = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.edit`));
+const canSort = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.sort`));
 const canToggle = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.toggle-status`));
 const canDelete = computed(() => hasPermission(loginUser.value, `${permissionPrefix}.delete`));
 const loading = ref(false);
@@ -140,14 +158,16 @@ const tableData = ref<LevelItem[]>([]);
 const searchForm = reactive({ name: '', status: '' });
 const appliedSearchForm = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 52, align: 'center' as const }] : []),
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '级别名称', minWidth: 220, align: 'left' },
+  { colKey: 'priceComplete', title: '价格状态', width: 130, align: 'center' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
-];
+]);
 const filteredData = computed(() =>
   tableData.value.filter(
     (item) =>
@@ -181,10 +201,10 @@ const ensureCurrentPage = () => {
 const loadLevels = async () => {
   loading.value = true;
   try {
-    tableData.value = sortByCreatedAtDesc(await listStoreLevels()).map(toLevelItem);
+    tableData.value = (await listStoreLevels()).map(toLevelItem);
     ensureCurrentPage();
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '店铺级别列表加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : '门店级别列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -219,6 +239,27 @@ const openEdit = (row: LevelItem) => {
 const closeForm = () => {
   formVisible.value = false;
   formRef.value?.clearValidate();
+};
+const sorting = ref(false);
+const handleDragSort = async (context: { current: LevelItem; target: LevelItem }) => {
+  if (!canSort.value || sorting.value) return;
+  const orderedRows = tableData.value.map((item) => ({ ...item }));
+  const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
+  const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
+  if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
+  const [currentRow] = orderedRows.splice(currentIndex, 1);
+  orderedRows.splice(targetIndex, 0, currentRow);
+  sorting.value = true;
+  try {
+    await reorderStoreLevels(orderedRows.map((item) => item.id));
+    await loadLevels();
+    adminFeedback.actionSuccess({ action: '更新排序', target: context.current.name });
+  } catch (error) {
+    adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
+    await loadLevels();
+  } finally {
+    sorting.value = false;
+  }
 };
 const submitLevel = async () => {
   if ((await formRef.value?.validate()) !== true) return;

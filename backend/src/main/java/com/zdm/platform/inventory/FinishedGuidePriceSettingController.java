@@ -32,7 +32,7 @@ public class FinishedGuidePriceSettingController {
   @PutMapping
   public ApiResponse<FinishedGuidePriceSetting> update(
       @Valid @RequestBody GuidePriceCoefficientRequest request) {
-    permissionGuard.requirePermission(PREFIX + ".edit");
+    permissionGuard.requirePermission(PREFIX + ".guide-price.edit");
     return ApiResponse.ok(service.saveSetting(request.priceCoefficient()));
   }
 }

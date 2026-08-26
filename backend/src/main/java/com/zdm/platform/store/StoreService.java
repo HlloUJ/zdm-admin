@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StoreService extends ServiceImpl<StoreMapper, Store> {
   private static final String DELETE_FAILED_MESSAGE = "门店经营数据删除失败，请稍后重试";
+  private static final String SUPPLIER_REFERENCED_MESSAGE = "该门店仍有供应商被商品引用，不能彻底删除";
   private static final String DUPLICATE_NAME_MESSAGE = "店铺名称已存在";
 
   private final CurrentIdentityProvider identityProvider;
@@ -42,7 +43,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     store.setId(null);
     normalizeAndValidateName(store, null);
     requireOpenedBusiness(store.getTenantId(), store.getType());
-    storeLevelService.requireSelectable(store.getStoreLevelId());
+    storeLevelService.requireEnabled(store.getStoreLevelId());
     store.setStatus("enabled");
     store.setCreatedBy(identity.displayName());
     boolean saved = save(store);
@@ -77,7 +78,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return null;
     }
     requireOperating(existing);
-    storeLevelService.requireSelectable(storeLevelId);
+    storeLevelService.requireEnabled(storeLevelId);
     existing.setStoreLevelId(storeLevelId);
     updateById(existing);
     return getById(id);
@@ -118,20 +119,45 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       return false;
     }
     requireArchived(existing);
+    requireStoreSuppliersUnreferenced(id);
     try {
       jdbcTemplate.update(
           "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)",
           id);
       jdbcTemplate.update(
-          "DELETE FROM account_roles WHERE store_id = ?",
+          "DELETE FROM account_roles WHERE store_id = ? OR role_id IN (SELECT id FROM roles WHERE store_id = ?)",
+          id,
           id);
       jdbcTemplate.update("DELETE FROM account_identities WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM employee_invites WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM employees WHERE store_id = ?", id);
+      jdbcTemplate.update(
+          "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE store_id = ?)",
+          id);
+      jdbcTemplate.update("DELETE FROM roles WHERE store_id = ?", id);
+      jdbcTemplate.update("DELETE FROM suppliers WHERE store_id = ?", id);
       deleteStoreCategories(id);
       return removeById(id);
     } catch (DataIntegrityViolationException exception) {
       throw new IllegalArgumentException(DELETE_FAILED_MESSAGE, exception);
+    }
+  }
+
+  private void requireStoreSuppliersUnreferenced(Long storeId) {
+    Integer referenceCount = jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM suppliers supplier
+        WHERE supplier.store_id = ?
+          AND (
+            EXISTS (SELECT 1 FROM slab_inventory slab WHERE slab.supplier_id = supplier.id)
+            OR EXISTS (SELECT 1 FROM finished_products product WHERE product.supplier_id = supplier.id)
+          )
+        """,
+        Integer.class,
+        storeId);
+    if (referenceCount != null && referenceCount > 0) {
+      throw new IllegalArgumentException(SUPPLIER_REFERENCED_MESSAGE);
     }
   }
 

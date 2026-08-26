@@ -1,20 +1,18 @@
 import { request } from './http';
 
-export type SlabMarkupConfigurationStatus = 'enabled' | 'disabled';
 export interface SlabMarkupConfigurationRecord {
   id: number;
+  storeLevelId: number;
   name: string;
   priceCoefficient: number;
   sortOrder: number;
-  status: SlabMarkupConfigurationStatus;
   createdByName?: string;
   createdByAccountId?: number;
   createdAt?: string;
   updatedAt?: string;
-  referenced: boolean;
 }
 export interface SlabMarkupConfigurationPayload {
-  name: string;
+  storeLevelId: number;
   priceCoefficient: number;
 }
 export interface SlabGuidePriceSettingRecord {
@@ -38,16 +36,6 @@ export const updateSlabMarkupConfiguration = (id: number, payload: SlabMarkupCon
   request<SlabMarkupConfigurationRecord>(`/admin/slab-markup-configurations/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
-  });
-export const updateSlabMarkupConfigurationStatus = (id: number, status: SlabMarkupConfigurationStatus) =>
-  request<SlabMarkupConfigurationRecord>(`/admin/slab-markup-configurations/${id}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
-  });
-export const reorderSlabMarkupConfigurations = (orderedIds: number[]) =>
-  request<SlabMarkupConfigurationRecord[]>('/admin/slab-markup-configurations/reorder', {
-    method: 'PATCH',
-    body: JSON.stringify({ orderedIds }),
   });
 export const deleteSlabMarkupConfiguration = (id: number) =>
   request<boolean>(`/admin/slab-markup-configurations/${id}`, { method: 'DELETE' });

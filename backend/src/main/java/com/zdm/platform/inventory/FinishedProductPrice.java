@@ -12,7 +12,8 @@ public class FinishedProductPrice {
   private Long finishedProductId;
   private String variantKey;
   private String variantLabel;
-  @NotNull private Long markupConfigurationId;
+  @NotNull private Long storeLevelId;
+  private String storeLevelName;
   @NotNull @DecimalMin("0.0000") @Digits(integer = 3, fraction = 4) private BigDecimal priceCoefficient;
   @NotNull @DecimalMin("0.00") private BigDecimal costPrice;
   @NotNull @DecimalMin("0.00") private BigDecimal price;
@@ -25,8 +26,10 @@ public class FinishedProductPrice {
   public void setVariantKey(String value) { this.variantKey = value; }
   public String getVariantLabel() { return variantLabel; }
   public void setVariantLabel(String value) { this.variantLabel = value; }
-  public Long getMarkupConfigurationId() { return markupConfigurationId; }
-  public void setMarkupConfigurationId(Long value) { this.markupConfigurationId = value; }
+  public Long getStoreLevelId() { return storeLevelId; }
+  public void setStoreLevelId(Long value) { this.storeLevelId = value; }
+  public String getStoreLevelName() { return storeLevelName; }
+  public void setStoreLevelName(String value) { this.storeLevelName = value; }
   public BigDecimal getPriceCoefficient() { return priceCoefficient; }
   public void setPriceCoefficient(BigDecimal value) { this.priceCoefficient = value; }
   public BigDecimal getCostPrice() { return costPrice; }
