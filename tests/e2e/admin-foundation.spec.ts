@@ -314,7 +314,7 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
   const createDialog = page.locator('.t-dialog').filter({ hasText: '新增' });
   await expect(createDialog).toBeVisible();
   await expect(createDialog.getByText('选择租户')).toBeVisible();
-  await expect(createDialog.getByText('店铺类型')).toBeVisible();
+  await expect(createDialog.getByText('门店类型')).toBeVisible();
   await expect(createDialog.getByText('门店地址')).toBeVisible();
   await createDialog.getByRole('button', { name: '取消' }).click();
   await expect(createDialog).toBeHidden();
@@ -322,9 +322,9 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
   const storeRow = page.locator('tbody tr').filter({ hasText: '杭州体验门店' }).first();
   await storeRow.locator('.level-cell').hover();
   await storeRow.getByLabel('修改门店级别').click();
-  const levelDialog = page.locator('.t-dialog').filter({ hasText: '店铺级别' });
+  const levelDialog = page.locator('.t-dialog').filter({ hasText: '门店级别' });
   await expect(levelDialog).toBeVisible();
-  await expect(levelDialog.getByText('店铺级别').first()).toBeVisible();
+  await expect(levelDialog.getByText('门店级别').first()).toBeVisible();
   await levelDialog.getByRole('button', { name: '取消' }).click();
   await expect(levelDialog).toBeHidden();
 

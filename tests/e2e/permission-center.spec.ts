@@ -739,7 +739,7 @@ test('shows only granted store management operations for a restricted account', 
   await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
 
   await row.getByRole('button', { name: '修改门店级别' }).click({ force: true });
-  const levelDialog = page.locator('.t-dialog').filter({ hasText: '店铺级别' });
+  const levelDialog = page.locator('.t-dialog').filter({ hasText: '门店级别' });
   await expect(levelDialog).toBeVisible();
   await levelDialog.getByRole('button', { name: '取消' }).click();
 });
