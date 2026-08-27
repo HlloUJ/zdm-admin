@@ -48,7 +48,10 @@ class MarkupConfigurationServiceTest {
         List.of("STORE_ADMIN"),
         List.of("all")));
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
-        mapper, identityProvider, Mockito.mock(StoreLevelPricingDirectory.class));
+        mapper,
+        identityProvider,
+        Mockito.mock(StoreLevelPricingDirectory.class),
+        Mockito.mock(SlabPriceConfigurationSyncService.class));
 
     assertThatThrownBy(() -> service.listConfigurations(false))
         .isInstanceOf(AccessDeniedException.class)
@@ -71,7 +74,10 @@ class MarkupConfigurationServiceTest {
     StoreLevelPricingDirectory.Level level = new StoreLevelPricingDirectory.Level(1L, "核心合作店", 1);
     when(storeLevelDirectory.findLevel(1L)).thenReturn(level);
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
-        mapper, identityProvider, storeLevelDirectory);
+        mapper,
+        identityProvider,
+        storeLevelDirectory,
+        Mockito.mock(SlabPriceConfigurationSyncService.class));
 
     assertThat(service.listConfigurations(false))
         .extracting(SlabMarkupConfiguration::getCreatedByAccountId)
@@ -94,10 +100,34 @@ class MarkupConfigurationServiceTest {
     StoreLevelPricingDirectory.Level level = new StoreLevelPricingDirectory.Level(1L, "核心合作店", 1);
     when(storeLevelDirectory.findLevel(1L)).thenReturn(level);
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
-        mapper, identityProvider, storeLevelDirectory);
+        mapper,
+        identityProvider,
+        storeLevelDirectory,
+        Mockito.mock(SlabPriceConfigurationSyncService.class));
 
     service.deleteConfiguration(21L);
     verify(mapper).deleteById(21L);
+  }
+
+  @Test
+  void usedSlabConfigurationCannotBeDeleted() {
+    SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
+    CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
+    SlabMarkupConfiguration configuration = slabConfiguration(21L, 1L, 1);
+    configuration.setStatus("enabled");
+    when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
+    when(mapper.selectById(21L)).thenReturn(configuration);
+    StoreLevelPricingDirectory storeLevelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
+    when(storeLevelDirectory.findLevel(1L)).thenReturn(new StoreLevelPricingDirectory.Level(1L, "核心合作店", 1));
+    SlabPriceConfigurationSyncService syncService = Mockito.mock(SlabPriceConfigurationSyncService.class);
+    when(syncService.countAutoReferences(21L)).thenReturn(3L);
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
+        mapper, identityProvider, storeLevelDirectory, syncService);
+
+    assertThatThrownBy(() -> service.deleteConfiguration(21L))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("该价格配置正在被3条大板价格使用，不能删除，请先停用");
+    verify(mapper, Mockito.never()).deleteById(21L);
   }
 
   @Test
@@ -134,7 +164,10 @@ class MarkupConfigurationServiceTest {
     when(storeLevelDirectory.findLevel(1L)).thenReturn(new StoreLevelPricingDirectory.Level(1L, "一级店", 10));
     when(storeLevelDirectory.findLevel(2L)).thenReturn(new StoreLevelPricingDirectory.Level(2L, "二级店", 20));
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
-        mapper, identityProvider, storeLevelDirectory);
+        mapper,
+        identityProvider,
+        storeLevelDirectory,
+        Mockito.mock(SlabPriceConfigurationSyncService.class));
 
     service.reorderConfigurations(List.of(42L, 41L));
 

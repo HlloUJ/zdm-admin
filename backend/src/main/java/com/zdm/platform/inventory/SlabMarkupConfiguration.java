@@ -1,5 +1,6 @@
 package com.zdm.platform.inventory;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.DecimalMin;
@@ -24,6 +25,15 @@ public class SlabMarkupConfiguration extends BaseEntity {
   private String createdByName;
   private Long createdByAccountId;
   private Boolean legacySeeded;
+
+  @TableField(exist = false)
+  private Long autoReferenceCount;
+
+  @TableField(exist = false)
+  private Long manualPriceCount;
+
+  @TableField(exist = false)
+  private Integer synchronizedPriceCount;
 
 
   public Long getStoreLevelId() {
@@ -80,6 +90,30 @@ public class SlabMarkupConfiguration extends BaseEntity {
 
   public void setLegacySeeded(Boolean legacySeeded) {
     this.legacySeeded = legacySeeded;
+  }
+
+  public Long getAutoReferenceCount() {
+    return autoReferenceCount;
+  }
+
+  public void setAutoReferenceCount(Long autoReferenceCount) {
+    this.autoReferenceCount = autoReferenceCount;
+  }
+
+  public Long getManualPriceCount() {
+    return manualPriceCount;
+  }
+
+  public void setManualPriceCount(Long manualPriceCount) {
+    this.manualPriceCount = manualPriceCount;
+  }
+
+  public Integer getSynchronizedPriceCount() {
+    return synchronizedPriceCount;
+  }
+
+  public void setSynchronizedPriceCount(Integer synchronizedPriceCount) {
+    this.synchronizedPriceCount = synchronizedPriceCount;
   }
 
 }

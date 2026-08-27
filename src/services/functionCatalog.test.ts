@@ -623,6 +623,7 @@ describe('full function catalog', () => {
       'admin.product-data-center.markup-configuration.slab.guide-price.edit',
       'admin.product-data-center.markup-configuration.slab.create',
       'admin.product-data-center.markup-configuration.slab.edit',
+      'admin.product-data-center.markup-configuration.slab.toggle-status',
       'admin.product-data-center.markup-configuration.slab.sort',
       'admin.product-data-center.markup-configuration.slab.delete',
       'admin.product-data-center.finished-stock-craft.view',

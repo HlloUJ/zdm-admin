@@ -64,6 +64,14 @@ public class SlabMarkupConfigurationController {
     return ApiResponse.ok(service.reorderConfigurations(request.orderedIds()));
   }
 
+  @PatchMapping("/{id}/status")
+  public ApiResponse<SlabMarkupConfiguration> updateStatus(
+      @PathVariable Long id,
+      @Valid @RequestBody SlabMarkupConfigurationStatusRequest request) {
+    permissionGuard.requirePermission(permission("toggle-status"));
+    return ApiResponse.ok(service.updateStatus(id, request.status()));
+  }
+
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requirePermission(permission("delete"));

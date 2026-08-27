@@ -7,6 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.zdm.platform.common.StoreLevelPricingDirectory;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -23,7 +25,7 @@ class SlabPriceServiceTest {
         .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "社区合作店", 1)));
     SlabPrice requested = price(7L, "0.80", "100.00", "80.00");
 
-    new SlabPriceService(mapper, levelDirectory).replacePrices(10L, List.of(requested));
+    createService(mapper, levelDirectory).replacePrices(10L, List.of(requested));
 
     ArgumentCaptor<SlabPrice> captor = ArgumentCaptor.forClass(SlabPrice.class);
     verify(mapper).insert(captor.capture());
@@ -42,7 +44,7 @@ class SlabPriceServiceTest {
     when(levelDirectory.listEnabledLevels())
         .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "当前门店级别", 1)));
 
-    SlabPriceService service = new SlabPriceService(mapper, levelDirectory);
+    SlabPriceService service = createService(mapper, levelDirectory);
     assertThatThrownBy(() -> service.replacePrices(10L, List.of(historical)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("必须填写全部展示的门店级别价格");
@@ -64,10 +66,33 @@ class SlabPriceServiceTest {
     when(levelDirectory.listEnabledLevels())
         .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "社区合作店", 1)));
 
-    assertThatThrownBy(() -> new SlabPriceService(mapper, levelDirectory)
+    assertThatThrownBy(() -> createService(mapper, levelDirectory)
         .replacePrices(10L, List.of(price(7L, "0.00", "100.00", "0.00"))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("价格系数必须大于0，成本价和价格不能为空且不能小于0");
+  }
+
+  @Test
+  void matchingActiveConfigurationCreatesAutoPrice() {
+    SlabPriceMapper mapper = Mockito.mock(SlabPriceMapper.class);
+    StoreLevelPricingDirectory levelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
+    when(mapper.selectList(any())).thenReturn(List.of());
+    when(levelDirectory.listEnabledLevels())
+        .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "社区合作店", 1)));
+    SlabMarkupConfiguration configuration = new SlabMarkupConfiguration();
+    configuration.setId(8L);
+    configuration.setStoreLevelId(7L);
+    configuration.setStatus("enabled");
+    configuration.setLegacySeeded(false);
+    configuration.setPriceCoefficient(new BigDecimal("1.2000"));
+
+    createService(mapper, levelDirectory, List.of(configuration))
+        .replacePrices(10L, List.of(price(7L, "1.20", "100.00", "120.00")));
+
+    ArgumentCaptor<SlabPrice> captor = ArgumentCaptor.forClass(SlabPrice.class);
+    verify(mapper).insert(captor.capture());
+    assertThat(captor.getValue().getPriceSource()).isEqualTo("auto");
+    assertThat(captor.getValue().getSourceConfigurationId()).isEqualTo(8L);
   }
 
   private static SlabPrice price(Long storeLevelId, String coefficient, String cost, String price) {
@@ -77,5 +102,33 @@ class SlabPriceServiceTest {
     requested.setCostPrice(new BigDecimal(cost));
     requested.setPrice(new BigDecimal(price));
     return requested;
+  }
+
+  private static SlabPriceService createService(
+      SlabPriceMapper mapper,
+      StoreLevelPricingDirectory levelDirectory) {
+    return createService(mapper, levelDirectory, List.of());
+  }
+
+  private static SlabPriceService createService(
+      SlabPriceMapper mapper,
+      StoreLevelPricingDirectory levelDirectory,
+      List<SlabMarkupConfiguration> configurations) {
+    SlabMarkupConfigurationMapper configurationMapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
+    when(configurationMapper.selectList(any())).thenReturn(configurations);
+    CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
+    when(identityProvider.require()).thenReturn(new CurrentIdentity(
+        1L,
+        1L,
+        1L,
+        1L,
+        "admin",
+        null,
+        null,
+        "运营管理员",
+        "all",
+        List.of("SUPER_ADMIN"),
+        List.of("all")));
+    return new SlabPriceService(mapper, levelDirectory, configurationMapper, identityProvider);
   }
 }

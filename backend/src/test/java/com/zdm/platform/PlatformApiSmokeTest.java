@@ -1766,8 +1766,8 @@ class PlatformApiSmokeTest {
           Long.valueOf(levelId))).isEqualTo(1);
       mockMvc.perform(delete("/api/admin/store-levels/{id}", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data").value(true));
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("该门店级别已被商品价格引用，不能删除"));
       assertThat(jdbcTemplate.queryForObject(
           "SELECT store_level_name FROM slab_prices WHERE slab_id = ? AND store_level_id = ?",
           String.class,
@@ -1775,6 +1775,10 @@ class PlatformApiSmokeTest {
           Long.valueOf(levelId))).isEqualTo("四级门店");
       jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabSnapshotId);
       slabSnapshotId = null;
+      mockMvc.perform(delete("/api/admin/store-levels/{id}", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
     } finally {
       if (finishedConfigurationId != null) {
         jdbcTemplate.update("DELETE FROM finished_markup_configurations WHERE id = ?", finishedConfigurationId);
