@@ -6,6 +6,10 @@ export interface SlabMarkupConfigurationRecord {
   name: string;
   priceCoefficient: number;
   sortOrder: number;
+  status: 'enabled' | 'disabled';
+  autoReferenceCount?: number;
+  manualPriceCount?: number;
+  synchronizedPriceCount?: number;
   createdByName?: string;
   createdByAccountId?: number;
   createdAt?: string;
@@ -44,6 +48,11 @@ export const reorderSlabMarkupConfigurations = (orderedIds: number[]) =>
   });
 export const deleteSlabMarkupConfiguration = (id: number) =>
   request<boolean>(`/admin/slab-markup-configurations/${id}`, { method: 'DELETE' });
+export const updateSlabMarkupConfigurationStatus = (id: number, status: 'enabled' | 'disabled') =>
+  request<SlabMarkupConfigurationRecord>(`/admin/slab-markup-configurations/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 export const getSlabGuidePriceSetting = () =>
   request<SlabGuidePriceSettingRecord | null>('/admin/slab-guide-price-setting');
 export const updateSlabGuidePriceSetting = (priceCoefficient: number) =>

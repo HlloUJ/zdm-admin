@@ -36,6 +36,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       sortOrder: 1,
       createdByAccountId: 99,
       createdByName: '其他运营员工',
+      status: 'enabled' as 'enabled' | 'disabled',
     },
     {
       id: 4,
@@ -45,6 +46,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       sortOrder: 2,
       createdByAccountId: 99,
       createdByName: '其他运营员工',
+      status: 'enabled' as 'enabled' | 'disabled',
     },
   ];
   const slabs = [
@@ -56,6 +58,8 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       sortOrder: 1,
       createdByAccountId: 99,
       createdByName: '其他运营员工',
+      status: 'enabled' as 'enabled' | 'disabled',
+      autoReferenceCount: 4,
     },
     {
       id: 6,
@@ -65,6 +69,8 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       sortOrder: 2,
       createdByAccountId: 99,
       createdByName: '其他运营员工',
+      status: 'enabled' as 'enabled' | 'disabled',
+      autoReferenceCount: 0,
     },
   ];
   await page.route('**/api/admin/store-levels/pricing-options', async (route) => {
@@ -106,10 +112,19 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
     });
   });
   await page.route('**/api/admin/slab-markup-configurations**', async (route) => {
-    if (route.request().method() === 'PATCH') {
+    if (route.request().method() === 'PATCH' && route.request().url().endsWith('/reorder')) {
       const orderedIds = route.request().postDataJSON().orderedIds as number[];
       const orderedRows = orderedIds.map((id) => slabs.find((item) => item.id === id)!);
       slabs.splice(0, slabs.length, ...orderedRows);
+    }
+    if (route.request().method() === 'PATCH' && route.request().url().endsWith('/status')) {
+      const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
+      const row = slabs.find((item) => item.id === id)!;
+      row.status = route.request().postDataJSON().status;
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', data: { ...row, synchronizedPriceCount: 0 } }),
+      });
     }
     await route.fulfill({
       contentType: 'application/json',
@@ -190,6 +205,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   expect((await createRequest).postDataJSON()).toEqual({ storeLevelId: 13, priceCoefficient: 0.5 });
 
   await page.getByText('大板价格配置', { exact: true }).click();
+  await expect(page.getByRole('columnheader', { name: '状态' })).toBeVisible();
   await expect(page.getByRole('cell', { name: '城市中心店', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '1.2', exact: true })).toBeVisible();
   const slabReorderRequest = page.waitForRequest(
@@ -203,6 +219,15 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
     .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('.t-table__handle-draggable'));
   expect((await slabReorderRequest).postDataJSON()).toEqual({ orderedIds: [6, 2] });
   await expect(page.getByText('已更新排序“城市中心店”', { exact: true })).toBeVisible();
+
+  const slabRow = page.getByRole('row').filter({ hasText: '城市中心店' });
+  const statusRequest = page.waitForRequest(
+    (request) => request.method() === 'PATCH' && request.url().endsWith('/slab-markup-configurations/2/status'),
+  );
+  await slabRow.getByText('停用', { exact: true }).click();
+  await page.getByRole('button', { name: '确认停用', exact: true }).click();
+  expect((await statusRequest).postDataJSON()).toEqual({ status: 'disabled' });
+  await expect(page.getByText('已停用“城市中心店”，现有自动价格已冻结', { exact: true })).toBeVisible();
 });
 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
@@ -282,6 +307,7 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
                 priceCoefficient: 1.75,
                 costPrice: 100,
                 price: 175,
+                priceSource: 'manual',
               },
             ],
             status: 'warehouse',
@@ -295,7 +321,7 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
   const row = page.getByRole('row', { name: /独立价格大板/ });
   await row.getByText('价格', { exact: true }).click();
   const drawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
-  await expect(drawer.getByText('历史门店级别', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('历史门店级别', { exact: false })).toBeVisible();
   await expect(drawer.getByText('当前发布模板', { exact: true })).toHaveCount(0);
   await expect(drawer.locator('input[value="175.00"]')).toBeVisible();
 

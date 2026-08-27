@@ -965,7 +965,15 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     markupActionLabels,
   );
-  await expect(slabMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(markupActionLabels);
+  await expect(slabMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '保存指导价',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '排序',
+    '删除',
+  ]);
   const slabVarietyPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '品种管理页' });
   await expect(slabVarietyPermissionRow.getByText('大板基础数据', { exact: true })).toBeVisible();
   await expect(slabVarietyPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([

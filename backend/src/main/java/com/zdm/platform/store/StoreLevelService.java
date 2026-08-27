@@ -22,6 +22,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private static final String STORE_REFERENCED_MESSAGE = "该门店级别已被门店引用，不能删除";
   private static final String PRICE_REFERENCED_MESSAGE = "该门店级别已被价格配置引用，不能删除";
+  private static final String PRODUCT_PRICE_REFERENCED_MESSAGE = "该门店级别已被商品价格引用，不能删除";
 
   private final StoreMapper storeMapper;
   private final CurrentIdentityProvider identityProvider;
@@ -87,6 +88,15 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     StoreLevel existing = getById(id);
     if (existing == null) {
       return null;
+    }
+    if ("disabled".equals(status)) {
+      Long activeStoreCount = storeMapper.selectCount(
+          Wrappers.<Store>lambdaQuery()
+              .eq(Store::getStoreLevelId, id)
+              .eq(Store::getStatus, "enabled"));
+      if (activeStoreCount > 0) {
+        throw new IllegalArgumentException("该门店级别仍有启用门店使用，不能停用，请先迁移门店级别");
+      }
     }
     existing.setStatus(status);
     updateById(existing);
@@ -187,6 +197,10 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (isPriceConfigured("finished_markup_configurations", id)
         || isPriceConfigured("slab_markup_configurations", id)) {
       throw new IllegalArgumentException(PRICE_REFERENCED_MESSAGE);
+    }
+    if (isPriceConfigured("finished_product_prices", id)
+        || isPriceConfigured("slab_prices", id)) {
+      throw new IllegalArgumentException(PRODUCT_PRICE_REFERENCED_MESSAGE);
     }
   }
 

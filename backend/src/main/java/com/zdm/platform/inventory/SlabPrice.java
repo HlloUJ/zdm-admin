@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @TableName("slab_prices")
 public class SlabPrice {
@@ -29,6 +30,12 @@ public class SlabPrice {
   @DecimalMin("0.00")
   private BigDecimal price;
 
+  private String priceSource;
+  private Long sourceConfigurationId;
+  private String manualUpdatedByName;
+  private Long manualUpdatedByAccountId;
+  private LocalDateTime manualUpdatedAt;
+
   public Long getId() { return id; }
   public void setId(Long id) { this.id = id; }
   public Long getSlabId() { return slabId; }
@@ -43,4 +50,20 @@ public class SlabPrice {
   public void setCostPrice(BigDecimal costPrice) { this.costPrice = costPrice; }
   public BigDecimal getPrice() { return price; }
   public void setPrice(BigDecimal price) { this.price = price; }
+  public String getPriceSource() { return priceSource; }
+  public void setPriceSource(String priceSource) { this.priceSource = priceSource; }
+  public Long getSourceConfigurationId() { return sourceConfigurationId; }
+  public void setSourceConfigurationId(Long sourceConfigurationId) {
+    this.sourceConfigurationId = sourceConfigurationId;
+  }
+  public String getManualUpdatedByName() { return manualUpdatedByName; }
+  public void setManualUpdatedByName(String manualUpdatedByName) {
+    this.manualUpdatedByName = manualUpdatedByName;
+  }
+  public Long getManualUpdatedByAccountId() { return manualUpdatedByAccountId; }
+  public void setManualUpdatedByAccountId(Long manualUpdatedByAccountId) {
+    this.manualUpdatedByAccountId = manualUpdatedByAccountId;
+  }
+  public LocalDateTime getManualUpdatedAt() { return manualUpdatedAt; }
+  public void setManualUpdatedAt(LocalDateTime manualUpdatedAt) { this.manualUpdatedAt = manualUpdatedAt; }
 }

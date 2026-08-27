@@ -387,6 +387,10 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                   },
                   { label: '新增', value: 'admin.product-data-center.markup-configuration.slab.create' },
                   { label: '编辑', value: 'admin.product-data-center.markup-configuration.slab.edit' },
+                  {
+                    label: '停用/启用',
+                    value: 'admin.product-data-center.markup-configuration.slab.toggle-status',
+                  },
                   { label: '排序', value: 'admin.product-data-center.markup-configuration.slab.sort' },
                   { label: '删除', value: 'admin.product-data-center.markup-configuration.slab.delete' },
                 ],
