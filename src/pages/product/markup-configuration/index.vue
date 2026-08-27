@@ -94,20 +94,13 @@
             </template>
             <template #priceCoefficient="{ row }">{{ formatNumber(row.priceCoefficient, 4) }}</template>
             <template #status="{ row }">
-              <t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">
+              <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
                 {{ row.status === 'enabled' ? '已启用' : '已停用' }}
               </t-tag>
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link
-                  v-if="canEdit && row.status !== 'disabled'"
-                  theme="primary"
-                  hover="color"
-                  @click="openEdit(row)"
-                >
-                  编辑
-                </t-link>
+                <t-link v-if="canEdit" theme="primary" hover="color" @click="openEdit(row)"> 编辑 </t-link>
                 <t-link
                   v-if="canToggleStatus"
                   :theme="row.status === 'enabled' ? 'warning' : 'success'"
@@ -183,7 +176,7 @@
     <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
       :action="statusConfirmRow?.status === 'enabled' ? '停用' : '启用'"
-      object-type="大板价格配置"
+      :object-type="`${activeType === 'finished' ? '成品' : '大板'}价格配置`"
       :object-name="statusConfirmRow?.name"
       @confirm="submitStatusConfirm"
       @cancel="statusConfirmVisible = false"
@@ -209,6 +202,7 @@ import {
   listFinishedMarkupConfigurations,
   reorderFinishedMarkupConfigurations,
   updateFinishedMarkupConfiguration,
+  updateFinishedMarkupConfigurationStatus,
   updateFinishedGuidePriceSetting,
   type FinishedMarkupConfigurationRecord,
 } from '@/services/finishedMarkupConfigurations';
@@ -246,15 +240,11 @@ const canEdit = computed(() => hasPermission(loginUser.value, `${activePrefix.va
 const canSort = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.sort`));
 const canEditGuide = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.guide-price.edit`));
 const canDelete = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.delete`));
-const canToggleStatus = computed(
-  () =>
-    activeType.value === 'slab' &&
-    hasPermission(loginUser.value, 'admin.product-data-center.markup-configuration.slab.toggle-status'),
-);
+const canToggleStatus = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.toggle-status`));
 const pricingRuleMessage = computed(() =>
   activeType.value === 'slab'
     ? '大板自动价格跟随当前配置；手工价格不会被覆盖。在用配置只能停用，不能删除。'
-    : '成品价格配置只用于新商品初始化；商品保存后使用自己的价格系数。',
+    : '成品价格配置只用于新商品初始化；停用后不再用于新商品，已保存商品不受影响。',
 );
 
 const loading = ref(false);
@@ -318,10 +308,10 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },
   { colKey: 'priceCoefficient', title: '价格系数', width: 130, align: 'right' },
-  ...(activeType.value === 'slab' ? [{ colKey: 'status', title: '状态', width: 100, align: 'center' as const }] : []),
+  { colKey: 'status', title: '状态', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: activeType.value === 'slab' ? 220 : 180, align: 'left', fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 220, align: 'left', fixed: 'right' },
 ]);
 const filteredData = computed(() => {
   const name = appliedSearchForm.name.trim();
@@ -515,10 +505,9 @@ const submitConfirm = async () => {
 };
 
 const statusConfirmVisible = ref(false);
-const statusConfirmRow = ref<SlabMarkupConfigurationRecord | null>(null);
+const statusConfirmRow = ref<MarkupConfigurationRecord | null>(null);
 const openStatusConfirm = (row: MarkupConfigurationRecord) => {
-  if (activeType.value !== 'slab') return;
-  statusConfirmRow.value = row as SlabMarkupConfigurationRecord;
+  statusConfirmRow.value = row;
   statusConfirmVisible.value = true;
 };
 const submitStatusConfirm = async () => {
@@ -526,14 +515,11 @@ const submitStatusConfirm = async () => {
   const row = statusConfirmRow.value;
   const status = row.status === 'enabled' ? 'disabled' : 'enabled';
   try {
-    const updated = await updateSlabMarkupConfigurationStatus(row.id, status);
+    if (activeType.value === 'finished') await updateFinishedMarkupConfigurationStatus(row.id, status);
+    else await updateSlabMarkupConfigurationStatus(row.id, status);
     await loadData();
     statusConfirmVisible.value = false;
-    adminFeedback.success(
-      status === 'enabled'
-        ? `已启用“${row.name}”并同步${updated.synchronizedPriceCount ?? 0}条自动价格`
-        : `已停用“${row.name}”，现有自动价格已冻结`,
-    );
+    adminFeedback.actionSuccess({ action: status === 'enabled' ? '启用' : '停用', target: row.name });
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '状态更新失败');
   }

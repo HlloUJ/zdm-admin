@@ -617,6 +617,7 @@ describe('full function catalog', () => {
       'admin.product-data-center.markup-configuration.finished.guide-price.edit',
       'admin.product-data-center.markup-configuration.finished.create',
       'admin.product-data-center.markup-configuration.finished.edit',
+      'admin.product-data-center.markup-configuration.finished.toggle-status',
       'admin.product-data-center.markup-configuration.finished.sort',
       'admin.product-data-center.markup-configuration.finished.delete',
       'admin.product-data-center.markup-configuration.slab.view',
