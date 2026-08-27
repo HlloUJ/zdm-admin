@@ -4,7 +4,11 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zdm.platform.common.StoreLevelPricingDirectory;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -47,7 +51,7 @@ public class SlabMarkupConfigurationService {
     payload.setId(null);
     payload.setName(level.name());
     payload.setStatus("enabled");
-    payload.setSortOrder(level.sortOrder());
+    payload.setSortOrder(nextSortOrder());
     payload.setCreatedByName(identity.displayName());
     payload.setCreatedByAccountId(identity.accountId());
     validateUniqueStoreLevel(payload.getStoreLevelId(), null);
@@ -79,6 +83,29 @@ public class SlabMarkupConfigurationService {
       throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
     return requireConfiguration(id);
+  }
+
+  @Transactional
+  public List<SlabMarkupConfiguration> reorderConfigurations(List<Long> orderedIds) {
+    requirePlatformScope();
+    List<SlabMarkupConfiguration> configurations = mapper.selectList(
+        Wrappers.<SlabMarkupConfiguration>lambdaQuery()
+            .eq(SlabMarkupConfiguration::getLegacySeeded, false));
+    if (orderedIds == null || orderedIds.size() != configurations.size()
+        || new HashSet<>(orderedIds).size() != configurations.size()) {
+      throw new IllegalArgumentException("请提交当前全部大板价格配置");
+    }
+    Map<Long, SlabMarkupConfiguration> configurationsById = configurations.stream()
+        .collect(Collectors.toMap(SlabMarkupConfiguration::getId, Function.identity()));
+    if (!configurationsById.keySet().equals(new HashSet<>(orderedIds))) {
+      throw new IllegalArgumentException("大板价格配置顺序与当前数据不一致");
+    }
+    for (int index = 0; index < orderedIds.size(); index += 1) {
+      SlabMarkupConfiguration configuration = configurationsById.get(orderedIds.get(index));
+      configuration.setSortOrder(index + 1);
+      mapper.updateById(configuration);
+    }
+    return listConfigurations(false);
   }
 
   @Transactional
@@ -122,6 +149,16 @@ public class SlabMarkupConfigurationService {
       throw new IllegalStateException("大板价格配置关联的门店级别不存在");
     }
     configuration.setName(level.name());
-    configuration.setSortOrder(level.sortOrder());
+  }
+
+  private int nextSortOrder() {
+    SlabMarkupConfiguration lastConfiguration = mapper.selectOne(
+        Wrappers.<SlabMarkupConfiguration>lambdaQuery()
+            .eq(SlabMarkupConfiguration::getLegacySeeded, false)
+            .orderByDesc(SlabMarkupConfiguration::getSortOrder)
+            .last("LIMIT 1"));
+    return lastConfiguration == null || lastConfiguration.getSortOrder() == null
+        ? 1
+        : lastConfiguration.getSortOrder() + 1;
   }
 }

@@ -37,6 +37,11 @@ export const updateSlabMarkupConfiguration = (id: number, payload: SlabMarkupCon
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+export const reorderSlabMarkupConfigurations = (orderedIds: number[]) =>
+  request<SlabMarkupConfigurationRecord[]>('/admin/slab-markup-configurations/reorder', {
+    method: 'PATCH',
+    body: JSON.stringify({ orderedIds }),
+  });
 export const deleteSlabMarkupConfiguration = (id: number) =>
   request<boolean>(`/admin/slab-markup-configurations/${id}`, { method: 'DELETE' });
 export const getSlabGuidePriceSetting = () =>
