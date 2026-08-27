@@ -253,6 +253,14 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await expect(page.getByText('已停用“城市中心店”', { exact: true })).toBeVisible();
   await expect(slabRow.locator('.t-tag').filter({ hasText: '已停用' })).toHaveClass(/t-tag--danger/);
   await expect(slabRow.getByText('编辑', { exact: true })).toBeVisible();
+
+  await slabRow.getByText('删除', { exact: true }).click();
+  await expect(page.getByText('该价格配置正在被4条大板价格使用，不能删除，请先停用', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-confirm-dialog')).toHaveCount(0);
+
+  const unusedSlabRow = page.getByRole('row').filter({ hasText: '区域合作店' });
+  await unusedSlabRow.getByText('删除', { exact: true }).click();
+  await expect(page.locator('.zdm-admin-confirm-dialog')).toContainText('确认删除价格配置“区域合作店”吗？');
 });
 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
