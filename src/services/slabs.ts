@@ -10,6 +10,11 @@ export interface SlabPrice {
   priceCoefficient: number;
   costPrice: number;
   price: number;
+  priceSource?: 'auto' | 'manual';
+  sourceConfigurationId?: number;
+  manualUpdatedByName?: string;
+  manualUpdatedByAccountId?: number;
+  manualUpdatedAt?: string;
 }
 
 export interface SlabOffShelfRecord {

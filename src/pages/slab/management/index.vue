@@ -524,7 +524,23 @@
                 </t-form-item>
               </div>
               <div v-for="item in partnerPriceRows" :key="item.id" class="price-editor__row">
-                <span>{{ item.label }}</span>
+                <span>
+                  {{ item.label }}
+                  <t-tag :theme="priceSourceTheme(productForm.markupPrices[item.id]?.priceSource)" variant="light">
+                    {{ priceSourceLabel(productForm.markupPrices[item.id]?.priceSource, item.id) }}
+                  </t-tag>
+                  <t-link
+                    v-if="
+                      productMode !== 'view' &&
+                      canRestoreAutoPrice(item.id, productForm.markupPrices[item.id]?.priceSource)
+                    "
+                    theme="primary"
+                    hover="color"
+                    @click="restoreProductAutoPrice(item.id)"
+                  >
+                    恢复跟随配置
+                  </t-link>
+                </span>
                 <t-form-item
                   class="price-form-item"
                   :name="`markupPrices.${item.id}.ratio`"
@@ -874,7 +890,22 @@
               <span><span class="price-required-star">*</span>价格</span>
             </div>
             <div v-for="(row, index) in batchPriceRows" :key="row.label" class="price-table__row">
-              <span>{{ row.label }}</span>
+              <span>
+                {{ row.label }}
+                <template v-if="row.configurationId != null">
+                  <t-tag :theme="priceSourceTheme(row.priceSource)" variant="light">
+                    {{ priceSourceLabel(row.priceSource, row.configurationId) }}
+                  </t-tag>
+                  <t-link
+                    v-if="!priceDrawerReadonly && canRestoreAutoPrice(row.configurationId, row.priceSource)"
+                    theme="primary"
+                    hover="color"
+                    @click="restoreBatchAutoPrice(row)"
+                  >
+                    恢复跟随配置
+                  </t-link>
+                </template>
+              </span>
               <t-input v-if="index === 0" class="price-input" model-value="1.00" disabled />
               <t-form-item
                 v-else
@@ -1143,6 +1174,8 @@ interface DrawerPriceRow {
   label: string;
   ratio: string;
   price: string;
+  priceSource?: 'auto' | 'manual';
+  sourceConfigurationId?: number;
 }
 
 interface DetailMediaItem {
@@ -1234,7 +1267,10 @@ interface ProductForm {
   level2Price: string;
   level3Ratio: string;
   level3Price: string;
-  markupPrices: Record<number, { ratio: string; price: string }>;
+  markupPrices: Record<
+    number,
+    { ratio: string; price: string; priceSource: 'auto' | 'manual'; sourceConfigurationId?: number }
+  >;
 }
 
 type CornerFieldKey =
@@ -1958,13 +1994,22 @@ const salesPriceRows = computed(() => {
     editingRowId.value == null
       ? []
       : (tableData.value.find((item) => item.id === editingRowId.value)?.markupPrices ?? []);
-  const rows: { id: number; label: string; priceCoefficient?: number }[] = savedPrices.map((price) => ({
+  const rows: {
+    id: number;
+    label: string;
+    priceCoefficient?: number;
+    priceSource?: 'auto' | 'manual';
+    sourceConfigurationId?: number;
+  }[] = savedPrices.map((price) => ({
     id: price.storeLevelId,
     label:
-      price.storeLevelName ||
+      publishOptions.storeLevels.find((level) => level.id === price.storeLevelId)?.label ||
       markupConfigurations.value.find((item) => item.storeLevelId === price.storeLevelId)?.name ||
+      price.storeLevelName ||
       `门店级别${price.storeLevelId}`,
     priceCoefficient: Number(price.priceCoefficient),
+    priceSource: price.priceSource ?? 'manual',
+    sourceConfigurationId: price.sourceConfigurationId,
   }));
   const savedIds = new Set(rows.map((item) => item.id));
   publishOptions.storeLevels.forEach((level) => {
@@ -1974,6 +2019,8 @@ const salesPriceRows = computed(() => {
       id: level.id,
       label: level.label,
       priceCoefficient: configuration == null ? undefined : Number(configuration.priceCoefficient),
+      priceSource: configuration == null ? 'manual' : 'auto',
+      sourceConfigurationId: configuration?.id,
     });
   });
   return rows;
@@ -2376,6 +2423,15 @@ const toNumber = (value: string) => {
 
 const formatPrice = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 const formatRatio = (value: number) => value.toFixed(2);
+const activeConfigurationForLevel = (storeLevelId: number) =>
+  markupConfigurations.value.find((item) => item.storeLevelId === storeLevelId);
+const priceSourceTheme = (source?: 'auto' | 'manual') => (source === 'auto' ? 'success' : 'warning');
+const priceSourceLabel = (source: 'auto' | 'manual' | undefined, storeLevelId: number) => {
+  if (source !== 'auto') return '手工价格';
+  return activeConfigurationForLevel(storeLevelId) ? '跟随配置' : '配置已停用';
+};
+const canRestoreAutoPrice = (storeLevelId: number, source?: 'auto' | 'manual') =>
+  source === 'manual' && Boolean(activeConfigurationForLevel(storeLevelId));
 
 const calculateProductPrice = (configurationId: number) => {
   const cost = toNumber(productForm.cost);
@@ -2427,10 +2483,22 @@ const initializeProductMarkupPrices = (prices: SlabPrice[] = []) => {
         {
           ratio: ratio == null ? '' : formatRatio(ratio),
           price: existing ? String(existing.price) : cost && ratio != null ? formatPrice(cost * ratio) : '',
+          priceSource: existing?.priceSource ?? item.priceSource ?? 'manual',
+          sourceConfigurationId: existing?.sourceConfigurationId ?? item.sourceConfigurationId,
         },
       ];
     }),
   );
+};
+
+const restoreProductAutoPrice = (storeLevelId: number) => {
+  const configuration = activeConfigurationForLevel(storeLevelId);
+  const editor = productForm.markupPrices[storeLevelId];
+  if (!configuration || !editor) return;
+  editor.ratio = formatRatio(Number(configuration.priceCoefficient));
+  editor.priceSource = 'auto';
+  editor.sourceConfigurationId = configuration.id;
+  calculateProductPrice(storeLevelId);
 };
 
 const calculateBatchPrice = (row: DrawerPriceRow) => {
@@ -2447,6 +2515,16 @@ const calculateBatchRatio = (row: DrawerPriceRow) => {
   const price = toNumber(row.price);
   if (!isValidSalesNumber(costValue, 0) || !isValidSalesNumber(row.price, 0) || !cost) return;
   row.ratio = (price / cost).toFixed(2);
+};
+
+const restoreBatchAutoPrice = (row: DrawerPriceRow) => {
+  if (row.configurationId == null) return;
+  const configuration = activeConfigurationForLevel(row.configurationId);
+  if (!configuration) return;
+  row.ratio = formatRatio(Number(configuration.priceCoefficient));
+  row.priceSource = 'auto';
+  row.sourceConfigurationId = configuration.id;
+  calculateBatchPrice(row);
 };
 
 const clearPriceDrawerFieldError = (field: string) => {
@@ -2476,6 +2554,10 @@ const handleBatchRatioChange = (index: number, _value?: unknown, context?: Sales
   if (context?.type === 'props') return;
   const row = batchPriceRows[index];
   if (!row) return;
+  if (row.configurationId != null) {
+    row.priceSource = 'manual';
+    row.sourceConfigurationId = undefined;
+  }
   const field = `rows.${index}.ratio`;
   if (!String(row.ratio ?? '').trim() || isValidSalesNumber(row.ratio, 0)) clearPriceDrawerFieldError(field);
   calculateBatchPrice(row);
@@ -2490,6 +2572,10 @@ const handleBatchPriceChange = (index: number, _value?: unknown, context?: Sales
   if (index === 0) {
     handleBatchCostChange(_value, context);
     return;
+  }
+  if (row.configurationId != null) {
+    row.priceSource = 'manual';
+    row.sourceConfigurationId = undefined;
   }
   calculateBatchRatio(row);
   if (String(row.ratio ?? '').trim()) clearPriceDrawerFieldError(`rows.${index}.ratio`);
@@ -2508,11 +2594,14 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
   const configuredRows: DrawerPriceRow[] = snapshots.map((snapshot) => ({
     configurationId: snapshot.storeLevelId,
     label:
-      snapshot.storeLevelName ||
+      publishOptions.storeLevels.find((level) => level.id === snapshot.storeLevelId)?.label ||
       markupConfigurations.value.find((item) => item.storeLevelId === snapshot.storeLevelId)?.name ||
+      snapshot.storeLevelName ||
       `门店级别${snapshot.storeLevelId}`,
     ratio: formatRatio(Number(snapshot.priceCoefficient)),
     price: String(snapshot.price),
+    priceSource: snapshot.priceSource ?? 'manual',
+    sourceConfigurationId: snapshot.sourceConfigurationId,
   }));
   const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.storeLevelId));
   publishOptions.storeLevels.forEach((level) => {
@@ -2524,6 +2613,8 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
       label: level.label,
       ratio,
       price: cost && ratio ? formatPrice(cost * toNumber(ratio)) : '',
+      priceSource: configuration == null ? 'manual' : 'auto',
+      sourceConfigurationId: configuration?.id,
     });
   });
   return [
@@ -2753,6 +2844,11 @@ const handleGuidePriceChange = (_value?: unknown, context?: SalesNumberChangeCon
 
 const handlePartnerRatioChange = (configurationId: number, _value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
+  const editor = productForm.markupPrices[configurationId];
+  if (editor) {
+    editor.priceSource = 'manual';
+    editor.sourceConfigurationId = undefined;
+  }
   clearSalesNumberFieldError(
     `markupPrices.${configurationId}.ratio`,
     productForm.markupPrices[configurationId]?.ratio,
@@ -2763,6 +2859,11 @@ const handlePartnerRatioChange = (configurationId: number, _value?: unknown, con
 
 const handlePartnerPriceChange = (configurationId: number, _value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
+  const editor = productForm.markupPrices[configurationId];
+  if (editor) {
+    editor.priceSource = 'manual';
+    editor.sourceConfigurationId = undefined;
+  }
   const field = `markupPrices.${configurationId}.price`;
   if (String(productForm.markupPrices[configurationId]?.price ?? '').trim()) clearSalesFieldError(field);
   calculateProductRatio(configurationId);
@@ -2909,6 +3010,8 @@ const handleProductSubmit = async () => {
       priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
       costPrice: toNumber(productForm.cost),
       price: toNumber(productForm.markupPrices[item.id].price),
+      priceSource: productForm.markupPrices[item.id].priceSource,
+      sourceConfigurationId: productForm.markupPrices[item.id].sourceConfigurationId,
       variantKey: '',
     })),
     status: editingItem?.status || publishTargetStatus.value,
@@ -3186,6 +3289,8 @@ const handleConfirmSubmit = async () => {
           priceCoefficient: Number(toNumber(item.ratio).toFixed(4)),
           costPrice,
           price: toNumber(item.price),
+          priceSource: item.priceSource,
+          sourceConfigurationId: item.sourceConfigurationId,
           variantKey: '',
         }));
       const guidePrice = batchPriceRows.find((item) => item.label === '指导价')?.price;

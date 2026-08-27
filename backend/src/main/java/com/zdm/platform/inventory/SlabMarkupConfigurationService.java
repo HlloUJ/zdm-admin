@@ -21,14 +21,17 @@ public class SlabMarkupConfigurationService {
   private final SlabMarkupConfigurationMapper mapper;
   private final CurrentIdentityProvider identityProvider;
   private final StoreLevelPricingDirectory storeLevelDirectory;
+  private final SlabPriceConfigurationSyncService priceSyncService;
 
   public SlabMarkupConfigurationService(
       SlabMarkupConfigurationMapper mapper,
       CurrentIdentityProvider identityProvider,
-      StoreLevelPricingDirectory storeLevelDirectory) {
+      StoreLevelPricingDirectory storeLevelDirectory,
+      SlabPriceConfigurationSyncService priceSyncService) {
     this.mapper = mapper;
     this.identityProvider = identityProvider;
     this.storeLevelDirectory = storeLevelDirectory;
+    this.priceSyncService = priceSyncService;
   }
 
   public List<SlabMarkupConfiguration> listConfigurations(boolean enabledOnly) {
@@ -36,6 +39,9 @@ public class SlabMarkupConfigurationService {
     var query = Wrappers.<SlabMarkupConfiguration>lambdaQuery();
     query.ne(SlabMarkupConfiguration::getName, "指导价")
         .eq(SlabMarkupConfiguration::getLegacySeeded, false);
+    if (enabledOnly) {
+      query.eq(SlabMarkupConfiguration::getStatus, "enabled");
+    }
     List<SlabMarkupConfiguration> configurations = mapper.selectList(query
         .orderByAsc(SlabMarkupConfiguration::getSortOrder)
         .orderByDesc(SlabMarkupConfiguration::getCreatedAt)
@@ -60,7 +66,10 @@ public class SlabMarkupConfigurationService {
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
-    return requireConfiguration(payload.getId());
+    SlabMarkupConfiguration created = requireConfiguration(payload.getId());
+    created.setSynchronizedPriceCount(priceSyncService.backfillMissingPrices(created));
+    enrichUsage(created);
+    return created;
   }
 
   @Transactional
@@ -82,7 +91,30 @@ public class SlabMarkupConfigurationService {
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
-    return requireConfiguration(id);
+    SlabMarkupConfiguration updated = requireConfiguration(id);
+    updated.setSynchronizedPriceCount(priceSyncService.refreshAutoPrices(updated));
+    enrichUsage(updated);
+    return updated;
+  }
+
+  @Transactional
+  public SlabMarkupConfiguration updateStatus(Long id, String status) {
+    requirePlatformScope();
+    if (!List.of("enabled", "disabled").contains(status)) {
+      throw new IllegalArgumentException("价格配置状态不正确");
+    }
+    SlabMarkupConfiguration existing = requireConfiguration(id);
+    existing.setStatus(status);
+    mapper.updateById(existing);
+    SlabMarkupConfiguration updated = requireConfiguration(id);
+    int synchronizedCount = 0;
+    if ("enabled".equals(status)) {
+      synchronizedCount += priceSyncService.refreshAutoPrices(updated);
+      synchronizedCount += priceSyncService.backfillMissingPrices(updated);
+    }
+    updated.setSynchronizedPriceCount(synchronizedCount);
+    enrichUsage(updated);
+    return updated;
   }
 
   @Transactional
@@ -111,7 +143,12 @@ public class SlabMarkupConfigurationService {
   @Transactional
   public void deleteConfiguration(Long id) {
     requirePlatformScope();
-    requireConfiguration(id);
+    SlabMarkupConfiguration existing = requireConfiguration(id);
+    long referenceCount = priceSyncService.countAutoReferences(existing.getId());
+    if (referenceCount > 0) {
+      throw new IllegalArgumentException(
+          "该价格配置正在被" + referenceCount + "条大板价格使用，不能删除，请先停用");
+    }
     mapper.deleteById(id);
   }
 
@@ -149,6 +186,12 @@ public class SlabMarkupConfigurationService {
       throw new IllegalStateException("大板价格配置关联的门店级别不存在");
     }
     configuration.setName(level.name());
+    enrichUsage(configuration);
+  }
+
+  private void enrichUsage(SlabMarkupConfiguration configuration) {
+    configuration.setAutoReferenceCount(priceSyncService.countAutoReferences(configuration.getId()));
+    configuration.setManualPriceCount(priceSyncService.countManualPrices(configuration.getStoreLevelId()));
   }
 
   private int nextSortOrder() {
