@@ -487,6 +487,13 @@ const submitForm = async () => {
 const confirmVisible = ref(false);
 const confirmRow = ref<MarkupConfigurationRecord | null>(null);
 const openConfirm = (row: MarkupConfigurationRecord) => {
+  if (activeType.value === 'slab') {
+    const referenceCount = (row as SlabMarkupConfigurationRecord).autoReferenceCount ?? 0;
+    if (referenceCount > 0) {
+      adminFeedback.warning(`该价格配置正在被${referenceCount}条大板价格使用，不能删除，请先停用`);
+      return;
+    }
+  }
   confirmRow.value = row;
   confirmVisible.value = true;
 };
