@@ -373,6 +373,10 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                   },
                   { label: '新增', value: 'admin.product-data-center.markup-configuration.finished.create' },
                   { label: '编辑', value: 'admin.product-data-center.markup-configuration.finished.edit' },
+                  {
+                    label: '停用/启用',
+                    value: 'admin.product-data-center.markup-configuration.finished.toggle-status',
+                  },
                   { label: '排序', value: 'admin.product-data-center.markup-configuration.finished.sort' },
                   { label: '删除', value: 'admin.product-data-center.markup-configuration.finished.delete' },
                 ],

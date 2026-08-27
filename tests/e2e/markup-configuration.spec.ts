@@ -80,7 +80,16 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
     });
   });
   await page.route('**/api/admin/finished-markup-configurations**', async (route) => {
-    if (route.request().method() === 'PATCH') {
+    if (route.request().method() === 'PATCH' && route.request().url().endsWith('/status')) {
+      const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
+      const row = finished.find((item) => item.id === id)!;
+      row.status = route.request().postDataJSON().status;
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', data: row }),
+      });
+    }
+    if (route.request().method() === 'PATCH' && route.request().url().endsWith('/reorder')) {
       const orderedIds = route.request().postDataJSON().orderedIds as number[];
       const orderedRows = orderedIds.map((id) => finished.find((item) => item.id === id)!);
       finished.splice(0, finished.length, ...orderedRows);
@@ -103,6 +112,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
         createdByAccountId: 1,
         createdByName: '运营管理员',
         sortOrder: finished.length + 1,
+        status: 'enabled',
         ...payload,
       });
     }
@@ -158,9 +168,22 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await expect(page.getByText('商品默认价格规则')).toBeVisible();
   await expect(page.getByText('指导价设置', { exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '门店级别' })).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: '状态' })).toHaveCount(0);
+  await expect(page.getByRole('columnheader', { name: '状态' })).toBeVisible();
   await expect(page.locator('thead').getByTitle('拖拽排序')).toBeVisible();
   await expect(page.getByRole('cell', { name: '城市中心店', exact: true })).toBeVisible();
+
+  const finishedRow = page.getByRole('row').filter({ hasText: '城市中心店' });
+  const finishedStatusRequest = page.waitForRequest(
+    (request) => request.method() === 'PATCH' && request.url().endsWith('/finished-markup-configurations/3/status'),
+  );
+  await finishedRow.getByText('停用', { exact: true }).click();
+  await expect(page.locator('.zdm-admin-confirm-dialog')).toContainText('确认停用成品价格配置“城市中心店”吗？');
+  await page.getByRole('button', { name: '确认停用', exact: true }).click();
+  expect((await finishedStatusRequest).postDataJSON()).toEqual({ status: 'disabled' });
+  await expect(page.getByText('已停用“城市中心店”', { exact: true })).toBeVisible();
+  await expect(finishedRow.getByText('已停用', { exact: true })).toBeVisible();
+  await expect(finishedRow.locator('.t-tag').filter({ hasText: '已停用' })).toHaveClass(/t-tag--danger/);
+  await expect(finishedRow.getByText('编辑', { exact: true })).toBeVisible();
 
   const finishedReorderRequest = page.waitForRequest(
     (request) =>
@@ -227,7 +250,9 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await slabRow.getByText('停用', { exact: true }).click();
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
   expect((await statusRequest).postDataJSON()).toEqual({ status: 'disabled' });
-  await expect(page.getByText('已停用“城市中心店”，现有自动价格已冻结', { exact: true })).toBeVisible();
+  await expect(page.getByText('已停用“城市中心店”', { exact: true })).toBeVisible();
+  await expect(slabRow.locator('.t-tag').filter({ hasText: '已停用' })).toHaveClass(/t-tag--danger/);
+  await expect(slabRow.getByText('编辑', { exact: true })).toBeVisible();
 });
 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
@@ -241,7 +266,7 @@ test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
   await expect(page.getByRole('button', { name: '保存指导价' })).toHaveCount(0);
 });
 
-test('价格配置无排序权限时不可拖拽且不包含独立停启', async ({ page }) => {
+test('价格配置无排序和停启权限时隐藏对应操作', async ({ page }) => {
   await seedLogin(
     page,
     [

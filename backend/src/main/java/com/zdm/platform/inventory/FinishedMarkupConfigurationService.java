@@ -34,6 +34,9 @@ public class FinishedMarkupConfigurationService {
     var query = Wrappers.<FinishedMarkupConfiguration>lambdaQuery();
     query.ne(FinishedMarkupConfiguration::getName, "指导价")
         .eq(FinishedMarkupConfiguration::getLegacySeeded, false);
+    if (enabledOnly) {
+      query.eq(FinishedMarkupConfiguration::getStatus, "enabled");
+    }
     List<FinishedMarkupConfiguration> result = mapper.selectList(query
         .orderByAsc(FinishedMarkupConfiguration::getSortOrder)
         .orderByDesc(FinishedMarkupConfiguration::getCreatedAt)
@@ -100,6 +103,18 @@ public class FinishedMarkupConfigurationService {
       mapper.updateById(configuration);
     }
     return listConfigurations(false);
+  }
+
+  @Transactional
+  public FinishedMarkupConfiguration updateStatus(Long id, String status) {
+    requirePlatformScope();
+    if (!List.of("enabled", "disabled").contains(status)) {
+      throw new IllegalArgumentException("价格配置状态不正确");
+    }
+    FinishedMarkupConfiguration existing = requireConfiguration(id);
+    existing.setStatus(status);
+    mapper.updateById(existing);
+    return requireConfiguration(id);
   }
 
   @Transactional

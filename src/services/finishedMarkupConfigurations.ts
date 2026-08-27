@@ -6,6 +6,7 @@ export interface FinishedMarkupConfigurationRecord {
   name: string;
   priceCoefficient: number;
   sortOrder: number;
+  status: 'enabled' | 'disabled';
   createdByName?: string;
   createdByAccountId?: number;
   createdAt?: string;
@@ -44,6 +45,11 @@ export const reorderFinishedMarkupConfigurations = (orderedIds: number[]) =>
   });
 export const deleteFinishedMarkupConfiguration = (id: number) =>
   request<boolean>(`/admin/finished-markup-configurations/${id}`, { method: 'DELETE' });
+export const updateFinishedMarkupConfigurationStatus = (id: number, status: 'enabled' | 'disabled') =>
+  request<FinishedMarkupConfigurationRecord>(`/admin/finished-markup-configurations/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 export const getFinishedGuidePriceSetting = () =>
   request<FinishedGuidePriceSettingRecord | null>('/admin/finished-guide-price-setting');
 export const updateFinishedGuidePriceSetting = (priceCoefficient: number) =>

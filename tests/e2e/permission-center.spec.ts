@@ -989,7 +989,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   ]) {
     await expect(row.locator('.permission-action-grid .t-checkbox')).toHaveText(['查看', '新增', '停用/启用', '删除']);
   }
-  const markupActionLabels = ['查看', '保存指导价', '新增', '编辑', '排序', '删除'];
+  const markupActionLabels = ['查看', '保存指导价', '新增', '编辑', '停用/启用', '排序', '删除'];
   const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品价格配置' });
   const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板价格配置' });
   await expect(finishedMarkupPermissionRow.getByText('价格配置', { exact: true })).toBeVisible();
