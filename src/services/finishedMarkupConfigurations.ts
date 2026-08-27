@@ -37,6 +37,11 @@ export const updateFinishedMarkupConfiguration = (id: number, payload: FinishedM
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+export const reorderFinishedMarkupConfigurations = (orderedIds: number[]) =>
+  request<FinishedMarkupConfigurationRecord[]>('/admin/finished-markup-configurations/reorder', {
+    method: 'PATCH',
+    body: JSON.stringify({ orderedIds }),
+  });
 export const deleteFinishedMarkupConfiguration = (id: number) =>
   request<boolean>(`/admin/finished-markup-configurations/${id}`, { method: 'DELETE' });
 export const getFinishedGuidePriceSetting = () =>

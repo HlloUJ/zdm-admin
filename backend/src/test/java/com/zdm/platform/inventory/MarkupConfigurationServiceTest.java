@@ -99,4 +99,67 @@ class MarkupConfigurationServiceTest {
     service.deleteConfiguration(21L);
     verify(mapper).deleteById(21L);
   }
+
+  @Test
+  void finishedConfigurationsCanPersistIndependentDragOrder() {
+    FinishedMarkupConfigurationMapper mapper = Mockito.mock(FinishedMarkupConfigurationMapper.class);
+    CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
+    FinishedMarkupConfiguration first = finishedConfiguration(31L, 1L, 1);
+    FinishedMarkupConfiguration second = finishedConfiguration(32L, 2L, 2);
+    when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
+    when(mapper.selectList(any())).thenReturn(List.of(first, second));
+    StoreLevelPricingDirectory storeLevelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
+    when(storeLevelDirectory.findLevel(1L)).thenReturn(new StoreLevelPricingDirectory.Level(1L, "一级店", 10));
+    when(storeLevelDirectory.findLevel(2L)).thenReturn(new StoreLevelPricingDirectory.Level(2L, "二级店", 20));
+    FinishedMarkupConfigurationService service = new FinishedMarkupConfigurationService(
+        mapper, identityProvider, storeLevelDirectory);
+
+    service.reorderConfigurations(List.of(32L, 31L));
+
+    assertThat(first.getSortOrder()).isEqualTo(2);
+    assertThat(second.getSortOrder()).isEqualTo(1);
+    verify(mapper).updateById(first);
+    verify(mapper).updateById(second);
+  }
+
+  @Test
+  void slabConfigurationsCanPersistIndependentDragOrder() {
+    SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
+    CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
+    SlabMarkupConfiguration first = slabConfiguration(41L, 1L, 1);
+    SlabMarkupConfiguration second = slabConfiguration(42L, 2L, 2);
+    when(identityProvider.require()).thenReturn(platformIdentityWithSelfDataPermission());
+    when(mapper.selectList(any())).thenReturn(List.of(first, second));
+    StoreLevelPricingDirectory storeLevelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
+    when(storeLevelDirectory.findLevel(1L)).thenReturn(new StoreLevelPricingDirectory.Level(1L, "一级店", 10));
+    when(storeLevelDirectory.findLevel(2L)).thenReturn(new StoreLevelPricingDirectory.Level(2L, "二级店", 20));
+    SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
+        mapper, identityProvider, storeLevelDirectory);
+
+    service.reorderConfigurations(List.of(42L, 41L));
+
+    assertThat(first.getSortOrder()).isEqualTo(2);
+    assertThat(second.getSortOrder()).isEqualTo(1);
+    verify(mapper).updateById(first);
+    verify(mapper).updateById(second);
+  }
+
+  private static FinishedMarkupConfiguration finishedConfiguration(
+      Long id, Long storeLevelId, int sortOrder) {
+    FinishedMarkupConfiguration configuration = new FinishedMarkupConfiguration();
+    configuration.setId(id);
+    configuration.setStoreLevelId(storeLevelId);
+    configuration.setSortOrder(sortOrder);
+    configuration.setLegacySeeded(false);
+    return configuration;
+  }
+
+  private static SlabMarkupConfiguration slabConfiguration(Long id, Long storeLevelId, int sortOrder) {
+    SlabMarkupConfiguration configuration = new SlabMarkupConfiguration();
+    configuration.setId(id);
+    configuration.setStoreLevelId(storeLevelId);
+    configuration.setSortOrder(sortOrder);
+    configuration.setLegacySeeded(false);
+    return configuration;
+  }
 }

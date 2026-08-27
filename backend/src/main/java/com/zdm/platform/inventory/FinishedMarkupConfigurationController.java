@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,6 +52,13 @@ public class FinishedMarkupConfigurationController {
       @Valid @RequestBody FinishedMarkupConfiguration payload) {
     permissionGuard.requirePermission(permission("edit"));
     return ApiResponse.ok(service.updateConfiguration(id, payload));
+  }
+
+  @PatchMapping("/reorder")
+  public ApiResponse<List<FinishedMarkupConfiguration>> reorder(
+      @Valid @RequestBody FinishedMarkupConfigurationReorderRequest request) {
+    permissionGuard.requirePermission(permission("sort"));
+    return ApiResponse.ok(service.reorderConfigurations(request.orderedIds()));
   }
 
   @DeleteMapping("/{id}")

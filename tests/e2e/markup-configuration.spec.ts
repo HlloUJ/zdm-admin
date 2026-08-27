@@ -33,6 +33,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       storeLevelId: 11,
       name: '城市中心店',
       priceCoefficient: 1.3,
+      sortOrder: 1,
       createdByAccountId: 99,
       createdByName: '其他运营员工',
     },
@@ -41,6 +42,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       storeLevelId: 12,
       name: '区域合作店',
       priceCoefficient: 1.1,
+      sortOrder: 2,
       createdByAccountId: 99,
       createdByName: '其他运营员工',
     },
@@ -51,6 +53,16 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       storeLevelId: 11,
       name: '城市中心店',
       priceCoefficient: 1.2,
+      sortOrder: 1,
+      createdByAccountId: 99,
+      createdByName: '其他运营员工',
+    },
+    {
+      id: 6,
+      storeLevelId: 12,
+      name: '区域合作店',
+      priceCoefficient: 1.05,
+      sortOrder: 2,
       createdByAccountId: 99,
       createdByName: '其他运营员工',
     },
@@ -62,6 +74,11 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
     });
   });
   await page.route('**/api/admin/finished-markup-configurations**', async (route) => {
+    if (route.request().method() === 'PATCH') {
+      const orderedIds = route.request().postDataJSON().orderedIds as number[];
+      const orderedRows = orderedIds.map((id) => finished.find((item) => item.id === id)!);
+      finished.splice(0, finished.length, ...orderedRows);
+    }
     if (route.request().method() === 'DELETE') {
       const id = Number(new URL(route.request().url()).pathname.split('/').at(-1));
       const index = finished.findIndex((item) => item.id === id);
@@ -79,6 +96,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
         name: level.name,
         createdByAccountId: 1,
         createdByName: '运营管理员',
+        sortOrder: finished.length + 1,
         ...payload,
       });
     }
@@ -88,6 +106,11 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
     });
   });
   await page.route('**/api/admin/slab-markup-configurations**', async (route) => {
+    if (route.request().method() === 'PATCH') {
+      const orderedIds = route.request().postDataJSON().orderedIds as number[];
+      const orderedRows = orderedIds.map((id) => slabs.find((item) => item.id === id)!);
+      slabs.splice(0, slabs.length, ...orderedRows);
+    }
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ code: 0, message: 'ok', data: slabs }),
@@ -121,8 +144,20 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await expect(page.getByText('指导价设置', { exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '门店级别' })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '状态' })).toHaveCount(0);
-  await expect(page.locator('thead').getByTitle('拖拽排序')).toHaveCount(0);
+  await expect(page.locator('thead').getByTitle('拖拽排序')).toBeVisible();
   await expect(page.getByRole('cell', { name: '城市中心店', exact: true })).toBeVisible();
+
+  const finishedReorderRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'PATCH' && request.url().endsWith('/api/admin/finished-markup-configurations/reorder'),
+  );
+  await page
+    .getByRole('row')
+    .filter({ hasText: '城市中心店' })
+    .locator('.t-table__handle-draggable')
+    .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('.t-table__handle-draggable'));
+  expect((await finishedReorderRequest).postDataJSON()).toEqual({ orderedIds: [4, 3] });
+  await expect(page.getByText('已更新排序“城市中心店”', { exact: true })).toBeVisible();
 
   const guideCoefficientInput = page.locator('.guide-coefficient-input input');
   await expect(guideCoefficientInput).toHaveValue('1.50');
@@ -157,6 +192,17 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await page.getByText('大板价格配置', { exact: true }).click();
   await expect(page.getByRole('cell', { name: '城市中心店', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '1.2', exact: true })).toBeVisible();
+  const slabReorderRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'PATCH' && request.url().endsWith('/api/admin/slab-markup-configurations/reorder'),
+  );
+  await page
+    .getByRole('row')
+    .filter({ hasText: '城市中心店' })
+    .locator('.t-table__handle-draggable')
+    .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('.t-table__handle-draggable'));
+  expect((await slabReorderRequest).postDataJSON()).toEqual({ orderedIds: [6, 2] });
+  await expect(page.getByText('已更新排序“城市中心店”', { exact: true })).toBeVisible();
 });
 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
@@ -170,7 +216,7 @@ test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
   await expect(page.getByRole('button', { name: '保存指导价' })).toHaveCount(0);
 });
 
-test('价格配置操作不再包含排序和独立停启', async ({ page }) => {
+test('价格配置无排序权限时不可拖拽且不包含独立停启', async ({ page }) => {
   await seedLogin(
     page,
     [
