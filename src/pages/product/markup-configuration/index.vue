@@ -76,7 +76,19 @@
               </div>
             </div>
           </t-form>
-          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+          <t-table
+            row-key="id"
+            :data="pageData"
+            :columns="columns"
+            :loading="loading"
+            :drag-sort="canSort ? 'row-handler' : undefined"
+            :drag-sort-options="{ animation: 200 }"
+            hover
+            table-layout="fixed"
+            @drag-sort="handleDragSort"
+          >
+            <template #dragTitle><t-icon name="move" title="拖拽排序" /></template>
+            <template #drag><t-icon name="move" title="拖拽排序" /></template>
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
             </template>
@@ -166,6 +178,7 @@ import {
   deleteFinishedMarkupConfiguration,
   getFinishedGuidePriceSetting,
   listFinishedMarkupConfigurations,
+  reorderFinishedMarkupConfigurations,
   updateFinishedMarkupConfiguration,
   updateFinishedGuidePriceSetting,
   type FinishedMarkupConfigurationRecord,
@@ -175,6 +188,7 @@ import {
   deleteSlabMarkupConfiguration,
   getSlabGuidePriceSetting,
   listSlabMarkupConfigurations,
+  reorderSlabMarkupConfigurations,
   updateSlabMarkupConfiguration,
   updateSlabGuidePriceSetting,
   type SlabMarkupConfigurationRecord,
@@ -199,6 +213,7 @@ const { visibleTabs, showTabRail } = usePermissionTabs({
 const activePrefix = computed(() => `${prefix}.${activeType.value}`);
 const canCreate = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.create`));
 const canEdit = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.edit`));
+const canSort = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.sort`));
 const canEditGuide = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.guide-price.edit`));
 const canDelete = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.delete`));
 const pricingRuleMessage = computed(
@@ -263,6 +278,7 @@ const searchForm = reactive({ name: '' });
 const appliedSearchForm = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 52, align: 'center' as const }] : []),
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },
   { colKey: 'priceCoefficient', title: '价格系数', width: 130, align: 'right' },
@@ -388,6 +404,30 @@ const handleFormCoefficientChange = (_value?: unknown, context?: PriceCoefficien
     (isValidCoefficientFormat(formData.priceCoefficient) && Number(formData.priceCoefficient) >= 0)
   ) {
     formRef.value?.clearValidate(['priceCoefficient']);
+  }
+};
+const sorting = ref(false);
+const handleDragSort = async (context: { current: MarkupConfigurationRecord; target: MarkupConfigurationRecord }) => {
+  if (!canSort.value || sorting.value) return;
+  const orderedRows = tableData.value.map((item) => ({ ...item }));
+  const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
+  const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
+  if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
+
+  const [currentRow] = orderedRows.splice(currentIndex, 1);
+  orderedRows.splice(targetIndex, 0, currentRow);
+  sorting.value = true;
+  try {
+    const orderedIds = orderedRows.map((item) => item.id);
+    if (activeType.value === 'finished') await reorderFinishedMarkupConfigurations(orderedIds);
+    else await reorderSlabMarkupConfigurations(orderedIds);
+    await loadData();
+    adminFeedback.actionSuccess({ action: '更新排序', target: context.current.name });
+  } catch (error) {
+    adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
+    await loadData();
+  } finally {
+    sorting.value = false;
   }
 };
 const submitForm = async () => {
