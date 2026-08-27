@@ -1677,6 +1677,34 @@ class PlatformApiSmokeTest {
           .andReturn();
       finishedConfigurationId = ((Number) com.jayway.jsonpath.JsonPath.read(
           finishedConfigurationResult.getResponse().getContentAsString(), "$.data.id")).longValue();
+      mockMvc.perform(patch("/api/admin/finished-markup-configurations/{id}/status", finishedConfigurationId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("disabled"));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT status FROM finished_markup_configurations WHERE id = ?",
+          String.class,
+          finishedConfigurationId)).isEqualTo("disabled");
+      mockMvc.perform(get("/api/admin/finished-markup-configurations/options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].id", not(hasItem(finishedConfigurationId.intValue()))));
+      mockMvc.perform(get("/api/admin/finished-markup-configurations")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].id", hasItem(finishedConfigurationId.intValue())));
+      mockMvc.perform(patch("/api/admin/finished-markup-configurations/{id}/status", finishedConfigurationId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"status\":\"enabled\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.status").value("enabled"));
+      mockMvc.perform(get("/api/admin/finished-markup-configurations/options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].id", hasItem(finishedConfigurationId.intValue())));
       MvcResult slabConfigurationResult = mockMvc.perform(post("/api/admin/slab-markup-configurations")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
