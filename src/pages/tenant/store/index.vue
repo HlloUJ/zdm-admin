@@ -498,7 +498,7 @@ const loadStorePage = async () => {
   try {
     const [tenants, levels, stores] = await Promise.all([
       listTenants(),
-      activeTab.value === 'operating' ? listStoreLevelOptions() : Promise.resolve([]),
+      listStoreLevelOptions(),
       listStores(activeTab.value),
     ]);
     tenantOptions.value = tenants.map(toTenantOption);
