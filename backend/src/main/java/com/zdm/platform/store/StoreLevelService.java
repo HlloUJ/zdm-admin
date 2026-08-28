@@ -90,13 +90,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
       return null;
     }
     if ("disabled".equals(status)) {
-      Long activeStoreCount = storeMapper.selectCount(
-          Wrappers.<Store>lambdaQuery()
-              .eq(Store::getStoreLevelId, id)
-              .eq(Store::getStatus, "enabled"));
-      if (activeStoreCount > 0) {
-        throw new IllegalArgumentException("该门店级别仍有启用门店使用，不能停用，请先迁移门店级别");
-      }
+      requireNoStoreReferences(id);
     }
     existing.setStatus(status);
     updateById(existing);
@@ -154,6 +148,15 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     return true;
   }
 
+  public boolean previewDisable(Long id) {
+    StoreLevel existing = getById(id);
+    if (existing == null) {
+      throw new IllegalArgumentException("门店级别不存在");
+    }
+    requireNoStoreReferences(id);
+    return true;
+  }
+
   public StoreLevel requireEnabled(Long id) {
     StoreLevel level = id == null ? null : getById(id);
     if (level == null) {
@@ -201,6 +204,14 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (isPriceConfigured("finished_product_prices", id)
         || isPriceConfigured("slab_prices", id)) {
       throw new IllegalArgumentException(PRODUCT_PRICE_REFERENCED_MESSAGE);
+    }
+  }
+
+  private void requireNoStoreReferences(Long id) {
+    Long storeCount = storeMapper.selectCount(
+        Wrappers.<Store>lambdaQuery().eq(Store::getStoreLevelId, id));
+    if (storeCount > 0) {
+      throw new IllegalArgumentException("该门店级别仍有门店使用，不能停用，请先调整相关门店的级别");
     }
   }
 

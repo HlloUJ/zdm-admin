@@ -135,6 +135,7 @@ import {
   createStoreLevel,
   deleteStoreLevel,
   listStoreLevels,
+  previewStoreLevelDisable,
   previewStoreLevelDelete,
   reorderStoreLevels,
   updateStoreLevel,
@@ -280,11 +281,14 @@ const confirmVisible = ref(false);
 const confirmType = ref<ConfirmType>('disable');
 const confirmRow = ref<LevelItem | null>(null);
 const openConfirm = async (row: LevelItem, type: ConfirmType) => {
-  if (type === 'delete') {
+  if (type === 'disable' || type === 'delete') {
     try {
-      await previewStoreLevelDelete(row.id);
+      if (type === 'disable') await previewStoreLevelDisable(row.id);
+      else await previewStoreLevelDelete(row.id);
     } catch (error) {
-      adminFeedback.error(error instanceof Error ? error.message : '删除条件校验失败');
+      adminFeedback.error(
+        error instanceof Error ? error.message : type === 'disable' ? '停用条件校验失败' : '删除条件校验失败',
+      );
       return;
     }
   }
