@@ -1989,6 +1989,15 @@ const cornerFields: { key: CornerFieldKey; label: string }[] = [
   { key: 'corner4Width', label: '扣角4宽' },
 ];
 
+function sortRowsByStoreLevel<T>(rows: T[], resolveId: (row: T) => number | undefined): T[] {
+  const orderById = new Map(publishOptions.storeLevels.map((level, index) => [level.id, index]));
+  return [...rows].sort((left, right) => {
+    const leftOrder = orderById.get(resolveId(left) ?? -1) ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = orderById.get(resolveId(right) ?? -1) ?? Number.MAX_SAFE_INTEGER;
+    return leftOrder - rightOrder;
+  });
+}
+
 const salesPriceRows = computed(() => {
   const savedPrices =
     editingRowId.value == null
@@ -2023,7 +2032,7 @@ const salesPriceRows = computed(() => {
       sourceConfigurationId: configuration?.id,
     });
   });
-  return rows;
+  return sortRowsByStoreLevel(rows, (row) => row.id);
 });
 const partnerPriceRows = computed(() => salesPriceRows.value);
 const guideRatioFieldName = computed(() => 'guideRatio');
@@ -2624,7 +2633,7 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
       ratio: guideRatio,
       price: guidePrice,
     },
-    ...configuredRows,
+    ...sortRowsByStoreLevel(configuredRows, (configuredRow) => configuredRow.configurationId),
   ];
 };
 
