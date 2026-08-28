@@ -71,6 +71,12 @@ public class StoreLevelController {
     return ApiResponse.ok(updated);
   }
 
+  @GetMapping("/{id}/disable-preview")
+  public ApiResponse<Boolean> previewDisable(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+    return ApiResponse.ok(service.previewDisable(id));
+  }
+
   @PatchMapping("/reorder")
   public ApiResponse<List<StoreLevel>> reorder(
       @Valid @RequestBody StoreLevelReorderRequest request) {

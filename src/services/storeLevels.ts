@@ -33,6 +33,7 @@ export const updateStoreLevelStatus = (id: number, status: StoreLevelPayload['st
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+export const previewStoreLevelDisable = (id: number) => request<boolean>(`/admin/store-levels/${id}/disable-preview`);
 export const reorderStoreLevels = (orderedIds: number[]) =>
   request<StoreLevelRecord[]>('/admin/store-levels/reorder', {
     method: 'PATCH',
