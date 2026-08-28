@@ -375,3 +375,98 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
   await expect(unconfiguredCurrentLevel.getByRole('textbox').first()).toHaveValue('');
   await expect(unconfiguredCurrentLevel.getByRole('textbox').last()).toHaveValue('');
 });
+
+test('大板缺少中间级别价格时仍按门店级别顺序展示', async ({ page }) => {
+  await seedLogin(page, ['all'], ['SUPER_ADMIN']);
+  await installAdminApiMocks(page);
+  await page.route('**/api/admin/slabs/form-options', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: {
+          varieties: [],
+          origins: [],
+          textures: [],
+          colorCategories: [],
+          grades: [],
+          suppliers: [],
+          storeLevels: [
+            { id: 1, label: '1级', status: 'enabled' },
+            { id: 2, label: '2级', status: 'enabled' },
+            { id: 3, label: '3级', status: 'enabled' },
+          ],
+        },
+      }),
+    });
+  });
+  await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          { id: 11, storeLevelId: 1, name: '1级', priceCoefficient: 1.1, status: 'enabled' },
+          { id: 12, storeLevelId: 2, name: '2级', priceCoefficient: 1.2, status: 'enabled' },
+          { id: 13, storeLevelId: 3, name: '3级', priceCoefficient: 1.3, status: 'enabled' },
+        ],
+      }),
+    });
+  });
+  await page.route('**/api/admin/slabs', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          {
+            id: 902,
+            name: '缺失中间级别价格大板',
+            serialNo: 'SLAB-SNAPSHOT-902',
+            warehouse: '平台仓',
+            publisherType: '平台发布',
+            costPrice: 100,
+            guidePrice: 150,
+            guidePriceCoefficient: 1.5,
+            markupPrices: [
+              {
+                storeLevelId: 1,
+                storeLevelName: '1级',
+                priceCoefficient: 1.1,
+                costPrice: 100,
+                price: 110,
+                priceSource: 'auto',
+                sourceConfigurationId: 11,
+              },
+              {
+                storeLevelId: 3,
+                storeLevelName: '3级',
+                priceCoefficient: 1.3,
+                costPrice: 100,
+                price: 130,
+                priceSource: 'auto',
+                sourceConfigurationId: 13,
+              },
+            ],
+            status: 'warehouse',
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto('/slab-management');
+  await page
+    .getByRole('row', { name: /缺失中间级别价格大板/ })
+    .getByText('价格', { exact: true })
+    .click();
+  const drawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
+  const rows = drawer.locator('.price-table__row');
+  await expect(rows).toHaveCount(5);
+  await expect(rows.nth(2)).toContainText('1级');
+  await expect(rows.nth(3)).toContainText('2级');
+  await expect(rows.nth(4)).toContainText('3级');
+});

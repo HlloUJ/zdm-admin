@@ -15,13 +15,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.zdm.platform.inventory.SlabPrice;
+import com.zdm.platform.inventory.SlabPriceService;
+import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.TokenAuthenticationFilter;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -54,6 +60,9 @@ class PlatformApiSmokeTest {
   @Autowired
   private JdbcTemplate jdbcTemplate;
 
+  @Autowired
+  private SlabPriceService slabPriceService;
+
   @BeforeEach
   void exposeAllTerminalFunctionsWithinEachPermissionTest() {
     jdbcTemplate.update(
@@ -82,6 +91,85 @@ class PlatformApiSmokeTest {
             WHERE configuration.store_level_id = level.id
           )
         """);
+  }
+
+  @Test
+  void manualSlabPriceCanBeSavedAfterItsConfigurationIsDisabled() {
+    Long configurationId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_markup_configurations WHERE status = 'enabled' ORDER BY id LIMIT 1",
+        Long.class);
+    Long targetLevelId = jdbcTemplate.queryForObject(
+        "SELECT store_level_id FROM slab_markup_configurations WHERE id = ?",
+        Long.class,
+        configurationId);
+    String serialNo = "disabled-manual-price-" + System.nanoTime();
+    jdbcTemplate.update(
+        "INSERT INTO slab_inventory (name, serial_no, publisher_type, cost_price, status) VALUES ('停用配置手工价格测试', ?, '平台发布', 100.00, 'warehouse')",
+        serialNo);
+    Long slabId = jdbcTemplate.queryForObject(
+        "SELECT id FROM slab_inventory WHERE serial_no = ?", Long.class, serialNo);
+
+    try {
+      jdbcTemplate.update(
+          "UPDATE slab_markup_configurations SET status = 'disabled' WHERE id = ?",
+          configurationId);
+      jdbcTemplate.update(
+          """
+          INSERT INTO slab_prices
+            (slab_id, store_level_id, store_level_name, price_coefficient, cost_price, price,
+             price_source, source_configuration_id)
+          SELECT ?, level.id, level.name, configuration.price_coefficient, 100.00,
+                 ROUND(100.00 * configuration.price_coefficient, 2),
+                 CASE WHEN level.id = ? THEN 'auto' ELSE 'manual' END,
+                 CASE WHEN level.id = ? THEN configuration.id ELSE NULL END
+          FROM store_levels level
+          INNER JOIN slab_markup_configurations configuration
+            ON configuration.store_level_id = level.id
+          WHERE level.status = 'enabled'
+          """,
+          slabId,
+          targetLevelId,
+          targetLevelId);
+      List<SlabPrice> requestedPrices = jdbcTemplate.query(
+          "SELECT * FROM slab_prices WHERE slab_id = ? ORDER BY id",
+          (resultSet, rowNumber) -> {
+            SlabPrice price = new SlabPrice();
+            price.setStoreLevelId(resultSet.getLong("store_level_id"));
+            price.setPriceCoefficient(resultSet.getBigDecimal("price_coefficient"));
+            price.setCostPrice(resultSet.getBigDecimal("cost_price"));
+            price.setPrice(resultSet.getBigDecimal("price"));
+            price.setPriceSource("manual");
+            return price;
+          },
+          slabId);
+      requestedPrices.stream()
+          .filter(price -> targetLevelId.equals(price.getStoreLevelId()))
+          .findFirst()
+          .ifPresent(price -> {
+            price.setPriceCoefficient(new BigDecimal("1.2500"));
+            price.setPrice(new BigDecimal("125.00"));
+          });
+      CurrentIdentity identity = new CurrentIdentity(
+          1L, 1L, 1L, 1L, "admin", null, null, "韩健", "all", List.of("SUPER_ADMIN"), List.of("all"));
+      SecurityContextHolder.getContext().setAuthentication(
+          new UsernamePasswordAuthenticationToken(identity, null, List.of()));
+
+      slabPriceService.replacePrices(slabId, requestedPrices);
+
+      Map<String, Object> saved = jdbcTemplate.queryForMap(
+          "SELECT price_source, source_configuration_id, manual_updated_by_name FROM slab_prices WHERE slab_id = ? AND store_level_id = ?",
+          slabId,
+          targetLevelId);
+      assertThat(saved.get("price_source")).isEqualTo("manual");
+      assertThat(saved.get("source_configuration_id")).isNull();
+      assertThat(saved.get("manual_updated_by_name")).isEqualTo("韩健");
+    } finally {
+      SecurityContextHolder.clearContext();
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
+      jdbcTemplate.update(
+          "UPDATE slab_markup_configurations SET status = 'enabled' WHERE id = ?",
+          configurationId);
+    }
   }
 
   @DynamicPropertySource
