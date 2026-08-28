@@ -1,5 +1,7 @@
 package com.zdm.platform.inventory;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -31,9 +33,17 @@ public class SlabPrice {
   private BigDecimal price;
 
   private String priceSource;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Long sourceConfigurationId;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String manualUpdatedByName;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Long manualUpdatedByAccountId;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime manualUpdatedAt;
 
   public Long getId() { return id; }
