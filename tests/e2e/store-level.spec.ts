@@ -72,6 +72,29 @@ test('shows the reference blocker before opening the store level delete confirma
   await expect(page.getByRole('button', { name: '确认删除', exact: true })).toHaveCount(0);
 });
 
+test('shows the store reference blocker before opening the store level disable confirmation', async ({ page }) => {
+  await page.route('**/api/admin/store-levels/1/disable-preview', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 400,
+        message: '该门店级别仍有门店使用，不能停用，请先调整相关门店的级别',
+        data: null,
+      }),
+    });
+  });
+
+  await page.goto('/store-level-management');
+  const row = page.getByRole('main').getByRole('row').filter({ hasText: '1级' }).first();
+  await row.getByText('停用', { exact: true }).click();
+
+  await expect(
+    page.getByText('该门店级别仍有门店使用，不能停用，请先调整相关门店的级别', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: '确认停用', exact: true })).toHaveCount(0);
+});
+
 test('hides store level operations without their permissions', async ({ page }) => {
   await page.addInitScript(() =>
     window.localStorage.setItem(

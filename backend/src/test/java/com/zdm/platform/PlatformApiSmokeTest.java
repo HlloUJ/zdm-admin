@@ -1614,6 +1614,10 @@ class PlatformApiSmokeTest {
 
     Long referencedLevelId = jdbcTemplate.queryForObject(
         "SELECT id FROM store_levels WHERE name = '1级'", Long.class);
+    mockMvc.perform(get("/api/admin/store-levels/{id}/disable-preview", referencedLevelId)
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("该门店级别仍有门店使用，不能停用，请先调整相关门店的级别"));
     mockMvc.perform(get("/api/admin/store-levels/{id}/delete-preview", referencedLevelId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isBadRequest())
@@ -1637,6 +1641,7 @@ class PlatformApiSmokeTest {
     Long finishedConfigurationId = null;
     Long slabConfigurationId = null;
     Long slabSnapshotId = null;
+    Long archivedReferenceStoreId = null;
     try {
       mockMvc.perform(get("/api/admin/store-levels/pricing-options")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -1737,12 +1742,31 @@ class PlatformApiSmokeTest {
           String.class,
           slabConfigurationId)).isEqualTo("四级门店");
 
+      String archivedStoreName = "归档门店级别停用校验-" + System.nanoTime();
+      jdbcTemplate.update(
+          "INSERT INTO stores (tenant_id, name, type, store_level_id, status, created_by) VALUES (1, ?, 'cityPartner', ?, 'disabled', '集成测试')",
+          archivedStoreName,
+          Long.valueOf(levelId));
+      archivedReferenceStoreId = jdbcTemplate.queryForObject(
+          "SELECT id FROM stores WHERE name = ?", Long.class, archivedStoreName);
+      mockMvc.perform(get("/api/admin/store-levels/{id}/disable-preview", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("该门店级别仍有门店使用，不能停用，请先调整相关门店的级别"));
+      jdbcTemplate.update("DELETE FROM stores WHERE id = ?", archivedReferenceStoreId);
+      archivedReferenceStoreId = null;
+
       mockMvc.perform(patch("/api/admin/store-levels/{id}/status", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("{\"status\":\"disabled\"}"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.status").value("disabled"));
+
+      mockMvc.perform(get("/api/admin/store-levels/{id}/disable-preview", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
 
       mockMvc.perform(get("/api/admin/stores/level-options")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -1816,6 +1840,9 @@ class PlatformApiSmokeTest {
       }
       if (slabSnapshotId != null) {
         jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabSnapshotId);
+      }
+      if (archivedReferenceStoreId != null) {
+        jdbcTemplate.update("DELETE FROM stores WHERE id = ?", archivedReferenceStoreId);
       }
       jdbcTemplate.update("DELETE FROM store_levels WHERE id = ?", Long.valueOf(levelId));
     }
