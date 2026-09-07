@@ -488,7 +488,8 @@ class PlatformApiSmokeTest {
     mockMvc.perform(delete("/api/admin/product-attributes/{id}", attributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").value(true));
+        .andExpect(jsonPath("$.data.deletionMode").value("physical"))
+        .andExpect(jsonPath("$.data.attributeValueCount").value(0));
     Integer deletedCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM product_attributes WHERE id = ?",
         Integer.class,
@@ -718,7 +719,8 @@ class PlatformApiSmokeTest {
     mockMvc.perform(delete("/api/admin/product-attributes/{id}", createdAttributeId)
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").value(true));
+        .andExpect(jsonPath("$.data.deletionMode").value("physical"))
+        .andExpect(jsonPath("$.data.attributeValueCount").value(0));
 
     jdbcTemplate.update(
         "UPDATE roles SET function_permissions = ? WHERE id = ?",
@@ -1671,6 +1673,45 @@ class PlatformApiSmokeTest {
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").value(true));
+  }
+
+  @Test
+  void finishedProductCategoryCountAlwaysUsesActualProducts() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_categories
+          (id, scope, name, sort_order, product_count, status, created_by_name,
+           created_by_account_id)
+        VALUES (9205, 'finished', '动态商品数量测试分类', 1, 99, 'enabled', '超级管理员', 1)
+        """);
+    try {
+      mockMvc.perform(get("/api/admin/product-categories")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[?(@.id == 9205)].productCount").value(hasItem(0)));
+
+      jdbcTemplate.update(
+          """
+          INSERT INTO finished_products
+            (id, category_id, name, sku, total_stock, status)
+          VALUES (9211, 9205, '动态分类计数测试商品', 'CATEGORY-COUNT-9211', 0, 'warehouse')
+          """);
+
+      mockMvc.perform(get("/api/admin/product-categories")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[?(@.id == 9205)].productCount").value(hasItem(1)));
+
+      jdbcTemplate.update("DELETE FROM finished_products WHERE id = 9211");
+
+      mockMvc.perform(get("/api/admin/product-categories")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[?(@.id == 9205)].productCount").value(hasItem(0)));
+    } finally {
+      jdbcTemplate.update("DELETE FROM finished_products WHERE id = 9211");
+      jdbcTemplate.update("DELETE FROM product_categories WHERE id = 9205");
+    }
   }
 
   @Test

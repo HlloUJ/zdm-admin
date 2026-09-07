@@ -29,8 +29,8 @@ export interface InventoryMovementPayload {
   remark?: string;
 }
 
-export function listInventoryMovements() {
-  return request<InventoryMovementRecord[]>('/admin/inventory-movements');
+export function listInventoryMovements(inventoryId: number) {
+  return request<InventoryMovementRecord[]>(`/admin/inventory-movements?inventoryId=${inventoryId}`);
 }
 
 export function createInventoryMovement(payload: InventoryMovementPayload) {

@@ -138,7 +138,9 @@ import {
   createProductAttribute,
   deleteProductAttribute,
   listProductAttributes,
+  previewProductAttributeDelete,
   updateProductAttributeStatus,
+  type ProductAttributeDeletePreview,
   type ProductAttributeRecord,
 } from '@/services/productAttributes';
 
@@ -209,6 +211,7 @@ const formRef = ref<FormInstanceFunctions>();
 const confirmDialogVisible = ref(false);
 const confirmType = ref<ConfirmType>('disable');
 const confirmTarget = ref<Attribute | null>(null);
+const deletePreview = ref<ProductAttributeDeletePreview | null>(null);
 const form = reactive({ scope: 'shared' as Scope, name: '', valueType: '' as '' | ValueType });
 const formRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入属性名称', type: 'error' }],
@@ -330,18 +333,35 @@ const openStatusConfirm = (row: Attribute) => {
   confirmType.value = row.status === 'enabled' ? 'disable' : 'enable';
   confirmDialogVisible.value = true;
 };
-const openDeleteConfirm = (row: Attribute) => {
+const openDeleteConfirm = async (row: Attribute) => {
   if (!canDeleteAttribute.value) return;
-  confirmTarget.value = row;
-  confirmType.value = 'delete';
-  confirmDialogVisible.value = true;
+  try {
+    const preview = await previewProductAttributeDelete(row.id);
+    if (preview.deletionMode === 'blocked') {
+      adminFeedback.error(preview.message || '该属性当前不能删除');
+      return;
+    }
+    confirmTarget.value = row;
+    confirmType.value = 'delete';
+    deletePreview.value = preview;
+    confirmDialogVisible.value = true;
+  } catch (error) {
+    adminFeedback.error(error instanceof Error ? error.message : '删除条件检查失败');
+  }
 };
 const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
   confirmTarget.value = null;
+  deletePreview.value = null;
 };
 const confirmText = computed(() => {
   const name = confirmTarget.value?.name ?? '';
+  if (confirmType.value === 'delete' && deletePreview.value?.deletionMode === 'physical') {
+    return `删除属性“${name}”将同步删除其下 ${deletePreview.value.attributeValueCount} 个属性值，删除后不可恢复，是否继续？`;
+  }
+  if (confirmType.value === 'delete' && deletePreview.value?.deletionMode === 'business') {
+    return `属性“${name}”仅被已售完商品历史使用。删除后将不再用于新商品和分类模板，但已售完商品仍保留历史属性信息，是否继续？`;
+  }
   return `是否${confirmType.value === 'disable' ? '停用' : confirmType.value === 'enable' ? '启用' : '删除'}属性“${name}”？`;
 });
 const handleConfirm = async () => {
@@ -351,9 +371,18 @@ const handleConfirm = async () => {
 
   try {
     if (confirmType.value === 'delete') {
-      await deleteProductAttribute(target.id);
+      const result = await deleteProductAttribute(target.id);
       data.value = data.value.filter((item) => item.id !== target.id);
       ensureCurrentPage();
+      if (result.deletionMode === 'physical') {
+        if (result.attributeValueCount > 0) {
+          adminFeedback.success(`属性“${target.name}”及其 ${result.attributeValueCount} 个属性值已删除。`);
+        } else {
+          adminFeedback.deleted(target.name);
+        }
+      } else {
+        adminFeedback.success(`属性“${target.name}”已删除，历史商品数据已保留。`);
+      }
     } else {
       const updated = await updateProductAttributeStatus(
         target.id,
@@ -364,9 +393,7 @@ const handleConfirm = async () => {
         data.value.splice(targetIndex, 1, toAttribute(updated));
       }
     }
-    if (confirmType.value === 'delete') {
-      adminFeedback.deleted(target.name);
-    } else {
+    if (confirmType.value !== 'delete') {
       adminFeedback.actionSuccess({ action, target: target.name });
     }
     closeConfirmDialog();

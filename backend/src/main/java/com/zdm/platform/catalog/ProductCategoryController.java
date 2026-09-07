@@ -62,8 +62,7 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
     }
     boolean operationDetected = false;
     if (!Objects.equals(existing.getName(), category.getName())
-        || !Objects.equals(existing.getParentId(), category.getParentId())
-        || !Objects.equals(existing.getProductCount(), category.getProductCount())) {
+        || !Objects.equals(existing.getParentId(), category.getParentId())) {
       requireCategoryPermission(existing.getScope(), "edit");
       operationDetected = true;
     }

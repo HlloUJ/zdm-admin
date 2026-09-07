@@ -54,15 +54,26 @@ public class ProductAttributeController {
     return ApiResponse.ok(service.updateStatus(id, request.status()));
   }
 
-  @DeleteMapping("/{id}")
-  public ApiResponse<Boolean> delete(@PathVariable Long id) {
+  @GetMapping("/{id}/delete-preview")
+  public ApiResponse<ProductAttributeDeletePreview> previewDelete(@PathVariable Long id) {
     ProductAttribute existing = requireAttribute(id);
     requireAttributePermission(existing.getScope(), "delete");
+    return ApiResponse.ok(withAuthorizedTemplateMessage(service.previewDelete(id)));
+  }
+
+  @DeleteMapping("/{id}")
+  public ApiResponse<ProductAttributeDeleteResult> delete(@PathVariable Long id) {
+    ProductAttribute existing = requireAttribute(id);
+    requireAttributePermission(existing.getScope(), "delete");
+    ProductAttributeDeletePreview preview = withAuthorizedTemplateMessage(service.previewDelete(id));
+    if ("blocked".equals(preview.deletionMode())) {
+      throw new IllegalArgumentException(preview.message());
+    }
     return ApiResponse.ok(service.deleteAttribute(id));
   }
 
   private ProductAttribute requireAttribute(Long id) {
-    ProductAttribute attribute = service.getById(id);
+    ProductAttribute attribute = service.getActiveById(id);
     if (attribute == null) {
       throw new IllegalArgumentException("属性不存在或已被删除");
     }
@@ -78,5 +89,30 @@ public class ProductAttributeController {
       throw new IllegalArgumentException("属性类型无效");
     }
     return PERMISSION_PREFIX + "." + scope;
+  }
+
+  private ProductAttributeDeletePreview withAuthorizedTemplateMessage(
+      ProductAttributeDeletePreview preview) {
+    if (preview.templateScopes().isEmpty()) {
+      return preview;
+    }
+    boolean hasLegacyView = permissionGuard.hasPermission(
+        "admin.product-data-center.category-attribute-template.view");
+    boolean canViewEveryTemplate = preview.templateScopes().stream()
+        .allMatch(scope -> hasLegacyView || permissionGuard.hasPermission(
+            "admin.product-data-center.category-attribute-template." + scope + ".view"));
+    if (!canViewEveryTemplate) {
+      return preview.withMessage(
+          "该属性已被分类属性模板使用，不能删除，请联系有权限的管理员处理。");
+    }
+    boolean finished = preview.templateScopes().contains("finished");
+    boolean accessory = preview.templateScopes().contains("accessory");
+    if (finished && accessory) {
+      return preview.withMessage(
+          "该属性已被分类属性模板使用，不能删除，请分别前往“分类属性模板-成品现货模板tab”和“分类属性模板-配件模板tab”移除该属性。");
+    }
+    String tabName = finished ? "成品现货模板tab" : "配件模板tab";
+    return preview.withMessage(
+        "该属性已被分类属性模板使用，不能删除，请先前往“分类属性模板-" + tabName + "”移除该属性。");
   }
 }

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDateTime;
 
 @TableName("product_attributes")
 public class ProductAttribute extends BaseEntity {
@@ -19,6 +20,9 @@ public class ProductAttribute extends BaseEntity {
   private String attributeRole;
   private String createdByName;
   private Long createdByAccountId;
+  private LocalDateTime deletedAt;
+  private String deletedByName;
+  private Long deletedByAccountId;
 
   @TableField(exist = false)
   private Long templateCount;
@@ -69,6 +73,30 @@ public class ProductAttribute extends BaseEntity {
 
   public void setCreatedByAccountId(Long createdByAccountId) {
     this.createdByAccountId = createdByAccountId;
+  }
+
+  public LocalDateTime getDeletedAt() {
+    return deletedAt;
+  }
+
+  public void setDeletedAt(LocalDateTime deletedAt) {
+    this.deletedAt = deletedAt;
+  }
+
+  public String getDeletedByName() {
+    return deletedByName;
+  }
+
+  public void setDeletedByName(String deletedByName) {
+    this.deletedByName = deletedByName;
+  }
+
+  public Long getDeletedByAccountId() {
+    return deletedByAccountId;
+  }
+
+  public void setDeletedByAccountId(Long deletedByAccountId) {
+    this.deletedByAccountId = deletedByAccountId;
   }
 
   public Long getTemplateCount() {
