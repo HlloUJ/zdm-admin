@@ -4,6 +4,7 @@ import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -44,7 +45,14 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
         PERMISSION_PREFIX + ".finished.view",
         PERMISSION_PREFIX + ".accessory.view",
         PERMISSION_PREFIX + ".view");
-    return ApiResponse.ok(service.listWithOptionCounts());
+    List<String> visibleScopes = visibleScopes();
+    List<Long> categoryIds = categoryService.lambdaQuery()
+        .in(ProductCategory::getScope, visibleScopes)
+        .list()
+        .stream()
+        .map(ProductCategory::getId)
+        .toList();
+    return ApiResponse.ok(service.listWithOptionCounts(categoryIds));
   }
 
   @Override
@@ -141,5 +149,16 @@ public class CategoryAttributeController extends AdminCrudController<CategoryAtt
     permissionGuard.requireAnyPermission(
         PERMISSION_PREFIX + "." + category.getScope() + "." + action,
         PERMISSION_PREFIX + "." + legacyAction);
+  }
+
+  private List<String> visibleScopes() {
+    boolean hasLegacyView = permissionGuard.hasPermission(PERMISSION_PREFIX + ".view");
+    List<String> scopes = new ArrayList<>();
+    for (String scope : List.of("finished", "accessory")) {
+      if (hasLegacyView || permissionGuard.hasPermission(PERMISSION_PREFIX + "." + scope + ".view")) {
+        scopes.add(scope);
+      }
+    }
+    return scopes;
   }
 }

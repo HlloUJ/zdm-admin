@@ -267,6 +267,39 @@ const productCategories = [
     createdByName: '韩健',
     createdAt: '2026-07-27T09:00:00',
   },
+  {
+    id: 3,
+    parentId: 1,
+    scope: 'finished',
+    name: '餐桌',
+    sortOrder: 2,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:01:00',
+  },
+  {
+    id: 4,
+    parentId: 3,
+    scope: 'finished',
+    name: '石材餐桌',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:02:00',
+  },
+  {
+    id: 5,
+    parentId: 4,
+    scope: 'finished',
+    name: '奢石餐桌',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:03:00',
+  },
 ];
 
 const storeCategories = [
@@ -604,6 +637,22 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/store-categories', storeCategories);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);
   await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
+  await page.route('**/api/admin/product-attributes/*/delete-preview', async (route) => {
+    await fulfillJson(route, {
+      deletionMode: 'physical',
+      attributeValueCount: 0,
+      unfinishedProductCount: 0,
+      soldOutProductCount: 0,
+      templateScopes: [],
+    });
+  });
+  await page.route(/\/api\/admin\/product-attributes\/\d+$/, async (route) => {
+    if (route.request().method() !== 'DELETE') {
+      await route.fallback();
+      return;
+    }
+    await fulfillJson(route, { deletionMode: 'physical', attributeValueCount: 0 });
+  });
   await mockCollection(page, '**/api/admin/product-attribute-values', productAttributeValues);
   await page.route('**/api/admin/product-attribute-values/attribute-options', async (route) => {
     await fulfillJson(
@@ -612,7 +661,7 @@ export async function installAdminApiMocks(page: Page) {
     );
   });
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
-  await mockCollection(page, '**/api/admin/inventory-movements', inventoryMovements);
+  await mockCollection(page, '**/api/admin/inventory-movements*', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);
   await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
   await mockCollection(page, '**/api/admin/slabs', slabs);
@@ -762,12 +811,13 @@ async function mockEmployeeInvites(page: Page) {
 }
 
 async function mockCollection(page: Page, pattern: string, records: unknown[]) {
+  const collection = structuredClone(records);
   await page.route(pattern, async (route) => {
     if (route.request().method() === 'GET') {
-      await fulfillJson(route, records);
+      await fulfillJson(route, collection);
       return;
     }
-    await fulfillJson(route, records[0] ?? {});
+    await fulfillJson(route, collection[0] ?? {});
   });
 
   await page.route(`${pattern}/**`, async (route) => {
@@ -780,17 +830,17 @@ async function mockCollection(page: Page, pattern: string, records: unknown[]) {
       const id = Number(
         ['permissions', 'status'].includes(pathParts.at(-1) ?? '') ? pathParts.at(-2) : pathParts.at(-1),
       );
-      const targetIndex = records.findIndex((record) => {
+      const targetIndex = collection.findIndex((record) => {
         if (!record || typeof record !== 'object' || !('id' in record)) return false;
         return Number(record.id) === id;
       });
       if (targetIndex !== -1) {
         const payload = route.request().postDataJSON() as Record<string, unknown>;
-        records[targetIndex] = { ...(records[targetIndex] as Record<string, unknown>), ...payload };
-        await fulfillJson(route, records[targetIndex]);
+        collection[targetIndex] = { ...(collection[targetIndex] as Record<string, unknown>), ...payload };
+        await fulfillJson(route, collection[targetIndex]);
         return;
       }
     }
-    await fulfillJson(route, records[0] ?? {});
+    await fulfillJson(route, collection[0] ?? {});
   });
 }

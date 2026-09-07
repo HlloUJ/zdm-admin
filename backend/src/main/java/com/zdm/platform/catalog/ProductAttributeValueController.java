@@ -48,6 +48,7 @@ public class ProductAttributeValueController {
         : attributeService.lambdaQuery()
             .in(ProductAttribute::getScope, scopes)
             .eq(ProductAttribute::getValueType, "select")
+            .isNull(ProductAttribute::getDeletedAt)
             .list());
   }
 
@@ -92,7 +93,7 @@ public class ProductAttributeValueController {
   }
 
   private ProductAttribute requireAttribute(Long id) {
-    ProductAttribute attribute = attributeService.getById(id);
+    ProductAttribute attribute = attributeService.getActiveById(id);
     if (attribute == null) {
       throw new IllegalArgumentException("所属属性不存在或已被删除");
     }
@@ -101,7 +102,7 @@ public class ProductAttributeValueController {
 
   private ProductAttributeValue requireValue(Long id) {
     ProductAttributeValue value = service.getById(id);
-    if (value == null) {
+    if (value == null || attributeService.getActiveById(value.getAttributeId()) == null) {
       throw new IllegalArgumentException("属性值不存在或已被删除");
     }
     return value;

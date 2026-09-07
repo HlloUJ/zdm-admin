@@ -1,4 +1,5 @@
 import { request } from './http';
+import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
 export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 
@@ -19,18 +20,47 @@ export interface FinishedProductGuidePrice {
   variantLabel?: string;
 }
 
+export interface FinishedProductAttributeEntry {
+  id?: number;
+  attributeId: number;
+  attributeName: string;
+  value: string;
+}
+
+export interface FinishedProductVariant {
+  id?: number;
+  variantKey: string;
+  variantLabel: string;
+  displayMode: 'single' | 'layered';
+  material?: string;
+  lengthValue?: string;
+  color?: string;
+  sizeValue?: string;
+  stock: number;
+}
+
 export interface FinishedProductRecord {
   id: number;
   categoryId?: number;
   supplierId?: number;
   name: string;
   sku: string;
+  mainImageMediaId?: number;
+  videoMediaId?: number;
+  mainImageUrl?: string;
+  videoUrl?: string;
   coverImage?: string;
+  detail?: string;
   publisherType?: string;
   totalStock?: number;
   guidePrice?: number;
   guidePrices?: FinishedProductGuidePrice[];
   markupPrices?: FinishedProductPrice[];
+  attributes?: FinishedProductAttributeEntry[];
+  variants?: FinishedProductVariant[];
+  offShelfReason?: string;
+  createdByName?: string;
+  createdByAccountId?: number;
   status?: FinishedProductStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -41,12 +71,16 @@ export interface FinishedProductPayload {
   supplierId?: number;
   name: string;
   sku: string;
-  coverImage?: string;
-  publisherType?: string;
+  mainImageMediaId: number;
+  videoMediaId: number;
+  detail: string;
   totalStock?: number;
   guidePrice?: number;
   guidePrices?: FinishedProductGuidePrice[];
   markupPrices?: FinishedProductPrice[];
+  attributes: FinishedProductAttributeEntry[];
+  variants: FinishedProductVariant[];
+  offShelfReason?: string;
   status: FinishedProductStatus;
 }
 
@@ -59,6 +93,14 @@ export function createFinishedProduct(payload: FinishedProductPayload) {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export function uploadFinishedProductMedia(file: File) {
+  return uploadMedia('/admin/finished-products/media', file);
+}
+
+export function releaseTemporaryFinishedProductMedia(mediaId: MediaResource['id']) {
+  return releaseTemporaryMedia('/admin/finished-products/media', mediaId);
 }
 
 export function updateFinishedProduct(id: number, payload: FinishedProductPayload) {

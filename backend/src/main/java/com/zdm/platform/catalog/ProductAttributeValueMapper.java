@@ -21,6 +21,9 @@ public interface ProductAttributeValueMapper extends BaseMapper<ProductAttribute
         attribute_value.updated_at,
         COUNT(binding.id) AS use_count
       FROM product_attribute_values attribute_value
+      JOIN product_attributes attribute
+        ON attribute.id = attribute_value.attribute_id
+       AND attribute.deleted_at IS NULL
       LEFT JOIN category_attribute_value_bindings binding
         ON binding.attribute_value_id = attribute_value.id
       GROUP BY
