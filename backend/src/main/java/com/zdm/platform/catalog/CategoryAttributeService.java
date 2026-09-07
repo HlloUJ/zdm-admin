@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -19,14 +20,17 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
   private static final int MAX_SKU_ATTRIBUTE_COUNT = 4;
   private static final String SKU_ATTRIBUTE_LIMIT_MESSAGE = "参与SKU组合的属性最多只能开启4个";
 
+  private final JdbcTemplate jdbc;
   private final CurrentIdentityProvider identityProvider;
   private final ProductAttributeService attributeService;
   private final CategoryAttributeValueBindingService valueBindingService;
 
   public CategoryAttributeService(
+      JdbcTemplate jdbc,
       CurrentIdentityProvider identityProvider,
       ProductAttributeService attributeService,
       CategoryAttributeValueBindingService valueBindingService) {
+    this.jdbc = jdbc;
     this.identityProvider = identityProvider;
     this.attributeService = attributeService;
     this.valueBindingService = valueBindingService;
@@ -99,6 +103,12 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
       throw new IllegalArgumentException("类目属性模板不存在");
     }
     payload.setAttributeRole(normalizeAttributeRole(payload.getAttributeRole()));
+    if (!StringUtils.hasText(payload.getAttributeRole())) {
+      throw new IllegalArgumentException("请选择属性角色");
+    }
+    if (!Objects.equals(existing.getAttributeRole(), payload.getAttributeRole()) && usageCount(existing) > 0) {
+      throw new IllegalArgumentException("该属性已被当前分类的商品使用，不能修改属性角色，请取消发布当前模板绑定后新增属性");
+    }
     validateAttributeRoleAndSku(payload.getAttributeRole(), payload.getSkuFlag());
     if ("published".equals(existing.getPublishStatus()) && hasConfigurationChanged(existing, payload)) {
       throw new IllegalArgumentException("请先取消发布后再修改属性配置");
@@ -113,7 +123,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     payload.setCreatedAt(existing.getCreatedAt());
     updateById(payload);
-    return getById(id);
+    return withUsage(getById(id));
   }
 
   @Transactional
@@ -136,7 +146,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     }
     existing.setPublishStatus(publishStatus);
     updateById(existing);
-    return getById(id);
+    return withUsage(getById(id));
   }
 
   public List<CategoryAttribute> listWithOptionCounts(List<Long> categoryIds) {
@@ -150,6 +160,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
         categoryAttributes.stream().map(CategoryAttribute::getId).toList());
     categoryAttributes.forEach(categoryAttribute ->
         categoryAttribute.setOptionCount(counts.getOrDefault(categoryAttribute.getId(), 0L)));
+    categoryAttributes.forEach(this::withUsage);
     return categoryAttributes;
   }
 
@@ -159,7 +170,30 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     if ("published".equals(existing.getPublishStatus())) {
       throw new IllegalArgumentException("请先取消发布后再移除属性");
     }
+    if (usageCount(existing) > 0) {
+      throw new IllegalArgumentException("该属性已被当前分类的商品使用，不能移除，请取消发布当前模板绑定");
+    }
     return removeById(id);
+  }
+
+  private CategoryAttribute withUsage(CategoryAttribute binding) {
+    binding.setUsageCount(usageCount(binding));
+    return binding;
+  }
+
+  private long usageCount(CategoryAttribute binding) {
+    String sql = """
+        SELECT COUNT(*) FROM finished_products p
+        WHERE p.category_id = ? AND (
+          EXISTS (SELECT 1 FROM finished_product_attribute_entries e
+            WHERE e.finished_product_id = p.id AND e.attribute_id = ?)
+          OR EXISTS (SELECT 1 FROM finished_product_variants v
+            WHERE v.finished_product_id = p.id
+              AND JSON_CONTAINS_PATH(v.sales_attributes, 'one', ?) = 1))
+        """;
+    Object[] arguments = {binding.getCategoryId(), binding.getAttributeId(), "$.attribute_" + binding.getAttributeId()};
+    Long count = jdbc.queryForObject(sql, Long.class, arguments);
+    return count == null ? 0 : count;
   }
 
   private CategoryAttribute requireCategoryAttribute(Long id) {
