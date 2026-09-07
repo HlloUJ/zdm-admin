@@ -13,6 +13,13 @@ public class CategoryAttribute extends BaseEntity {
   @NotNull
   private Long attributeId;
 
+
+  @TableField(exist = false)
+  private Long usageCount;
+
+  public Long getUsageCount() { return usageCount; }
+  public void setUsageCount(Long usageCount) { this.usageCount = usageCount; }
+
   private String attributeRole;
   private Boolean requiredFlag;
   private Boolean skuFlag;
