@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -31,26 +33,29 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
   }
 
   public List<ProductCategory> listNewestFirst() {
-    return lambdaQuery()
+    List<ProductCategory> categories = lambdaQuery()
         .orderByDesc(ProductCategory::getCreatedAt)
         .orderByDesc(ProductCategory::getId)
         .list();
+    return attachActualFinishedProductCounts(categories);
   }
 
   public List<ProductCategory> listNewestFirst(Collection<String> scopes) {
     if (scopes.isEmpty()) {
       return List.of();
     }
-    return lambdaQuery()
+    List<ProductCategory> categories = lambdaQuery()
         .in(ProductCategory::getScope, scopes)
         .orderByDesc(ProductCategory::getCreatedAt)
         .orderByDesc(ProductCategory::getId)
         .list();
+    return attachActualFinishedProductCounts(categories);
   }
 
   @Transactional
   public ProductCategory createCategory(ProductCategory category) {
     category.setId(null);
+    category.setProductCount(0);
     normalizeAndValidateCategory(category, null);
     category.setCreatedByName(resolveCreatedByName());
     category.setCreatedByAccountId(identityProvider.require().accountId());
@@ -72,13 +77,14 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     payload.setCreatedAt(existing.getCreatedAt());
+    payload.setProductCount(resolveActualProductCount(existing));
     normalizeAndValidateCategory(payload, id);
     try {
       updateById(payload);
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
     }
-    return getById(id);
+    return attachActualFinishedProductCounts(List.of(getById(id))).get(0);
   }
 
   @Transactional
@@ -111,6 +117,43 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
+  }
+
+  private List<ProductCategory> attachActualFinishedProductCounts(
+      List<ProductCategory> categories) {
+    if (categories.stream().noneMatch(category -> "finished".equals(category.getScope()))) {
+      return categories;
+    }
+    Map<Long, Integer> countByCategoryId = jdbcTemplate.query(
+        """
+        SELECT category_id, COUNT(*)
+        FROM finished_products
+        WHERE category_id IS NOT NULL
+        GROUP BY category_id
+        """,
+        resultSet -> {
+          Map<Long, Integer> counts = new HashMap<>();
+          while (resultSet.next()) {
+            counts.put(resultSet.getLong(1), Math.toIntExact(resultSet.getLong(2)));
+          }
+          return counts;
+        });
+    categories.stream()
+        .filter(category -> "finished".equals(category.getScope()))
+        .forEach(category -> category.setProductCount(
+            countByCategoryId.getOrDefault(category.getId(), 0)));
+    return categories;
+  }
+
+  private int resolveActualProductCount(ProductCategory category) {
+    if (!"finished".equals(category.getScope())) {
+      return category.getProductCount() == null ? 0 : category.getProductCount();
+    }
+    Long count = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM finished_products WHERE category_id = ?",
+        Long.class,
+        category.getId());
+    return count == null ? 0 : Math.toIntExact(count);
   }
 
   private void normalizeAndValidateCategory(ProductCategory category, Long excludedCategoryId) {

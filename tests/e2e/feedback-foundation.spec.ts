@@ -98,7 +98,7 @@ test('uses the same action-specific confirmation foundation across modules', asy
   await attributeRow.getByText('删除', { exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
     action: '删除',
-    content: '是否删除属性“E2E 共享属性”？',
+    content: '删除属性“E2E 共享属性”将同步删除其下 0 个属性值，删除后不可恢复，是否继续？',
     danger: true,
   });
   await page.getByRole('button', { name: '取消', exact: true }).click();
@@ -126,6 +126,62 @@ test('uses the same action-specific confirmation foundation across modules', asy
     content: '删除后大板将进入回收站，是否删除大板“雪花白大板 06”？',
     danger: true,
   });
+});
+
+test('shows the product attribute deletion mode returned by the server', async ({ page }) => {
+  await page.route('**/api/admin/product-attributes/1/delete-preview', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: {
+          deletionMode: 'business',
+          attributeValueCount: 2,
+          unfinishedProductCount: 0,
+          soldOutProductCount: 1,
+          templateScopes: [],
+        },
+      }),
+    });
+  });
+
+  await page.goto('/product-attribute');
+  const row = page.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
+  await row.getByText('删除', { exact: true }).click();
+  await expectUnifiedConfirmDialog(page, {
+    action: '删除',
+    content:
+      '属性“E2E 共享属性”仅被已售完商品历史使用。删除后将不再用于新商品和分类模板，但已售完商品仍保留历史属性信息，是否继续？',
+    danger: true,
+  });
+});
+
+test('does not open a deletion dialog when an unfinished product still uses the attribute', async ({ page }) => {
+  const message = '该属性仍被未售完商品使用，不能删除，请先处理关联商品。';
+  await page.route('**/api/admin/product-attributes/1/delete-preview', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: {
+          deletionMode: 'blocked',
+          attributeValueCount: 2,
+          unfinishedProductCount: 1,
+          soldOutProductCount: 0,
+          templateScopes: [],
+          message,
+        },
+      }),
+    });
+  });
+
+  await page.goto('/product-attribute');
+  const row = page.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
+  await row.getByText('删除', { exact: true }).click();
+  await expect(page.getByText(message, { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-confirm-dialog')).toHaveCount(0);
 });
 
 test('warns immediately instead of opening confirmation when a slab is not ready for shelving', async ({ page }) => {

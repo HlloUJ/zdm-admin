@@ -47,14 +47,9 @@
                       trigger="hover"
                     />
                   </t-form-item>
-                  <t-form-item label="租户">
-                    <t-select v-model="currentFilter.tenant" clearable placeholder="请选择">
-                      <t-option v-for="item in tenantOptions" :key="item" :label="item" :value="item" />
-                    </t-select>
-                  </t-form-item>
-                  <t-form-item label="门店">
-                    <t-select v-model="currentFilter.store" clearable placeholder="请选择">
-                      <t-option v-for="item in storeOptions" :key="item" :label="item" :value="item" />
+                  <t-form-item label="供应商">
+                    <t-select v-model="currentFilter.supplier" clearable placeholder="请选择">
+                      <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
                     </t-select>
                   </t-form-item>
                 </div>
@@ -113,7 +108,8 @@
                   title="点击查看大图"
                   @click="openImagePreview(row)"
                 >
-                  <img :src="row.image" :alt="row.name" />
+                  <img v-if="row.image" :src="row.image" :alt="row.name" />
+                  <t-icon v-else name="image-off" />
                 </button>
               </template>
               <template #product="{ row }">
@@ -123,16 +119,12 @@
                   <div class="product-code">编码：{{ row.code }}</div>
                 </div>
               </template>
-              <template #tenant="{ row }">
+              <template #supplier="{ row }">
                 <div class="tenant-cell">
-                  <div>{{ row.tenant }}</div>
-                  <span class="store-text">{{ row.store }}</span>
+                  <div>{{ row.supplier }}</div>
                   <div class="tenant-tags">
-                    <t-tag :class="publisherTagClass(row.publisherType)" variant="light" class="tenant-tag">
+                    <t-tag variant="light" class="publisher-tag platform-publish">
                       {{ row.publisherType }}
-                    </t-tag>
-                    <t-tag v-if="row.publisherType === '平台发布'" variant="light" class="tenant-tag supplier-publish">
-                      外部供应商
                     </t-tag>
                   </div>
                 </div>
@@ -146,7 +138,7 @@
               <template #operation="{ row }">
                 <div class="table-actions">
                   <t-link
-                    v-for="action in rowActions(row)"
+                    v-for="action in rowActions()"
                     :key="action.action"
                     :theme="action.theme"
                     hover="color"
@@ -190,38 +182,24 @@
               <t-tab-panel value="description" label="图文描述">
                 <div class="form-section">
                   <div class="upload-grid">
-                    <button
-                      :class="[
-                        'upload-box',
-                        uploadState.mainImage && 'uploaded',
-                        submitAttempted && !uploadState.mainImage && 'error',
-                      ]"
-                      type="button"
-                      @click="simulateUpload('mainImage')"
-                    >
-                      <span class="required-star">*</span>
-                      <t-icon :name="uploadState.mainImage ? 'check-circle' : 'add'" />
-                      <strong>商品主图</strong>
-                      <span>{{
-                        uploadState.mainImage ? '已上传图片' : submitAttempted ? '请上传图片' : '点击上传图片'
-                      }}</span>
-                    </button>
-                    <button
-                      :class="[
-                        'upload-box',
-                        uploadState.video && 'uploaded',
-                        submitAttempted && !uploadState.video && 'error',
-                      ]"
-                      type="button"
-                      @click="simulateUpload('video')"
-                    >
-                      <span class="required-star">*</span>
-                      <t-icon :name="uploadState.video ? 'check-circle' : 'add'" />
-                      <strong>商品视频</strong>
-                      <span>{{
-                        uploadState.video ? '已上传视频' : submitAttempted ? '请上传视频' : '点击上传视频'
-                      }}</span>
-                    </button>
+                    <AdminMediaUpload
+                      v-model="mainImageMedia"
+                      title="商品主图"
+                      accept="image/*"
+                      required
+                      :error-message="submitAttempted && !mainImageMedia ? '请上传图片' : ''"
+                      :upload="(file) => uploadProductMedia(file, 'image')"
+                      @removed="releasePendingProductMedia"
+                    />
+                    <AdminMediaUpload
+                      v-model="videoMedia"
+                      title="商品视频"
+                      accept="video/*"
+                      required
+                      :error-message="submitAttempted && !videoMedia ? '请上传视频' : ''"
+                      :upload="(file) => uploadProductMedia(file, 'video')"
+                      @removed="releasePendingProductMedia"
+                    />
                   </div>
                   <t-form :data="productForm" label-width="84px" colon>
                     <t-form-item label="宝贝详情" required-mark>
@@ -304,9 +282,6 @@
                     >
                       <template #specText="{ row }">
                         <div class="spec-name-cell">
-                          <button class="spec-thumb" type="button" @click="simulateSpecImageUpload(row, 'spec')">
-                            <t-icon :name="row.specImage ? 'image' : 'add'" />
-                          </button>
                           <span>{{ row.specText || '-' }}</span>
                         </div>
                       </template>
@@ -315,53 +290,21 @@
                           <t-option v-for="item in materialOptions" :key="item" :label="item" :value="item" />
                         </t-select>
                         <div v-else class="spec-name-cell">
-                          <button
-                            v-if="isConfirmedImageField('material')"
-                            class="spec-thumb mini"
-                            type="button"
-                            @click="simulateSpecImageUpload(row, 'material')"
-                          >
-                            <t-icon :name="row.materialImage ? 'image' : 'add'" />
-                          </button>
                           <span>{{ row.material || '-' }}</span>
                         </div>
                       </template>
                       <template #length="{ row }">
                         <div class="spec-name-cell">
-                          <button
-                            v-if="isConfirmedImageField('length')"
-                            class="spec-thumb mini"
-                            type="button"
-                            @click="simulateSpecImageUpload(row, 'length')"
-                          >
-                            <t-icon :name="row.lengthImage ? 'image' : 'add'" />
-                          </button>
                           <span>{{ row.length || '-' }}</span>
                         </div>
                       </template>
                       <template #color="{ row }">
                         <div class="spec-name-cell">
-                          <button
-                            v-if="isConfirmedImageField('color')"
-                            class="spec-thumb mini"
-                            type="button"
-                            @click="simulateSpecImageUpload(row, 'color')"
-                          >
-                            <t-icon :name="row.colorImage ? 'image' : 'add'" />
-                          </button>
                           <span>{{ row.color || '-' }}</span>
                         </div>
                       </template>
                       <template #size="{ row }">
                         <div class="spec-name-cell">
-                          <button
-                            v-if="isConfirmedImageField('size')"
-                            class="spec-thumb mini"
-                            type="button"
-                            @click="simulateSpecImageUpload(row, 'size')"
-                          >
-                            <t-icon :name="row.sizeImage ? 'image' : 'add'" />
-                          </button>
                           <span>{{ row.size || '-' }}</span>
                         </div>
                       </template>
@@ -497,32 +440,36 @@
       </main>
     </div>
 
-    <t-dialog
+    <AdminDialog
       v-model:visible="categoryDialogVisible"
       header="选择商品分类"
-      width="760px"
-      placement="center"
+      width="920px"
       confirm-btn="确认，下一步"
       cancel-btn="取消"
       @confirm="confirmCategory"
       @cancel="closeCategoryDialog"
       @close="closeCategoryDialog"
     >
-      <div class="category-picker">
-        <div v-for="(column, columnIndex) in categoryColumns" :key="columnIndex" class="category-column">
-          <button
-            v-for="item in column"
-            :key="item"
-            type="button"
-            :class="['category-option', categorySelection[columnIndex] === item && 'active']"
-            @click="selectCategory(columnIndex, item)"
-          >
-            <span>{{ item }}</span>
-            <t-icon v-if="columnIndex < 2" name="chevron-right" />
-          </button>
+      <div class="category-picker" data-testid="finished-category-picker">
+        <div v-for="(column, columnIndex) in categoryPickerColumns" :key="columnIndex" class="category-column">
+          <div class="category-column-title">第{{ columnIndex + 1 }}级分类</div>
+          <div class="category-option-list">
+            <button
+              v-for="item in column"
+              :key="item.id"
+              type="button"
+              :class="['category-option', categoryPickerSelection[columnIndex] === item.id && 'active']"
+              @click="selectCategory(columnIndex, item.id)"
+            >
+              <span>{{ item.name }}</span>
+              <t-icon v-if="hasCategoryChildren(item.id)" name="chevron-right" />
+            </button>
+            <t-empty v-if="column.length === 0" description="请先选择上级分类" />
+          </div>
         </div>
       </div>
-    </t-dialog>
+      <div v-if="categoryPickerPath" class="category-picker-path">已选择：{{ categoryPickerPath }}</div>
+    </AdminDialog>
 
     <t-dialog
       v-model:visible="specDialogVisible"
@@ -542,9 +489,6 @@
           <div class="spec-section-title">商品规格</div>
           <div class="single-spec-list">
             <div v-for="(item, index) in singleSpecs" :key="item.id" class="single-spec-row">
-              <button class="spec-upload-box small" type="button" title="上传图片" @click="item.imageUploaded = true">
-                <t-icon :name="item.imageUploaded ? 'image' : 'add'" />
-              </button>
               <t-input v-model="item.text" placeholder="请输入规格文本，如 1500*800*750mm" />
               <t-button shape="square" variant="text" theme="danger" @click="removeSingleSpec(index)">
                 <t-icon name="delete" />
@@ -577,23 +521,8 @@
           <div v-for="group in selectedSpecGroups" :key="group.name" class="spec-group">
             <div class="spec-group-head">
               <div class="spec-group-title">{{ group.name }}</div>
-              <t-checkbox
-                :model-value="group.withImage"
-                :disabled="isSpecImageGroupDisabled(group)"
-                @change="(checked: boolean) => toggleSpecImageGroup(group, checked)"
-              >
-                添加图片
-              </t-checkbox>
             </div>
             <div v-for="(value, index) in group.values" :key="value.id" class="layered-value-row">
-              <button
-                v-if="group.withImage"
-                class="spec-upload-box small"
-                type="button"
-                @click="value.imageUploaded = true"
-              >
-                <t-icon :name="value.imageUploaded ? 'image' : 'add'" />
-              </button>
               <t-select
                 v-if="group.name === '大理石台面材质'"
                 v-model="value.value"
@@ -908,7 +837,7 @@
 
     <t-dialog
       v-model:visible="reasonDialogVisible"
-      :header="reasonState.type === 'reject' ? '驳回' : '下架'"
+      header="下架"
       width="520px"
       placement="center"
       confirm-btn="提交"
@@ -918,14 +847,9 @@
       @close="closeReasonDialog"
     >
       <t-form :data="reasonForm" label-width="96px" colon>
-        <t-form-item :label="reasonState.type === 'reject' ? '驳回原因' : '下架原因'" required-mark>
+        <t-form-item label="下架原因" required-mark>
           <t-select v-model="reasonForm.reason" placeholder="请选择">
-            <t-option
-              v-for="item in reasonState.type === 'reject' ? rejectReasons : offShelfReasons"
-              :key="item"
-              :label="item"
-              :value="item"
-            />
+            <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
           </t-select>
         </t-form-item>
         <t-form-item label="详细说明">
@@ -943,12 +867,12 @@
       @close="closeDetailDialog"
     >
       <div v-if="detailProduct" class="detail-panel">
-        <img :src="detailProduct.image" :alt="detailProduct.name" />
+        <img v-if="detailProduct.image" :src="detailProduct.image" :alt="detailProduct.name" />
         <div class="detail-info">
           <h2>{{ detailProduct.name }}</h2>
           <p>ID：{{ detailProduct.id }} ｜ 编码：{{ detailProduct.code }}</p>
           <p>分类：{{ detailProduct.category }} ｜ 库存：{{ activeTab === 'soldOut' ? 0 : detailProduct.stock }}</p>
-          <p>租户/门店：{{ detailProduct.tenant }} / {{ detailProduct.store }}</p>
+          <p>供应商：{{ detailProduct.supplier }}</p>
           <p>价格区间：{{ detailProduct.priceRange }}</p>
           <p v-if="detailProduct.offShelfReason">下架原因：{{ detailProduct.offShelfReason }}</p>
         </div>
@@ -987,7 +911,14 @@ import type { PrimaryTableCol, RowspanColspan, TableRowData } from 'tdesign-vue-
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import {
+  adminFeedback,
+  AdminConfirmDialog,
+  AdminDialog,
+  AdminMediaUpload,
+  AdminPagination,
+  type AdminMediaValue,
+} from '@/components/foundation';
 import {
   getFinishedGuidePriceSetting,
   listFinishedMarkupConfigurationOptions,
@@ -997,11 +928,15 @@ import {
   createFinishedProduct,
   deleteFinishedProduct,
   listFinishedProducts,
+  releaseTemporaryFinishedProductMedia,
   updateFinishedProduct,
+  uploadFinishedProductMedia,
+  type FinishedProductAttributeEntry,
   type FinishedProductPayload,
   type FinishedProductRecord,
   type FinishedProductGuidePrice,
   type FinishedProductPrice,
+  type FinishedProductVariant,
 } from '@/services/finishedProducts';
 import {
   createInventoryMovement,
@@ -1010,18 +945,18 @@ import {
   type MovementType,
 } from '@/services/inventoryMovements';
 import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
+import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
+import { listProductAttributeValues, type ProductAttributeValueRecord } from '@/services/productAttributeValues';
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
-type PublisherType = '租户发布' | '平台发布';
-type RowAction = 'shelf' | 'edit' | 'reject' | 'delete' | 'offShelf' | 'restore' | 'purge' | 'movement';
+type PublisherType = '平台发布';
+type RowAction = 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge' | 'movement';
 type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type FormTabKey = 'description' | 'base' | 'sales';
-type UploadTarget = 'mainImage' | 'video' | 'attributeImage';
 type SpecMode = 'single' | 'layered';
 type LayeredSpecField = 'material' | 'length' | 'color' | 'size';
-type SpecImageField = 'spec' | LayeredSpecField;
 type BatchFilterField = 'specText' | LayeredSpecField;
 type DecimalField =
   | 'cost'
@@ -1034,7 +969,7 @@ type DecimalField =
   | 'level3Coefficient'
   | 'level3';
 type ConfirmType =
-  'shelf' | 'delete' | 'restore' | 'purge' | 'reject' | 'batchShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
+  'shelf' | 'delete' | 'restore' | 'purge' | 'batchShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type ProductFormMode = 'create' | 'edit';
 type PriceDrawerMode = 'batchFill' | 'view';
 
@@ -1048,8 +983,7 @@ interface FilterState {
   id: string;
   name: string;
   category: string;
-  tenant: string;
-  store: string;
+  supplier: string;
 }
 
 interface PaginationState {
@@ -1066,8 +1000,7 @@ interface StockItem {
   supplierId?: number;
   category: string;
   stock: number;
-  tenant: string;
-  store: string;
+  supplier: string;
   publisherType: PublisherType;
   isExternalSupplier: boolean;
   guidePrice?: number;
@@ -1076,6 +1009,12 @@ interface StockItem {
   offShelfReason?: string;
   markupPrices?: FinishedProductPrice[];
   guidePrices?: FinishedProductGuidePrice[];
+  mainImageMediaId?: number;
+  videoMediaId?: number;
+  videoUrl?: string;
+  detail: string;
+  attributes: FinishedProductAttributeEntry[];
+  variants: FinishedProductVariant[];
 }
 
 interface ProductForm {
@@ -1198,93 +1137,8 @@ const tabs: TabConfig[] = [
   { value: 'recycle', label: '回收站' },
 ];
 
-const categoryCascaderOptions: CategoryCascaderOption[] = [
-  {
-    label: '家具',
-    value: '家具',
-    children: [
-      {
-        label: '餐桌',
-        value: '家具 / 餐桌',
-        children: [
-          { label: '奢石餐桌', value: '家具 / 餐桌 / 奢石餐桌' },
-          { label: '岩板餐桌', value: '家具 / 餐桌 / 岩板餐桌' },
-          { label: '圆桌', value: '家具 / 餐桌 / 圆桌' },
-        ],
-      },
-      {
-        label: '茶几',
-        value: '家具 / 茶几',
-        children: [
-          { label: '岩板茶几', value: '家具 / 茶几 / 岩板茶几' },
-          { label: '圆几', value: '家具 / 茶几 / 圆几' },
-          { label: '组合茶几', value: '家具 / 茶几 / 组合茶几' },
-        ],
-      },
-      {
-        label: '边柜',
-        value: '家具 / 边柜',
-        children: [
-          { label: '玄关柜', value: '家具 / 边柜 / 玄关柜' },
-          { label: '餐边柜', value: '家具 / 边柜 / 餐边柜' },
-          { label: '电视柜', value: '家具 / 边柜 / 电视柜' },
-        ],
-      },
-    ],
-  },
-  {
-    label: '软装',
-    value: '软装',
-    children: [
-      {
-        label: '地毯',
-        value: '软装 / 地毯',
-        children: [
-          { label: '标准款', value: '软装 / 地毯 / 标准款' },
-          { label: '设计师款', value: '软装 / 地毯 / 设计师款' },
-        ],
-      },
-      {
-        label: '摆件',
-        value: '软装 / 摆件',
-        children: [
-          { label: '石材摆件', value: '软装 / 摆件 / 石材摆件' },
-          { label: '金属摆件', value: '软装 / 摆件 / 金属摆件' },
-        ],
-      },
-    ],
-  },
-  {
-    label: '整装套餐',
-    value: '整装套餐',
-    children: [
-      {
-        label: '客餐厅',
-        value: '整装套餐 / 客餐厅',
-        children: [
-          { label: '轻奢套餐', value: '整装套餐 / 客餐厅 / 轻奢套餐' },
-          { label: '现代套餐', value: '整装套餐 / 客餐厅 / 现代套餐' },
-        ],
-      },
-      {
-        label: '全屋',
-        value: '整装套餐 / 全屋',
-        children: [
-          { label: '标准套餐', value: '整装套餐 / 全屋 / 标准套餐' },
-          { label: '定制套餐', value: '整装套餐 / 全屋 / 定制套餐' },
-        ],
-      },
-    ],
-  },
-];
-
-const tenantOptions = ['杭州云栖装饰', '平台自营', '南山设计中心', '云石供应链', '外部精品供应商'];
-const storeOptions = ['杭州旗舰店', '深圳体验店', '上海设计中心', '云浮仓', '平台仓'];
-const fallbackSupplierOptions = ['云石供应链', '平台自营', '星河矿业', '南山石材', '外部精品供应商'];
 const pageSizeOptions = [10, 20, 50];
-const rejectReasons = ['图片不清晰', '资料不完整', '规格填写异常', '价格信息缺失'];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
-const materialOptions = ['鱼肚白', '雪花白', '爵士白', '劳伦黑金', '潘多拉'];
 const layeredFieldLabels: Record<LayeredSpecField, string> = {
   material: '大理石台面材质',
   length: '桌面长度（mm）',
@@ -1321,7 +1175,9 @@ const movementLoading = ref(false);
 const movementRows = ref<InventoryMovementRecord[]>([]);
 const imagePreviewSrc = ref('');
 const imagePreviewTitle = ref('商品主图');
-const selectedCategoryPath = ref('家具 > 餐桌 > 奢石餐桌');
+const selectedCategoryId = ref<number>();
+const selectedCategoryPath = ref('');
+const categoryPickerSelection = ref<number[]>([]);
 const specMode = ref<SpecMode>('single');
 const confirmedSpecMode = ref<SpecMode>('single');
 const confirmedLayeredFields = ref<LayeredSpecField[]>([]);
@@ -1337,11 +1193,12 @@ const batchFillFilters = reactive<Record<BatchFilterField, string[]>>({
   size: [],
 });
 const submitAttempted = ref(false);
-const uploadState = reactive({
-  mainImage: false,
-  video: false,
-});
+const mainImageMedia = ref<AdminMediaValue>();
+const videoMedia = ref<AdminMediaValue>();
+const pendingUploadedMediaIds = new Set<number>();
 const productCategories = ref<ProductCategoryRecord[]>([]);
+const productAttributes = ref<ProductAttributeRecord[]>([]);
+const productAttributeValues = ref<ProductAttributeValueRecord[]>([]);
 const productSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<FinishedMarkupConfigurationRecord[]>([]);
 const productPriceLevels = computed(() => {
@@ -1372,12 +1229,87 @@ const productPriceLevels = computed(() => {
 const guidePriceSettingCoefficient = ref<number>();
 const dataItems = ref<StockItem[]>([]);
 
+const categoryCascaderOptions = computed<CategoryCascaderOption[]>(() => {
+  const enabled = productCategories.value.filter(
+    (category) => category.scope === 'finished' && category.status !== 'disabled',
+  );
+  const childrenByParent = new Map<number | undefined, ProductCategoryRecord[]>();
+  enabled.forEach((category) => {
+    const siblings = childrenByParent.get(category.parentId) ?? [];
+    siblings.push(category);
+    childrenByParent.set(category.parentId, siblings);
+  });
+  const build = (parentId?: number, parentPath = ''): CategoryCascaderOption[] =>
+    (childrenByParent.get(parentId) ?? [])
+      .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id)
+      .map((category) => {
+        const path = parentPath ? `${parentPath} / ${category.name}` : category.name;
+        const children = build(category.id, path);
+        return { label: category.name, value: path, ...(children.length ? { children } : {}) };
+      });
+  return build(undefined);
+});
+
+const enabledFinishedCategories = computed(() =>
+  productCategories.value
+    .filter((category) => category.scope === 'finished' && category.status !== 'disabled')
+    .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id),
+);
+
+const categoryChildrenByParent = computed(() => {
+  const children = new Map<number | undefined, ProductCategoryRecord[]>();
+  enabledFinishedCategories.value.forEach((category) => {
+    const parentId = category.parentId ?? undefined;
+    const siblings = children.get(parentId) ?? [];
+    siblings.push(category);
+    children.set(parentId, siblings);
+  });
+  return children;
+});
+
+const categoryPickerColumns = computed(() => {
+  const columns: ProductCategoryRecord[][] = [categoryChildrenByParent.value.get(undefined) ?? []];
+  for (let level = 1; level < 3; level += 1) {
+    const parentId = categoryPickerSelection.value[level - 1];
+    columns.push(parentId == null ? [] : (categoryChildrenByParent.value.get(parentId) ?? []));
+  }
+  for (let level = 3; ; level += 1) {
+    const parentId = categoryPickerSelection.value[level - 1];
+    if (parentId == null) break;
+    const children = categoryChildrenByParent.value.get(parentId) ?? [];
+    if (!children.length) break;
+    columns.push(children);
+  }
+  return columns;
+});
+
+const categoryPickerPath = computed(() => {
+  const categoryById = new Map(enabledFinishedCategories.value.map((category) => [category.id, category]));
+  return categoryPickerSelection.value
+    .map((categoryId) => categoryById.get(categoryId)?.name)
+    .filter(Boolean)
+    .join(' > ');
+});
+
+const hasCategoryChildren = (categoryId: number) => Boolean(categoryChildrenByParent.value.get(categoryId)?.length);
+
+const categoryPathIds = (categoryId?: number) => {
+  if (categoryId == null) return [];
+  const categoryById = new Map(enabledFinishedCategories.value.map((category) => [category.id, category]));
+  const path: number[] = [];
+  let current = categoryById.get(categoryId);
+  while (current) {
+    path.unshift(current.id);
+    current = current.parentId == null ? undefined : categoryById.get(current.parentId);
+  }
+  return path;
+};
+
 const defaultFilter = (): FilterState => ({
   id: '',
   name: '',
   category: '',
-  tenant: '',
-  store: '',
+  supplier: '',
 });
 
 const filters = reactive<Record<StockStatus, FilterState>>({
@@ -1442,20 +1374,33 @@ const createEmptyBatchFillForm = (): BatchFillForm => ({
 
 const batchFillForm = reactive<BatchFillForm>(createEmptyBatchFillForm());
 
-const attributeFields: { key: string; label: string; type: 'input' | 'select'; options?: string[] }[] = [
-  { key: 'brand', label: '品牌', type: 'select', options: ['装点猫', '华中石业', '国庆奢石家居', '卓越五金'] },
-  { key: 'model', label: '型号', type: 'input' },
-  { key: 'style', label: '风格', type: 'select', options: ['现代轻奢', '新中式', '极简', '法式'] },
-  { key: 'shape', label: '款式', type: 'select', options: ['圆角矩形', '圆形', '椭圆形', '方形'] },
-  { key: 'material', label: '桌面材质', type: 'select', options: ['大理石', '岩板', '奢石', '石英石'] },
-  { key: 'craftTexture', label: '工艺/纹理', type: 'select', options: ['水刀拼花', '直纹', '山水纹', '细纹'] },
-  { key: 'layers', label: '层数', type: 'select', options: ['单层', '双层'] },
-  { key: 'functionText', label: '功能', type: 'input' },
-  { key: 'waterproof', label: '防水防污', type: 'select', options: ['支持', '不支持'] },
-  { key: 'loadBearing', label: '承重能力', type: 'input' },
-  { key: 'origin', label: '产地', type: 'input' },
-  { key: 'installDesc', label: '安装说明详情', type: 'input' },
-];
+const attributeFields = computed(() =>
+  productAttributes.value
+    .filter(
+      (attribute) =>
+        (attribute.scope === 'shared' || attribute.scope === 'finished') && attribute.status !== 'disabled',
+    )
+    .map((attribute) => ({
+      key: `attribute_${attribute.id}`,
+      attributeId: attribute.id,
+      label: attribute.name,
+      type: attribute.valueType === 'select' ? ('select' as const) : ('input' as const),
+      options: productAttributeValues.value
+        .filter((value) => value.attributeId === attribute.id && value.status !== 'disabled')
+        .map((value) => value.value),
+    })),
+);
+
+const materialOptions = computed(() => {
+  const materialAttributeIds = new Set(
+    productAttributes.value
+      .filter((attribute) => attribute.name.includes('材质') && attribute.status !== 'disabled')
+      .map((attribute) => attribute.id),
+  );
+  return productAttributeValues.value
+    .filter((value) => materialAttributeIds.has(value.attributeId) && value.status !== 'disabled')
+    .map((value) => value.value);
+});
 
 const specGroups = reactive<SpecGroup[]>([
   {
@@ -1488,15 +1433,7 @@ const specGroups = reactive<SpecGroup[]>([
   },
 ]);
 
-const categorySelection = ref(['家具', '餐桌', '奢石餐桌']);
-const categoryColumns = computed(() => [
-  ['家具', '软装', '整装套餐'],
-  categorySelection.value[0] === '家具' ? ['餐桌', '茶几', '边柜'] : ['地毯', '摆件', '灯具'],
-  categorySelection.value[1] === '餐桌' ? ['奢石餐桌', '岩板餐桌', '圆桌'] : ['标准款', '设计师款', '定制款'],
-]);
-
-const reasonState = reactive<{ type: 'reject' | 'offShelf'; product: StockItem | null; isBatch: boolean }>({
-  type: 'reject',
+const reasonState = reactive<{ product: StockItem | null; isBatch: boolean }>({
   product: null,
   isBatch: false,
 });
@@ -1517,7 +1454,6 @@ const confirmAction = computed(() => {
     delete: '删除',
     restore: '恢复',
     purge: '彻底删除',
-    reject: '驳回',
     batchShelf: '批量上架',
     batchRestore: '批量恢复',
     batchPurge: '批量彻底删除',
@@ -1526,38 +1462,13 @@ const confirmAction = computed(() => {
   return actionMap[confirmState.type];
 });
 
-const createStoneImage = (seed: number) => {
-  const palettes = [
-    ['#f8fafc', '#c9d4df', '#52677f'],
-    ['#fff7ed', '#d6a06f', '#56606d'],
-    ['#ecfeff', '#9eb7b8', '#1f2937'],
-    ['#f5f3ff', '#c4b5fd', '#57534e'],
-    ['#fef2f2', '#fca5a5', '#57534e'],
-  ];
-  const [start, middle, end] = palettes[seed % palettes.length];
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="${start}"/>
-          <stop offset="0.52" stop-color="${middle}"/>
-          <stop offset="1" stop-color="${end}"/>
-        </linearGradient>
-      </defs>
-      <rect width="180" height="180" rx="14" fill="url(#bg)"/>
-      <path d="M-8 42 C34 18 58 62 96 40 C132 20 146 36 188 12" fill="none" stroke="#fff" stroke-opacity=".48" stroke-width="8"/>
-      <path d="M-12 126 C28 94 72 144 112 108 C142 82 164 102 192 76" fill="none" stroke="#fff" stroke-opacity=".34" stroke-width="7"/>
-      <path d="M18 184 C54 126 86 164 112 126 C134 94 158 112 176 86" fill="none" stroke="#172033" stroke-opacity=".16" stroke-width="5"/>
-    </svg>
-  `;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-};
+const isFinishedSupplyType = (type: SupplierRecord['supplyTypes'][number]) =>
+  type.status !== 'disabled' && (type.code === 'finished' || type.name === '成品' || type.name === '成品现货');
 
 const supplierOptions = computed(() => {
-  const remoteOptions = productSuppliers.value
-    .filter((supplier) => supplier.status !== 'disabled')
+  return productSuppliers.value
+    .filter((supplier) => supplier.status !== 'disabled' && supplier.supplyTypes.some(isFinishedSupplyType))
     .map((supplier) => supplier.name);
-  return remoteOptions.length ? remoteOptions : fallbackSupplierOptions;
 });
 
 const countByStatus = computed<Record<StockStatus, number>>(() => ({
@@ -1571,7 +1482,7 @@ const countByStatus = computed<Record<StockStatus, number>>(() => ({
 const normalizeStatus = (status?: string): StockStatus =>
   status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';
 
-const normalizePublisherType = (type?: string): PublisherType => (type === '租户发布' ? '租户发布' : '平台发布');
+const normalizePublisherType = (): PublisherType => '平台发布';
 
 const categoryPathById = (categoryId?: number) => {
   if (!categoryId) return '未分类';
@@ -1585,25 +1496,13 @@ const categoryPathById = (categoryId?: number) => {
   return names.length ? names.join(' / ') : '未分类';
 };
 
-const categoryIdByPath = (path: string) => {
-  const leafName = path
-    .split(/[>/]/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .at(-1);
-  const matched = productCategories.value.find(
-    (category) => category.scope === 'finished' && category.name === leafName && category.status !== 'disabled',
-  );
-  return matched?.id ?? productCategories.value.find((category) => category.scope === 'finished')?.id;
-};
-
 const supplierNameById = (supplierId?: number) =>
   productSuppliers.value.find((supplier) => supplier.id === supplierId)?.name ?? '平台自营';
 
 const supplierIdByName = (name: string) =>
   productSuppliers.value.find((supplier) => supplier.name === name && supplier.status !== 'disabled')?.id ??
   productSuppliers.value.find(
-    (supplier) => supplier.supplyTypes.some((type) => type.code === 'finished') && supplier.status !== 'disabled',
+    (supplier) => supplier.supplyTypes.some(isFinishedSupplyType) && supplier.status !== 'disabled',
   )?.id;
 
 const formatPriceRange = (guidePrice?: number) => {
@@ -1611,27 +1510,33 @@ const formatPriceRange = (guidePrice?: number) => {
   return value > 0 ? `￥${value.toFixed(2)}` : '-';
 };
 
-const toStockItem = (record: FinishedProductRecord, index: number): StockItem => {
+const toStockItem = (record: FinishedProductRecord): StockItem => {
   const status = normalizeStatus(record.status);
-  const publisherType = normalizePublisherType(record.publisherType);
+  const publisherType = normalizePublisherType();
   return {
     id: record.id,
     code: record.sku,
-    image: record.coverImage || createStoneImage(Number(record.id || index)),
+    image: record.mainImageUrl || '',
     name: record.name,
     categoryId: record.categoryId,
     supplierId: record.supplierId,
     category: categoryPathById(record.categoryId),
     stock: status === 'soldOut' ? 0 : (record.totalStock ?? 0),
-    tenant: supplierNameById(record.supplierId),
-    store: publisherType === '平台发布' ? '平台仓' : '门店仓',
+    supplier: supplierNameById(record.supplierId),
     publisherType,
     isExternalSupplier: Boolean(record.supplierId),
     guidePrice: record.guidePrice,
     guidePrices: record.guidePrices,
     markupPrices: record.markupPrices,
+    mainImageMediaId: record.mainImageMediaId,
+    videoMediaId: record.videoMediaId,
+    videoUrl: record.videoUrl,
+    detail: record.detail || '',
+    attributes: record.attributes ?? [],
+    variants: record.variants ?? [],
     priceRange: formatPriceRange(record.guidePrice),
     status,
+    offShelfReason: record.offShelfReason,
   };
 };
 
@@ -1642,10 +1547,16 @@ const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): Fini
     supplierId: nextItem.supplierId,
     name: nextItem.name,
     sku: nextItem.code,
-    coverImage: nextItem.image,
-    publisherType: nextItem.publisherType,
+    mainImageMediaId: nextItem.mainImageMediaId!,
+    videoMediaId: nextItem.videoMediaId!,
+    detail: nextItem.detail,
     totalStock: nextItem.stock,
     guidePrice: nextItem.guidePrice,
+    guidePrices: nextItem.guidePrices,
+    markupPrices: nextItem.markupPrices,
+    attributes: nextItem.attributes,
+    variants: nextItem.variants,
+    offShelfReason: nextItem.offShelfReason,
     status: nextItem.status,
   };
 };
@@ -1672,14 +1583,19 @@ const createMovement = async (
 const loadInventoryData = async () => {
   loading.value = true;
   try {
-    const [categories, suppliers, products, markupResult, guideSetting] = await Promise.all([
-      listProductCategories(),
-      listSuppliers(),
-      listFinishedProducts(),
-      listFinishedMarkupConfigurationOptions(),
-      getFinishedGuidePriceSetting(),
-    ]);
+    const [categories, attributes, attributeValues, suppliers, products, markupResult, guideSetting] =
+      await Promise.all([
+        listProductCategories(),
+        listProductAttributes(),
+        listProductAttributeValues(),
+        listSuppliers(),
+        listFinishedProducts(),
+        listFinishedMarkupConfigurationOptions(),
+        getFinishedGuidePriceSetting(),
+      ]);
     productCategories.value = categories;
+    productAttributes.value = attributes;
+    productAttributeValues.value = attributeValues;
     productSuppliers.value = suppliers;
     markupConfigurations.value = markupResult;
     guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
@@ -1698,9 +1614,7 @@ const currentPagination = computed(() => paginations[activeTab.value]);
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
 const formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));
 const totalStock = computed(() => specRows.value.reduce((sum, row) => sum + Number(row.quantity || 0), 0));
-const formEditorCover = computed(
-  () => editingProduct.value?.image || (uploadState.mainImage ? dataItems.value[0]?.image : ''),
-);
+const formEditorCover = computed(() => mainImageMedia.value?.url || '');
 
 const handleMenuReselect = (event: Event) => {
   const detail = (event as CustomEvent<{ path?: string }>).detail;
@@ -1722,14 +1636,10 @@ const filteredData = computed(() => {
   const filter = currentAppliedFilter.value;
   return dataItems.value.filter((item) => {
     if (item.status !== activeTab.value) return false;
-    if ((activeTab.value === 'offShelf' || activeTab.value === 'recycle') && item.publisherType !== '平台发布') {
-      return false;
-    }
     if (filter.id && !String(item.id).includes(filter.id)) return false;
     if (filter.name && !item.name.includes(filter.name)) return false;
     if (filter.category && item.category !== filter.category) return false;
-    if (filter.tenant && item.tenant !== filter.tenant) return false;
-    if (filter.store && item.store !== filter.store) return false;
+    if (filter.supplier && item.supplier !== filter.supplier) return false;
     return true;
   });
 });
@@ -1775,7 +1685,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'product', title: '商品名称/ID/编码', minWidth: 220 },
     { colKey: 'stock', title: '库存', width: 88, align: 'center' },
-    { colKey: 'tenant', title: '租户/门店', width: 210 },
+    { colKey: 'supplier', title: '供应商', width: 180 },
     { colKey: 'price', title: '库存/价格', width: 120, align: 'center' },
   ];
   if (activeTab.value !== 'soldOut') {
@@ -1906,12 +1816,9 @@ const batchFillMatchedRows = computed(() =>
   ),
 );
 
-const tabLabel = (tab: TabConfig) => `${tab.label}（${countByStatus.value[tab.value]}）`;
-
-const publisherTagClass = (type: PublisherType) => {
-  if (type === '租户发布') return 'tenant-publish';
-  if (type === '平台发布') return 'platform-publish';
-  return 'platform-publish';
+const tabLabel = (tab: TabConfig) => {
+  const count = countByStatus.value[tab.value];
+  return count ? `${tab.label} ${count}` : tab.label;
 };
 
 const withMovementAction = (actions: { action: RowAction; label: string; theme: string }[]) => [
@@ -1919,25 +1826,15 @@ const withMovementAction = (actions: { action: RowAction; label: string; theme: 
   { action: 'movement' as const, label: '流水', theme: 'primary' },
 ];
 
-const rowActions = (row: StockItem): { action: RowAction; label: string; theme: string }[] => {
+const rowActions = (): { action: RowAction; label: string; theme: string }[] => {
   if (activeTab.value === 'warehouse') {
-    const lastAction =
-      row.publisherType === '租户发布'
-        ? { action: 'reject' as const, label: '驳回', theme: 'warning' }
-        : { action: 'delete' as const, label: '删除', theme: 'danger' };
     return withMovementAction([
       { action: 'shelf', label: '上架', theme: 'primary' },
       { action: 'edit', label: '编辑', theme: 'primary' },
-      lastAction,
+      { action: 'delete', label: '删除', theme: 'danger' },
     ]);
   }
   if (activeTab.value === 'selling') {
-    if (row.publisherType === '租户发布') {
-      return withMovementAction([
-        { action: 'reject', label: '驳回', theme: 'warning' },
-        { action: 'edit', label: '编辑', theme: 'primary' },
-      ]);
-    }
     return withMovementAction([
       { action: 'offShelf', label: '下架', theme: 'warning' },
       { action: 'edit', label: '编辑', theme: 'primary' },
@@ -2038,10 +1935,6 @@ const handleRowAction = (action: RowAction, row: StockItem) => {
     openReasonDialog('offShelf', row, false);
     return;
   }
-  if (action === 'reject') {
-    openReasonDialog('reject', row, false);
-    return;
-  }
   if (action === 'restore') {
     openConfirm('restore', row, `是否放回到仓库“${fullName}”？`);
     return;
@@ -2089,14 +1982,7 @@ const openMovementDrawer = async (row: StockItem) => {
   movementDrawerVisible.value = true;
   movementLoading.value = true;
   try {
-    const records = await listInventoryMovements();
-    movementRows.value = records
-      .filter((item) => item.inventoryType === 'finished_product' && item.inventoryId === row.id)
-      .sort((first, second) => {
-        const firstTime = new Date(first.createdAt ?? '').getTime();
-        const secondTime = new Date(second.createdAt ?? '').getTime();
-        return (Number.isNaN(secondTime) ? 0 : secondTime) - (Number.isNaN(firstTime) ? 0 : firstTime);
-      });
+    movementRows.value = await listInventoryMovements(row.id);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '库存流水加载失败');
   } finally {
@@ -2111,6 +1997,11 @@ const closeMovementDrawer = () => {
 };
 
 const openCategoryDialog = () => {
+  if (!formPageVisible.value) {
+    selectedCategoryId.value = undefined;
+    selectedCategoryPath.value = '';
+  }
+  categoryPickerSelection.value = categoryPathIds(selectedCategoryId.value);
   categoryDialogVisible.value = true;
 };
 
@@ -2118,23 +2009,24 @@ const closeCategoryDialog = () => {
   categoryDialogVisible.value = false;
 };
 
-const selectCategory = (columnIndex: number, item: string) => {
-  const next = [...categorySelection.value];
-  next[columnIndex] = item;
-  if (columnIndex === 0) {
-    next[1] = item === '家具' ? '餐桌' : '地毯';
-    next[2] = item === '家具' ? '奢石餐桌' : '标准款';
-  }
-  if (columnIndex === 1) {
-    next[2] = item === '餐桌' ? '奢石餐桌' : '标准款';
-  }
-  categorySelection.value = next;
+const selectCategory = (columnIndex: number, categoryId: number) => {
+  categoryPickerSelection.value = [...categoryPickerSelection.value.slice(0, columnIndex), categoryId];
 };
 
 const confirmCategory = () => {
-  selectedCategoryPath.value = categorySelection.value.join(' > ');
+  const categoryId = categoryPickerSelection.value.at(-1);
+  if (categoryId == null) {
+    adminFeedback.warning('请选择成品现货分类');
+    return;
+  }
+  if (hasCategoryChildren(categoryId)) {
+    adminFeedback.warning('请继续选择下级分类');
+    return;
+  }
+  selectedCategoryId.value = categoryId;
+  selectedCategoryPath.value = categoryPickerPath.value;
   closeCategoryDialog();
-  openFormPage('create');
+  if (!formPageVisible.value) openFormPage('create');
 };
 
 const createDraftId = () => Date.now() + Math.floor(Math.random() * 100000);
@@ -2203,37 +2095,27 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
 });
 
 const createEditSpecRows = (row: StockItem): SpecRow[] => {
-  if (row.markupPrices?.length || row.guidePrices?.length) {
-    const byVariant = new Map<
-      string,
-      { markupPrices: FinishedProductPrice[]; guidePrice?: FinishedProductGuidePrice }
-    >();
-    row.markupPrices?.forEach((price) => {
-      const key = price.variantKey || row.code;
-      const current = byVariant.get(key) ?? { markupPrices: [] };
-      current.markupPrices.push(price);
-      byVariant.set(key, current);
-    });
-    row.guidePrices?.forEach((price) => {
-      const key = price.variantKey || row.code;
-      const current = byVariant.get(key) ?? { markupPrices: [] };
-      current.guidePrice = price;
-      byVariant.set(key, current);
-    });
-    return Array.from(byVariant.entries()).map(([variantKey, prices], index) =>
-      createBaseSpecRow({
+  if (row.variants.length) {
+    return row.variants.map((variant, index) => {
+      const markupPrices = row.markupPrices?.filter((price) => price.variantKey === variant.variantKey) ?? [];
+      const guidePrice = row.guidePrices?.find((price) => price.variantKey === variant.variantKey);
+      return createBaseSpecRow({
         id: row.id * 100 + index + 1,
-        mode: 'single',
-        specText: prices.guidePrice?.variantLabel || prices.markupPrices[0]?.variantLabel || variantKey,
+        mode: variant.displayMode,
+        specText: variant.displayMode === 'single' ? variant.variantLabel : '',
+        material: variant.material || '',
+        length: variant.lengthValue || '',
+        color: variant.color || '',
+        size: variant.sizeValue || '',
         costCoefficient: '1',
-        cost: String(prices.guidePrice?.costPrice ?? prices.markupPrices[0]?.costPrice ?? ''),
-        guideCoefficient: prices.guidePrice == null ? '' : String(Number(prices.guidePrice.priceCoefficient)),
-        guide: prices.guidePrice == null ? '' : String(prices.guidePrice.price),
-        quantity: index === 0 ? row.stock : 0,
-        merchantCode: variantKey,
-        markupPrices: createMarkupEditors(prices.markupPrices),
-      }),
-    );
+        cost: String(guidePrice?.costPrice ?? markupPrices[0]?.costPrice ?? ''),
+        guideCoefficient: guidePrice == null ? '' : String(Number(guidePrice.priceCoefficient)),
+        guide: guidePrice == null ? '' : String(guidePrice.price),
+        quantity: variant.stock,
+        merchantCode: variant.variantKey,
+        markupPrices: createMarkupEditors(markupPrices),
+      });
+    });
   }
   return [
     createBaseSpecRow({
@@ -2263,30 +2145,52 @@ const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
   confirmedSpecMode.value = 'single';
   confirmedLayeredFields.value = [];
   confirmedImageField.value = null;
-  uploadState.mainImage = false;
-  uploadState.video = false;
+  mainImageMedia.value = undefined;
+  videoMedia.value = undefined;
   if (row) {
     productForm.name = row.name;
     productForm.merchantCode = row.code;
     productForm.totalStock = row.stock;
-    productForm.supplier = row.publisherType === '平台发布' ? '平台自营' : row.tenant;
+    productForm.supplier = row.supplier;
     productForm.shelfNow = row.status === 'selling' ? 'now' : 'later';
-    productForm.brand = '装点猫甄选';
-    productForm.style = '现代轻奢';
-    productForm.material = '大理石';
-    productForm.detail = '天然奢石纹理，适配门店、设计师和 C 端客户选品场景。';
+    productForm.detail = row.detail;
+    row.attributes.forEach((attribute) => {
+      productForm[`attribute_${attribute.attributeId}`] = attribute.value;
+    });
+    selectedCategoryId.value = row.categoryId;
     selectedCategoryPath.value = row.category.replaceAll('/', ' > ');
     specRows.value = createEditSpecRows(row);
-    confirmedSpecMode.value = 'layered';
-    confirmedLayeredFields.value = ['material', 'color', 'size', 'length'];
+    confirmedSpecMode.value = row.variants[0]?.displayMode ?? 'single';
+    confirmedLayeredFields.value = (['material', 'color', 'size', 'length'] as LayeredSpecField[]).filter((field) =>
+      row.variants.some((variant) =>
+        Boolean(
+          field === 'material'
+            ? variant.material
+            : field === 'color'
+              ? variant.color
+              : field === 'size'
+                ? variant.sizeValue
+                : variant.lengthValue,
+        ),
+      ),
+    );
     confirmedImageField.value = null;
     priceRows.value = specRows.value.map(specToPriceRow);
-    uploadState.mainImage = true;
-    uploadState.video = true;
+    mainImageMedia.value = row.mainImageMediaId
+      ? { name: `${row.name}-主图`, mediaId: row.mainImageMediaId, url: row.image }
+      : undefined;
+    videoMedia.value = row.videoMediaId
+      ? { name: `${row.name}-视频`, mediaId: row.videoMediaId, url: row.videoUrl }
+      : undefined;
   }
 };
 
 const closeFormPage = () => {
+  if (pendingUploadedMediaIds.size) {
+    const pendingIds = [...pendingUploadedMediaIds];
+    pendingUploadedMediaIds.clear();
+    pendingIds.forEach((mediaId) => void releaseTemporaryFinishedProductMedia(mediaId));
+  }
   formPageVisible.value = false;
   editingProduct.value = null;
   if (route.path === '/finished-stock-management' && Object.keys(route.query).length) {
@@ -2294,25 +2198,22 @@ const closeFormPage = () => {
   }
 };
 
-const simulateUpload = (target: UploadTarget) => {
-  const labelMap: Record<UploadTarget, string> = {
-    mainImage: '商品主图',
-    video: '商品视频',
-    attributeImage: '属性图片',
-  };
-  if (target === 'mainImage' || target === 'video') {
-    uploadState[target] = true;
+const uploadProductMedia = async (file: File, expectedType: 'image' | 'video'): Promise<AdminMediaValue> => {
+  const uploaded = await uploadFinishedProductMedia(file);
+  if (uploaded.mediaType !== expectedType) {
+    await releaseTemporaryFinishedProductMedia(uploaded.id);
+    throw new Error(expectedType === 'image' ? '请选择图片文件' : '请选择视频文件');
   }
-  adminFeedback.success(`${labelMap[target]}已选择占位资源`);
+  pendingUploadedMediaIds.add(uploaded.id);
+  return { name: file.name, mediaId: uploaded.id, url: uploaded.url };
 };
 
-const simulateSpecImageUpload = (row: SpecRow, field: SpecImageField) => {
-  const key = `${field}Image` as 'specImage' | 'materialImage' | 'lengthImage' | 'colorImage' | 'sizeImage';
-  row[key] = true;
-  adminFeedback.success('规格图片已选择占位资源');
+const releasePendingProductMedia = (media: AdminMediaValue) => {
+  const mediaId = media.mediaId;
+  if (!mediaId || !pendingUploadedMediaIds.has(mediaId)) return;
+  pendingUploadedMediaIds.delete(mediaId);
+  void releaseTemporaryFinishedProductMedia(mediaId);
 };
-
-const isConfirmedImageField = (field: LayeredSpecField) => confirmedImageField.value === field;
 
 const normalizeDecimalInput = (value: unknown) => {
   const text = String(value ?? '').replace(/[^\d.]/g, '');
@@ -2494,9 +2395,6 @@ const selectedSpecGroups = computed(() => specGroups.filter((group) => group.sel
 
 const selectedImageGroup = computed(() => selectedSpecGroups.value.find((group) => group.withImage));
 
-const isSpecImageGroupDisabled = (group: SpecGroup) =>
-  Boolean(selectedImageGroup.value && selectedImageGroup.value !== group);
-
 const addSingleSpec = () => {
   singleSpecs.value.push(createSingleSpecItem());
 };
@@ -2528,18 +2426,6 @@ const toggleSpecGroup = (group: SpecGroup) => {
   group.selected = !group.selected;
   group.withImage = false;
   group.values = [createSpecValue()];
-};
-
-const toggleSpecImageGroup = (group: SpecGroup, checked: boolean) => {
-  if (checked && isSpecImageGroupDisabled(group)) return;
-  specGroups.forEach((item) => {
-    item.withImage = item === group ? checked : false;
-    if (item !== group) {
-      item.values.forEach((value) => {
-        value.imageUploaded = false;
-      });
-    }
-  });
 };
 
 const resetSpecDialog = () => {
@@ -2748,10 +2634,12 @@ const validateProductForm = () => {
       }),
   );
   const checks: { valid: boolean; tab: FormTabKey; message: string }[] = [
-    { valid: uploadState.mainImage, tab: 'description', message: '请上传商品主图' },
-    { valid: uploadState.video, tab: 'description', message: '请上传商品视频' },
+    { valid: Boolean(mainImageMedia.value?.mediaId), tab: 'description', message: '请上传商品主图' },
+    { valid: Boolean(videoMedia.value?.mediaId), tab: 'description', message: '请上传商品视频' },
     { valid: Boolean(productForm.detail.trim()), tab: 'description', message: '请输入宝贝详情' },
     { valid: Boolean(productForm.name.trim()), tab: 'base', message: '请输入商品名称' },
+    { valid: Boolean(productForm.supplier), tab: 'base', message: '请选择供应商' },
+    { valid: selectedCategoryId.value != null, tab: 'base', message: '请选择商品分类' },
     { valid: specRows.value.length > 0, tab: 'sales', message: '请创建销售规格' },
     {
       valid: editingProduct.value != null || guidePriceSettingCoefficient.value != null,
@@ -2776,14 +2664,33 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
   const guidePrice = Number(specRows.value[0]?.guide || 0);
   const status = productForm.shelfNow === 'now' ? 'selling' : 'warehouse';
   return {
-    categoryId: categoryIdByPath(selectedCategoryPath.value),
+    categoryId: selectedCategoryId.value,
     supplierId: supplierIdByName(productForm.supplier),
     name: productForm.name.trim(),
-    sku: productForm.merchantCode.trim() || `FP-${Date.now()}`,
-    coverImage: editingProduct.value?.image || (uploadState.mainImage ? createStoneImage(Date.now()) : undefined),
-    publisherType: '平台发布',
+    sku: productForm.merchantCode.trim(),
+    mainImageMediaId: mainImageMedia.value!.mediaId!,
+    videoMediaId: videoMedia.value!.mediaId!,
+    detail: productForm.detail.trim(),
     totalStock: stock,
     guidePrice: guidePrice > 0 ? guidePrice : undefined,
+    attributes: attributeFields.value
+      .map((field) => ({
+        attributeId: field.attributeId,
+        attributeName: field.label,
+        value: String(productForm[field.key] ?? '').trim(),
+      }))
+      .filter((attribute) => attribute.value),
+    variants: specRows.value.map((row) => ({
+      variantKey: row.merchantCode.trim(),
+      variantLabel:
+        row.specText || [row.material, row.length, row.color, row.size].filter(Boolean).join(' / ') || row.merchantCode,
+      displayMode: row.mode,
+      material: row.material || undefined,
+      lengthValue: row.length || undefined,
+      color: row.color || undefined,
+      sizeValue: row.size || undefined,
+      stock: Number(row.quantity || 0),
+    })),
     guidePrices: specRows.value.map((row) => ({
       priceCoefficient: Number(Number(row.guideCoefficient).toFixed(4)),
       costPrice: Number(row.cost),
@@ -2808,13 +2715,14 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
         };
       }),
     ),
+    offShelfReason: editingProduct.value?.offShelfReason,
     status,
   };
 };
 
 const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {
-  const nextItem = toStockItem(record, dataItems.value.length);
-  nextItem.offShelfReason = offShelfReason;
+  const nextItem = toStockItem(record);
+  if (offShelfReason) nextItem.offShelfReason = offShelfReason;
   const index = dataItems.value.findIndex((item) => item.id === record.id);
   if (index >= 0) dataItems.value[index] = nextItem;
   else dataItems.value.unshift(nextItem);
@@ -2840,6 +2748,7 @@ const submitProductForm = async () => {
       upsertStockItem(created);
       await createMovement(created.id, 'initial', 0, payload.totalStock ?? 0, '新建成品库存');
     }
+    pendingUploadedMediaIds.clear();
     formPageVisible.value = false;
     if (isCreate) {
       adminFeedback.created(payload.name);
@@ -2853,8 +2762,7 @@ const submitProductForm = async () => {
   }
 };
 
-const openReasonDialog = (type: 'reject' | 'offShelf', product: StockItem | null, isBatch: boolean) => {
-  reasonState.type = type;
+const openReasonDialog = (_type: 'offShelf', product: StockItem | null, isBatch: boolean) => {
   reasonState.product = product;
   reasonState.isBatch = isBatch;
   reasonForm.reason = '';
@@ -2874,11 +2782,6 @@ const submitReason = async () => {
   closeReasonDialog();
   saving.value = true;
   try {
-    if (reasonState.type === 'reject' && reasonState.product) {
-      await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason || '平台驳回');
-      adminFeedback.success('商品已驳回');
-      return;
-    }
     if (reasonState.isBatch) {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'offShelf', reasonForm.reason)));
       selectedKeys.value = [];
@@ -2931,6 +2834,7 @@ const updateProductStatus = async (id: number, status: StockStatus, reason?: str
     toProductPayload(item, {
       status,
       stock: afterStock,
+      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,
     }),
   );
   upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);
@@ -2953,8 +2857,6 @@ const handleConfirm = async () => {
     } else if (type === 'purge' && product) {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
-    } else if (type === 'reject' && product) {
-      await updateProductStatus(product.id, 'offShelf', reasonForm.reason || '平台驳回');
     } else if (type === 'batchShelf') {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'selling')));
       selectedKeys.value = [];
@@ -3252,24 +3154,14 @@ const handleConfirm = async () => {
   white-space: nowrap;
 }
 
-.tenant-tag {
+.publisher-tag {
   width: fit-content;
   max-width: 100%;
-}
-
-.tenant-publish {
-  color: #1664ff;
-  background: #eef5ff;
 }
 
 .platform-publish {
   color: #0f7b3b;
   background: #effaf3;
-}
-
-.supplier-publish {
-  color: #b45309;
-  background: #fff7ed;
 }
 
 .table-actions {
@@ -3481,17 +3373,35 @@ const handleConfirm = async () => {
 }
 
 .category-picker {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 12px;
   min-height: 280px;
+  padding-bottom: 4px;
+  overflow-x: auto;
 }
 
 .category-column {
+  flex: 0 0 260px;
   padding: 8px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
+}
+
+.category-column-title {
+  padding: 6px 10px 10px;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.category-option-list {
+  height: 252px;
+  overflow-y: auto;
+}
+
+.category-option-list :deep(.t-empty) {
+  margin-top: 72px;
 }
 
 .category-option {
@@ -3501,17 +3411,22 @@ const handleConfirm = async () => {
   width: 100%;
   height: 38px;
   padding: 0 10px;
-  color: #374151;
+  color: var(--td-text-color-primary);
   cursor: pointer;
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--td-radius-default);
 }
 
 .category-option.active {
-  color: #1664ff;
-  background: #eef5ff;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
   font-weight: 700;
+}
+
+.category-picker-path {
+  margin-top: 12px;
+  color: var(--td-text-color-secondary);
 }
 
 .spec-dialog {

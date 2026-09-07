@@ -22,6 +22,20 @@ export interface ProductAttributePayload {
   status: 'enabled' | 'disabled';
 }
 
+export interface ProductAttributeDeletePreview {
+  deletionMode: 'physical' | 'business' | 'blocked';
+  attributeValueCount: number;
+  unfinishedProductCount: number;
+  soldOutProductCount: number;
+  templateScopes: Array<'finished' | 'accessory'>;
+  message?: string;
+}
+
+export interface ProductAttributeDeleteResult {
+  deletionMode: 'physical' | 'business';
+  attributeValueCount: number;
+}
+
 export function listProductAttributes() {
   return request<ProductAttributeRecord[]>('/admin/product-attributes');
 }
@@ -40,8 +54,12 @@ export function updateProductAttributeStatus(id: number, status: ProductAttribut
   });
 }
 
+export function previewProductAttributeDelete(id: number) {
+  return request<ProductAttributeDeletePreview>(`/admin/product-attributes/${id}/delete-preview`);
+}
+
 export function deleteProductAttribute(id: number) {
-  return request<boolean>(`/admin/product-attributes/${id}`, {
+  return request<ProductAttributeDeleteResult>(`/admin/product-attributes/${id}`, {
     method: 'DELETE',
   });
 }

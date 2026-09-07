@@ -19,10 +19,25 @@ public class FinishedProduct extends BaseEntity {
   @NotBlank
   private String sku;
 
+  /** @deprecated kept only for compatibility with pre-media rows. */
+  @Deprecated(forRemoval = false)
   private String coverImage;
+  private Long mainImageMediaId;
+  private Long videoMediaId;
+
+  @TableField(exist = false)
+  private String mainImageUrl;
+
+  @TableField(exist = false)
+  private String videoUrl;
+
+  private String detail;
   private String publisherType;
   private Integer totalStock;
   private BigDecimal guidePrice;
+  private String offShelfReason;
+  private String createdByName;
+  private Long createdByAccountId;
 
   @Valid
   @TableField(exist = false)
@@ -31,6 +46,14 @@ public class FinishedProduct extends BaseEntity {
   @Valid
   @TableField(exist = false)
   private List<FinishedProductGuidePrice> guidePrices;
+
+  @Valid
+  @TableField(exist = false)
+  private List<FinishedProductAttributeEntry> attributes;
+
+  @Valid
+  @TableField(exist = false)
+  private List<FinishedProductVariant> variants;
 
   public Long getCategoryId() {
     return categoryId;
@@ -72,6 +95,17 @@ public class FinishedProduct extends BaseEntity {
     this.coverImage = coverImage;
   }
 
+  public Long getMainImageMediaId() { return mainImageMediaId; }
+  public void setMainImageMediaId(Long mainImageMediaId) { this.mainImageMediaId = mainImageMediaId; }
+  public Long getVideoMediaId() { return videoMediaId; }
+  public void setVideoMediaId(Long videoMediaId) { this.videoMediaId = videoMediaId; }
+  public String getMainImageUrl() { return mainImageUrl; }
+  public void setMainImageUrl(String mainImageUrl) { this.mainImageUrl = mainImageUrl; }
+  public String getVideoUrl() { return videoUrl; }
+  public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+  public String getDetail() { return detail; }
+  public void setDetail(String detail) { this.detail = detail; }
+
   public String getPublisherType() {
     return publisherType;
   }
@@ -96,6 +130,13 @@ public class FinishedProduct extends BaseEntity {
     this.guidePrice = guidePrice;
   }
 
+  public String getOffShelfReason() { return offShelfReason; }
+  public void setOffShelfReason(String offShelfReason) { this.offShelfReason = offShelfReason; }
+  public String getCreatedByName() { return createdByName; }
+  public void setCreatedByName(String createdByName) { this.createdByName = createdByName; }
+  public Long getCreatedByAccountId() { return createdByAccountId; }
+  public void setCreatedByAccountId(Long createdByAccountId) { this.createdByAccountId = createdByAccountId; }
+
   public List<FinishedProductPrice> getMarkupPrices() {
     return markupPrices == null ? null : List.copyOf(markupPrices);
   }
@@ -110,5 +151,21 @@ public class FinishedProduct extends BaseEntity {
 
   public void setGuidePrices(List<FinishedProductGuidePrice> guidePrices) {
     this.guidePrices = guidePrices == null ? null : List.copyOf(guidePrices);
+  }
+
+  public List<FinishedProductAttributeEntry> getAttributes() {
+    return attributes == null ? null : List.copyOf(attributes);
+  }
+
+  public void setAttributes(List<FinishedProductAttributeEntry> attributes) {
+    this.attributes = attributes == null ? null : List.copyOf(attributes);
+  }
+
+  public List<FinishedProductVariant> getVariants() {
+    return variants == null ? null : List.copyOf(variants);
+  }
+
+  public void setVariants(List<FinishedProductVariant> variants) {
+    this.variants = variants == null ? null : List.copyOf(variants);
   }
 }

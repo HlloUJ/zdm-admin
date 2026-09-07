@@ -208,7 +208,7 @@
                       <t-link
                         v-if="canRemoveBinding"
                         theme="danger"
-                        :disabled="savingId !== null"
+                        :disabled="row.publishStatus === 'published' || savingId !== null"
                         @click="openDeleteConfirm(row)"
                       >
                         移除

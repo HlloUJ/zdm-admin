@@ -132,7 +132,122 @@ class CategoryAttributeApiTest {
         .andExpect(status().isOk());
     mockMvc.perform(delete("/api/admin/product-attributes/{id}", attributeId)
             .header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletionMode").value("physical"));
+  }
+
+  @Test
+  void productAttributeDeletionReturnsBusinessMessagesForExistingReferences() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_categories
+          (id, scope, name, sort_order, product_count, status, created_by_name)
+        VALUES (9880, 'finished', '属性删除保护测试分类', 1, 0, 'enabled', '韩健')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attributes
+          (id, scope, name, value_type, attribute_role, status)
+        VALUES
+          (9880, 'finished', '分类模板引用属性', 'text', 'basic', 'enabled'),
+          (9881, 'finished', '属性值引用属性', 'select', 'basic', 'enabled'),
+          (9882, 'finished', '无引用属性', 'text', 'basic', 'enabled'),
+          (9883, 'finished', '未售完商品引用属性', 'text', 'basic', 'enabled'),
+          (9884, 'finished', '已售完商品历史属性', 'select', 'basic', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO category_attributes
+          (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
+        VALUES (9880, 9880, 0, 0, 1, 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO product_attribute_values
+          (attribute_id, scope, value, code, status)
+        VALUES
+          (9881, 'finished', '物理删除属性值', 'attribute-physical-delete', 'enabled'),
+          (9884, 'finished', '历史保留属性值', 'attribute-business-delete', 'enabled')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO finished_products
+          (id, category_id, name, sku, total_stock, status)
+        VALUES
+          (9883, 9880, '未售完属性删除保护商品', 'ATTRIBUTE-DELETE-ACTIVE-9883', 1, 'warehouse'),
+          (9884, 9880, '已售完属性业务删除商品', 'ATTRIBUTE-DELETE-SOLD-9884', 0, 'soldOut')
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO finished_product_attribute_entries
+          (finished_product_id, attribute_id, attribute_name, value)
+        VALUES
+          (9883, 9883, '未售完商品引用属性', '仍在使用'),
+          (9884, 9884, '已售完商品历史属性', '历史快照')
+        """);
+    String token = TokenAuthenticationFilter.createAccountToken(1L);
+
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", 9880)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message")
+            .value("该属性已被分类属性模板使用，不能删除，请先前往“分类属性模板-成品现货模板tab”移除该属性。"));
+
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", 9881)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletionMode").value("physical"))
+        .andExpect(jsonPath("$.data.attributeValueCount").value(1));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attributes WHERE id = 9881",
+        Integer.class)).isZero();
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attribute_values WHERE attribute_id = 9881",
+        Integer.class)).isZero();
+
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", 9882)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletionMode").value("physical"))
+        .andExpect(jsonPath("$.data.attributeValueCount").value(0));
+
+    mockMvc.perform(get("/api/admin/product-attributes/{id}/delete-preview", 9883)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletionMode").value("blocked"))
+        .andExpect(jsonPath("$.data.unfinishedProductCount").value(1))
+        .andExpect(jsonPath("$.data.message")
+            .value("该属性仍被未售完商品使用，不能删除，请先处理关联商品。"));
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", 9883)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message")
+            .value("该属性仍被未售完商品使用，不能删除，请先处理关联商品。"));
+
+    mockMvc.perform(get("/api/admin/product-attributes/{id}/delete-preview", 9884)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletionMode").value("business"))
+        .andExpect(jsonPath("$.data.soldOutProductCount").value(1))
+        .andExpect(jsonPath("$.data.attributeValueCount").value(1));
+    mockMvc.perform(delete("/api/admin/product-attributes/{id}", 9884)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.deletionMode").value("business"))
+        .andExpect(jsonPath("$.data.attributeValueCount").value(1));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attributes WHERE id = 9884 AND deleted_at IS NOT NULL",
+        Integer.class)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM product_attribute_values WHERE attribute_id = 9884 AND status = 'disabled'",
+        Integer.class)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM finished_product_attribute_entries WHERE attribute_id = 9884",
+        Integer.class)).isEqualTo(1);
+    mockMvc.perform(get("/api/admin/product-attributes")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == 9884)]").isEmpty());
   }
 
   @Test
@@ -467,7 +582,9 @@ class CategoryAttributeApiTest {
         """
         INSERT INTO product_categories
           (id, scope, name, sort_order, product_count, status, created_by_name)
-        VALUES (9920, 'finished', '数据权限豁免测试分类', 1, 0, 'enabled', '其他创建人')
+        VALUES
+          (9920, 'finished', '数据权限豁免测试分类', 1, 0, 'enabled', '其他创建人'),
+          (9923, 'accessory', '无权查看的配件分类', 1, 0, 'enabled', '其他创建人')
         """);
     jdbcTemplate.update(
         """
@@ -476,7 +593,8 @@ class CategoryAttributeApiTest {
         VALUES
           (9920, 'shared', '已绑定测试属性', 'select', 'basic', 'enabled'),
           (9921, 'shared', '批量绑定属性一', 'select', 'basic', 'enabled'),
-          (9922, 'finished', '批量绑定属性二', 'number', 'basic', 'enabled')
+          (9922, 'finished', '批量绑定属性二', 'number', 'basic', 'enabled'),
+          (9923, 'accessory', '无权查看的配件属性', 'text', 'basic', 'enabled')
         """);
     jdbcTemplate.update(
         """
@@ -488,7 +606,9 @@ class CategoryAttributeApiTest {
         """
         INSERT INTO category_attributes
           (category_id, attribute_id, required_flag, sku_flag, sort_order, status, created_by_name)
-        VALUES (9920, 9920, 1, 0, 1, 'enabled', '其他绑定人')
+        VALUES
+          (9920, 9920, 1, 0, 1, 'enabled', '其他绑定人'),
+          (9923, 9923, 0, 0, 1, 'enabled', '无权查看的配件绑定人')
         """);
     Long otherCreatorBindingId = jdbcTemplate.queryForObject(
         "SELECT id FROM category_attributes WHERE category_id = 9920 AND attribute_id = 9920",
@@ -499,7 +619,8 @@ class CategoryAttributeApiTest {
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[?(@.id == %s)].createdByName".formatted(otherCreatorBindingId))
-            .value(hasItem("其他绑定人")));
+            .value(hasItem("其他绑定人")))
+        .andExpect(jsonPath("$.data[?(@.categoryId == 9923)]").isEmpty());
 
     mockMvc.perform(post("/api/admin/category-attributes/batch")
             .header("Authorization", "Bearer " + token)
@@ -631,6 +752,15 @@ class CategoryAttributeApiTest {
         "SELECT publish_status FROM category_attributes WHERE id = ?",
         String.class,
         batchBindingId)).isEqualTo("published");
+
+    mockMvc.perform(delete("/api/admin/category-attributes/{id}", batchBindingId)
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先取消发布后再移除属性"));
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM category_attributes WHERE id = ?",
+        Integer.class,
+        batchBindingId)).isEqualTo(1);
 
     mockMvc.perform(put("/api/admin/category-attributes/{id}/unpublish", batchBindingId)
             .header("Authorization", "Bearer " + token))

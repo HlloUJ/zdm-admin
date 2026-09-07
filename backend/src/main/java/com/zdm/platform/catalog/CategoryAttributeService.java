@@ -34,6 +34,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
 
   @Transactional
   public CategoryAttribute createCategoryAttribute(CategoryAttribute categoryAttribute) {
+    requireActiveAttribute(categoryAttribute.getAttributeId());
     categoryAttribute.setAttributeRole(normalizeAttributeRole(categoryAttribute.getAttributeRole()));
     validateAttributeRoleAndSku(categoryAttribute.getAttributeRole(), categoryAttribute.getSkuFlag());
     validateSkuAttributeLimit(categoryAttribute.getCategoryId(), null, categoryAttribute.getSkuFlag());
@@ -49,6 +50,7 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
   @Transactional
   public List<CategoryAttribute> createCategoryAttributes(CategoryAttributeBatchRequest request) {
     List<Long> attributeIds = new ArrayList<>(new LinkedHashSet<>(request.attributeIds()));
+    attributeIds.forEach(this::requireActiveAttribute);
     boolean alreadyBound = lambdaQuery()
         .eq(CategoryAttribute::getCategoryId, request.categoryId())
         .in(CategoryAttribute::getAttributeId, attributeIds)
@@ -137,8 +139,13 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
     return getById(id);
   }
 
-  public List<CategoryAttribute> listWithOptionCounts() {
-    List<CategoryAttribute> categoryAttributes = list();
+  public List<CategoryAttribute> listWithOptionCounts(List<Long> categoryIds) {
+    if (categoryIds.isEmpty()) {
+      return List.of();
+    }
+    List<CategoryAttribute> categoryAttributes = lambdaQuery()
+        .in(CategoryAttribute::getCategoryId, categoryIds)
+        .list();
     var counts = valueBindingService.enabledBindingCounts(
         categoryAttributes.stream().map(CategoryAttribute::getId).toList());
     categoryAttributes.forEach(categoryAttribute ->
@@ -148,7 +155,10 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
 
   @Transactional
   public boolean deleteCategoryAttribute(Long id) {
-    requireCategoryAttribute(id);
+    CategoryAttribute existing = requireCategoryAttribute(id);
+    if ("published".equals(existing.getPublishStatus())) {
+      throw new IllegalArgumentException("请先取消发布后再移除属性");
+    }
     return removeById(id);
   }
 
@@ -158,6 +168,14 @@ public class CategoryAttributeService extends ServiceImpl<CategoryAttributeMappe
       throw new IllegalArgumentException("类目属性模板不存在");
     }
     return existing;
+  }
+
+  private ProductAttribute requireActiveAttribute(Long id) {
+    ProductAttribute attribute = attributeService.getActiveByIdForShare(id);
+    if (attribute == null) {
+      throw new IllegalArgumentException("属性不存在或已被删除");
+    }
+    return attribute;
   }
 
   private String normalizeAttributeRole(String attributeRole) {
