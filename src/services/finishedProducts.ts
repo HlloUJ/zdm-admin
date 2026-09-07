@@ -32,6 +32,7 @@ export interface FinishedProductVariant {
   variantKey: string;
   variantLabel: string;
   displayMode: 'single' | 'layered';
+  salesAttributes?: Record<string, string>;
   material?: string;
   lengthValue?: string;
   color?: string;
@@ -46,6 +47,8 @@ export interface FinishedProductRecord {
   name: string;
   sku: string;
   mainImageMediaId?: number;
+  mainImageMediaIds?: number[];
+  mainImageUrls?: string[];
   videoMediaId?: number;
   mainImageUrl?: string;
   videoUrl?: string;
@@ -72,6 +75,7 @@ export interface FinishedProductPayload {
   name: string;
   sku: string;
   mainImageMediaId: number;
+  mainImageMediaIds?: number[];
   videoMediaId: number;
   detail: string;
   totalStock?: number;
@@ -115,3 +119,11 @@ export function deleteFinishedProduct(id: number) {
     method: 'DELETE',
   });
 }
+
+export interface FinishedProductPriceLevelOption {
+  id: number;
+  name: string;
+  sortOrder?: number;
+}
+export const listFinishedProductPriceLevelOptions = () =>
+  request<FinishedProductPriceLevelOption[]>('/admin/finished-products/price-level-options');

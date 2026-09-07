@@ -2,6 +2,7 @@ package com.zdm.platform.inventory;
 
 import com.zdm.platform.common.AdminCrudController;
 import com.zdm.platform.common.ApiResponse;
+import com.zdm.platform.common.StoreLevelPricingDirectory;
 import com.zdm.platform.media.MediaAssetService;
 import com.zdm.platform.media.MediaStorageService;
 import com.zdm.platform.media.MediaUploadResponse;
@@ -26,15 +27,25 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   private final FinishedProductService service;
   private final PermissionGuard permissionGuard;
   private final MediaAssetService mediaAssetService;
+  private final StoreLevelPricingDirectory storeLevelDirectory;
 
   public FinishedProductController(
       FinishedProductService service,
       PermissionGuard permissionGuard,
-      MediaAssetService mediaAssetService) {
+      MediaAssetService mediaAssetService,
+      StoreLevelPricingDirectory storeLevelDirectory) {
     super(service, permissionGuard, PERMISSION_PREFIX);
     this.service = service;
     this.permissionGuard = permissionGuard;
     this.mediaAssetService = mediaAssetService;
+    this.storeLevelDirectory = storeLevelDirectory;
+  }
+
+  @GetMapping("/price-level-options")
+  public ApiResponse<List<StoreLevelPricingDirectory.Level>> priceLevelOptions() {
+    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
+    permissionGuard.requireAllData();
+    return ApiResponse.ok(storeLevelDirectory.listEnabledLevels());
   }
 
   @PostMapping("/media")

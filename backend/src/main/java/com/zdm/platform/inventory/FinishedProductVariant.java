@@ -1,11 +1,14 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import java.util.Map;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
-@TableName("finished_product_variants")
+@TableName(value = "finished_product_variants", autoResultMap = true)
 public class FinishedProductVariant extends BaseEntity {
   private Long finishedProductId;
 
@@ -14,6 +17,12 @@ public class FinishedProductVariant extends BaseEntity {
 
   @NotBlank
   private String variantLabel;
+
+  @TableField(typeHandler = JacksonTypeHandler.class)
+  private Map<String, String> salesAttributes;
+
+  public Map<String, String> getSalesAttributes() { return salesAttributes; }
+  public void setSalesAttributes(Map<String, String> salesAttributes) { this.salesAttributes = salesAttributes; }
 
   private String displayMode;
   private String material;

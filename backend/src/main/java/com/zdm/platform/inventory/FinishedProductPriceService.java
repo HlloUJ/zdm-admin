@@ -1,6 +1,7 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zdm.platform.common.StoreLevelPricingDirectory;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -16,12 +17,12 @@ import org.springframework.util.StringUtils;
 @Service
 public class FinishedProductPriceService {
   private final FinishedProductPriceMapper mapper;
-  private final FinishedMarkupConfigurationService configurationService;
+  private final StoreLevelPricingDirectory storeLevelDirectory;
 
   public FinishedProductPriceService(FinishedProductPriceMapper mapper,
-      FinishedMarkupConfigurationService configurationService) {
+      StoreLevelPricingDirectory storeLevelDirectory) {
     this.mapper = mapper;
-    this.configurationService = configurationService;
+    this.storeLevelDirectory = storeLevelDirectory;
   }
 
   public List<FinishedProductPrice> listPrices(Long productId) {
@@ -35,13 +36,9 @@ public class FinishedProductPriceService {
   @Transactional
   public void replacePrices(Long productId, List<FinishedProductPrice> requestedPrices) {
     List<FinishedProductPrice> existingPrices = listPrices(productId);
-    Map<Long, String> levelNames = existingPrices.isEmpty()
-        ? configurationService.listConfigurations(true).stream().collect(Collectors.toMap(
-            FinishedMarkupConfiguration::getStoreLevelId,
-            FinishedMarkupConfiguration::getName))
-        : existingPrices.stream().collect(Collectors.toMap(
-            FinishedProductPrice::getStoreLevelId,
-            FinishedProductPrice::getStoreLevelName));
+    Map<Long, String> levelNames = new LinkedHashMap<>();
+    existingPrices.forEach(price -> levelNames.putIfAbsent(price.getStoreLevelId(), price.getStoreLevelName()));
+    storeLevelDirectory.listEnabledLevels().forEach(level -> levelNames.putIfAbsent(level.id(), level.name()));
     Set<Long> expectedIds = levelNames.keySet();
     if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
       return;

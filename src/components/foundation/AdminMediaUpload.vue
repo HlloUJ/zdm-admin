@@ -15,8 +15,22 @@
       删除
     </t-button>
     <strong v-if="showTitle">{{ title }}</strong>
+    <video
+      v-if="mediaType === 'video' && modelValue?.url"
+      class="admin-media-upload__preview"
+      :src="modelValue.url"
+      :aria-label="`播放${title}`"
+      preload="metadata"
+      muted
+      playsinline
+      role="button"
+      tabindex="0"
+      @click.stop="emit('preview', modelValue)"
+      @keydown.enter.stop="emit('preview', modelValue)"
+      @keydown.space.prevent.stop="emit('preview', modelValue)"
+    />
     <img
-      v-if="previewUrl"
+      v-else-if="previewUrl"
       class="admin-media-upload__preview"
       :src="previewUrl"
       :alt="title"
@@ -59,6 +73,7 @@ const props = withDefaults(
     title: string;
     label?: string;
     accept?: string;
+    mediaType?: 'image' | 'video';
     required?: boolean;
     showTitle?: boolean;
     disabled?: boolean;
@@ -69,6 +84,7 @@ const props = withDefaults(
     modelValue: undefined,
     label: '点击上传',
     accept: 'image/*',
+    mediaType: 'image',
     required: false,
     showTitle: true,
     disabled: false,
