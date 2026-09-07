@@ -235,7 +235,7 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(categoryPanel.locator('.category-node-leaf.active')).toHaveText('岩板茶几');
   const materialRow = main.locator('tbody tr').filter({ hasText: '材质' }).first();
   await expect(materialRow).toContainText('韩健');
-  await expect(materialRow.getByText('停用', { exact: true })).toHaveCount(1);
+  await expect(materialRow.getByText('停用', { exact: true })).toHaveCount(0);
   await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
   await expect(materialRow.locator('.t-tag').filter({ hasText: '未发布' })).toHaveClass(/t-tag--danger/);
   const publishButton = materialRow.getByText('发布', { exact: true });
@@ -253,24 +253,21 @@ test('selects the first leaf and manages bindings from the template list', async
   const filterItemTops = await templatePanel
     .locator('.filter-fields .t-form__item')
     .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
-  expect(filterItemTops).toHaveLength(3);
+  expect(filterItemTops).toHaveLength(2);
   expect(Math.max(...filterItemTops) - Math.min(...filterItemTops)).toBeLessThanOrEqual(1);
   const keywordFilter = templatePanel.locator('.t-form__item').filter({ hasText: '属性名称' });
-  const statusFilter = templatePanel.locator('.t-form__item').filter({ hasText: '状态' });
   const keywordFilterWidth = await keywordFilter.evaluate((item) => item.getBoundingClientRect().width);
-  const statusFilterWidth = await statusFilter.evaluate((item) => item.getBoundingClientRect().width);
   const publishFilterWidth = await publishFilter.evaluate((item) => item.getBoundingClientRect().width);
-  expect(keywordFilterWidth / statusFilterWidth).toBeCloseTo(1.6, 1);
-  expect(publishFilterWidth).toBeCloseTo(statusFilterWidth, 0);
+  expect(keywordFilterWidth / publishFilterWidth).toBeCloseTo(1.6, 1);
   const filterControlTops = await templatePanel
     .locator('.filter-row .t-form__item, .filter-row .t-button')
     .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
-  expect(filterControlTops).toHaveLength(5);
+  expect(filterControlTops).toHaveLength(4);
   expect(Math.max(...filterControlTops) - Math.min(...filterControlTops)).toBeLessThanOrEqual(1);
   const filterSpacing = await templatePanel.locator('.filter-row').evaluate((row) => {
     const keywordLabel = row.querySelector<HTMLElement>('.t-form__item:nth-child(1) .t-form__label');
     const keywordInput = row.querySelector<HTMLElement>('.t-form__item:nth-child(1) .t-input');
-    const publishItem = row.querySelector<HTMLElement>('.t-form__item:nth-child(3)');
+    const publishItem = row.querySelector<HTMLElement>('.t-form__item:nth-child(2)');
     const queryButton = row.querySelector<HTMLElement>('.filter-actions .t-button');
     return keywordLabel && keywordInput && publishItem && queryButton
       ? {
@@ -359,12 +356,11 @@ test('selects the first leaf and manages bindings from the template list', async
   });
   expect(skuHeaderLayout.width).toBeGreaterThanOrEqual(156);
   expect(skuHeaderLayout.height).toBeLessThanOrEqual(skuHeaderLayout.lineHeight + 2);
-  await expect(headers.nth(7)).toContainText('状态');
-  await expect(headers.nth(8)).toContainText('发布');
-  await expect(headers.nth(9)).toContainText('绑定人');
-  await expect(headers.nth(10)).toContainText('绑定时间');
+  await expect(headers.nth(7)).toContainText('发布');
+  await expect(headers.nth(8)).toContainText('绑定人');
+  await expect(headers.nth(9)).toContainText('绑定时间');
   await expect(headers.getByText('排序', { exact: true })).toHaveCount(0);
-  const operationColumnWidth = await headers.nth(11).evaluate((header) => header.getBoundingClientRect().width);
+  const operationColumnWidth = await headers.nth(10).evaluate((header) => header.getBoundingClientRect().width);
   expect(operationColumnWidth).toBeGreaterThanOrEqual(226);
   expect(operationColumnWidth).toBeLessThanOrEqual(234);
   await expect(materialRow).toContainText('韩健');
@@ -505,11 +501,11 @@ test('selects the first leaf and manages bindings from the template list', async
   const colorRow = main.locator('tbody tr').filter({ hasText: '颜色' });
   const sizeRow = main.locator('tbody tr').filter({ hasText: '尺寸' });
   await expect(colorRow).toContainText('当前操作员');
-  await expect(colorRow.getByText('启用', { exact: true })).toHaveCount(1);
+  await expect(colorRow.getByText('启用', { exact: true })).toHaveCount(0);
   await expect(colorRow.getByText('未发布', { exact: true })).toHaveCount(1);
   await expect(sizeRow).toContainText('当前操作员');
   await expect(sizeRow.locator('td').nth(3)).toHaveText('-');
-  await expect(sizeRow.getByText('启用', { exact: true })).toHaveCount(1);
+  await expect(sizeRow.getByText('启用', { exact: true })).toHaveCount(0);
   await expect(sizeRow.getByText('未发布', { exact: true })).toHaveCount(1);
   const colorRoleSelect = colorRow.locator('.attribute-role-select');
   const sizeRoleSelect = sizeRow.locator('.attribute-role-select');
@@ -521,7 +517,7 @@ test('selects the first leaf and manages bindings from the template list', async
   await expect(sizeSkuSwitch).toHaveClass(/t-is-disabled/);
 
   await colorRow.getByText('发布', { exact: true }).click();
-  await expect(page.locator('.t-message').filter({ hasText: '请先选择属性角色' })).toBeVisible();
+  await expect(page.locator('.t-message').filter({ hasText: '请选择属性角色' })).toBeVisible();
 
   const salesRoleResponsePromise = page.waitForResponse(
     (response) =>
@@ -700,7 +696,7 @@ test('keeps template data visible while hiding ungranted binding operations', as
   await expect(row.locator('.attribute-role-select').getByRole('textbox')).toBeDisabled();
   await expect(row.locator('.t-table__handle-draggable')).toHaveCount(0);
   await expect(row.getByText('启用', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('停用', { exact: true })).toHaveCount(1);
+  await expect(row.getByText('停用', { exact: true })).toHaveCount(0);
   await expect(row.getByText('未发布', { exact: true })).toHaveCount(1);
   await expect(row.getByText('发布', { exact: true })).toHaveCount(0);
   await expect(row.getByText('取消发布', { exact: true })).toHaveCount(0);
@@ -734,4 +730,59 @@ test('enables only the granted category attribute field control', async ({ page 
   await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
   await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
   await expect(row.getByText('绑定选项值', { exact: true })).toHaveCount(0);
+});
+
+test('keeps used roles locked without an enable or disable control', async ({ page }) => {
+  await page.route('**/api/admin/category-attributes', (route) =>
+    fulfillJson(route, [
+      {
+        id: 1,
+        categoryId: 3,
+        attributeId: 1,
+        attributeRole: 'product',
+        requiredFlag: true,
+        skuFlag: false,
+        publishStatus: 'unpublished',
+        usageCount: 2,
+      },
+    ]),
+  );
+  await page.goto('/category-attribute-template');
+  const panel = page.locator('.template-panel');
+  const row = panel.getByRole('row').filter({ hasText: '材质' });
+  await expect(row.locator('.attribute-role-select input')).toBeDisabled();
+  await expect(row.getByText('移除', { exact: true })).toHaveCount(0);
+  await expect(panel.getByRole('columnheader', { name: '状态', exact: true })).toHaveCount(0);
+  await expect(panel.locator('.t-form__item').filter({ hasText: '状态' })).toHaveCount(0);
+  await expect(row.getByText('停用', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('启用', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('发布', { exact: true })).toBeVisible();
+});
+
+test('validates an empty attribute role only after publishing is requested', async ({ page }) => {
+  await page.route('**/api/admin/category-attributes', (route) =>
+    fulfillJson(route, [
+      {
+        id: 1,
+        categoryId: 3,
+        attributeId: 1,
+        attributeRole: null,
+        requiredFlag: false,
+        skuFlag: false,
+        status: 'enabled',
+        publishStatus: 'unpublished',
+        usageCount: 0,
+      },
+    ]),
+  );
+  await page.goto('/category-attribute-template');
+  const row = page.locator('.template-panel').getByRole('row').filter({ hasText: '材质' });
+  const roleInput = row.locator('.attribute-role-select .t-input');
+  await expect(roleInput).not.toHaveClass(/t-is-error/);
+  await row.getByText('发布', { exact: true }).click();
+  await expect(roleInput).toHaveClass(/t-is-error/);
+  await expect(page.getByText('请选择属性角色', { exact: true })).toBeVisible();
+  await row.locator('.attribute-role-select').click();
+  await page.getByText('商品属性', { exact: true }).last().click();
+  await expect(roleInput).not.toHaveClass(/t-is-error/);
 });

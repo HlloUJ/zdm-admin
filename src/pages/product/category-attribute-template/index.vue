@@ -73,12 +73,6 @@
                         <t-form-item label="属性名称" label-width="72px">
                           <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
                         </t-form-item>
-                        <t-form-item label="状态">
-                          <t-select v-model="searchForm.status" clearable placeholder="全部">
-                            <t-option label="启用" value="enabled" />
-                            <t-option label="停用" value="disabled" />
-                          </t-select>
-                        </t-form-item>
                         <t-form-item label="发布">
                           <t-select v-model="searchForm.publishStatus" clearable placeholder="全部">
                             <t-option label="已发布" value="published" />
@@ -137,7 +131,9 @@
                       class="attribute-role-select"
                       :model-value="row.attributeRole || undefined"
                       :loading="savingId === row.id && savingField === 'attributeRole'"
-                      :disabled="!canSetAttributeRole || row.publishStatus === 'published'"
+                      :disabled="!canSetAttributeRole || row.publishStatus === 'published' || row.usageCount > 0"
+                      :status="roleValidationIds.has(row.id) && !row.attributeRole ? 'error' : undefined"
+                      :title="row.usageCount > 0 ? `已被当前分类的 ${row.usageCount} 个商品使用，不能修改属性角色` : ''"
                       placeholder="请选择"
                       size="small"
                       @change="changeAttributeRole(row, $event)"
@@ -175,11 +171,6 @@
                       />
                     </span>
                   </template>
-                  <template #status="{ row }">
-                    <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
-                      {{ row.status === 'enabled' ? '启用' : '停用' }}
-                    </t-tag>
-                  </template>
                   <template #publishStatus="{ row }">
                     <t-tag :theme="row.publishStatus === 'published' ? 'success' : 'danger'" variant="light">
                       {{ row.publishStatus === 'published' ? '已发布' : '未发布' }}
@@ -206,7 +197,7 @@
                         {{ row.publishStatus === 'published' ? '取消发布' : '发布' }}
                       </t-link>
                       <t-link
-                        v-if="canRemoveBinding"
+                        v-if="canRemoveBinding && row.usageCount === 0"
                         theme="danger"
                         :disabled="row.publishStatus === 'published' || savingId !== null"
                         @click="openDeleteConfirm(row)"
@@ -388,7 +379,7 @@
 
 <script setup lang="ts">
 import type { PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, h, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -435,6 +426,7 @@ interface BindingRow {
   scope: ProductAttributeRecord['scope'];
   valueType: ProductAttributeRecord['valueType'];
   optionCount: number;
+  usageCount: number;
   attributeRole: AttributeRole;
   requiredFlag: boolean;
   skuFlag: boolean;
@@ -486,6 +478,7 @@ const canRemoveBinding = computed(() => hasTemplateAction('delete'));
 const pageTitle = computed(() => (activeScope.value === 'finished' ? '成品现货发布模板' : '配件发布模板'));
 const loading = ref(false);
 const savingId = ref<number | null>(null);
+const roleValidationIds = reactive(new Set<number>());
 const savingField = ref<'attributeRole' | 'requiredFlag' | 'skuFlag' | null>(null);
 const categories = ref<ProductCategoryRecord[]>([]);
 const attributes = ref<ProductAttributeRecord[]>([]);
@@ -516,8 +509,8 @@ const publishConfirmVisible = ref(false);
 const publishTarget = ref<BindingRow | null>(null);
 const deleteConfirmVisible = ref(false);
 const deleteTarget = ref<BindingRow | null>(null);
-const searchForm = reactive({ keyword: '', status: '' as Status | '', publishStatus: '' as PublishStatus | '' });
-const appliedSearch = reactive({ keyword: '', status: '' as Status | '', publishStatus: '' as PublishStatus | '' });
+const searchForm = reactive({ keyword: '', publishStatus: '' as PublishStatus | '' });
+const appliedSearch = reactive({ keyword: '', publishStatus: '' as PublishStatus | '' });
 const pagination = reactive({ current: 1, pageSize: 10 });
 const pageSizeOptions = [10, 20, 50];
 const bindForm = reactive({ attributeIds: [] as number[] });
@@ -527,10 +520,14 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
   { colKey: 'valueType', title: '值类型', width: 120 },
   { colKey: 'optionCount', title: '选项数', width: 100, align: 'center' },
-  { colKey: 'attributeRole', title: '属性角色', width: 140, align: 'center' },
+  {
+    colKey: 'attributeRole',
+    title: () => h('span', ['属性角色', h('span', { style: { color: 'var(--td-error-color)' } }, '*')]),
+    width: 140,
+    align: 'center',
+  },
   { colKey: 'skuFlag', title: '参与SKU组合', width: 160, align: 'center' },
   { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
-  { colKey: 'status', title: '状态', width: 90, align: 'center' },
   { colKey: 'publishStatus', title: '发布', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
@@ -628,6 +625,7 @@ const allBindingRows = computed<BindingRow[]>(() => {
         scope: attribute?.scope ?? 'shared',
         valueType: attribute?.valueType ?? 'text',
         optionCount: item.optionCount ?? 0,
+        usageCount: item.usageCount ?? 0,
         attributeRole: (item.attributeRole === 'product' || item.attributeRole === 'sales'
           ? item.attributeRole
           : '') as AttributeRole,
@@ -651,7 +649,6 @@ const bindingRows = computed(() =>
     const keyword = appliedSearch.keyword.trim().toLowerCase();
     return (
       (!keyword || item.name.toLowerCase().includes(keyword)) &&
-      (!appliedSearch.status || item.status === appliedSearch.status) &&
       (!appliedSearch.publishStatus || item.publishStatus === appliedSearch.publishStatus)
     );
   }),
@@ -837,7 +834,6 @@ function search() {
 
 function reset() {
   searchForm.keyword = '';
-  searchForm.status = '';
   searchForm.publishStatus = '';
   search();
 }
@@ -1039,8 +1035,12 @@ function getCurrentBindingRow(row: BindingRow) {
 
 function changeAttributeRole(row: BindingRow, value: unknown) {
   const currentRow = getCurrentBindingRow(row);
-  if (!canSetAttributeRole.value || currentRow.publishStatus === 'published') return;
+  if (!canSetAttributeRole.value || currentRow.usageCount > 0 || currentRow.publishStatus === 'published') return;
   const nextRole = getAttributeRoleValue(value);
+  if (!nextRole) {
+    adminFeedback.warning('请选择属性角色');
+    return;
+  }
   if (nextRole === currentRow.attributeRole) return;
   if (currentRow.skuFlag && nextRole !== 'sales') {
     roleChangeTarget.value = currentRow;
@@ -1143,7 +1143,8 @@ async function togglePublish(row: BindingRow) {
 async function openPublishConfirm(row: BindingRow) {
   if (!canTogglePublish.value || savingId.value !== null) return;
   if (row.publishStatus === 'unpublished' && !row.attributeRole) {
-    adminFeedback.error('请先选择属性角色');
+    roleValidationIds.add(row.id);
+    adminFeedback.error('请选择属性角色');
     return;
   }
   if (row.publishStatus === 'unpublished' && row.valueType === 'select') {

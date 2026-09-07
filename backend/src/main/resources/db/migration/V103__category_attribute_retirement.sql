@@ -1,0 +1,1 @@
+ALTER TABLE category_attributes ADD COLUMN retired_flag BOOLEAN NOT NULL DEFAULT FALSE;
