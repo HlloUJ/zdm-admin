@@ -96,11 +96,9 @@ public class ProductAttributeController {
     if (preview.templateScopes().isEmpty()) {
       return preview;
     }
-    boolean hasLegacyView = permissionGuard.hasPermission(
-        "admin.product-data-center.category-attribute-template.view");
     boolean canViewEveryTemplate = preview.templateScopes().stream()
-        .allMatch(scope -> hasLegacyView || permissionGuard.hasPermission(
-            "admin.product-data-center.category-attribute-template." + scope + ".view"));
+        .allMatch(scope -> permissionGuard.hasPermission(
+            "admin.product-data-center.category-attribute-template." + scope + ".attributes.view"));
     if (!canViewEveryTemplate) {
       return preview.withMessage(
           "该属性已被分类属性模板使用，不能删除，请联系有权限的管理员处理。");

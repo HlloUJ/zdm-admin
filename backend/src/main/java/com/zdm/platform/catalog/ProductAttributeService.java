@@ -76,8 +76,9 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
     List<String> templateScopes = jdbcTemplate.queryForList(
         """
         SELECT DISTINCT category.scope
-        FROM category_attributes binding
-        JOIN product_categories category ON category.id = binding.category_id
+        FROM category_template_versions template
+        JOIN product_categories category ON category.id = template.category_id
+        JOIN JSON_TABLE(template.content, '$[*]' COLUMNS(attribute_id BIGINT PATH '$.attributeId')) binding ON TRUE
         WHERE binding.attribute_id = ?
         ORDER BY category.scope
         """,

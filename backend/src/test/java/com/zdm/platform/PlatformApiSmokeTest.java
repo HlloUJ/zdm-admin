@@ -455,9 +455,8 @@ class PlatformApiSmokeTest {
 
     jdbcTemplate.update(
         """
-        INSERT INTO category_attributes
-          (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
-        VALUES (4, ?, 0, 0, 1, 'enabled')
+        INSERT INTO category_template_versions (category_id, content, created_by_name)
+        VALUES (4, JSON_ARRAY(JSON_OBJECT('attributeId', ?)), '测试人员')
         """,
         attributeId);
     mockMvc.perform(get("/api/admin/product-attributes")
@@ -484,7 +483,7 @@ class PlatformApiSmokeTest {
         attributeId);
     assertThat(persistedName).isEqualTo(attributeName);
 
-    jdbcTemplate.update("DELETE FROM category_attributes WHERE attribute_id = ?", attributeId);
+    jdbcTemplate.update("DELETE FROM category_template_versions WHERE category_id = 4 AND JSON_CONTAINS(content, JSON_OBJECT('attributeId', ?))", attributeId);
     mockMvc.perform(delete("/api/admin/product-attributes/{id}", attributeId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
@@ -1906,9 +1905,8 @@ class PlatformApiSmokeTest {
         """);
     jdbcTemplate.update(
         """
-        INSERT INTO category_attributes
-          (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
-        VALUES (9203, 9204, 0, 0, 1, 'enabled')
+        INSERT INTO category_template_versions (category_id, content, created_by_name)
+        VALUES (9203, JSON_ARRAY(JSON_OBJECT('attributeId', 9204, 'options', JSON_ARRAY())), '测试人员')
         """);
 
     mockMvc.perform(delete("/api/admin/product-categories/9203")

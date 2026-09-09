@@ -9,6 +9,8 @@ const syncIntegrationSource = readFileSync(new URL('./sync-integration.mjs', imp
 const taskPreviewSource = readFileSync(new URL('./dev-task.mjs', import.meta.url), 'utf8');
 
 import {
+  snapshotAppliedMigrations,
+  verifyPausedCatalog,
   backendSensitiveFiles,
   chooseTaskFrontendPort,
   CURRENT_TASK_FRONTEND_PORT,
@@ -321,4 +323,32 @@ test('roots task preview assets and aliases in the selected worktree', () => {
     if (previousApiTarget === undefined) delete process.env.ZDM_API_PROXY_TARGET;
     else process.env.ZDM_API_PROXY_TARGET = previousApiTarget;
   }
+});
+
+test('pause snapshots only applied migrations and rejects missing or failed history', () => {
+  const catalog = [
+    { name: 'V1__a.sql', content: 'SELECT 1;' },
+    { name: 'V2__b.sql', content: 'SELECT 2;' },
+  ];
+  const snapshot = snapshotAppliedMigrations(catalog, [{ script: 'V1__a.sql', success: '1' }]);
+  assert.equal(snapshot.length, 1);
+  assert.deepEqual(verifyPausedCatalog({ type: 'zdm-paused-database-task', catalog: snapshot }), [catalog[0]]);
+  assert.throws(() => snapshotAppliedMigrations(catalog, [{ script: 'V3__missing.sql', success: '1' }]), /找不到/);
+  assert.throws(() => snapshotAppliedMigrations(catalog, [{ script: 'V1__a.sql', success: '0' }]), /失败/);
+  assert.throws(
+    () => verifyPausedCatalog({ type: 'zdm-paused-database-task', catalog: [{ ...snapshot[0], content: 'changed' }] }),
+    /校验失败/,
+  );
+  assert.throws(
+    () =>
+      verifyPausedCatalog({ type: 'zdm-paused-database-task', catalog: [{ ...snapshot[0], name: '../V1__a.sql' }] }),
+    /校验失败/,
+  );
+});
+
+test('pause is an explicit operation and does not imply delivery', () => {
+  const options = parseTaskPreviewArgs(['--pause', '--worktree', '/tmp/owned-task']);
+  assert.equal(options.pause, true);
+  assert.equal(options.handoff, false);
+  assert.equal(options.stop, false);
 });

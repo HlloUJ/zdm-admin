@@ -68,6 +68,10 @@ export function parseTaskPreviewArgs(args) {
       result.help = true;
       continue;
     }
+    if (value === '--pause') {
+      result.pause = true;
+      continue;
+    }
     if (value === '--stop') {
       result.stop = true;
       continue;
@@ -393,6 +397,116 @@ function readMigrationCatalog(root) {
     .map((entry) => ({ name: entry.name, content: readFileSync(path.join(directory, entry.name), 'utf8') }));
 }
 
+export function snapshotAppliedMigrations(catalog, history) {
+  const byName = new Map(catalog.map((entry) => [entry.name, entry]));
+  return history.map(({ script, success }) => {
+    if (success !== '1') throw new Error(`Flyway 存在失败记录：${script}`);
+    const entry = byName.get(script);
+    if (!entry) throw new Error(`找不到已执行迁移的原始文件：${script}`);
+    return { ...entry, sha256: createHash('sha256').update(entry.content).digest('hex') };
+  });
+}
+
+export function verifyPausedCatalog(record) {
+  if (record?.type !== 'zdm-paused-database-task' || !Array.isArray(record.catalog)) {
+    throw new Error('暂停任务迁移记录格式无效');
+  }
+  return record.catalog.map((entry) => {
+    if (
+      !entry ||
+      typeof entry.name !== 'string' ||
+      path.basename(entry.name) !== entry.name ||
+      !migrationVersion(entry.name) ||
+      typeof entry.content !== 'string' ||
+      entry.sha256 !== createHash('sha256').update(entry.content).digest('hex')
+    ) {
+      throw new Error('暂停任务迁移快照校验失败');
+    }
+    return { name: entry.name, content: entry.content };
+  });
+}
+
+function readPausedMigrations(integrationRoot) {
+  const { directory } = databaseRuntimePaths(integrationRoot);
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory)
+    .filter((name) => /^paused-.*\.json$/.test(name))
+    .flatMap((name) => {
+      const file = path.join(directory, name);
+      if (lstatSync(file).isSymbolicLink()) throw new Error('暂停记录不能是符号链接');
+      return verifyPausedCatalog(JSON.parse(readFileSync(file, 'utf8')));
+    });
+}
+
+async function pauseDatabaseTask({ root, branch, project, integrationRoot, context }) {
+  const lock = readDatabaseLock(integrationRoot);
+  if (!lock || lock.project !== project || path.resolve(lock.workspaceRoot) !== path.resolve(root)) {
+    throw new Error('只有当前共享数据库锁的所属任务可以暂停交接');
+  }
+  if (failedFlywayVersions(integrationRoot)) throw new Error('存在失败迁移，保留现场，不能暂停交接');
+  const competing = otherSharedDatabaseTaskBackends(integrationRoot, project);
+  if (competing.length) throw new Error(`存在其他任务后端：${competing.join(', ')}`);
+  const historyText = capture(
+    'docker',
+    [
+      'exec',
+      INTEGRATION_MYSQL_CONTAINER,
+      'mysql',
+      '--user=zdm_admin',
+      '--password=zdm_admin_pwd',
+      '--database=zdm_admin',
+      '--batch',
+      '--skip-column-names',
+      '--execute',
+      'SELECT script, success FROM flyway_schema_history ORDER BY installed_rank;',
+    ],
+    { cwd: integrationRoot },
+  );
+  const history = historyText
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const [script, success] = line.split('\t');
+      return { script, success };
+    });
+  const combined = mergeMigrationCatalog({
+    integrationFiles: [...readMigrationCatalog(integrationRoot), ...readPausedMigrations(integrationRoot)],
+    taskFiles: readMigrationCatalog(root),
+  });
+  const catalog = snapshotAppliedMigrations(combined, history);
+  // Stop writers first. Any failure keeps the old lock and every existing backup.
+  await stopSupervisedPreview(root);
+  const managed = await currentManagedPreview();
+  if (managed && path.resolve(managed.workspaceRoot) === path.resolve(root)) await stopManagedPreview();
+  composeRun(context, ['stop', 'backend']);
+  stopIntegrationBackend(integrationRoot);
+  if (otherSharedDatabaseTaskBackends(integrationRoot, '__paused__').length) {
+    throw new Error('仍有任务后端运行，保留原锁');
+  }
+  const backupFile = createDatabaseBackup({ integrationRoot, project });
+  const { directory, lockFile } = databaseRuntimePaths(integrationRoot);
+  const current = readDatabaseLock(integrationRoot);
+  if (JSON.stringify(current) !== JSON.stringify(lock)) throw new Error('暂停期间数据库锁已变化');
+  const record = {
+    type: 'zdm-paused-database-task',
+    project,
+    branch,
+    workspaceRoot: root,
+    head: gitCapture(root, ['rev-parse', 'HEAD']),
+    backupFile,
+    previousLock: lock,
+    catalog,
+    pausedAt: new Date().toISOString(),
+  };
+  const recordPath = path.join(directory, `paused-${project}-${Date.now()}.json`);
+  writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`, { flag: 'wx' });
+  unlinkSync(lockFile);
+  console.log(`任务已暂停：${branch}`);
+  console.log(`迁移现场：${recordPath}`);
+  console.log(`当前数据备份：${backupFile}`);
+  console.log('未修改 Git、未恢复或删除数据库；下一任务启动时将重新校验全部已执行迁移。');
+}
+
 function taskMigrationDirectory(project) {
   return path.join(tmpdir(), 'zdm-task-preview', project, 'migrations');
 }
@@ -410,7 +524,7 @@ function prepareTaskMigrations({ root, integrationRoot, project }) {
     mkdirSync(directory, { recursive: true });
   }
   const catalog = mergeMigrationCatalog({
-    integrationFiles: readMigrationCatalog(integrationRoot),
+    integrationFiles: [...readMigrationCatalog(integrationRoot), ...readPausedMigrations(integrationRoot)],
     taskFiles: readMigrationCatalog(root),
   });
   for (const entry of catalog) writeFileSync(path.join(directory, entry.name), entry.content, { flag: 'wx' });
@@ -991,6 +1105,7 @@ Options:
   --worktree /path          从新版启动器预览尚未包含该脚本的旧任务 Worktree
   --check                   检查当前任务预览身份及其 API 代理链路
   --handoff                 集成分支包含任务提交后，停止任务预览和后端、恢复集成后端并释放数据库锁
+  --pause                   备份并暂停当前锁所属任务，保留已执行迁移供其他任务校验
   --stop                    仅停止当前任务前端和后端；不删除数据库或备份`);
 }
 
@@ -1004,6 +1119,8 @@ export async function main(args = process.argv.slice(2)) {
   if (options.databaseRisk && options.mode === 'frontend')
     throw new Error('--database-risk 不能与 --mode frontend 同时使用');
   if (options.port && options.temporary) throw new Error('--port 不能与 --temporary 同时使用');
+  if (options.pause && (options.stop || options.handoff || options.temporary || options.apiTarget || options.check))
+    throw new Error('--pause 只能用于暂停当前任务');
   if (options.stop && options.handoff) throw new Error('--stop 不能与 --handoff 同时使用');
   if (
     options.check &&
@@ -1042,6 +1159,18 @@ export async function main(args = process.argv.slice(2)) {
   const project = taskProjectName({ branch, root });
   const integrationWorktree = integrationWorktreeFor(worktrees);
   const integrationRoot = integrationWorktree.path;
+  if (options.pause) {
+    ensureDocker(root);
+    const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
+    await pauseDatabaseTask({
+      root,
+      branch,
+      project,
+      integrationRoot,
+      context: composeContext({ root, project, backendPort }),
+    });
+    return;
+  }
   if (options.handoff) {
     ensureDocker(root);
     const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
