@@ -1506,9 +1506,8 @@ class PlatformApiSmokeTest {
         """);
     jdbcTemplate.update(
         """
-        INSERT INTO category_attributes
-          (category_id, attribute_id, required_flag, sku_flag, sort_order, status)
-        VALUES (9203, 9204, 0, 0, 1, 'enabled')
+        INSERT INTO category_template_versions (category_id, content, created_by_name)
+        VALUES (9203, JSON_ARRAY(JSON_OBJECT('attributeId', 9204, 'options', JSON_ARRAY())), '测试人员')
         """);
 
     mockMvc.perform(delete("/api/admin/product-categories/9203")

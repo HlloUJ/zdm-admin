@@ -206,28 +206,6 @@ const permissionAliases: Record<string, string[]> = {
       [`admin.product-data-center.category.${scope}.disable`, `admin.product-data-center.category.${scope}.enable`],
     ]),
   ),
-  'admin.product-data-center.category-attribute-template.finished.view': [
-    'admin.product-data-center.category-attribute-template.view',
-  ],
-  'admin.product-data-center.category-attribute-template.accessory.view': [
-    'admin.product-data-center.category-attribute-template.view',
-  ],
-  ...Object.fromEntries(
-    (['finished', 'accessory'] as const).flatMap((scope) =>
-      [
-        ['create', 'create'],
-        ['attribute-role', 'edit'],
-        ['sku-combination', 'edit'],
-        ['required', 'edit'],
-        ['bind-values', 'edit'],
-        ['toggle-publish', 'toggle-publish'],
-        ['delete', 'delete'],
-      ].map(([action, legacyAction]) => [
-        `admin.product-data-center.category-attribute-template.${scope}.${action}`,
-        [`admin.product-data-center.category-attribute-template.${legacyAction}`],
-      ]),
-    ),
-  ),
   'admin.permission-management.employee-management.create': [
     'admin.permission-management.employee-management.邀请员工',
   ],

@@ -10,6 +10,7 @@ export interface FunctionAction {
 
 export interface FunctionTab {
   label: string;
+  parentLabel?: string;
   value: string;
   actions: FunctionAction[];
 }
@@ -92,13 +93,8 @@ const productAttributeTabActions = (scope: string): FunctionAction[] => [
 ];
 
 const categoryAttributeTemplateTabActions = (scope: string): FunctionAction[] => [
-  { label: '绑定属性', value: `${scope}.create` },
-  { label: '属性角色', value: `${scope}.attribute-role` },
-  { label: '参与SKU组合', value: `${scope}.sku-combination` },
-  { label: '必填', value: `${scope}.required` },
-  { label: '绑定选项值', value: `${scope}.bind-values` },
-  { label: '发布/取消发布', value: `${scope}.toggle-publish` },
-  { label: '移除', value: `${scope}.delete` },
+  { label: '创建新版本草稿', value: `${scope}.create` },
+  { label: '版本记录', value: `${scope}.history` },
 ];
 
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
@@ -333,22 +329,13 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             label: '分类属性模板页',
             value: 'admin.product-data-center.category-attribute-template',
             actions: [],
-            tabs: [
-              {
-                label: '成品现货模板',
-                value: 'admin.product-data-center.category-attribute-template.finished',
-                actions: categoryAttributeTemplateTabActions(
-                  'admin.product-data-center.category-attribute-template.finished',
-                ),
-              },
-              {
-                label: '配件模板',
-                value: 'admin.product-data-center.category-attribute-template.accessory',
-                actions: categoryAttributeTemplateTabActions(
-                  'admin.product-data-center.category-attribute-template.accessory',
-                ),
-              },
-            ],
+            tabs: ['finished', 'accessory'].map((scope) => ({
+              label: scope === 'finished' ? '成品现货模板' : '配件模板',
+              value: `admin.product-data-center.category-attribute-template.${scope}.attributes`,
+              actions: categoryAttributeTemplateTabActions(
+                `admin.product-data-center.category-attribute-template.${scope}.attributes`,
+              ),
+            })),
           },
         ],
       },
@@ -753,7 +740,7 @@ export const collectFunctionCatalogRows = (module?: FunctionModule): FunctionCat
           : [];
         const tabRows = rowTabs.map((tab) => ({
           key: `${menu.value}.${page.value}.${tab.value}`,
-          tabLabels: [tab.label],
+          tabLabels: tab.parentLabel ? [tab.parentLabel, tab.label] : [tab.label],
           actions: tab.actions,
           selectionLabel: '当前 Tab 权限',
         }));

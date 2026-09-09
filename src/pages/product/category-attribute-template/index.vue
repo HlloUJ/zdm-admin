@@ -1,386 +1,351 @@
 <template>
   <div class="admin-layout">
     <AdminTopNav />
-
     <div class="admin-shell">
       <AdminSideMenu />
-
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '分类属性模板']" :badge="pageTitle" />
-
-        <AdminListLayout>
+        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '分类属性模板']" />
+        <AdminListLayout class="template-workbench">
           <template #toolbar>
-            <div class="scope-controls">
-              <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
+            <div class="list-controls">
+              <div class="scope-controls">
+                <t-tabs
+                  v-if="scopeTabs.length > 1"
+                  :value="scope"
+                  :list="scopeTabs"
+                  class="scope-tabs"
+                  @change="switchScope"
+                />
+              </div>
             </div>
           </template>
-
           <template #table>
-            <div class="category-template-layout">
-              <aside class="category-panel">
-                <div class="category-search">
-                  <t-input
-                    v-model="categoryKeyword"
-                    clearable
-                    placeholder="请输入分类名称"
-                    @clear="clearCategorySearch"
-                    @enter="searchCategory"
+            <t-alert v-if="!scopeTabs.length" theme="warning" message="暂无分类属性模板权限" />
+            <div
+              v-else
+              ref="versionLayout"
+              class="version-layout"
+              :style="{ '--category-viewport-height': categoryViewportHeight }"
+            >
+              <t-card class="category-panel" :shadow="false">
+                <t-space direction="vertical" class="category-content">
+                  <t-input v-model="keyword" clearable placeholder="请输入分类名称">
+                    <template #prefix-icon><t-icon name="search" /></template>
+                  </t-input>
+                  <t-tree
+                    v-model:expanded="expandedCategories"
+                    :data="categoryTree"
+                    :keys="{ value: 'id', label: 'name' }"
+                    :actived="categoryId ? [categoryId] : []"
+                    activable
+                    :filter="keyword ? filterCategory : undefined"
+                    @active="selectCategory"
                   />
-                  <t-button theme="default" variant="base" @click="searchCategory">搜索</t-button>
-                </div>
-
-                <div class="category-tree">
-                  <template v-for="row in visibleCategoryRows" :key="row.node.id">
-                    <div
-                      v-if="row.node.children.length"
-                      class="category-node category-node-parent"
-                      :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
-                    >
-                      <t-button
-                        class="expand-button"
-                        shape="square"
-                        size="small"
-                        variant="text"
-                        :aria-label="`${isCategoryExpanded(row.node.id) ? '收起' : '展开'}${row.node.name}`"
-                        @click="toggleCategory(row.node.id)"
-                      >
-                        <t-icon :name="isCategoryExpanded(row.node.id) ? 'chevron-down' : 'chevron-right'" />
-                      </t-button>
-                      <span class="category-name">{{ row.node.name }}</span>
-                    </div>
-                    <button
-                      v-else
-                      type="button"
-                      class="category-node category-node-leaf"
-                      :aria-label="row.node.name"
-                      :class="{ active: row.node.id === selectedCategoryId }"
-                      :style="{ paddingLeft: `${row.level * 20 + 12}px` }"
-                      @click="selectLeafCategory(row.node)"
-                    >
-                      <span class="expand-placeholder"></span>
-                      <span class="category-name">{{ row.node.name }}</span>
-                    </button>
-                  </template>
-                  <div v-if="!visibleCategoryRows.length && !loading" class="category-empty">暂无分类</div>
-                </div>
-              </aside>
-
-              <section class="template-panel">
-                <div class="template-search">
-                  <t-form :data="searchForm" label-width="56px" colon>
-                    <div class="filter-row">
-                      <div class="filter-fields">
-                        <t-form-item label="属性名称" label-width="72px">
-                          <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
-                        </t-form-item>
-                        <t-form-item label="发布">
-                          <t-select v-model="searchForm.publishStatus" clearable placeholder="全部">
-                            <t-option label="已发布" value="published" />
-                            <t-option label="未发布" value="unpublished" />
-                          </t-select>
-                        </t-form-item>
-                      </div>
-                      <div class="filter-actions">
-                        <t-button theme="primary" @click="search">
-                          <template #icon><t-icon name="search" /></template>查询
-                        </t-button>
-                        <t-button theme="default" variant="base" @click="reset">
-                          <template #icon><t-icon name="refresh" /></template>重置
-                        </t-button>
-                      </div>
-                    </div>
-                  </t-form>
-                  <div class="template-toolbar">
-                    <t-button
-                      v-if="canBindAttribute"
-                      theme="primary"
-                      :disabled="!selectedCategoryId"
-                      @click="openBindDialog"
-                    >
-                      <template #icon><t-icon name="add" /></template>绑定属性
-                    </t-button>
-                  </div>
-                </div>
-
-                <t-table
-                  row-key="id"
-                  :data="pageData"
-                  :columns="columns"
-                  :loading="loading"
-                  :drag-sort="canBindAttribute ? 'row-handler' : undefined"
-                  :drag-sort-options="{ animation: 200 }"
-                  hover
-                  table-layout="fixed"
-                  @drag-sort="handleDragSort"
-                >
-                  <template #drag><t-icon name="move" class="binding-drag-icon" title="拖拽排序" /></template>
-                  <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
-                  <template #optionCount="{ row }">
+                </t-space>
+              </t-card>
+              <t-card class="version-panel" :shadow="false">
+                <t-space direction="vertical" size="medium" class="version-content">
+                  <div v-if="isDraft" class="template-tab-bar">
                     <t-link
-                      v-if="row.valueType === 'select'"
-                      theme="primary"
+                      class="exit-edit"
+                      theme="default"
                       hover="color"
-                      @click="openBoundValueView(row)"
+                      :underline="false"
+                      :disabled="busy"
+                      @click="exitEdit"
+                      ><template #prefix-icon><t-icon name="arrow-left" /></template>草稿箱</t-link
                     >
-                      {{ row.optionCount }}
-                    </t-link>
-                    <span v-else>-</span>
-                  </template>
-                  <template #attributeRole="{ row }">
-                    <t-select
-                      class="attribute-role-select"
-                      :model-value="row.attributeRole || undefined"
-                      :loading="savingId === row.id && savingField === 'attributeRole'"
-                      :disabled="!canSetAttributeRole || row.publishStatus === 'published' || row.usageCount > 0"
-                      :status="roleValidationIds.has(row.id) && !row.attributeRole ? 'error' : undefined"
-                      :title="row.usageCount > 0 ? `已被当前分类的 ${row.usageCount} 个商品使用，不能修改属性角色` : ''"
-                      placeholder="请选择"
-                      size="small"
-                      @change="changeAttributeRole(row, $event)"
-                    >
-                      <t-option label="商品属性" value="product" />
-                      <t-option label="销售属性" value="sales" />
-                    </t-select>
-                  </template>
-                  <template #requiredFlag="{ row }">
-                    <t-switch
-                      :model-value="row.requiredFlag"
-                      :loading="savingId === row.id && savingField === 'requiredFlag'"
-                      :disabled="!canSetRequired || row.publishStatus === 'published'"
-                      @change="changeFlag(row, 'requiredFlag', $event)"
-                    />
-                  </template>
-                  <template #skuFlag="{ row }">
-                    <span
-                      class="sku-switch-cell"
-                      :title="
-                        row.attributeRole !== 'sales'
-                          ? '只有销售属性才能参与SKU组合'
-                          : row.publishStatus === 'published'
-                            ? '请先取消发布后再修改属性配置'
-                            : ''
-                      "
-                    >
-                      <t-switch
-                        :model-value="row.skuFlag"
-                        :loading="savingId === row.id && savingField === 'skuFlag'"
-                        :disabled="
-                          !canSetSkuCombination || row.attributeRole !== 'sales' || row.publishStatus === 'published'
+                  </div>
+                  <t-loading :loading="loading">
+                    <t-space direction="vertical" size="large" class="version-content">
+                      <t-alert
+                        v-if="!isDraft"
+                        :message="
+                          selected
+                            ? '已发布版本仅可调整属性展示顺序，其他配置不可修改，如需调整配置，需创建新版本草稿，并发布新版本。'
+                            : '当前暂无已发布属性模板，请创建新版本草稿，并发布新版本。'
                         "
-                        @change="changeFlag(row, 'skuFlag', $event)"
                       />
-                    </span>
-                  </template>
-                  <template #publishStatus="{ row }">
-                    <t-tag :theme="row.publishStatus === 'published' ? 'success' : 'danger'" variant="light">
-                      {{ row.publishStatus === 'published' ? '已发布' : '未发布' }}
-                    </t-tag>
-                  </template>
-                  <template #operation="{ row }">
-                    <div class="table-actions">
-                      <t-link
-                        v-if="row.valueType === 'select' && canBindOptionValues"
-                        theme="primary"
-                        hover="color"
-                        :disabled="row.publishStatus === 'published' || savingId !== null"
-                        @click="openValueBindingDialog(row)"
-                      >
-                        绑定选项值
-                      </t-link>
-                      <t-link
-                        v-if="canTogglePublish"
-                        :theme="row.publishStatus === 'published' ? 'warning' : 'success'"
-                        hover="color"
-                        :disabled="savingId !== null"
-                        @click="openPublishConfirm(row)"
-                      >
-                        {{ row.publishStatus === 'published' ? '取消发布' : '发布' }}
-                      </t-link>
-                      <t-link
-                        v-if="canRemoveBinding && row.usageCount === 0"
-                        theme="danger"
-                        :disabled="row.publishStatus === 'published' || savingId !== null"
-                        @click="openDeleteConfirm(row)"
-                      >
-                        移除
-                      </t-link>
-                      <span
-                        v-if="
-                          (row.valueType !== 'select' || !canBindOptionValues) && !canTogglePublish && !canRemoveBinding
-                        "
-                      >
-                        -
-                      </span>
-                    </div>
-                  </template>
-                </t-table>
-
-                <AdminPagination
-                  v-model:current="pagination.current"
-                  v-model:page-size="pagination.pageSize"
-                  :total="totalCount"
-                  :page-size-options="pageSizeOptions"
-                  @change="handlePaginationChange"
-                />
-              </section>
+                      <t-alert v-if="selected && isDraft" message="修改自动保存到草稿，发布后生成新版本。" />
+                      <div v-if="isDraft" class="draft-footer">
+                        <t-space class="draft-status" break-line>
+                          <t-tag theme="warning" variant="light">草稿</t-tag>
+                          <span class="draft-version-info"
+                            >待发布版本 <span class="metadata-value">V{{ nextAttributeVersion }}</span></span
+                          >
+                        </t-space>
+                        <t-button
+                          v-if="can('create')"
+                          class="publish-draft"
+                          :disabled="busy || (dirty && !can('create'))"
+                          @click="preparePublish"
+                          >发布新版本</t-button
+                        >
+                        <t-button
+                          v-if="editable"
+                          class="add-attribute"
+                          theme="default"
+                          variant="outline"
+                          @click="openAdd"
+                          ><template #icon><t-icon name="add" /></template>添加属性</t-button
+                        >
+                      </div>
+                      <div v-if="!isDraft" class="version-toolbar">
+                        <t-space class="version-actions">
+                          <t-button
+                            v-if="!draft && can('create')"
+                            :disabled="!categoryId || busy"
+                            @click="createDraft()"
+                            >创建新版本草稿</t-button
+                          >
+                          <t-button
+                            v-if="draft && selectedId !== draft.id && can('create')"
+                            theme="default"
+                            @click="navigate(() => choose(draft!))"
+                            >继续编辑草稿</t-button
+                          >
+                        </t-space>
+                        <t-button
+                          v-if="can('history')"
+                          class="version-history"
+                          theme="default"
+                          variant="outline"
+                          :disabled="!versions.length"
+                          @click="historyVisible = true"
+                        >
+                          <template #icon><t-icon name="time" /></template>版本记录
+                        </t-button>
+                      </div>
+                      <template v-if="selected">
+                        <t-space direction="vertical" size="medium" class="version-content">
+                          <div v-if="!isDraft" class="attribute-summary">
+                            <div class="template-metadata">
+                              <t-tag :theme="isCurrentDisplayedVersion ? 'primary' : 'default'" variant="light">
+                                {{ isCurrentDisplayedVersion ? '当前版本' : '历史版本' }}
+                                {{ versionLabel(displayedVersion) }}
+                              </t-tag>
+                              <span v-if="displayedVersion?.publishedByName"
+                                >创建人 <span class="metadata-value">{{ displayedVersion.publishedByName }}</span></span
+                              >
+                              <span v-if="displayedVersion?.publishedAt"
+                                >创建时间
+                                <span class="metadata-value">{{
+                                  formatDateTime(displayedVersion.publishedAt)
+                                }}</span></span
+                              >
+                            </div>
+                          </div>
+                          <div>
+                            <t-table
+                              hover
+                              class="attribute-table"
+                              table-layout="fixed"
+                              row-key="attributeId"
+                              :data="attributePageRows"
+                              :columns="attributeColumns"
+                              :drag-sort="canSortAttributes ? 'row-handler' : undefined"
+                              @drag-sort="sortAttributes"
+                            >
+                              <template #serialNumber="{ rowIndex }">{{
+                                (attributePage - 1) * attributePageSize + rowIndex + 1
+                              }}</template>
+                              <template #drag><t-icon name="move" /></template>
+                              <template #scope="{ row }">{{ row.scope === 'shared' ? '共享' : '专属' }}</template>
+                              <template #valueType="{ row }">{{ typeLabel(row.valueType) }}</template>
+                              <template #attributeRole="{ row }">
+                                <t-select
+                                  v-if="editable"
+                                  v-model="row.attributeRole"
+                                  placeholder="请选择"
+                                  :status="
+                                    validatedAttributeIds.includes(row.attributeId) && !row.attributeRole
+                                      ? 'error'
+                                      : undefined
+                                  "
+                                  :options="[
+                                    { label: '商品属性', value: 'product' },
+                                    { label: '销售属性', value: 'sales' },
+                                  ]"
+                                  @change="changeAttributeRole(row)"
+                                />
+                                <span v-else>{{
+                                  row.attributeRole === 'sales'
+                                    ? '销售属性'
+                                    : row.attributeRole === 'product'
+                                      ? '商品属性'
+                                      : '未配置'
+                                }}</span>
+                              </template>
+                              <template #skuFlag="{ row }">
+                                <span v-if="row.attributeRole !== 'sales'">-</span>
+                                <span
+                                  v-else-if="editable"
+                                  class="specification-control"
+                                  @click.capture="notifySpecificationLimit(row)"
+                                >
+                                  <t-switch
+                                    :value="row.skuFlag"
+                                    :disabled="!row.skuFlag && specificationCount >= 4"
+                                    role="switch"
+                                    :aria-label="`${row.name}构建规格`"
+                                    :aria-checked="!!row.skuFlag"
+                                    tabindex="0"
+                                    @change="toggleSpecification(row, Boolean($event))"
+                                    @keydown.enter.prevent="toggleSpecification(row, !row.skuFlag)"
+                                    @keydown.space.prevent="toggleSpecification(row, !row.skuFlag)"
+                                  />
+                                </span>
+                                <span v-else>{{ row.skuFlag ? '是' : '否' }}</span>
+                              </template>
+                              <template #requiredFlag="{ row }"
+                                ><t-switch v-if="editable" v-model="row.requiredFlag" class="required-switch" /><span
+                                  v-else
+                                  >{{ row.requiredFlag ? '是' : '否' }}</span
+                                ></template
+                              >
+                              <template #options="{ row }"
+                                ><t-link
+                                  v-if="row.valueType === 'select'"
+                                  :theme="
+                                    validatedAttributeIds.includes(row.attributeId) && !row.options.length
+                                      ? 'danger'
+                                      : 'primary'
+                                  "
+                                  @click="openValues(row)"
+                                  >{{ row.options.length }}</t-link
+                                ><span v-else>—</span></template
+                              >
+                              <template #operation="{ row }"
+                                ><t-link theme="danger" @click="removeTarget = row">移除</t-link></template
+                              >
+                            </t-table>
+                            <AdminPagination
+                              :current="attributePage"
+                              :page-size="attributePageSize"
+                              :total="rows.length"
+                              @change="changeAttributePage"
+                            />
+                          </div>
+                        </t-space>
+                        <t-typography-paragraph v-if="!editable && selected.changeNote"
+                          >变更说明：{{ selected.changeNote }}</t-typography-paragraph
+                        >
+                      </template>
+                      <t-empty v-if="!selected" description="当前分类暂无版本，请创建草稿" />
+                    </t-space>
+                  </t-loading>
+                </t-space>
+              </t-card>
             </div>
           </template>
         </AdminListLayout>
       </main>
     </div>
-
-    <AdminDialog
-      v-model:visible="bindDialogVisible"
-      header="绑定属性"
-      width="760px"
-      confirm-btn="提交"
-      @confirm="submitBind"
-      @close="closeBindDialog"
-    >
-      <div class="bind-category-context">
-        <span class="bind-category-label">商品分类：</span>
-        <span>{{ selectedCategoryPath }}</span>
-      </div>
-      <div class="bind-list-toolbar">
-        <t-input v-model="bindSearchKeyword" clearable placeholder="请输入属性名称" />
-        <span class="bind-list-count">已选择 {{ bindForm.attributeIds.length }} 项</span>
-      </div>
+    <AdminDialog v-model:visible="addVisible" header="添加属性" width="720px" @confirm="addAttributes">
+      <t-input v-model="attributeKeyword" placeholder="搜索属性名称" clearable />
       <t-table
-        v-model:selected-row-keys="bindForm.attributeIds"
-        class="bind-attribute-table"
-        row-key="id"
-        :columns="bindColumns"
-        :data="bindAttributeRows"
-        :max-height="360"
-        empty="暂无可绑定属性"
         hover
-        select-on-row-click
         table-layout="fixed"
+        row-key="id"
+        select-on-row-click
+        :data="addPageRows"
+        :columns="addColumns"
+        :selected-row-keys="addIds"
+        @select-change="selectAddAttributes"
+      >
+        <template #valueType="{ row }">{{ typeLabel(row.valueType) }}</template>
+      </t-table>
+      <AdminPagination
+        :current="addPage"
+        :page-size="addPageSize"
+        :total="filteredAddAttributes.length"
+        @change="changeAddPage"
       />
     </AdminDialog>
-
     <AdminDialog
-      v-model:visible="valueBindingDialogVisible"
-      header="绑定选项值"
-      width="760px"
-      confirm-btn="提交"
-      @confirm="submitValueBindings"
-      @close="closeValueBindingDialog"
+      v-model:visible="valuesVisible"
+      :header="`${editable ? '编辑' : '查看'}选项值 · ${valueTarget?.name || ''}`"
+      width="720px"
+      :footer="editable ? undefined : false"
+      @confirm="applyValues"
     >
-      <div class="bind-category-context">
-        <span class="bind-category-label">当前属性：</span>
-        <span>{{ valueBindingTarget?.name || '-' }}</span>
-      </div>
-      <div class="bind-list-toolbar">
-        <t-input v-model="valueSearchKeyword" clearable placeholder="请输入选项值" />
-        <span class="bind-list-count">已选择 {{ selectedValueIds.length }} 项</span>
-      </div>
+      <t-input v-if="editable" v-model="valueKeyword" placeholder="搜索选项值" clearable />
       <t-table
-        v-model:selected-row-keys="selectedValueIds"
-        class="bind-option-value-table"
-        row-key="id"
-        :columns="valueOptionColumns"
-        :data="filteredValueOptions"
-        :loading="valueOptionsLoading"
-        :max-height="360"
-        empty="暂无可绑定的选项值"
-        hover
-        select-on-row-click
-        table-layout="fixed"
-      >
-        <template #status="{ row }">
-          <t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">
-            {{ row.status === 'enabled' ? '启用' : '停用' }}
-          </t-tag>
-        </template>
-      </t-table>
-    </AdminDialog>
-
-    <AdminDialog
-      v-model:visible="boundValueViewVisible"
-      header="已绑定选项值"
-      width="620px"
-      confirm-btn="关闭"
-      :cancel-btn="null"
-      @confirm="closeBoundValueView"
-      @close="closeBoundValueView"
-    >
-      <div class="bind-category-context">
-        <span class="bind-category-label">当前属性：</span>
-        <span>{{ boundValueViewTarget?.name || '-' }}</span>
-      </div>
-      <div class="bind-list-toolbar">
-        <t-input v-model="boundValueSearchKeyword" clearable placeholder="请输入选项值" />
-        <span class="bind-list-count">已绑定 {{ boundValueOptions.length }} 项</span>
-      </div>
-      <t-table
-        class="bound-option-value-table"
-        row-key="id"
-        :columns="boundValueViewColumns"
-        :data="filteredBoundValueOptions"
-        :loading="boundValueViewLoading"
-        :max-height="360"
-        empty="暂无已绑定选项值"
         hover
         table-layout="fixed"
-      >
-        <template #status="{ row }">
-          <t-tag :theme="row.status === 'enabled' ? 'success' : 'default'" variant="light">
-            {{ row.status === 'enabled' ? '启用' : '停用' }}
-          </t-tag>
-        </template>
-        <template #operation="{ row }">
-          <t-link
-            v-if="canRemoveBoundValue"
-            theme="danger"
-            :disabled="boundValueRemovingId === row.id"
-            @click="removeBoundValue(row)"
-          >
-            移除
-          </t-link>
-        </template>
-      </t-table>
+        row-key="id"
+        :data="editable ? valuePageRows : valueTarget?.options || []"
+        :columns="valueColumns"
+        :select-on-row-click="editable"
+        :selected-row-keys="valueIds"
+        @select-change="selectValues"
+      />
+      <AdminPagination
+        v-if="editable"
+        :current="valuePage"
+        :page-size="valuePageSize"
+        :total="filteredValues.length"
+        @change="changeValuePage"
+      />
     </AdminDialog>
-
     <AdminConfirmDialog
-      v-model:visible="roleChangeConfirmVisible"
-      action="修改"
-      object-type="属性角色"
-      :object-name="roleChangeTarget?.name"
-      @confirm="handleRoleChangeConfirm"
-      @close="closeRoleChangeConfirm"
-    >
-      {{ roleChangeConfirmText }}
-    </AdminConfirmDialog>
-
-    <AdminConfirmDialog
-      v-model:visible="publishConfirmVisible"
-      :action="publishTarget?.publishStatus === 'published' ? '取消发布' : '发布'"
-      object-type="属性"
-      :object-name="publishTarget?.name"
-      @confirm="handlePublishConfirm"
-      @close="closePublishConfirm"
-    >
-      {{ publishTarget?.publishStatus === 'published' ? '是否取消发布' : '是否发布' }}属性“{{ publishTarget?.name }}”？
-    </AdminConfirmDialog>
-
-    <AdminConfirmDialog
-      v-model:visible="deleteConfirmVisible"
+      :visible="!!removeTarget"
       action="移除"
       object-type="属性"
-      :object-name="deleteTarget?.name"
-      @confirm="handleDelete"
-      @close="closeDeleteConfirm"
+      :object-name="removeTarget?.name"
+      @confirm="removeAttribute"
+      @close="removeTarget = undefined"
+      @cancel="removeTarget = undefined"
+    />
+    <AdminDialog
+      v-model:visible="publishVisible"
+      header="发布新版本"
+      width="max-content"
+      :confirm-btn="{ content: '确认发布', loading: busy }"
+      @confirm="publish"
     >
-      是否移除属性“{{ deleteTarget?.name }}”？
-    </AdminConfirmDialog>
+      <div class="publish-confirm-content">
+        版本发布后，不能修改。<br />
+        本次版本发布不影响现存商品，后续新建商品使用最新版本属性模板。
+      </div>
+    </AdminDialog>
+    <AdminDialog
+      :visible="!!copyTarget"
+      header="复制版本"
+      :confirm-btn="{ content: '确认复制', loading: busy }"
+      @confirm="copyVersion(copyTarget!)"
+      @close="copyTarget = undefined"
+      @cancel="copyTarget = undefined"
+      >当前分类已有草稿，复制后将覆盖草稿中的全部配置，是否继续？</AdminDialog
+    >
+    <t-drawer v-model:visible="historyVisible" header="版本记录" size="760px" :footer="false">
+      <t-table row-key="id" :data="versions.filter((v) => v.state === 'published')" :columns="historyColumns">
+        <template #versionNo="{ row }">
+          <t-space size="small" align="center">
+            <span>{{ versionLabel(row) }}</span>
+            <t-tag
+              v-if="row.id === versions.find((version) => version.state === 'published')?.id"
+              theme="primary"
+              variant="light"
+              >当前版本</t-tag
+            >
+          </t-space>
+        </template>
+        <template #publishedAt="{ row }">{{ formatDateTime(row.publishedAt) }}</template>
+        <template #operation="{ row }">
+          <t-space>
+            <t-link theme="primary" @click="viewHistoryVersion(row)">查看</t-link>
+            <t-link v-if="can('create')" theme="primary" :disabled="busy" @click="prepareCopy(row)">复制</t-link>
+          </t-space>
+        </template>
+      </t-table>
+    </t-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
+import { toRaw, computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { computed, h, onMounted, reactive, ref, watch } from 'vue';
-
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import {
@@ -391,1109 +356,677 @@ import {
   AdminPageHeader,
   AdminPagination,
 } from '@/components/foundation';
-import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
+import type { ProductAttributeRecord } from '@/services/productAttributes';
+import type { ProductAttributeValueRecord } from '@/services/productAttributeValues';
+import type { ProductCategoryRecord } from '@/services/productCategories';
 import {
-  createCategoryAttributes,
-  deleteCategoryAttribute,
-  listCategoryAttributeValueOptions,
-  listCategoryAttributes,
-  updateCategoryAttribute,
-  publishCategoryAttribute,
-  unpublishCategoryAttribute,
-  updateCategoryAttributeValueBindings,
-  type CategoryAttributePayload,
-  type CategoryAttributeRecord,
-  type CategoryAttributeValueOption,
-} from '@/services/categoryAttributes';
-import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
-import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
-
-type Scope = 'finished' | 'accessory';
-type Status = 'enabled' | 'disabled';
-type PublishStatus = 'published' | 'unpublished';
-type AttributeRole = '' | 'product' | 'sales';
-
-const MAX_SKU_ATTRIBUTE_COUNT = 4;
-const SKU_ATTRIBUTE_LIMIT_MESSAGE = '参与SKU组合的属性最多只能开启4个';
-
-interface BindingRow {
-  id: number;
-  categoryId: number;
-  attributeId: number;
-  name: string;
-  scope: ProductAttributeRecord['scope'];
-  valueType: ProductAttributeRecord['valueType'];
-  optionCount: number;
-  usageCount: number;
-  attributeRole: AttributeRole;
-  requiredFlag: boolean;
-  skuFlag: boolean;
-  sortOrder: number;
-  status: Status;
-  publishStatus: PublishStatus;
-  createdByName: string;
-  createdByAccountId?: number;
-  createdAt: string;
-}
-
-interface CategoryTreeNode extends ProductCategoryRecord {
-  children: CategoryTreeNode[];
-}
-
-interface CategoryTreeRow {
-  node: CategoryTreeNode;
-  level: number;
-}
-
-interface BindAttributeRow {
-  id: number;
-  name: string;
-  valueType: string;
-  createdAt: string;
-}
-
-const activeScope = ref<Scope>('finished');
-const permissionPrefix = 'admin.product-data-center.category-attribute-template';
-const loginUser = computed(() => getLoginUser());
-const categoryAttributeScopeTabs: { label: string; value: Scope }[] = [
-  { label: '成品现货模板', value: 'finished' },
-  { label: '配件模板', value: 'accessory' },
-];
-const { visibleTabs: scopeTabs, showTabRail: showScopeTabRail } = usePermissionTabs({
-  tabs: categoryAttributeScopeTabs,
-  activeTab: activeScope,
-  canAccess: (tab) => hasPermission(loginUser.value, `${permissionPrefix}.${tab.value}.view`),
-});
-const hasTemplateAction = (action: string) =>
-  hasPermission(loginUser.value, `${permissionPrefix}.${activeScope.value}.${action}`);
-const canBindAttribute = computed(() => hasTemplateAction('create'));
-const canSetAttributeRole = computed(() => hasTemplateAction('attribute-role'));
-const canSetSkuCombination = computed(() => hasTemplateAction('sku-combination'));
-const canSetRequired = computed(() => hasTemplateAction('required'));
-const canBindOptionValues = computed(() => hasTemplateAction('bind-values'));
-const canTogglePublish = computed(() => hasTemplateAction('toggle-publish'));
-const canRemoveBinding = computed(() => hasTemplateAction('delete'));
-const pageTitle = computed(() => (activeScope.value === 'finished' ? '成品现货发布模板' : '配件发布模板'));
-const loading = ref(false);
-const savingId = ref<number | null>(null);
-const roleValidationIds = reactive(new Set<number>());
-const savingField = ref<'attributeRole' | 'requiredFlag' | 'skuFlag' | null>(null);
+  listTemplateCategories,
+  listTemplateAttributes,
+  listTemplateValues,
+  listTemplateVersions,
+  createTemplateDraft,
+  copyTemplateDraft,
+  saveTemplateDraft,
+  saveTemplateDisplayOrder,
+  publishTemplateDraft,
+  versionLabel,
+  type TemplateScope,
+  type TemplateVersion,
+  type TemplateAttribute,
+} from '@/services/templateVersions';
+const prefix = 'admin.product-data-center.category-attribute-template';
+const scope = ref<TemplateScope>('finished');
+const allowed = (s: string, action: string) => hasPermission(getLoginUser(), `${prefix}.${s}.attributes.${action}`);
+const scopeTabs = computed(() =>
+  [
+    { label: '成品现货模板', value: 'finished' },
+    { label: '配件模板', value: 'accessory' },
+  ].filter((t) => allowed(t.value, 'view')),
+);
+const can = (action: string) => allowed(scope.value, action);
 const categories = ref<ProductCategoryRecord[]>([]);
-const attributes = ref<ProductAttributeRecord[]>([]);
-const bindings = ref<CategoryAttributeRecord[]>([]);
-const selectedCategoryId = ref<number | undefined>();
-const expandedCategoryIds = ref<number[]>([]);
-const categoryKeyword = ref('');
-const appliedCategoryKeyword = ref('');
-const bindDialogVisible = ref(false);
-const bindSearchKeyword = ref('');
-const valueBindingDialogVisible = ref(false);
-const valueBindingTarget = ref<BindingRow | null>(null);
-const valueOptions = ref<CategoryAttributeValueOption[]>([]);
-const valueSearchKeyword = ref('');
-const selectedValueIds = ref<number[]>([]);
-const valueOptionsLoading = ref(false);
-const valueBindingsSaving = ref(false);
-const boundValueViewVisible = ref(false);
-const boundValueViewTarget = ref<BindingRow | null>(null);
-const boundValueOptions = ref<CategoryAttributeValueOption[]>([]);
-const boundValueSearchKeyword = ref('');
-const boundValueViewLoading = ref(false);
-const boundValueRemovingId = ref<number | null>(null);
-const roleChangeConfirmVisible = ref(false);
-const roleChangeTarget = ref<BindingRow | null>(null);
-const roleChangeNextRole = ref<AttributeRole>('');
-const publishConfirmVisible = ref(false);
-const publishTarget = ref<BindingRow | null>(null);
-const deleteConfirmVisible = ref(false);
-const deleteTarget = ref<BindingRow | null>(null);
-const searchForm = reactive({ keyword: '', publishStatus: '' as PublishStatus | '' });
-const appliedSearch = reactive({ keyword: '', publishStatus: '' as PublishStatus | '' });
-const pagination = reactive({ current: 1, pageSize: 10 });
-const pageSizeOptions = [10, 20, 50];
-const bindForm = reactive({ attributeIds: [] as number[] });
-
-const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(canBindAttribute.value ? [{ colKey: 'drag', title: '', width: 44, align: 'center' as const }] : []),
-  { colKey: 'name', title: '属性名称', minWidth: 160, ellipsis: true },
-  { colKey: 'valueType', title: '值类型', width: 120 },
-  { colKey: 'optionCount', title: '选项数', width: 100, align: 'center' },
+const expandedCategories = ref<Array<string | number>>([]);
+const versionLayout = ref<HTMLElement>();
+const categoryViewportHeight = ref('100dvh');
+const updateCategoryHeight = () => {
+  if (!versionLayout.value) return;
+  const layoutTop = versionLayout.value.getBoundingClientRect().top + window.scrollY;
+  categoryViewportHeight.value = `${Math.max(0, window.innerHeight - layoutTop - 24)}px`;
+};
+const categoryLayoutObserver = new ResizeObserver(updateCategoryHeight);
+watch(versionLayout, (element, previous) => {
+  if (previous) categoryLayoutObserver.unobserve(previous);
+  if (element) categoryLayoutObserver.observe(element);
+});
+const categoryId = ref<number>();
+const keyword = ref('');
+const versions = ref<TemplateVersion[]>([]);
+const selectedId = ref<number>();
+const rows = ref<TemplateAttribute[]>([]);
+const attributePage = ref(1);
+const attributePageSize = ref(10);
+const attributePageRows = computed(() => {
+  const start = (attributePage.value - 1) * attributePageSize.value;
+  return rows.value.slice(start, start + attributePageSize.value);
+});
+function changeAttributePage(pageInfo: PageInfo) {
+  attributePage.value = pageInfo.pageSize === attributePageSize.value ? pageInfo.current : 1;
+  attributePageSize.value = pageInfo.pageSize;
+}
+watch(
+  () => rows.value.length,
+  (total) => {
+    attributePage.value = Math.min(attributePage.value, Math.max(1, Math.ceil(total / attributePageSize.value)));
+  },
+);
+const note = ref('');
+const saved = ref('');
+const loading = ref(false);
+const busy = ref(false);
+let savePromise: Promise<boolean> | undefined;
+const validatedAttributeIds = ref<number[]>([]);
+let loadSequence = 0;
+const selected = computed(() => versions.value.find((v) => v.id === selectedId.value));
+const draft = computed(() => versions.value.find((v) => v.state === 'draft'));
+const isDraft = computed(() => selected.value?.state === 'draft');
+const editable = computed(() => isDraft.value && can('create') && !busy.value);
+const canSortAttributes = computed(() => !!selected.value && can('create') && !busy.value && !loading.value);
+const specificationCount = computed(
+  () => rows.value.filter((row) => row.attributeRole === 'sales' && row.skuFlag).length,
+);
+function changeAttributeRole(row: TemplateAttribute) {
+  if (row.attributeRole !== 'sales') row.skuFlag = false;
+}
+function notifySpecificationLimit(row: TemplateAttribute) {
+  if (!row.skuFlag && specificationCount.value >= 4) {
+    adminFeedback.warning('最多选择4个属性构建规格');
+  }
+}
+function toggleSpecification(row: TemplateAttribute, value: boolean) {
+  if (!editable.value || row.attributeRole !== 'sales') return;
+  if (value && !row.skuFlag && specificationCount.value >= 4) {
+    notifySpecificationLimit(row);
+    return;
+  }
+  row.skuFlag = value;
+}
+const content = () => rows.value;
+const dirty = computed(() => isDraft.value && saved.value !== JSON.stringify([content(), note.value]));
+const nextAttributeVersion = computed(
+  () =>
+    Math.max(
+      0,
+      ...versions.value.filter((version) => version.state === 'published').map((version) => version.versionNo || 0),
+    ) + 1,
+);
+const displayedVersion = computed(() =>
+  selected.value?.state === 'published'
+    ? selected.value
+    : versions.value.find((version) => version.state === 'published'),
+);
+const isCurrentDisplayedVersion = computed(
+  () => displayedVersion.value?.id === versions.value.find((version) => version.state === 'published')?.id,
+);
+interface CategoryNode extends ProductCategoryRecord {
+  children: CategoryNode[];
+  disabled: boolean;
+}
+const categoryTree = computed(() => {
+  const build = (parentId?: number): CategoryNode[] =>
+    categories.value
+      .filter((c) => (c.parentId || undefined) === parentId)
+      .map((c) => {
+        const children = build(c.id);
+        return { ...c, children, disabled: false };
+      });
+  return build();
+});
+const filterCategory = (node: { data: { name?: string } }) =>
+  !keyword.value || !!node.data.name?.includes(keyword.value);
+const typeLabel = (type: string) => ({ select: '下拉选择', number: '数字输入', text: '文本输入' })[type] || type;
+const attributeColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  ...(canSortAttributes.value ? [{ colKey: 'drag', title: '', width: 24, className: 'attribute-drag-cell' }] : []),
+  { colKey: 'serialNumber', title: '序号', width: 80 },
+  { colKey: 'name', title: '属性名称' },
+  { colKey: 'valueType', title: '输入类型', width: 100 },
   {
     colKey: 'attributeRole',
-    title: () => h('span', ['属性角色', h('span', { style: { color: 'var(--td-error-color)' } }, '*')]),
-    width: 140,
-    align: 'center',
+    title: () =>
+      isDraft.value
+        ? h('span', ['属性角色', h('span', { style: { color: 'var(--td-error-color)' } }, ' *')])
+        : '属性角色',
+    width: 150,
   },
-  { colKey: 'skuFlag', title: '参与SKU组合', width: 160, align: 'center' },
-  { colKey: 'requiredFlag', title: '必填', width: 90, align: 'center' },
-  { colKey: 'publishStatus', title: '发布', width: 100, align: 'center' },
-  { colKey: 'createdByName', title: '绑定人', width: 120, align: 'left' },
-  { colKey: 'createdAt', title: '绑定时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 230, fixed: 'right' },
-]);
-
-const bindColumns = computed<PrimaryTableCol<BindAttributeRow>[]>(() => [
+  { colKey: 'skuFlag', title: '构建规格', width: 100 },
+  { colKey: 'requiredFlag', title: '必填', width: 70 },
   {
-    colKey: 'row-select',
-    type: 'multiple',
-    width: 52,
-    disabled: ({ row }) => boundAttributeIds.value.has(row.id) && !canRemoveBinding.value,
+    colKey: 'options',
+    title: () =>
+      isDraft.value ? h('span', ['选项值', h('span', { style: { color: 'var(--td-error-color)' } }, ' *')]) : '选项值',
+    width: 110,
   },
-  { colKey: 'name', title: '属性名称', minWidth: 180, ellipsis: true },
-  { colKey: 'valueType', title: '值类型', width: 140 },
-  { colKey: 'createdAt', title: '创建时间', width: 180 },
+  ...(editable.value ? [{ colKey: 'operation', title: '操作', width: 80, fixed: 'right' as const }] : []),
 ]);
-
-const valueOptionColumns = computed<PrimaryTableCol<CategoryAttributeValueOption>[]>(() => [
+const addColumns: PrimaryTableCol<TableRowData>[] = [
+  { colKey: 'row-select', type: 'multiple' },
+  { colKey: 'name', title: '属性名称' },
+  { colKey: 'valueType', title: '输入类型' },
+];
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}+08:00`);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+};
+const historyColumns: PrimaryTableCol<TableRowData>[] = [
+  { colKey: 'versionNo', title: '版本', width: 160 },
+  { colKey: 'publishedByName', title: '创建人' },
+  { colKey: 'publishedAt', title: '创建时间' },
+  { colKey: 'operation', title: '操作', width: 190 },
+];
+const pendingEdits = new Map<
+  number,
   {
-    colKey: 'row-select',
-    type: 'multiple',
-    width: 52,
-    disabled: ({ row }) => row.status !== 'enabled',
-  },
-  { colKey: 'value', title: '选项值', minWidth: 300, ellipsis: true },
-  { colKey: 'status', title: '状态', width: 90, align: 'center' },
-]);
-
-const filteredValueOptions = computed(() => {
-  const keyword = valueSearchKeyword.value.trim();
-  if (!keyword) return valueOptions.value;
-  return valueOptions.value.filter((option) => fuzzyIncludes(option.value, keyword));
-});
-
-const filteredBoundValueOptions = computed(() => {
-  const keyword = boundValueSearchKeyword.value.trim();
-  if (!keyword) return boundValueOptions.value;
-  return boundValueOptions.value.filter((option) => fuzzyIncludes(option.value, keyword));
-});
-
-const canRemoveBoundValue = computed(
-  () =>
-    canBindOptionValues.value &&
-    Boolean(boundValueViewTarget.value) &&
-    boundValueViewTarget.value?.publishStatus !== 'published',
-);
-
-const boundValueViewColumns = computed<PrimaryTableCol<CategoryAttributeValueOption>[]>(() => [
-  { colKey: 'value', title: '选项值', minWidth: 300, ellipsis: true },
-  { colKey: 'status', title: '状态', width: 90, align: 'center' },
-  ...(canRemoveBoundValue.value ? [{ colKey: 'operation', title: '操作', width: 90, align: 'center' as const }] : []),
-]);
-
-const selectedCategoryPath = computed(() => {
-  if (!selectedCategoryId.value) return '未选择分类';
-
-  const categoryMap = new Map(categories.value.map((item) => [item.id, item]));
-  const names: string[] = [];
-  let current = categoryMap.get(selectedCategoryId.value);
-  while (current) {
-    names.unshift(current.name);
-    current = current.parentId ? categoryMap.get(current.parentId) : undefined;
+    revision: number;
+    rows: TemplateAttribute[];
+    note: string;
+    saved: string;
+    validatedAttributeIds: number[];
+    page: number;
   }
-  return names.join(' > ') || '未选择分类';
-});
-
-const scopedCategories = computed(() =>
-  categories.value
-    .filter((item) => item.scope === activeScope.value && item.status === 'enabled')
-    .sort((first, second) => createdAtTime(second) - createdAtTime(first) || second.id - first.id),
-);
-
-const categoryTree = computed(() => filterCategoryTree(buildCategoryTree(undefined)));
-
-const visibleCategoryRows = computed(() => {
-  const rows: CategoryTreeRow[] = [];
-  categoryTree.value.forEach((node) => collectVisibleCategoryRows(node, 0, rows));
-  return rows;
-});
-
-const allBindingRows = computed<BindingRow[]>(() => {
-  if (!selectedCategoryId.value) return [];
-
-  const attributeMap = new Map(attributes.value.map((item) => [item.id, item]));
-  return bindings.value
-    .filter((item) => item.categoryId === selectedCategoryId.value)
-    .map((item) => {
-      const attribute = attributeMap.get(item.attributeId);
-      return {
-        id: item.id,
-        categoryId: item.categoryId,
-        attributeId: item.attributeId,
-        name: attribute?.name ?? `属性 #${item.attributeId}`,
-        scope: attribute?.scope ?? 'shared',
-        valueType: attribute?.valueType ?? 'text',
-        optionCount: item.optionCount ?? 0,
-        usageCount: item.usageCount ?? 0,
-        attributeRole: (item.attributeRole === 'product' || item.attributeRole === 'sales'
-          ? item.attributeRole
-          : '') as AttributeRole,
-        requiredFlag: Boolean(item.requiredFlag),
-        skuFlag: Boolean(item.skuFlag),
-        sortOrder: item.sortOrder ?? 0,
-        status: (attribute?.status === 'disabled' ? 'disabled' : 'enabled') as Status,
-        publishStatus: (item.publishStatus === 'published'
-          ? 'published'
-          : 'unpublished') as BindingRow['publishStatus'],
-        createdByName: item.createdByName || '-',
-        createdByAccountId: item.createdByAccountId,
-        createdAt: formatDateTime(item.createdAt),
-      };
-    })
-    .sort((first, second) => first.sortOrder - second.sortOrder || first.id - second.id);
-});
-
-const bindingRows = computed(() =>
-  allBindingRows.value.filter((item) => {
-    const keyword = appliedSearch.keyword.trim().toLowerCase();
-    return (
-      (!keyword || item.name.toLowerCase().includes(keyword)) &&
-      (!appliedSearch.publishStatus || item.publishStatus === appliedSearch.publishStatus)
-    );
-  }),
-);
-
-const totalCount = computed(() => bindingRows.value.length);
-const pageData = computed(() => {
-  const start = (pagination.current - 1) * pagination.pageSize;
-  return bindingRows.value.slice(start, start + pagination.pageSize);
-});
-
-const boundAttributeIds = computed(
-  () =>
-    new Set(
-      bindings.value.filter((item) => item.categoryId === selectedCategoryId.value).map((item) => item.attributeId),
-    ),
-);
-
-const bindableAttributeIds = computed(
-  () =>
-    new Set(
-      attributes.value
-        .filter((item) => (item.scope === 'shared' || item.scope === activeScope.value) && item.status !== 'disabled')
-        .map((item) => item.id),
-    ),
-);
-
-const bindAttributeRows = computed<BindAttributeRow[]>(() =>
-  attributes.value
-    .filter((item) => bindableAttributeIds.value.has(item.id))
-    .filter((item) => !bindSearchKeyword.value.trim() || item.name.includes(bindSearchKeyword.value.trim()))
-    .sort((first, second) => createdAtTime(second) - createdAtTime(first) || second.id - first.id)
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      valueType: valueTypeLabel(item.valueType),
-      createdAt: formatDateTime(item.createdAt),
-    })),
-);
-
-function hasCategoryChildren(categoryId: number) {
-  return scopedCategories.value.some((item) => item.parentId === categoryId);
-}
-
-function createdAtTime(record: { createdAt?: string }) {
-  if (!record.createdAt) return 0;
-  const timestamp = new Date(record.createdAt).getTime();
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-}
-
-function buildCategoryTree(parentId: number | undefined): CategoryTreeNode[] {
-  return scopedCategories.value
-    .filter((item) => (item.parentId ?? undefined) === parentId)
-    .map((item) => ({ ...item, children: buildCategoryTree(item.id) }));
-}
-
-function filterCategoryTree(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
-  const keyword = appliedCategoryKeyword.value.trim();
-  if (!keyword) return nodes;
-
-  return nodes.flatMap((node) => {
-    if (node.name.includes(keyword)) return [node];
-    const children = filterCategoryTree(node.children);
-    return children.length ? [{ ...node, children }] : [];
+>();
+const viewSelections = new Map<string, number | undefined>();
+const viewKey = () => `${scope.value}:${categoryId.value}`;
+const scopeSelections = new Map<TemplateScope, { categoryId?: number }>();
+function rememberEdits() {
+  viewSelections.set(viewKey(), selectedId.value);
+  scopeSelections.set(scope.value, { categoryId: categoryId.value });
+  if (!selected.value || !isDraft.value) return;
+  pendingEdits.set(selected.value.id, {
+    revision: selected.value.revision,
+    rows: JSON.parse(JSON.stringify(rows.value)),
+    note: note.value,
+    saved: saved.value,
+    validatedAttributeIds: [...validatedAttributeIds.value],
+    page: attributePage.value,
   });
 }
-
-function collectVisibleCategoryRows(node: CategoryTreeNode, level: number, rows: CategoryTreeRow[]) {
-  rows.push({ node, level });
-  if (!appliedCategoryKeyword.value.trim() && !isCategoryExpanded(node.id)) return;
-  node.children.forEach((child) => collectVisibleCategoryRows(child, level + 1, rows));
+function choose(v?: TemplateVersion) {
+  attributePage.value = 1;
+  selectedId.value = v?.id;
+  rows.value = v
+    ? JSON.parse(JSON.stringify(v.content)).map((row: TemplateAttribute) => ({
+        ...row,
+        skuFlag: row.attributeRole === 'sales' && !!row.skuFlag,
+      }))
+    : [];
+  note.value = v?.changeNote || '';
+  saved.value = JSON.stringify([content(), note.value]);
+  validatedAttributeIds.value = [];
+  const pending = v?.state === 'draft' ? pendingEdits.get(v.id) : undefined;
+  if (pending && pending.revision === v?.revision) {
+    rows.value = JSON.parse(JSON.stringify(pending.rows));
+    note.value = pending.note;
+    saved.value = pending.saved;
+    validatedAttributeIds.value = [...pending.validatedAttributeIds];
+    attributePage.value = pending.page;
+  } else if (v) pendingEdits.delete(v.id);
 }
-
-function isCategoryExpanded(categoryId: number) {
-  return expandedCategoryIds.value.includes(categoryId);
+function upsert(v: TemplateVersion) {
+  pendingEdits.delete(v.id);
+  versions.value = [v, ...versions.value.filter((x) => x.id !== v.id)];
+  choose(v);
 }
-
-function expandAllCategories() {
-  expandedCategoryIds.value = scopedCategories.value
-    .filter((item) => hasCategoryChildren(item.id))
-    .map((item) => item.id);
-}
-
-function toggleCategory(categoryId: number) {
-  expandedCategoryIds.value = isCategoryExpanded(categoryId)
-    ? expandedCategoryIds.value.filter((id) => id !== categoryId)
-    : [...expandedCategoryIds.value, categoryId];
-}
-
-function selectLeafCategory(category: CategoryTreeNode) {
-  if (category.children.length) return;
-  selectedCategoryId.value = category.id;
-  reset();
-}
-
-function findFirstLeaf(nodes: CategoryTreeNode[]): CategoryTreeNode | undefined {
-  for (const node of nodes) {
-    if (!node.children.length) return node;
-    const leaf = findFirstLeaf(node.children);
-    if (leaf) return leaf;
+const error = (e: unknown, action = '操作', target?: string) => adminFeedback.actionError({ action, target, error: e });
+async function loadVersions() {
+  const sequence = ++loadSequence;
+  loading.value = true;
+  versions.value = [];
+  choose();
+  try {
+    if (!categoryId.value || !can('view')) return;
+    const list = await listTemplateVersions(categoryId.value);
+    if (sequence !== loadSequence) return;
+    versions.value = list;
+    if (viewSelections.has(viewKey())) {
+      const previousId = viewSelections.get(viewKey());
+      choose(
+        list.find((version) => version.id === previousId) || list.find((version) => version.state === 'published'),
+      );
+    } else choose(list.find((version) => version.state === 'published'));
+  } catch (e) {
+    if (sequence === loadSequence) error(e);
+  } finally {
+    if (sequence === loadSequence) loading.value = false;
   }
-  return undefined;
 }
-
-function searchCategory() {
-  appliedCategoryKeyword.value = categoryKeyword.value;
-}
-
-function clearCategorySearch() {
-  categoryKeyword.value = '';
-  appliedCategoryKeyword.value = '';
-}
-
-function valueTypeLabel(value: ProductAttributeRecord['valueType']) {
-  return { select: '标准选项', number: '数值', text: '文本' }[value];
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
-
-  const pad = (number: number) => number.toString().padStart(2, '0');
-  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function fuzzyIncludes(value: string, keyword: string) {
-  const source = value.toLowerCase().replace(/\s+/g, '');
-  const query = keyword.toLowerCase().replace(/\s+/g, '');
-  if (!query || source.includes(query)) return true;
-
-  let queryIndex = 0;
-  for (const character of source) {
-    if (character === query[queryIndex]) queryIndex += 1;
-    if (queryIndex === query.length) return true;
-  }
-  return false;
-}
-
-function toPayload(row: BindingRow): CategoryAttributePayload {
-  return {
-    categoryId: row.categoryId,
-    attributeId: row.attributeId,
-    attributeRole: row.attributeRole || null,
-    requiredFlag: row.requiredFlag,
-    skuFlag: row.skuFlag,
-    sortOrder: row.sortOrder,
-    status: row.status,
-  };
-}
-
-function syncSelectedCategory() {
-  const selectedCategory = scopedCategories.value.find((item) => item.id === selectedCategoryId.value);
-  const stillAvailable = Boolean(selectedCategory && !hasCategoryChildren(selectedCategory.id));
-  if (!stillAvailable) selectedCategoryId.value = findFirstLeaf(buildCategoryTree(undefined))?.id;
-  pagination.current = 1;
-}
-
-async function loadData() {
+async function loadScope() {
+  ++loadSequence;
+  categoryId.value = undefined;
+  versions.value = [];
+  choose();
   loading.value = true;
   try {
-    const [categoryRecords, attributeRecords, bindingRecords] = await Promise.all([
-      listProductCategories(),
-      listProductAttributes(),
-      listCategoryAttributes(),
-    ]);
-    categories.value = categoryRecords;
-    attributes.value = attributeRecords;
-    bindings.value = bindingRecords;
-    syncSelectedCategory();
-    expandAllCategories();
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '类目属性模板加载失败');
-  } finally {
+    categories.value = sortByCreatedAtDesc(await listTemplateCategories(scope.value));
+    expandedCategories.value = categories.value.map((category) => category.id);
+    const previousCategoryId = scopeSelections.get(scope.value)?.categoryId;
+    categoryId.value = categories.value.some((c) => c.id === previousCategoryId)
+      ? previousCategoryId
+      : categories.value.find(
+          (c) => c.status === 'enabled' && !categories.value.some((child) => child.parentId === c.id),
+        )?.id;
+    await loadVersions();
+  } catch (e) {
+    error(e);
     loading.value = false;
   }
 }
-
-function search() {
-  Object.assign(appliedSearch, searchForm);
-  pagination.current = 1;
+let navigationSequence = 0;
+async function navigate(action: () => void) {
+  if (busy.value || loading.value) return;
+  const sequence = ++navigationSequence;
+  if (isDraft.value && (dirty.value || savePromise) && !(await save())) return;
+  if (sequence !== navigationSequence) return;
+  rememberEdits();
+  action();
 }
-
-function reset() {
-  searchForm.keyword = '';
-  searchForm.publishStatus = '';
-  search();
+function exitEdit() {
+  navigate(() => choose(versions.value.find((version) => version.state === 'published')));
 }
-
-function handlePaginationChange(pageInfo: PageInfo) {
-  pagination.current = pageInfo.current;
-  pagination.pageSize = pageInfo.pageSize;
-}
-
-function openBindDialog() {
-  if (!canBindAttribute.value) return;
-  if (!selectedCategoryId.value) {
-    adminFeedback.warning('请选择分类');
-    return;
-  }
-  bindSearchKeyword.value = '';
-  bindForm.attributeIds = [...boundAttributeIds.value].filter((id) => bindableAttributeIds.value.has(id));
-  bindDialogVisible.value = true;
-}
-
-function closeBindDialog() {
-  bindDialogVisible.value = false;
-  bindSearchKeyword.value = '';
-  bindForm.attributeIds = [];
-}
-
-async function submitBind() {
-  if (!canBindAttribute.value) return;
-  const newAttributeIds = bindForm.attributeIds.filter((id) => !boundAttributeIds.value.has(id));
-  const removedBindings = bindings.value.filter(
-    (item) =>
-      item.categoryId === selectedCategoryId.value &&
-      bindableAttributeIds.value.has(item.attributeId) &&
-      !bindForm.attributeIds.includes(item.attributeId),
-  );
-  if (!selectedCategoryId.value) {
-    adminFeedback.warning('请选择分类');
-    return;
-  }
-  if (removedBindings.length && !canRemoveBinding.value) return;
-  if (!newAttributeIds.length && !removedBindings.length) {
-    closeBindDialog();
-    adminFeedback.info('绑定关系未变更');
-    return;
-  }
-  try {
-    const [created] = await Promise.all([
-      newAttributeIds.length
-        ? createCategoryAttributes({ categoryId: selectedCategoryId.value, attributeIds: newAttributeIds })
-        : Promise.resolve([] as CategoryAttributeRecord[]),
-      ...removedBindings.map((item) => deleteCategoryAttribute(item.id)),
-    ]);
-    const removedIds = new Set(removedBindings.map((item) => item.id));
-    bindings.value = bindings.value.filter((item) => !removedIds.has(item.id));
-    bindings.value.push(...created);
-    const target = selectedCategoryPath.value;
-    closeBindDialog();
-    adminFeedback.actionSuccess({ action: '更新绑定关系', target });
-  } catch (error) {
-    await loadData();
-    adminFeedback.error(error instanceof Error ? error.message : '绑定关系更新失败');
-  }
-}
-
-async function openValueBindingDialog(row: BindingRow) {
-  if (!canBindOptionValues.value || row.valueType !== 'select' || row.publishStatus === 'published') return;
-  valueBindingTarget.value = row;
-  valueSearchKeyword.value = '';
-  valueBindingDialogVisible.value = true;
-  valueOptionsLoading.value = true;
-  try {
-    valueOptions.value = await listCategoryAttributeValueOptions(row.id);
-    selectedValueIds.value = valueOptions.value
-      .filter((option) => option.selected && option.status === 'enabled')
-      .map((option) => option.id);
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '选项值加载失败');
-    closeValueBindingDialog();
-  } finally {
-    valueOptionsLoading.value = false;
-  }
-}
-
-function closeValueBindingDialog() {
-  valueBindingDialogVisible.value = false;
-  valueBindingTarget.value = null;
-  valueOptions.value = [];
-  valueSearchKeyword.value = '';
-  selectedValueIds.value = [];
-}
-
-async function openBoundValueView(row: BindingRow) {
-  if (row.valueType !== 'select') return;
-  boundValueViewTarget.value = row;
-  boundValueOptions.value = [];
-  boundValueSearchKeyword.value = '';
-  boundValueViewVisible.value = true;
-  boundValueViewLoading.value = true;
-  try {
-    const options = await listCategoryAttributeValueOptions(row.id);
-    boundValueOptions.value = options.filter((option) => option.selected && option.status === 'enabled');
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '已绑定选项值加载失败');
-    closeBoundValueView();
-  } finally {
-    boundValueViewLoading.value = false;
-  }
-}
-
-function closeBoundValueView() {
-  boundValueViewVisible.value = false;
-  boundValueViewTarget.value = null;
-  boundValueOptions.value = [];
-  boundValueSearchKeyword.value = '';
-}
-
-async function removeBoundValue(row: CategoryAttributeValueOption) {
-  if (!canRemoveBoundValue.value || !boundValueViewTarget.value || boundValueRemovingId.value !== null) return;
-  boundValueRemovingId.value = row.id;
-  try {
-    const remainingValueIds = boundValueOptions.value
-      .filter((option) => option.id !== row.id)
-      .map((option) => option.id);
-    const updatedOptions = await updateCategoryAttributeValueBindings(boundValueViewTarget.value.id, remainingValueIds);
-    boundValueOptions.value = updatedOptions.filter((option) => option.selected && option.status === 'enabled');
-    const optionCount = boundValueOptions.value.length;
-    bindings.value = bindings.value.map((binding) =>
-      binding.id === boundValueViewTarget.value?.id ? { ...binding, optionCount } : binding,
-    );
-    adminFeedback.actionSuccess({ action: '移除', target: row.value });
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '选项值移除失败');
-  } finally {
-    boundValueRemovingId.value = null;
-  }
-}
-
-async function submitValueBindings() {
-  if (!canBindOptionValues.value || !valueBindingTarget.value || valueBindingsSaving.value) return;
-  const target = valueBindingTarget.value;
-  valueBindingsSaving.value = true;
-  try {
-    const updatedOptions = await updateCategoryAttributeValueBindings(target.id, selectedValueIds.value);
-    const optionCount = updatedOptions.filter((option) => option.selected && option.status === 'enabled').length;
-    bindings.value = bindings.value.map((binding) =>
-      binding.id === target.id ? { ...binding, optionCount } : binding,
-    );
-    adminFeedback.actionSuccess({ action: '绑定选项值', target: target.name });
-    closeValueBindingDialog();
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '选项值绑定失败');
-  } finally {
-    valueBindingsSaving.value = false;
-  }
-}
-
-async function persistRow(
-  row: BindingRow,
-  patch: Partial<BindingRow>,
-  field: 'attributeRole' | 'requiredFlag' | 'skuFlag' | null = null,
-) {
-  if (field === 'attributeRole' && !canSetAttributeRole.value) return;
-  if (field === 'requiredFlag' && !canSetRequired.value) return;
-  if (field === 'skuFlag' && !canSetSkuCombination.value) return;
-  if (field === null && !canBindAttribute.value) return;
-  savingId.value = row.id;
-  savingField.value = field;
-  const nextRow = { ...row, ...patch };
-  try {
-    const updated = await updateCategoryAttribute(row.id, toPayload(nextRow));
-    const index = bindings.value.findIndex((item) => item.id === row.id);
-    if (index >= 0) bindings.value[index] = updated;
-    adminFeedback.actionSuccess({ action: field === null ? '绑定' : '保存', target: row.name });
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
-  } finally {
-    savingId.value = null;
-    savingField.value = null;
-  }
-}
-
-function getSwitchValue(value: unknown) {
-  if (typeof value === 'boolean') return value;
-  if (value && typeof value === 'object' && 'value' in value) return Boolean((value as { value?: boolean }).value);
-  return Boolean(value);
-}
-
-function getAttributeRoleValue(value: unknown): AttributeRole {
-  if (value === 'product' || value === 'sales') return value;
-  if (value && typeof value === 'object' && 'value' in value) {
-    return getAttributeRoleValue((value as { value?: unknown }).value);
-  }
-  return '';
-}
-
-function getCurrentBindingRow(row: BindingRow) {
-  return allBindingRows.value.find((item) => item.id === row.id) ?? row;
-}
-
-function changeAttributeRole(row: BindingRow, value: unknown) {
-  const currentRow = getCurrentBindingRow(row);
-  if (!canSetAttributeRole.value || currentRow.usageCount > 0 || currentRow.publishStatus === 'published') return;
-  const nextRole = getAttributeRoleValue(value);
-  if (!nextRole) {
-    adminFeedback.warning('请选择属性角色');
-    return;
-  }
-  if (nextRole === currentRow.attributeRole) return;
-  if (currentRow.skuFlag && nextRole !== 'sales') {
-    roleChangeTarget.value = currentRow;
-    roleChangeNextRole.value = nextRole;
-    roleChangeConfirmVisible.value = true;
-    return;
-  }
-  persistRow(currentRow, { attributeRole: nextRole }, 'attributeRole');
-}
-
-const roleChangeConfirmText = computed(() => {
-  const nextRoleLabel = roleChangeNextRole.value === 'product' ? '商品属性' : '未选择角色';
-  return `切换为${nextRoleLabel}后将关闭“参与SKU组合”，是否继续？`;
-});
-
-function closeRoleChangeConfirm() {
-  roleChangeConfirmVisible.value = false;
-  roleChangeTarget.value = null;
-  roleChangeNextRole.value = '';
-}
-
-async function handleRoleChangeConfirm() {
-  if (!roleChangeTarget.value) return;
-  await persistRow(
-    roleChangeTarget.value,
-    { attributeRole: roleChangeNextRole.value, skuFlag: false },
-    'attributeRole',
-  );
-  closeRoleChangeConfirm();
-}
-
-function changeFlag(row: BindingRow, field: 'requiredFlag' | 'skuFlag', value: unknown) {
-  const currentRow = getCurrentBindingRow(row);
-  const nextValue = getSwitchValue(value);
-  if (field === 'skuFlag' && nextValue && currentRow.attributeRole !== 'sales') {
-    adminFeedback.error('只有销售属性才能参与SKU组合');
-    return;
-  }
-  if (
-    field === 'skuFlag' &&
-    nextValue &&
-    !currentRow.skuFlag &&
-    allBindingRows.value.filter((item) => item.skuFlag).length >= MAX_SKU_ATTRIBUTE_COUNT
-  ) {
-    adminFeedback.error(SKU_ATTRIBUTE_LIMIT_MESSAGE);
-    return;
-  }
-  persistRow(currentRow, { [field]: nextValue }, field);
-}
-
-async function handleDragSort(context: { current: BindingRow; target: BindingRow }) {
-  if (!canBindAttribute.value || savingId.value !== null) return;
-  const orderedRows = allBindingRows.value.map((item) => ({ ...item }));
-  const currentIndex = orderedRows.findIndex((item) => item.id === context.current.id);
-  const targetIndex = orderedRows.findIndex((item) => item.id === context.target.id);
-  if (currentIndex < 0 || targetIndex < 0 || currentIndex === targetIndex) return;
-
-  const [currentRow] = orderedRows.splice(currentIndex, 1);
-  orderedRows.splice(targetIndex, 0, currentRow);
-  orderedRows.forEach((item, itemIndex) => {
-    item.sortOrder = itemIndex + 1;
+function switchScope(value: unknown) {
+  navigate(() => {
+    scope.value = value as TemplateScope;
+    void loadScope();
   });
-  savingId.value = context.current.id;
-  savingField.value = null;
+}
+function selectCategory(ids: (string | number)[]) {
+  const id = Number(ids[0]);
+  if (!id || categories.value.some((c) => c.parentId === id)) return;
+  navigate(() => {
+    categoryId.value = id;
+    void loadVersions();
+  });
+}
+const copyTarget = ref<TemplateVersion>();
+let copyDraftSnapshot: { draftId: number; revision: number } | undefined;
+function prepareCopy(version: TemplateVersion) {
+  copyDraftSnapshot = draft.value ? { draftId: draft.value.id, revision: draft.value.revision } : undefined;
+  if (draft.value) copyTarget.value = version;
+  else void copyVersion(version);
+}
+async function copyVersion(version: TemplateVersion) {
+  if (busy.value) return;
+  busy.value = true;
   try {
-    const updatedRows = await Promise.all(orderedRows.map((item) => updateCategoryAttribute(item.id, toPayload(item))));
-    const updatedMap = new Map(updatedRows.map((item) => [item.id, item]));
-    bindings.value = bindings.value.map((item) => updatedMap.get(item.id) ?? item);
-    adminFeedback.actionSuccess({ action: '更新排序', target: context.current.name });
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
-    await loadData();
+    const copied = await copyTemplateDraft(version.id, copyDraftSnapshot);
+    pendingEdits.delete(copied.id);
+    upsert(copied);
+    copyTarget.value = undefined;
+    historyVisible.value = false;
+    adminFeedback.actionSuccess({ action: '复制', target: versionLabel(version) });
+  } catch (e) {
+    error(e, '复制', versionLabel(version));
   } finally {
-    savingId.value = null;
+    busy.value = false;
   }
 }
-
-async function togglePublish(row: BindingRow) {
-  if (!canTogglePublish.value || savingId.value !== null) return;
-  savingId.value = row.id;
-  savingField.value = null;
+async function createDraft() {
+  if (!categoryId.value) return;
+  busy.value = true;
   try {
-    const updated =
-      row.publishStatus === 'published'
-        ? await unpublishCategoryAttribute(row.id)
-        : await publishCategoryAttribute(row.id);
-    const index = bindings.value.findIndex((item) => item.id === row.id);
-    if (index >= 0) bindings.value[index] = updated;
-    adminFeedback.actionSuccess({
-      action: row.publishStatus === 'published' ? '取消发布' : '发布',
-      target: row.name,
-    });
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '发布状态更新失败');
+    upsert(
+      await createTemplateDraft({
+        categoryId: categoryId.value,
+      }),
+    );
+    historyVisible.value = false;
+  } catch (e) {
+    error(e);
   } finally {
-    savingId.value = null;
+    busy.value = false;
   }
 }
-
-async function openPublishConfirm(row: BindingRow) {
-  if (!canTogglePublish.value || savingId.value !== null) return;
-  if (row.publishStatus === 'unpublished' && !row.attributeRole) {
-    roleValidationIds.add(row.id);
-    adminFeedback.error('请选择属性角色');
+function save(): Promise<boolean> {
+  if (savePromise) return savePromise;
+  if (!selected.value || !isDraft.value || !can('create')) return Promise.resolve(!dirty.value);
+  if (!dirty.value) return Promise.resolve(true);
+  const draftId = selected.value.id;
+  savePromise = (async () => {
+    try {
+      // Serialize saves so rapid edits always use the latest server revision.
+      while (selected.value?.id === draftId && isDraft.value && dirty.value) {
+        const snapshot = JSON.stringify([content(), note.value]);
+        const [draftContent, draftNote] = JSON.parse(snapshot) as [TemplateVersion['content'], string];
+        const updated = await saveTemplateDraft(draftId, selected.value.revision, draftContent, draftNote);
+        versions.value = versions.value.map((version) => (version.id === draftId ? updated : version));
+        saved.value = snapshot;
+        pendingEdits.delete(draftId);
+      }
+      adminFeedback.actionSuccess({ action: '保存', target: '草稿' });
+      return true;
+    } catch (e) {
+      error(e, '保存', '草稿');
+      return false;
+    } finally {
+      savePromise = undefined;
+    }
+  })();
+  return savePromise;
+}
+watch(
+  () => JSON.stringify([selectedId.value, content(), note.value]),
+  () => {
+    if (isDraft.value && can('create') && !loading.value && dirty.value) void save();
+  },
+  { flush: 'post' },
+);
+const publishVisible = ref(false);
+async function preparePublish() {
+  if (!(await save())) return;
+  validatedAttributeIds.value = rows.value.map((row) => row.attributeId);
+  if (
+    !rows.value.length ||
+    rows.value.some((r) => !r.attributeRole || (r.valueType === 'select' && !r.options.length))
+  ) {
+    const invalidIndex = rows.value.findIndex(
+      (row) => !row.attributeRole || (row.valueType === 'select' && !row.options.length),
+    );
+    if (invalidIndex >= 0) attributePage.value = Math.floor(invalidIndex / attributePageSize.value) + 1;
+    adminFeedback.warning('请完善属性角色和选项值后发布');
     return;
   }
-  if (row.publishStatus === 'unpublished' && row.valueType === 'select') {
-    try {
-      const options = await listCategoryAttributeValueOptions(row.id);
-      if (!options.some((option) => option.selected && option.status === 'enabled')) {
-        adminFeedback.error('请先绑定选项值');
-        return;
-      }
-    } catch (error) {
-      adminFeedback.error(error instanceof Error ? error.message : '选项值加载失败');
-      return;
-    }
-  }
-  publishTarget.value = row;
-  publishConfirmVisible.value = true;
+  publishVisible.value = true;
 }
-
-function closePublishConfirm() {
-  publishConfirmVisible.value = false;
-  publishTarget.value = null;
-}
-
-async function handlePublishConfirm() {
-  if (!publishTarget.value) return;
-  await togglePublish(publishTarget.value);
-  closePublishConfirm();
-}
-
-function openDeleteConfirm(row: BindingRow) {
-  if (!canRemoveBinding.value) return;
-  deleteTarget.value = row;
-  deleteConfirmVisible.value = true;
-}
-
-function closeDeleteConfirm() {
-  deleteConfirmVisible.value = false;
-  deleteTarget.value = null;
-}
-
-async function handleDelete() {
-  if (!canRemoveBinding.value) return;
-  if (!deleteTarget.value) return;
-  const target = deleteTarget.value;
+async function publish() {
+  if (!(await save())) return;
+  if (!selected.value) return;
+  busy.value = true;
   try {
-    await deleteCategoryAttribute(target.id);
-    bindings.value = bindings.value.filter((item) => item.id !== target.id);
-    closeDeleteConfirm();
-    adminFeedback.actionSuccess({ action: '移除', target: target.name });
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '移除失败');
+    upsert(await publishTemplateDraft(selected.value.id, selected.value.revision));
+    publishVisible.value = false;
+    adminFeedback.actionSuccess({ action: '发布', target: '新版本' });
+  } catch (e) {
+    error(e, '发布', '新版本');
+  } finally {
+    busy.value = false;
   }
 }
-
-watch(activeScope, () => {
-  closeBoundValueView();
-  closeValueBindingDialog();
-  selectedCategoryId.value = undefined;
-  categoryKeyword.value = '';
-  appliedCategoryKeyword.value = '';
-  syncSelectedCategory();
-  expandAllCategories();
-  reset();
+const addVisible = ref(false),
+  attributeKeyword = ref(''),
+  addIds = ref<number[]>([]),
+  availableAttributes = ref<ProductAttributeRecord[]>([]);
+const addPage = ref(1);
+const addPageSize = ref(10);
+const filteredAddAttributes = computed(() =>
+  availableAttributes.value.filter((attribute) => attribute.name.includes(attributeKeyword.value)),
+);
+const addPageRows = computed(() =>
+  filteredAddAttributes.value.slice((addPage.value - 1) * addPageSize.value, addPage.value * addPageSize.value),
+);
+watch(attributeKeyword, () => {
+  addPage.value = 1;
 });
-
-onMounted(loadData);
+function changeAddPage(page: PageInfo) {
+  addPage.value = page.pageSize === addPageSize.value ? page.current : 1;
+  addPageSize.value = page.pageSize;
+}
+function selectAddAttributes(keys: Array<string | number>) {
+  const pageIds = new Set(addPageRows.value.map((attribute) => attribute.id));
+  addIds.value = [...new Set([...addIds.value.filter((id) => !pageIds.has(id)), ...keys.map(Number)])];
+}
+async function openAdd() {
+  if (!categoryId.value) return;
+  try {
+    availableAttributes.value = (await listTemplateAttributes(categoryId.value)).filter(
+      (a) => !rows.value.some((r) => r.attributeId === a.id),
+    );
+    addIds.value = [];
+    addPage.value = 1;
+    attributeKeyword.value = '';
+    addVisible.value = true;
+  } catch (e) {
+    error(e);
+  }
+}
+function addAttributes() {
+  for (const attribute of availableAttributes.value.filter((a) => addIds.value.includes(a.id)))
+    rows.value.push({
+      attributeId: attribute.id,
+      name: attribute.name,
+      scope: attribute.scope,
+      valueType: attribute.valueType,
+      attributeRole: '',
+      requiredFlag: false,
+      skuFlag: false,
+      sortOrder: rows.value.length + 1,
+      options: [],
+    });
+  addVisible.value = false;
+}
+const valueTarget = ref<TemplateAttribute>(),
+  valuesVisible = ref(false),
+  valueKeyword = ref(''),
+  valueIds = ref<number[]>([]),
+  valueOptions = ref<ProductAttributeValueRecord[]>([]);
+const valuePage = ref(1);
+const valuePageSize = ref(10);
+const filteredValues = computed(() =>
+  (editable.value ? valueOptions.value : valueTarget.value?.options || []).filter((option) =>
+    option.value.includes(valueKeyword.value),
+  ),
+);
+const valuePageRows = computed(() =>
+  filteredValues.value.slice((valuePage.value - 1) * valuePageSize.value, valuePage.value * valuePageSize.value),
+);
+const valueColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  ...(editable.value ? [{ colKey: 'row-select', type: 'multiple' as const }] : []),
+  { colKey: 'value', title: '选项值' },
+]);
+watch(valueKeyword, () => {
+  valuePage.value = 1;
+});
+function changeValuePage(page: PageInfo) {
+  valuePage.value = page.pageSize === valuePageSize.value ? page.current : 1;
+  valuePageSize.value = page.pageSize;
+}
+function selectValues(keys: Array<string | number>) {
+  if (!editable.value) return;
+  const pageIds = new Set(valuePageRows.value.map((option) => option.id));
+  valueIds.value = [...new Set([...valueIds.value.filter((id) => !pageIds.has(id)), ...keys.map(Number)])];
+}
+async function openValues(row: TemplateAttribute) {
+  valueTarget.value = row;
+  valueKeyword.value = '';
+  valuePage.value = 1;
+  valueIds.value = row.options.map((v) => v.id);
+  try {
+    valueOptions.value =
+      editable.value && categoryId.value ? await listTemplateValues(categoryId.value, row.attributeId) : [];
+    valuesVisible.value = true;
+  } catch (e) {
+    error(e);
+  }
+}
+function applyValues() {
+  if (editable.value && valueTarget.value)
+    valueTarget.value.options = valueOptions.value
+      .filter((v) => valueIds.value.includes(v.id))
+      .map((v) => ({ id: v.id, value: v.value, code: v.code }));
+  valuesVisible.value = false;
+}
+const removeTarget = ref<TemplateAttribute>();
+function removeAttribute() {
+  validatedAttributeIds.value = validatedAttributeIds.value.filter((id) => id !== removeTarget.value?.attributeId);
+  rows.value = rows.value.filter((r) => r.attributeId !== removeTarget.value?.attributeId);
+  rows.value.forEach((r, i) => (r.sortOrder = i + 1));
+  removeTarget.value = undefined;
+}
+async function sortAttributes(context: { currentIndex: number; targetIndex: number }) {
+  if (!canSortAttributes.value || context.currentIndex === context.targetIndex) return;
+  const version = selected.value!;
+  const previousRows = structuredClone(toRaw(rows.value));
+  const offset = (attributePage.value - 1) * attributePageSize.value;
+  const [row] = rows.value.splice(offset + context.currentIndex, 1);
+  if (row) rows.value.splice(offset + context.targetIndex, 0, row);
+  rows.value.forEach((r, i) => (r.sortOrder = i + 1));
+  if (isDraft.value) return;
+  busy.value = true;
+  try {
+    const updated = await saveTemplateDisplayOrder(
+      version.id,
+      version.revision,
+      rows.value.map((r) => r.attributeId),
+    );
+    versions.value = versions.value.map((v) => (v.id === updated.id ? updated : v));
+    rows.value = structuredClone(updated.content as TemplateAttribute[]);
+    adminFeedback.actionSuccess({ action: '调整', target: '字段显示顺序' });
+  } catch (e) {
+    rows.value = previousRows;
+    error(e, '调整', '字段显示顺序');
+  } finally {
+    busy.value = false;
+  }
+}
+const historyVisible = ref(false);
+function viewHistoryVersion(version: TemplateVersion) {
+  void navigate(() => {
+    choose(version);
+    historyVisible.value = false;
+  });
+}
+onMounted(() => {
+  window.addEventListener('resize', updateCategoryHeight);
+  if (scopeTabs.value.length) {
+    scope.value = scopeTabs.value[0]!.value as TemplateScope;
+    void loadScope();
+  }
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateCategoryHeight);
+  categoryLayoutObserver.disconnect();
+});
 </script>
-
 <style scoped>
-.scope-controls {
-  flex: 1;
-  width: 100%;
-  min-width: 0;
+.publish-confirm-content {
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
 }
-
-.scope-controls :deep(.t-tabs) {
-  width: 100%;
-}
-
-.category-template-layout {
+.list-controls {
   display: grid;
-  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  width: 100%;
   gap: var(--td-comp-margin-l);
 }
-
-.category-panel,
-.template-panel {
+.scope-controls {
   min-width: 0;
-  min-height: 600px;
-  overflow: hidden;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-medium);
 }
-
-.category-tree {
-  max-height: 640px;
-  padding: var(--td-comp-paddingTB-s) 0;
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
+}
+:deep(.zdm-admin-list-layout__content) {
+  overflow-anchor: none;
+}
+.version-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--td-comp-margin-l);
+}
+.category-panel {
+  min-height: var(--category-viewport-height);
+  contain: size;
   overflow-y: auto;
 }
-
-.category-search {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-.category-search :deep(.t-input) {
-  flex: 1;
+.category-panel,
+.version-panel {
   min-width: 0;
 }
-
-.category-node {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 40px;
-  gap: var(--td-comp-margin-xs);
-  padding-right: var(--td-comp-paddingLR-s);
-  color: var(--td-text-color-primary);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-  background: transparent;
-  border: 0;
-  text-align: left;
-}
-
-.category-node-leaf {
-  cursor: pointer;
-}
-
-.category-node-leaf:hover,
-.category-node-leaf.active {
-  color: var(--td-brand-color);
-  background: var(--td-brand-color-light);
-}
-
-.expand-button,
-.expand-placeholder {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-}
-
-.category-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.category-empty {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-l);
-  color: var(--td-text-color-secondary);
-  text-align: center;
-}
-
-.template-search {
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-.template-toolbar {
-  display: flex;
-  align-items: center;
-  margin-top: var(--td-comp-margin-l);
-}
-
-.bind-category-context {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--td-comp-margin-l);
-  color: var(--td-text-color-primary);
-  font-size: 14px;
-  line-height: 22px;
-}
-
-.bind-category-label {
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-}
-
-.bind-list-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-
-.bind-list-toolbar :deep(.t-input) {
-  width: 320px;
-}
-
-.bind-list-count {
-  flex-shrink: 0;
-  color: var(--td-text-color-secondary);
-  font-size: 14px;
-}
-
-.bind-attribute-table {
+.category-content,
+.version-content {
   width: 100%;
 }
-
-.attribute-role-select {
-  width: 108px;
+.category-content :deep(.t-space-item) {
+  width: 100%;
 }
-
-.sku-switch-cell {
-  display: inline-flex;
-  align-items: center;
+.category-content :deep(.t-tree__item.t-is-active) {
+  background-color: var(--td-brand-color-light);
+  border-radius: var(--td-radius-default);
 }
-
-.filter-row {
-  position: relative;
+.attribute-table :deep(.attribute-drag-cell:first-child) {
+  padding-left: 0;
+  padding-right: 0;
+}
+.attribute-summary {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
   gap: var(--td-comp-margin-l);
 }
-
-.filter-fields {
-  display: flex;
-  flex: 1;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  min-width: 0;
-  gap: var(--td-comp-margin-s);
+.metadata-value {
+  color: var(--td-text-color-primary);
 }
-
-.filter-fields :deep(.t-form__item) {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-bottom: 0;
+.draft-version-info {
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
 }
-
-.filter-fields :deep(.t-form__item:nth-child(1)) {
-  width: 26.6667%;
-}
-
-.filter-fields :deep(.t-form__item:nth-child(2)),
-.filter-fields :deep(.t-form__item:nth-child(3)) {
-  width: 16.6667%;
-}
-
-.filter-fields :deep(.t-input),
-.filter-fields :deep(.t-select) {
-  width: 100%;
-}
-
-.filter-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
+.template-metadata {
+  margin-left: auto;
   display: flex;
   justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
-.template-panel :deep(.t-table) {
-  border-radius: 0;
-}
-
-.template-panel :deep(.zdm-admin-pagination) {
-  padding: 0 var(--td-comp-paddingLR-xl) var(--td-comp-paddingTB-l);
-}
-
-.table-actions {
-  display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--td-comp-margin-s);
-  white-space: nowrap;
-}
-
-.table-actions :deep(.t-link) {
-  flex: 0 0 auto;
-}
-
-.binding-drag-icon {
+  gap: var(--td-comp-margin-l);
   color: var(--td-text-color-secondary);
-  cursor: grab;
-  transition: color 0.2s ease;
+  font: var(--td-font-body-small);
 }
-
-:deep(.t-table__handle-draggable) {
-  cursor: grab;
+.version-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
 }
-
-:deep(.t-table__handle-draggable:hover .binding-drag-icon) {
-  color: var(--td-brand-color);
+.version-history {
+  margin-left: auto;
 }
-
-:deep(tr.t-table__ele--draggable-chosen td) {
-  background: var(--td-brand-color-light);
-  box-shadow:
-    inset 0 1px 0 var(--td-brand-color),
-    inset 0 -1px 0 var(--td-brand-color);
+.draft-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-l);
 }
-
-:deep(tr.t-table__ele--draggable-ghost td) {
-  background: var(--td-brand-color-light);
-  border-top: 2px solid var(--td-brand-color);
-  opacity: 0.75;
+.draft-status {
+  margin-right: auto;
 }
-
-:deep(tr.t-table__ele--draggable-dragging) {
-  cursor: grabbing;
-  opacity: 0.9;
+.add-attribute {
+  order: 1;
 }
-
-:deep(.t-table th),
-:deep(.t-table td) {
-  padding-right: 24px;
-  padding-left: 24px;
+.template-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--td-comp-margin-l);
 }
-
-@media (max-width: 1120px) {
-  .category-template-layout {
-    grid-template-columns: 240px minmax(0, 1fr);
-  }
-
-  .filter-actions {
-    flex-wrap: wrap;
-  }
+.exit-edit {
+  flex-shrink: 0;
 }
-
-@media (max-width: 720px) {
-  .category-template-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .category-panel,
-  .template-panel {
-    min-height: auto;
-  }
-
-  .category-tree {
-    max-height: 360px;
-  }
-
-  .filter-fields :deep(.t-form__item) {
-    flex-basis: 100%;
-    width: 100%;
+.publish-draft {
+  order: 2;
+}
+@media (max-width: 1180px) {
+  .version-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
   }
 }
 </style>
