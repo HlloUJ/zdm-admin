@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zdm.platform.security.TokenAuthenticationFilter;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -76,10 +77,18 @@ class FinishedProductRichTextApiTest {
         <div data-w-e-type="video" data-w-e-is-void><video controls><source src="%s" type="video/mp4"></video></div>
         <table><tbody><tr><td>规格</td></tr></tbody></table>
         """.formatted(images.get(5).path("url").asText(), video.path("url").asText()));
+    payload.put("createdByName", "伪造创建人");
+    payload.put("createdByAccountId", 99999);
+    payload.put("createdAt", "2000-01-01T00:00:00");
+    LocalDateTime beforeCreate = LocalDateTime.now().minusSeconds(1);
     JsonNode created = data(mvc.perform(post("/api/admin/finished-products").header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     long id = created.path("id").asLong();
     assertThat(id).isPositive();
+    assertThat(created.path("createdByAccountId").asLong()).isEqualTo(1L);
+    assertThat(created.path("createdByName").asText()).isNotBlank().isNotEqualTo("伪造创建人");
+    assertThat(LocalDateTime.parse(created.path("createdAt").asText()))
+        .isBetween(beforeCreate, LocalDateTime.now().plusSeconds(1));
     String stored = jdbc.queryForObject("SELECT detail FROM finished_products WHERE id = ?", String.class, id);
     assertThat(stored).contains("media:" + images.get(5).path("id").asLong()).doesNotContain("/api/open/media/");
     JsonNode reloaded = data(mvc.perform(get("/api/admin/finished-products").header("Authorization", token))).get(0);
@@ -94,6 +103,9 @@ class FinishedProductRichTextApiTest {
     payload.put("status", "recycle");
     JsonNode updated = data(mvc.perform(put("/api/admin/finished-products/{id}", id).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
+    assertThat(updated.path("createdByName")).isEqualTo(created.path("createdByName"));
+    assertThat(updated.path("createdByAccountId")).isEqualTo(created.path("createdByAccountId"));
+    assertThat(updated.path("createdAt")).isEqualTo(created.path("createdAt"));
     assertThat(updated.path("variants").get(0).path("salesAttributes").path("attribute_99001").asText()).isEqualTo("橡木");
     assertThat(updated.path("detail").asText()).contains("<em>更新后的详情</em>").doesNotContain("<img", "<video");
     assertThat(referenceCount(id, "detailMedia%")).isZero();

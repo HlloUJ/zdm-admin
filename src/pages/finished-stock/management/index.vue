@@ -46,16 +46,18 @@
               <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
             </t-tabs>
 
-            <t-form :data="currentFilter" label-width="76px" colon>
+            <t-form :data="currentFilter" label-width="44px" colon>
               <div class="filter-row">
                 <div class="filter-fields">
-                  <t-form-item label="ID">
-                    <t-input v-model="currentFilter.id" clearable placeholder="请输入" />
+                  <t-form-item label="商品">
+                    <t-input
+                      v-model="currentFilter.keyword"
+                      clearable
+                      placeholder="商品名称 / ID / 编码"
+                      @enter="handleSearch"
+                    />
                   </t-form-item>
-                  <t-form-item label="商品名称">
-                    <t-input v-model="currentFilter.name" clearable placeholder="请输入" />
-                  </t-form-item>
-                  <t-form-item label="平台分类">
+                  <t-form-item label="商品分类" label-width="72px">
                     <t-cascader
                       v-model="currentFilter.category"
                       :options="categoryCascaderOptions"
@@ -65,7 +67,7 @@
                       trigger="hover"
                     />
                   </t-form-item>
-                  <t-form-item label="供应商">
+                  <t-form-item label="供应商" label-width="60px">
                     <t-select v-model="currentFilter.supplier" clearable placeholder="请选择">
                       <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
                     </t-select>
@@ -139,22 +141,18 @@
               </template>
               <template #supplier="{ row }">
                 <div class="tenant-cell">
-                  <div>{{ row.supplier }}</div>
-                  <div class="tenant-tags">
-                    <t-tag variant="light" class="publisher-tag platform-publish">
-                      {{ row.publisherType }}
-                    </t-tag>
-                  </div>
+                  <span>{{ row.supplier }}</span>
+                  <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->
+                  <span class="store-text">平台仓</span>
                 </div>
               </template>
+              <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
               <template #stock="{ row }">
-                <strong>{{ activeTab === 'soldOut' ? 0 : row.stock }}</strong>
-              </template>
-              <template #price="{ row }">
-                <t-link theme="primary" hover="color" @click="openPriceDrawer('view', row)">查看</t-link>
+                <span>{{ activeTab === 'soldOut' ? 0 : row.stock }}</span>
               </template>
               <template #operation="{ row }">
                 <div class="table-actions">
+                  <t-link theme="primary" hover="color" @click="openPriceDrawer('view', row)">价格</t-link>
                   <t-link
                     v-for="action in rowActions()"
                     :key="action.action"
@@ -247,17 +245,15 @@
             <AdminSectionCard id="finished-product-base" class="form-section" aria-label="基础信息">
               <h2 class="form-section-title">基础信息</h2>
               <t-form :data="productForm" label-width="116px" colon>
-                <div class="form-grid">
-                  <t-form-item label="商品名称" required-mark>
-                    <t-input
-                      v-model="productForm.name"
-                      :status="requiredFieldStatus(productForm.name)"
-                      clearable
-                      placeholder="请输入"
-                      :maxlength="60"
-                    />
-                  </t-form-item>
-                </div>
+                <t-form-item label="商品名称" required-mark>
+                  <t-input
+                    v-model="productForm.name"
+                    :status="requiredFieldStatus(productForm.name)"
+                    clearable
+                    placeholder="请输入"
+                    :maxlength="60"
+                  />
+                </t-form-item>
               </t-form>
               <section class="product-attributes" aria-labelledby="product-attributes-title">
                 <h3 id="product-attributes-title" class="product-attributes-title">
@@ -313,199 +309,195 @@
 
             <AdminSectionCard id="finished-product-sales" class="form-section" aria-label="销售信息">
               <h2 class="form-section-title">销售信息</h2>
-              <t-form :data="productForm" label-width="112px" colon>
-                <div class="sales-head">
-                  <t-form-item label="销售属性">
-                    <span>{{
-                      salesAttributeFields.length
-                        ? salesAttributeFields.map((field) => field.label).join('、')
-                        : '当前分类未配置销售属性'
-                    }}</span>
-                  </t-form-item>
-                  <t-form-item label="销售规格" required-mark>
-                    <t-button
-                      v-if="!specRows.length"
-                      :theme="submitAttempted ? 'danger' : 'primary'"
-                      variant="outline"
-                      @click="openSpecDialog"
-                    >
-                      <template #icon><t-icon name="add" /></template>
-                      创建规格
-                    </t-button>
-                  </t-form-item>
-                </div>
-                <div class="form-grid three">
-                  <t-form-item label="总库存">
-                    <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
-                  </t-form-item>
-                  <t-form-item label="商家编码" required-mark>
-                    <t-input
-                      v-model="productForm.merchantCode"
-                      :status="requiredFieldStatus(productForm.merchantCode)"
-                      clearable
-                      placeholder="请输入"
-                      :maxlength="60"
-                    />
-                  </t-form-item>
-                  <t-form-item label="上架" required-mark :status="requiredFieldStatus(productForm.shelfNow)">
-                    <t-radio-group v-model="productForm.shelfNow">
-                      <t-radio value="now">立刻上架</t-radio>
-                      <t-radio value="later">暂不上架</t-radio>
-                    </t-radio-group>
-                  </t-form-item>
-                </div>
-              </t-form>
-
-              <div v-if="specRows.length" class="spec-table-block">
-                <div class="spec-toolbar">
-                  <span>销售属性 · 规格表格</span>
-                </div>
-                <t-table row-key="id" :data="specRows" :columns="specColumns" hover table-layout="fixed">
-                  <template #specText="{ row }">
-                    <div class="spec-name-cell">
-                      <span>{{ row.specText || '-' }}</span>
-                    </div>
-                  </template>
-                  <template v-for="field in salesAttributeFields" :key="field.key" #[field.key]="{ row }">
-                    <t-select
-                      v-if="field.type === 'select'"
-                      v-model="row[field.key]"
-                      clearable
-                      :status="field.required ? requiredFieldStatus(row[field.key]) : undefined"
-                      placeholder="请选择"
-                    >
-                      <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
-                    </t-select>
-                    <t-input
-                      v-else
-                      v-model="row[field.key]"
-                      :status="field.required ? requiredFieldStatus(row[field.key]) : undefined"
-                      placeholder="请输入"
-                    />
-                  </template>
-                  <template #cost="{ row }">
-                    <SpecPriceInput
-                      v-model="row.cost"
-                      class="decimal-input"
-                      placeholder="价格"
-                      label="价格"
-                      :submitted="submitAttempted"
-                      @change="handleSpecCostChange(row, $event)"
-                    />
-                  </template>
-                  <template
-                    v-for="configuration in productPriceLevels"
-                    #[`markup-${configuration.id}`]="{ row }"
-                    :key="configuration.id"
+              <t-form :data="productForm" label-width="116px" colon>
+                <t-form-item label="销售规格" required-mark>
+                  <t-button
+                    v-if="!specRows.length"
+                    :theme="submitAttempted ? 'danger' : 'primary'"
+                    variant="outline"
+                    @click="openSpecDialog"
                   >
-                    <div class="price-pair">
-                      <SpecPriceInput
-                        v-model="row.markupPrices[configuration.id].coefficient"
-                        placeholder="价格系数"
-                        label="价格系数"
-                        :submitted="submitAttempted"
-                        @change="handleMarkupCoefficientChange(row, configuration.id, $event)"
-                      />
-                      <SpecPriceInput
-                        v-model="row.markupPrices[configuration.id].price"
-                        placeholder="价格"
-                        label="价格"
-                        :submitted="submitAttempted"
-                        @change="handleMarkupPriceChange(row, configuration.id, $event)"
-                      />
-                    </div>
-                  </template>
-                  <template #guide="{ row }">
-                    <div class="price-pair">
-                      <SpecPriceInput
-                        v-model="row.guideCoefficient"
-                        placeholder="价格系数"
-                        label="价格系数"
-                        :submitted="submitAttempted"
-                        @change="handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)"
-                      />
-                      <SpecPriceInput
-                        v-model="row.guide"
-                        placeholder="价格"
-                        label="价格"
-                        :submitted="submitAttempted"
-                        @change="handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)"
-                      />
-                    </div>
-                  </template>
-                  <template #level1="{ row }">
-                    <div class="price-pair">
-                      <t-input
-                        v-model="row.level1Coefficient"
-                        placeholder="价格系数"
-                        @change="handleSpecCoefficientChange(row, 'level1Coefficient', 'level1', $event)"
-                        @blur="formatDecimalValue(row, 'level1Coefficient')"
-                      />
-                      <t-input
-                        v-model="row.level1"
-                        placeholder="价格"
-                        @change="handleSpecPriceChange(row, 'level1', 'level1Coefficient', $event)"
-                        @blur="formatDecimalValue(row, 'level1')"
-                      />
-                    </div>
-                  </template>
-                  <template #level2="{ row }">
-                    <div class="price-pair">
-                      <t-input
-                        v-model="row.level2Coefficient"
-                        placeholder="价格系数"
-                        @change="handleSpecCoefficientChange(row, 'level2Coefficient', 'level2', $event)"
-                        @blur="formatDecimalValue(row, 'level2Coefficient')"
-                      />
-                      <t-input
-                        v-model="row.level2"
-                        placeholder="价格"
-                        @change="handleSpecPriceChange(row, 'level2', 'level2Coefficient', $event)"
-                        @blur="formatDecimalValue(row, 'level2')"
-                      />
-                    </div>
-                  </template>
-                  <template #level3="{ row }">
-                    <div class="price-pair">
-                      <t-input
-                        v-model="row.level3Coefficient"
-                        placeholder="价格系数"
-                        @change="handleSpecCoefficientChange(row, 'level3Coefficient', 'level3', $event)"
-                        @blur="formatDecimalValue(row, 'level3Coefficient')"
-                      />
-                      <t-input
-                        v-model="row.level3"
-                        placeholder="价格"
-                        @change="handleSpecPriceChange(row, 'level3', 'level3Coefficient', $event)"
-                        @blur="formatDecimalValue(row, 'level3')"
-                      />
-                    </div>
-                  </template>
-                  <template #quantity="{ row }">
-                    <div class="quantity-editor">
-                      <t-input-number v-model="row.quantity" theme="normal" :min="0" />
-                    </div>
-                  </template>
-                  <template #merchantCode="{ row }">
-                    <t-input v-model="row.merchantCode" placeholder="请输入" />
-                  </template>
-                  <template #operation="{ row }">
-                    <div class="table-actions">
-                      <t-link theme="danger" hover="color" @click="deleteSpec(row.id)">删除</t-link>
-                    </div>
-                  </template>
-                </t-table>
-                <div class="spec-table-actions">
-                  <t-button theme="primary" variant="outline" @click="openPriceDrawer('batchFill')">
-                    <template #icon><t-icon name="edit" /></template>
-                    批量填写
+                    <template #icon><t-icon name="add" /></template>
+                    创建规格
                   </t-button>
-                  <t-button theme="primary" variant="outline" @click="openSpecDialog(true)">
-                    <template #icon><t-icon name="setting" /></template>
-                    编辑规格
-                  </t-button>
-                </div>
-              </div>
+                  <div v-if="specRows.length" class="spec-table-block">
+                    <t-table row-key="id" :data="specRows" :columns="specColumns" hover table-layout="fixed">
+                      <template #specText="{ row }">
+                        <div class="spec-name-cell">
+                          <span>{{ row.specText || '-' }}</span>
+                        </div>
+                      </template>
+                      <template v-for="field in salesAttributeFields" :key="field.key" #[field.key]="{ row }">
+                        <t-select
+                          v-if="field.type === 'select'"
+                          v-model="row[field.key]"
+                          clearable
+                          :status="field.required ? requiredFieldStatus(row[field.key]) : undefined"
+                          placeholder="请选择"
+                        >
+                          <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
+                        </t-select>
+                        <t-input
+                          v-else
+                          v-model="row[field.key]"
+                          :status="field.required ? requiredFieldStatus(row[field.key]) : undefined"
+                          placeholder="请输入"
+                        />
+                      </template>
+                      <template #cost="{ row }">
+                        <SpecPriceInput
+                          v-model="row.cost"
+                          class="decimal-input"
+                          placeholder="价格"
+                          label="价格"
+                          :submitted="submitAttempted"
+                          @change="handleSpecCostChange(row, $event)"
+                        />
+                      </template>
+                      <template
+                        v-for="configuration in productPriceLevels"
+                        #[`markup-${configuration.id}`]="{ row }"
+                        :key="configuration.id"
+                      >
+                        <div class="partner-price-cell">
+                          <div class="price-pair with-source">
+                            <SpecPriceInput
+                              v-model="row.markupPrices[configuration.id].coefficient"
+                              placeholder="系数"
+                              label="系数"
+                              :submitted="submitAttempted"
+                              @change="handleMarkupCoefficientChange(row, configuration.id, $event)"
+                              @commit="markSpecPriceManual(row, configuration.id)"
+                            />
+                            <SpecPriceInput
+                              v-model="row.markupPrices[configuration.id].price"
+                              placeholder="价格"
+                              label="价格"
+                              :submitted="submitAttempted"
+                              @change="handleMarkupPriceChange(row, configuration.id, $event)"
+                              @commit="markSpecPriceManual(row, configuration.id)"
+                            />
+                            <PriceSourceToggle
+                              :source="row.markupPrices[configuration.id].priceSource"
+                              :available="
+                                Boolean(configuration.configurationId) && configuration.priceCoefficient != null
+                              "
+                              @toggle="toggleSpecPriceSource(row, configuration.id)"
+                            />
+                          </div>
+                        </div>
+                      </template>
+                      <template #guide="{ row }">
+                        <div class="price-pair">
+                          <SpecPriceInput
+                            v-model="row.guideCoefficient"
+                            placeholder="系数"
+                            label="系数"
+                            :submitted="submitAttempted"
+                            @change="handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)"
+                          />
+                          <SpecPriceInput
+                            v-model="row.guide"
+                            placeholder="价格"
+                            label="价格"
+                            :submitted="submitAttempted"
+                            @change="handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)"
+                          />
+                        </div>
+                      </template>
+                      <template #level1="{ row }">
+                        <div class="price-pair">
+                          <t-input
+                            v-model="row.level1Coefficient"
+                            placeholder="系数"
+                            @change="handleSpecCoefficientChange(row, 'level1Coefficient', 'level1', $event)"
+                            @blur="formatDecimalValue(row, 'level1Coefficient')"
+                          />
+                          <t-input
+                            v-model="row.level1"
+                            placeholder="价格"
+                            @change="handleSpecPriceChange(row, 'level1', 'level1Coefficient', $event)"
+                            @blur="formatDecimalValue(row, 'level1')"
+                          />
+                        </div>
+                      </template>
+                      <template #level2="{ row }">
+                        <div class="price-pair">
+                          <t-input
+                            v-model="row.level2Coefficient"
+                            placeholder="系数"
+                            @change="handleSpecCoefficientChange(row, 'level2Coefficient', 'level2', $event)"
+                            @blur="formatDecimalValue(row, 'level2Coefficient')"
+                          />
+                          <t-input
+                            v-model="row.level2"
+                            placeholder="价格"
+                            @change="handleSpecPriceChange(row, 'level2', 'level2Coefficient', $event)"
+                            @blur="formatDecimalValue(row, 'level2')"
+                          />
+                        </div>
+                      </template>
+                      <template #level3="{ row }">
+                        <div class="price-pair">
+                          <t-input
+                            v-model="row.level3Coefficient"
+                            placeholder="系数"
+                            @change="handleSpecCoefficientChange(row, 'level3Coefficient', 'level3', $event)"
+                            @blur="formatDecimalValue(row, 'level3Coefficient')"
+                          />
+                          <t-input
+                            v-model="row.level3"
+                            placeholder="价格"
+                            @change="handleSpecPriceChange(row, 'level3', 'level3Coefficient', $event)"
+                            @blur="formatDecimalValue(row, 'level3')"
+                          />
+                        </div>
+                      </template>
+                      <template #quantity="{ row }">
+                        <div class="quantity-editor">
+                          <t-input-number v-model="row.quantity" theme="normal" :min="0" />
+                        </div>
+                      </template>
+                      <template #merchantCode="{ row }">
+                        <t-input v-model="row.merchantCode" placeholder="请输入" />
+                      </template>
+                      <template #operation="{ row }">
+                        <div class="table-actions">
+                          <t-link theme="danger" hover="color" @click="deleteSpec(row.id)">删除</t-link>
+                        </div>
+                      </template>
+                    </t-table>
+                    <div class="spec-table-actions">
+                      <t-button theme="primary" variant="outline" @click="openPriceDrawer('batchFill')">
+                        <template #icon><t-icon name="edit" /></template>
+                        批量填写
+                      </t-button>
+                      <t-button theme="primary" variant="outline" @click="openSpecDialog(true)">
+                        <template #icon><t-icon name="setting" /></template>
+                        编辑规格
+                      </t-button>
+                    </div>
+                  </div>
+                </t-form-item>
+                <t-form-item label="总库存">
+                  <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
+                </t-form-item>
+                <t-form-item label="商家编码" required-mark>
+                  <t-input
+                    v-model="productForm.merchantCode"
+                    :status="requiredFieldStatus(productForm.merchantCode)"
+                    clearable
+                    placeholder="请输入"
+                    :maxlength="60"
+                  />
+                </t-form-item>
+                <t-form-item label="上架" required-mark :status="requiredFieldStatus(productForm.shelfNow)">
+                  <t-radio-group v-model="productForm.shelfNow">
+                    <t-radio value="now">立刻上架</t-radio>
+                    <t-radio value="later">暂不上架</t-radio>
+                  </t-radio-group>
+                </t-form-item>
+              </t-form>
             </AdminSectionCard>
 
             <AdminSectionCard class="form-submit-bar">
@@ -602,7 +594,8 @@
               {{ group.name }}
             </button>
           </div>
-          <div v-if="!selectedSpecGroups.length" class="layered-empty">请选择销售属性标签</div>
+          <div v-if="!specGroups.length" class="layered-empty">当前分类暂无已发布且参与 SKU 组合的销售属性</div>
+          <div v-else-if="!selectedSpecGroups.length" class="layered-empty">请选择销售属性标签</div>
           <div v-for="group in selectedSpecGroups" :key="group.name" class="spec-group">
             <div class="spec-group-head">
               <div class="spec-group-title">
@@ -651,17 +644,19 @@
       size="1180px"
       lazy
       destroy-on-close
-      :footer="false"
+      :footer="priceDrawerMode === 'view' && !['soldOut', 'recycle'].includes(priceEditorTarget?.status ?? '')"
+      confirm-btn="保存"
+      cancel-btn="取消"
+      @confirm="productPriceEditorRef?.confirmSave()"
+      @cancel="closePriceDrawer"
       @close="closePriceDrawer"
     >
-      <div class="drawer-head">
+      <div v-if="priceDrawerMode === 'batchFill'" class="drawer-head">
         <div>
-          <strong>{{ priceDrawerMode === 'view' ? '价格明细' : '批量填写' }}</strong>
-          <span>{{
-            priceDrawerMode === 'view' ? '查看当前商品的规格库存与阶梯价格' : '按规格属性值圈定范围，再填写要覆盖的字段'
-          }}</span>
+          <strong>批量填写</strong>
+          <span>按规格属性值圈定范围，再填写要覆盖的字段</span>
         </div>
-        <t-button v-if="priceDrawerMode !== 'view'" theme="primary" @click="savePriceDrawer">
+        <t-button theme="primary" @click="savePriceDrawer">
           <template #icon><t-icon name="save" /></template>
           保存
         </t-button>
@@ -707,26 +702,32 @@
             </div>
             <div class="batch-field-grid">
               <t-form-item label="成本价">
-                <t-input
+                <SpecPriceInput
                   v-model="batchFillForm.cost"
                   placeholder="价格"
+                  label="价格"
+                  optional
+                  :submitted="batchFillSubmitted"
                   @change="handleBatchCostChange"
-                  @blur="formatDecimalValue(batchFillForm, 'cost')"
                 />
               </t-form-item>
               <t-form-item label="指导价">
                 <div class="price-pair wide">
-                  <t-input
+                  <SpecPriceInput
                     v-model="batchFillForm.guideCoefficient"
-                    placeholder="价格系数"
+                    placeholder="系数"
+                    label="系数"
+                    optional
+                    :submitted="batchFillSubmitted"
                     @change="handleBatchCoefficientChange('guideCoefficient', 'guide', $event)"
-                    @blur="formatDecimalValue(batchFillForm, 'guideCoefficient')"
                   />
-                  <t-input
+                  <SpecPriceInput
                     v-model="batchFillForm.guide"
                     placeholder="价格"
+                    label="价格"
+                    optional
+                    :submitted="batchFillSubmitted"
                     @change="handleBatchPriceChange('guide', 'guideCoefficient', $event)"
-                    @blur="formatDecimalValue(batchFillForm, 'guide')"
                   />
                 </div>
               </t-form-item>
@@ -736,20 +737,37 @@
                 :label="configuration.name"
               >
                 <div class="price-pair wide">
-                  <t-input
+                  <SpecPriceInput
                     v-model="batchMarkupPrices[configuration.id].coefficient"
-                    placeholder="价格系数"
+                    placeholder="系数"
+                    label="系数"
+                    optional
+                    :submitted="batchFillSubmitted"
                     @change="handleBatchMarkupChange(configuration.id, 'coefficient', $event)"
                   />
-                  <t-input
+                  <SpecPriceInput
                     v-model="batchMarkupPrices[configuration.id].price"
                     placeholder="价格"
+                    label="价格"
+                    optional
+                    :submitted="batchFillSubmitted"
                     @change="handleBatchMarkupChange(configuration.id, 'price', $event)"
                   />
                 </div>
               </t-form-item>
               <t-form-item label="数量">
                 <t-input-number v-model="batchFillForm.quantity" theme="normal" :min="0" />
+              </t-form-item>
+              <t-form-item v-for="field in salesAttributeFields" :key="field.key" :label="field.label">
+                <t-select
+                  v-if="field.type === 'select'"
+                  v-model="batchSalesAttributes[field.key]"
+                  clearable
+                  placeholder="请选择"
+                >
+                  <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
+                </t-select>
+                <t-input v-else v-model="batchSalesAttributes[field.key]" clearable placeholder="请输入" />
               </t-form-item>
               <t-form-item label="商家编码">
                 <t-input v-model="batchFillForm.merchantCode" placeholder="请输入" />
@@ -759,146 +777,21 @@
         </div>
       </template>
 
-      <t-table v-else row-key="id" :data="priceRows" :columns="priceColumns" hover table-layout="fixed">
-        <template #stock="{ row }">
-          <t-input-number
-            v-model="row.stock"
-            class="stock-input"
-            theme="normal"
-            :min="0"
-            :disabled="priceDrawerMode === 'view'"
-          />
-        </template>
-        <template #cost="{ row }">
-          <t-input
-            v-model="row.cost"
-            :status="requiredFieldStatus(row.cost)"
-            class="decimal-input"
-            placeholder="价格"
-            :disabled="priceDrawerMode === 'view'"
-            @change="limitDecimalInput(row, 'cost', $event)"
-            @blur="formatDecimalValue(row, 'cost')"
-          />
-        </template>
-        <template #guide="{ row }">
-          <div class="price-pair">
-            <t-input
-              v-model="row.guideCoefficient"
-              :status="requiredFieldStatus(row.guideCoefficient)"
-              placeholder="价格系数"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'guideCoefficient', $event)"
-              @blur="formatDecimalValue(row, 'guideCoefficient')"
-            />
-            <t-input
-              v-model="row.guide"
-              :status="requiredFieldStatus(row.guide)"
-              placeholder="价格"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'guide', $event)"
-              @blur="formatDecimalValue(row, 'guide')"
-            />
-          </div>
-        </template>
-        <template #level1="{ row }">
-          <div class="price-pair">
-            <t-input
-              v-model="row.level1Coefficient"
-              placeholder="价格系数"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'level1Coefficient', $event)"
-              @blur="formatDecimalValue(row, 'level1Coefficient')"
-            />
-            <t-input
-              v-model="row.level1"
-              placeholder="价格"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'level1', $event)"
-              @blur="formatDecimalValue(row, 'level1')"
-            />
-          </div>
-        </template>
-        <template #level2="{ row }">
-          <div class="price-pair">
-            <t-input
-              v-model="row.level2Coefficient"
-              placeholder="价格系数"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'level2Coefficient', $event)"
-              @blur="formatDecimalValue(row, 'level2Coefficient')"
-            />
-            <t-input
-              v-model="row.level2"
-              placeholder="价格"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'level2', $event)"
-              @blur="formatDecimalValue(row, 'level2')"
-            />
-          </div>
-        </template>
-        <template #level3="{ row }">
-          <div class="price-pair">
-            <t-input
-              v-model="row.level3Coefficient"
-              placeholder="价格系数"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'level3Coefficient', $event)"
-              @blur="formatDecimalValue(row, 'level3Coefficient')"
-            />
-            <t-input
-              v-model="row.level3"
-              placeholder="价格"
-              :disabled="priceDrawerMode === 'view'"
-              @change="limitDecimalInput(row, 'level3', $event)"
-              @blur="formatDecimalValue(row, 'level3')"
-            />
-          </div>
-        </template>
-      </t-table>
-    </t-drawer>
-
-    <t-drawer
-      v-model:visible="movementDrawerVisible"
-      header="库存流水"
-      placement="right"
-      size="780px"
-      lazy
-      destroy-on-close
-      :footer="false"
-      @close="closeMovementDrawer"
-    >
-      <div class="movement-drawer">
-        <div v-if="movementTarget" class="movement-head">
-          <div>
-            <strong>{{ movementTarget.name }}</strong>
-            <span>ID：{{ movementTarget.id }} ｜ 编码：{{ movementTarget.code }}</span>
-          </div>
-          <t-tag :theme="movementTarget.status === 'selling' ? 'success' : 'primary'" variant="light">
-            当前库存 {{ movementTarget.stock }}
-          </t-tag>
+      <ProductPriceEditor
+        v-else-if="priceEditorTarget"
+        ref="productPriceEditorRef"
+        :key="priceEditorTarget.id"
+        :product-id="priceEditorTarget.id"
+        :product="toProductPayload(priceEditorTarget)"
+        :levels="productPriceLevels"
+        @saved="handlePriceEditorSaved"
+      />
+      <template #footer>
+        <div class="price-editor-footer">
+          <t-button theme="primary" @click="productPriceEditorRef?.confirmSave()">保存</t-button>
+          <t-button theme="default" @click="closePriceDrawer">取消</t-button>
         </div>
-
-        <t-table
-          row-key="id"
-          :data="movementRows"
-          :columns="movementColumns"
-          :loading="movementLoading"
-          hover
-          table-layout="fixed"
-        >
-          <template #movementType="{ row }">{{ movementTypeLabel(row.movementType) }}</template>
-          <template #quantity="{ row }">
-            <span :class="movementQuantityClass(row.quantity)">{{ formatMovementQuantity(row.quantity) }}</span>
-          </template>
-          <template #stockChange="{ row }">
-            {{ formatMovementNumber(row.beforeQuantity) }} → {{ formatMovementNumber(row.afterQuantity) }}
-          </template>
-          <template #createdAt="{ row }">{{ formatMovementTime(row.createdAt) }}</template>
-          <template #empty>
-            <div class="table-empty">暂无库存流水</div>
-          </template>
-        </t-table>
-      </div>
+      </template>
     </t-drawer>
 
     <t-dialog
@@ -985,7 +878,9 @@ import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
+import PriceSourceToggle from './components/PriceSourceToggle.vue';
 import SpecPriceInput from './components/SpecPriceInput.vue';
+import ProductPriceEditor from './components/ProductPriceEditor.vue';
 import { isValidSpecPriceNumber } from './priceValidation';
 import {
   adminFeedback,
@@ -1017,22 +912,17 @@ import {
   type FinishedProductPrice,
   type FinishedProductVariant,
 } from '@/services/finishedProducts';
-import {
-  createInventoryMovement,
-  listInventoryMovements,
-  type InventoryMovementRecord,
-  type MovementType,
-} from '@/services/inventoryMovements';
 import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
 import { listCategoryAttributes, type CategoryAttributeRecord } from '@/services/categoryAttributes';
 import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
 import { listProductAttributeValues, type ProductAttributeValueRecord } from '@/services/productAttributeValues';
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
+import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 type PublisherType = '平台发布';
-type RowAction = 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge' | 'movement';
+type RowAction = 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
 type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type FormSectionKey = 'description' | 'base' | 'sales';
 type SpecMode = 'single' | 'layered';
@@ -1060,8 +950,7 @@ interface TabConfig {
 }
 
 interface FilterState {
-  id: string;
-  name: string;
+  keyword: string;
   category: string;
   supplier: string;
 }
@@ -1073,6 +962,8 @@ interface PaginationState {
 
 interface StockItem {
   id: number;
+  createdByName: string;
+  createdAt?: string;
   code: string;
   image: string;
   name: string;
@@ -1146,7 +1037,10 @@ interface SpecRow extends TableRowData {
   level3: string;
   quantity: number;
   merchantCode: string;
-  markupPrices: Record<number, { coefficient: string; price: string }>;
+  markupPrices: Record<
+    number,
+    { coefficient: string; price: string; priceSource?: 'auto' | 'manual'; sourceConfigurationId?: number }
+  >;
 }
 
 interface PriceRow extends TableRowData {
@@ -1282,8 +1176,8 @@ const categoryDialogVisible = ref(false);
 const categorySwitchWarningVisible = ref(false);
 const productMediaUploading = ref(0);
 const specDialogVisible = ref(false);
+const productPriceEditorRef = ref<InstanceType<typeof ProductPriceEditor>>();
 const priceDrawerVisible = ref(false);
-const movementDrawerVisible = ref(false);
 const reasonDialogVisible = ref(false);
 const confirmDialogVisible = ref(false);
 const detailDialogVisible = ref(false);
@@ -1291,9 +1185,6 @@ const imagePreviewVisible = ref(false);
 const priceDrawerMode = ref<PriceDrawerMode>('batchFill');
 const detailProduct = ref<StockItem | null>(null);
 const editingProduct = ref<StockItem | null>(null);
-const movementTarget = ref<StockItem | null>(null);
-const movementLoading = ref(false);
-const movementRows = ref<InventoryMovementRecord[]>([]);
 const imagePreviewSrc = ref('');
 const imagePreviewTitle = ref('商品主图');
 const productPreviewType = ref<'image' | 'video'>('image');
@@ -1367,6 +1258,7 @@ const productPriceLevels = computed(() => {
       return {
         id: level.id,
         name: level.name,
+        configurationId: configuration?.id,
         priceCoefficient: configuration == null ? undefined : Number(configuration.priceCoefficient),
       };
     });
@@ -1374,6 +1266,7 @@ const productPriceLevels = computed(() => {
     if (!levels.some((level) => level.id === price.storeLevelId))
       levels.push({
         id: price.storeLevelId,
+        configurationId: undefined,
         name: price.storeLevelName || `门店级别${price.storeLevelId}`,
         priceCoefficient: Number(price.priceCoefficient),
       });
@@ -1421,9 +1314,10 @@ const categoryCascaderOptions = computed<CategoryCascaderOption[]>(() => {
   );
   const childrenByParent = new Map<number | undefined, ProductCategoryRecord[]>();
   enabled.forEach((category) => {
-    const siblings = childrenByParent.get(category.parentId) ?? [];
+    const parentId = category.parentId ?? undefined;
+    const siblings = childrenByParent.get(parentId) ?? [];
     siblings.push(category);
-    childrenByParent.set(category.parentId, siblings);
+    childrenByParent.set(parentId, siblings);
   });
   const build = (parentId?: number, parentPath = ''): CategoryCascaderOption[] =>
     (childrenByParent.get(parentId) ?? [])
@@ -1492,8 +1386,7 @@ const categoryPathIds = (categoryId?: number) => {
 };
 
 const defaultFilter = (): FilterState => ({
-  id: '',
-  name: '',
+  keyword: '',
   category: '',
   supplier: '',
 });
@@ -1559,6 +1452,8 @@ const createEmptyBatchFillForm = (): BatchFillForm => ({
 });
 
 const batchFillForm = reactive<BatchFillForm>(createEmptyBatchFillForm());
+const batchFillSubmitted = ref(false);
+const batchSalesAttributes = ref<Record<string, string>>({});
 const batchMarkupPrices = ref<Record<number, { coefficient: string; price: string }>>({});
 
 const templateAttributeFields = computed(() =>
@@ -1571,6 +1466,12 @@ const templateAttributeFields = computed(() =>
           (binding) =>
             binding.categoryId === selectedCategoryId.value &&
             binding.attributeId === attribute.id &&
+            (binding.publishStatus === 'published' ||
+              (editingProduct.value?.categoryId === selectedCategoryId.value &&
+                (editingProduct.value?.attributes.some((entry) => entry.attributeId === attribute.id) ||
+                  editingProduct.value?.variants.some((variant) =>
+                    Object.hasOwn(variant.salesAttributes ?? {}, `attribute_${attribute.id}`),
+                  )))) &&
             (binding.attributeRole === 'product' || binding.attributeRole === 'sales'),
         ),
     )
@@ -1599,9 +1500,21 @@ const salesAttributeFields = computed(() => templateAttributeFields.value.filter
 const layeredFieldLabels = computed<Record<string, string>>(() =>
   Object.fromEntries(salesAttributeFields.value.map((field) => [field.key, field.label])),
 );
+const skuAttributeFields = computed(() =>
+  salesAttributeFields.value.filter((field) =>
+    categoryAttributeBindings.value.some(
+      (binding) =>
+        binding.categoryId === selectedCategoryId.value &&
+        binding.attributeId === field.attributeId &&
+        binding.attributeRole === 'sales' &&
+        binding.publishStatus === 'published' &&
+        binding.skuFlag === true,
+    ),
+  ),
+);
 const specGroups = reactive<SpecGroup[]>([]);
 watch(
-  salesAttributeFields,
+  skuAttributeFields,
   (fields) => {
     const existing = new Map(specGroups.map((group) => [group.field, group]));
     specGroups.splice(
@@ -1704,12 +1617,31 @@ const formatPriceRange = (guidePrice?: number) => {
   return value > 0 ? `￥${value.toFixed(2)}` : '-';
 };
 
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const timestamp = new Date(`${value.replace(' ', 'T').replace(/Z$/, '')}Z`);
+  if (Number.isNaN(timestamp.getTime())) return '-';
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(timestamp);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}/${part('month')}/${part('day')} ${part('hour')}:${part('minute')}`;
+};
+
 const toStockItem = (record: FinishedProductRecord): StockItem => {
   const status = normalizeStatus(record.status);
   const publisherType = normalizePublisherType();
   return {
     id: record.id,
     code: record.sku,
+    createdByName: record.createdByName?.trim() || '-',
+    createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
     categoryId: record.categoryId,
@@ -1756,25 +1688,6 @@ const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): Fini
     offShelfReason: nextItem.offShelfReason,
     status: nextItem.status,
   };
-};
-
-const createMovement = async (
-  productId: number,
-  movementType: 'initial' | 'adjustment' | 'status_change',
-  beforeQuantity: number,
-  afterQuantity: number,
-  reason: string,
-) => {
-  await createInventoryMovement({
-    inventoryType: 'finished_product',
-    inventoryId: productId,
-    movementType,
-    quantity: afterQuantity - beforeQuantity,
-    beforeQuantity,
-    afterQuantity,
-    reason,
-    remark: '管理后台成品库存操作',
-  });
 };
 
 const loadInventoryData = async () => {
@@ -1837,10 +1750,14 @@ onBeforeUnmount(() => {
 
 const filteredData = computed(() => {
   const filter = currentAppliedFilter.value;
-  return dataItems.value.filter((item) => {
+  const keyword = filter.keyword.trim().toLocaleLowerCase();
+  return sortByCreatedAtDesc(dataItems.value).filter((item) => {
     if (item.status !== activeTab.value) return false;
-    if (filter.id && !String(item.id).includes(filter.id)) return false;
-    if (filter.name && !item.name.includes(filter.name)) return false;
+    if (
+      keyword &&
+      ![item.name, String(item.id), item.code].some((value) => value.toLocaleLowerCase().includes(keyword))
+    )
+      return false;
     if (filter.category && item.category !== filter.category) return false;
     if (filter.supplier && item.supplier !== filter.supplier) return false;
     return true;
@@ -1889,7 +1806,8 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'product', title: '商品名称/ID/编码', minWidth: 220 },
     { colKey: 'stock', title: '库存', width: 88, align: 'center' },
     { colKey: 'supplier', title: '供应商', width: 180 },
-    { colKey: 'price', title: '库存/价格', width: 120, align: 'center' },
+    { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
+    { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   ];
   if (activeTab.value !== 'soldOut') {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
@@ -1908,61 +1826,32 @@ const requiredColumnTitle = (label: string) => () =>
 
 const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'cost', title: requiredColumnTitle('成本价'), width: 110 },
-    { colKey: 'guide', title: requiredColumnTitle('指导价'), width: 170 },
+    { colKey: 'cost', title: requiredColumnTitle('成本价'), width: 96 },
+    { colKey: 'guide', title: requiredColumnTitle('指导价'), width: 164 },
     ...productPriceLevels.value.map((item) => ({
       colKey: `markup-${item.id}`,
       title: requiredColumnTitle(item.name),
-      width: 170,
+      width: 196,
     })),
     { colKey: 'quantity', title: requiredColumnTitle('数量'), width: 96 },
   ];
   const tailColumns: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'merchantCode', title: '商家编码', width: 150 },
-    { colKey: 'operation', title: '操作', width: 100, align: 'left', fixed: 'right' },
+    { colKey: 'merchantCode', title: '商家编码', width: 130 },
+    { colKey: 'operation', title: '操作', width: 80, align: 'left', fixed: 'right' },
   ];
 
   const salesColumns = salesAttributeFields.value.map<PrimaryTableCol<TableRowData>>((field) => ({
     colKey: field.key,
     title: field.required ? requiredColumnTitle(field.label) : field.label,
-    width: 160,
+    width: 136,
   }));
   return [
-    ...(confirmedSpecMode.value === 'single' ? [{ colKey: 'specText', title: '商品规格', width: 180 }] : []),
-    ...salesColumns,
+    ...(confirmedSpecMode.value === 'single' ? [{ colKey: 'specText', title: '商品规格', width: 120 }] : []),
     ...priceColumnsBase,
+    ...salesColumns,
     ...tailColumns,
   ];
 });
-
-const priceColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
-  const dimensionColumns: PrimaryTableCol<TableRowData>[] =
-    confirmedSpecMode.value === 'single'
-      ? [{ colKey: 'specText', title: '商品规格', width: 132 }]
-      : confirmedLayeredFields.value.map<PrimaryTableCol<TableRowData>>((field) => ({
-          colKey: field,
-          title: layeredFieldLabels.value[field],
-          width: field === 'material' ? 126 : field === 'size' ? 108 : 92,
-        }));
-  const editableColumns: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'merchantCode', title: '商家编码', width: 132 },
-    { colKey: 'stock', title: '库存', width: 82 },
-    { colKey: 'cost', title: '成本价*', width: 96 },
-    { colKey: 'guide', title: '指导价*', width: 96 },
-    { colKey: 'level1', title: '1级合伙人价格*', width: 124 },
-    { colKey: 'level2', title: '2级合伙人价格*', width: 124 },
-    { colKey: 'level3', title: '3级合伙人价格*', width: 124 },
-  ];
-  return [...dimensionColumns, ...editableColumns];
-});
-
-const movementColumns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'createdAt', title: '时间', width: 150 },
-  { colKey: 'movementType', title: '类型', width: 100 },
-  { colKey: 'quantity', title: '变动', width: 90, align: 'center' },
-  { colKey: 'stockChange', title: '库存变化', width: 130, align: 'center' },
-  { colKey: 'reason', title: '原因', minWidth: 140, ellipsis: true },
-];
 
 const batchFilterFields = computed<BatchFilterField[]>(() =>
   confirmedSpecMode.value === 'single' ? ['specText'] : confirmedLayeredFields.value,
@@ -1993,40 +1882,35 @@ const tabLabel = (tab: TabConfig) => {
   return count ? `${tab.label} ${count}` : tab.label;
 };
 
-const withMovementAction = (actions: { action: RowAction; label: string; theme: string }[]) => [
-  ...actions,
-  { action: 'movement' as const, label: '流水', theme: 'primary' },
-];
-
 const rowActions = (): { action: RowAction; label: string; theme: string }[] => {
   if (activeTab.value === 'warehouse') {
-    return withMovementAction([
+    return [
       { action: 'shelf', label: '上架', theme: 'primary' },
       { action: 'edit', label: '编辑', theme: 'primary' },
       { action: 'delete', label: '删除', theme: 'danger' },
-    ]);
+    ];
   }
   if (activeTab.value === 'selling') {
-    return withMovementAction([
+    return [
       { action: 'offShelf', label: '下架', theme: 'warning' },
       { action: 'edit', label: '编辑', theme: 'primary' },
       { action: 'delete', label: '删除', theme: 'danger' },
-    ]);
+    ];
   }
   if (activeTab.value === 'offShelf') {
-    return withMovementAction([
+    return [
       { action: 'restore', label: '放回到仓库', theme: 'primary' },
       { action: 'edit', label: '编辑', theme: 'primary' },
       { action: 'delete', label: '删除', theme: 'danger' },
-    ]);
+    ];
   }
   if (activeTab.value === 'soldOut') {
     return [];
   }
-  return withMovementAction([
+  return [
     { action: 'restore', label: '放回到仓库', theme: 'primary' },
     { action: 'purge', label: '彻底删除', theme: 'danger' },
-  ]);
+  ];
 };
 
 const handleTabChange = () => {
@@ -2036,7 +1920,6 @@ const handleTabChange = () => {
 const handleSearch = () => {
   Object.assign(currentAppliedFilter.value, currentFilter.value);
   currentPagination.value.current = 1;
-  adminFeedback.success('已按筛选条件刷新列表');
 };
 
 const handleReset = () => {
@@ -2091,10 +1974,6 @@ const handleBatchAction = (action: BatchAction) => {
 
 const handleRowAction = (action: RowAction, row: StockItem) => {
   const fullName = `${row.name}（${row.code}）`;
-  if (action === 'movement') {
-    openMovementDrawer(row);
-    return;
-  }
   if (action === 'edit') {
     openFormPage('edit', row);
     return;
@@ -2116,56 +1995,6 @@ const handleRowAction = (action: RowAction, row: StockItem) => {
     return;
   }
   openConfirm('purge', row, `是否彻底删除商品“${fullName}”？`);
-};
-
-const movementTypeLabel = (type: MovementType) =>
-  ({
-    initial: '初始入库',
-    adjustment: '库存调整',
-    status_change: '状态变更',
-    inbound: '入库',
-    outbound: '出库',
-  })[type] ?? type;
-
-const formatMovementNumber = (value?: number) => Number(value ?? 0).toFixed(2);
-
-const formatMovementQuantity = (value?: number) => {
-  const quantity = Number(value ?? 0);
-  if (quantity > 0) return `+${quantity.toFixed(2)}`;
-  return quantity.toFixed(2);
-};
-
-const movementQuantityClass = (value?: number) => {
-  const quantity = Number(value ?? 0);
-  if (quantity > 0) return 'movement-positive';
-  if (quantity < 0) return 'movement-negative';
-  return 'movement-neutral';
-};
-
-const formatMovementTime = (value?: string) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.replace('T', ' ');
-  return date.toLocaleString('zh-CN', { hour12: false });
-};
-
-const openMovementDrawer = async (row: StockItem) => {
-  movementTarget.value = row;
-  movementDrawerVisible.value = true;
-  movementLoading.value = true;
-  try {
-    movementRows.value = await listInventoryMovements(row.id);
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '库存流水加载失败');
-  } finally {
-    movementLoading.value = false;
-  }
-};
-
-const closeMovementDrawer = () => {
-  movementDrawerVisible.value = false;
-  movementTarget.value = null;
-  movementRows.value = [];
 };
 
 const hasProductFormContent = () => {
@@ -2270,6 +2099,13 @@ const createMarkupEditors = (prices: FinishedProductPrice[] = []) => {
         {
           coefficient: coefficient == null ? '' : coefficient.toFixed(4).replace(/0+$/, '').replace(/\.$/, ''),
           price: existing ? String(existing.price) : '',
+          priceSource: existing
+            ? (existing.priceSource ?? 'manual')
+            : configuration.configurationId
+              ? ('auto' as const)
+              : ('manual' as const),
+          sourceConfigurationId:
+            existing?.sourceConfigurationId ?? (existing ? undefined : configuration.configurationId),
         },
       ];
     }),
@@ -2434,17 +2270,6 @@ const releasePendingProductMedia = (media: AdminMediaValue) => {
   void releaseTemporaryFinishedProductMedia(mediaId);
 };
 
-const normalizeDecimalInput = (value: unknown) => {
-  const text = String(value ?? '').replace(/[^\d.]/g, '');
-  const [integerPart, ...decimalParts] = text.split('.');
-  if (!text.includes('.')) return integerPart;
-  return `${integerPart || '0'}.${decimalParts.join('').slice(0, 2)}`;
-};
-
-const limitDecimalInput = (row: SpecRow | PriceRow | BatchFillForm, field: DecimalField, value: unknown) => {
-  row[field] = normalizeDecimalInput(value);
-};
-
 const formatDecimalValue = (row: SpecRow | PriceRow | BatchFillForm, field: DecimalField) => {
   const rawValue = String(row[field] ?? '').trim();
   if (!rawValue) {
@@ -2529,6 +2354,29 @@ const handleSpecPriceChange = (
   syncSpecCoefficientByPrice(row, priceField, coefficientField);
 };
 
+const toggleSpecPriceSource = (row: SpecRow, levelId: number) => {
+  const editor = row.markupPrices[levelId];
+  if (editor.priceSource === 'auto') {
+    editor.priceSource = 'manual';
+    editor.sourceConfigurationId = undefined;
+  } else restoreSpecAutoPrice(row, levelId);
+};
+
+const restoreSpecAutoPrice = (row: SpecRow, levelId: number) => {
+  const configuration = productPriceLevels.value.find((level) => level.id === levelId);
+  if (!configuration?.configurationId || configuration.priceCoefficient == null) return;
+  const editor = row.markupPrices[levelId];
+  editor.coefficient = String(configuration.priceCoefficient);
+  editor.priceSource = 'auto';
+  editor.sourceConfigurationId = configuration.configurationId;
+  if (isValidSpecPriceNumber(row.cost)) editor.price = (Number(row.cost) * configuration.priceCoefficient).toFixed(2);
+};
+
+const markSpecPriceManual = (row: SpecRow, levelId: number) => {
+  row.markupPrices[levelId].priceSource = 'manual';
+  row.markupPrices[levelId].sourceConfigurationId = undefined;
+};
+
 const handleMarkupCoefficientChange = (row: SpecRow, configurationId: number, value: unknown) => {
   const editor = row.markupPrices[configurationId];
   if (!editor) return;
@@ -2550,6 +2398,7 @@ const handleMarkupPriceChange = (row: SpecRow, configurationId: number, value: u
 };
 
 const syncBatchPriceByCoefficient = (coefficientField: DecimalField, priceField: DecimalField) => {
+  if (!isValidSpecPriceNumber(batchFillForm.cost) || !isValidSpecPriceNumber(batchFillForm[coefficientField])) return;
   const cost = decimalNumber(batchFillForm.cost);
   const coefficient = decimalNumber(batchFillForm[coefficientField]);
   if (cost === null || coefficient === null) return;
@@ -2557,6 +2406,7 @@ const syncBatchPriceByCoefficient = (coefficientField: DecimalField, priceField:
 };
 
 const syncBatchCoefficientByPrice = (priceField: DecimalField, coefficientField: DecimalField) => {
+  if (!isValidSpecPriceNumber(batchFillForm.cost) || !isValidSpecPriceNumber(batchFillForm[priceField])) return;
   const cost = decimalNumber(batchFillForm.cost);
   const price = decimalNumber(batchFillForm[priceField]);
   if (cost === null || cost === 0 || price === null) return;
@@ -2578,7 +2428,8 @@ const syncAllBatchPricesByCost = () => {
 
 const handleBatchMarkupChange = (id: number, field: 'coefficient' | 'price', value: unknown) => {
   const editor = batchMarkupPrices.value[id];
-  editor[field] = normalizeDecimalInput(value);
+  editor[field] = String(value ?? '');
+  if (!isValidSpecPriceNumber(editor[field]) || !isValidSpecPriceNumber(batchFillForm.cost)) return;
   const cost = decimalNumber(batchFillForm.cost);
   const amount = decimalNumber(editor[field]);
   if (cost === null || amount === null) return;
@@ -2587,7 +2438,8 @@ const handleBatchMarkupChange = (id: number, field: 'coefficient' | 'price', val
 };
 
 const handleBatchCostChange = (value: unknown) => {
-  limitDecimalInput(batchFillForm, 'cost', value);
+  batchFillForm.cost = String(value ?? '');
+  if (!isValidSpecPriceNumber(batchFillForm.cost)) return;
   syncAllBatchPricesByCost();
   for (const [id, editor] of Object.entries(batchMarkupPrices.value)) {
     handleBatchMarkupChange(Number(id), 'coefficient', editor.coefficient);
@@ -2595,12 +2447,12 @@ const handleBatchCostChange = (value: unknown) => {
 };
 
 const handleBatchCoefficientChange = (coefficientField: DecimalField, priceField: DecimalField, value: unknown) => {
-  limitDecimalInput(batchFillForm, coefficientField, value);
+  batchFillForm[coefficientField] = String(value ?? '');
   syncBatchPriceByCoefficient(coefficientField, priceField);
 };
 
 const handleBatchPriceChange = (priceField: DecimalField, coefficientField: DecimalField, value: unknown) => {
-  limitDecimalInput(batchFillForm, priceField, value);
+  batchFillForm[priceField] = String(value ?? '');
   syncBatchCoefficientByPrice(priceField, coefficientField);
 };
 
@@ -2729,6 +2581,31 @@ const confirmCreateSpec = () => {
     adminFeedback.warning('请至少配置一条商品规格');
     return;
   }
+  const fields = specMode.value === 'single' ? ['specText'] : selectedSpecGroups.value.map((group) => group.field);
+  const sameStructure =
+    confirmedSpecMode.value === specMode.value &&
+    (specMode.value === 'single' ||
+      [...confirmedLayeredFields.value].sort().join('|') === [...fields].sort().join('|'));
+  if (sameStructure) {
+    const keyOf = (row: SpecRow) => JSON.stringify(fields.map((field) => String(row[field] ?? '').trim()));
+    const existing = new Map<string, SpecRow[]>();
+    for (const row of specRows.value) {
+      const key = keyOf(row);
+      existing.set(key, [...(existing.get(key) ?? []), row]);
+    }
+    rows.forEach((row, index) => {
+      const previous = existing.get(keyOf(row))?.shift();
+      if (previous)
+        rows[index] = {
+          ...previous,
+          specImage: row.specImage,
+          materialImage: row.materialImage,
+          lengthImage: row.lengthImage,
+          colorImage: row.colorImage,
+          sizeImage: row.sizeImage,
+        };
+    });
+  }
   confirmedSpecMode.value = specMode.value;
   confirmedLayeredFields.value =
     specMode.value === 'layered' ? selectedSpecGroups.value.map((group) => group.field) : [];
@@ -2806,14 +2683,30 @@ const specToPriceRow = (row: SpecRow): PriceRow => ({
   level3: row.level3,
 });
 
-const openPriceDrawer = (mode: PriceDrawerMode, row?: StockItem) => {
-  priceDrawerMode.value = mode;
+const priceEditorTarget = ref<StockItem | null>(null);
+const handlePriceEditorSaved = (record: FinishedProductRecord, closeAfterSave = true) => {
+  upsertStockItem(record);
+  if (closeAfterSave) closePriceDrawer();
+};
+const openPriceDrawer = async (mode: PriceDrawerMode, row?: StockItem) => {
   if (mode === 'view' && row) {
-    priceRows.value = createEditSpecRows(row).map(specToPriceRow);
+    try {
+      const [, products] = await Promise.all([refreshPriceConfigurations(), listFinishedProducts()]);
+      const latest = products.find((product) => product.id === row.id);
+      if (!latest) {
+        adminFeedback.error('商品不存在，请刷新列表');
+        return;
+      }
+      upsertStockItem(latest);
+      priceEditorTarget.value = toStockItem(latest);
+    } catch {
+      adminFeedback.error('价格配置加载失败，请重试');
+      return;
+    }
   } else {
-    priceRows.value = specRows.value.map(specToPriceRow);
     resetBatchFillState();
   }
+  priceDrawerMode.value = mode;
   priceDrawerVisible.value = true;
 };
 
@@ -2822,6 +2715,8 @@ const closePriceDrawer = () => {
 };
 
 const resetBatchFillState = () => {
+  batchFillSubmitted.value = false;
+  batchSalesAttributes.value = Object.fromEntries(salesAttributeFields.value.map((field) => [field.key, '']));
   batchMarkupPrices.value = Object.fromEntries(
     productPriceLevels.value.map((level) => [level.id, { coefficient: '', price: '' }]),
   );
@@ -2842,6 +2737,21 @@ const clearBatchFilterField = (field: BatchFilterField) => {
 
 const savePriceDrawer = () => {
   if (priceDrawerMode.value === 'batchFill') {
+    batchFillSubmitted.value = true;
+    const priceInputs = [
+      batchFillForm.cost,
+      batchFillForm.guideCoefficient,
+      batchFillForm.guide,
+      ...productPriceLevels.value.flatMap((level) => {
+        const editor = batchMarkupPrices.value[level.id];
+        return [editor.coefficient, editor.price];
+      }),
+    ];
+    if (priceInputs.some((value) => String(value ?? '').trim() && !isValidSpecPriceNumber(value))) {
+      adminFeedback.error('请输入正确的价格或系数');
+      return;
+    }
+
     const matchedIds = new Set(batchFillMatchedRows.value.map((row) => row.id));
     if (!matchedIds.size) {
       adminFeedback.warning('当前条件下没有可批量填写的规格');
@@ -2851,12 +2761,21 @@ const savePriceDrawer = () => {
       return matchedIds.has(row.id)
         ? {
             ...row,
+            ...Object.fromEntries(
+              salesAttributeFields.value
+                .filter((field) => batchSalesAttributes.value[field.key]?.trim())
+                .map((field) => [field.key, batchSalesAttributes.value[field.key]]),
+            ),
             markupPrices: Object.fromEntries(
               productPriceLevels.value.map((level) => {
                 const original = row.markupPrices[level.id];
                 const input = batchMarkupPrices.value[level.id];
                 const cost = decimalNumber(batchFillForm.cost || row.cost);
                 const editor = { ...original };
+                if (input.coefficient || input.price) {
+                  editor.priceSource = 'manual';
+                  editor.sourceConfigurationId = undefined;
+                }
                 if (input.coefficient) editor.coefficient = input.coefficient;
                 if (input.price) {
                   editor.price = input.price;
@@ -2940,7 +2859,7 @@ const validateProductForm = () => {
     {
       valid: editingProduct.value != null || guidePriceSettingCoefficient.value != null,
       tab: 'sales',
-      message: '请先配置成品指导价默认价格系数',
+      message: '请先配置成品指导价默认系数',
     },
     { valid: pricesComplete, tab: 'sales', message: '请完善每条规格的成本价、指导价和商家编码' },
     { valid: Boolean(productForm.merchantCode.trim()), tab: 'sales', message: '请输入商家编码' },
@@ -3010,6 +2929,8 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
         const editor = row.markupPrices[configuration.id];
         return {
           storeLevelId: configuration.id,
+          priceSource: editor.priceSource,
+          sourceConfigurationId: editor.sourceConfigurationId,
           priceCoefficient: Number(Number(editor.coefficient).toFixed(4)),
           costPrice: Number(row.cost),
           price: Number(editor.price),
@@ -3050,16 +2971,11 @@ const submitProductForm = async () => {
   try {
     const payload = buildProductPayloadFromForm();
     if (formPageMode.value === 'edit' && editingProduct.value) {
-      const beforeStock = editingProduct.value.stock;
       const updated = await updateFinishedProduct(editingProduct.value.id, payload);
       upsertStockItem(updated);
-      if (beforeStock !== (payload.totalStock ?? 0)) {
-        await createMovement(updated.id, 'adjustment', beforeStock, payload.totalStock ?? 0, '编辑成品库存数量');
-      }
     } else {
       const created = await createFinishedProduct(payload);
       upsertStockItem(created);
-      await createMovement(created.id, 'initial', 0, payload.totalStock ?? 0, '新建成品库存');
     }
     pendingUploadedMediaIds.forEach((mediaId) => {
       void releaseTemporaryFinishedProductMedia(mediaId).catch(() => undefined);
@@ -3152,7 +3068,6 @@ const closeImagePreview = () => {
 const updateProductStatus = async (id: number, status: StockStatus, reason?: string) => {
   const item = dataItems.value.find((product) => product.id === id);
   if (!item) return;
-  const beforeStock = item.stock;
   const afterStock = status === 'soldOut' ? 0 : item.stock;
   const updated = await updateFinishedProduct(
     id,
@@ -3163,7 +3078,6 @@ const updateProductStatus = async (id: number, status: StockStatus, reason?: str
     }),
   );
   upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);
-  await createMovement(id, 'status_change', beforeStock, afterStock, reason || `状态变更为 ${status}`);
 };
 
 const handleConfirm = async () => {
@@ -3242,7 +3156,6 @@ const handleConfirm = async () => {
 .toolbar-buttons,
 .form-title-row,
 .selected-category,
-.spec-toolbar,
 .drawer-head {
   display: flex;
   align-items: center;
@@ -3354,20 +3267,20 @@ const handleConfirm = async () => {
 
 .filter-row {
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--td-comp-margin-m);
 }
 
 .filter-fields {
   display: grid;
   flex: 1;
-  grid-template-columns: repeat(5, minmax(170px, 1fr));
-  gap: 12px 16px;
+  grid-template-columns: minmax(290px, 1.6fr) repeat(2, minmax(170px, 1fr));
+  gap: var(--td-comp-margin-m);
 }
 
 .filter-actions {
   display: flex;
   flex: 0 0 auto;
-  gap: 8px;
+  gap: var(--td-comp-margin-s);
   align-self: flex-start;
 }
 
@@ -3460,33 +3373,10 @@ const handleConfirm = async () => {
   gap: 4px;
 }
 
-.product-name {
-  color: #111827;
-  font-weight: 600;
-}
-
 .product-code,
 .store-text {
   color: #6b7280;
   font-size: 12px;
-}
-
-.tenant-tags {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.publisher-tag {
-  width: fit-content;
-  max-width: 100%;
-}
-
-.platform-publish {
-  color: #0f7b3b;
-  background: #effaf3;
 }
 
 .table-actions {
@@ -3665,12 +3555,9 @@ const handleConfirm = async () => {
   font-weight: 700;
 }
 
-.sales-head {
-  margin-bottom: 6px;
-}
-
 .spec-table-block {
-  margin-top: 18px;
+  width: 100%;
+  min-width: 0;
 }
 
 :deep(.spec-table-block .t-table__th),
@@ -3688,17 +3575,11 @@ const handleConfirm = async () => {
   border-top: 1px solid var(--td-component-border);
 }
 
-.spec-toolbar {
-  justify-content: space-between;
-  margin-bottom: 12px;
-  font-weight: 700;
-}
-
 .spec-table-actions {
   display: flex;
   justify-content: flex-start;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: var(--td-comp-margin-xxl);
 }
 
 .spec-name-cell {
@@ -3706,6 +3587,13 @@ const handleConfirm = async () => {
   align-items: center;
   min-width: 0;
   gap: 8px;
+}
+
+.spec-name-cell > span {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .spec-thumb {
@@ -3730,8 +3618,13 @@ const handleConfirm = async () => {
 
 .price-pair {
   display: grid;
+  align-items: start;
   grid-template-columns: 54px minmax(72px, 1fr);
   gap: 6px;
+}
+
+.price-pair.with-source {
+  grid-template-columns: 54px minmax(72px, 1fr) 24px;
 }
 
 .price-pair.wide {
@@ -3949,6 +3842,12 @@ const handleConfirm = async () => {
   border-top: 1px solid #e5e7eb;
 }
 
+.price-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
+
 .drawer-head {
   justify-content: space-between;
   margin-bottom: 16px;
@@ -3966,52 +3865,6 @@ const handleConfirm = async () => {
 .drawer-head span {
   color: #6b7280;
   font-size: 13px;
-}
-
-.movement-drawer {
-  display: grid;
-  gap: 16px;
-}
-
-.movement-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px;
-  background: #fff;
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
-}
-
-.movement-head div {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.movement-head strong {
-  color: #111827;
-  font-weight: 700;
-}
-
-.movement-head span {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.movement-positive {
-  color: var(--td-success-color);
-  font-weight: 700;
-}
-
-.movement-negative {
-  color: var(--td-error-color);
-  font-weight: 700;
-}
-
-.movement-neutral {
-  color: var(--td-text-color-secondary);
 }
 
 .batch-fill-panel {
@@ -4092,8 +3945,26 @@ const handleConfirm = async () => {
 
 .batch-field-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(260px, 1fr));
-  gap: 12px 20px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px 28px;
+}
+
+.batch-field-grid > :deep(.t-form__item) {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.batch-field-grid :deep(.t-form__label) {
+  font-size: var(--td-font-size-body-small);
+}
+
+.batch-field-grid .price-pair.wide {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.batch-field-grid :deep(.t-input-number) {
+  max-width: 100%;
 }
 
 .detail-panel {

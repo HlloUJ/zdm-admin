@@ -27,7 +27,7 @@ class FinishedProductPriceServiceTest {
     requested.setCostPrice(new BigDecimal("100.00"));
     requested.setPrice(new BigDecimal("50.00"));
 
-    new FinishedProductPriceService(mapper, directory)
+    new FinishedProductPriceService(mapper, directory, Mockito.mock(FinishedMarkupConfigurationMapper.class))
         .replacePrices(10L, List.of(requested));
 
     ArgumentCaptor<FinishedProductPrice> captor = ArgumentCaptor.forClass(FinishedProductPrice.class);
@@ -56,7 +56,7 @@ class FinishedProductPriceServiceTest {
     requested.setCostPrice(new BigDecimal("100.00"));
     requested.setPrice(new BigDecimal("120.00"));
 
-    new FinishedProductPriceService(mapper, directory)
+    new FinishedProductPriceService(mapper, directory, Mockito.mock(FinishedMarkupConfigurationMapper.class))
         .replacePrices(10L, List.of(requested));
 
     ArgumentCaptor<FinishedProductPrice> captor = ArgumentCaptor.forClass(FinishedProductPrice.class);
@@ -74,7 +74,7 @@ class FinishedProductPriceServiceTest {
     FinishedProductPrice requested = new FinishedProductPrice();
     requested.setStoreLevelId(7L);
     requested.setVariantKey("SKU-A");
-    assertThatThrownBy(() -> new FinishedProductPriceService(mapper, directory)
+    assertThatThrownBy(() -> new FinishedProductPriceService(mapper, directory, Mockito.mock(FinishedMarkupConfigurationMapper.class))
         .replacePrices(10L, List.of(requested)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("全部启用的价格层级");

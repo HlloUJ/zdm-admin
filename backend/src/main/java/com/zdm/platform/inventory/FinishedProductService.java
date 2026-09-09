@@ -9,6 +9,7 @@ import com.zdm.platform.media.MediaReferenceService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -78,6 +79,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     product.setPublisherType(PLATFORM_PUBLISHER);
     product.setCreatedByName(identity.displayName());
     product.setCreatedByAccountId(identity.accountId());
+    product.setCreatedAt(LocalDateTime.now());
     try {
       save(product);
     } catch (DuplicateKeyException exception) {

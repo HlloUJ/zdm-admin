@@ -4,6 +4,8 @@ import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media'
 export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 
 export interface FinishedProductPrice {
+  priceSource?: 'auto' | 'manual';
+  sourceConfigurationId?: number;
   storeLevelId: number;
   storeLevelName?: string;
   priceCoefficient: number;

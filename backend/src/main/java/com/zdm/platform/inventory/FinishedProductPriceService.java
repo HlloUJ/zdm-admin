@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -18,10 +19,12 @@ import org.springframework.util.StringUtils;
 public class FinishedProductPriceService {
   private final FinishedProductPriceMapper mapper;
   private final StoreLevelPricingDirectory storeLevelDirectory;
+  private final FinishedMarkupConfigurationMapper configurationMapper;
 
   public FinishedProductPriceService(FinishedProductPriceMapper mapper,
-      StoreLevelPricingDirectory storeLevelDirectory) {
+      StoreLevelPricingDirectory storeLevelDirectory, FinishedMarkupConfigurationMapper configurationMapper) {
     this.mapper = mapper;
+    this.configurationMapper = configurationMapper;
     this.storeLevelDirectory = storeLevelDirectory;
   }
 
@@ -48,6 +51,9 @@ public class FinishedProductPriceService {
     }
     Map<String, List<FinishedProductPrice>> byVariant = requestedPrices.stream().collect(Collectors.groupingBy(
         item -> normalizedVariantKey(item.getVariantKey()), LinkedHashMap::new, Collectors.toList()));
+    Map<Long, FinishedMarkupConfiguration> configurations = configurationMapper.selectList(
+        Wrappers.<FinishedMarkupConfiguration>lambdaQuery()).stream()
+        .collect(Collectors.toMap(FinishedMarkupConfiguration::getStoreLevelId, Function.identity()));
     List<FinishedProductPrice> normalized = new ArrayList<>();
     byVariant.forEach((variantKey, prices) -> {
       Set<Long> actualIds = prices.stream().map(FinishedProductPrice::getStoreLevelId)
@@ -55,7 +61,14 @@ public class FinishedProductPriceService {
       if (!actualIds.equals(expectedIds) || actualIds.size() != prices.size()) {
         throw new IllegalArgumentException("每个成品规格都必须填写全部启用的价格层级");
       }
-      prices.forEach(price -> normalized.add(normalize(productId, variantKey, price, levelNames)));
+      prices.forEach(price -> {
+        FinishedProductPrice result = normalize(productId, variantKey, price, levelNames);
+        FinishedProductPrice existing = existingPrices.stream().filter(item ->
+            variantKey.equals(item.getVariantKey()) && price.getStoreLevelId().equals(item.getStoreLevelId()))
+            .findFirst().orElse(null);
+        applySource(result, price, existing, configurations.get(price.getStoreLevelId()));
+        normalized.add(result);
+      });
     });
     mapper.delete(Wrappers.<FinishedProductPrice>lambdaQuery()
         .eq(FinishedProductPrice::getFinishedProductId, productId));
@@ -92,6 +105,26 @@ public class FinishedProductPriceService {
     normalized.setCostPrice(cost.setScale(2, RoundingMode.HALF_UP));
     normalized.setPrice(expected);
     return normalized;
+  }
+
+  private void applySource(FinishedProductPrice result, FinishedProductPrice requested,
+      FinishedProductPrice existing, FinishedMarkupConfiguration configuration) {
+    String source = requested.getPriceSource();
+    boolean matches = configuration != null
+        && result.getPriceCoefficient().compareTo(configuration.getPriceCoefficient()) == 0
+        && ("enabled".equals(configuration.getStatus()) || (existing != null
+            && "auto".equals(existing.getPriceSource())
+            && configuration.getId().equals(existing.getSourceConfigurationId())));
+    if (source != null && !List.of("auto", "manual").contains(source)) {
+      throw new IllegalArgumentException("成品价格来源不正确");
+    }
+    boolean auto = source == null
+        ? matches && (existing == null || "auto".equals(existing.getPriceSource())) : "auto".equals(source);
+    if (auto && !matches) {
+      throw new IllegalArgumentException("跟随配置价格必须使用当前有效系数");
+    }
+    result.setPriceSource(auto ? "auto" : "manual");
+    result.setSourceConfigurationId(auto ? configuration.getId() : null);
   }
 
   private String normalizedVariantKey(String value) {

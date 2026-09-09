@@ -18,13 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class FinishedMarkupConfigurationService {
   private static final String DUPLICATE_LEVEL_MESSAGE = "该门店级别已配置成品价格";
   private final FinishedMarkupConfigurationMapper mapper;
+  private final FinishedPriceConfigurationSyncService priceSyncService;
   private final CurrentIdentityProvider identityProvider;
   private final StoreLevelPricingDirectory storeLevelDirectory;
 
   public FinishedMarkupConfigurationService(FinishedMarkupConfigurationMapper mapper,
       CurrentIdentityProvider identityProvider,
-      StoreLevelPricingDirectory storeLevelDirectory) {
+      StoreLevelPricingDirectory storeLevelDirectory, FinishedPriceConfigurationSyncService priceSyncService) {
     this.mapper = mapper;
+    this.priceSyncService = priceSyncService;
     this.identityProvider = identityProvider;
     this.storeLevelDirectory = storeLevelDirectory;
   }
@@ -61,7 +63,9 @@ public class FinishedMarkupConfigurationService {
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
-    return requireConfiguration(payload.getId());
+    FinishedMarkupConfiguration created = requireConfiguration(payload.getId());
+    priceSyncService.backfillMissingPrices(created);
+    return created;
   }
 
   @Transactional
@@ -79,7 +83,9 @@ public class FinishedMarkupConfigurationService {
     try { mapper.updateById(payload); } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
-    return requireConfiguration(id);
+    FinishedMarkupConfiguration updated = requireConfiguration(id);
+    priceSyncService.refreshAutoPrices(updated);
+    return updated;
   }
 
   @Transactional
@@ -114,6 +120,8 @@ public class FinishedMarkupConfigurationService {
     FinishedMarkupConfiguration existing = requireConfiguration(id);
     existing.setStatus(status);
     mapper.updateById(existing);
+    priceSyncService.refreshAutoPrices(existing);
+    priceSyncService.backfillMissingPrices(existing);
     return requireConfiguration(id);
   }
 
@@ -121,6 +129,9 @@ public class FinishedMarkupConfigurationService {
   public void deleteConfiguration(Long id) {
     requirePlatformScope();
     requireConfiguration(id);
+    if (priceSyncService.countAutoReferences(id) > 0) {
+      throw new IllegalArgumentException("该价格配置正在被成品价格使用，不能删除，请先停用");
+    }
     mapper.deleteById(id);
   }
 
