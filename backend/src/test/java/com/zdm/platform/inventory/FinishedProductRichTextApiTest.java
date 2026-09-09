@@ -51,6 +51,22 @@ class FinishedProductRichTextApiTest {
   }
 
   @Test
+  void productTemplateOptionsUseLatestPublishedSnapshotOnly() throws Exception {
+    jdbc.update("INSERT INTO product_categories (id, scope, name) VALUES (99021, 'finished', '快照分类'), (99022, 'accessory', '配件分类')");
+    String snapshot = "[{\"attributeId\":91,\"name\":\"发布名称\",\"attributeRole\":\"sales\",\"skuFlag\":true,\"requiredFlag\":true,\"sortOrder\":1,\"valueType\":\"select\",\"options\":[{\"id\":92,\"value\":\"发布值\"}]}]";
+    jdbc.update("INSERT INTO category_template_versions (category_id, version_no, state, content, created_by_name) VALUES (99021, 1, 'published', '[]', '测试'), (99021, 2, 'published', ?, '测试'), (99021, NULL, 'draft', '[]', '测试'), (99022, 1, 'published', '[]', '测试')", snapshot);
+    JsonNode result = data(mvc.perform(get("/api/admin/finished-products/attribute-template-options").header("Authorization", token)));
+    List<JsonNode> matching = new ArrayList<>();
+    result.forEach(row -> {
+      assertThat(row.path("categoryId").asLong()).isNotEqualTo(99022L);
+      if (row.path("categoryId").asLong() == 99021L) matching.add(row);
+    });
+    assertThat(matching).hasSize(1);
+    assertThat(matching.getFirst().path("versionNo").asInt()).isEqualTo(2);
+    assertThat(matching.getFirst().path("content")).isEqualTo(json.readTree(snapshot));
+  }
+
+  @Test
   void roundTripsRichTextAndGalleryAndReleasesRemovedReferences() throws Exception {
     jdbc.update("INSERT INTO product_categories (id, scope, name) VALUES (99001, 'finished', '富文本验收分类')");
     jdbc.update("""

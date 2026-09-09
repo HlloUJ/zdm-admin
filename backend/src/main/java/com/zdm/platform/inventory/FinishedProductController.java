@@ -41,6 +41,14 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     this.storeLevelDirectory = storeLevelDirectory;
   }
 
+  @GetMapping("/attribute-template-options")
+  public ApiResponse<List<FinishedProductService.AttributeTemplateOption>> attributeTemplateOptions() {
+    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".view", PERMISSION_PREFIX + ".create",
+        PERMISSION_PREFIX + ".edit");
+    permissionGuard.requireAllData();
+    return ApiResponse.ok(service.attributeTemplateOptions());
+  }
+
   @GetMapping("/price-level-options")
   public ApiResponse<List<StoreLevelPricingDirectory.Level>> priceLevelOptions() {
     permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");

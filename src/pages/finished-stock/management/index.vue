@@ -913,7 +913,10 @@ import {
   type FinishedProductVariant,
 } from '@/services/finishedProducts';
 import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
-import { listCategoryAttributes, type CategoryAttributeRecord } from '@/services/categoryAttributes';
+import {
+  listFinishedProductTemplateAttributes,
+  type FinishedProductTemplateAttribute,
+} from '@/services/finishedProducts';
 import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
 import { listProductAttributeValues, type ProductAttributeValueRecord } from '@/services/productAttributeValues';
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
@@ -1221,11 +1224,11 @@ const videoMedia = ref<AdminMediaValue>();
 const pendingUploadedMediaIds = new Set<number>();
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productAttributes = ref<ProductAttributeRecord[]>([]);
-const categoryAttributeBindings = ref<CategoryAttributeRecord[]>([]);
+const categoryAttributeBindings = ref<FinishedProductTemplateAttribute[]>([]);
 let templateRefresh: Promise<void> | undefined;
 const refreshCategoryAttributeBindings = () => {
   if (!templateRefresh) {
-    templateRefresh = listCategoryAttributes()
+    templateRefresh = listFinishedProductTemplateAttributes()
       .then((bindings) => {
         categoryAttributeBindings.value = bindings;
       })
@@ -1456,44 +1459,57 @@ const batchFillSubmitted = ref(false);
 const batchSalesAttributes = ref<Record<string, string>>({});
 const batchMarkupPrices = ref<Record<number, { coefficient: string; price: string }>>({});
 
-const templateAttributeFields = computed(() =>
-  productAttributes.value
-    .filter(
-      (attribute) =>
-        (attribute.scope === 'shared' || attribute.scope === 'finished') &&
-        attribute.status !== 'disabled' &&
-        categoryAttributeBindings.value.some(
-          (binding) =>
-            binding.categoryId === selectedCategoryId.value &&
-            binding.attributeId === attribute.id &&
-            (binding.publishStatus === 'published' ||
-              (editingProduct.value?.categoryId === selectedCategoryId.value &&
-                (editingProduct.value?.attributes.some((entry) => entry.attributeId === attribute.id) ||
-                  editingProduct.value?.variants.some((variant) =>
-                    Object.hasOwn(variant.salesAttributes ?? {}, `attribute_${attribute.id}`),
-                  )))) &&
-            (binding.attributeRole === 'product' || binding.attributeRole === 'sales'),
-        ),
-    )
+const templateAttributeFields = computed(() => {
+  const fields = categoryAttributeBindings.value
+    .filter((attribute) => attribute.categoryId === selectedCategoryId.value)
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((attribute) => ({
-      key: `attribute_${attribute.id}` as LayeredSpecField,
-      role: categoryAttributeBindings.value.find(
-        (binding) => binding.categoryId === selectedCategoryId.value && binding.attributeId === attribute.id,
-      )?.attributeRole,
-      attributeId: attribute.id,
+      key: `attribute_${attribute.attributeId}` as const,
+      role: attribute.attributeRole,
+      attributeId: attribute.attributeId,
       label: attribute.name,
-      required: categoryAttributeBindings.value.some(
-        (binding) =>
-          binding.categoryId === selectedCategoryId.value &&
-          binding.attributeId === attribute.id &&
-          binding.requiredFlag === true,
-      ),
+      required: attribute.requiredFlag,
       type: attribute.valueType === 'select' ? ('select' as const) : ('input' as const),
-      options: productAttributeValues.value
-        .filter((value) => value.attributeId === attribute.id && value.status !== 'disabled')
-        .map((value) => value.value),
-    })),
-);
+      options: attribute.options.map((option) => option.value),
+    }));
+  const product = editingProduct.value;
+  if (product && product.categoryId === selectedCategoryId.value) {
+    for (const entry of product.attributes) {
+      if (!fields.some((field) => field.attributeId === entry.attributeId)) {
+        fields.push({
+          key: `attribute_${entry.attributeId}`,
+          role: 'product',
+          attributeId: entry.attributeId,
+          label: entry.attributeName,
+          required: false,
+          type: 'input',
+          options: [],
+        });
+      }
+    }
+    for (const variant of product.variants) {
+      for (const key of Object.keys(variant.salesAttributes ?? {})) {
+        if (!/^attribute_\d+$/.test(key)) continue;
+        const attributeId = Number(key.slice(10));
+        if (!fields.some((field) => field.attributeId === attributeId)) {
+          fields.push({
+            key: `attribute_${attributeId}`,
+            role: 'sales',
+            attributeId,
+            label:
+              productAttributes.value.find((attribute) => attribute.id === attributeId)?.name ??
+              `销售属性 ${attributeId}`,
+            required: false,
+            type: 'input',
+            options: [],
+          });
+        }
+      }
+    }
+  }
+  return fields;
+});
 
 const attributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'product'));
 const salesAttributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'sales'));
@@ -1507,7 +1523,6 @@ const skuAttributeFields = computed(() =>
         binding.categoryId === selectedCategoryId.value &&
         binding.attributeId === field.attributeId &&
         binding.attributeRole === 'sales' &&
-        binding.publishStatus === 'published' &&
         binding.skuFlag === true,
     ),
   ),
@@ -1702,7 +1717,7 @@ const loadInventoryData = async () => {
         listFinishedProducts(),
         listFinishedMarkupConfigurationOptions(),
         getFinishedGuidePriceSetting(),
-        listCategoryAttributes(),
+        listFinishedProductTemplateAttributes(),
       ]);
     productCategories.value = categories;
     productAttributes.value = attributes;

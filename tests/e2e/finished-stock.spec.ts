@@ -1,52 +1,63 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
 
-test.beforeEach(async ({ page }) => {
-  await page.route('**/api/admin/category-attributes', (route) =>
+async function installFinishedMocks(page: Page) {
+  await installAdminApiMocks(page);
+  await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
     route.fulfill({
       json: {
         code: 0,
         message: 'ok',
         data: [
           {
-            id: 1,
             categoryId: 5,
-            attributeId: 1,
-            attributeRole: 'product',
-            requiredFlag: true,
-            status: 'disabled',
-            publishStatus: 'published',
+            content: [
+              {
+                attributeId: 1,
+                name: 'E2E 共享属性',
+                valueType: 'select',
+                attributeRole: 'product',
+                requiredFlag: true,
+                sortOrder: 1,
+                options: [{ id: 1, value: 'E2E 共享属性值' }],
+              },
+              {
+                attributeId: 2,
+                name: 'E2E 成品现货专属属性',
+                valueType: 'select',
+                attributeRole: 'product',
+                requiredFlag: false,
+                sortOrder: 2,
+                options: [{ id: 2, value: 'E2E 成品现货专属属性值' }],
+              },
+            ],
           },
           {
-            id: 2,
             categoryId: 6,
-            attributeId: 2,
-            attributeRole: 'product',
-            publishStatus: 'published',
-            requiredFlag: true,
-            status: 'enabled',
-          },
-          {
-            id: 3,
-            categoryId: 5,
-            attributeId: 2,
-            attributeRole: 'product',
-            publishStatus: 'published',
-            requiredFlag: false,
-            status: 'enabled',
+            content: [
+              {
+                attributeId: 2,
+                name: 'E2E 成品现货专属属性',
+                valueType: 'select',
+                attributeRole: 'product',
+                requiredFlag: true,
+                sortOrder: 1,
+                options: [{ id: 2, value: 'E2E 成品现货专属属性值' }],
+              },
+            ],
           },
         ],
       },
     }),
   );
-});
+}
 
 test('shows finished stock actions without inventory movements', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
   });
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
@@ -102,7 +113,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token');
   });
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
@@ -214,7 +225,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
 
 test('edits an initially empty rich product description with real toolbar actions', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
@@ -286,7 +297,7 @@ test('edits an initially empty rich product description with real toolbar action
 
 test('shows every publish section and navigates anchors without losing form input', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
@@ -368,7 +379,7 @@ test('shows every publish section and navigates anchors without losing form inpu
 
 test('confirms category changes and replaces the cleared form attributes', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
@@ -418,7 +429,7 @@ test('confirms category changes and replaces the cleared form attributes', async
 
 test('refreshes configured finished prices and calculates dynamic specification and batch prices', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
@@ -578,7 +589,7 @@ test('refreshes configured finished prices and calculates dynamic specification 
 
 test('uses only template-bound role attributes and builds dynamic sales specifications', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   const respond = (data: unknown) => ({ json: { code: 0, message: 'ok', data } });
   await page.route('**/api/admin/finished-products/price-level-options', (route) => route.fulfill(respond([])));
   await page.route('**/api/admin/product-attributes', (route) =>
@@ -593,29 +604,42 @@ test('uses only template-bound role attributes and builds dynamic sales specific
       ]),
     ),
   );
-  await page.route('**/api/admin/category-attributes', (route) =>
+  await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
     route.fulfill(
       respond([
         {
-          id: 1,
           categoryId: 5,
-          attributeId: 1,
-          attributeRole: 'product',
-          publishStatus: 'published',
-          requiredFlag: true,
+          content: [
+            {
+              attributeId: 1,
+              name: '商品测试属性',
+              valueType: 'input',
+              attributeRole: 'product',
+              requiredFlag: true,
+              sortOrder: 1,
+              options: [],
+            },
+            {
+              attributeId: 2,
+              name: '销售测试属性',
+              valueType: 'input',
+              attributeRole: 'sales',
+              requiredFlag: true,
+              skuFlag: true,
+              sortOrder: 2,
+              options: [],
+            },
+            {
+              attributeId: 5,
+              name: '不参与组合属性',
+              valueType: 'input',
+              attributeRole: 'sales',
+              skuFlag: false,
+              sortOrder: 3,
+              options: [],
+            },
+          ],
         },
-        {
-          id: 2,
-          categoryId: 5,
-          attributeId: 2,
-          attributeRole: 'sales',
-          publishStatus: 'published',
-          requiredFlag: true,
-          skuFlag: true,
-        },
-        { id: 4, categoryId: 5, attributeId: 4, attributeRole: null },
-        { id: 5, categoryId: 5, attributeId: 5, attributeRole: 'sales', publishStatus: 'published', skuFlag: false },
-        { id: 6, categoryId: 5, attributeId: 6, attributeRole: 'sales', publishStatus: 'unpublished', skuFlag: true },
       ]),
     ),
   );
@@ -669,17 +693,10 @@ test('uses published bindings for new products and keeps unpublished historical 
   page,
 }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   const respond = (data: unknown) => ({ json: { code: 0, message: 'ok', data } });
   await page.route('**/api/admin/finished-products/price-level-options', (route) => route.fulfill(respond([])));
-  await page.route('**/api/admin/category-attributes', (route) =>
-    route.fulfill(
-      respond([
-        { id: 1, categoryId: 5, attributeId: 1, attributeRole: 'product', publishStatus: 'unpublished' },
-        { id: 2, categoryId: 5, attributeId: 2, attributeRole: 'sales', publishStatus: 'unpublished' },
-      ]),
-    ),
-  );
+  await page.route('**/api/admin/finished-products/attribute-template-options', (route) => route.fulfill(respond([])));
   await page.route('**/api/admin/finished-products', (route) =>
     route.fulfill(
       respond([
@@ -724,7 +741,7 @@ test('uses published bindings for new products and keeps unpublished historical 
 
 test('edits prices in a specification table and preserves product details on save', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installAdminApiMocks(page);
+  await installFinishedMocks(page);
   let product = {
     id: 71,
     name: '多规格价格商品',

@@ -61,6 +61,30 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     this.detailContent = new FinishedProductDetailContent(mediaAssetService);
   }
 
+  public record AttributeTemplateOption(Long categoryId, Long versionId, Integer versionNo,
+      com.fasterxml.jackson.databind.JsonNode content) {}
+
+  public List<AttributeTemplateOption> attributeTemplateOptions() {
+    return jdbcTemplate.query("""
+        SELECT version.category_id, version.id, version.version_no, version.content
+        FROM category_template_versions version
+        JOIN product_categories category ON category.id = version.category_id
+        WHERE category.scope = 'finished' AND category.tenant_id IS NULL
+          AND category.status = 'enabled' AND version.state = 'published'
+          AND NOT EXISTS (SELECT 1 FROM category_template_versions newer
+            WHERE newer.category_id = version.category_id AND newer.state = 'published'
+              AND newer.version_no > version.version_no)
+        ORDER BY version.category_id
+        """, (row, index) -> {
+          try {
+            return new AttributeTemplateOption(row.getLong("category_id"), row.getLong("id"),
+                row.getInt("version_no"), new com.fasterxml.jackson.databind.ObjectMapper().readTree(row.getString("content")));
+          } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw new IllegalStateException("属性模板配置读取失败", error);
+          }
+        });
+  }
+
   public List<FinishedProduct> listWithDetails() {
     return lambdaQuery()
         .orderByDesc(FinishedProduct::getCreatedAt)

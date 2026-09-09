@@ -129,3 +129,23 @@ export interface FinishedProductPriceLevelOption {
 }
 export const listFinishedProductPriceLevelOptions = () =>
   request<FinishedProductPriceLevelOption[]>('/admin/finished-products/price-level-options');
+
+export interface FinishedProductTemplateAttribute {
+  categoryId: number;
+  attributeId: number;
+  name: string;
+  valueType: string;
+  attributeRole: 'product' | 'sales' | '';
+  requiredFlag: boolean;
+  skuFlag: boolean;
+  sortOrder: number;
+  options: { id: number; value: string; code?: string }[];
+}
+export async function listFinishedProductTemplateAttributes(): Promise<FinishedProductTemplateAttribute[]> {
+  const templates = await request<
+    { categoryId: number; content: Omit<FinishedProductTemplateAttribute, 'categoryId'>[] }[]
+  >('/admin/finished-products/attribute-template-options');
+  return templates.flatMap((template) =>
+    template.content.map((attribute) => ({ ...attribute, categoryId: template.categoryId })),
+  );
+}
