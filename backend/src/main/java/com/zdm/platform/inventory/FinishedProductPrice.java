@@ -18,6 +18,13 @@ public class FinishedProductPrice {
   @NotNull @DecimalMin("0.00") private BigDecimal costPrice;
   @NotNull @DecimalMin("0.00") private BigDecimal price;
 
+  private String priceSource;
+  private Long sourceConfigurationId;
+  public String getPriceSource() { return priceSource; }
+  public void setPriceSource(String value) { priceSource = value; }
+  public Long getSourceConfigurationId() { return sourceConfigurationId; }
+  public void setSourceConfigurationId(Long value) { sourceConfigurationId = value; }
+
   public Long getId() { return id; }
   public void setId(Long id) { this.id = id; }
   public Long getFinishedProductId() { return finishedProductId; }

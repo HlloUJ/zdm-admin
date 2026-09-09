@@ -9,6 +9,7 @@ import com.zdm.platform.media.MediaReferenceService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,6 +37,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   private final MediaCleanupService mediaCleanupService;
   private final MediaReferenceService mediaReferenceService;
   private final CurrentIdentityProvider identityProvider;
+  private final FinishedProductDetailContent detailContent;
 
   public FinishedProductService(
       FinishedProductPriceService priceService,
@@ -56,6 +58,31 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     this.mediaCleanupService = mediaCleanupService;
     this.mediaReferenceService = mediaReferenceService;
     this.identityProvider = identityProvider;
+    this.detailContent = new FinishedProductDetailContent(mediaAssetService);
+  }
+
+  public record AttributeTemplateOption(Long categoryId, Long versionId, Integer versionNo,
+      com.fasterxml.jackson.databind.JsonNode content) {}
+
+  public List<AttributeTemplateOption> attributeTemplateOptions() {
+    return jdbcTemplate.query("""
+        SELECT version.category_id, version.id, version.version_no, version.content
+        FROM category_template_versions version
+        JOIN product_categories category ON category.id = version.category_id
+        WHERE category.scope = 'finished' AND category.tenant_id IS NULL
+          AND category.status = 'enabled' AND version.state = 'published'
+          AND NOT EXISTS (SELECT 1 FROM category_template_versions newer
+            WHERE newer.category_id = version.category_id AND newer.state = 'published'
+              AND newer.version_no > version.version_no)
+        ORDER BY version.category_id
+        """, (row, index) -> {
+          try {
+            return new AttributeTemplateOption(row.getLong("category_id"), row.getLong("id"),
+                row.getInt("version_no"), new com.fasterxml.jackson.databind.ObjectMapper().readTree(row.getString("content")));
+          } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw new IllegalStateException("属性模板配置读取失败", error);
+          }
+        });
   }
 
   public List<FinishedProduct> listWithDetails() {
@@ -76,6 +103,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     product.setPublisherType(PLATFORM_PUBLISHER);
     product.setCreatedByName(identity.displayName());
     product.setCreatedByAccountId(identity.accountId());
+    product.setCreatedAt(LocalDateTime.now());
     try {
       save(product);
     } catch (DuplicateKeyException exception) {
@@ -137,13 +165,13 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     }
     product.setName(product.getName().trim());
     product.setSku(product.getSku().trim());
-    product.setDetail(product.getDetail().trim());
+    product.setDetail(detailContent.normalize(product.getDetail()));
     if (!ALLOWED_STATUSES.contains(product.getStatus())) {
       throw new IllegalArgumentException("成品现货状态不正确");
     }
     validateCategory(product.getCategoryId());
     validateSupplier(product.getSupplierId());
-    validateMedia(product.getMainImageMediaId(), product.getVideoMediaId());
+    validateMedia(product);
     validateAttributes(product.getAttributes());
     normalizeVariants(product);
     validatePrices(product);
@@ -177,12 +205,26 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     }
   }
 
-  private void validateMedia(Long mainImageMediaId, Long videoMediaId) {
-    MediaAsset mainImage = mediaAssetService.requireAvailable(mainImageMediaId);
-    if (mainImage == null || !"image".equals(mainImage.getMediaType())) {
-      throw new IllegalArgumentException("请上传商品主图");
+  private void validateMedia(FinishedProduct product) {
+    List<Long> imageIds = product.getMainImageMediaIds();
+    if (imageIds == null) {
+      imageIds = product.getMainImageMediaId() == null ? List.of() : List.of(product.getMainImageMediaId());
     }
-    MediaAsset video = mediaAssetService.requireAvailable(videoMediaId);
+    if (imageIds.isEmpty() || imageIds.size() > 5) {
+      throw new IllegalArgumentException("商品主图需上传1至5张图片");
+    }
+    if (imageIds.stream().anyMatch(java.util.Objects::isNull) || new LinkedHashSet<>(imageIds).size() != imageIds.size()) {
+      throw new IllegalArgumentException("商品主图不能为空或重复");
+    }
+    for (Long imageId : imageIds) {
+      MediaAsset mainImage = mediaAssetService.requireAvailable(imageId);
+      if (mainImage == null || !"image".equals(mainImage.getMediaType())) {
+        throw new IllegalArgumentException("请上传商品主图");
+      }
+    }
+    product.setMainImageMediaIds(imageIds);
+    product.setMainImageMediaId(imageIds.getFirst());
+    MediaAsset video = mediaAssetService.requireAvailable(product.getVideoMediaId());
     if (video == null || !"video".equals(video.getMediaType())) {
       throw new IllegalArgumentException("请上传商品视频");
     }
@@ -281,7 +323,11 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   private void syncMediaReferences(FinishedProduct product) {
     Map<String, Long> media = new LinkedHashMap<>();
     media.put("mainImage", product.getMainImageMediaId());
+    for (int index = 1; index < product.getMainImageMediaIds().size(); index++) {
+      media.put("mainImage" + (index + 1), product.getMainImageMediaIds().get(index));
+    }
     media.put("video", product.getVideoMediaId());
+    media.putAll(detailContent.references(product.getDetail()));
     mediaReferenceService.replace(MEDIA_DOMAIN, product.getId(), media);
   }
 
@@ -289,8 +335,20 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (product == null) {
       return null;
     }
+    List<Long> imageIds = jdbcTemplate.queryForList("""
+        SELECT media_id FROM media_references
+        WHERE business_domain = ? AND business_id = ?
+          AND field_key IN ('mainImage', 'mainImage2', 'mainImage3', 'mainImage4', 'mainImage5')
+        ORDER BY field_key
+        """, Long.class, MEDIA_DOMAIN, product.getId());
+    if (imageIds.isEmpty() && product.getMainImageMediaId() != null) {
+      imageIds = List.of(product.getMainImageMediaId());
+    }
+    product.setMainImageMediaIds(imageIds);
+    product.setMainImageUrls(imageIds.stream().map(mediaAssetService::publicUrl).toList());
     product.setMainImageUrl(mediaAssetService.publicUrl(product.getMainImageMediaId()));
     product.setVideoUrl(mediaAssetService.publicUrl(product.getVideoMediaId()));
+    product.setDetail(detailContent.render(product.getDetail()));
     product.setMarkupPrices(priceService.listPrices(product.getId()));
     product.setGuidePrices(guidePriceService.listPrices(product.getId()));
     product.setVariants(variantMapper.selectList(Wrappers.lambdaQuery(FinishedProductVariant.class)

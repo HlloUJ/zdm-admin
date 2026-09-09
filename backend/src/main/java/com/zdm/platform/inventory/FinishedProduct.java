@@ -26,6 +26,12 @@ public class FinishedProduct extends BaseEntity {
   private Long videoMediaId;
 
   @TableField(exist = false)
+  private List<Long> mainImageMediaIds;
+
+  @TableField(exist = false)
+  private List<String> mainImageUrls;
+
+  @TableField(exist = false)
   private String mainImageUrl;
 
   @TableField(exist = false)
@@ -97,6 +103,18 @@ public class FinishedProduct extends BaseEntity {
 
   public Long getMainImageMediaId() { return mainImageMediaId; }
   public void setMainImageMediaId(Long mainImageMediaId) { this.mainImageMediaId = mainImageMediaId; }
+  public List<Long> getMainImageMediaIds() {
+    return mainImageMediaIds == null ? null : new java.util.ArrayList<>(mainImageMediaIds);
+  }
+  public void setMainImageMediaIds(List<Long> mainImageMediaIds) {
+    this.mainImageMediaIds = mainImageMediaIds == null ? null : new java.util.ArrayList<>(mainImageMediaIds);
+  }
+  public List<String> getMainImageUrls() {
+    return mainImageUrls == null ? null : List.copyOf(mainImageUrls);
+  }
+  public void setMainImageUrls(List<String> mainImageUrls) {
+    this.mainImageUrls = mainImageUrls == null ? null : List.copyOf(mainImageUrls);
+  }
   public Long getVideoMediaId() { return videoMediaId; }
   public void setVideoMediaId(Long videoMediaId) { this.videoMediaId = videoMediaId; }
   public String getMainImageUrl() { return mainImageUrl; }

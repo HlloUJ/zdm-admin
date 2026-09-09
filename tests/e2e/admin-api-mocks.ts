@@ -432,21 +432,8 @@ const finishedProducts = [
     totalStock: 12,
     guidePrice: 2999,
     status: 'warehouse',
-    createdAt: '2026-07-27T09:00:00',
-  },
-];
-
-const inventoryMovements = [
-  {
-    id: 1,
-    inventoryType: 'finished_product',
-    inventoryId: 1,
-    movementType: 'initial',
-    quantity: 12,
-    beforeQuantity: 0,
-    afterQuantity: 12,
-    reason: 'E2E 初始入库',
-    remark: '系统初始化',
+    createdByName: '韩健',
+    createdByAccountId: 1,
     createdAt: '2026-07-27T09:00:00',
   },
 ];
@@ -707,7 +694,6 @@ export async function installAdminApiMocks(page: Page) {
     );
   });
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
-  await mockCollection(page, '**/api/admin/inventory-movements*', inventoryMovements);
   await mockCollection(page, '**/api/admin/crafts', crafts);
   await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
   await mockCollection(page, '**/api/admin/slabs', slabs);
