@@ -4,6 +4,8 @@ import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media'
 export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 
 export interface FinishedProductPrice {
+  priceSource?: 'auto' | 'manual';
+  sourceConfigurationId?: number;
   storeLevelId: number;
   storeLevelName?: string;
   priceCoefficient: number;
@@ -32,6 +34,7 @@ export interface FinishedProductVariant {
   variantKey: string;
   variantLabel: string;
   displayMode: 'single' | 'layered';
+  salesAttributes?: Record<string, string>;
   material?: string;
   lengthValue?: string;
   color?: string;
@@ -46,6 +49,8 @@ export interface FinishedProductRecord {
   name: string;
   sku: string;
   mainImageMediaId?: number;
+  mainImageMediaIds?: number[];
+  mainImageUrls?: string[];
   videoMediaId?: number;
   mainImageUrl?: string;
   videoUrl?: string;
@@ -72,6 +77,7 @@ export interface FinishedProductPayload {
   name: string;
   sku: string;
   mainImageMediaId: number;
+  mainImageMediaIds?: number[];
   videoMediaId: number;
   detail: string;
   totalStock?: number;
@@ -114,4 +120,32 @@ export function deleteFinishedProduct(id: number) {
   return request<boolean>(`/admin/finished-products/${id}`, {
     method: 'DELETE',
   });
+}
+
+export interface FinishedProductPriceLevelOption {
+  id: number;
+  name: string;
+  sortOrder?: number;
+}
+export const listFinishedProductPriceLevelOptions = () =>
+  request<FinishedProductPriceLevelOption[]>('/admin/finished-products/price-level-options');
+
+export interface FinishedProductTemplateAttribute {
+  categoryId: number;
+  attributeId: number;
+  name: string;
+  valueType: string;
+  attributeRole: 'product' | 'sales' | '';
+  requiredFlag: boolean;
+  skuFlag: boolean;
+  sortOrder: number;
+  options: { id: number; value: string; code?: string }[];
+}
+export async function listFinishedProductTemplateAttributes(): Promise<FinishedProductTemplateAttribute[]> {
+  const templates = await request<
+    { categoryId: number; content: Omit<FinishedProductTemplateAttribute, 'categoryId'>[] }[]
+  >('/admin/finished-products/attribute-template-options');
+  return templates.flatMap((template) =>
+    template.content.map((attribute) => ({ ...attribute, categoryId: template.categoryId })),
+  );
 }

@@ -142,7 +142,7 @@ class MarkupConfigurationServiceTest {
     when(storeLevelDirectory.findLevel(1L)).thenReturn(new StoreLevelPricingDirectory.Level(1L, "一级店", 10));
     when(storeLevelDirectory.findLevel(2L)).thenReturn(new StoreLevelPricingDirectory.Level(2L, "二级店", 20));
     FinishedMarkupConfigurationService service = new FinishedMarkupConfigurationService(
-        mapper, identityProvider, storeLevelDirectory);
+        mapper, identityProvider, storeLevelDirectory, Mockito.mock(FinishedPriceConfigurationSyncService.class));
 
     service.reorderConfigurations(List.of(32L, 31L));
 
