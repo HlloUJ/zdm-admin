@@ -838,7 +838,11 @@ function tailFile(file, lines) {
 async function installService({ paths, worktree, taskArgs = [] }) {
   if (process.platform !== 'darwin') throw new Error('长期预览服务目前仅支持 macOS launchd');
   const selected = resolveTaskWorktree(worktree || process.cwd()).root;
-  const launcherPath = discoverIntegrationLauncher();
+  const launcherOverride = process.env.ZDM_TASK_PREVIEW_LAUNCHER_WORKTREE;
+  const launcherPath = launcherOverride
+    ? path.join(resolveTaskWorktree(launcherOverride).root, 'scripts', 'dev-task.mjs')
+    : discoverIntegrationLauncher();
+  if (!existsSync(launcherPath)) throw new Error('指定的任务启动器不存在');
   const workingDirectory = path.dirname(path.dirname(launcherPath));
   ensureDirectory(paths.runtimeDirectory);
   ensureDirectory(path.dirname(paths.logFile));
