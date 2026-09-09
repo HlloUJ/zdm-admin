@@ -439,7 +439,7 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
         "store_levels",
         "product_attributes",
         "product_attribute_values",
-        "category_attributes",
+        "category_template_versions",
         "crafts",
         "slab_varieties",
         "slab_origins",
@@ -471,15 +471,7 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
       return;
     }
     jdbcTemplate.update(
-        """
-        DELETE cavb FROM category_attribute_value_bindings cavb
-        JOIN category_attributes ca ON ca.id = cavb.category_attribute_id
-        JOIN product_categories pc ON pc.id = ca.category_id
-        WHERE pc.tenant_id = ?
-        """,
-        tenantId);
-    jdbcTemplate.update(
-        "DELETE ca FROM category_attributes ca JOIN product_categories pc ON pc.id = ca.category_id WHERE pc.tenant_id = ?",
+        "DELETE template FROM category_template_versions template JOIN product_categories pc ON pc.id = template.category_id WHERE pc.tenant_id = ?",
         tenantId);
     while (!remaining.isEmpty()) {
       List<Long> leaves = remaining.stream()

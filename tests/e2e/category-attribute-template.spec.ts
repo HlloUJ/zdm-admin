@@ -1,788 +1,671 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
-
+import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
-const apiOk = (data: unknown) => ({ code: 0, message: 'ok', data });
-const fulfillJson = (route: Route, data: unknown) =>
-  route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(apiOk(data)),
-  });
-
-async function installCategoryAttributeMocks(page: Page) {
-  const selectedValueIds = new Map<number, number[]>([[1, [101]]]);
-  const categoryAttributes = [
-    {
-      id: 1,
-      categoryId: 3,
-      attributeId: 1,
-      attributeRole: 'product' as string | null,
-      requiredFlag: true,
-      skuFlag: false,
-      sortOrder: 1,
-      status: 'enabled',
-      publishStatus: 'unpublished',
-      optionCount: 1,
-      createdByAccountId: 1,
-      createdByName: '韩健',
-      createdAt: '2026-08-04T09:30:00',
-    },
-  ];
-
-  await page.route('**/api/admin/product-categories', (route) =>
-    fulfillJson(route, [
-      { id: 1, scope: 'finished', name: '成品现货', status: 'enabled', createdAt: '2026-08-01T09:00:00' },
-      {
-        id: 2,
-        parentId: 1,
-        scope: 'finished',
-        name: '茶几',
-        status: 'enabled',
-        createdAt: '2026-08-02T09:00:00',
-      },
-      {
-        id: 3,
-        parentId: 2,
-        scope: 'finished',
-        name: '岩板茶几',
-        status: 'enabled',
-        createdAt: '2026-08-03T09:00:00',
-      },
-      {
-        id: 4,
-        parentId: 2,
-        scope: 'finished',
-        name: '停用茶几',
-        status: 'disabled',
-        createdAt: '2026-08-04T09:00:00',
-      },
-      {
-        id: 5,
-        parentId: 2,
-        scope: 'finished',
-        name: '实木茶几',
-        status: 'enabled',
-        createdAt: '2026-08-02T10:00:00',
-      },
-      {
-        id: 6,
-        parentId: 1,
-        scope: 'finished',
-        name: '停用父级',
-        status: 'disabled',
-        createdAt: '2026-08-05T09:00:00',
-      },
-      {
-        id: 7,
-        parentId: 6,
-        scope: 'finished',
-        name: '隐藏子类',
-        status: 'enabled',
-        createdAt: '2026-08-06T09:00:00',
-      },
-    ]),
-  );
-  await page.route('**/api/admin/product-attributes', (route) =>
-    fulfillJson(route, [
-      {
-        id: 1,
-        scope: 'shared',
-        name: '材质',
-        valueType: 'select',
-        status: 'disabled',
-        createdAt: '2026-08-04T09:00:00',
-      },
-      {
-        id: 2,
-        scope: 'shared',
-        name: '颜色',
-        valueType: 'select',
-        status: 'enabled',
-        createdAt: '2026-08-04T10:00:00',
-      },
-      {
-        id: 3,
-        scope: 'finished',
-        name: '尺寸',
-        valueType: 'number',
-        status: 'enabled',
-        createdAt: '2026-08-04T11:00:00',
-      },
-      {
-        id: 4,
-        scope: 'shared',
-        name: '停用属性',
-        valueType: 'text',
-        status: 'disabled',
-        createdAt: '2026-08-04T12:00:00',
-      },
-    ]),
-  );
-  await page.route('**/api/admin/category-attributes/batch', async (route) => {
-    const payload = route.request().postDataJSON() as { categoryId: number; attributeIds: number[] };
-    const created = payload.attributeIds.map((attributeId, index) => ({
-      id: categoryAttributes.length + index + 1,
-      categoryId: payload.categoryId,
-      attributeId,
-      attributeRole: null,
-      requiredFlag: false,
-      skuFlag: false,
-      sortOrder: categoryAttributes.length + index + 1,
-      status: 'disabled',
-      publishStatus: 'unpublished',
-      optionCount: 0,
-      createdByAccountId: 1,
-      createdByName: '当前操作员',
-      createdAt: '2026-08-04T10:00:00',
-    }));
-    categoryAttributes.push(...created);
-    await fulfillJson(route, created);
-  });
-  await page.route(/\/api\/admin\/category-attributes\/\d+\/values$/, async (route) => {
-    const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
-    if (route.request().method() === 'PUT') {
-      const payload = route.request().postDataJSON() as { valueIds: number[] };
-      selectedValueIds.set(id, payload.valueIds);
-    }
-    const selected = selectedValueIds.get(id) ?? [];
-    await fulfillJson(route, [
-      { id: 101, value: '岩板1', code: 'SLAB-1', status: 'enabled', selected: selected.includes(101) },
-      { id: 102, value: '实木2', code: 'WOOD-1', status: 'enabled', selected: selected.includes(102) },
-    ]);
-  });
-  await page.route(/\/api\/admin\/category-attributes\/\d+$/, async (route) => {
-    const id = Number(new URL(route.request().url()).pathname.split('/').at(-1));
-    const index = categoryAttributes.findIndex((item) => item.id === id);
-    if (route.request().method() === 'PUT' && index >= 0) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      Object.assign(categoryAttributes[index], route.request().postDataJSON());
-      await fulfillJson(route, categoryAttributes[index]);
-      return;
-    }
-    if (route.request().method() === 'DELETE' && index >= 0) {
-      categoryAttributes.splice(index, 1);
-      await fulfillJson(route, true);
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route(/\/api\/admin\/category-attributes\/\d+\/(publish|unpublish)$/, async (route) => {
-    const urlParts = new URL(route.request().url()).pathname.split('/');
-    const id = Number(urlParts.at(-2));
-    const index = categoryAttributes.findIndex((item) => item.id === id);
-    if (route.request().method() !== 'PUT' || index < 0) {
-      await route.fallback();
-      return;
-    }
-    categoryAttributes[index].publishStatus = urlParts.at(-1) === 'publish' ? 'published' : 'unpublished';
-    await fulfillJson(route, categoryAttributes[index]);
-  });
-  await page.route('**/api/admin/category-attributes', (route) => fulfillJson(route, categoryAttributes));
-}
-
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem('zdm-admin-token', 'dev-token');
-    window.localStorage.setItem(
+async function setup(page: Page, permissions = ['all']) {
+  await page.addInitScript((permissions) => {
+    localStorage.setItem('zdm-admin-token', 'dev-token');
+    localStorage.setItem(
       'zdm-admin-user',
       JSON.stringify({
         id: 1,
-        name: '韩健',
-        phone: '15926626945',
-        roles: ['SUPER_ADMIN'],
-        permissions: ['all'],
+        name: '测试人员',
+        roles: permissions.includes('all') ? ['SUPER_ADMIN'] : [],
+        permissions,
         dataPermission: 'all',
       }),
     );
-  });
+  }, permissions);
   await installAdminApiMocks(page);
-  await installCategoryAttributeMocks(page);
+  const attribute = {
+    attributeId: 10,
+    name: '颜色',
+    scope: 'shared',
+    valueType: 'select',
+    attributeRole: 'sales',
+    requiredFlag: true,
+    sortOrder: 1,
+    options: [{ id: 100, value: '白色', code: 'white' }],
+  };
+  const versions: Record<string, unknown>[] = [
+    {
+      id: 1,
+      categoryId: 3,
+      versionNo: 1,
+      state: 'published',
+      revision: 2,
+      content: [attribute],
+      createdByName: '测试人员',
+      publishedByName: '测试人员',
+      publishedAt: '2026-09-08T09:00:00+08:00',
+      changeNote: '初始版本',
+    },
+    {
+      id: 2,
+      categoryId: 3,
+      versionNo: null,
+      state: 'draft',
+      revision: 0,
+      content: [structuredClone(attribute)],
+      createdByName: '测试人员',
+      changeNote: '',
+    },
+  ];
+  await page.route('**/api/admin/template-versions**', async (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname.replace('/api/admin/template-versions', '');
+    const method = route.request().method();
+    const body = method === 'GET' || method === 'DELETE' ? {} : route.request().postDataJSON();
+    let data: unknown;
+    if (path === '/categories')
+      data = [
+        {
+          id: url.searchParams.get('scope') === 'finished' ? 3 : 4,
+          name: url.searchParams.get('scope') === 'finished' ? '岩板餐桌' : '桌腿',
+          scope: url.searchParams.get('scope'),
+          status: 'enabled',
+        },
+      ];
+    else if (path === '/attribute-options')
+      data = [{ id: 11, name: '尺寸', scope: 'shared', valueType: 'text', status: 'enabled' }];
+    else if (path === '/value-options')
+      data = [
+        { id: 100, value: '白色', code: 'white' },
+        { id: 101, value: '黑色', code: 'black' },
+      ];
+    else if (path === '' && method === 'GET')
+      data = versions.filter((v) => v.categoryId === Number(url.searchParams.get('categoryId')));
+    else if (path === '' && method === 'POST') {
+      data = {
+        id: versions.length + 1,
+        ...body,
+        versionNo: null,
+        state: 'draft',
+        revision: 0,
+        content: [],
+        createdByName: '测试人员',
+        changeNote: '',
+      };
+      versions.push(data as Record<string, unknown>);
+    } else {
+      const id = Number(path.split('/')[1]);
+      const version = versions.find((v) => v.id === id)!;
+      if (path.endsWith('/display-order')) {
+        const previous = version.content as Array<{ attributeId: number; sortOrder: number }>;
+        version.content = body.attributeIds.map((id: number, index: number) => ({
+          ...previous.find((row) => row.attributeId === id),
+          sortOrder: index + 1,
+        }));
+        version.revision = Number(version.revision) + 1;
+      } else if (method === 'PUT') Object.assign(version, body, { revision: Number(version.revision) + 1 });
+      if (path.endsWith('/publish'))
+        Object.assign(version, {
+          state: 'published',
+          versionNo: versions.filter((v) => v.categoryId === version.categoryId && v.state === 'published').length + 1,
+          revision: Number(version.revision) + 1,
+          publishedByName: '测试人员',
+          publishedAt: '2026-09-08T10:00:00',
+        });
+      if (method === 'DELETE') versions.splice(versions.indexOf(version), 1);
+      data = method === 'DELETE' ? true : version;
+    }
+    await route.fulfill({ json: { code: 0, message: 'ok', data } });
+  });
+  return versions;
+}
+
+test('tabs retain automatically saved drafts', async ({ page }) => {
+  const versions = await setup(page);
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(page.getByText('成品现货模板', { exact: true })).toBeVisible();
+  await expect(page.getByText('配件模板', { exact: true })).toBeVisible();
+  await expect(page.locator('.exit-edit')).toHaveText('草稿箱');
+  await expect(page.getByRole('button', { name: '保存草稿', exact: true })).toHaveCount(0);
+  await page.locator('.attribute-table .required-switch').first().click();
+  await page.getByText('配件模板', { exact: true }).click();
+  await expect(page.locator('.category-content .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  expect((versions.find((v) => v.id === 2)?.content as Record<string, unknown>[])[0]?.requiredFlag).toBe(false);
+  await page.getByText('成品现货模板', { exact: true }).click();
+  await expect(page.locator('.attribute-table .required-switch').first()).not.toHaveClass(/t-is-checked/);
+  await page.locator('.exit-edit').click();
+  await expect(page.locator('.exit-edit')).toHaveCount(0);
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(page.locator('.attribute-table .required-switch').first()).not.toHaveClass(/t-is-checked/);
+  await expect(page.getByText('已保存“草稿”', { exact: true })).toBeVisible();
+  expect(versions.find((v) => v.id === 2)?.versionNo).toBeNull();
+  expect((versions.find((v) => v.id === 2)?.content as Record<string, unknown>[])[0]?.requiredFlag).toBe(false);
+  await page.getByText('配件模板', { exact: true }).click();
+  await expect(page.locator('.category-content .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
+  await expect(page.locator('.version-panel .t-tabs')).toHaveCount(0);
 });
 
-test('selects the first leaf and manages bindings from the template list', async ({ page }) => {
+test('published snapshots stay read only without inner template tabs', async ({ page }) => {
+  await setup(page);
   await page.goto('/category-attribute-template');
+  await expect(page.locator('.attribute-table')).toBeVisible();
+  await expect(page.getByRole('switch')).toHaveCount(0);
+  await expect(page.locator('.version-panel .t-tabs')).toHaveCount(0);
+  await expect(page.getByText('标准属性构建规格', { exact: true })).toHaveCount(0);
+});
 
-  const main = page.getByRole('main');
-  await expect(main.locator('.zdm-admin-list-layout')).toHaveCount(1);
-  await expect(main.locator('.zdm-admin-list-layout__filters')).toHaveCount(0);
-  await expect(main.getByText('当前分类：')).toHaveCount(0);
-  await expect(main.getByRole('button', { name: '切换分类' })).toHaveCount(0);
+test('only an authorized scope is visible and cannot create versions', async ({ page }) => {
+  await setup(page, ['admin.product-data-center.category-attribute-template.accessory.attributes.view']);
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(page.locator('.category-content .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
+  await expect(page.getByRole('main').locator('.t-tabs__nav-item')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '创建新版本草稿', exact: true })).toHaveCount(0);
+});
 
-  const tabsWidth = await main.locator('.zdm-admin-list-layout__toolbar').evaluate((toolbar) => {
-    const scope = toolbar.querySelector<HTMLElement>('.scope-controls')?.getBoundingClientRect();
-    const tabs = toolbar.querySelector<HTMLElement>('.t-tabs')?.getBoundingClientRect();
-    const toolbarRect = toolbar.getBoundingClientRect();
-    return scope && tabs ? { toolbar: toolbarRect.width, scope: scope.width, tabs: tabs.width } : null;
-  });
-  expect(tabsWidth).not.toBeNull();
-  expect(tabsWidth!.scope).toBeGreaterThanOrEqual(tabsWidth!.toolbar - 1);
-  expect(tabsWidth!.tabs).toBeGreaterThanOrEqual(tabsWidth!.scope - 1);
+test('attribute list paginates without dropping draft rows on save', async ({ page }) => {
+  const versions = await setup(page);
+  const draft = versions.find((version) => version.id === 2)!;
+  const original = (draft.content as Record<string, unknown>[])[0]!;
+  draft.content = Array.from({ length: 12 }, (_, index) => ({
+    ...original,
+    attributeId: 1000 + index,
+    name: `分页属性${index + 1}`,
+    sortOrder: index + 1,
+  }));
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  const list = page.locator('.attribute-table');
+  await expect(list.locator('tbody tr')).toHaveCount(10);
+  await expect(list.locator('tbody tr').first().locator('td').nth(1)).toHaveText('1');
+  await expect(list.getByText('分页属性11', { exact: true })).toHaveCount(0);
+  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await expect(list.locator('tbody tr')).toHaveCount(2);
+  await expect(list.locator('tbody tr').first().locator('td').nth(1)).toHaveText('11');
+  await expect(list.getByText('分页属性11', { exact: true })).toBeVisible();
+  await list.locator('tbody tr').first().locator('.required-switch').click();
+  await expect(page.getByText('已保存“草稿”', { exact: true })).toBeVisible();
+  const saved = draft.content as Record<string, unknown>[];
+  expect(saved).toHaveLength(12);
+  expect(saved[0]?.requiredFlag).toBe(true);
+  expect(saved[10]?.requiredFlag).toBe(false);
+});
 
-  const categoryPanel = main.locator('.category-panel');
-  const templatePanel = main.locator('.template-panel');
-  await expect(categoryPanel.locator('.panel-toolbar')).toHaveCount(0);
-  await expect(templatePanel.locator('.panel-toolbar')).toHaveCount(0);
-  await expect(categoryPanel.locator('.category-node-parent')).toHaveCount(2);
-  await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toBeVisible();
-  await expect(categoryPanel.getByText('停用茶几', { exact: true })).toHaveCount(0);
-  await expect(categoryPanel.getByText('停用父级', { exact: true })).toHaveCount(0);
-  await expect(categoryPanel.getByText('隐藏子类', { exact: true })).toHaveCount(0);
-  const leafNodes = categoryPanel.locator('.category-node-leaf');
-  await expect(leafNodes).toHaveCount(2);
-  await expect(leafNodes.nth(0)).toHaveText('岩板茶几');
-  await expect(leafNodes.nth(1)).toHaveText('实木茶几');
-  await expect(categoryPanel.locator('.category-node-leaf.active')).toHaveText('岩板茶几');
-  const materialRow = main.locator('tbody tr').filter({ hasText: '材质' }).first();
-  await expect(materialRow).toContainText('韩健');
-  await expect(materialRow.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
-  await expect(materialRow.locator('.t-tag').filter({ hasText: '未发布' })).toHaveClass(/t-tag--danger/);
-  const publishButton = materialRow.getByText('发布', { exact: true });
-  await expect(publishButton).toBeVisible();
-  await expect(publishButton).toHaveClass(/t-link--theme-success/);
-  await expect(publishButton).toHaveClass(/t-link--hover-color/);
-  await expect(publishButton).not.toHaveClass(/t-link--hover-underline/);
-  await expect(materialRow.getByText('移除', { exact: true })).toBeVisible();
-  await expect(materialRow.getByText('启用', { exact: true })).toHaveCount(0);
-  await expect(materialRow.getByText('删除', { exact: true })).toHaveCount(0);
-  const bindButton = templatePanel.locator('.template-toolbar').getByRole('button', { name: '绑定属性' });
-  await expect(bindButton).toBeEnabled();
+test('category panel matches the content panel without growing from page scroll', async ({ page }) => {
+  const versions = await setup(page);
+  const draft = versions.find((version) => version.id === 2)!;
+  const original = (draft.content as Record<string, unknown>[])[0]!;
+  draft.content = Array.from({ length: 10 }, (_, index) => ({
+    ...original,
+    attributeId: 1000 + index,
+    name: `属性${index + 1}`,
+    sortOrder: index + 1,
+  }));
+  await page.setViewportSize({ width: 1393, height: 650 });
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  const panel = page.locator('.category-panel');
+  await expect(page.locator('.attribute-table tbody tr')).toHaveCount(10);
+  const initialHeight = (await panel.boundingBox())!.height;
+  expect(initialHeight).toBe((await page.locator('.version-panel').boundingBox())!.height);
+  await page.locator('.attribute-table tbody tr').last().scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.locator('.exit-edit').click();
+  await expect
+    .poll(
+      async () => (await panel.boundingBox())!.height - (await page.locator('.version-panel').boundingBox())!.height,
+    )
+    .toBe(0);
+  const switchedHeight = (await panel.boundingBox())!.height;
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => (await panel.boundingBox())!.height).toBe(switchedHeight);
+});
 
-  const publishFilter = templatePanel.locator('.t-form__item').filter({ hasText: '发布' });
-  const filterItemTops = await templatePanel
-    .locator('.filter-fields .t-form__item')
-    .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
-  expect(filterItemTops).toHaveLength(2);
-  expect(Math.max(...filterItemTops) - Math.min(...filterItemTops)).toBeLessThanOrEqual(1);
-  const keywordFilter = templatePanel.locator('.t-form__item').filter({ hasText: '属性名称' });
-  const keywordFilterWidth = await keywordFilter.evaluate((item) => item.getBoundingClientRect().width);
-  const publishFilterWidth = await publishFilter.evaluate((item) => item.getBoundingClientRect().width);
-  expect(keywordFilterWidth / publishFilterWidth).toBeCloseTo(1.6, 1);
-  const filterControlTops = await templatePanel
-    .locator('.filter-row .t-form__item, .filter-row .t-button')
-    .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
-  expect(filterControlTops).toHaveLength(4);
-  expect(Math.max(...filterControlTops) - Math.min(...filterControlTops)).toBeLessThanOrEqual(1);
-  const filterSpacing = await templatePanel.locator('.filter-row').evaluate((row) => {
-    const keywordLabel = row.querySelector<HTMLElement>('.t-form__item:nth-child(1) .t-form__label');
-    const keywordInput = row.querySelector<HTMLElement>('.t-form__item:nth-child(1) .t-input');
-    const publishItem = row.querySelector<HTMLElement>('.t-form__item:nth-child(2)');
-    const queryButton = row.querySelector<HTMLElement>('.filter-actions .t-button');
-    return keywordLabel && keywordInput && publishItem && queryButton
-      ? {
-          labelWidth: keywordLabel.getBoundingClientRect().width,
-          labelRight: keywordLabel.getBoundingClientRect().right,
-          inputLeft: keywordInput.getBoundingClientRect().left,
-          publishRight: publishItem.getBoundingClientRect().right,
-          queryLeft: queryButton.getBoundingClientRect().left,
-        }
-      : null;
-  });
-  expect(filterSpacing).not.toBeNull();
-  expect(filterSpacing!.labelWidth).toBeGreaterThanOrEqual(72);
-  expect(filterSpacing!.inputLeft).toBeGreaterThanOrEqual(filterSpacing!.labelRight);
-  expect(filterSpacing!.queryLeft).toBeGreaterThan(filterSpacing!.publishRight);
-  await publishFilter.locator('.t-select').click();
-  await page.getByRole('listitem', { name: '已发布' }).click();
-  await templatePanel.getByRole('button', { name: '查询', exact: true }).click();
-  await expect(materialRow).toHaveCount(0);
-  await publishFilter.locator('.t-select').click();
-  await page.getByRole('listitem', { name: '未发布' }).click();
-  await templatePanel.getByRole('button', { name: '查询', exact: true }).click();
-  await expect(materialRow).toBeVisible();
-
-  const materialSwitches = materialRow.locator('.t-switch');
-  await materialSwitches.nth(1).click();
-  await expect(materialSwitches.nth(1)).toHaveClass(/t-is-loading/);
-  await expect(materialSwitches.nth(0)).not.toHaveClass(/t-is-loading/);
-  await expect(materialSwitches.nth(1)).not.toHaveClass(/t-is-loading/);
-
-  const toolbarPosition = await templatePanel.evaluate((panel) => {
-    const filters = panel.querySelector<HTMLElement>('.filter-row')?.getBoundingClientRect();
-    const toolbar = panel.querySelector<HTMLElement>('.template-toolbar')?.getBoundingClientRect();
-    return filters && toolbar ? { filterBottom: filters.bottom, toolbarTop: toolbar.top } : null;
-  });
-  expect(toolbarPosition).not.toBeNull();
-  expect(toolbarPosition!.toolbarTop).toBeGreaterThanOrEqual(toolbarPosition!.filterBottom);
-
-  const positions = await main.locator('.category-template-layout').evaluate((layout) => {
-    const category = layout.querySelector<HTMLElement>('.category-panel')?.getBoundingClientRect();
-    const template = layout.querySelector<HTMLElement>('.template-panel')?.getBoundingClientRect();
-    return category && template ? { categoryRight: category.right, templateLeft: template.left } : null;
-  });
-  expect(positions).not.toBeNull();
-  expect(positions!.categoryRight).toBeLessThanOrEqual(positions!.templateLeft);
-
-  const typography = await categoryPanel.locator('.category-name').evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const style = getComputedStyle(node);
-      return `${style.fontFamily}|${style.fontSize}|${style.fontWeight}|${style.lineHeight}`;
+test('add attributes paginates and retains selections across search and pages', async ({ page }) => {
+  await setup(page);
+  await page.route('**/attribute-options?**', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        message: 'ok',
+        data: Array.from({ length: 12 }, (_, index) => ({
+          id: 200 + index,
+          name: `候选属性${index + 1}`,
+          scope: 'shared',
+          valueType: 'text',
+          status: 'enabled',
+        })),
+      },
     }),
   );
-  expect(new Set(typography).size).toBe(1);
-
-  const categorySearchInput = categoryPanel.getByPlaceholder('请输入分类名称');
-  await categorySearchInput.fill('实木');
-  await categoryPanel.getByRole('button', { name: '搜索', exact: true }).click();
-  await expect(categoryPanel.getByRole('button', { name: '实木茶几', exact: true })).toBeVisible();
-  await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toHaveCount(0);
-  await expect(categoryPanel.locator('.category-node-parent')).toHaveCount(2);
-
-  await categorySearchInput.hover();
-  await categoryPanel.locator('.t-input__suffix-clear').click();
-  await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toBeVisible();
-  await expect(categoryPanel.getByRole('button', { name: '实木茶几', exact: true })).toBeVisible();
-  await expect(categoryPanel.getByText('停用茶几', { exact: true })).toHaveCount(0);
-
-  await categoryPanel.getByRole('button', { name: '岩板茶几', exact: true }).click();
-
-  await expect(categoryPanel.getByRole('button', { name: '岩板茶几', exact: true })).toHaveClass(/active/);
-  await expect(bindButton).toBeEnabled();
-
-  const headers = main.getByRole('columnheader');
-  await expect(headers.nth(3)).toContainText('选项数');
-  await expect(headers.nth(4)).toContainText('属性角色');
-  await expect(headers.nth(5)).toContainText('参与SKU组合');
-  await expect(headers.nth(6)).toContainText('必填');
-  const skuHeaderLayout = await headers.nth(5).evaluate((header) => {
-    const content = header.querySelector<HTMLElement>('.t-table__th-cell-inner') ?? header;
-    const style = getComputedStyle(content);
-    return {
-      width: header.getBoundingClientRect().width,
-      height: content.getBoundingClientRect().height,
-      lineHeight: Number.parseFloat(style.lineHeight),
-    };
-  });
-  expect(skuHeaderLayout.width).toBeGreaterThanOrEqual(156);
-  expect(skuHeaderLayout.height).toBeLessThanOrEqual(skuHeaderLayout.lineHeight + 2);
-  await expect(headers.nth(7)).toContainText('发布');
-  await expect(headers.nth(8)).toContainText('绑定人');
-  await expect(headers.nth(9)).toContainText('绑定时间');
-  await expect(headers.getByText('排序', { exact: true })).toHaveCount(0);
-  const operationColumnWidth = await headers.nth(10).evaluate((header) => header.getBoundingClientRect().width);
-  expect(operationColumnWidth).toBeGreaterThanOrEqual(226);
-  expect(operationColumnWidth).toBeLessThanOrEqual(234);
-  await expect(materialRow).toContainText('韩健');
-  await expect(materialRow.locator('td').nth(3)).toHaveText('1');
-  const materialRoleInput = materialRow.locator('.attribute-role-select').getByRole('textbox');
-  await expect(materialRoleInput).toHaveValue('商品属性');
-
-  await materialRow.locator('td').nth(3).getByText('1', { exact: true }).click();
-  const boundValueViewDialog = page.locator('.t-dialog').filter({ hasText: '已绑定选项值' });
-  await expect(boundValueViewDialog).toBeVisible();
-  await expect(boundValueViewDialog).toContainText('当前属性：材质');
-  await expect(boundValueViewDialog).toContainText('已绑定 1 项');
-  await expect(boundValueViewDialog.locator('tbody tr')).toHaveCount(1);
-  await expect(boundValueViewDialog.locator('tbody tr')).toContainText('岩板1');
-  await expect(boundValueViewDialog.getByRole('checkbox')).toHaveCount(0);
-  const boundValueSearchInput = boundValueViewDialog.getByPlaceholder('请输入选项值');
-  await boundValueSearchInput.fill('板1');
-  await expect(boundValueViewDialog.locator('tbody tr')).toHaveCount(1);
-  await boundValueSearchInput.fill('木');
-  await expect(boundValueViewDialog.getByText('暂无已绑定选项值', { exact: true })).toBeVisible();
-  await expect(boundValueViewDialog.getByText('岩板1', { exact: true })).toHaveCount(0);
-  await boundValueSearchInput.fill('');
-  const removeBoundValueRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/1/values') && request.method() === 'PUT',
-  );
-  await boundValueViewDialog.getByText('移除', { exact: true }).click();
-  const removeBoundValueRequest = await removeBoundValueRequestPromise;
-  expect(removeBoundValueRequest.postDataJSON()).toEqual({ valueIds: [] });
-  await expect(boundValueViewDialog.getByText('暂无已绑定选项值', { exact: true })).toBeVisible();
-  await expect(materialRow.locator('td').nth(3)).toHaveText('0');
-  await boundValueViewDialog.getByRole('button', { name: '关闭', exact: true }).click();
-  await expect(boundValueViewDialog).toBeHidden();
-
-  await materialRow.getByText('绑定选项值', { exact: true }).click();
-  const valueBindingDialog = page.locator('.t-dialog').filter({ hasText: '当前属性：材质' });
-  await expect(valueBindingDialog).toBeVisible();
-  const valueRows = valueBindingDialog.locator('tbody tr');
-  await expect(valueRows).toHaveCount(2);
-  await expect(valueRows.filter({ hasText: '岩板' }).getByRole('checkbox')).not.toBeChecked();
-  await expect(valueRows.filter({ hasText: '玻璃' })).toHaveCount(0);
-  await expect(valueBindingDialog.getByRole('columnheader', { name: '选项编码' })).toHaveCount(0);
-  const valueSearchInput = valueBindingDialog.getByPlaceholder('请输入选项值');
-  await valueSearchInput.fill('木2');
-  await expect(valueRows).toHaveCount(1);
-  await expect(valueRows.filter({ hasText: '实木' })).toBeVisible();
-  await valueRows.filter({ hasText: '实木' }).locator('.t-checkbox').click();
-  await valueSearchInput.fill('');
-  await expect(valueRows).toHaveCount(2);
-  await expect(valueRows.filter({ hasText: '实木' }).getByRole('checkbox')).toBeChecked();
-  await valueRows.filter({ hasText: '岩板' }).locator('.t-checkbox').click();
-  await valueSearchInput.fill('1');
-  await expect(valueRows).toHaveCount(1);
-  await expect(valueRows.filter({ hasText: '岩板1' })).toBeVisible();
-  await valueSearchInput.fill('');
-  const valueBindingRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/1/values') && request.method() === 'PUT',
-  );
-  await valueBindingDialog.getByRole('button', { name: '提交', exact: true }).click();
-  const valueBindingRequest = await valueBindingRequestPromise;
-  const valueBindingPayload = valueBindingRequest.postDataJSON() as { valueIds: number[] };
-  expect(valueBindingPayload.valueIds).toHaveLength(2);
-  expect(valueBindingPayload.valueIds).toEqual(expect.arrayContaining([101, 102]));
-  await expect(valueBindingDialog).toBeHidden();
-  await expect(materialRow.locator('td').nth(3)).toHaveText('2');
-
-  let publishRequestCount = 0;
-  await page.route('**/api/admin/category-attributes/1/publish', async (route) => {
-    publishRequestCount += 1;
-    await route.fallback();
-  });
-  const publishRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/1/publish') && request.method() === 'PUT',
-  );
-  await materialRow.getByText('发布', { exact: true }).click();
-  const publishDialog = page.locator('.t-dialog').filter({ hasText: '是否发布属性“材质”？' });
-  await expect(publishDialog).toBeVisible();
-  expect(publishRequestCount).toBe(0);
-  await publishDialog.getByRole('button', { name: '确认发布', exact: true }).click();
-  await publishRequestPromise;
-  await expect(page.getByText('已发布“材质”', { exact: true })).toBeVisible();
-  expect(publishRequestCount).toBe(1);
-  await expect(materialRow.getByText('已发布', { exact: true })).toHaveCount(1);
-  await expect(materialRow.locator('.t-tag').filter({ hasText: '已发布' })).toHaveClass(/t-tag--success/);
-  await expect(materialRoleInput).toBeDisabled();
-  await expect(materialRow.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
-  await expect(materialRow.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
-  const unpublishButton = materialRow.getByText('取消发布', { exact: true });
-  await expect(unpublishButton).toBeVisible();
-  await expect(unpublishButton).toHaveClass(/t-link--theme-warning/);
-  await expect(unpublishButton).toHaveClass(/t-link--hover-color/);
-  await expect(unpublishButton).not.toHaveClass(/t-link--hover-underline/);
-  const operationButtonTops = await materialRow
-    .locator('.table-actions .t-link')
-    .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().top));
-  expect(operationButtonTops).toHaveLength(3);
-  expect(Math.max(...operationButtonTops) - Math.min(...operationButtonTops)).toBeLessThanOrEqual(1);
-
-  let unpublishRequestCount = 0;
-  await page.route('**/api/admin/category-attributes/1/unpublish', async (route) => {
-    unpublishRequestCount += 1;
-    await route.fallback();
-  });
-  const unpublishRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/1/unpublish') && request.method() === 'PUT',
-  );
-  await materialRow.getByText('取消发布', { exact: true }).click();
-  const unpublishDialog = page.locator('.t-dialog').filter({ hasText: '是否取消发布属性“材质”？' });
-  await expect(unpublishDialog).toBeVisible();
-  expect(unpublishRequestCount).toBe(0);
-  await unpublishDialog.getByRole('button', { name: '确认取消发布', exact: true }).click();
-  await unpublishRequestPromise;
-  await expect(page.getByText('已取消发布“材质”', { exact: true })).toBeVisible();
-  expect(unpublishRequestCount).toBe(1);
-  await expect(materialRow.getByText('未发布', { exact: true })).toHaveCount(1);
-  await expect(materialRow.getByText('发布', { exact: true })).toBeVisible();
-
-  await bindButton.click();
-  const bindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
-  await expect(bindDialog).toBeVisible();
-  const bindTable = bindDialog.locator('.bind-attribute-table');
-  const bindRows = bindTable.locator('tbody tr');
-  await expect(bindDialog.getByText('已选择 0 项', { exact: true })).toBeVisible();
-  await expect(bindRows).toHaveCount(2);
-  await expect(bindRows.nth(0)).toContainText('尺寸');
-  await expect(bindRows.nth(1)).toContainText('颜色');
-  await expect(bindRows.filter({ hasText: '材质' })).toHaveCount(0);
-  await expect(bindRows.filter({ hasText: '停用属性' })).toHaveCount(0);
-  await bindRows.nth(0).locator('.t-checkbox').click();
-  await bindRows.nth(1).locator('.t-checkbox').click();
-  await expect(bindDialog.getByText('已选择 2 项', { exact: true })).toBeVisible();
-  const batchRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/batch') && request.method() === 'POST',
-  );
-  await bindDialog.getByRole('button', { name: '提交', exact: true }).click();
-  const batchRequest = await batchRequestPromise;
-  expect(batchRequest.postDataJSON()).toEqual({ categoryId: 3, attributeIds: [3, 2] });
-  await expect(bindDialog).toBeHidden();
-  const colorRow = main.locator('tbody tr').filter({ hasText: '颜色' });
-  const sizeRow = main.locator('tbody tr').filter({ hasText: '尺寸' });
-  await expect(colorRow).toContainText('当前操作员');
-  await expect(colorRow.getByText('启用', { exact: true })).toHaveCount(0);
-  await expect(colorRow.getByText('未发布', { exact: true })).toHaveCount(1);
-  await expect(sizeRow).toContainText('当前操作员');
-  await expect(sizeRow.locator('td').nth(3)).toHaveText('-');
-  await expect(sizeRow.getByText('启用', { exact: true })).toHaveCount(0);
-  await expect(sizeRow.getByText('未发布', { exact: true })).toHaveCount(1);
-  const colorRoleSelect = colorRow.locator('.attribute-role-select');
-  const sizeRoleSelect = sizeRow.locator('.attribute-role-select');
-  const colorRoleInput = colorRoleSelect.getByRole('textbox');
-  const sizeRoleInput = sizeRoleSelect.getByRole('textbox');
-  const sizeSkuSwitch = sizeRow.locator('.t-switch').nth(0);
-  await expect(colorRoleInput).toHaveValue('');
-  await expect(sizeRoleInput).toHaveValue('');
-  await expect(sizeSkuSwitch).toHaveClass(/t-is-disabled/);
-
-  await colorRow.getByText('发布', { exact: true }).click();
-  await expect(page.locator('.t-message').filter({ hasText: '请选择属性角色' })).toBeVisible();
-
-  const salesRoleResponsePromise = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/admin/category-attributes/2') &&
-      response.request().method() === 'PUT' &&
-      response.request().postDataJSON().attributeRole === 'sales',
-  );
-  await sizeRoleSelect.click();
-  await page.getByRole('listitem', { name: '销售属性', exact: true }).click();
-  const salesRoleResponse = await salesRoleResponsePromise;
-  expect(salesRoleResponse.request().postDataJSON()).toMatchObject({ attributeRole: 'sales', skuFlag: false });
-  await expect(sizeRoleInput).toHaveValue('销售属性');
-  await expect(sizeRoleSelect.locator('.t-loading')).toHaveCount(0);
-  await sizeRoleSelect.hover();
-  await expect(sizeRoleSelect.locator('.t-input__suffix-clear')).toHaveCount(0);
-  await expect(sizeSkuSwitch).not.toHaveClass(/t-is-disabled/);
-
-  const skuRequestPromise = page.waitForRequest(
-    (request) =>
-      request.url().endsWith('/api/admin/category-attributes/2') &&
-      request.method() === 'PUT' &&
-      request.postDataJSON().skuFlag === true,
-  );
-  await sizeSkuSwitch.click();
-  await skuRequestPromise;
-  await expect(sizeSkuSwitch).toHaveClass(/t-is-checked/);
-
-  let roleChangeRequestCount = 0;
-  await page.route('**/api/admin/category-attributes/2', async (route) => {
-    if (route.request().method() === 'PUT') roleChangeRequestCount += 1;
-    await route.fallback();
-  });
-  const productRoleRequestPromise = page.waitForRequest(
-    (request) =>
-      request.url().endsWith('/api/admin/category-attributes/2') &&
-      request.method() === 'PUT' &&
-      request.postDataJSON().attributeRole === 'product',
-  );
-  await sizeRoleSelect.click();
-  await page.getByRole('listitem', { name: '商品属性', exact: true }).click();
-  const roleChangeDialog = page.locator('.t-dialog').filter({ hasText: '切换为商品属性后将关闭“参与SKU组合”' });
-  await expect(roleChangeDialog).toBeVisible();
-  expect(roleChangeRequestCount).toBe(0);
-  await roleChangeDialog.getByRole('button', { name: '确认修改', exact: true }).click();
-  const productRoleRequest = await productRoleRequestPromise;
-  expect(productRoleRequest.postDataJSON()).toMatchObject({ attributeRole: 'product', skuFlag: false });
-  expect(roleChangeRequestCount).toBe(1);
-  await expect(sizeRoleInput).toHaveValue('商品属性');
-  await expect(sizeSkuSwitch).not.toHaveClass(/t-is-checked/);
-  await expect(sizeSkuSwitch).toHaveClass(/t-is-disabled/);
-
-  const tableRows = main.locator('tbody tr');
-  await expect(tableRows.nth(0)).toContainText('材质');
-  await expect(tableRows.nth(1)).toContainText('尺寸');
-  await expect(tableRows.nth(2)).toContainText('颜色');
-  await expect(materialRow.locator('.t-table__handle-draggable .binding-drag-icon')).toBeVisible();
-  await colorRow.locator('.t-table__handle-draggable').dragTo(sizeRow.locator('.t-table__handle-draggable'));
-  await expect(tableRows.nth(1)).toContainText('颜色');
-  await expect(tableRows.nth(2)).toContainText('尺寸');
-
-  await bindButton.click();
-  const updatedBindDialog = page.locator('.t-dialog').filter({ hasText: '商品分类：' });
-  const updatedSizeRow = updatedBindDialog.locator('tbody tr').filter({ hasText: '尺寸' });
-  await expect(updatedSizeRow.getByRole('checkbox')).toBeChecked();
-  await updatedSizeRow.locator('.t-checkbox').click();
-  const unbindRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/2') && request.method() === 'DELETE',
-  );
-  await updatedBindDialog.getByRole('button', { name: '提交', exact: true }).click();
-  await unbindRequestPromise;
-  await expect(sizeRow).toHaveCount(0);
-
-  const removeRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/api/admin/category-attributes/3') && request.method() === 'DELETE',
-  );
-  await colorRow.getByText('移除', { exact: true }).click();
-  const removeDialog = page.locator('.t-dialog').filter({ hasText: '是否移除属性“颜色”？' });
-  await expect(removeDialog).toBeVisible();
-  await removeDialog.getByRole('button', { name: '确认移除', exact: true }).click();
-  await removeRequestPromise;
-  await expect(page.getByText('已移除“颜色”', { exact: true })).toBeVisible();
-  await expect(colorRow).toHaveCount(0);
-
-  await expect(templatePanel.locator('.zdm-admin-pagination')).toBeVisible();
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  await page.getByRole('button', { name: '添加属性', exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.getByRole('columnheader', { name: '来源', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('columnheader', { name: '输入类型', exact: true })).toBeVisible();
+  await expect(dialog.locator('tbody tr')).toHaveCount(10);
+  const firstRow = dialog.locator('tbody tr').first();
+  await firstRow.getByText('候选属性1', { exact: true }).click();
+  await expect(firstRow.getByRole('checkbox')).toBeChecked();
+  await firstRow.getByText('文本输入', { exact: true }).click();
+  await expect(firstRow.getByRole('checkbox')).not.toBeChecked();
+  await firstRow.locator('.t-checkbox').click();
+  await expect(firstRow.getByRole('checkbox')).toBeChecked();
+  await dialog.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await expect(dialog.locator('tbody tr')).toHaveCount(2);
+  await dialog.locator('tbody tr').first().locator('.t-checkbox').click();
+  await dialog.getByPlaceholder('搜索属性名称').fill('候选属性12');
+  await expect(dialog.locator('tbody tr')).toHaveCount(1);
+  await expect(dialog.locator('tbody tr')).toContainText('文本输入');
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(page.locator('.attribute-table')).toContainText('候选属性1');
+  await expect(page.locator('.attribute-table')).toContainText('候选属性11');
 });
 
-test('每个类目最多只能开启4个SKU组合属性', async ({ page }) => {
-  const productAttributes = Array.from({ length: 5 }, (_, index) => ({
-    id: index + 1,
-    scope: 'shared',
-    name: `SKU属性${index + 1}`,
-    valueType: 'select',
-    status: 'enabled',
-    createdAt: `2026-08-04T${String(index + 9).padStart(2, '0')}:00:00`,
+test('publish highlights missing roles and dropdown options', async ({ page }) => {
+  const versions = await setup(page);
+  const draft = versions.find((version) => version.id === 2)!;
+  const row = (draft.content as Record<string, unknown>[])[0]!;
+  row.attributeRole = '';
+  row.options = [];
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  const table = page.locator('.attribute-table');
+  await expect(table.getByRole('columnheader', { name: '属性角色 *', exact: true })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: '选项值 *', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '发布新版本', exact: true }).click();
+  await expect(page.getByText('请完善属性角色和选项值后发布', { exact: true })).toBeVisible();
+  await expect(table.locator('.t-select .t-input')).toHaveClass(/t-is-error/);
+  await expect(table.locator('.t-link--theme-danger').filter({ hasText: /^0$/ })).toBeVisible();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  await page.getByRole('button', { name: '添加属性', exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  await dialog.getByText('尺寸', { exact: true }).click();
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  const addedRole = table.locator('tbody tr').last().locator('.t-select .t-input');
+  await expect(addedRole).not.toHaveClass(/t-is-error/);
+  await page.getByRole('button', { name: '发布新版本', exact: true }).click();
+  await expect(addedRole).toHaveClass(/t-is-error/);
+});
+
+test('option values support row selection and pagination without applying on cancel', async ({ page }) => {
+  await setup(page);
+  await page.route('**/value-options?**', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: Array.from({ length: 12 }, (_, i) => ({ id: 100 + i, value: `选项${i + 1}`, code: `code${i + 1}` })),
+      },
+    }),
+  );
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  const link = page.locator('.attribute-table tbody tr').first().locator('.t-link').first();
+  const originalCount = await link.innerText();
+  await link.click();
+  const dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.locator('tbody tr')).toHaveCount(10);
+  await dialog.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await dialog.getByText('选项11', { exact: true }).click();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(link).toHaveText(originalCount);
+  await link.click();
+  await dialog.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await dialog.getByText('选项11', { exact: true }).click();
+  await dialog.getByPlaceholder('搜索选项值').fill('选项12');
+  await expect(dialog.locator('tbody tr')).toHaveCount(1);
+  await dialog.getByText('选项12', { exact: true }).click();
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(link).toHaveText(String(Number(originalCount) + 2));
+});
+
+test('exit edit waits for auto-save before returning to published view', async ({ page }) => {
+  const versions = await setup(page);
+  await page.goto('/category-attribute-template');
+  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
+  await page.waitForLoadState('networkidle');
+  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(page.locator('.exit-edit')).toHaveText('草稿箱');
+  await expect(page.locator('.version-panel .t-tabs')).toHaveCount(0);
+  await page.locator('.attribute-table .required-switch').first().click();
+  await page.locator('.exit-edit').click();
+  await expect(
+    page.getByText('已发布版本仅可调整属性展示顺序，其他配置不可修改，如需调整配置，需创建新版本草稿，并发布新版本。'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: '保存草稿', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(page.locator('.attribute-table .required-switch').first()).not.toHaveClass(/t-is-checked/);
+  expect((versions.find((v) => v.id === 2)!.content as Array<{ requiredFlag: boolean }>)[0]!.requiredFlag).toBe(false);
+});
+
+test('refresh opens published view rather than automatically editing the existing draft', async ({ page }) => {
+  await setup(page);
+  await page.goto('/category-attribute-template');
+  await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toBeVisible();
+  await expect(page.locator('.exit-edit')).toHaveCount(0);
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(page.locator('.exit-edit')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toBeVisible();
+  await expect(page.locator('.exit-edit')).toHaveCount(0);
+  await expect(
+    page.getByText('已发布版本仅可调整属性展示顺序，其他配置不可修改，如需调整配置，需创建新版本草稿，并发布新版本。'),
+  ).toBeVisible();
+});
+
+test('new attribute drafts start empty without a base version', async ({ page }) => {
+  const versions = await setup(page);
+  versions.splice(
+    versions.findIndex((version) => version.id === 2),
+    1,
+  );
+  await page.goto('/category-attribute-template');
+  await page.getByRole('button', { name: '创建新版本草稿', exact: true }).click();
+  await expect(page.locator('.exit-edit')).toHaveText('草稿箱');
+  await expect(page.locator('.draft-version-info')).toHaveText('待发布版本 V2');
+  const draft = versions.find((version) => version.state === 'draft')!;
+  expect(draft.baseId).toBeUndefined();
+  expect(draft.content).toEqual([]);
+});
+
+test('published metadata and history use creation labels and formatted publish time, hidden in draft', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
+  const page = await context.newPage();
+  await setup(page);
+  await page.goto('/category-attribute-template');
+  const metadata = page.locator('.template-metadata');
+  await expect(metadata).toContainText('创建人');
+  await expect(metadata).toContainText('创建时间');
+  await expect(metadata).toContainText('2026/09/08 09:00');
+  await page.getByRole('button', { name: '版本记录', exact: true }).click();
+  const drawer = page.locator('.t-drawer');
+  await expect(drawer.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
+  await expect(drawer.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
+  await expect(drawer.getByRole('cell', { name: '2026/09/08 09:00', exact: true })).toBeVisible();
+  await drawer.getByText('查看', { exact: true }).click();
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(metadata).toHaveCount(0);
+  await context.close();
+});
+
+test('published option values show all rows without search pagination or footer actions', async ({ page }) => {
+  const versions = await setup(page);
+  const options = Array.from({ length: 12 }, (_, i) => ({ id: 100 + i, value: `只读选项${i + 1}`, code: `${i + 1}` }));
+  (versions[0]!.content as Array<{ options: typeof options }>)[0]!.options = options;
+  await page.goto('/category-attribute-template');
+  await page.locator('.t-table__body').getByText('12', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.getByText('只读选项12', { exact: true })).toBeVisible();
+  await expect(dialog.getByPlaceholder('搜索选项值')).toHaveCount(0);
+  await expect(dialog.locator('.t-pagination')).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '取消', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '提交', exact: true })).toHaveCount(0);
+});
+
+test('attribute list and draft show serial numbers and support dragging', async ({ page }) => {
+  await setup(page);
+  await page.goto('/category-attribute-template');
+  const table = page.locator('.attribute-table');
+  await expect(table.getByRole('columnheader', { name: '序号', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(table.getByRole('columnheader', { name: '序号', exact: true })).toBeVisible();
+  await expect(table.locator('.t-icon-move')).toBeVisible();
+});
+
+test('published drag order saves automatically and survives refresh', async ({ page }) => {
+  const versions = await setup(page);
+  const version = versions[0]!;
+  const original = (version.content as Array<Record<string, unknown>>)[0]!;
+  version.content = Array.from({ length: 12 }, (_, i) => ({
+    ...original,
+    attributeId: 1000 + i,
+    name: `拖拽属性${i + 1}`,
+    sortOrder: i + 1,
   }));
-  const categoryAttributes = productAttributes.map((attribute, index) => ({
-    id: index + 1,
-    categoryId: 3,
-    attributeId: attribute.id,
-    attributeRole: 'sales',
-    requiredFlag: false,
+  await page.goto('/category-attribute-template');
+  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  const handles = page.locator('.attribute-table .t-icon-move');
+  await handles.first().dragTo(handles.nth(1), { targetPosition: { x: 8, y: 13 } });
+  await expect(page.getByText('已调整“字段显示顺序”', { exact: true })).toBeVisible();
+  expect((version.content as Array<{ attributeId: number }>)[10]!.attributeId).toBe(1011);
+  expect(version.versionNo).toBe(1);
+  await page.reload();
+  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await expect(page.locator('.attribute-table tbody tr').first()).toContainText('拖拽属性12');
+  await expect(page.locator('.attribute-table tbody tr').first().locator('td').nth(1)).toHaveText('11');
+});
+
+test('failed display order save restores rows', async ({ page }) => {
+  const versions = await setup(page);
+  const original = (versions[0]!.content as Array<Record<string, unknown>>)[0]!;
+  versions[0]!.content = [original, { ...original, attributeId: 11, name: '第二属性', sortOrder: 2 }];
+  await page.route('**/api/admin/template-versions/*/display-order', (route) =>
+    route.fulfill({ status: 400, json: { code: 400, message: '排序保存失败' } }),
+  );
+  await page.goto('/category-attribute-template');
+  const handles = page.locator('.attribute-table .t-icon-move');
+  await handles.first().dragTo(handles.nth(1), { targetPosition: { x: 8, y: 13 } });
+  await expect(page.getByText('调整“字段显示顺序”失败：排序保存失败', { exact: true })).toBeVisible();
+  await expect(page.locator('.attribute-table tbody tr').first()).toContainText('颜色');
+});
+
+test('view-only users cannot drag published attributes', async ({ page }) => {
+  await setup(page, ['admin.product-data-center.category-attribute-template.finished.attributes.view']);
+  await page.goto('/category-attribute-template');
+  await expect(page.locator('.attribute-table').getByText('颜色', { exact: true })).toBeVisible();
+  await expect(page.locator('.attribute-table .t-icon-move')).toHaveCount(0);
+});
+
+test('auto-save serializes rapid changes and publish waits for the latest revision', async ({ page }) => {
+  const versions = await setup(page);
+  const revisions: number[] = [];
+  let releaseFirst!: () => void;
+  const firstHeld = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  await page.route('**/api/admin/template-versions/2', async (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback();
+    revisions.push(route.request().postDataJSON().revision);
+    if (revisions.length === 1) await firstHeld;
+    await route.fallback();
+  });
+  await page.goto('/category-attribute-template');
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  const toggle = page.locator('.attribute-table .required-switch').first();
+  await toggle.click();
+  await expect.poll(() => revisions.length).toBe(1);
+  await toggle.click();
+  await page.getByRole('button', { name: '发布新版本', exact: true }).click();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  releaseFirst();
+  await expect(page.locator('.t-dialog:visible')).toBeVisible();
+  expect(revisions).toEqual([0, 1]);
+  const draft = versions.find((v) => v.id === 2)!;
+  expect((draft.content as Array<{ requiredFlag: boolean }>)[0]!.requiredFlag).toBe(true);
+  await page.locator('.t-dialog:visible').getByRole('button', { name: '确认发布', exact: true }).click();
+  await expect(page.getByText('已发布“新版本”', { exact: true })).toBeVisible();
+  expect(draft.revision).toBe(3);
+});
+
+test('auto-save failure preserves edits and navigation retries saving before refresh', async ({ page }) => {
+  const versions = await setup(page);
+  let fail = true;
+  await page.route('**/api/admin/template-versions/2', (route) => {
+    if (route.request().method() === 'PUT' && fail)
+      return route.fulfill({ status: 500, json: { code: 500, message: '暂时无法保存' } });
+    return route.fallback();
+  });
+  await page.goto('/category-attribute-template');
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await page.locator('.attribute-table .required-switch').first().click();
+  await expect(page.getByText('保存“草稿”失败：暂时无法保存', { exact: true })).toBeVisible();
+  await expect(page.locator('.attribute-table .required-switch').first()).not.toHaveClass(/t-is-checked/);
+  expect((versions[1]!.content as Array<{ requiredFlag: boolean }>)[0]!.requiredFlag).toBe(true);
+  fail = false;
+  await page.locator('.exit-edit').click();
+  await expect(page.getByText('已保存“草稿”', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(page.locator('.attribute-table .required-switch').first()).not.toHaveClass(/t-is-checked/);
+  await expect(page.getByText('尚未保存', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.draft-save-status')).toHaveCount(0);
+  await expect(page.locator('.draft-status').getByText('已保存', { exact: true })).toHaveCount(0);
+  const status = await page.locator('.draft-status').boundingBox();
+  const add = await page.getByRole('button', { name: '添加属性', exact: true }).boundingBox();
+  const publish = await page.getByRole('button', { name: '发布新版本', exact: true }).boundingBox();
+  expect(status!.x).toBeLessThan(add!.x);
+  expect(add!.x).toBeLessThan(publish!.x);
+  await expect(page.locator('.attribute-summary')).toHaveCount(0);
+});
+
+test('history view closes the drawer and shows the chosen version metadata and attributes', async ({ page }) => {
+  const versions = await setup(page);
+  const latest = structuredClone(versions[0]!);
+  latest.id = 3;
+  latest.versionNo = 2;
+  latest.publishedByName = '新版创建人';
+  latest.publishedAt = '2026-09-09T11:00:00+08:00';
+  latest.content = [];
+  versions.unshift(latest);
+  await page.goto('/category-attribute-template');
+  await expect(page.locator('.template-metadata')).toContainText('当前版本 V2');
+  await page.getByRole('button', { name: '版本记录', exact: true }).click();
+  const drawer = page.locator('.t-drawer:visible');
+  await drawer
+    .getByRole('row')
+    .filter({ has: page.getByRole('cell', { name: 'V1', exact: true }) })
+    .getByText('查看', { exact: true })
+    .click();
+  await expect(drawer).not.toHaveClass(/t-drawer--open/);
+  await expect(page.locator('.template-metadata')).toContainText('历史版本 V1');
+  await expect(page.locator('.template-metadata')).toContainText('2026/09/08 09:00');
+  await expect(page.locator('.template-metadata')).not.toContainText('新版创建人');
+  await expect(page.locator('.attribute-table').getByText('颜色', { exact: true })).toBeVisible();
+});
+
+test('specification switches enforce a template-wide limit and persist with the attribute draft', async ({ page }) => {
+  const versions = await setup(page);
+  const draft = versions.find((version) => version.id === 2)!;
+  const original = (draft.content as Record<string, unknown>[])[0]!;
+  draft.content = Array.from({ length: 12 }, (_, index) => ({
+    ...original,
+    attributeId: 1000 + index,
+    name: `构建测试${index + 1}`,
+    attributeRole: index === 4 ? 'product' : index === 5 ? '' : 'sales',
     skuFlag: index < 4,
     sortOrder: index + 1,
-    status: 'enabled',
-    publishStatus: 'unpublished',
-    createdByAccountId: 1,
-    createdByName: '韩健',
-    createdAt: '2026-08-04T09:30:00',
   }));
-  let updateRequestCount = 0;
-
-  await page.route('**/api/admin/product-attributes', (route) => fulfillJson(route, productAttributes));
-  await page.route('**/api/admin/category-attributes', (route) => fulfillJson(route, categoryAttributes));
-  await page.route(/\/api\/admin\/category-attributes\/\d+$/, async (route) => {
-    if (route.request().method() === 'PUT') updateRequestCount += 1;
-    await route.fallback();
-  });
-
   await page.goto('/category-attribute-template');
-  const fifthRow = page.getByRole('main').locator('tbody tr').filter({ hasText: 'SKU属性5' });
-  await expect(fifthRow.locator('.t-switch').nth(0)).not.toHaveClass(/t-is-checked/);
-  await fifthRow.locator('.t-switch').nth(0).click();
-  await expect(page.locator('.t-message').filter({ hasText: '参与SKU组合的属性最多只能开启4个' })).toBeVisible();
-  await expect(fifthRow.locator('.t-switch').nth(0)).not.toHaveClass(/t-is-checked/);
-  expect(updateRequestCount).toBe(0);
-});
-
-test('标准选项属性未绑定选项值时禁止发布', async ({ page }) => {
-  await page.route('**/api/admin/category-attributes/1/values', (route) =>
-    fulfillJson(route, [
-      { id: 101, value: '岩板', code: 'SLAB', status: 'enabled', selected: false },
-      { id: 102, value: '实木', code: 'WOOD', status: 'enabled', selected: false },
-    ]),
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  const table = page.locator('.attribute-table');
+  const headers = await table.locator('thead th').allTextContents();
+  const specificationColumn = headers.findIndex((text) => text.includes('构建规格'));
+  expect(headers.findIndex((text) => text.includes('构建规格'))).toBe(
+    headers.findIndex((text) => text.includes('属性角色')) + 1,
   );
-  let publishRequestCount = 0;
-  await page.route('**/api/admin/category-attributes/1/publish', async (route) => {
-    publishRequestCount += 1;
-    await route.fallback();
+  await expect(table.locator('tbody tr').nth(4).locator('td').nth(specificationColumn)).toHaveText('-');
+  await expect(table.locator('tbody tr').nth(5).locator('td').nth(specificationColumn)).toHaveText('-');
+  const seventh = table.locator('tbody tr').nth(6).locator('.specification-control');
+  await expect(seventh.locator('.t-switch')).toHaveClass(/t-is-disabled/);
+  await seventh.click();
+  await expect(page.getByText('最多选择4个属性构建规格', { exact: true })).toBeVisible();
+  expect((draft.content as Record<string, unknown>[]).filter((row) => row.skuFlag)).toHaveLength(4);
+  await table.locator('.specification-control .t-switch').first().click();
+  await expect(seventh.locator('.t-switch')).not.toHaveClass(/t-is-disabled/);
+  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await table.locator('.specification-control .t-switch').last().click();
+  await expect.poll(() => (draft.content as Record<string, unknown>[])[11]?.skuFlag).toBe(true);
+  await expect(table.locator('.specification-control .t-switch').first()).toHaveClass(/t-is-disabled/);
+  await page.locator('.zdm-admin-pagination').getByText('1', { exact: true }).click();
+  const secondRole = table.locator('tbody tr').nth(1).locator('.t-select');
+  await secondRole.click();
+  await page.locator('.t-select__list:visible').getByText('商品属性', { exact: true }).click();
+  await expect.poll(() => (draft.content as Record<string, unknown>[])[1]?.skuFlag).toBe(false);
+  await expect(table.locator('tbody tr').nth(1).locator('td').nth(specificationColumn)).toHaveText('-');
+  await expect.poll(() => (draft.content as Record<string, unknown>[]).filter((row) => row.skuFlag).length).toBe(3);
+  await page.reload();
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(table.locator('.specification-control .t-switch').first()).not.toHaveClass(/t-is-checked/);
+  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await expect(table.locator('.specification-control .t-switch').last()).toHaveClass(/t-is-checked/);
+});
+
+test('create permission includes continuing and all draft controls without history permission', async ({ page }) => {
+  const prefix = 'admin.product-data-center.category-attribute-template.finished.attributes.';
+  await setup(page, [prefix + 'view', prefix + 'create']);
+  await page.goto('/category-attribute-template');
+  await expect(page.getByRole('button', { name: '版本记录', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await expect(page.getByRole('button', { name: '添加属性', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '发布新版本', exact: true })).toBeVisible();
+  await expect(page.getByText('移除', { exact: true })).toBeVisible();
+  await expect(page.locator('.attribute-table .required-switch')).toBeVisible();
+});
+
+test('history permission gives version records but no draft access', async ({ page }) => {
+  const prefix = 'admin.product-data-center.category-attribute-template.finished.attributes.';
+  await setup(page, [prefix + 'view', prefix + 'history']);
+  await page.goto('/category-attribute-template');
+  await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '版本记录', exact: true }).click();
+  await expect(page.locator('.t-drawer')).toBeVisible();
+  await expect(page.locator('.t-drawer').getByText('复制', { exact: true })).toHaveCount(0);
+});
+
+test('copy after view confirms before replacing a draft and opens the complete copied configuration', async ({
+  page,
+}) => {
+  const versions = await setup(page);
+  const original = structuredClone(versions[0]!);
+  const draft = versions[1]!;
+  draft.content = [];
+  let copies = 0;
+  await page.route('**/api/admin/template-versions/1/copy', async (route) => {
+    copies++;
+    expect(route.request().postDataJSON()).toEqual({ draftId: 2, revision: 0 });
+    Object.assign(draft, { content: structuredClone(original.content), revision: 1 });
+    await route.fulfill({ json: { code: 0, message: 'ok', data: draft } });
   });
-
   await page.goto('/category-attribute-template');
-  const row = page.getByRole('main').locator('tbody tr').filter({ hasText: '材质' }).first();
-  await row.getByText('发布', { exact: true }).click();
-
-  await expect(page.locator('.t-message').filter({ hasText: '请先绑定选项值' })).toBeVisible();
-  await expect(page.locator('.t-dialog').filter({ hasText: '是否发布属性“材质”？' })).toHaveCount(0);
-  expect(publishRequestCount).toBe(0);
+  await page.getByRole('button', { name: '版本记录', exact: true }).click();
+  const links = page.locator('.t-drawer tbody .t-link');
+  await expect(links).toHaveText(['查看', '复制']);
+  await page.getByText('复制', { exact: true }).click();
+  await expect(page.getByText('当前分类已有草稿，复制后将覆盖草稿中的全部配置，是否继续？')).toBeVisible();
+  expect(copies).toBe(0);
+  await page.getByRole('button', { name: '确认复制', exact: true }).click();
+  await expect(page.getByRole('button', { name: '添加属性', exact: true })).toBeVisible();
+  await expect(page.locator('.attribute-table')).toContainText('颜色');
+  await expect(page.locator('.t-drawer')).not.toHaveClass(/t-drawer--open/);
+  expect(copies).toBe(1);
+  expect(versions[0]).toEqual(original);
 });
 
-test('keeps template data visible while hiding ungranted binding operations', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'zdm-admin-user',
-      JSON.stringify({
-        id: 20,
-        name: '模板查看员',
-        phone: '15926620020',
-        roles: ['CATEGORY_ATTRIBUTE_VIEWER'],
-        permissions: ['admin.product-data-center.category-attribute-template.finished.view'],
-        dataPermission: 'self',
-      }),
-    );
+test('copy creates a draft immediately when none exists', async ({ page }) => {
+  const versions = await setup(page);
+  versions.splice(1, 1);
+  await page.route('**/api/admin/template-versions/1/copy', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({});
+    const copied = { ...structuredClone(versions[0]), id: 3, versionNo: null, state: 'draft', revision: 1 };
+    versions.push(copied);
+    await route.fulfill({ json: { code: 0, message: 'ok', data: copied } });
   });
-
   await page.goto('/category-attribute-template');
-  const main = page.getByRole('main');
-  await expect(main.locator('.scope-controls .t-tabs')).toHaveCount(0);
-  await expect(main.getByRole('button', { name: '岩板茶几', exact: true })).toHaveClass(/active/);
-
-  const row = main.locator('tbody tr').filter({ hasText: '材质' }).first();
-  await expect(row).toContainText('韩健');
-  await expect(main.getByRole('button', { name: '绑定属性' })).toHaveCount(0);
-  await expect(row.locator('.t-switch')).toHaveCount(2);
-  await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
-  await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
-  await expect(row.locator('.attribute-role-select').getByRole('textbox')).toBeDisabled();
-  await expect(row.locator('.t-table__handle-draggable')).toHaveCount(0);
-  await expect(row.getByText('启用', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('未发布', { exact: true })).toHaveCount(1);
-  await expect(row.getByText('发布', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('取消发布', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('移除', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('删除', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('绑定选项值', { exact: true })).toHaveCount(0);
-  await expect(row.locator('.table-actions')).toHaveText('-');
-});
-
-test('enables only the granted category attribute field control', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'zdm-admin-user',
-      JSON.stringify({
-        id: 21,
-        name: '模板属性角色管理员',
-        phone: '15926620021',
-        roles: ['CATEGORY_ATTRIBUTE_ROLE_EDITOR'],
-        permissions: [
-          'admin.product-data-center.category-attribute-template.finished.view',
-          'admin.product-data-center.category-attribute-template.finished.attribute-role',
-        ],
-        dataPermission: 'self',
-      }),
-    );
-  });
-
-  await page.goto('/category-attribute-template');
-  const row = page.getByRole('main').locator('tbody tr').filter({ hasText: '材质' }).first();
-  await expect(row.locator('.attribute-role-select').getByRole('textbox')).toBeEnabled();
-  await expect(row.locator('.t-switch').nth(0)).toHaveClass(/t-is-disabled/);
-  await expect(row.locator('.t-switch').nth(1)).toHaveClass(/t-is-disabled/);
-  await expect(row.getByText('绑定选项值', { exact: true })).toHaveCount(0);
-});
-
-test('keeps used roles locked without an enable or disable control', async ({ page }) => {
-  await page.route('**/api/admin/category-attributes', (route) =>
-    fulfillJson(route, [
-      {
-        id: 1,
-        categoryId: 3,
-        attributeId: 1,
-        attributeRole: 'product',
-        requiredFlag: true,
-        skuFlag: false,
-        publishStatus: 'unpublished',
-        usageCount: 2,
-      },
-    ]),
-  );
-  await page.goto('/category-attribute-template');
-  const panel = page.locator('.template-panel');
-  const row = panel.getByRole('row').filter({ hasText: '材质' });
-  await expect(row.locator('.attribute-role-select input')).toBeDisabled();
-  await expect(row.getByText('移除', { exact: true })).toHaveCount(0);
-  await expect(panel.getByRole('columnheader', { name: '状态', exact: true })).toHaveCount(0);
-  await expect(panel.locator('.t-form__item').filter({ hasText: '状态' })).toHaveCount(0);
-  await expect(row.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('启用', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('发布', { exact: true })).toBeVisible();
-});
-
-test('validates an empty attribute role only after publishing is requested', async ({ page }) => {
-  await page.route('**/api/admin/category-attributes', (route) =>
-    fulfillJson(route, [
-      {
-        id: 1,
-        categoryId: 3,
-        attributeId: 1,
-        attributeRole: null,
-        requiredFlag: false,
-        skuFlag: false,
-        status: 'enabled',
-        publishStatus: 'unpublished',
-        usageCount: 0,
-      },
-    ]),
-  );
-  await page.goto('/category-attribute-template');
-  const row = page.locator('.template-panel').getByRole('row').filter({ hasText: '材质' });
-  const roleInput = row.locator('.attribute-role-select .t-input');
-  await expect(roleInput).not.toHaveClass(/t-is-error/);
-  await row.getByText('发布', { exact: true }).click();
-  await expect(roleInput).toHaveClass(/t-is-error/);
-  await expect(page.getByText('请选择属性角色', { exact: true })).toBeVisible();
-  await row.locator('.attribute-role-select').click();
-  await page.getByText('商品属性', { exact: true }).last().click();
-  await expect(roleInput).not.toHaveClass(/t-is-error/);
+  await page.getByRole('button', { name: '版本记录', exact: true }).click();
+  await page.getByText('复制', { exact: true }).click();
+  await expect(page.getByRole('button', { name: '添加属性', exact: true })).toBeVisible();
+  await expect(page.locator('.attribute-table')).toContainText('颜色');
+  await expect(page.getByRole('button', { name: '确认复制', exact: true })).toHaveCount(0);
 });

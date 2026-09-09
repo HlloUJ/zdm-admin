@@ -470,30 +470,19 @@ describe('full function catalog', () => {
     );
     expect(categoryAttributePage?.actions).toEqual([]);
     expect(categoryAttributePage?.tabs).toEqual(
-      ['finished', 'accessory'].map((scope, index) => ({
-        label: index === 0 ? '成品现货模板' : '配件模板',
-        value: `admin.product-data-center.category-attribute-template.${scope}`,
+      ['finished', 'accessory'].map((scope) => ({
+        label: scope === 'finished' ? '成品现货模板' : '配件模板',
+        value: `admin.product-data-center.category-attribute-template.${scope}.attributes`,
         actions: [
-          { label: '查看', value: `admin.product-data-center.category-attribute-template.${scope}.view` },
-          { label: '绑定属性', value: `admin.product-data-center.category-attribute-template.${scope}.create` },
+          { label: '查看', value: `admin.product-data-center.category-attribute-template.${scope}.attributes.view` },
           {
-            label: '属性角色',
-            value: `admin.product-data-center.category-attribute-template.${scope}.attribute-role`,
+            label: '创建新版本草稿',
+            value: `admin.product-data-center.category-attribute-template.${scope}.attributes.create`,
           },
           {
-            label: '参与SKU组合',
-            value: `admin.product-data-center.category-attribute-template.${scope}.sku-combination`,
+            label: '版本记录',
+            value: `admin.product-data-center.category-attribute-template.${scope}.attributes.history`,
           },
-          { label: '必填', value: `admin.product-data-center.category-attribute-template.${scope}.required` },
-          {
-            label: '绑定选项值',
-            value: `admin.product-data-center.category-attribute-template.${scope}.bind-values`,
-          },
-          {
-            label: '发布/取消发布',
-            value: `admin.product-data-center.category-attribute-template.${scope}.toggle-publish`,
-          },
-          { label: '移除', value: `admin.product-data-center.category-attribute-template.${scope}.delete` },
         ],
       })),
     );
@@ -597,22 +586,12 @@ describe('full function catalog', () => {
       'admin.product-data-center.attribute-value.accessory.create',
       'admin.product-data-center.attribute-value.accessory.toggle-status',
       'admin.product-data-center.attribute-value.accessory.delete',
-      'admin.product-data-center.category-attribute-template.finished.view',
-      'admin.product-data-center.category-attribute-template.finished.create',
-      'admin.product-data-center.category-attribute-template.finished.attribute-role',
-      'admin.product-data-center.category-attribute-template.finished.sku-combination',
-      'admin.product-data-center.category-attribute-template.finished.required',
-      'admin.product-data-center.category-attribute-template.finished.bind-values',
-      'admin.product-data-center.category-attribute-template.finished.toggle-publish',
-      'admin.product-data-center.category-attribute-template.finished.delete',
-      'admin.product-data-center.category-attribute-template.accessory.view',
-      'admin.product-data-center.category-attribute-template.accessory.create',
-      'admin.product-data-center.category-attribute-template.accessory.attribute-role',
-      'admin.product-data-center.category-attribute-template.accessory.sku-combination',
-      'admin.product-data-center.category-attribute-template.accessory.required',
-      'admin.product-data-center.category-attribute-template.accessory.bind-values',
-      'admin.product-data-center.category-attribute-template.accessory.toggle-publish',
-      'admin.product-data-center.category-attribute-template.accessory.delete',
+      'admin.product-data-center.category-attribute-template.finished.attributes.view',
+      'admin.product-data-center.category-attribute-template.finished.attributes.create',
+      'admin.product-data-center.category-attribute-template.finished.attributes.history',
+      'admin.product-data-center.category-attribute-template.accessory.attributes.view',
+      'admin.product-data-center.category-attribute-template.accessory.attributes.create',
+      'admin.product-data-center.category-attribute-template.accessory.attributes.history',
       'admin.product-data-center.markup-configuration.finished.view',
       'admin.product-data-center.markup-configuration.finished.guide-price.edit',
       'admin.product-data-center.markup-configuration.finished.create',

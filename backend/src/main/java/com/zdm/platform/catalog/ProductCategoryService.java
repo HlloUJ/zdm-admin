@@ -1,6 +1,5 @@
 package com.zdm.platform.catalog;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
@@ -21,15 +20,12 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
 
   private final CurrentIdentityProvider identityProvider;
   private final JdbcTemplate jdbcTemplate;
-  private final CategoryAttributeMapper categoryAttributeMapper;
 
   public ProductCategoryService(
       CurrentIdentityProvider identityProvider,
-      JdbcTemplate jdbcTemplate,
-      CategoryAttributeMapper categoryAttributeMapper) {
+      JdbcTemplate jdbcTemplate) {
     this.identityProvider = identityProvider;
     this.jdbcTemplate = jdbcTemplate;
-    this.categoryAttributeMapper = categoryAttributeMapper;
   }
 
   public List<ProductCategory> listNewestFirst() {
@@ -103,8 +99,8 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     if (referencedProductCount != null && referencedProductCount > 0) {
       throw new IllegalArgumentException("该分类已关联商品，不能删除，请先停用该分类");
     }
-    if (categoryAttributeMapper.selectCount(
-        Wrappers.lambdaQuery(CategoryAttribute.class).eq(CategoryAttribute::getCategoryId, id)) > 0) {
+    if (java.util.Objects.requireNonNull(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM category_template_versions WHERE category_id = ?", Long.class, id)) > 0) {
       throw new IllegalArgumentException("该分类已配置发布属性模板，不能删除，请先移除模板配置");
     }
     if (!removeById(id)) {
