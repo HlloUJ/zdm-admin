@@ -24,6 +24,12 @@ public class SlabInventory extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String serialNo;
 
+  @jakarta.validation.constraints.PositiveOrZero(message = "库存不能为负数")
+  private Integer stock;
+
+  public Integer getStock() { return stock; }
+  public void setStock(Integer stock) { this.stock = stock; }
+
   private String warehouse;
   private String publisherType;
   private Long mainImageMediaId;

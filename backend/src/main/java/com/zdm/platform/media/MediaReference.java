@@ -9,6 +9,12 @@ import java.time.LocalDateTime;
 public class MediaReference {
   @TableId(type = IdType.AUTO)
   private Long id;
+  private String referenceKind;
+  private String retentionReason;
+  public String getReferenceKind() { return referenceKind; }
+  public void setReferenceKind(String value) { referenceKind = value; }
+  public String getRetentionReason() { return retentionReason; }
+  public void setRetentionReason(String value) { retentionReason = value; }
   private Long mediaId;
   private String businessDomain;
   private Long businessId;

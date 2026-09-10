@@ -71,6 +71,38 @@ public class MediaStorageService {
     return new StoredMedia(publicId, storageKey, mediaType, mimeType, file.getSize());
   }
 
+  public StoredMedia createHistoryPreview(String storageKey) {
+    try {
+      java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(resolve(storageKey).toFile());
+      if (image == null) {
+        throw new IllegalArgumentException("无法解码图片，需要补充历史预览");
+      }
+      double scale = Math.min(1.0, 1280.0 / Math.max(image.getWidth(), image.getHeight()));
+      int width = Math.max(1, (int) Math.round(image.getWidth() * scale));
+      int height = Math.max(1, (int) Math.round(image.getHeight() * scale));
+      java.awt.image.BufferedImage preview = new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB);
+      java.awt.Graphics2D graphics = preview.createGraphics();
+      try {
+        graphics.setColor(java.awt.Color.WHITE);
+        graphics.fillRect(0, 0, width, height);
+        graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.drawImage(image, 0, 0, width, height, null);
+      } finally { graphics.dispose(); }
+      String publicId = UUID.randomUUID().toString();
+      String key = "media/" + publicId + ".jpg";
+      Files.createDirectories(storageRoot.resolve("media"));
+      var writer = javax.imageio.ImageIO.getImageWritersByFormatName("jpeg").next();
+      try (var output = javax.imageio.ImageIO.createImageOutputStream(resolve(key).toFile())) {
+        writer.setOutput(output);
+        var params = writer.getDefaultWriteParam();
+        params.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+        params.setCompressionQuality(0.75f);
+        writer.write(null, new javax.imageio.IIOImage(preview, null, null), params);
+      } finally { writer.dispose(); }
+      return new StoredMedia(publicId, key, "image", "image/jpeg", Files.size(resolve(key)));
+    } catch (IOException exception) { throw new IllegalStateException("历史预览生成失败", exception); }
+  }
+
   public Resource load(String storageKey) {
     try {
       return new UrlResource(resolve(storageKey).toUri());

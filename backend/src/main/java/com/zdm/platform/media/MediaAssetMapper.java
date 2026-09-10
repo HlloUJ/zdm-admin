@@ -23,8 +23,12 @@ public interface MediaAssetMapper extends BaseMapper<MediaAsset> {
 
   @Select("""
       SELECT asset.* FROM media_assets asset
-      LEFT JOIN media_references reference ON reference.media_id = asset.id
+      LEFT JOIN media_references reference ON reference.media_id = asset.id AND reference.reference_kind IN ('BUSINESS', 'PREVIEW', 'MANUAL')
       WHERE asset.status IN ('active', 'pending_delete') AND reference.id IS NULL
+        AND asset.unreferenced_since IS NOT NULL
+        AND asset.unreferenced_since <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND (NOT EXISTS (SELECT 1 FROM media_references h WHERE h.media_id=asset.id AND h.reference_kind='HISTORY')
+          OR (asset.history_preview_state='ready' AND asset.unreferenced_since <= DATE_SUB(NOW(), INTERVAL 181 DAY)))
       ORDER BY asset.id LIMIT #{limit}
       """)
   List<MediaAsset> selectUnreferenced(int limit);

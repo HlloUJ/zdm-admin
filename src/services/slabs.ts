@@ -28,6 +28,7 @@ export interface SlabOffShelfRecord {
 }
 
 export interface SlabRecord {
+  stock?: number;
   id: number;
   supplierId?: number;
   varietyId?: number;
@@ -78,6 +79,7 @@ export interface SlabRecord {
 }
 
 export interface SlabPayload {
+  stock?: number;
   supplierId?: number;
   varietyId?: number;
   originId?: number;

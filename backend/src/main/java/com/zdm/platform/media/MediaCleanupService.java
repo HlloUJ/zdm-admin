@@ -14,11 +14,13 @@ public class MediaCleanupService {
   private final MediaAssetMapper assetMapper;
   private final MediaCleanupTaskMapper taskMapper;
   private final MediaCleanupWorker worker;
+  private final MediaRetentionService retention;
 
   public MediaCleanupService(
       MediaAssetMapper assetMapper,
       MediaCleanupTaskMapper taskMapper,
-      MediaCleanupWorker worker) {
+      MediaCleanupWorker worker, MediaRetentionService retention) {
+    this.retention = retention;
     this.assetMapper = assetMapper;
     this.taskMapper = taskMapper;
     this.worker = worker;
@@ -29,7 +31,10 @@ public class MediaCleanupService {
     if (candidates.isEmpty()) {
       return;
     }
-    Runnable enqueue = () -> candidates.forEach(mediaId -> enqueue(mediaId, "realtime", reason, true));
+    Runnable enqueue = () -> candidates.forEach(mediaId -> {
+      retention.released(mediaId);
+      enqueue(mediaId, "realtime", reason, true);
+    });
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
       enqueue.run();
       return;

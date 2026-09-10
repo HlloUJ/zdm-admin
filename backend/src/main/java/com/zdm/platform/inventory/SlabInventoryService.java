@@ -94,6 +94,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
 
   @Transactional
   public SlabInventory createWithPrices(SlabInventory inventory) {
+    if (inventory.getStock() == null) { inventory.setStock("soldOut".equals(inventory.getStatus()) ? 0 : 1); }
     inventory.setSerialNo(normalizeOptionalText(inventory.getSerialNo()));
     validateReferences(inventory);
     validateGuidePrice(inventory);
@@ -121,7 +122,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         null,
         API_PUBLISHER.equals(created.getPublisherType()) ? "EXTERNAL_API" : "MANUAL",
         null,
-        Map.of());
+        creationDetails(created));
     return created;
   }
 
@@ -132,6 +133,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       return null;
     }
     inventory.setSerialNo(normalizeOptionalText(inventory.getSerialNo()));
+    if (inventory.getStock() == null) { inventory.setStock(existing.getStock()); }
     List<SlabPrice> existingPrices = priceService.listPrices(id);
     validateReferencesForUpdate(existing, inventory);
     validateGuidePrice(inventory);
@@ -363,11 +365,59 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     };
   }
 
+  private Map<String, Object> creationDetails(SlabInventory created) {
+    Map<String, Object> values = new LinkedHashMap<>();
+    values.put("库存", created.getStock());
+    values.put("大板名称", created.getName());
+    values.put("大板编号", created.getSerialNo());
+    values.put("供应商ID", created.getSupplierId());
+    values.put("品种ID", created.getVarietyId());
+    values.put("产地ID", created.getOriginId());
+    values.put("纹理ID", created.getTextureId());
+    values.put("色系ID", created.getColorId());
+    values.put("等级ID", created.getGradeId());
+    values.put("仓库", created.getWarehouse());
+    values.put("长度", created.getLengthMm());
+    values.put("宽度", created.getWidthMm());
+    values.put("高度", created.getThicknessMm());
+    values.put("误差", created.getToleranceMm());
+    values.put("扣角1长", created.getCorner1LengthMm());
+    values.put("扣角1宽", created.getCorner1WidthMm());
+    values.put("扣角2长", created.getCorner2LengthMm());
+    values.put("扣角2宽", created.getCorner2WidthMm());
+    values.put("扣角3长", created.getCorner3LengthMm());
+    values.put("扣角3宽", created.getCorner3WidthMm());
+    values.put("扣角4长", created.getCorner4LengthMm());
+    values.put("扣角4宽", created.getCorner4WidthMm());
+    values.put("1:1主图", created.getMainImageMediaId());
+    values.put("扫描图", created.getScanImageMediaId());
+    values.put("设计图", created.getDesignImageMediaId());
+    values.put("商品视频", created.getVideoMediaId());
+    values.put("视频封面", created.getVideoCoverMediaId());
+    values.put("成本价", created.getCostPrice());
+    values.put("指导价", created.getGuidePrice());
+    values.put("指导价系数", created.getGuidePriceCoefficient());
+    values.put("大板ID", created.getId());
+    values.put("面积", created.getAreaSquareMeter());
+    values.put("发布类型", created.getPublisherType());
+    values.put("状态", created.getStatus());
+    values.put("创建人", created.getCreatedByName());
+    values.put("创建账号ID", created.getCreatedByAccountId());
+    values.put("创建时间", created.getCreatedAt());
+    values.put("价格层级", priceDetails(created.getMarkupPrices()));
+    for (SlabPrice price : created.getMarkupPrices()) {
+      values.put(price.getStoreLevelName() + "价格来源", priceSourceLabel(price));
+      values.put(price.getStoreLevelName() + "来源配置ID", price.getSourceConfigurationId());
+    }
+    return operationLogService.creationSnapshot(values);
+  }
+
   private Map<String, Object> collectChanges(
       SlabInventory before,
       List<SlabPrice> beforePrices,
       SlabInventory after) {
     Map<String, Object> changes = new LinkedHashMap<>();
+    addChange(changes, "库存", before.getStock(), after.getStock());
     addChange(changes, "大板名称", before.getName(), after.getName());
     addChange(changes, "大板编号", before.getSerialNo(), after.getSerialNo());
     addChange(changes, "供应商ID", before.getSupplierId(), after.getSupplierId());
