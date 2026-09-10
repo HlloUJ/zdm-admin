@@ -119,6 +119,20 @@ class PlatformApiSmokeTest {
         long id = mapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
         assertThat(id).isPositive();
         ids.add(id);
+        String snapshot = jdbcTemplate.queryForObject(
+            "SELECT change_details FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'CREATE'",
+            String.class, id);
+        var details = mapper.readTree(snapshot);
+        assertThat(details.path("大板名称").path("after").asText()).isEqualTo("可选编号测试");
+        assertThat(details.has("大板编号")).isTrue();
+        assertThat(details.path("大板编号").path("after").isNull()).isTrue();
+        assertThat(details.path("1:1主图").path("after").asLong()).isEqualTo(main);
+        assertThat(details.has("视频封面")).isTrue();
+        assertThat(details.has("供应商")).isTrue();
+        assertThat(details.has("扣角4宽")).isTrue();
+        assertThat(details.has("面积")).isTrue();
+        assertThat(details.has("创建时间")).isTrue();
+        assertThat(details.path("价格层级").path("after").size()).isEqualTo(prices.size());
         assertThat(jdbcTemplate.queryForObject("SELECT serial_no FROM slab_inventory WHERE id = ?", String.class, id)).isNull();
       }
       long id = ids.getFirst();
@@ -132,6 +146,27 @@ class PlatformApiSmokeTest {
         assertThat(jdbcTemplate.queryForObject("SELECT serial_no FROM slab_inventory WHERE id = ?", String.class, id))
             .isEqualTo(value.isEmpty() ? null : value);
       }
+      var stockBody = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload);
+      stockBody.put("stock", 9);
+      mockMvc.perform(put("/api/admin/slabs/{id}", id)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json").content(mapper.writeValueAsBytes(stockBody)))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.stock").value(9));
+      assertThat(jdbcTemplate.queryForObject("SELECT stock FROM slab_inventory WHERE id=?", Integer.class, id)).isEqualTo(9);
+      var stockChanges = mapper.readTree(jdbcTemplate.queryForObject(
+          "SELECT change_details FROM slab_operation_logs WHERE slab_id=? AND operation_type='UPDATE' ORDER BY id DESC LIMIT 1", String.class, id));
+      assertThat(stockChanges.path("库存").path("before").asInt()).isEqualTo(1);
+      assertThat(stockChanges.path("库存").path("after").asInt()).isEqualTo(9);
+      Long logCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=?", Long.class, id);
+      mockMvc.perform(put("/api/admin/slabs/{id}", id)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json").content(mapper.writeValueAsBytes(stockBody)))
+          .andExpect(status().isOk());
+      assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=?", Long.class, id)).isEqualTo(logCount);
+      String initialSnapshot = jdbcTemplate.queryForObject(
+          "SELECT change_details FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'CREATE'",
+          String.class, id);
+      assertThat(mapper.readTree(initialSnapshot).path("大板编号").path("after").isNull()).isTrue();
     } finally {
       for (Long id : ids) {
         jdbcTemplate.update("DELETE FROM media_references WHERE business_domain = 'SLAB' AND business_id = ?", id);
@@ -305,10 +340,12 @@ class PlatformApiSmokeTest {
         "UPDATE media_assets SET created_at = DATE_SUB(NOW(), INTERVAL 2 DAY) WHERE id = ?",
         mediaId);
 
+    jdbcTemplate.update("UPDATE media_lifecycle_control SET deletion_enabled=TRUE,migration_completed=TRUE WHERE id=1");
     mockMvc.perform(post("/api/admin/media/cleanup")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.deletedCount", greaterThanOrEqualTo(1)));
+    jdbcTemplate.update("UPDATE media_lifecycle_control SET deletion_enabled=FALSE WHERE id=1");
     mockMvc.perform(get(mediaUrl)).andExpect(status().is4xxClientError());
     mockMvc.perform(get("/api/admin/media/audit")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))

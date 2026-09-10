@@ -17,12 +17,14 @@ public class MediaReferenceService {
   private final MediaCleanupService cleanupService;
   private final MediaReferenceMapper referenceMapper;
   private final CurrentIdentityProvider identityProvider;
+  private final MediaRetentionService retention;
 
   public MediaReferenceService(
       MediaAssetService assetService,
       MediaCleanupService cleanupService,
       MediaReferenceMapper referenceMapper,
-      CurrentIdentityProvider identityProvider) {
+      CurrentIdentityProvider identityProvider, MediaRetentionService retention) {
+    this.retention = retention;
     this.assetService = assetService;
     this.cleanupService = cleanupService;
     this.referenceMapper = referenceMapper;
@@ -41,6 +43,8 @@ public class MediaReferenceService {
     Map<String, MediaReference> existing = new LinkedHashMap<>();
     referenceMapper.selectBusinessReferences(domain, businessId)
         .forEach(reference -> existing.put(reference.getFieldKey(), reference));
+    java.util.stream.Stream.concat(existing.values().stream().map(MediaReference::getMediaId), desired.values().stream())
+        .distinct().sorted().forEach(id -> assetService.getBaseMapper().selectByIdForUpdate(id));
     List<Long> released = new ArrayList<>();
 
     for (Map.Entry<String, MediaReference> entry : existing.entrySet()) {
@@ -60,6 +64,7 @@ public class MediaReferenceService {
       if (current == null || !Objects.equals(current.getMediaId(), asset.getId())) {
         MediaReference reference = new MediaReference();
         reference.setMediaId(asset.getId());
+        reference.setReferenceKind("BUSINESS");
         reference.setBusinessDomain(domain);
         reference.setBusinessId(businessId);
         reference.setFieldKey(entry.getKey());
@@ -72,6 +77,7 @@ public class MediaReferenceService {
       }
       assetService.markReferenced(asset);
     }
+    released.forEach(retention::released);
     cleanupService.enqueueAfterCommit(released, "业务媒体被替换");
   }
 
@@ -79,7 +85,9 @@ public class MediaReferenceService {
   public void removeBusiness(String domain, Long businessId, String reason) {
     List<Long> released = referenceMapper.selectBusinessReferences(domain, businessId).stream()
         .map(MediaReference::getMediaId).toList();
+    released.stream().distinct().sorted().forEach(id -> assetService.getBaseMapper().selectByIdForUpdate(id));
     referenceMapper.deleteBusinessReferences(domain, businessId);
+    released.forEach(retention::released);
     cleanupService.enqueueAfterCommit(released, reason);
   }
 }

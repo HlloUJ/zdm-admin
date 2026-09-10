@@ -135,6 +135,7 @@ public class MediaAssetService extends ServiceImpl<MediaAssetMapper, MediaAsset>
   @Transactional
   public void markReferenced(MediaAsset asset) {
     asset.setStatus("active");
+    asset.setUnreferencedSince(null);
     asset.setConfirmedAt(asset.getConfirmedAt() == null ? LocalDateTime.now() : asset.getConfirmedAt());
     asset.setLastReferencedAt(LocalDateTime.now());
     asset.setPendingDeleteAt(null);

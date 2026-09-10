@@ -6,6 +6,21 @@ import java.time.LocalDateTime;
 
 @TableName("media_assets")
 public class MediaAsset extends BaseEntity {
+  @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+  private LocalDateTime unreferencedSince;
+  private Long historyPreviewMediaId;
+  private String historyPreviewState;
+  @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+  private String historyPreviewError;
+
+  public LocalDateTime getUnreferencedSince() { return unreferencedSince; }
+  public void setUnreferencedSince(LocalDateTime value) { unreferencedSince = value; }
+  public Long getHistoryPreviewMediaId() { return historyPreviewMediaId; }
+  public void setHistoryPreviewMediaId(Long value) { historyPreviewMediaId = value; }
+  public String getHistoryPreviewState() { return historyPreviewState; }
+  public void setHistoryPreviewState(String value) { historyPreviewState = value; }
+  public String getHistoryPreviewError() { return historyPreviewError; }
+  public void setHistoryPreviewError(String value) { historyPreviewError = value; }
   private String publicId;
   private String storageKey;
   private String originalName;

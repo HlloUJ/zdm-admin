@@ -9,17 +9,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class MediaCleanupWorker {
   private final MediaAssetMapper assetMapper;
   private final MediaCleanupTaskMapper taskMapper;
-  private final MediaReferenceMapper referenceMapper;
   private final MediaStorageService storageService;
+  private final MediaRetentionService retention;
 
   public MediaCleanupWorker(
       MediaAssetMapper assetMapper,
       MediaCleanupTaskMapper taskMapper,
-      MediaReferenceMapper referenceMapper,
-      MediaStorageService storageService) {
+      MediaStorageService storageService, MediaRetentionService retention) {
+    this.retention = retention;
     this.assetMapper = assetMapper;
     this.taskMapper = taskMapper;
-    this.referenceMapper = referenceMapper;
     this.storageService = storageService;
   }
 
@@ -40,15 +39,17 @@ public class MediaCleanupWorker {
       complete(task);
       return CleanupResult.ofSkipped();
     }
-    if (referenceMapper.countByMediaId(asset.getId()) > 0) {
-      asset.setStatus("active");
-      asset.setPendingDeleteAt(null);
-      assetMapper.updateById(asset);
+    MediaRetentionPolicy.Decision decision = retention.evaluate(asset);
+    if (!decision.eligible() || !retention.deletionEnabled()) {
+      // Re-evaluated by the scheduler after the deadline or a reference change.
       complete(task);
       return CleanupResult.ofSkipped();
     }
 
     try {
+      if (!storageService.load(asset.getStorageKey()).exists()) {
+        throw new IllegalStateException("媒体文件缺失，待核查");
+      }
       asset.setStatus("pending_delete");
       asset.setPendingDeleteAt(LocalDateTime.now());
       assetMapper.updateById(asset);

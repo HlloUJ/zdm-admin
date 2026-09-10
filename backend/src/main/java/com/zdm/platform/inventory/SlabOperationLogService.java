@@ -5,8 +5,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zdm.platform.media.MediaAsset;
-import com.zdm.platform.media.MediaAssetService;
-import com.zdm.platform.media.MediaUploadResponse;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.time.LocalDate;
@@ -40,17 +38,17 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
   private final CurrentIdentityProvider identityProvider;
   private final ObjectMapper objectMapper;
   private final JdbcTemplate jdbcTemplate;
-  private final MediaAssetService mediaAssetService;
+  private final com.zdm.platform.media.MediaHistoryService historyService;
 
   public SlabOperationLogService(
       CurrentIdentityProvider identityProvider,
       ObjectMapper objectMapper,
       JdbcTemplate jdbcTemplate,
-      MediaAssetService mediaAssetService) {
+      com.zdm.platform.media.MediaHistoryService historyService) {
+    this.historyService = historyService;
     this.identityProvider = identityProvider;
     this.objectMapper = objectMapper;
     this.jdbcTemplate = jdbcTemplate;
-    this.mediaAssetService = mediaAssetService;
   }
 
   public SlabOperationLogPage listPage(
@@ -101,7 +99,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
           change.computeIfPresent("before", (key, value) -> resolveReferenceName(field, value, referenceCaches));
           change.computeIfPresent("after", (key, value) -> resolveReferenceName(field, value, referenceCaches));
         } else if (MEDIA_TYPES.containsKey(field)) {
-          change.remove("before");
+          change.computeIfPresent("before", (key, value) -> resolveMedia(field, value, mediaCache));
           change.computeIfPresent("after", (key, value) -> resolveMedia(field, value, mediaCache));
         }
       });
@@ -140,20 +138,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     if (id == null) {
       return value;
     }
-    MediaAsset asset = mediaCache.computeIfAbsent(id, mediaAssetService::getById);
-    Map<String, Object> result = new LinkedHashMap<>();
-    result.put("mediaType", MEDIA_TYPES.get(field));
-    if (asset == null || "deleted".equals(asset.getStatus())) {
-      result.put("available", false);
-      return result;
-    }
-    MediaUploadResponse response = mediaAssetService.toResponse(asset);
-    result.put("available", true);
-    result.put("url", response.url());
-    result.put("mediaType", response.mediaType());
-    result.put("mimeType", response.mimeType());
-    result.put("originalName", asset.getOriginalName());
-    return result;
+    return historyService.view(id, MEDIA_TYPES.get(field));
   }
 
   private Long parseId(Object value) {
@@ -170,6 +155,21 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     return null;
   }
 
+  public Map<String, Object> creationSnapshot(Map<String, Object> values) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    Map<String, Map<Long, String>> referenceCaches = new HashMap<>();
+    values.forEach((field, value) -> {
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("before", null);
+      // Store reference names now so later catalog edits do not rewrite creation history.
+      boolean reference = REFERENCE_TABLES.containsKey(field);
+      entry.put("after", reference ? resolveReferenceName(field, value, referenceCaches) : value);
+      snapshot.put(reference ? field.replace("ID", "") : field, entry);
+    });
+    return snapshot;
+  }
+
+  @org.springframework.transaction.annotation.Transactional
   public void record(
       SlabInventory slab,
       String operationType,
@@ -203,6 +203,19 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     log.setOperatedAt(now);
     log.setCreatedAt(now);
     save(log);
+    Map<String, Long> historicalMedia = new LinkedHashMap<>();
+    changes.forEach((field, value) -> {
+      if (!MEDIA_TYPES.containsKey(field) || !(value instanceof Map<?, ?> change)) {
+        return;
+      }
+      for (String side : List.of("before", "after")) {
+        Long mediaId = parseId(change.get(side));
+        if (mediaId != null) {
+          historicalMedia.put(field + ":" + side, mediaId);
+        }
+      }
+    });
+    historyService.retain("SLAB_LOG", log.getId(), historicalMedia);
   }
 
   private String buildWhereClause(

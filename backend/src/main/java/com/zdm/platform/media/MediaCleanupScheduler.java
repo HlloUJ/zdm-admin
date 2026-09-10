@@ -20,6 +20,7 @@ public class MediaCleanupScheduler {
   private final MediaAssetMapper assetMapper;
   private final MediaCleanupRunMapper runMapper;
   private final MediaCleanupService cleanupService;
+  private final MediaHistoryService historyService;
   private final MediaCleanupTaskMapper taskMapper;
   private final MediaCleanupWorker worker;
 
@@ -27,13 +28,14 @@ public class MediaCleanupScheduler {
       JdbcTemplate jdbcTemplate,
       MediaAssetMapper assetMapper,
       MediaCleanupRunMapper runMapper,
-      MediaCleanupService cleanupService,
+      MediaCleanupService cleanupService, MediaHistoryService historyService,
       MediaCleanupTaskMapper taskMapper,
       MediaCleanupWorker worker) {
     this.jdbcTemplate = jdbcTemplate;
     this.assetMapper = assetMapper;
     this.runMapper = runMapper;
     this.cleanupService = cleanupService;
+    this.historyService = historyService;
     this.taskMapper = taskMapper;
     this.worker = worker;
   }
@@ -45,6 +47,8 @@ public class MediaCleanupScheduler {
 
   @Scheduled(fixedDelayString = "${zdm.media.retry-delay-ms:60000}")
   public void retryFailedCleanup() {
+    historyService.deletedLogIds().forEach(id -> historyService.release("SLAB_LOG", id));
+    historyService.pendingPreviews().forEach(historyService::generatePreview);
     taskMapper.selectReady(LocalDateTime.now(), 100).forEach(task -> worker.processAsync(task.getId()));
   }
 
@@ -67,6 +71,8 @@ public class MediaCleanupScheduler {
     int failed = 0;
     long releasedBytes = 0L;
     try {
+      historyService.deletedLogIds().forEach(id -> historyService.release("SLAB_LOG", id));
+      historyService.pendingPreviews().forEach(historyService::generatePreview);
       Set<Long> candidates = new LinkedHashSet<>();
       assetMapper.selectExpiredTemporary(LocalDateTime.now().minusHours(24), BATCH_SIZE)
           .forEach(asset -> candidates.add(asset.getId()));

@@ -703,7 +703,7 @@
     <AdminDialog
       v-model:visible="operationLogDetailVisible"
       header="操作详情"
-      width="960px"
+      width="min(1040px, calc(100vw - 48px))"
       dialog-class-name="operation-log-detail-dialog"
       :cancel-btn="null"
       confirm-btn="关闭"
@@ -733,37 +733,108 @@
             </t-descriptions-item>
           </t-descriptions>
 
-          <template v-if="operationLogChangeRows.length">
-            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">
-              变更对比
-              <t-tag theme="primary" variant="light">{{ operationLogChangeRows.length }} 项</t-tag>
-            </div>
-            <div class="operation-log-diff-list">
-              <div v-for="row in operationLogChangeRows" :key="row.field" class="operation-log-diff-item">
-                <div class="operation-log-diff-item__field">{{ row.field }}</div>
-                <div v-if="row.mediaType" class="operation-log-media-after">
-                  <div class="operation-log-diff-value operation-log-diff-value--after">
-                    <span class="operation-log-diff-value__label">修改后</span>
+          <template v-if="operationLogIsCreate && operationLogChangeRows.length">
+            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">图片</div>
+            <t-row :gutter="[16, 16]">
+              <t-col v-for="row in creationLogImages" :key="row.field" :span="4">
+                <div class="operation-log-media-card">
+                  <div class="operation-log-media-card__title">{{ row.field }}</div>
+                  <button
+                    class="operation-log-media-card__preview"
+                    type="button"
+                    :disabled="!row.afterMedia?.available"
+                    :aria-label="`查看${row.field}`"
+                    @click="row.afterMedia && openOperationLogMediaPreview(row.afterMedia, row.field)"
+                  >
                     <img
                       v-if="row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'image'"
-                      class="operation-log-media-preview operation-log-media-preview--image"
                       :src="row.afterMedia.url"
-                      :alt="`${row.field}修改后`"
-                      @click="openOperationLogMediaPreview(row.afterMedia, `${row.field} - 修改后`)"
+                      :alt="row.field"
                     />
                     <video
                       v-else-if="
                         row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'video'
                       "
-                      class="operation-log-media-preview operation-log-media-preview--video"
                       :src="row.afterMedia.url"
                       preload="metadata"
                       muted
                       playsinline
-                      @click="openOperationLogMediaPreview(row.afterMedia, `${row.field} - 修改后`)"
                     />
-                    <span v-else class="operation-log-media-empty">{{ mediaAfterFallback(row.afterMedia) }}</span>
+                    <span v-else>{{ mediaAfterFallback(row.afterMedia) }}</span>
+                  </button>
+                  <div class="operation-log-media-card__hint">
+                    {{
+                      row.afterMedia?.available
+                        ? row.afterMedia.message ||
+                          (row.afterMedia.mediaType === 'video' ? '点击播放视频' : '点击查看大图')
+                        : '暂无可预览内容'
+                    }}
                   </div>
+                </div>
+              </t-col>
+            </t-row>
+            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">基础信息</div>
+            <t-descriptions bordered :column="3" layout="horizontal">
+              <t-descriptions-item v-for="row in creationLogBase" :key="row.field" :label="row.field">
+                {{ row.after }}
+              </t-descriptions-item>
+            </t-descriptions>
+            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">销售信息</div>
+            <t-descriptions bordered :column="3" layout="horizontal">
+              <t-descriptions-item v-for="row in creationLogSales" :key="row.field" :label="row.field">
+                {{ row.after }}
+              </t-descriptions-item>
+            </t-descriptions>
+            <t-table
+              class="operation-log-detail__prices"
+              row-key="label"
+              :data="creationLogPrices"
+              :columns="creationLogPriceColumns"
+              bordered
+            />
+          </template>
+          <template v-else-if="operationLogChangeRows.length">
+            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">
+              {{ operationLogIsCreate ? '创建时信息' : '变更对比' }}
+              <t-tag theme="primary" variant="light">{{ operationLogChangeRows.length }} 项</t-tag>
+            </div>
+            <div class="operation-log-diff-list">
+              <div v-for="row in operationLogChangeRows" :key="row.field" class="operation-log-diff-item">
+                <div class="operation-log-diff-item__field">{{ row.field }}</div>
+                <t-row v-if="row.mediaType" :gutter="16">
+                  <t-col
+                    v-for="side in [
+                      { label: '修改前', media: row.beforeMedia },
+                      { label: '修改后', media: row.afterMedia },
+                    ]"
+                    :key="side.label"
+                    :span="6"
+                  >
+                    <t-space direction="vertical">
+                      <span>{{ side.label }}</span>
+                      <img
+                        v-if="side.media?.available && side.media.url && side.media.mediaType === 'image'"
+                        class="operation-log-media-preview operation-log-media-preview--image"
+                        :src="side.media.url"
+                        :alt="`${row.field}${side.label}`"
+                        @click="openOperationLogMediaPreview(side.media, `${row.field} - ${side.label}`)"
+                      />
+                      <video
+                        v-else-if="side.media?.available && side.media.url && side.media.mediaType === 'video'"
+                        class="operation-log-media-preview operation-log-media-preview--video"
+                        :src="side.media.url"
+                        preload="metadata"
+                        muted
+                        playsinline
+                        @click="openOperationLogMediaPreview(side.media, `${row.field} - ${side.label}`)"
+                      />
+                      <span v-else>{{ mediaAfterFallback(side.media) }}</span>
+                      <span v-if="side.media?.available && side.media.message">{{ side.media.message }}</span>
+                    </t-space>
+                  </t-col>
+                </t-row>
+                <div v-else-if="operationLogIsCreate" class="operation-log-media-after">
+                  <span>{{ row.after }}</span>
                 </div>
                 <div v-else-if="row.priceTiers?.length" class="operation-log-price-diff">
                   <div class="operation-log-price-diff__header">价格层级</div>
@@ -790,7 +861,9 @@
                   </div>
                   <t-icon name="arrow-right" class="operation-log-diff-arrow" />
                   <div class="operation-log-diff-value operation-log-diff-value--after">
-                    <span class="operation-log-diff-value__label">修改后</span>
+                    <span class="operation-log-diff-value__label">{{
+                      operationLogIsCreate ? '创建时' : '修改后'
+                    }}</span>
                     <span>{{ row.after }}</span>
                   </div>
                 </div>
@@ -1072,6 +1145,7 @@ interface OperationLogChangeRow {
   priceTiers?: OperationLogPriceTierRow[];
   mediaType?: 'image' | 'video';
   afterMedia?: OperationLogMediaValue;
+  beforeMedia?: OperationLogMediaValue;
 }
 
 interface OperationLogPriceTierRow {
@@ -1089,6 +1163,8 @@ interface OperationLogMediaValue {
   mediaType: 'image' | 'video';
   mimeType?: string;
   originalName?: string;
+  previewOnly?: boolean;
+  message?: string;
 }
 
 interface PriceGroup {
@@ -1116,6 +1192,7 @@ interface DetailMediaItem {
 }
 
 interface SlabItem {
+  stock?: number;
   id: number;
   supplierId?: number;
   varietyId?: number;
@@ -1407,6 +1484,7 @@ const formatPriceTierChanges = (value: unknown): string | null => {
 };
 const formatOperationValue = (value: unknown, field?: string): string => {
   if (value == null || value === '') return '未填写';
+  if (field === '状态') return operationStatusLabels[value as SlabStatus] || String(value);
   if (field === '价格层级') return formatPriceTierChanges(value) || '未填写';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
@@ -1474,6 +1552,7 @@ const operationLogMediaTypes: Record<string, 'image' | 'video'> = {
   扫描图: 'image',
   设计图: 'image',
   商品视频: 'video',
+  视频封面: 'image',
 };
 const operationLogFieldOrder = [
   '1:1主图',
@@ -1499,6 +1578,8 @@ const operationLogFieldOrder = [
   '扣角4长',
   '扣角4宽',
   '供应商ID',
+  '供应商',
+  '库存',
   '大板编号',
   '成本价',
   '指导价系数',
@@ -1510,25 +1591,29 @@ const normalizeOperationLogMedia = (value: unknown, field: string): OperationLog
   if (value == null || value === '') return undefined;
   const fallbackType = operationLogMediaTypes[field];
   if (typeof value !== 'object') {
-    return { available: false, mediaType: fallbackType };
+    return { available: false, mediaType: fallbackType, message: '媒体信息暂不可用' };
   }
   const media = value as Partial<OperationLogMediaValue>;
   return {
     available: Boolean(media.available && media.url),
     url: media.url,
-    mediaType: media.mediaType === 'video' ? 'video' : fallbackType,
+    mediaType: media.mediaType === 'video' || media.mediaType === 'image' ? media.mediaType : fallbackType,
     mimeType: media.mimeType,
     originalName: media.originalName,
+    previewOnly: media.previewOnly,
+    message: media.message,
   };
 };
-const mediaAfterFallback = (media?: OperationLogMediaValue) => (media ? '媒体文件已清理' : '已删除');
+const mediaAfterFallback = (media?: OperationLogMediaValue) =>
+  media?.message || (media ? '历史媒体已不可用' : '未填写');
+const operationLogIsCreate = computed(() => operationLogDetail.value?.operationType === 'CREATE');
 const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {
   const details = operationLogDetail.value?.changeDetails;
   if (!details) return [];
   try {
     const parsed = JSON.parse(details) as Record<string, { before?: unknown; after?: unknown }>;
     return Object.entries(parsed)
-      .filter(([field]) => !['面积', '视频封面'].includes(field))
+      .filter(([field]) => operationLogIsCreate.value || !['面积', '视频封面'].includes(field))
       .sort(
         ([leftField], [rightField]) =>
           (operationLogFieldOrderIndex.get(leftField) ?? Number.MAX_SAFE_INTEGER) -
@@ -1543,12 +1628,53 @@ const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {
           after: formatOperationValue(change.after, field),
           priceTiers,
           mediaType,
+          beforeMedia: mediaType ? normalizeOperationLogMedia(change.before, field) : undefined,
           afterMedia: mediaType ? normalizeOperationLogMedia(change.after, field) : undefined,
         };
       });
   } catch {
     return [];
   }
+});
+const creationLogImages = computed(() => operationLogChangeRows.value.filter((row) => row.mediaType));
+const creationLogSalesFields = new Set(['库存', '供应商', '大板编号', '仓库', '发布类型', '状态']);
+const creationLogMetadataFields = new Set(['大板ID', '创建人', '创建账号ID', '创建时间']);
+const creationLogPriceFields = new Set(['成本价', '指导价', '指导价系数', '价格层级']);
+const creationLogBase = computed(() =>
+  operationLogChangeRows.value.filter(
+    (row) =>
+      !row.mediaType &&
+      !creationLogSalesFields.has(row.field) &&
+      !creationLogMetadataFields.has(row.field) &&
+      !creationLogPriceFields.has(row.field) &&
+      !row.field.endsWith('价格来源') &&
+      !row.field.endsWith('来源配置ID'),
+  ),
+);
+const creationLogSales = computed(() =>
+  operationLogChangeRows.value.filter((row) => creationLogSalesFields.has(row.field)),
+);
+const creationLogPriceColumns = [
+  { colKey: 'label', title: '价格层级' },
+  { colKey: 'coefficient', title: '价格系数' },
+  { colKey: 'price', title: '价格' },
+  { colKey: 'source', title: '价格来源' },
+];
+const creationLogPrices = computed(() => {
+  if (!operationLogIsCreate.value) return [];
+  const rows = operationLogChangeRows.value;
+  const value = (field: string) => rows.find((row) => row.field === field)?.after ?? '未填写';
+  const tiers = rows.find((row) => row.field === '价格层级')?.priceTiers ?? [];
+  return [
+    { label: '成本价', coefficient: '1.00', price: value('成本价'), source: '—' },
+    { label: '指导价', coefficient: value('指导价系数'), price: value('指导价'), source: '—' },
+    ...tiers.map((tier) => ({
+      label: tier.label,
+      coefficient: tier.afterCoefficient,
+      price: tier.afterPrice,
+      source: value(`${tier.label}价格来源`),
+    })),
+  ];
 });
 const operationSourceLabel = (source: SlabOperationLogRecord['operationSource']) =>
   ({ MANUAL: '平台操作', EXTERNAL_API: '外部接口', SYSTEM: '系统任务' })[source] || source;
@@ -1719,6 +1845,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
   const supplier = supplierById(record.supplierId);
   return {
     id: record.id,
+    stock: record.stock,
     supplierId: record.supplierId,
     varietyId: record.varietyId,
     originId: record.originId,
@@ -1779,6 +1906,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
 const toSlabPayload = (item: SlabItem, patch: Partial<SlabItem> = {}): SlabPayload => {
   const next = { ...item, ...patch };
   return {
+    stock: next.stock,
     supplierId: next.supplierId,
     varietyId: next.varietyId,
     originId: next.originId,
@@ -2583,7 +2711,7 @@ const openMediaPreview = (media: DetailMediaItem) => {
 
 const openOperationLogMediaPreview = (media: OperationLogMediaValue, title: string) => {
   if (!media.url) return;
-  uploadPreviewTitle.value = title;
+  uploadPreviewTitle.value = media.message ? `${title}（${media.message}）` : title;
   uploadPreviewUrl.value = media.url;
   uploadPreviewType.value = media.mediaType;
   uploadPreviewDialogVisible.value = true;
@@ -2620,7 +2748,6 @@ const resetProductForm = () => {
 };
 
 const fillProductForm = (row: SlabItem) => {
-  const hasSalesInformation = Boolean(row.supplierId || row.sku.trim() || row.price.cost || row.markupPrices?.length);
   Object.assign(productForm, {
     variety: row.variety,
     origin: row.origin,
@@ -2641,7 +2768,7 @@ const fillProductForm = (row: SlabItem) => {
     corner4Width: row.corner4WidthMm == null ? '' : String(row.corner4WidthMm),
     supplier: row.supplierId ? row.tenant : '',
     cost: row.price.cost,
-    stock: row.status === 'soldOut' ? '0' : hasSalesInformation ? '1' : '',
+    stock: row.stock == null ? '' : String(row.stock),
     sku: row.sku,
     guideRatio:
       row.guidePriceCoefficient != null
@@ -2903,6 +3030,7 @@ const handleProductSubmit = async () => {
   const widthMm = toNumber(productForm.width);
   const thicknessMm = toNumber(productForm.height);
   const payload: SlabPayload = {
+    stock: Number(normalizedStock),
     supplierId: supplierIdByName(productForm.supplier) ?? editingItem?.supplierId,
     varietyId: varietyIdByName(productForm.variety),
     originId: originIdByName(productForm.origin),
@@ -3577,6 +3705,19 @@ const saveBatchPrice = async () => {
   margin-top: var(--td-comp-margin-xl);
 }
 
+.operation-log-detail__prices {
+  margin-top: var(--td-comp-margin-l);
+}
+
+.operation-log-detail__prices :deep(thead th) {
+  background-color: var(--td-bg-color-secondarycontainer);
+}
+
+.operation-log-detail :deep(.t-descriptions__content),
+.operation-log-detail :deep(.t-descriptions__label) {
+  overflow-wrap: anywhere;
+}
+
 .operation-log-detail__long-text {
   white-space: pre-wrap;
   word-break: break-word;
@@ -3639,6 +3780,55 @@ const saveBatchPrice = async () => {
   justify-self: center;
   color: var(--td-brand-color);
   font-size: var(--td-font-size-title-medium);
+}
+
+.operation-log-media-card {
+  overflow: hidden;
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
+  background: var(--td-bg-color-container);
+}
+
+.operation-log-media-card__title {
+  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);
+  background: var(--td-bg-color-secondarycontainer);
+  font-weight: 500;
+}
+
+.operation-log-media-card__preview {
+  display: flex;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  align-items: center;
+  justify-content: center;
+  padding: var(--td-comp-paddingTB-s);
+  border: 0;
+  background: var(--td-bg-color-container-hover);
+  color: var(--td-text-color-placeholder);
+  font: inherit;
+  cursor: zoom-in;
+}
+
+.operation-log-media-card__preview:disabled {
+  cursor: default;
+}
+
+.operation-log-media-card__preview:focus-visible {
+  outline: 2px solid var(--td-brand-color);
+  outline-offset: -2px;
+}
+
+.operation-log-media-card__preview img,
+.operation-log-media-card__preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.operation-log-media-card__hint {
+  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
 }
 
 .operation-log-media-preview {
