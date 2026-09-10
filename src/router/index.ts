@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 import { getLoginUser } from '@/services/auth';
-import { getAuthToken } from '@/services/http';
+import { getAuthToken, SESSION_EXPIRED_MESSAGE } from '@/services/http';
+import { adminFeedback } from '@/components/foundation/feedback/adminFeedback';
 import { getFirstAccessiblePath, hasMenuPermission, routePermissionPrefixMap } from '@/services/adminPermissions';
 
 const router = createRouter({
@@ -163,6 +164,11 @@ router.beforeEach((to) => {
   }
 
   return true;
+});
+
+window.addEventListener('zdm-auth-session-cleared', () => {
+  adminFeedback.warning(SESSION_EXPIRED_MESSAGE);
+  void router.replace('/login');
 });
 
 export default router;

@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabInventory> {
-  private static final String DUPLICATE_SKU_MESSAGE = "SKU已存在";
+  private static final String DUPLICATE_SKU_MESSAGE = "大板编号已存在";
   private static final String PLATFORM_PUBLISHER = "平台发布";
   private static final String API_PUBLISHER = "接口获取";
   private static final Set<String> ALLOWED_STATUSES = Set.of(
@@ -94,6 +94,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
 
   @Transactional
   public SlabInventory createWithPrices(SlabInventory inventory) {
+    inventory.setSerialNo(normalizeOptionalText(inventory.getSerialNo()));
     validateReferences(inventory);
     validateGuidePrice(inventory);
     List<SlabPrice> markupPrices = inventory.getMarkupPrices();
@@ -130,6 +131,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if (existing == null) {
       return null;
     }
+    inventory.setSerialNo(normalizeOptionalText(inventory.getSerialNo()));
     List<SlabPrice> existingPrices = priceService.listPrices(id);
     validateReferencesForUpdate(existing, inventory);
     validateGuidePrice(inventory);
@@ -367,7 +369,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       SlabInventory after) {
     Map<String, Object> changes = new LinkedHashMap<>();
     addChange(changes, "大板名称", before.getName(), after.getName());
-    addChange(changes, "SKU", before.getSerialNo(), after.getSerialNo());
+    addChange(changes, "大板编号", before.getSerialNo(), after.getSerialNo());
     addChange(changes, "供应商ID", before.getSupplierId(), after.getSupplierId());
     addChange(changes, "品种ID", before.getVarietyId(), after.getVarietyId());
     addChange(changes, "产地ID", before.getOriginId(), after.getOriginId());
@@ -396,7 +398,20 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     addChange(changes, "指导价", before.getGuidePrice(), after.getGuidePrice());
     addChange(changes, "指导价系数", before.getGuidePriceCoefficient(), after.getGuidePriceCoefficient());
     addChange(changes, "价格层级", priceDetails(beforePrices), priceDetails(after.getMarkupPrices()));
+    for (SlabPrice price : after.getMarkupPrices()) {
+      SlabPrice previous = beforePrices.stream()
+          .filter(item -> Objects.equals(item.getStoreLevelId(), price.getStoreLevelId()))
+          .findFirst().orElse(null);
+      if (previous != null) {
+        addChange(changes, price.getStoreLevelName() + "价格来源",
+            priceSourceLabel(previous), priceSourceLabel(price));
+      }
+    }
     return changes;
+  }
+
+  private String priceSourceLabel(SlabPrice price) {
+    return "auto".equals(price.getPriceSource()) ? "跟随配置" : "手工价格";
   }
 
   private List<Map<String, Object>> priceDetails(List<SlabPrice> prices) {
@@ -432,7 +447,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   }
 
   private boolean isPriceChange(String field) {
-    return Set.of("成本价", "指导价", "指导价系数", "价格层级").contains(field);
+    return Set.of("成本价", "指导价", "指导价系数", "价格层级").contains(field) || field.endsWith("价格来源");
   }
 
   private void applyCreationMetadata(SlabInventory inventory) {

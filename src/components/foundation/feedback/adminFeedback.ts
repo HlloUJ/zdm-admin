@@ -1,5 +1,6 @@
 import type { MessageInfoOptions } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
+import { SessionExpiredError } from '@/services/http';
 
 type FeedbackTheme = 'success' | 'error' | 'warning' | 'info';
 type FeedbackInput = string | MessageInfoOptions;
@@ -110,6 +111,7 @@ export const adminFeedback = {
   actionSuccess: ({ action, target }: ActionFeedbackOptions) =>
     showFeedback('success', buildActionSuccessText(action, target)),
   actionError: ({ action, error, fallback, target }: ActionFeedbackOptions) => {
+    if (error instanceof SessionExpiredError) return;
     const subject = target ? `${action}“${target}”` : action;
     return showFeedback('error', `${subject}失败：${getSafeErrorMessage(error, fallback)}`);
   },

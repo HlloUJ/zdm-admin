@@ -1,6 +1,7 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.Valid;
@@ -20,7 +21,7 @@ public class SlabInventory extends BaseEntity {
   @NotBlank
   private String name;
 
-  @NotBlank
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String serialNo;
 
   private String warehouse;
