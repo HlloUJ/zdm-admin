@@ -1,0 +1,1 @@
+ALTER TABLE slab_inventory MODIFY COLUMN serial_no VARCHAR(100) NULL;

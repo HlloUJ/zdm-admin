@@ -186,7 +186,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     LocalDateTime now = LocalDateTime.now();
     SlabOperationLog log = new SlabOperationLog();
     log.setSlabId(slab.getId());
-    log.setSlabSerialNo(slab.getSerialNo());
+    log.setSlabSerialNo(slab.getSerialNo() == null ? "" : slab.getSerialNo());
     log.setSlabName(slab.getName());
     log.setPublisherType(slab.getPublisherType());
     log.setOperationType(operationType);

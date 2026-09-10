@@ -29,7 +29,7 @@
               <div class="filter-fields">
                 <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
                   <t-form-item label="大板" class="slab-keyword-filter">
-                    <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/SKU" />
+                    <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
                   </t-form-item>
                   <t-form-item label="品种">
                     <t-select v-model="currentFilter.variety" clearable filterable placeholder="请选择">
@@ -177,7 +177,7 @@
               <div class="slab-meta">
                 <div class="slab-name">{{ row.name }}</div>
                 <div class="slab-code">ID：{{ row.id }}</div>
-                <div class="slab-code">SKU：{{ row.code }}</div>
+                <div class="slab-code">大板编号：{{ row.code }}</div>
               </div>
             </template>
             <template #tenant="{ row }">
@@ -454,7 +454,7 @@
                   @keydown="handleStockKeydown"
                 />
               </t-form-item>
-              <t-form-item label="SKU" name="sku" required-mark>
+              <t-form-item label="大板编号" name="sku">
                 <t-input
                   v-model="productForm.sku"
                   :disabled="productMode === 'view'"
@@ -464,123 +464,72 @@
               </t-form-item>
             </div>
             <div class="section-title">价格设置</div>
-            <div class="price-editor">
+            <div :key="productPriceSession" class="price-editor">
               <div class="price-editor__head">
                 <span>价格层级</span>
                 <span><span class="price-required-star">*</span>价格系数</span>
                 <span><span class="price-required-star">*</span>价格</span>
+                <span />
               </div>
               <div class="price-editor__row">
                 <span>成本价（基准）</span>
                 <t-input class="price-input" model-value="1.00" disabled />
-                <t-form-item class="price-form-item" name="cost" label-width="0" :required-mark="false">
-                  <t-input-number
-                    v-model="productForm.cost"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    placeholder="请输入"
-                    @change="handleCostChange"
-                  />
-                </t-form-item>
+                <SpecPriceInput
+                  v-model="productForm.cost"
+                  label="成本价"
+                  placeholder="请输入"
+                  :submitted="productPriceSubmitted"
+                  :disabled="productMode === 'view'"
+                  @change="handleCostChange"
+                />
+                <span />
               </div>
               <div class="price-editor__row">
                 <span>指导价</span>
-                <t-form-item
-                  class="price-form-item"
-                  :name="guideRatioFieldName"
-                  :rules="salesNumberFieldRules('指导价的价格系数', 0)"
-                  label-width="0"
-                  :required-mark="false"
-                >
-                  <t-input-number
-                    v-model="productForm.guideRatio"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="handleGuideRatioChange"
-                  />
-                </t-form-item>
-                <t-form-item
-                  class="price-form-item"
-                  :name="guidePriceFieldName"
-                  :rules="salesNumberFieldRules('指导价', 0)"
-                  label-width="0"
-                  :required-mark="false"
-                >
-                  <t-input-number
-                    v-model="productForm.guidePrice"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="handleGuidePriceChange"
-                  />
-                </t-form-item>
+                <SpecPriceInput
+                  v-model="productForm.guideRatio"
+                  label="系数"
+                  placeholder="系数"
+                  :submitted="productPriceSubmitted"
+                  :disabled="productMode === 'view'"
+                  @change="handleGuideRatioChange"
+                />
+                <SpecPriceInput
+                  v-model="productForm.guidePrice"
+                  label="价格"
+                  placeholder="价格"
+                  :submitted="productPriceSubmitted"
+                  :disabled="productMode === 'view'"
+                  @change="handleGuidePriceChange"
+                />
+                <span />
               </div>
               <div v-for="item in partnerPriceRows" :key="item.id" class="price-editor__row">
-                <span>
-                  {{ item.label }}
-                  <t-tag :theme="priceSourceTheme(productForm.markupPrices[item.id]?.priceSource)" variant="light">
-                    {{ priceSourceLabel(productForm.markupPrices[item.id]?.priceSource, item.id) }}
-                  </t-tag>
-                  <t-link
-                    v-if="
-                      productMode !== 'view' &&
-                      canRestoreAutoPrice(item.id, productForm.markupPrices[item.id]?.priceSource)
-                    "
-                    theme="primary"
-                    hover="color"
-                    @click="restoreProductAutoPrice(item.id)"
-                  >
-                    恢复跟随配置
-                  </t-link>
-                </span>
-                <t-form-item
-                  class="price-form-item"
-                  :name="`markupPrices.${item.id}.ratio`"
-                  :rules="salesNumberFieldRules(`${item.label}的价格系数`, 0)"
-                  label-width="0"
-                  :required-mark="false"
-                >
-                  <t-input-number
-                    v-model="productForm.markupPrices[item.id].ratio"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="
-                      (value: unknown, context: SalesNumberChangeContext) =>
-                        handlePartnerRatioChange(item.id, value, context)
-                    "
-                  />
-                </t-form-item>
-                <t-form-item
-                  class="price-form-item"
-                  :name="`markupPrices.${item.id}.price`"
-                  :rules="salesNumberFieldRules(`${item.label}价格`, 0)"
-                  label-width="0"
-                  :required-mark="false"
-                >
-                  <t-input-number
-                    v-model="productForm.markupPrices[item.id].price"
-                    class="price-input"
-                    large-number
-                    :disabled="productMode === 'view'"
-                    :decimal-places="2"
-                    theme="normal"
-                    @change="
-                      (value: unknown, context: SalesNumberChangeContext) =>
-                        handlePartnerPriceChange(item.id, value, context)
-                    "
-                  />
-                </t-form-item>
+                <span>{{ item.label }}</span>
+                <SpecPriceInput
+                  v-model="productForm.markupPrices[item.id].ratio"
+                  label="系数"
+                  placeholder="系数"
+                  :submitted="productPriceSubmitted"
+                  :disabled="productMode === 'view'"
+                  @change="handlePartnerRatioChange(item.id)"
+                  @commit="markProductPriceManual(item.id)"
+                />
+                <SpecPriceInput
+                  v-model="productForm.markupPrices[item.id].price"
+                  label="价格"
+                  placeholder="价格"
+                  :submitted="productPriceSubmitted"
+                  :disabled="productMode === 'view'"
+                  @change="handlePartnerPriceChange(item.id)"
+                  @commit="markProductPriceManual(item.id)"
+                />
+                <PriceSourceToggle
+                  :source="productForm.markupPrices[item.id]?.priceSource"
+                  :available="hasActivePriceConfiguration(item.id)"
+                  :readonly="productMode === 'view' || saving"
+                  @toggle="toggleProductPriceSource(item.id)"
+                />
               </div>
             </div>
           </t-form>
@@ -622,7 +571,7 @@
           <t-descriptions bordered :column="2">
             <t-descriptions-item label="大板名称" :span="2">{{ detailDrawerRow.name }}</t-descriptions-item>
             <t-descriptions-item label="ID">{{ detailDrawerRow.id }}</t-descriptions-item>
-            <t-descriptions-item label="SKU">{{ detailDrawerRow.code }}</t-descriptions-item>
+            <t-descriptions-item label="大板编号">{{ detailDrawerRow.code }}</t-descriptions-item>
             <t-descriptions-item label="品种">{{ detailDrawerRow.variety }}</t-descriptions-item>
             <t-descriptions-item label="产地">{{ detailDrawerRow.origin }}</t-descriptions-item>
             <t-descriptions-item label="纹理">{{ detailDrawerRow.texture }}</t-descriptions-item>
@@ -678,7 +627,7 @@
         <t-form :data="operationLogFilter" label-width="44px" colon>
           <div class="operation-log-filters">
             <t-form-item label="大板" class="operation-log-keyword-filter">
-              <t-input v-model="operationLogFilter.keyword" clearable placeholder="大板名称/ID/SKU" />
+              <t-input v-model="operationLogFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
             </t-form-item>
             <t-form-item label="操作类型" label-width="72px">
               <t-select v-model="operationLogFilter.operationType" clearable placeholder="请选择">
@@ -722,7 +671,7 @@
             <div class="slab-meta">
               <div class="slab-name">{{ row.slabName }}</div>
               <div class="slab-code">ID：{{ row.slabId }}</div>
-              <div class="slab-code">SKU：{{ row.slabSerialNo }}</div>
+              <div class="slab-code">大板编号：{{ row.slabSerialNo }}</div>
             </div>
           </template>
           <template #operationType="{ row }">{{ operationTypeLabel(row.operationType) }}</template>
@@ -765,7 +714,7 @@
           <div class="operation-log-detail__section-title">操作信息</div>
           <t-descriptions bordered :column="3">
             <t-descriptions-item label="大板名称">{{ operationLogDetail.slabName }}</t-descriptions-item>
-            <t-descriptions-item label="SKU">{{ operationLogDetail.slabSerialNo }}</t-descriptions-item>
+            <t-descriptions-item label="大板编号">{{ operationLogDetail.slabSerialNo }}</t-descriptions-item>
             <t-descriptions-item label="操作类型">
               {{ operationTypeLabel(operationLogDetail.operationType) }}
             </t-descriptions-item>
@@ -883,69 +832,47 @@
           </t-button>
         </div>
         <t-form ref="priceDrawerFormRef" :data="priceDrawerForm" class="price-drawer-form">
-          <div class="price-table">
+          <div :key="drawerPriceSession" class="price-table">
             <div class="price-table__head">
               <span>价格层级</span>
               <span><span class="price-required-star">*</span>价格系数</span>
               <span><span class="price-required-star">*</span>价格</span>
+              <span />
             </div>
-            <div v-for="(row, index) in batchPriceRows" :key="row.label" class="price-table__row">
-              <span>
-                {{ row.label }}
-                <template v-if="row.configurationId != null">
-                  <t-tag :theme="priceSourceTheme(row.priceSource)" variant="light">
-                    {{ priceSourceLabel(row.priceSource, row.configurationId) }}
-                  </t-tag>
-                  <t-link
-                    v-if="!priceDrawerReadonly && canRestoreAutoPrice(row.configurationId, row.priceSource)"
-                    theme="primary"
-                    hover="color"
-                    @click="restoreBatchAutoPrice(row)"
-                  >
-                    恢复跟随配置
-                  </t-link>
-                </template>
-              </span>
+            <div
+              v-for="(row, index) in batchPriceRows"
+              :key="row.configurationId ?? row.label"
+              class="price-table__row"
+            >
+              <span>{{ row.label }}</span>
               <t-input v-if="index === 0" class="price-input" model-value="1.00" disabled />
-              <t-form-item
+              <SpecPriceInput
                 v-else
-                class="price-form-item"
-                :name="`rows.${index}.ratio`"
-                :rules="salesNumberFieldRules(`${row.label}的价格系数`, 0)"
-                label-width="0"
-                :required-mark="false"
-              >
-                <t-input-number
-                  v-model="row.ratio"
-                  class="price-input"
-                  large-number
-                  :disabled="priceDrawerReadonly"
-                  :decimal-places="2"
-                  theme="normal"
-                  @change="
-                    (value: unknown, context: SalesNumberChangeContext) => handleBatchRatioChange(index, value, context)
-                  "
-                />
-              </t-form-item>
-              <t-form-item
-                class="price-form-item"
-                :name="`rows.${index}.price`"
-                :rules="salesNumberFieldRules(row.label, 0)"
-                label-width="0"
-                :required-mark="false"
-              >
-                <t-input-number
-                  v-model="row.price"
-                  class="price-input"
-                  large-number
-                  :disabled="priceDrawerReadonly"
-                  :decimal-places="2"
-                  theme="normal"
-                  @change="
-                    (value: unknown, context: SalesNumberChangeContext) => handleBatchPriceChange(index, value, context)
-                  "
-                />
-              </t-form-item>
+                v-model="row.ratio"
+                label="系数"
+                placeholder="系数"
+                :submitted="drawerPriceSubmitted"
+                :disabled="priceDrawerReadonly"
+                @change="handleBatchRatioChange(index)"
+                @commit="markDrawerPriceManual(row)"
+              />
+              <SpecPriceInput
+                v-model="row.price"
+                label="价格"
+                placeholder="价格"
+                :submitted="drawerPriceSubmitted"
+                :disabled="priceDrawerReadonly"
+                @change="handleBatchPriceChange(index)"
+                @commit="markDrawerPriceManual(row)"
+              />
+              <PriceSourceToggle
+                v-if="row.configurationId != null"
+                :source="row.priceSource"
+                :available="hasActivePriceConfiguration(row.configurationId)"
+                :readonly="priceDrawerReadonly || saving"
+                @toggle="toggleDrawerPriceSource(row)"
+              />
+              <span v-else />
             </div>
           </div>
         </t-form>
@@ -1051,6 +978,9 @@
 </template>
 
 <script setup lang="ts">
+import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
+import SpecPriceInput from '@/pages/finished-stock/management/components/SpecPriceInput.vue';
+
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -1364,6 +1294,10 @@ const loading = ref(false);
 const saving = ref(false);
 const selectedKeys = ref<number[]>([]);
 const productDialogVisible = ref(false);
+const productPriceSubmitted = ref(false);
+const drawerPriceSubmitted = ref(false);
+const productPriceSession = ref(0);
+const drawerPriceSession = ref(0);
 const productMode = ref<ProductMode>('create');
 const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');
 const productTab = ref('images');
@@ -1435,7 +1369,7 @@ const operationTypeOptions: { label: string; value: SlabOperationType }[] = [
 const operationTypeLabel = (type: SlabOperationType) =>
   operationTypeOptions.find((item) => item.value === type)?.label || type;
 const operationLogColumns: PrimaryTableCol<SlabOperationLogRecord>[] = [
-  { colKey: 'slab', title: '大板名称/ID/SKU', minWidth: 220 },
+  { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
   { colKey: 'operationType', title: '操作类型', width: 110 },
   { colKey: 'summary', title: '操作内容', minWidth: 220 },
   { colKey: 'operatorName', title: '操作人', width: 110 },
@@ -1565,7 +1499,7 @@ const operationLogFieldOrder = [
   '扣角4长',
   '扣角4宽',
   '供应商ID',
-  'SKU',
+  '大板编号',
   '成本价',
   '指导价系数',
   '指导价',
@@ -1791,7 +1725,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     textureId: record.textureId,
     colorId: record.colorId,
     gradeId: record.gradeId,
-    code: record.serialNo,
+    code: record.serialNo ?? '',
     image: record.mainImageUrl || '',
     mainImageMediaId: record.mainImageMediaId,
     scanImageMediaId: record.scanImageMediaId,
@@ -1823,7 +1757,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     guidePriceCoefficient: record.guidePriceCoefficient,
     status: normalizeStatus(record.status),
     variety: record.varietyName || variety?.label || (record.varietyId ? `品种 #${record.varietyId}` : '-'),
-    sku: record.serialNo,
+    sku: record.serialNo ?? '',
     lengthMm: record.lengthMm,
     widthMm: record.widthMm,
     thicknessMm: record.thicknessMm,
@@ -2056,21 +1990,6 @@ const isValidSalesNumber = (value: unknown, minimum: number) => {
   const normalizedValue = String(value ?? '').trim();
   return /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(normalizedValue) && Number(normalizedValue) >= minimum;
 };
-const salesNumberFieldRules = (label: string, minimum: number): FormRule[] => [
-  { required: true, message: `请输入${label}`, type: 'error', trigger: 'submit' },
-  {
-    validator: (value) => Boolean(String(value ?? '').trim()),
-    message: `请输入${label}`,
-    type: 'error',
-    trigger: 'blur',
-  },
-  {
-    validator: (value) => !String(value ?? '').trim() || isValidSalesNumber(value, minimum),
-    message: `请输入正确的${label}`,
-    type: 'error',
-    trigger: 'blur',
-  },
-];
 const salesRules: Record<string, FormRule[]> = {
   supplier: requiredSalesFieldRules('请选择供应商'),
   stock: [
@@ -2120,8 +2039,6 @@ const salesRules: Record<string, FormRule[]> = {
       trigger: 'submit',
     },
   ],
-  sku: requiredSalesFieldRules('请输入SKU'),
-  cost: salesNumberFieldRules('成本价', 0),
 };
 const stockInputProps = {
   onPaste: ({ e, pasteValue }: { e: ClipboardEvent; pasteValue: string }) => {
@@ -2189,7 +2106,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     return [
       { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
       { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-      { colKey: 'slab', title: '大板名称/ID/SKU', minWidth: 220 },
+      { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
       { colKey: 'variety', title: '品种', width: 140 },
       { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },
       { colKey: 'offShelvedByName', title: '下架人', width: 120, align: 'center' },
@@ -2201,7 +2118,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const baseColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
     { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-    { colKey: 'slab', title: '大板名称/ID/SKU', minWidth: 220 },
+    { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
     { colKey: 'variety', title: '品种', width: 140 },
     { colKey: 'origin', title: '产地', width: 110 },
     { colKey: 'texture', title: '纹理', width: 110 },
@@ -2433,14 +2350,29 @@ const toNumber = (value: string) => {
 const formatPrice = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 const formatRatio = (value: number) => value.toFixed(2);
 const activeConfigurationForLevel = (storeLevelId: number) =>
-  markupConfigurations.value.find((item) => item.storeLevelId === storeLevelId);
-const priceSourceTheme = (source?: 'auto' | 'manual') => (source === 'auto' ? 'success' : 'warning');
-const priceSourceLabel = (source: 'auto' | 'manual' | undefined, storeLevelId: number) => {
-  if (source !== 'auto') return '手工价格';
-  return activeConfigurationForLevel(storeLevelId) ? '跟随配置' : '配置已停用';
+  markupConfigurations.value.find((item) => item.storeLevelId === storeLevelId && item.status === 'enabled');
+const hasActivePriceConfiguration = (levelId: number) => activeConfigurationForLevel(levelId)?.priceCoefficient != null;
+const markProductPriceManual = (levelId: number) => {
+  const editor = productForm.markupPrices[levelId];
+  if (!editor) return;
+  editor.priceSource = 'manual';
+  editor.sourceConfigurationId = undefined;
 };
-const canRestoreAutoPrice = (storeLevelId: number, source?: 'auto' | 'manual') =>
-  source === 'manual' && Boolean(activeConfigurationForLevel(storeLevelId));
+const markDrawerPriceManual = (row: DrawerPriceRow) => {
+  if (row.configurationId == null) return;
+  row.priceSource = 'manual';
+  row.sourceConfigurationId = undefined;
+};
+const toggleProductPriceSource = (levelId: number) => {
+  if (productMode.value === 'view' || saving.value) return;
+  if (productForm.markupPrices[levelId]?.priceSource === 'auto') markProductPriceManual(levelId);
+  else restoreProductAutoPrice(levelId);
+};
+const toggleDrawerPriceSource = (row: DrawerPriceRow) => {
+  if (priceDrawerReadonly.value || saving.value) return;
+  if (row.priceSource === 'auto') markDrawerPriceManual(row);
+  else restoreBatchAutoPrice(row);
+};
 
 const calculateProductPrice = (configurationId: number) => {
   const cost = toNumber(productForm.cost);
@@ -2503,7 +2435,7 @@ const initializeProductMarkupPrices = (prices: SlabPrice[] = []) => {
 const restoreProductAutoPrice = (storeLevelId: number) => {
   const configuration = activeConfigurationForLevel(storeLevelId);
   const editor = productForm.markupPrices[storeLevelId];
-  if (!configuration || !editor) return;
+  if (!configuration || configuration.priceCoefficient == null || !editor) return;
   editor.ratio = formatRatio(Number(configuration.priceCoefficient));
   editor.priceSource = 'auto';
   editor.sourceConfigurationId = configuration.id;
@@ -2529,7 +2461,7 @@ const calculateBatchRatio = (row: DrawerPriceRow) => {
 const restoreBatchAutoPrice = (row: DrawerPriceRow) => {
   if (row.configurationId == null) return;
   const configuration = activeConfigurationForLevel(row.configurationId);
-  if (!configuration) return;
+  if (!configuration || configuration.priceCoefficient == null) return;
   row.ratio = formatRatio(Number(configuration.priceCoefficient));
   row.priceSource = 'auto';
   row.sourceConfigurationId = configuration.id;
@@ -2563,10 +2495,6 @@ const handleBatchRatioChange = (index: number, _value?: unknown, context?: Sales
   if (context?.type === 'props') return;
   const row = batchPriceRows[index];
   if (!row) return;
-  if (row.configurationId != null) {
-    row.priceSource = 'manual';
-    row.sourceConfigurationId = undefined;
-  }
   const field = `rows.${index}.ratio`;
   if (!String(row.ratio ?? '').trim() || isValidSalesNumber(row.ratio, 0)) clearPriceDrawerFieldError(field);
   calculateBatchPrice(row);
@@ -2581,10 +2509,6 @@ const handleBatchPriceChange = (index: number, _value?: unknown, context?: Sales
   if (index === 0) {
     handleBatchCostChange(_value, context);
     return;
-  }
-  if (row.configurationId != null) {
-    row.priceSource = 'manual';
-    row.sourceConfigurationId = undefined;
   }
   calculateBatchRatio(row);
   if (String(row.ratio ?? '').trim()) clearPriceDrawerFieldError(`rows.${index}.ratio`);
@@ -2678,6 +2602,8 @@ const closeDetailDrawer = () => {
 };
 
 const openPriceDrawer = (row: SlabItem) => {
+  drawerPriceSubmitted.value = false;
+  drawerPriceSession.value += 1;
   priceDrawerRowId.value = row.id;
   priceDrawerVisible.value = true;
   try {
@@ -2735,6 +2661,8 @@ const fillProductForm = (row: SlabItem) => {
 };
 
 const openProductDialog = (mode: ProductMode, row?: SlabItem) => {
+  productPriceSubmitted.value = false;
+  productPriceSession.value += 1;
   if (pendingUploadedMediaIds.size) {
     const staleMediaIds = [...pendingUploadedMediaIds];
     pendingUploadedMediaIds.clear();
@@ -2853,11 +2781,6 @@ const handleGuidePriceChange = (_value?: unknown, context?: SalesNumberChangeCon
 
 const handlePartnerRatioChange = (configurationId: number, _value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
-  const editor = productForm.markupPrices[configurationId];
-  if (editor) {
-    editor.priceSource = 'manual';
-    editor.sourceConfigurationId = undefined;
-  }
   clearSalesNumberFieldError(
     `markupPrices.${configurationId}.ratio`,
     productForm.markupPrices[configurationId]?.ratio,
@@ -2868,11 +2791,6 @@ const handlePartnerRatioChange = (configurationId: number, _value?: unknown, con
 
 const handlePartnerPriceChange = (configurationId: number, _value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
-  const editor = productForm.markupPrices[configurationId];
-  if (editor) {
-    editor.priceSource = 'manual';
-    editor.sourceConfigurationId = undefined;
-  }
   const field = `markupPrices.${configurationId}.price`;
   if (String(productForm.markupPrices[configurationId]?.price ?? '').trim()) clearSalesFieldError(field);
   calculateProductRatio(configurationId);
@@ -2908,6 +2826,7 @@ const handleMeasurementBlur = async (field: MeasurementField) => {
 };
 
 const handleProductSubmit = async () => {
+  productPriceSubmitted.value = true;
   if (productMode.value === 'view') {
     closeProductDialog();
     return;
@@ -2957,7 +2876,6 @@ const handleProductSubmit = async () => {
     !isValidSalesNumber(productForm.guideRatio, 0) || !isValidSalesNumber(productForm.guidePrice, 0);
   const hasInvalidSalesInformation =
     !String(productForm.supplier ?? '').trim() ||
-    !String(productForm.sku ?? '').trim() ||
     !isValidSalesNumber(productForm.cost, 0) ||
     stockHasLeadingZero.value ||
     !/^[1-9]\d*$/.test(normalizedStock) ||
@@ -2972,7 +2890,9 @@ const handleProductSubmit = async () => {
         ? '库存不能为0'
         : stockHasLeadingZero.value || (normalizedStock && !/^[1-9]\d*$/.test(normalizedStock))
           ? '请输入正确的库存'
-          : '请完善销售信息',
+          : hasInvalidSalesPrice || hasInvalidGuidePrice || !isValidSalesNumber(productForm.cost, 0)
+            ? '请完善价格信息'
+            : '请完善销售信息',
     );
     return;
   }
@@ -3352,7 +3272,7 @@ const handleConfirmSubmit = async () => {
     if (type === 'delete' && row) adminFeedback.deleted(row.name);
     else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });
     else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });
-    else if (type === 'savePrice' && row) adminFeedback.actionSuccess({ action: '保存价格', target: row.name });
+    else if (type === 'savePrice' && row) adminFeedback.success('价格保存成功');
     else if (type === 'batchShelf') {
       adminFeedback.actionSuccess({ action: '批量上架', target: `${selectedCount} 个大板` });
     } else if (type === 'batchRestore') {
@@ -3485,6 +3405,8 @@ const closePriceDrawer = () => {
 };
 
 const saveBatchPrice = async () => {
+  if (priceDrawerReadonly.value || saving.value) return;
+  drawerPriceSubmitted.value = true;
   const hasInvalidPrice = batchPriceRows.some(
     (row, index) => !isValidSalesNumber(row.price, 0) || (index > 0 && !isValidSalesNumber(row.ratio, 0)),
   );
@@ -4113,7 +4035,7 @@ const saveBatchPrice = async () => {
 .price-editor__head,
 .price-editor__row {
   display: grid;
-  grid-template-columns: 1fr 140px 140px;
+  grid-template-columns: minmax(0, 1fr) 140px 140px 22px;
   align-items: center;
   gap: var(--td-comp-margin-l);
   padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);
@@ -4132,7 +4054,7 @@ const saveBatchPrice = async () => {
 .price-table__head,
 .price-table__row {
   display: grid;
-  grid-template-columns: minmax(140px, max-content) 160px 180px;
+  grid-template-columns: minmax(140px, max-content) 160px 180px 22px;
   gap: var(--td-comp-margin-l);
   padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);
   border-bottom: 1px solid var(--td-component-border);

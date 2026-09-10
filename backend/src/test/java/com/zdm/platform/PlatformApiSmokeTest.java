@@ -94,6 +94,109 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void slabNumberCanBeEmptyAndCleared() throws Exception {
+    Long main = uploadSlabMedia("optional-main.png", "image/png");
+    Long scan = uploadSlabMedia("optional-scan.png", "image/png");
+    Long design = uploadSlabMedia("optional-design.png", "image/png");
+    String payload = """
+        {"name":"可选编号测试","serialNo":"  ","status":"warehouse",
+         "mainImageMediaId":%d,"scanImageMediaId":%d,"designImageMediaId":%d}
+        """.formatted(main, scan, design);
+    var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    var pricePayload = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload);
+    var prices = pricePayload.putArray("markupPrices");
+    for (Long levelId : jdbcTemplate.queryForList("SELECT id FROM store_levels WHERE status = 'enabled'", Long.class)) {
+      prices.addObject().put("storeLevelId", levelId).put("priceCoefficient", 1).put("costPrice", 1).put("price", 1);
+    }
+    payload = mapper.writeValueAsString(pricePayload);
+    java.util.ArrayList<Long> ids = new java.util.ArrayList<>();
+    try {
+      for (int i = 0; i < 2; i++) {
+        MvcResult result = mockMvc.perform(post("/api/admin/slabs")
+                .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+                .contentType("application/json").content(payload))
+            .andExpect(status().isOk()).andReturn();
+        long id = mapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
+        assertThat(id).isPositive();
+        ids.add(id);
+        assertThat(jdbcTemplate.queryForObject("SELECT serial_no FROM slab_inventory WHERE id = ?", String.class, id)).isNull();
+      }
+      long id = ids.getFirst();
+      for (String value : List.of("optional-" + System.nanoTime(), "")) {
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload);
+        body.put("serialNo", value);
+        mockMvc.perform(put("/api/admin/slabs/{id}", id)
+                .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+                .contentType("application/json").content(mapper.writeValueAsBytes(body)))
+            .andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject("SELECT serial_no FROM slab_inventory WHERE id = ?", String.class, id))
+            .isEqualTo(value.isEmpty() ? null : value);
+      }
+    } finally {
+      for (Long id : ids) {
+        jdbcTemplate.update("DELETE FROM media_references WHERE business_domain = 'SLAB' AND business_id = ?", id);
+        jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", id);
+        jdbcTemplate.update("DELETE FROM slab_prices WHERE slab_id = ?", id);
+        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", id);
+      }
+    }
+  }
+
+  @Test
+  void slabPriceSourceChangesAreLoggedWithoutChangingAmounts() throws Exception {
+    var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    var payload = mapper.createObjectNode();
+    payload.put("name", "价格来源日志测试").put("status", "warehouse");
+    payload.put("mainImageMediaId", uploadSlabMedia("source-main.png", "image/png"));
+    payload.put("scanImageMediaId", uploadSlabMedia("source-scan.png", "image/png"));
+    payload.put("designImageMediaId", uploadSlabMedia("source-design.png", "image/png"));
+    var prices = payload.putArray("markupPrices");
+    for (Map<String, Object> config : jdbcTemplate.queryForList(
+        "SELECT store_level_id, price_coefficient FROM slab_markup_configurations WHERE status = 'enabled'")) {
+      BigDecimal ratio = (BigDecimal) config.get("price_coefficient");
+      prices.addObject().put("storeLevelId", ((Number) config.get("store_level_id")).longValue())
+          .put("priceCoefficient", ratio).put("costPrice", 100)
+          .put("price", ratio.multiply(new BigDecimal("100"))).put("priceSource", "auto");
+    }
+    MvcResult created = mockMvc.perform(post("/api/admin/slabs")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json").content(mapper.writeValueAsBytes(payload)))
+        .andExpect(status().isOk()).andReturn();
+    long id = mapper.readTree(created.getResponse().getContentAsString()).path("data").path("id").asLong();
+    assertThat(id).isPositive();
+    try {
+      var target = (com.fasterxml.jackson.databind.node.ObjectNode) prices.get(0);
+      for (String source : List.of("manual", "auto")) {
+        target.put("priceSource", source);
+        mockMvc.perform(put("/api/admin/slabs/{id}", id)
+                .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+                .contentType("application/json").content(mapper.writeValueAsBytes(payload)))
+            .andExpect(status().isOk());
+        String details = jdbcTemplate.queryForObject(
+            "SELECT change_details FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'PRICE_UPDATE' ORDER BY id DESC LIMIT 1",
+            String.class, id);
+        var changes = mapper.readTree(details);
+        assertThat(changes.size()).isEqualTo(1);
+        var change = changes.elements().next();
+        assertThat(change.path("before").asText()).isEqualTo("manual".equals(source) ? "跟随配置" : "手工价格");
+        assertThat(change.path("after").asText()).isEqualTo("manual".equals(source) ? "手工价格" : "跟随配置");
+      }
+      mockMvc.perform(put("/api/admin/slabs/{id}", id)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json").content(mapper.writeValueAsBytes(payload)))
+          .andExpect(status().isOk());
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'PRICE_UPDATE'",
+          Integer.class, id)).isEqualTo(2);
+    } finally {
+      jdbcTemplate.update("DELETE FROM media_references WHERE business_domain = 'SLAB' AND business_id = ?", id);
+      jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", id);
+      jdbcTemplate.update("DELETE FROM slab_prices WHERE slab_id = ?", id);
+      jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", id);
+    }
+  }
+
+  @Test
   void manualSlabPriceCanBeSavedAfterItsConfigurationIsDisabled() {
     Long configurationId = jdbcTemplate.queryForObject(
         "SELECT id FROM slab_markup_configurations WHERE status = 'enabled' ORDER BY id LIMIT 1",
@@ -5106,7 +5209,7 @@ class PlatformApiSmokeTest {
                   }
                   """.formatted(serialNo, mainImageMediaId, scanImageMediaId, designImageMediaId)))
           .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.message").value("SKU已存在"));
+          .andExpect(jsonPath("$.message").value("大板编号已存在"));
 
       MvcResult interfaceSlabResult = mockMvc.perform(post("/api/admin/slabs")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
