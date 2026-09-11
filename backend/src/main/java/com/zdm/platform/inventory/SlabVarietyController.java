@@ -33,7 +33,7 @@ public class SlabVarietyController extends AdminCrudController<SlabVariety> {
   @GetMapping
   public ApiResponse<List<SlabVariety>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(permissionGuard.filterData(service.list()));
   }
 
   @Override

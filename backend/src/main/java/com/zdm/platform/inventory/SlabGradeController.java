@@ -33,7 +33,7 @@ public class SlabGradeController extends AdminCrudController<SlabGrade> {
   @GetMapping
   public ApiResponse<List<SlabGrade>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listGrades());
+    return ApiResponse.ok(permissionGuard.filterData(service.listGrades()));
   }
 
   @Override
@@ -69,7 +69,7 @@ public class SlabGradeController extends AdminCrudController<SlabGrade> {
   public ApiResponse<List<SlabGrade>> reorder(
       @Valid @RequestBody SlabGradeReorderRequest request) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".sort");
-    return ApiResponse.ok(service.reorderGrades(request.orderedIds()));
+    return ApiResponse.ok(permissionGuard.filterData(service.reorderGrades(request.orderedIds())));
   }
 
   @Override

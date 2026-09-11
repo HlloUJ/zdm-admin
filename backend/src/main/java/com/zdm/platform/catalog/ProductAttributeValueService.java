@@ -67,4 +67,14 @@ public class ProductAttributeValueService
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
   }
+  @Override
+  public ProductAttributeValue getById(java.io.Serializable id) {
+    ProductAttributeValue entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

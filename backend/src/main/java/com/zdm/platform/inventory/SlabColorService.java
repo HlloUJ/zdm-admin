@@ -26,7 +26,7 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
   }
 
   public List<SlabColor> listColors() {
-    List<SlabColor> colors = list(Wrappers.<SlabColor>lambdaQuery().orderByDesc(SlabColor::getCreatedAt));
+    List<SlabColor> colors = com.zdm.platform.security.DataScope.filter(identityProvider.require(), list(Wrappers.<SlabColor>lambdaQuery().orderByDesc(SlabColor::getCreatedAt)));
     if (colors.isEmpty()) {
       return colors;
     }
@@ -126,6 +126,7 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     if (category == null) {
       throw new IllegalArgumentException("色系分类不存在");
     }
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), category.getCreatedByAccountId());
     return category;
   }
 
@@ -162,6 +163,16 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     CurrentIdentity identity = identityProvider.current().orElse(null);
     return identity != null && StringUtils.hasText(identity.displayName())
         ? identity.displayName() : DEFAULT_CREATED_BY_NAME;
+  }
+
+  @Override
+  public SlabColor getById(java.io.Serializable id) {
+    SlabColor entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
   }
 
 }

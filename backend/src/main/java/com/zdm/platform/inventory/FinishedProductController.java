@@ -54,14 +54,14 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int pageSize) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(operationLogs.listPage(keyword, operationType, operatorName, startDate, endDate, page, pageSize));
   }
 
   @GetMapping("/operation-logs/{id}")
   public ApiResponse<FinishedOperationLog> operationLogDetail(@PathVariable Long id) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(operationLogs.detail(id));
   }
 
@@ -69,28 +69,28 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   public ApiResponse<List<FinishedProductService.AttributeTemplateOption>> attributeTemplateOptions() {
     permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".view", PERMISSION_PREFIX + ".create",
         PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.attributeTemplateOptions());
   }
 
   @GetMapping("/price-level-options")
   public ApiResponse<List<StoreLevelPricingDirectory.Level>> priceLevelOptions() {
     permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(storeLevelDirectory.listEnabledLevels());
   }
 
   @PostMapping("/media")
   public ApiResponse<MediaUploadResponse> uploadMedia(@RequestParam("file") MultipartFile file) {
     permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(mediaAssetService.upload(file, MediaStorageService.defaultImageSizeLimit()));
   }
 
   @DeleteMapping("/media")
   public ApiResponse<Boolean> deleteTemporaryMedia(@RequestParam Long mediaId) {
     permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
   }
 
@@ -98,15 +98,15 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   @GetMapping
   public ApiResponse<List<FinishedProduct>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    permissionGuard.requireAllData();
-    return ApiResponse.ok(service.listWithDetails());
+    permissionGuard.requireDataPermission();
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithDetails()));
   }
 
   @Override
   @PostMapping
   public ApiResponse<FinishedProduct> create(@Valid @RequestBody FinishedProduct product) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.createWithDetails(product));
   }
 
@@ -115,7 +115,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   public ApiResponse<FinishedProduct> update(
       @PathVariable Long id, @Valid @RequestBody FinishedProduct product) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.updateWithDetails(id, product));
   }
 
@@ -123,7 +123,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     FinishedProduct product = service.getById(id);
     if (product == null || !"recycle".equals(product.getStatus())) {
       throw new IllegalArgumentException("只有回收站中的成品现货可以彻底删除");

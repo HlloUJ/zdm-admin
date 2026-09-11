@@ -31,7 +31,7 @@ public class SupplierSupplyTypeController {
   @GetMapping
   public ApiResponse<List<SupplierSupplyType>> list() {
     permissionGuard.requireView(PREFIX);
-    return ApiResponse.ok(service.listTypes());
+    return ApiResponse.ok(permissionGuard.filterData(service.listTypes()));
   }
 
   @PostMapping

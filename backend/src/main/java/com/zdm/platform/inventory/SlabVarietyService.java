@@ -101,4 +101,14 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
     }
   }
+  @Override
+  public SlabVariety getById(java.io.Serializable id) {
+    SlabVariety entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

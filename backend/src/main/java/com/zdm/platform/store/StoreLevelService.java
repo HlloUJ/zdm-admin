@@ -38,12 +38,12 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
   }
 
   public List<StoreLevel> listEnabled() {
-    return enrich(lambdaQuery().eq(StoreLevel::getStatus, "enabled")
+    return enrich(lambdaQuery().eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), StoreLevel::getCreatedByAccountId, identityProvider.require().accountId()).eq(StoreLevel::getStatus, "enabled")
         .orderByAsc(StoreLevel::getSortOrder).orderByAsc(StoreLevel::getId).list());
   }
 
   public List<StoreLevel> listLevels() {
-    return enrich(lambdaQuery().orderByAsc(StoreLevel::getSortOrder)
+    return enrich(lambdaQuery().eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), StoreLevel::getCreatedByAccountId, identityProvider.require().accountId()).orderByAsc(StoreLevel::getSortOrder)
         .orderByAsc(StoreLevel::getId).list());
   }
 
@@ -99,7 +99,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
 
   @Transactional
   public List<StoreLevel> reorderLevels(List<Long> orderedIds) {
-    List<StoreLevel> levels = listLevels();
+    List<StoreLevel> levels = com.zdm.platform.security.DataScope.filter(identityProvider.require(), listLevels());
     if (orderedIds == null || orderedIds.size() != levels.size()
         || new HashSet<>(orderedIds).size() != levels.size()) {
       throw new IllegalArgumentException("请提交全部门店级别");
@@ -255,4 +255,14 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
       throw new IllegalArgumentException("级别名称已存在");
     }
   }
+  @Override
+  public StoreLevel getById(java.io.Serializable id) {
+    StoreLevel entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

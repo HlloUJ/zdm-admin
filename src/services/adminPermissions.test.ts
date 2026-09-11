@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LoginUser } from './auth';
-import { adminMenuEntries, getFirstAccessiblePath, hasMenuPermission, hasPermission } from './adminPermissions';
+import {
+  adminMenuEntries,
+  getFirstAccessiblePath,
+  hasMenuPermission,
+  hasPermission,
+  isSuperAdmin,
+} from './adminPermissions';
 
 function createUser(permissions: string[]): LoginUser {
   return {
@@ -81,5 +87,20 @@ describe('admin menu permissions', () => {
 
   it('keeps menus without a permission prefix hidden from regular users', () => {
     expect(hasMenuPermission(createUser([]))).toBe(false);
+  });
+});
+
+describe('super administrator identity', () => {
+  it('keeps all function permissions separate from super administrator status', () => {
+    const user = { ...createUser(['all']), dataPermission: 'self' as const };
+    expect(isSuperAdmin(user)).toBe(false);
+    expect(hasPermission(user, 'admin.supplier-management.edit')).toBe(true);
+    expect(hasMenuPermission(user, 'admin.supplier-management')).toBe(true);
+  });
+
+  it('recognizes a real super administrator without separately assigned functions', () => {
+    const user = { ...createUser([]), roles: ['SUPER_ADMIN'] };
+    expect(isSuperAdmin(user)).toBe(true);
+    expect(hasPermission(user, 'admin.supplier-management.edit')).toBe(true);
   });
 });

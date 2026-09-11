@@ -30,7 +30,7 @@ public class EmployeeController {
   @GetMapping
   public ApiResponse<List<Employee>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(employeeService.listForCurrentAdmin());
+    return ApiResponse.ok(permissionGuard.filterData(employeeService.listForCurrentAdmin()));
   }
 
   @PostMapping

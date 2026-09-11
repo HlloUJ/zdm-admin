@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 @TableName("crafts")
-public class Craft extends BaseEntity {
+public class Craft extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String name;
 

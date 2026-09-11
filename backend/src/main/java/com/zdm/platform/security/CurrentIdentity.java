@@ -20,6 +20,6 @@ public record CurrentIdentity(
   }
 
   public boolean isSuperAdmin() {
-    return roles.contains("SUPER_ADMIN") || permissions.contains("all");
+    return roles.contains("SUPER_ADMIN");
   }
 }

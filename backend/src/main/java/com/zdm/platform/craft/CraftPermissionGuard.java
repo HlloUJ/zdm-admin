@@ -13,6 +13,10 @@ public class CraftPermissionGuard {
     this.permissionGuard = permissionGuard;
   }
 
+  public java.util.List<Craft> filterData(java.util.List<Craft> records) {
+    return permissionGuard.filterData(records);
+  }
+
   public void requireView() {
     permissionGuard.requireView(PREFIX);
   }

@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 @TableName("slab_colors")
-public class SlabColor extends BaseEntity {
+public class SlabColor extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotNull
   private Long categoryId;
   @NotBlank

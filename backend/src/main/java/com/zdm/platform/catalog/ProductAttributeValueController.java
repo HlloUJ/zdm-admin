@@ -35,15 +35,15 @@ public class ProductAttributeValueController {
   @GetMapping
   public ApiResponse<List<ProductAttributeValue>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listWithUseCounts(visibleScopes()));
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithUseCounts(visibleScopes())));
   }
 
   @GetMapping("/attribute-options")
   public ApiResponse<List<ProductAttribute>> listAttributeOptions() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(attributeService.listWithTemplateCounts(visibleScopes()).stream()
+    return ApiResponse.ok(permissionGuard.filterData(attributeService.listWithTemplateCounts(visibleScopes()).stream()
         .filter(attribute -> "select".equals(attribute.getValueType()))
-        .toList());
+        .toList()));
   }
 
   @PostMapping

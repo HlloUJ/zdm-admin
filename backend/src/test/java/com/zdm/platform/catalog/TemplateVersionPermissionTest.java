@@ -28,7 +28,7 @@ class TemplateVersionPermissionTest {
     when(identity.require()).thenReturn(new CurrentIdentity(1L, 1L, 1L, 1L, "admin", null, null,
         "测试", "all", List.of(), List.of("admin.product-data-center.category-attribute-template.finished.attributes.view")));
     TemplateVersion version = new TemplateVersion(1L, 1L, 1, "published", 0,
-        new ObjectMapper().createArrayNode(), "测试", "测试", "", null, null);
+        new ObjectMapper().createArrayNode(), "测试", "测试", "", null, null, 1L);
     when(jdbc.query(org.mockito.ArgumentMatchers.anyString(),
         org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<TemplateVersion>>any(),
         org.mockito.ArgumentMatchers.eq(1L))).thenReturn(List.of(version));
@@ -95,11 +95,11 @@ class TemplateVersionPermissionTest {
         "测试", "all", List.of(), List.of(prefix + "view", prefix + "create")));
     ObjectMapper json = new ObjectMapper();
     TemplateVersion draft = new TemplateVersion(3L, 1L, null, "draft", 0,
-        json.createArrayNode(), "测试", null, "", null, null);
+        json.createArrayNode(), "测试", null, "", null, null, 1L);
     TemplateVersion old = new TemplateVersion(1L, 1L, 1, "published", 0,
-        json.createArrayNode(), "测试", "测试", "", null, null);
+        json.createArrayNode(), "测试", "测试", "", null, null, 1L);
     TemplateVersion latest = new TemplateVersion(2L, 1L, 2, "published", 0,
-        json.createArrayNode(), "测试", "测试", "", null, null);
+        json.createArrayNode(), "测试", "测试", "", null, null, 1L);
     when(jdbc.query(org.mockito.ArgumentMatchers.anyString(),
         org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<TemplateVersion>>any(),
         org.mockito.ArgumentMatchers.eq(3L))).thenReturn(List.of(draft));

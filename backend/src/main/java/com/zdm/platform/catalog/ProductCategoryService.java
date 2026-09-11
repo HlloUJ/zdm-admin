@@ -183,4 +183,14 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
       throw new IllegalArgumentException("上级分类与当前分类类型不一致");
     }
   }
+  @Override
+  public ProductCategory getById(java.io.Serializable id) {
+    ProductCategory entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

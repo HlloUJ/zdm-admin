@@ -18,12 +18,12 @@ public class PermissionGuard {
 
   public boolean hasPermission(String permission) {
     CurrentIdentity identity = identity();
-    return identity.isSuperAdmin() || identity.permissions().contains(permission);
+    return identity.isSuperAdmin() || identity.permissions().contains("all") || identity.permissions().contains(permission);
   }
 
   public boolean hasView(String permissionPrefix) {
     CurrentIdentity identity = identity();
-    if (identity.isSuperAdmin()) {
+    if (identity.isSuperAdmin() || identity.permissions().contains("all")) {
       return true;
     }
     return identity.permissions().stream()
@@ -47,6 +47,20 @@ public class PermissionGuard {
     if (!hasView(permissionPrefix)) {
       throw new AccessDeniedException("无权访问当前功能");
     }
+  }
+
+  public <T extends CreatorOwned> java.util.List<T> filterData(java.util.List<T> records) {
+    return DataScope.filter(identity(), records);
+  }
+
+  public void requireData(CreatorOwned entity) {
+    if (entity != null) {
+      DataScope.requireAccess(identity(), entity.getCreatedByAccountId());
+    }
+  }
+
+  public void requireDataPermission() {
+    DataScope.requireConfigured(identity());
   }
 
   public void requireAllData() {

@@ -53,6 +53,8 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     } else {
       query.eq(Role::getTenantId, scope.tenantId()).eq(Role::getStoreId, scope.storeId());
     }
+    query.eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), Role::getCreatedByAccountId,
+        identityProvider.require().accountId());
     return query
         .orderByDesc(Role::getCreatedAt)
         .list();
@@ -156,6 +158,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), role.getCreatedByAccountId());
     RoleScope scope = requireCurrentScope();
     if (!Objects.equals(role.getTenantId(), scope.tenantId())
         || !Objects.equals(role.getStoreId(), scope.storeId())) {

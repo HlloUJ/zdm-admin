@@ -43,6 +43,7 @@ public class FinishedMarkupConfigurationService {
         .orderByAsc(FinishedMarkupConfiguration::getSortOrder)
         .orderByDesc(FinishedMarkupConfiguration::getCreatedAt)
         .orderByDesc(FinishedMarkupConfiguration::getId));
+    result = com.zdm.platform.security.DataScope.filter(identityProvider.require(), result);
     result.forEach(this::enrich);
     return result;
   }
@@ -94,6 +95,7 @@ public class FinishedMarkupConfigurationService {
     List<FinishedMarkupConfiguration> configurations = mapper.selectList(
         Wrappers.<FinishedMarkupConfiguration>lambdaQuery()
             .eq(FinishedMarkupConfiguration::getLegacySeeded, false));
+    configurations = com.zdm.platform.security.DataScope.filter(identityProvider.require(), configurations);
     if (orderedIds == null || orderedIds.size() != configurations.size()
         || new HashSet<>(orderedIds).size() != configurations.size()) {
       throw new IllegalArgumentException("请提交当前全部成品价格配置");
@@ -140,6 +142,7 @@ public class FinishedMarkupConfigurationService {
     if (configuration == null) {
       throw new IllegalArgumentException("成品现货价格层级不存在");
     }
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), configuration.getCreatedByAccountId());
     enrich(configuration);
     return configuration;
   }

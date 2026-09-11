@@ -36,7 +36,7 @@ public class ProductAttributeController {
         visibleScopes.add(scope);
       }
     }
-    return ApiResponse.ok(service.listWithTemplateCounts(visibleScopes));
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithTemplateCounts(visibleScopes)));
   }
 
   @PostMapping

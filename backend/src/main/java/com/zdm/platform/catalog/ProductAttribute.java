@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
 @TableName("product_attributes")
-public class ProductAttribute extends BaseEntity {
+public class ProductAttribute extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String scope;
 

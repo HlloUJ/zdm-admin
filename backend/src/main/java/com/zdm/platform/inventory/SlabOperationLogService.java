@@ -185,6 +185,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     CurrentIdentity identity = externalOperation ? null : identityProvider.require();
     LocalDateTime now = LocalDateTime.now();
     SlabOperationLog log = new SlabOperationLog();
+    log.setProductCreatedByAccountId(slab.getCreatedByAccountId());
     log.setSlabId(slab.getId());
     log.setSlabSerialNo(slab.getSerialNo() == null ? "" : slab.getSerialNo());
     log.setSlabName(slab.getName());
@@ -226,6 +227,10 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       LocalDate endDate,
       List<Object> parameters) {
     List<String> conditions = new ArrayList<>();
+    if (!com.zdm.platform.security.DataScope.isAll(identityProvider.require())) {
+      conditions.add("product_created_by_account_id = ?");
+      parameters.add(identityProvider.require().accountId());
+    }
     if (keyword != null && !keyword.isBlank()) {
       String normalizedKeyword = "%" + keyword.trim() + "%";
       conditions.add("(slab_name LIKE ? OR slab_serial_no LIKE ? OR CAST(slab_id AS CHAR) LIKE ?)");

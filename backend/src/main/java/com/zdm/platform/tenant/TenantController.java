@@ -29,7 +29,7 @@ public class TenantController {
   @GetMapping
   public ApiResponse<List<Tenant>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(tenantService.listTenants());
+    return ApiResponse.ok(permissionGuard.filterData(tenantService.listTenants()));
   }
 
   @PostMapping

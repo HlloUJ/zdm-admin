@@ -33,7 +33,7 @@ public class SlabOriginController extends AdminCrudController<SlabOrigin> {
   @GetMapping
   public ApiResponse<List<SlabOrigin>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(permissionGuard.filterData(service.list()));
   }
 
   @Override

@@ -376,6 +376,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
 
   private CurrentIdentity requireEmployeeOrganizationScope(Employee employee) {
     CurrentIdentity identity = requireSupportedOrganizationScope();
+    com.zdm.platform.security.DataScope.requireAccess(identity, employee.getCreatedByAccountId());
     if (!Objects.equals(employee.getTenantId(), identity.tenantId())
         || !Objects.equals(employee.getStoreId(), identity.storeId())) {
       throw new AccessDeniedException("当前组织无权操作该员工");

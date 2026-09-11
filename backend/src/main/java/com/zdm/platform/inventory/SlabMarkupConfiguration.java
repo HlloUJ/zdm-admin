@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 @TableName("slab_markup_configurations")
-public class SlabMarkupConfiguration extends BaseEntity {
+public class SlabMarkupConfiguration extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotNull
   private Long storeLevelId;
 

@@ -154,26 +154,32 @@ export const routePermissionPrefixMap = Object.fromEntries(
 );
 
 export function isSuperAdmin(user: LoginUser) {
-  return user.roles.includes('SUPER_ADMIN') || user.permissions.includes('all');
+  return user.roles.includes('SUPER_ADMIN');
 }
 
 export function hasPermission(user: LoginUser, permission: string) {
   return (
-    isSuperAdmin(user) || getPermissionCandidates(permission).some((candidate) => user.permissions.includes(candidate))
+    isSuperAdmin(user) ||
+    user.permissions.includes('all') ||
+    getPermissionCandidates(permission).some((candidate) => user.permissions.includes(candidate))
   );
 }
 
 export function hasAnyPermission(user: LoginUser, permissions: string[]) {
-  return isSuperAdmin(user) || permissions.some((permission) => hasPermission(user, permission));
+  return (
+    isSuperAdmin(user) ||
+    user.permissions.includes('all') ||
+    permissions.some((permission) => hasPermission(user, permission))
+  );
 }
 
 export function hasPermissionPrefix(user: LoginUser, prefix?: string) {
-  if (!prefix || isSuperAdmin(user)) return true;
+  if (!prefix || isSuperAdmin(user) || user.permissions.includes('all')) return true;
   return user.permissions.some((permission) => permission === prefix || permission.startsWith(`${prefix}.`));
 }
 
 export function hasMenuPermission(user: LoginUser, prefix?: string) {
-  if (isSuperAdmin(user)) return true;
+  if (isSuperAdmin(user) || user.permissions.includes('all')) return true;
   if (!prefix) return false;
   return user.permissions.some(
     (permission) =>

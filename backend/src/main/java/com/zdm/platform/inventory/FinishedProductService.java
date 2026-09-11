@@ -74,6 +74,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
         JOIN product_categories category ON category.id = version.category_id
         WHERE category.scope = 'finished' AND category.tenant_id IS NULL
           AND category.status = 'enabled' AND version.state = 'published'
+          AND (? OR version.created_by_account_id = ?)
           AND NOT EXISTS (SELECT 1 FROM category_template_versions newer
             WHERE newer.category_id = version.category_id AND newer.state = 'published'
               AND newer.version_no > version.version_no)
@@ -85,11 +86,12 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
           } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
             throw new IllegalStateException("属性模板配置读取失败", error);
           }
-        });
+        }, com.zdm.platform.security.DataScope.isAll(identityProvider.require()), identityProvider.require().accountId());
   }
 
   public List<FinishedProduct> listWithDetails() {
     return lambdaQuery()
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), FinishedProduct::getCreatedByAccountId, identityProvider.require().accountId())
         .orderByDesc(FinishedProduct::getCreatedAt)
         .orderByDesc(FinishedProduct::getId)
         .list()
@@ -201,9 +203,9 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
 
   private void validateCategory(Long categoryId) {
     Long count = categoryId == null ? 0L : jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM product_categories WHERE id = ? AND scope = 'finished' AND status = 'enabled'",
+        "SELECT COUNT(*) FROM product_categories WHERE id = ? AND scope = 'finished' AND status = 'enabled' AND (? OR created_by_account_id = ?)",
         Long.class,
-        categoryId);
+        categoryId, com.zdm.platform.security.DataScope.isAll(identityProvider.require()), identityProvider.require().accountId());
     if (count == null || count == 0) {
       throw new IllegalArgumentException("请选择有效的成品现货分类");
     }
@@ -218,10 +220,11 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
         WHERE supplier.id = ?
           AND supplier.owner_scope = 'platform'
           AND supplier.owner_id = 0
+          AND (? OR supplier.created_by_account_id = ?)
           AND supplier.status = 'enabled'
           AND (supply_type.code = 'finished' OR supply_type.name IN ('成品', '成品现货'))
           AND supply_type.status = 'enabled'
-        """, Long.class, supplierId);
+        """, Long.class, supplierId, com.zdm.platform.security.DataScope.isAll(identityProvider.require()), identityProvider.require().accountId());
     if (count == null || count == 0) {
       throw new IllegalArgumentException("所选供应商未启用成品现货供货类型");
     }
@@ -382,4 +385,14 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
             .orderByAsc(FinishedProductAttributeEntry::getId)));
     return product;
   }
+  @Override
+  public FinishedProduct getById(java.io.Serializable id) {
+    FinishedProduct entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

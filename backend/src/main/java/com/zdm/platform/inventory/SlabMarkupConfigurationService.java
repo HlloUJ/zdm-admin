@@ -46,6 +46,7 @@ public class SlabMarkupConfigurationService {
         .orderByAsc(SlabMarkupConfiguration::getSortOrder)
         .orderByDesc(SlabMarkupConfiguration::getCreatedAt)
         .orderByDesc(SlabMarkupConfiguration::getId));
+    configurations = com.zdm.platform.security.DataScope.filter(identityProvider.require(), configurations);
     configurations.forEach(this::enrich);
     return configurations;
   }
@@ -123,6 +124,7 @@ public class SlabMarkupConfigurationService {
     List<SlabMarkupConfiguration> configurations = mapper.selectList(
         Wrappers.<SlabMarkupConfiguration>lambdaQuery()
             .eq(SlabMarkupConfiguration::getLegacySeeded, false));
+    configurations = com.zdm.platform.security.DataScope.filter(identityProvider.require(), configurations);
     if (orderedIds == null || orderedIds.size() != configurations.size()
         || new HashSet<>(orderedIds).size() != configurations.size()) {
       throw new IllegalArgumentException("请提交当前全部大板价格配置");
@@ -157,6 +159,7 @@ public class SlabMarkupConfigurationService {
     if (configuration == null) {
       throw new IllegalArgumentException("加价配置不存在");
     }
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), configuration.getCreatedByAccountId());
     enrich(configuration);
     return configuration;
   }

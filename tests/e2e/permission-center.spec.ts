@@ -402,7 +402,7 @@ test('shows supplier status without unrelated operations for a status-only accou
   await expect(supplierActions.locator('.t-link')).toHaveText(/^(停用|启用)$/);
 });
 
-test('allows account 15900000002 with self data scope to view all suppliers', async ({ page }) => {
+test('allows account 15900000002 with all data scope to view all suppliers', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
@@ -412,7 +412,7 @@ test('allows account 15900000002 with self data scope to view all suppliers', as
         phone: '15900000002',
         roles: ['OPERATION_MANAGER'],
         permissions: ['admin.supplier-management.view'],
-        dataPermission: 'self',
+        dataPermission: 'all',
       }),
     );
   });

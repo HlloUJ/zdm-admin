@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 @TableName("finished_markup_configurations")
-public class FinishedMarkupConfiguration extends BaseEntity {
+public class FinishedMarkupConfiguration extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotNull private Long storeLevelId;
   private String name;
   @NotNull @DecimalMin(value = "0.0000", inclusive = false) @Digits(integer = 3, fraction = 4)
