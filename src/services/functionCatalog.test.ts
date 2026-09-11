@@ -108,6 +108,15 @@ describe('full function catalog', () => {
       label: '商品管理',
       menus: [
         {
+          label: '成品现货管理',
+          pages: [
+            {
+              label: '成品现货管理页',
+              actions: [{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }],
+            },
+          ],
+        },
+        {
           label: '大板管理',
           direct: false,
           pages: [
@@ -206,12 +215,13 @@ describe('full function catalog', () => {
       collectFunctionCatalogRows(fullFunctionCatalog[1])
         .filter((row) => row.showMenu)
         .map((row) => row.menuLabel),
-    ).toEqual(['大板管理', '商品公共基础数据', '成品现货基础数据', '大板基础数据']);
+    ).toEqual(['成品现货管理', '大板管理', '商品公共基础数据', '成品现货基础数据', '大板基础数据']);
     expect(
       collectFunctionCatalogRows(fullFunctionCatalog[1])
         .filter((row) => row.showThirdMenu)
         .map((row) => row.thirdMenuLabel),
     ).toEqual([
+      undefined,
       undefined,
       '商品分类管理',
       '属性库管理',
@@ -518,6 +528,7 @@ describe('full function catalog', () => {
       'admin.tenant.store-level-management.sort',
       'admin.tenant.store-level-management.toggle-status',
       'admin.tenant.store-level-management.delete',
+      'admin.finished-stock-management.operation-log.view',
       'admin.slab-management.operation-log.view',
       'admin.slab-management.warehouse.view',
       'admin.slab-management.warehouse.publish',

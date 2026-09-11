@@ -1,6 +1,15 @@
 <template>
   <div class="product-price-editor">
-    <t-table row-key="key" :data="editors" :columns="columns" table-layout="fixed" bordered hover>
+    <t-table
+      row-key="key"
+      :data="displayEditors"
+      :columns="columns"
+      :rowspan-and-colspan="specRowspanAndColspan"
+      table-layout="auto"
+      table-content-width="max-content"
+      bordered
+      hover
+    >
       <template #label="{ row }">{{ row.label }}</template>
       <template v-for="(priceField, index) in priceFields" :key="priceField.key" #[priceField.key]="{ row }">
         <div>
@@ -53,11 +62,13 @@ import { AdminDialog, adminFeedback } from '@/components/foundation';
 import {
   updateFinishedProduct,
   type FinishedProductPayload,
+  type FinishedProductVariant,
   type FinishedProductRecord,
 } from '@/services/finishedProducts';
 import PriceSourceToggle from './PriceSourceToggle.vue';
 import SpecPriceInput from './SpecPriceInput.vue';
 import { isValidSpecPriceNumber } from '../priceValidation';
+import { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';
 const props = defineProps<{
   productId: number;
   product: FinishedProductPayload;
@@ -73,22 +84,23 @@ type PriceRow = {
   priceSource?: 'auto' | 'manual';
   sourceConfigurationId?: number;
 };
-type VariantEditor = { key: string; label: string; rows: PriceRow[] };
+type VariantEditor = { key: string; label: string; specValues: Record<string, string>; rows: PriceRow[] };
 const readonly = computed(() => ['soldOut', 'recycle'].includes(props.product.status));
 const submitted = ref(false);
 const saving = ref(false);
 const confirmVisible = ref(false);
-const variants = props.product.variants.length
-  ? props.product.variants
-  : Array.from(
-      new Set([
-        ...(props.product.guidePrices ?? []).map((price) => price.variantKey),
-        ...(props.product.markupPrices ?? []).map((price) => price.variantKey),
-      ]),
-    ).map((key) => ({
-      variantKey: key,
-      variantLabel: props.product.guidePrices?.find((price) => price.variantKey === key)?.variantLabel || key,
-    }));
+const variants: (Pick<FinishedProductVariant, 'variantKey' | 'variantLabel'> & Partial<FinishedProductVariant>)[] =
+  props.product.variants.length
+    ? props.product.variants
+    : Array.from(
+        new Set([
+          ...(props.product.guidePrices ?? []).map((price) => price.variantKey),
+          ...(props.product.markupPrices ?? []).map((price) => price.variantKey),
+        ]),
+      ).map((key) => ({
+        variantKey: key,
+        variantLabel: props.product.guidePrices?.find((price) => price.variantKey === key)?.variantLabel || key,
+      }));
 if (!variants.length) variants.push({ variantKey: props.product.sku, variantLabel: props.product.name });
 const levels = [...props.levels];
 for (const price of props.product.markupPrices ?? []) {
@@ -102,6 +114,7 @@ const editors = ref<VariantEditor[]>(
     return {
       key: variant.variantKey,
       label: variant.variantLabel || variant.variantKey,
+      specValues: variant.salesAttributes ?? {},
       rows: [
         {
           key: 'cost',
@@ -135,9 +148,34 @@ const editors = ref<VariantEditor[]>(
     };
   }),
 );
+const dimensions = computed(() =>
+  props.product.variants[0]?.displayMode === 'layered' ? (props.product.specDimensions ?? []) : [],
+);
+const displayEditors = computed(() =>
+  orderLayeredRows(
+    editors.value.map((editor) => ({ ...editor.specValues, editor })),
+    dimensions.value,
+  ).map((item) => item.editor),
+);
+const specRowspanAndColspan = ({ rowIndex, col }: { rowIndex: number; col: { colKey?: string } }) => {
+  const fieldIndex = dimensions.value.findIndex((dimension) => `spec:${dimension.key}` === col.colKey);
+  return layeredCellSpan(
+    displayEditors.value.map((editor) => dimensions.value.map((dimension) => editor.specValues[dimension.key] ?? '')),
+    rowIndex,
+    fieldIndex,
+  );
+};
 const priceFields = computed(() => editors.value[0]?.rows ?? []);
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  { colKey: 'label', title: '商品规格', width: 180, fixed: 'left' },
+  ...(dimensions.value.length
+    ? dimensions.value.map((dimension) => ({
+        colKey: `spec:${dimension.key}`,
+        title: dimension.name,
+        minWidth: 100,
+        ellipsis: false,
+        cell: (_h: unknown, { row }: { row: TableRowData }) => row.specValues[dimension.key] ?? '',
+      }))
+    : [{ colKey: 'label', title: '商品规格', minWidth: 180, ellipsis: false }]),
   ...priceFields.value.map((field, index) => ({
     colKey: field.key,
     title: () => h('span', [field.label, h('span', { class: 'required-star' }, '*')]),
@@ -239,6 +277,10 @@ defineExpose({ confirmSave });
   width: 100%;
   min-width: 0;
   gap: var(--td-comp-margin-l);
+}
+.product-price-editor :deep(th),
+.product-price-editor :deep(td) {
+  white-space: nowrap;
 }
 .price-pair {
   display: grid;

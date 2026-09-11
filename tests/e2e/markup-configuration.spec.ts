@@ -177,7 +177,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
     (request) => request.method() === 'PATCH' && request.url().endsWith('/finished-markup-configurations/3/status'),
   );
   await finishedRow.getByText('停用', { exact: true }).click();
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toContainText('确认停用成品价格配置“城市中心店”吗？');
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('确认停用成品价格配置“城市中心店”吗？');
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
   expect((await finishedStatusRequest).postDataJSON()).toEqual({ status: 'disabled' });
   await expect(page.getByText('已停用“城市中心店”', { exact: true })).toBeVisible();
@@ -204,7 +204,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await expect(page.getByText('价格系数不能小于1.00', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '新增', exact: true }).click();
-  const createDialog = page.locator('.t-dialog').filter({ has: page.getByText('新增', { exact: true }) });
+  const createDialog = page.locator('.t-dialog:visible').filter({ has: page.getByText('新增', { exact: true }) });
   await createDialog.getByPlaceholder('请选择', { exact: true }).click();
   const levelDropdown = page.locator('.t-select__dropdown:visible');
   await expect(levelDropdown.getByText('城市中心店', { exact: true })).toBeVisible();
@@ -256,11 +256,11 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
 
   await slabRow.getByText('删除', { exact: true }).click();
   await expect(page.getByText('该价格配置正在被4条大板价格使用，不能删除，请先停用', { exact: true })).toBeVisible();
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toHaveCount(0);
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toHaveCount(0);
 
   const unusedSlabRow = page.getByRole('row').filter({ hasText: '区域合作店' });
   await unusedSlabRow.getByText('删除', { exact: true }).click();
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toContainText('确认删除价格配置“区域合作店”吗？');
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('确认删除价格配置“区域合作店”吗？');
 });
 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
@@ -294,7 +294,7 @@ test('价格配置无排序和停启权限时隐藏对应操作', async ({ page 
   await expect(page.locator('.t-table__handle-draggable')).toHaveCount(0);
 
   await row.getByText('删除', { exact: true }).click();
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toContainText('确认删除价格配置“城市中心店”吗？');
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('确认删除价格配置“城市中心店”吗？');
   const deleteRequest = page.waitForRequest(
     (request) => request.method() === 'DELETE' && request.url().endsWith('/api/admin/finished-markup-configurations/3'),
   );
@@ -363,7 +363,7 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
     .getByRole('row', { name: /独立价格大板/ })
     .getByText('编辑', { exact: true })
     .click();
-  const productDialog = page.locator('.t-dialog').filter({ hasText: '编辑商品' });
+  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑商品' });
   await productDialog.getByText('销售信息', { exact: true }).click();
   const historicalRow = productDialog.locator('.price-editor__row').filter({ hasText: '历史门店级别' });
   await expect(historicalRow.getByRole('textbox').first()).toHaveValue('1.75');

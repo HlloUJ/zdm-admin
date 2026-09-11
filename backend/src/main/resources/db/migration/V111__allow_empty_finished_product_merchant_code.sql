@@ -1,0 +1,1 @@
+ALTER TABLE finished_products MODIFY COLUMN sku VARCHAR(100) NULL;

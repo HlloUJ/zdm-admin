@@ -29,6 +29,12 @@ export interface FinishedProductAttributeEntry {
   value: string;
 }
 
+export interface FinishedSpecDimension {
+  key: string;
+  name: string;
+  values: string[];
+}
+
 export interface FinishedProductVariant {
   id?: number;
   variantKey: string;
@@ -63,7 +69,10 @@ export interface FinishedProductRecord {
   markupPrices?: FinishedProductPrice[];
   attributes?: FinishedProductAttributeEntry[];
   variants?: FinishedProductVariant[];
+  specDimensions?: FinishedSpecDimension[];
   offShelfReason?: string;
+  offShelfAt?: string;
+  offShelfDetail?: string;
   createdByName?: string;
   createdByAccountId?: number;
   status?: FinishedProductStatus;
@@ -86,7 +95,10 @@ export interface FinishedProductPayload {
   markupPrices?: FinishedProductPrice[];
   attributes: FinishedProductAttributeEntry[];
   variants: FinishedProductVariant[];
+  specDimensions?: FinishedSpecDimension[];
   offShelfReason?: string;
+  offShelfAt?: string;
+  offShelfDetail?: string;
   status: FinishedProductStatus;
 }
 

@@ -1,0 +1,23 @@
+CREATE TABLE finished_operation_logs (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  product_id BIGINT NOT NULL,
+  merchant_code VARCHAR(100) NULL,
+  product_name VARCHAR(200) NOT NULL,
+  publisher_type VARCHAR(30) NULL,
+  operation_type VARCHAR(40) NOT NULL,
+  operation_summary VARCHAR(255) NOT NULL,
+  before_status VARCHAR(20) NULL,
+  after_status VARCHAR(20) NULL,
+  standard_reason VARCHAR(500) NULL,
+  detail_reason TEXT NULL,
+  change_details JSON NOT NULL,
+  operation_source VARCHAR(30) NOT NULL DEFAULT 'MANUAL',
+  batch_no CHAR(36) NULL,
+  operator_name VARCHAR(100) NOT NULL,
+  operator_account_id BIGINT NULL,
+  operated_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_finished_log_time (operated_at, id),
+  KEY idx_finished_log_product (product_id, operated_at),
+  KEY idx_finished_log_type (operation_type, operated_at)
+);
