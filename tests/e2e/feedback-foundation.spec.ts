@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function expectUnifiedConfirmDialog(page: Page, options: { action: string; content: string; danger?: boolean }) {
-  const dialog = page.locator('.zdm-admin-confirm-dialog');
+  const dialog = page.locator('.zdm-admin-confirm-dialog:visible');
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText(`确认${options.action}`);
   await expect(dialog).toContainText(options.content);
@@ -44,7 +44,7 @@ async function selectProductOption(
 }
 
 async function submitSlabProduct(page: Page) {
-  const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
+  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
   for (const [index, name] of ['main-image.svg', 'scan-image.svg', 'design-image.svg'].entries()) {
     await productDialog
       .locator('input[type="file"]')
@@ -75,7 +75,11 @@ async function submitSlabProduct(page: Page) {
   await productDialog.getByText('销售信息', { exact: true }).click();
   await selectProductOption(page, productDialog, '供应商', '装点猫大板供应商');
   await productDialog.locator('.t-form__item').filter({ hasText: '库存' }).getByRole('textbox').fill('1');
-  await productDialog.locator('.t-form__item').filter({ hasText: 'SKU' }).getByRole('textbox').fill('SLAB-PUBLISH-E2E');
+  await productDialog
+    .locator('.t-form__item')
+    .filter({ hasText: '大板编号' })
+    .getByRole('textbox')
+    .fill('SLAB-PUBLISH-E2E');
   const costInput = productDialog
     .locator('.price-editor__row')
     .filter({ hasText: '成本价' })
@@ -181,7 +185,7 @@ test('does not open a deletion dialog when an unfinished product still uses the 
   const row = page.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
   await row.getByText('删除', { exact: true }).click();
   await expect(page.getByText(message, { exact: true })).toBeVisible();
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toHaveCount(0);
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toHaveCount(0);
 });
 
 test('warns immediately instead of opening confirmation when a slab is not ready for shelving', async ({ page }) => {
@@ -233,7 +237,7 @@ test('warns immediately instead of opening confirmation when a slab is not ready
   await row.getByText('上架', { exact: true }).click();
 
   await expect(page.getByText('请完善大板销售信息后再上架', { exact: true })).toBeVisible();
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toHaveCount(0);
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toHaveCount(0);
 });
 
 test('physically deletes an interface slab with a reason and exposes an immutable operation log', async ({ page }) => {
@@ -392,7 +396,7 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   await page.goto('/slab-management');
   const row = page.getByRole('row', { name: /外部系统大板 09/ });
   await row.getByText('删除', { exact: true }).click();
-  const dialog = page.locator('.t-dialog').filter({ hasText: '删除原因' });
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '删除原因' });
   await expect(dialog).toContainText('该大板为外部系统创建，删除后将物理移除该大板，且不会进入回收站，操作不可恢复。');
   await expect(dialog.locator('.external-delete-warning')).toHaveCSS('margin-bottom', '16px');
   await expect(
@@ -403,7 +407,7 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
 
   expect(deletionPayload).toEqual({ reason: '资料不完整', detail: '' });
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toHaveCount(0);
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toHaveCount(0);
   await expect(page.getByText('已删除“外部系统大板 09”', { exact: true })).toBeVisible();
   await expect(row).toHaveCount(0);
   await page.locator('a.t-link').filter({ hasText: '操作日志' }).click();
@@ -417,7 +421,7 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   await expect(logDrawer).toContainText('资料不完整');
   const priceOperationRow = logDrawer.getByRole('row', { name: /历史操作大板 1/ });
   await priceOperationRow.getByText('详情', { exact: true }).click();
-  const detailDialog = page.locator('.t-dialog').filter({ hasText: '操作详情' });
+  const detailDialog = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
   await expect(detailDialog.locator('.operation-log-diff-item')).toHaveCount(12);
   await expect(detailDialog.locator('.operation-log-diff-item__field')).toHaveText([
     '1:1主图',
@@ -450,13 +454,15 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   await expect(detailDialog.locator('.operation-log-media-preview--image')).toHaveCount(3);
   await expect(detailDialog.locator('.operation-log-media-preview--video')).toHaveCount(1);
   await expect(detailDialog.getByText('媒体文件已清理', { exact: true })).toHaveCount(0);
-  await expect(detailDialog.locator('.operation-log-media-after')).toHaveCount(4);
+  await expect(
+    detailDialog.locator('.operation-log-diff-item').filter({ has: page.locator('.operation-log-media-preview') }),
+  ).toHaveCount(4);
   await detailDialog.locator('.operation-log-media-preview--image').first().click();
-  const mediaPreviewDialog = page.locator('.t-dialog').filter({ hasText: '1:1主图 - 修改后' });
+  const mediaPreviewDialog = page.locator('.t-dialog:visible').filter({ hasText: '1:1主图 - 修改后' });
   await expect(mediaPreviewDialog.locator('.upload-large-preview')).toBeVisible();
   await page.keyboard.press('Escape');
   await detailDialog.locator('.operation-log-media-preview--video').click();
-  const videoPreviewDialog = page.locator('.t-dialog').filter({ hasText: '视频 - 修改后' });
+  const videoPreviewDialog = page.locator('.t-dialog:visible').filter({ hasText: '视频 - 修改后' });
   await expect(videoPreviewDialog.locator('video.upload-large-preview')).toBeVisible();
   await page.keyboard.press('Escape');
   const priceComparison = detailDialog.locator('.operation-log-diff-item').filter({ hasText: '价格层级' });
@@ -466,7 +472,7 @@ test('physically deletes an interface slab with a reason and exposes an immutabl
   await expect(priceComparison.locator('.operation-log-diff-value--after')).toContainText('价格：145.00');
   await expect(detailDialog).not.toContainText('"configurationId"');
   await detailDialog.getByRole('button', { name: '关闭', exact: true }).click();
-  const operationLogPagination = logDrawer.locator('.zdm-admin-pagination .t-pagination');
+  const operationLogPagination = logDrawer.locator('.zdm-admin-pagination:visible .t-pagination');
   await expect(operationLogPagination).toBeVisible();
   await expect(logDrawer.getByRole('row', { name: /历史操作大板 10/ })).toHaveCount(0);
   await operationLogPagination.locator('.t-pagination__btn-next').click();
@@ -502,7 +508,7 @@ test('permanently deletes one or multiple slabs from the recycle tab after confi
   await page.getByRole('button', { name: '确认彻底删除', exact: true }).click();
   await singleDelete;
   await expect(singleRow).toHaveCount(0);
-  await expect(page.locator('.zdm-admin-confirm-dialog')).toBeHidden();
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toBeHidden();
 
   const batchRow = page.getByRole('row', { name: /回收站大板 08/ });
   await batchRow.locator('.t-checkbox').click();
@@ -750,7 +756,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await row.locator('.t-checkbox').click();
   await page.getByRole('button', { name: '批量下架', exact: true }).click();
 
-  const dialog = page.locator('.t-dialog').filter({ hasText: '批量下架' });
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '批量下架' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('下架原因', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
@@ -786,7 +792,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   expect((await page.locator('.table-card thead th').allTextContents()).map((text) => text.trim())).toEqual([
     '',
     '商品主图',
-    '大板名称/ID/SKU',
+    '大板名称/ID/大板编号',
     '品种',
     '下架原因/详细说明',
     '下架人',
@@ -831,7 +837,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(page.locator('.t-popup__content:visible').getByText(latestDetailReason, { exact: true })).toBeVisible();
   await expect(historyTrigger).toHaveCSS('opacity', '1');
   await historyTrigger.click();
-  const historyDialog = page.locator('.t-dialog').filter({ hasText: '历史下架原因' });
+  const historyDialog = page.locator('.t-dialog:visible').filter({ hasText: '历史下架原因' });
   await expect(historyDialog).toBeVisible();
   const historyRows = historyDialog.locator('tbody tr');
   await expect(historyRows).toHaveCount(2);
@@ -984,9 +990,11 @@ test('leaves SKU blank for operations staff when publishing a product', async ({
   });
   await page.goto('/slab-management');
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
-  const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
+  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
   await productDialog.getByText('销售信息', { exact: true }).click();
-  await expect(productDialog.locator('.t-form__item').filter({ hasText: 'SKU' }).getByRole('textbox')).toHaveValue('');
+  await expect(productDialog.locator('.t-form__item').filter({ hasText: '大板编号' }).getByRole('textbox')).toHaveValue(
+    '',
+  );
 });
 
 test('allows slab prices for enabled store levels without markup configurations', async ({ page }) => {
@@ -998,7 +1006,7 @@ test('allows slab prices for enabled store levels without markup configurations'
   });
   await page.goto('/slab-management');
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
-  const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
+  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
   await productDialog.getByText('销售信息', { exact: true }).click();
 
   const costInput = productDialog
@@ -1023,7 +1031,7 @@ test('filters slab varieties and origins by search text when publishing a produc
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   await page.getByText('基础信息', { exact: true }).click();
 
-  const productDialog = page.locator('.t-dialog').filter({ hasText: '发布商品' });
+  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
   const varietyInput = productDialog.locator('.t-form__item').filter({ hasText: '品种' }).getByRole('textbox');
   await varietyInput.fill('潘多');
   const varietyDropdown = page.locator('.t-select__dropdown:visible');
@@ -1148,7 +1156,7 @@ test('shows the duplicate store name error on the edit form', async ({ page }) =
   await page.goto('/tenant-store-management');
   const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
   await row.getByText('编辑', { exact: true }).click();
-  const dialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑' });
   await dialog.locator('.t-form__item').filter({ hasText: '门店名称' }).getByPlaceholder('请输入').fill('已归档门店');
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
 

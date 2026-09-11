@@ -1,6 +1,7 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.Valid;
@@ -8,15 +9,26 @@ import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 import java.util.List;
 
-@TableName("finished_products")
+@TableName(value = "finished_products", autoResultMap = true)
 public class FinishedProduct extends BaseEntity {
+  @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+  private List<FinishedSpecDimension> specDimensions;
+
+  public List<FinishedSpecDimension> getSpecDimensions() {
+    return specDimensions == null ? null : List.copyOf(specDimensions);
+  }
+
+  public void setSpecDimensions(List<FinishedSpecDimension> value) {
+    specDimensions = value == null ? null : List.copyOf(value);
+  }
+
   private Long categoryId;
   private Long supplierId;
 
   @NotBlank
   private String name;
 
-  @NotBlank
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String sku;
 
   /** @deprecated kept only for compatibility with pre-media rows. */
@@ -42,6 +54,13 @@ public class FinishedProduct extends BaseEntity {
   private Integer totalStock;
   private BigDecimal guidePrice;
   private String offShelfReason;
+  private java.time.LocalDateTime offShelfAt;
+  public java.time.LocalDateTime getOffShelfAt() { return offShelfAt; }
+  public void setOffShelfAt(java.time.LocalDateTime value) { this.offShelfAt = value; }
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String offShelfDetail;
+  public String getOffShelfDetail() { return offShelfDetail; }
+  public void setOffShelfDetail(String value) { this.offShelfDetail = value; }
   private String createdByName;
   private Long createdByAccountId;
 

@@ -77,10 +77,10 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await page.goto('/finished-stock-management');
   const categoryFilter = page.locator('.filter-card .t-form__item').filter({ hasText: '商品分类' });
   await categoryFilter.locator('input').click();
-  await expect(page.getByText('有效商品分类', { exact: true })).toBeVisible();
+  await expect(page.locator('.t-cascader__panel:visible').getByText('有效商品分类', { exact: true })).toBeVisible();
   await expect(page.getByText('已停用分类', { exact: true })).toHaveCount(0);
   await expect(page.getByText('辅料分类', { exact: true })).toHaveCount(0);
-  await page.getByPlaceholder('商品名称 / ID / 编码', { exact: true }).click();
+  await page.getByPlaceholder('商品名称 / ID / 商家编码', { exact: true }).click();
 
   await expect(page.getByText(/仓库中/)).toBeVisible();
   await expect(page.getByText('供应商', { exact: true }).first()).toBeVisible();
@@ -94,7 +94,7 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await expect(firstProductRow.getByText('2026/07/27 17:00', { exact: true })).toBeVisible();
   await expect(page.getByText('流水', { exact: true })).toHaveCount(0);
   await expect(page.getByText('库存流水', { exact: true })).toHaveCount(0);
-  const keyword = page.getByPlaceholder('商品名称 / ID / 编码', { exact: true });
+  const keyword = page.getByPlaceholder('商品名称 / ID / 商家编码', { exact: true });
   for (const text of ['轻奢', '1', 'fp-20260727', '  岩板  ']) {
     await keyword.fill(text);
     await page.getByRole('button', { name: '查询', exact: true }).click();
@@ -137,7 +137,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await expect(page.getByText('当前分类：成品现货 > 餐桌 > 石材餐桌 > 奢石餐桌')).toBeVisible();
   const images = page.locator('.t-form__item').filter({ hasText: '最多上传5张图片' });
   const video = page.locator('.t-form__item').filter({ hasText: '最多上传1段视频' });
-  await expect(images.locator('input[type="file"]')).toHaveCount(1);
+  await expect(images.locator('input[type="file"]')).toHaveCount(5);
   await expect(video.locator('input[type="file"]')).toHaveCount(1);
   await expect(images.locator('.t-form__label')).toContainText('商品主图');
   await expect(video.locator('.t-form__label')).toContainText('商品视频');
@@ -161,12 +161,15 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
     .locator('.admin-media-upload')
     .filter({ has: page.getByText('点击上传', { exact: true }) });
   for (let index = 0; index < 5; index++) {
-    await expect(emptyUploads).toHaveCount(1);
-    await emptyUploads.locator('input[type="file"]').setInputFiles({
-      name: `product-${index}.png`,
-      mimeType: 'image/png',
-      buffer: Buffer.from('test-image'),
-    });
+    await expect(emptyUploads).toHaveCount(5 - index);
+    await emptyUploads
+      .first()
+      .locator('input[type="file"]')
+      .setInputFiles({
+        name: `product-${index}.png`,
+        mimeType: 'image/png',
+        buffer: Buffer.from('test-image'),
+      });
     await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(index + 1);
   }
   await expect(emptyUploads).toHaveCount(0);
@@ -175,7 +178,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(4);
 
   await images.getByRole('button', { name: '商品主图2', exact: true }).click();
-  const preview = page.locator('.t-dialog').filter({ has: page.locator('.image-preview-dialog') });
+  const preview = page.locator('.t-dialog:visible').filter({ has: page.locator('.image-preview-dialog') });
   await expect(preview).toBeVisible();
   await expect(preview.locator('.image-preview-dialog img')).toHaveAttribute('src', '/test-product.png');
   await preview.locator('.t-dialog__close').click();
@@ -489,7 +492,9 @@ test('refreshes configured finished prices and calculates dynamic specification 
   const following = configuredCell.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true });
   const manual = configuredCell.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true });
   await following.click();
-  await expect(page.getByText('确定更改价格不跟随价格配置浮动？', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.t-dialog:visible').getByText('确定更改价格不跟随价格配置浮动？', { exact: true }),
+  ).toBeVisible();
   await page.locator('.t-dialog__cancel:visible').click();
   await expect(following).toBeVisible();
   await following.click();
@@ -655,8 +660,9 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   await expect(page.locator('#finished-product-sales')).not.toContainText('销售测试属性');
   await page.getByRole('button', { name: '创建规格', exact: true }).click();
   await page.getByText('分层展示：选择标准属性构建规格', { exact: true }).click();
+  await page.getByRole('button', { name: '确认切换', exact: true }).click();
   await expect(page.locator('.selected-tags .spec-attr-tag')).toHaveText(['销售测试属性']);
-  await page.getByText('单层展示', { exact: false }).last().click();
+  await page.getByRole('button', { name: '重置', exact: true }).click();
 
   await page.getByPlaceholder('请输入规格文本，如 1500*800*750mm').fill('标准规格');
   await page.getByRole('button', { name: '确认创建', exact: true }).click();
@@ -682,11 +688,13 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   await expect(salesInput).toHaveValue('大号');
   await expect(salesInput.locator('..')).not.toHaveClass(/t-is-error/);
   await page.getByRole('button', { name: '编辑规格', exact: true }).click();
+  await page.getByPlaceholder('请输入规格文本，如 1500*800*750mm').fill('大号');
   await page.getByText('分层展示：选择标准属性构建规格', { exact: true }).click();
+  await page.getByRole('button', { name: '确认切换', exact: true }).click();
   await expect(page.locator('.spec-attr-tag')).toHaveText(['销售测试属性']);
   await page.getByPlaceholder('请输入属性值').fill('小号');
   await page.getByRole('button', { name: '确认创建', exact: true }).click();
-  await expect(table.locator('tbody tr td').nth(3).getByRole('textbox')).toHaveValue('小号');
+  await expect(table.locator('tbody tr td').first()).toHaveText('小号');
 });
 
 test('uses published bindings for new products and keeps unpublished historical attributes on edit', async ({
@@ -822,8 +830,10 @@ test('edits prices in a specification table and preserves product details on sav
   }
 
   await visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }).click();
-  await expect(page.getByText('确定更改价格不跟随价格配置浮动？', { exact: true })).toBeVisible();
-  await page.locator('.t-dialog__cancel').click();
+  await expect(
+    page.locator('.t-dialog:visible').getByText('确定更改价格不跟随价格配置浮动？', { exact: true }),
+  ).toBeVisible();
+  await page.locator('.t-dialog:visible .t-dialog__cancel').click();
   expect(saves).toBe(0);
   await expect(
     visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }),
@@ -854,7 +864,7 @@ test('edits prices in a specification table and preserves product details on sav
   ).toBeVisible();
   expect(product.markupPrices[0].priceSource).toBe('auto');
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await page.locator('.t-dialog__cancel').click();
+  await page.locator('.t-dialog:visible .t-dialog__cancel').click();
   await page.locator('.price-editor-footer').getByRole('button', { name: '取消', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);

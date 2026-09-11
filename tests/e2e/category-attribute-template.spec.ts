@@ -125,7 +125,7 @@ test('tabs retain automatically saved drafts', async ({ page }) => {
   await expect(page.getByRole('button', { name: '保存草稿', exact: true })).toHaveCount(0);
   await page.locator('.attribute-table .required-switch').first().click();
   await page.getByText('配件模板', { exact: true }).click();
-  await expect(page.locator('.category-content .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
+  await expect(page.locator('.category-content:visible .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   expect((versions.find((v) => v.id === 2)?.content as Record<string, unknown>[])[0]?.requiredFlag).toBe(false);
   await page.getByText('成品现货模板', { exact: true }).click();
@@ -138,7 +138,7 @@ test('tabs retain automatically saved drafts', async ({ page }) => {
   expect(versions.find((v) => v.id === 2)?.versionNo).toBeNull();
   expect((versions.find((v) => v.id === 2)?.content as Record<string, unknown>[])[0]?.requiredFlag).toBe(false);
   await page.getByText('配件模板', { exact: true }).click();
-  await expect(page.locator('.category-content .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
+  await expect(page.locator('.category-content:visible .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
   await expect(page.locator('.version-panel .t-tabs')).toHaveCount(0);
 });
 
@@ -157,7 +157,7 @@ test('only an authorized scope is visible and cannot create versions', async ({ 
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
   await page.waitForLoadState('networkidle');
   if (await continueDraft.isVisible()) await continueDraft.click();
-  await expect(page.locator('.category-content .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
+  await expect(page.locator('.category-content:visible .t-tree__label').filter({ hasText: '桌腿' })).toBeVisible();
   await expect(page.getByRole('main').locator('.t-tabs__nav-item')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '创建新版本草稿', exact: true })).toHaveCount(0);
 });
@@ -180,7 +180,7 @@ test('attribute list paginates without dropping draft rows on save', async ({ pa
   await expect(list.locator('tbody tr')).toHaveCount(10);
   await expect(list.locator('tbody tr').first().locator('td').nth(1)).toHaveText('1');
   await expect(list.getByText('分页属性11', { exact: true })).toHaveCount(0);
-  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await page.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await expect(list.locator('tbody tr')).toHaveCount(2);
   await expect(list.locator('tbody tr').first().locator('td').nth(1)).toHaveText('11');
   await expect(list.getByText('分页属性11', { exact: true })).toBeVisible();
@@ -257,7 +257,7 @@ test('add attributes paginates and retains selections across search and pages', 
   await expect(firstRow.getByRole('checkbox')).not.toBeChecked();
   await firstRow.locator('.t-checkbox').click();
   await expect(firstRow.getByRole('checkbox')).toBeChecked();
-  await dialog.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await dialog.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await expect(dialog.locator('tbody tr')).toHaveCount(2);
   await dialog.locator('tbody tr').first().locator('.t-checkbox').click();
   await dialog.getByPlaceholder('搜索属性名称').fill('候选属性12');
@@ -315,12 +315,12 @@ test('option values support row selection and pagination without applying on can
   await link.click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.locator('tbody tr')).toHaveCount(10);
-  await dialog.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await dialog.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await dialog.getByText('选项11', { exact: true }).click();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(link).toHaveText(originalCount);
   await link.click();
-  await dialog.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await dialog.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await dialog.getByText('选项11', { exact: true }).click();
   await dialog.getByPlaceholder('搜索选项值').fill('选项12');
   await expect(dialog.locator('tbody tr')).toHaveCount(1);
@@ -435,14 +435,14 @@ test('published drag order saves automatically and survives refresh', async ({ p
     sortOrder: i + 1,
   }));
   await page.goto('/category-attribute-template');
-  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await page.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   const handles = page.locator('.attribute-table .t-icon-move');
   await handles.first().dragTo(handles.nth(1), { targetPosition: { x: 8, y: 13 } });
   await expect(page.getByText('已调整“字段显示顺序”', { exact: true })).toBeVisible();
   expect((version.content as Array<{ attributeId: number }>)[10]!.attributeId).toBe(1011);
   expect(version.versionNo).toBe(1);
   await page.reload();
-  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await page.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await expect(page.locator('.attribute-table tbody tr').first()).toContainText('拖拽属性12');
   await expect(page.locator('.attribute-table tbody tr').first().locator('td').nth(1)).toHaveText('11');
 });
@@ -584,11 +584,11 @@ test('specification switches enforce a template-wide limit and persist with the 
   expect((draft.content as Record<string, unknown>[]).filter((row) => row.skuFlag)).toHaveLength(4);
   await table.locator('.specification-control .t-switch').first().click();
   await expect(seventh.locator('.t-switch')).not.toHaveClass(/t-is-disabled/);
-  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await page.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await table.locator('.specification-control .t-switch').last().click();
   await expect.poll(() => (draft.content as Record<string, unknown>[])[11]?.skuFlag).toBe(true);
   await expect(table.locator('.specification-control .t-switch').first()).toHaveClass(/t-is-disabled/);
-  await page.locator('.zdm-admin-pagination').getByText('1', { exact: true }).click();
+  await page.locator('.zdm-admin-pagination:visible').getByText('1', { exact: true }).click();
   const secondRole = table.locator('tbody tr').nth(1).locator('.t-select');
   await secondRole.click();
   await page.locator('.t-select__list:visible').getByText('商品属性', { exact: true }).click();
@@ -598,7 +598,7 @@ test('specification switches enforce a template-wide limit and persist with the 
   await page.reload();
   await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
   await expect(table.locator('.specification-control .t-switch').first()).not.toHaveClass(/t-is-checked/);
-  await page.locator('.zdm-admin-pagination').getByText('2', { exact: true }).click();
+  await page.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await expect(table.locator('.specification-control .t-switch').last()).toHaveClass(/t-is-checked/);
 });
 

@@ -638,6 +638,20 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
       ...module,
       label: '商品管理',
       menus: [
+        {
+          label: '成品现货管理',
+          value: 'admin.finished-stock-management.menu',
+          direct: false,
+          pages: [
+            {
+              label: '成品现货管理页',
+              value: 'admin.finished-stock-management',
+              audiences: ['admin'],
+              actions: [{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }],
+              tabs: [],
+            },
+          ],
+        },
         ...(slabManagementMenu ? [slabManagementMenu] : []),
         {
           label: '商品公共基础数据',

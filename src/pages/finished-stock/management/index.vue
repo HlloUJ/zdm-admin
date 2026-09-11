@@ -37,7 +37,9 @@
               <t-breadcrumb-item v-if="formPageVisible">{{ formPageTitle }}</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
-          <t-tag theme="primary" variant="light">全平台共用成品现货库</t-tag>
+          <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="operationLogsVisible = true"
+            >操作日志</t-link
+          >
         </header>
 
         <template v-if="!formPageVisible">
@@ -53,7 +55,7 @@
                     <t-input
                       v-model="currentFilter.keyword"
                       clearable
-                      placeholder="商品名称 / ID / 编码"
+                      placeholder="商品名称 / ID / 商家编码"
                       @enter="handleSearch"
                     />
                   </t-form-item>
@@ -136,7 +138,7 @@
                 <div class="product-meta">
                   <div class="product-name">{{ row.name }}</div>
                   <div class="product-code">ID：{{ row.id }}</div>
-                  <div class="product-code">编码：{{ row.code }}</div>
+                  <div class="product-code">商家编码：{{ row.code }}</div>
                 </div>
               </template>
               <template #supplier="{ row }">
@@ -146,13 +148,27 @@
                   <span class="store-text">平台仓</span>
                 </div>
               </template>
+              <template #offShelfAt="{ row }">{{
+                row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
+              }}</template>
               <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-              <template #stock="{ row }">
-                <span>{{ activeTab === 'soldOut' ? 0 : row.stock }}</span>
+              <template #offShelfReason="{ row }">
+                <div class="off-shelf-reason-cell">
+                  <span>{{ row.offShelfReason || '—' }}</span>
+                  <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
+                    <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
+                  </t-tooltip>
+                </div>
               </template>
               <template #operation="{ row }">
                 <div class="table-actions">
-                  <t-link theme="primary" hover="color" @click="openPriceDrawer('view', row)">价格</t-link>
+                  <t-link
+                    v-if="activeTab !== 'offShelf'"
+                    theme="primary"
+                    hover="color"
+                    @click="openPriceDrawer('view', row)"
+                    >价格</t-link
+                  >
                   <t-link
                     v-for="action in rowActions()"
                     :key="action.action"
@@ -186,7 +202,13 @@
                   <h1>{{ formPageTitle }}</h1>
                   <div class="selected-category">
                     当前分类：{{ selectedCategoryPath }}
-                    <t-button size="small" variant="outline" @click="openCategoryDialog">切换分类</t-button>
+                    <t-button
+                      v-if="formPageMode === 'create'"
+                      size="small"
+                      variant="outline"
+                      @click="openCategoryDialog"
+                      >切换分类</t-button
+                    >
                   </div>
                 </div>
                 <t-button theme="default" variant="base" @click="closeFormPage">
@@ -199,13 +221,13 @@
               <h2 class="form-section-title">图文描述</h2>
               <t-form :data="productForm" label-width="116px" colon>
                 <t-form-item label="商品主图" required-mark help="最多上传5张图片，第一张作为商品封面">
-                  <div class="upload-grid">
+                  <div class="upload-grid main-image-upload-grid">
                     <AdminMediaUpload
                       v-for="index in mainImageUploadIndexes"
                       :key="index"
                       v-model="mainImageSlots[index]"
-                      :title="`商品主图${index + 1}`"
-                      :show-title="false"
+                      :title="index === 0 ? '封面图' : `商品主图${index + 1}`"
+                      :show-title="true"
                       accept="image/*"
                       :error-message="submitAttempted && !mainImageMedia && index === 0 ? '请上传图片' : ''"
                       :upload="(file) => uploadProductMedia(file, 'image')"
@@ -321,15 +343,27 @@
                     创建规格
                   </t-button>
                   <div v-if="specRows.length" class="spec-table-block">
-                    <t-table row-key="id" :data="specRows" :columns="specColumns" hover table-layout="fixed">
+                    <t-table
+                      row-key="id"
+                      :data="specRows"
+                      :columns="specColumns"
+                      :rowspan-and-colspan="specRowspanAndColspan"
+                      table-content-width="max-content"
+                      bordered
+                      hover
+                      table-layout="auto"
+                    >
                       <template #specText="{ row }">
                         <div class="spec-name-cell">
                           <span>{{ row.specText || '-' }}</span>
                         </div>
                       </template>
                       <template v-for="field in salesAttributeFields" :key="field.key" #[field.key]="{ row }">
+                        <span v-if="confirmedSpecMode === 'layered' && confirmedLayeredFields.includes(field.key)">
+                          {{ row[field.key] || '-' }}
+                        </span>
                         <t-select
-                          v-if="field.type === 'select'"
+                          v-else-if="field.type === 'select'"
                           v-model="row[field.key]"
                           clearable
                           :status="field.required ? requiredFieldStatus(row[field.key]) : undefined"
@@ -455,7 +489,16 @@
                       </template>
                       <template #quantity="{ row }">
                         <div class="quantity-editor">
-                          <t-input-number v-model="row.quantity" theme="normal" :min="0" />
+                          <t-input-number
+                            v-model="row.quantity"
+                            theme="normal"
+                            :min="0"
+                            :status="submitAttempted && !isValidSpecQuantity(row.quantity) ? 'error' : undefined"
+                            :tips="
+                              submitAttempted && !isValidSpecQuantity(row.quantity) ? '请输入大于 0 的数量' : undefined
+                            "
+                            placeholder="请输入"
+                          />
                         </div>
                       </template>
                       <template #merchantCode="{ row }">
@@ -482,14 +525,8 @@
                 <t-form-item label="总库存">
                   <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
                 </t-form-item>
-                <t-form-item label="商家编码" required-mark>
-                  <t-input
-                    v-model="productForm.merchantCode"
-                    :status="requiredFieldStatus(productForm.merchantCode)"
-                    clearable
-                    placeholder="请输入"
-                    :maxlength="60"
-                  />
+                <t-form-item label="商家编码">
+                  <t-input v-model="productForm.merchantCode" clearable placeholder="请输入" :maxlength="60" />
                 </t-form-item>
                 <t-form-item label="上架" required-mark :status="requiredFieldStatus(productForm.shelfNow)">
                   <t-radio-group v-model="productForm.shelfNow">
@@ -561,71 +598,140 @@
       @close="closeSpecDialog"
     >
       <div class="spec-dialog">
-        <t-radio-group v-model="specMode" @change="handleSpecModeChange">
+        <t-radio-group :value="specMode" @change="requestSpecModeChange">
           <t-radio value="single">单层展示：自定义填写规格</t-radio>
           <t-radio value="layered">分层展示：选择标准属性构建规格</t-radio>
         </t-radio-group>
 
+        <t-alert v-if="specConversionNotice" theme="info" :message="specConversionNotice" />
+        <t-alert
+          v-if="unmatchedSpecNames.length && specMode === 'layered'"
+          theme="warning"
+          :message="`以下单层规格尚未匹配，请按原文配置属性值后再确认，或点击重置恢复：${unmatchedSpecNames.join('、')}`"
+        />
         <div v-if="specMode === 'single'" class="single-spec-editor">
           <div class="spec-section-title">商品规格</div>
           <div class="single-spec-list">
             <div v-for="(item, index) in singleSpecs" :key="item.id" class="single-spec-row">
-              <t-input v-model="item.text" placeholder="请输入规格文本，如 1500*800*750mm" />
+              <t-input
+                v-model="item.text"
+                :status="isDuplicateSingleSpec(item) ? 'error' : specDraftFieldStatus(item.text, item.id)"
+                placeholder="请输入规格文本，如 1500*800*750mm"
+              />
               <t-button shape="square" variant="text" theme="danger" @click="removeSingleSpec(index)">
                 <t-icon name="delete" />
               </t-button>
+              <t-button
+                :class="{ 'spec-add-hidden': index !== singleSpecs.length - 1 }"
+                shape="square"
+                theme="default"
+                variant="outline"
+                title="新增规格项"
+                aria-label="新增规格项"
+                @click="addSingleSpec"
+              >
+                <t-icon name="add" />
+              </t-button>
             </div>
           </div>
-          <t-button class="spec-add-button" theme="default" variant="outline" @click="addSingleSpec">
-            <template #icon><t-icon name="add" /></template>
-            新增规格项
-          </t-button>
         </div>
 
         <div v-else class="layered-spec-editor">
           <div class="selected-tags">
             <button
               v-for="group in specGroups"
-              :key="group.name"
+              :key="group.field"
               type="button"
-              :class="['spec-attr-tag', group.selected && 'active']"
+              :draggable="!isSpecGroupDisabled(group)"
+              :disabled="isSpecGroupDisabled(group)"
+              :title="isSpecGroupDisabled(group) ? '最多选择 3 个销售属性' : '拖拽调整属性顺序，点击选择属性'"
+              :class="['spec-attr-tag', { active: group.selected, disabled: isSpecGroupDisabled(group) }]"
+              @dragstart="startSpecGroupDrag($event, group.field)"
+              @dragover.prevent
+              @drop.prevent="dropSpecGroup(group.field)"
+              @dragend="draggedSpecField = null"
               @click="toggleSpecGroup(group)"
             >
+              <t-icon name="move" />
               {{ group.name }}
             </button>
           </div>
-          <div v-if="!specGroups.length" class="layered-empty">当前分类暂无已发布且参与 SKU 组合的销售属性</div>
+          <div v-if="!specGroups.length" class="layered-empty">当前分类暂无已发布的属性模板</div>
           <div v-else-if="!selectedSpecGroups.length" class="layered-empty">请选择销售属性标签</div>
-          <div v-for="group in selectedSpecGroups" :key="group.name" class="spec-group">
-            <div class="spec-group-head">
+          <div
+            v-for="group in selectedSpecGroups"
+            :key="group.field"
+            class="spec-group"
+            @dragover.prevent
+            @drop.prevent="dropSpecGroup(group.field)"
+          >
+            <div
+              class="spec-group-head"
+              draggable="true"
+              title="拖拽调整属性顺序"
+              @dragstart="startSpecGroupDrag($event, group.field)"
+              @dragend="draggedSpecField = null"
+            >
               <div class="spec-group-title">
+                <t-icon name="move" />
                 <span v-if="salesAttributeByKey(group.field)?.required" style="color: var(--td-error-color)">* </span
                 >{{ group.name }}
               </div>
             </div>
-            <div v-for="(value, index) in group.values" :key="value.id" class="layered-value-row">
-              <t-select
-                v-if="salesAttributeByKey(group.field)?.type === 'select'"
-                v-model="value.value"
-                clearable
-                placeholder="请选择属性值"
+            <div class="layered-values">
+              <div
+                v-for="(value, index) in group.values"
+                :key="value.id"
+                class="layered-value-row"
+                @dragover.prevent
+                @drop.prevent="dropSpecValue($event, group, value.id)"
               >
-                <t-option
-                  v-for="item in salesAttributeByKey(group.field)?.options"
-                  :key="item"
-                  :label="item"
-                  :value="item"
+                <span
+                  class="spec-value-drag-handle"
+                  draggable="true"
+                  title="拖拽调整属性值顺序"
+                  aria-label="拖拽调整属性值顺序"
+                  @dragstart.stop="startSpecValueDrag($event, group.field, value.id)"
+                  @dragend.stop="draggedSpecValue = null"
+                >
+                  <t-icon name="move" />
+                </span>
+                <t-select
+                  v-if="salesAttributeByKey(group.field)?.type === 'select'"
+                  v-model="value.value"
+                  :status="specDraftFieldStatus(value.value, value.id)"
+                  clearable
+                  placeholder="请选择属性值"
+                >
+                  <t-option
+                    v-for="item in salesAttributeByKey(group.field)?.options"
+                    :key="item"
+                    :label="item"
+                    :value="item"
+                    :disabled="isSpecOptionSelected(group, value.id, item)"
+                  />
+                </t-select>
+                <t-input
+                  v-else
+                  v-model="value.value"
+                  :status="isDuplicateSpecValue(group, value) ? 'error' : specDraftFieldStatus(value.value, value.id)"
+                  placeholder="请输入属性值"
                 />
-              </t-select>
-              <t-input v-else v-model="value.value" placeholder="请输入属性值" />
-              <t-button shape="square" variant="text" theme="danger" @click="removeSpecValue(group.name, index)">
-                <t-icon name="delete" />
-              </t-button>
+                <t-button shape="square" variant="text" theme="danger" @click="removeSpecValue(group.name, index)">
+                  <t-icon name="delete" />
+                </t-button>
+                <t-button
+                  :class="{ 'spec-add-hidden': index !== group.values.length - 1 || !canAddSpecValue(group) }"
+                  shape="square"
+                  variant="outline"
+                  aria-label="新增属性值"
+                  title="新增属性值"
+                  @click="addSpecValue(group.name)"
+                >
+                  <t-icon name="add" />
+                </t-button>
+              </div>
             </div>
-            <t-button class="spec-add-button" size="small" variant="outline" @click="addSpecValue(group.name)">
-              <template #icon><t-icon name="add" /></template>
-              新增属性值
-            </t-button>
           </div>
         </div>
 
@@ -635,6 +741,19 @@
           <t-button theme="default" variant="base" @click="closeSpecDialog">取消</t-button>
         </div>
       </div>
+    </AdminDialog>
+
+    <AdminDialog
+      v-model:visible="specModeConfirmVisible"
+      header="切换展示模式可能导致当前数据被清空"
+      confirm-btn="确认切换"
+      cancel-btn="取消"
+      @confirm="confirmSpecModeChange"
+      @cancel="specModeConfirmVisible = false"
+      @close="specModeConfirmVisible = false"
+    >
+      您正在从【单层展示】切换至【分层展示】。本次操作将可能导致已填写的单层数据被清空，切换后需按分层结构重新配置。
+      点击抽屉下方「重置」按钮可还原至单层数据
     </AdminDialog>
 
     <t-drawer
@@ -758,7 +877,7 @@
               <t-form-item label="数量">
                 <t-input-number v-model="batchFillForm.quantity" theme="normal" :min="0" />
               </t-form-item>
-              <t-form-item v-for="field in salesAttributeFields" :key="field.key" :label="field.label">
+              <t-form-item v-for="field in batchEditableSalesFields" :key="field.key" :label="field.label">
                 <t-select
                   v-if="field.type === 'select'"
                   v-model="batchSalesAttributes[field.key]"
@@ -817,26 +936,21 @@
       </t-form>
     </t-dialog>
 
-    <t-dialog
+    <t-drawer
       v-model:visible="detailDialogVisible"
       header="商品详情"
-      width="760px"
-      placement="center"
+      size="960px"
+      placement="right"
       :footer="false"
       @close="closeDetailDialog"
     >
-      <div v-if="detailProduct" class="detail-panel">
-        <img v-if="detailProduct.image" :src="detailProduct.image" :alt="detailProduct.name" />
-        <div class="detail-info">
-          <h2>{{ detailProduct.name }}</h2>
-          <p>ID：{{ detailProduct.id }} ｜ 编码：{{ detailProduct.code }}</p>
-          <p>分类：{{ detailProduct.category }} ｜ 库存：{{ activeTab === 'soldOut' ? 0 : detailProduct.stock }}</p>
-          <p>供应商：{{ detailProduct.supplier }}</p>
-          <p>价格区间：{{ detailProduct.priceRange }}</p>
-          <p v-if="detailProduct.offShelfReason">下架原因：{{ detailProduct.offShelfReason }}</p>
-        </div>
-      </div>
-    </t-dialog>
+      <ProductDetail
+        v-if="detailProduct"
+        :product="detailProduct"
+        :attribute-names="detailAttributeNames"
+        @preview="openProductMediaPreview"
+      />
+    </t-drawer>
 
     <t-dialog
       v-model:visible="imagePreviewVisible"
@@ -859,6 +973,8 @@
       </div>
     </t-dialog>
 
+    <FinishedOperationLogs v-if="canViewOperationLogs" v-model:visible="operationLogsVisible" />
+
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
       :action="confirmAction"
@@ -874,6 +990,7 @@
 </template>
 
 <script setup lang="ts">
+import { matchSpecText, matchSpecAttributeSubset, specIdentity } from './specModeConversion';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -881,7 +998,13 @@ import ProductRichEditor from '@/components/ProductRichEditor.vue';
 import PriceSourceToggle from './components/PriceSourceToggle.vue';
 import SpecPriceInput from './components/SpecPriceInput.vue';
 import ProductPriceEditor from './components/ProductPriceEditor.vue';
+import FinishedOperationLogs from './components/FinishedOperationLogs.vue';
+import { hasPermission } from '@/services/adminPermissions';
+import { getLoginUser } from '@/services/auth';
+
 import { isValidSpecPriceNumber } from './priceValidation';
+import { copySpecDimensions, orderLayeredRows, editableSalesFields } from './layeredSpecs';
+import { resetProductForm } from './productFormState';
 import {
   adminFeedback,
   AdminConfirmDialog,
@@ -907,6 +1030,7 @@ import {
   uploadFinishedProductMedia,
   type FinishedProductAttributeEntry,
   type FinishedProductPayload,
+  type FinishedSpecDimension,
   type FinishedProductRecord,
   type FinishedProductGuidePrice,
   type FinishedProductPrice,
@@ -920,12 +1044,14 @@ import {
 import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
 import { listProductAttributeValues, type ProductAttributeValueRecord } from '@/services/productAttributeValues';
 import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
+import { sortByOffShelfAtDesc } from './offShelfSorting';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
+import ProductDetail from './components/ProductDetail.vue';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 type PublisherType = '平台发布';
-type RowAction = 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
+type RowAction = 'detail' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
 type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type FormSectionKey = 'description' | 'base' | 'sales';
 type SpecMode = 'single' | 'layered';
@@ -981,6 +1107,8 @@ interface StockItem {
   priceRange: string;
   status: StockStatus;
   offShelfReason?: string;
+  offShelfAt?: string;
+  offShelfDetail?: string;
   markupPrices?: FinishedProductPrice[];
   guidePrices?: FinishedProductGuidePrice[];
   mainImageMediaId?: number;
@@ -991,6 +1119,7 @@ interface StockItem {
   detail: string;
   attributes: FinishedProductAttributeEntry[];
   variants: FinishedProductVariant[];
+  specDimensions?: FinishedSpecDimension[];
 }
 
 interface ProductForm {
@@ -1038,7 +1167,7 @@ interface SpecRow extends TableRowData {
   level2: string;
   level3Coefficient: string;
   level3: string;
-  quantity: number;
+  quantity: number | null;
   merchantCode: string;
   markupPrices: Record<
     number,
@@ -1083,6 +1212,7 @@ interface BatchFillForm {
 }
 
 interface SingleSpecItem {
+  sourceRow?: SpecRow;
   id: number;
   text: string;
   imageUploaded: boolean;
@@ -1179,6 +1309,9 @@ const categoryDialogVisible = ref(false);
 const categorySwitchWarningVisible = ref(false);
 const productMediaUploading = ref(0);
 const specDialogVisible = ref(false);
+const validatedSpecDraftIds = ref(new Set<number>());
+const specDraftFieldStatus = (value: string, id: number) =>
+  validatedSpecDraftIds.value.has(id) && !value.trim() ? 'error' : undefined;
 const productPriceEditorRef = ref<InstanceType<typeof ProductPriceEditor>>();
 const priceDrawerVisible = ref(false);
 const reasonDialogVisible = ref(false);
@@ -1197,6 +1330,7 @@ const categoryPickerSelection = ref<number[]>([]);
 const specMode = ref<SpecMode>('single');
 const confirmedSpecMode = ref<SpecMode>('single');
 const confirmedLayeredFields = ref<LayeredSpecField[]>([]);
+const confirmedSpecDimensions = ref<FinishedSpecDimension[]>([]);
 const confirmedImageField = ref<LayeredSpecField | null>(null);
 const singleSpecs = ref<SingleSpecItem[]>([{ id: Date.now(), text: '', imageUploaded: false }]);
 const priceRows = ref<PriceRow[]>([]);
@@ -1209,17 +1343,14 @@ const batchFillFilters = reactive<Record<BatchFilterField, string[]>>({
   size: [],
 });
 const submitAttempted = ref(false);
+const isValidSpecQuantity = (value: unknown) =>
+  String(value ?? '').trim() !== '' && Number.isFinite(Number(value)) && Number(value) > 0;
 const requiredFieldStatus = (value: unknown) =>
   submitAttempted.value && !String(value ?? '').trim() ? 'error' : undefined;
 const mainImageSlots = ref<(AdminMediaValue | undefined)[]>(Array.from({ length: 5 }));
 const mainImages = computed(() => mainImageSlots.value.filter((item): item is AdminMediaValue => Boolean(item)));
-const mainImageUploadIndexes = computed(() => {
-  const indexes = mainImageSlots.value.flatMap((image, index) => (image ? [index] : []));
-  const emptyIndex = mainImageSlots.value.findIndex((image) => !image);
-  if (emptyIndex !== -1) indexes.push(emptyIndex);
-  return indexes;
-});
-const mainImageMedia = computed(() => mainImages.value[0]);
+const mainImageUploadIndexes = [0, 1, 2, 3, 4];
+const mainImageMedia = computed(() => mainImageSlots.value[0]);
 const videoMedia = ref<AdminMediaValue>();
 const pendingUploadedMediaIds = new Set<number>();
 const productCategories = ref<ProductCategoryRecord[]>([]);
@@ -1473,6 +1604,20 @@ const templateAttributeFields = computed(() => {
       type: attribute.valueType === 'select' ? ('select' as const) : ('input' as const),
       options: attribute.options.map((option) => option.value),
     }));
+  for (const dimension of confirmedSpecDimensions.value) {
+    const existing = fields.find((field) => field.key === dimension.key);
+    if (existing) existing.label = dimension.name;
+    else if (/^attribute_\d+$/.test(dimension.key))
+      fields.push({
+        key: dimension.key as `attribute_${number}`,
+        attributeId: Number(dimension.key.slice(10)),
+        role: 'sales',
+        label: dimension.name,
+        required: false,
+        type: 'input',
+        options: [],
+      });
+  }
   const product = editingProduct.value;
   if (product && product.categoryId === selectedCategoryId.value) {
     for (const entry of product.attributes) {
@@ -1517,14 +1662,16 @@ const layeredFieldLabels = computed<Record<string, string>>(() =>
   Object.fromEntries(salesAttributeFields.value.map((field) => [field.key, field.label])),
 );
 const skuAttributeFields = computed(() =>
-  salesAttributeFields.value.filter((field) =>
-    categoryAttributeBindings.value.some(
-      (binding) =>
-        binding.categoryId === selectedCategoryId.value &&
-        binding.attributeId === field.attributeId &&
-        binding.attributeRole === 'sales' &&
-        binding.skuFlag === true,
-    ),
+  salesAttributeFields.value.filter(
+    (field) =>
+      confirmedLayeredFields.value.includes(field.key) ||
+      categoryAttributeBindings.value.some(
+        (binding) =>
+          binding.categoryId === selectedCategoryId.value &&
+          binding.attributeId === field.attributeId &&
+          binding.attributeRole === 'sales' &&
+          binding.skuFlag === true,
+      ),
   ),
 );
 const specGroups = reactive<SpecGroup[]>([]);
@@ -1535,17 +1682,23 @@ watch(
     specGroups.splice(
       0,
       specGroups.length,
-      ...fields.map((field) =>
-        existing.has(field.key)
-          ? { ...existing.get(field.key)!, name: field.label }
-          : {
-              field: field.key,
-              name: field.label,
-              selected: field.required,
-              withImage: false,
-              values: [{ id: Date.now() + field.attributeId, value: '', imageUploaded: false }],
-            },
-      ),
+      ...[...fields]
+        .sort((a, b) => {
+          const order = [...existing.keys()];
+          const rank = (key: LayeredSpecField) => (order.includes(key) ? order.indexOf(key) : order.length);
+          return rank(a.key) - rank(b.key);
+        })
+        .map((field) =>
+          existing.has(field.key)
+            ? { ...existing.get(field.key)!, name: field.label }
+            : {
+                field: field.key,
+                name: field.label,
+                selected: false,
+                withImage: false,
+                values: [{ id: Date.now() + field.attributeId, value: '', imageUploaded: false }],
+              },
+        ),
     );
     fields.forEach((field) => {
       batchFillFilters[field.key] ??= [];
@@ -1574,7 +1727,7 @@ const confirmAction = computed(() => {
   const actionMap: Record<ConfirmType, string> = {
     shelf: '上架',
     delete: '删除',
-    restore: '恢复',
+    restore: '放回',
     purge: '彻底删除',
     batchShelf: '批量上架',
     batchRestore: '批量恢复',
@@ -1654,7 +1807,7 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
   const publisherType = normalizePublisherType();
   return {
     id: record.id,
-    code: record.sku,
+    code: record.sku ?? '',
     createdByName: record.createdByName?.trim() || '-',
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
@@ -1677,9 +1830,12 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     detail: record.detail || '',
     attributes: record.attributes ?? [],
     variants: record.variants ?? [],
+    specDimensions: record.specDimensions,
     priceRange: formatPriceRange(record.guidePrice),
     status,
     offShelfReason: record.offShelfReason,
+    offShelfAt: record.offShelfAt,
+    offShelfDetail: record.offShelfDetail,
   };
 };
 
@@ -1700,7 +1856,9 @@ const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): Fini
     markupPrices: nextItem.markupPrices,
     attributes: nextItem.attributes,
     variants: nextItem.variants,
+    specDimensions: nextItem.specDimensions,
     offShelfReason: nextItem.offShelfReason,
+    offShelfDetail: nextItem.offShelfDetail,
     status: nextItem.status,
   };
 };
@@ -1766,7 +1924,9 @@ onBeforeUnmount(() => {
 const filteredData = computed(() => {
   const filter = currentAppliedFilter.value;
   const keyword = filter.keyword.trim().toLocaleLowerCase();
-  return sortByCreatedAtDesc(dataItems.value).filter((item) => {
+  const sorted =
+    activeTab.value === 'offShelf' ? sortByOffShelfAtDesc(dataItems.value) : sortByCreatedAtDesc(dataItems.value);
+  return sorted.filter((item) => {
     if (item.status !== activeTab.value) return false;
     if (
       keyword &&
@@ -1802,9 +1962,9 @@ const batchButtons = computed(() => {
     ],
     selling: [
       { action: 'publish', label: '发布商品', theme: 'primary', icon: 'add' },
-      { action: 'batchOffShelf', label: '批量下架', theme: 'warning', icon: 'rollback', className: 'warning-button' },
+      { action: 'batchOffShelf', label: '批量下架', theme: 'default', icon: 'download', className: 'brown-button' },
     ],
-    offShelf: [{ action: 'batchRestore', label: '批量放回到仓库', theme: 'primary', icon: 'rollback' }],
+    offShelf: [{ action: 'batchRestore', label: '批量放回仓库', theme: 'primary', icon: 'rollback' }],
     soldOut: [],
     recycle: [
       { action: 'batchRestore', label: '批量放回到仓库', theme: 'primary', icon: 'rollback' },
@@ -1818,21 +1978,29 @@ const batchButtons = computed(() => {
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const base: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'image', title: '商品主图', width: 96 },
-    { colKey: 'product', title: '商品名称/ID/编码', minWidth: 220 },
-    { colKey: 'stock', title: '库存', width: 88, align: 'center' },
+    { colKey: 'product', title: '商品名称/ID/商家编码', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
     { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-    { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+    {
+      colKey: activeTab.value === 'offShelf' ? 'offShelfAt' : 'createdAt',
+      title: activeTab.value === 'offShelf' ? '下架时间' : '创建时间',
+      width: 180,
+      align: 'center',
+    },
   ];
   if (activeTab.value !== 'soldOut') {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
   if (activeTab.value === 'offShelf') {
-    base.splice(5, 0, { colKey: 'offShelfReason', title: '下架原因', width: 140 });
+    base.splice(5, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
   }
-  if (activeTab.value !== 'soldOut') {
-    base.push({ colKey: 'operation', title: '操作', width: 230, align: 'left', fixed: 'right' });
-  }
+  base.push({
+    colKey: 'operation',
+    title: '操作',
+    width: activeTab.value === 'soldOut' ? 100 : 230,
+    align: 'left',
+    fixed: 'right',
+  });
   return base;
 });
 
@@ -1841,32 +2009,57 @@ const requiredColumnTitle = (label: string) => () =>
 
 const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'cost', title: requiredColumnTitle('成本价'), width: 96 },
-    { colKey: 'guide', title: requiredColumnTitle('指导价'), width: 164 },
+    { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },
+    { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 148 },
     ...productPriceLevels.value.map((item) => ({
       colKey: `markup-${item.id}`,
       title: requiredColumnTitle(item.name),
-      width: 196,
+      minWidth: 176,
     })),
-    { colKey: 'quantity', title: requiredColumnTitle('数量'), width: 96 },
+    { colKey: 'quantity', title: requiredColumnTitle('数量'), minWidth: 80 },
   ];
   const tailColumns: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'merchantCode', title: '商家编码', width: 130 },
-    { colKey: 'operation', title: '操作', width: 80, align: 'left', fixed: 'right' },
+    { colKey: 'merchantCode', title: '商家编码', minWidth: 112 },
+    { colKey: 'operation', title: '操作', minWidth: 64, align: 'left', fixed: 'right' },
   ];
 
-  const salesColumns = salesAttributeFields.value.map<PrimaryTableCol<TableRowData>>((field) => ({
+  const createSalesColumn = (field: (typeof salesAttributeFields.value)[number]): PrimaryTableCol<TableRowData> => ({
     colKey: field.key,
     title: field.required ? requiredColumnTitle(field.label) : field.label,
-    width: 136,
-  }));
-  return [
-    ...(confirmedSpecMode.value === 'single' ? [{ colKey: 'specText', title: '商品规格', width: 120 }] : []),
-    ...priceColumnsBase,
-    ...salesColumns,
-    ...tailColumns,
-  ];
+  });
+  const orderedSpecColumns: PrimaryTableCol<TableRowData>[] =
+    confirmedSpecMode.value === 'single'
+      ? [{ colKey: 'specText', title: '商品规格', minWidth: 100 }]
+      : confirmedLayeredFields.value.map((key) => {
+          const field = salesAttributeByKey(key);
+          return field ? createSalesColumn(field) : { colKey: key, title: layeredFieldLabels.value[key] || key };
+        });
+  const remainingSalesColumns = salesAttributeFields.value
+    .filter((field) => confirmedSpecMode.value === 'single' || !confirmedLayeredFields.value.includes(field.key))
+    .map(createSalesColumn);
+  return [...orderedSpecColumns, ...priceColumnsBase, ...remainingSalesColumns, ...tailColumns];
 });
+
+const specRowspanAndColspan = ({ rowIndex, col }: { rowIndex: number; col: { colKey?: string } }) => {
+  if (confirmedSpecMode.value !== 'layered') return {};
+  const fieldIndex = confirmedLayeredFields.value.findIndex((field) => field === col.colKey);
+  if (fieldIndex < 0) return {};
+  const parentFields = confirmedLayeredFields.value.slice(0, fieldIndex + 1);
+  const row = specRows.value[rowIndex];
+  if (!row) return {};
+  const sameGroup = (candidate: SpecRow) => parentFields.every((field) => candidate[field] === row[field]);
+  if (rowIndex > 0 && sameGroup(specRows.value[rowIndex - 1])) return { rowspan: 0, colspan: 0 };
+  let rowspan = 1;
+  while (rowIndex + rowspan < specRows.value.length && sameGroup(specRows.value[rowIndex + rowspan])) rowspan += 1;
+  return { rowspan, colspan: 1 };
+};
+
+const batchEditableSalesFields = computed(() =>
+  editableSalesFields(
+    salesAttributeFields.value,
+    confirmedSpecMode.value === 'layered' ? confirmedLayeredFields.value : [],
+  ),
+);
 
 const batchFilterFields = computed<BatchFilterField[]>(() =>
   confirmedSpecMode.value === 'single' ? ['specText'] : confirmedLayeredFields.value,
@@ -1909,13 +2102,12 @@ const rowActions = (): { action: RowAction; label: string; theme: string }[] => 
     return [
       { action: 'offShelf', label: '下架', theme: 'warning' },
       { action: 'edit', label: '编辑', theme: 'primary' },
-      { action: 'delete', label: '删除', theme: 'danger' },
     ];
   }
   if (activeTab.value === 'offShelf') {
     return [
-      { action: 'restore', label: '放回到仓库', theme: 'primary' },
-      { action: 'edit', label: '编辑', theme: 'primary' },
+      { action: 'detail', label: '详情', theme: 'primary' },
+      { action: 'restore', label: '放回仓库', theme: 'primary' },
       { action: 'delete', label: '删除', theme: 'danger' },
     ];
   }
@@ -1977,7 +2169,7 @@ const handleBatchAction = (action: BatchAction) => {
     return;
   }
   if (action === 'batchRestore') {
-    openConfirm('batchRestore', null, '是否批量放回到仓库所选成品现货？');
+    openConfirm('batchRestore', null, '是否将所选成品现货放回仓库？');
     return;
   }
   if (action === 'batchPurge') {
@@ -1988,13 +2180,16 @@ const handleBatchAction = (action: BatchAction) => {
 };
 
 const handleRowAction = (action: RowAction, row: StockItem) => {
-  const fullName = `${row.name}（${row.code}）`;
+  if (action === 'detail') {
+    void openProductDetail(row);
+    return;
+  }
   if (action === 'edit') {
     openFormPage('edit', row);
     return;
   }
   if (action === 'shelf') {
-    openConfirm('shelf', row, `是否上架商品“${fullName}”？`);
+    openConfirm('shelf', row, `是否上架商品“${row.name}”？`);
     return;
   }
   if (action === 'offShelf') {
@@ -2002,14 +2197,14 @@ const handleRowAction = (action: RowAction, row: StockItem) => {
     return;
   }
   if (action === 'restore') {
-    openConfirm('restore', row, `是否放回到仓库“${fullName}”？`);
+    openConfirm('restore', row, `是否放回仓库“${row.name}”？`);
     return;
   }
   if (action === 'delete') {
-    openConfirm('delete', row, `是否删除商品“${fullName}”？`);
+    openConfirm('delete', row, `是否删除商品“${row.name}”？`);
     return;
   }
-  openConfirm('purge', row, `是否彻底删除商品“${fullName}”？`);
+  openConfirm('purge', row, `是否彻底删除商品“${row.name}”？`);
 };
 
 const hasProductFormContent = () => {
@@ -2037,6 +2232,7 @@ const confirmCategorySwitchWarning = () => {
 };
 
 const openCategoryDialog = () => {
+  if (formPageVisible.value && formPageMode.value === 'edit') return;
   if (productMediaUploading.value || detailMediaUploading.value) {
     adminFeedback.warning('请等待媒体上传完成后切换分类');
     return;
@@ -2061,6 +2257,7 @@ const selectCategory = (columnIndex: number, categoryId: number) => {
 };
 
 const confirmCategory = () => {
+  if (formPageVisible.value && formPageMode.value === 'edit') return;
   const categoryId = categoryPickerSelection.value.at(-1);
   if (categoryId == null) {
     adminFeedback.warning('请选择成品现货分类');
@@ -2074,9 +2271,6 @@ const confirmCategory = () => {
     const editingTarget = editingProduct.value;
     const pendingIds = [...pendingUploadedMediaIds];
     pendingUploadedMediaIds.clear();
-    for (const key of Object.keys(productForm)) {
-      if (key.startsWith('attribute_')) delete productForm[key];
-    }
     openFormPage(formPageMode.value);
     editingProduct.value = editingTarget;
     clearSpecDraft();
@@ -2155,7 +2349,7 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
   level2: '',
   level3Coefficient: '',
   level3: '',
-  quantity: 0,
+  quantity: null,
   merchantCode: '',
   markupPrices: createMarkupEditors(),
   ...partial,
@@ -2207,11 +2401,12 @@ const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
   }
   activeFormSection.value = 'description';
   submitAttempted.value = false;
-  Object.assign(productForm, createEmptyProductForm());
+  resetProductForm(productForm, createEmptyProductForm());
   specRows.value = [];
   priceRows.value = [];
   confirmedSpecMode.value = 'single';
   confirmedLayeredFields.value = [];
+  confirmedSpecDimensions.value = [];
   confirmedImageField.value = null;
   mainImageSlots.value = Array.from({ length: 5 });
   videoMedia.value = undefined;
@@ -2229,9 +2424,20 @@ const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
     selectedCategoryPath.value = row.category.replaceAll('/', ' > ');
     specRows.value = createEditSpecRows(row);
     confirmedSpecMode.value = row.variants[0]?.displayMode ?? 'single';
-    confirmedLayeredFields.value = salesAttributeFields.value
-      .map((field) => field.key)
-      .filter((field) => row.variants.some((variant) => variant.salesAttributes?.[field]));
+    confirmedSpecDimensions.value = copySpecDimensions(row.specDimensions);
+    if (confirmedSpecMode.value === 'layered') {
+      specRows.value = orderLayeredRows(specRows.value, confirmedSpecDimensions.value);
+    }
+    confirmedLayeredFields.value = (
+      row.specDimensions?.length
+        ? row.specDimensions.map((dimension) => dimension.key)
+        : skuAttributeFields.value
+            .map((field) => field.key)
+            .filter((field) => row.variants.some((variant) => variant.salesAttributes?.[field]))
+    ) as LayeredSpecField[];
+    if (confirmedSpecMode.value === 'layered' && !row.specDimensions?.length) {
+      adminFeedback.warning('此商品缺少历史规格顺序，请在编辑规格中核对后保存');
+    }
     confirmedImageField.value = null;
     priceRows.value = specRows.value.map(specToPriceRow);
     const imageIds = row.mainImageMediaIds ?? (row.mainImageMediaId ? [row.mainImageMediaId] : []);
@@ -2472,41 +2678,225 @@ const handleBatchPriceChange = (priceField: DecimalField, coefficientField: Deci
 };
 
 const openSpecDialog = async (preserveCurrent = false) => {
+  validatedSpecDraftIds.value = new Set();
   try {
     await refreshPriceConfigurations();
   } catch {
     adminFeedback.error('价格配置加载失败，请重试');
     return;
   }
-  if (preserveCurrent && specRows.value.length) {
-    hydrateSpecDialogFromRows();
-  } else {
-    resetSpecDialog();
+  clearSpecDraft();
+  specConversionNotice.value = '';
+  unmatchedSpecNames.value = [];
+  if (preserveCurrent && specRows.value.length) hydrateSpecDialogFromRows();
+  if (specMode.value === 'single') {
+    singleSpecs.value.forEach((item, index) => {
+      item.sourceRow = cloneSpecDraft(specRows.value[index]);
+    });
   }
+  specSourceRows = cloneSpecDraft(specRows.value).map((row) => ({
+    ...row,
+    _specDraftIdentity: JSON.stringify(
+      specGroups
+        .filter((group) => group.selected)
+        .map((group) => [
+          group.field,
+          group.values.find(
+            (entry) => normalizeLayeredValue(group.field, entry.value) === String(row[group.field] || ''),
+          )?.id,
+        ])
+        .sort(),
+    ),
+  }));
+  specOpeningDraft = captureSpecDraft();
   specDialogVisible.value = true;
 };
 
 const closeSpecDialog = () => {
+  specModeConfirmVisible.value = false;
   specDialogVisible.value = false;
 };
 
-const handleSpecModeChange = (value: unknown) => {
-  if (value === 'single' || value === 'layered') {
-    specMode.value = value;
+let specSourceRows: SpecRow[] = [];
+const specConversionNotice = ref('');
+const unmatchedSpecNames = ref<string[]>([]);
+const cloneSpecDraft = <T,>(value: T): T => (value == null ? value : JSON.parse(JSON.stringify(value)));
+const captureSpecDraft = () => cloneSpecDraft({ mode: specMode.value, singles: singleSpecs.value, groups: specGroups });
+let specOpeningDraft: ReturnType<typeof captureSpecDraft> | undefined;
+const knownConversionGroups = () => {
+  const selected = selectedSpecGroups.value;
+  const candidates = selected.length
+    ? selected
+    : specGroups.filter(
+        (group) => salesAttributeFields.value.find((field) => field.key === group.field)?.options.length,
+      );
+  return candidates.slice(0, MAX_SPEC_GROUPS).map((group) => ({
+    field: group.field,
+    values: [
+      ...new Set(
+        [
+          ...group.values.map((item) => normalizeLayeredValue(group.field, item.value)),
+          ...(salesAttributeFields.value.find((field) => field.key === group.field)?.options || []),
+        ].filter(Boolean),
+      ),
+    ],
+  }));
+};
+const specModeConfirmVisible = ref(false);
+const requestSpecModeChange = (value: unknown) => {
+  if (specMode.value === 'single' && value === 'layered') {
+    specModeConfirmVisible.value = true;
+    return;
   }
-  clearSpecDraft(false);
+  handleSpecModeChange(value);
+};
+const confirmSpecModeChange = () => {
+  specModeConfirmVisible.value = false;
+  if (specDialogVisible.value && specMode.value === 'single') handleSpecModeChange('layered');
+};
+const handleSpecModeChange = (value: unknown) => {
+  if ((value !== 'single' && value !== 'layered') || value === specMode.value) return;
+  validatedSpecDraftIds.value = new Set();
+  if (value === 'single') {
+    const fields = selectedSpecGroups.value.map((group) => group.field);
+    const currentRows = buildLayeredSpecRows();
+    if (
+      !fields.length ||
+      !currentRows.length ||
+      selectedSpecGroups.value.some((group) => group.values.some((item) => !item.value.trim()))
+    ) {
+      adminFeedback.warning('请先填写完整的分层属性值，再转换为单层展示');
+      return;
+    }
+    const unmatchedDrafts = singleSpecs.value.filter((item) => unmatchedSpecNames.value.includes(item.text));
+    singleSpecs.value = currentRows.map((row) => {
+      const sources = [
+        ...specSourceRows,
+        ...singleSpecs.value.flatMap((item) => (item.sourceRow ? [item.sourceRow] : [])),
+      ];
+      const previous =
+        sources.find((source) => source._specDraftIdentity && source._specDraftIdentity === row._specDraftIdentity) ||
+        sources.find((source) => specIdentity(source, fields) === specIdentity(row, fields));
+      return {
+        ...createSingleSpecItem(
+          fields.map((field) => String(row[field] || '')).join(' '),
+          Boolean(row.materialImage || row.lengthImage || row.colorImage || row.sizeImage),
+        ),
+        sourceRow: {
+          ...cloneSpecDraft(previous || row),
+          ...Object.fromEntries(fields.map((field) => [field, row[field]])),
+          _specDraftIdentity: row._specDraftIdentity,
+          _specOriginFields: fields,
+        },
+      };
+    });
+    singleSpecs.value.push(...unmatchedDrafts);
+    unmatchedSpecNames.value = [];
+    specConversionNotice.value =
+      '已将原属性值文本自动拼接预填，您可根据实际情况自行修改。原规格关联的价格、库存和商家编码将保留。';
+  } else {
+    unmatchedSpecNames.value = [];
+    const candidates = knownConversionGroups();
+    const matched: Record<string, string>[] = [];
+    singleSpecs.value
+      .filter((item) => item.text.trim())
+      .forEach((item) => {
+        const originalFields = item.sourceRow?._specOriginFields;
+        const rowAttributes = Object.fromEntries(
+          specGroups.map((group) => [group.field, String(item.sourceRow?.[group.field] || '')]),
+        );
+        const values =
+          Array.isArray(originalFields) && originalFields.length
+            ? Object.fromEntries(originalFields.map((field: string) => [field, String(item.sourceRow![field] || '')]))
+            : matchSpecAttributeSubset(item.text, rowAttributes, MAX_SPEC_GROUPS) ||
+              matchSpecText(item.text, candidates);
+        if (!values) {
+          unmatchedSpecNames.value.push(item.text);
+          return;
+        }
+        matched.push(values);
+        if (item.sourceRow) Object.assign(item.sourceRow, values, { _specOriginFields: Object.keys(values) });
+      });
+    if (matched.length)
+      specGroups.forEach((group) => {
+        const values = [...new Set(matched.map((item) => item[group.field]).filter(Boolean))];
+        group.selected = values.length > 0;
+        if (values.length)
+          group.values = values.map((value) => {
+            const existing = group.values.find((item) => normalizeLayeredValue(group.field, item.value) === value);
+            return existing || createSpecValue(group.field === 'length' ? value.replace(/mm$/, '') : value);
+          });
+      });
+    singleSpecs.value.forEach((item) => {
+      if (!item.sourceRow || unmatchedSpecNames.value.includes(item.text)) return;
+      item.sourceRow._specDraftIdentity = JSON.stringify(
+        selectedSpecGroups.value
+          .map((group) => [
+            group.field,
+            group.values.find(
+              (entry) => normalizeLayeredValue(group.field, entry.value) === String(item.sourceRow![group.field] || ''),
+            )?.id,
+          ])
+          .sort(),
+      );
+    });
+    specConversionNotice.value =
+      '已尽量保留并回填可明确对应的属性值；无法匹配的规格需补充配置。单层名称修改不会自动覆盖原属性结构，可点击重置恢复本次打开时的数据。';
+  }
+  specMode.value = value;
 };
 
 const clearSpecDraft = (resetMode = true) => {
+  validatedSpecDraftIds.value = new Set();
   if (resetMode) {
     specMode.value = 'single';
   }
   singleSpecs.value = [createSingleSpecItem()];
   specGroups.forEach((group) => {
-    group.selected = salesAttributeByKey(group.field)?.required ?? false;
+    group.selected = false;
     group.withImage = false;
     group.values = [createSpecValue()];
   });
+};
+
+const draggedSpecValue = ref<{ field: LayeredSpecField; id: number } | null>(null);
+const startSpecValueDrag = (event: DragEvent, field: LayeredSpecField, id: number) => {
+  draggedSpecField.value = null;
+  draggedSpecValue.value = { field, id };
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(id));
+  }
+};
+const dropSpecValue = (event: DragEvent, group: SpecGroup, targetId: number) => {
+  const source = draggedSpecValue.value;
+  if (!source) return;
+  event.stopPropagation();
+  draggedSpecValue.value = null;
+  if (source.field !== group.field) return;
+  const sourceIndex = group.values.findIndex((value) => value.id === source.id);
+  const targetIndex = group.values.findIndex((value) => value.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+  const [value] = group.values.splice(sourceIndex, 1);
+  group.values.splice(targetIndex, 0, value);
+};
+
+const draggedSpecField = ref<LayeredSpecField | null>(null);
+const startSpecGroupDrag = (event: DragEvent, field: LayeredSpecField) => {
+  draggedSpecValue.value = null;
+  draggedSpecField.value = field;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', field);
+  }
+};
+const dropSpecGroup = (targetField: LayeredSpecField) => {
+  const sourceIndex = specGroups.findIndex((group) => group.field === draggedSpecField.value);
+  const targetIndex = specGroups.findIndex((group) => group.field === targetField);
+  draggedSpecField.value = null;
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+  const [group] = specGroups.splice(sourceIndex, 1);
+  specGroups.splice(targetIndex, 0, group);
 };
 
 const selectedSpecGroups = computed(() => specGroups.filter((group) => group.selected));
@@ -2518,12 +2908,36 @@ const addSingleSpec = () => {
 };
 
 const removeSingleSpec = (index: number) => {
+  if (singleSpecs.value.length <= 1) {
+    adminFeedback.warning('至少需要输入一个商品规格');
+    return;
+  }
   singleSpecs.value.splice(index, 1);
+};
+
+const isDuplicateSingleSpec = (current: SingleSpecItem) => {
+  const text = current.text.trim();
+  return text !== '' && singleSpecs.value.some((item) => item.id !== current.id && item.text.trim() === text);
+};
+
+const isDuplicateSpecValue = (group: SpecGroup, current: SpecValue) => {
+  if (salesAttributeByKey(group.field)?.type === 'select') return false;
+  const value = current.value.trim();
+  return value !== '' && group.values.some((item) => item.id !== current.id && item.value.trim() === value);
+};
+
+const isSpecOptionSelected = (group: SpecGroup, currentId: number, option: string) =>
+  group.values.some((value) => value.id !== currentId && value.value === option);
+
+const canAddSpecValue = (group: SpecGroup) => {
+  const field = salesAttributeByKey(group.field);
+  return field?.type !== 'select' || group.values.length < (field.options?.length ?? 0);
 };
 
 const addSpecValue = (name: string) => {
   const group = specGroups.find((item) => item.name === name);
-  group?.values.push(createSpecValue());
+  if (!group || !canAddSpecValue(group)) return;
+  group.values.push(createSpecValue());
 };
 
 const removeSpecValue = (name: string, index: number) => {
@@ -2536,15 +2950,28 @@ const removeSpecValue = (name: string, index: number) => {
   group?.values.splice(index, 1);
 };
 
+const MAX_SPEC_GROUPS = 3;
+const isSpecGroupDisabled = (group: SpecGroup) => !group.selected && selectedSpecGroups.value.length >= MAX_SPEC_GROUPS;
+
 const toggleSpecGroup = (group: SpecGroup) => {
-  if (salesAttributeByKey(group.field)?.required) return;
+  if (isSpecGroupDisabled(group)) return;
   group.selected = !group.selected;
   group.withImage = false;
   group.values = [createSpecValue()];
 };
 
 const resetSpecDialog = () => {
-  clearSpecDraft(true);
+  if (!specOpeningDraft) {
+    clearSpecDraft();
+    return;
+  }
+  const saved = cloneSpecDraft(specOpeningDraft);
+  specMode.value = saved.mode;
+  singleSpecs.value = saved.singles;
+  specGroups.splice(0, specGroups.length, ...saved.groups);
+  validatedSpecDraftIds.value = new Set();
+  unmatchedSpecNames.value = [];
+  specConversionNotice.value = '';
 };
 
 const hydrateSpecDialogFromRows = () => {
@@ -2555,10 +2982,16 @@ const hydrateSpecDialogFromRows = () => {
     confirmedImageField.value = null;
     return;
   }
+  const dimensionOrder = confirmedLayeredFields.value;
+  specGroups.sort((a, b) => {
+    const rank = (key: LayeredSpecField) =>
+      dimensionOrder.includes(key) ? dimensionOrder.indexOf(key) : dimensionOrder.length;
+    return rank(a.field) - rank(b.field);
+  });
   let hasHydratedImageGroup = false;
   specGroups.forEach((group) => {
     const imageKey = `${group.field}Image` as 'materialImage' | 'lengthImage' | 'colorImage' | 'sizeImage';
-    group.selected = specRows.value.some((row) => Boolean(row[group.field]));
+    group.selected = confirmedLayeredFields.value.includes(group.field);
     const rowHasImage = specRows.value.some((row) => Boolean(row[imageKey]));
     group.withImage = rowHasImage && !hasHydratedImageGroup;
     if (group.withImage) hasHydratedImageGroup = true;
@@ -2569,6 +3002,8 @@ const hydrateSpecDialogFromRows = () => {
       .map(([value, imageUploaded]) =>
         createSpecValue(group.field === 'length' ? value.replace('mm', '') : value, group.withImage && imageUploaded),
       );
+    const dimension = confirmedSpecDimensions.value.find((item) => item.key === group.field);
+    if (dimension) group.values.sort((a, b) => dimension.values.indexOf(a.value) - dimension.values.indexOf(b.value));
     if (!group.values.length) group.values = [createSpecValue()];
   });
   confirmedLayeredFields.value = specGroups.filter((group) => group.selected).map((group) => group.field);
@@ -2576,6 +3011,36 @@ const hydrateSpecDialogFromRows = () => {
 };
 
 const confirmCreateSpec = () => {
+  validatedSpecDraftIds.value = new Set(
+    specMode.value === 'single'
+      ? singleSpecs.value.map((item) => item.id)
+      : selectedSpecGroups.value.flatMap((group) => group.values.map((item) => item.id)),
+  );
+  if (specMode.value === 'layered' && selectedSpecGroups.value.length > MAX_SPEC_GROUPS) {
+    adminFeedback.error('最多选择 3 个销售属性');
+    return;
+  }
+  const hasEmptyValue =
+    specMode.value === 'single'
+      ? singleSpecs.value.some((item) => !item.text.trim())
+      : selectedSpecGroups.value.some((group) => group.values.some((item) => !item.value.trim()));
+  if (hasEmptyValue) {
+    adminFeedback.error(
+      specMode.value === 'single' ? '商品规格不能为空，请填写后再确认创建' : '请填写所有规格属性值后再确认创建',
+    );
+    return;
+  }
+  if (specMode.value === 'single' && singleSpecs.value.some(isDuplicateSingleSpec)) {
+    adminFeedback.error('商品规格名称不能重复，请修改后再确认创建');
+    return;
+  }
+  if (
+    specMode.value === 'layered' &&
+    selectedSpecGroups.value.some((group) => group.values.some((value) => isDuplicateSpecValue(group, value)))
+  ) {
+    adminFeedback.error('同一属性的值不能重复，请修改后再确认创建');
+    return;
+  }
   const rows =
     specMode.value === 'single'
       ? singleSpecs.value
@@ -2583,12 +3048,10 @@ const confirmCreateSpec = () => {
           .filter((item) => item.text)
           .map((item) =>
             createBaseSpecRow({
+              ...cloneSpecDraft(item.sourceRow || {}),
               mode: 'single',
               specText: item.text,
               specImage: item.imageUploaded,
-              material: '',
-              quantity: 0,
-              merchantCode: '',
             }),
           )
       : buildLayeredSpecRows();
@@ -2596,31 +3059,80 @@ const confirmCreateSpec = () => {
     adminFeedback.warning('请至少配置一条商品规格');
     return;
   }
-  const fields = specMode.value === 'single' ? ['specText'] : selectedSpecGroups.value.map((group) => group.field);
-  const sameStructure =
-    confirmedSpecMode.value === specMode.value &&
-    (specMode.value === 'single' ||
-      [...confirmedLayeredFields.value].sort().join('|') === [...fields].sort().join('|'));
-  if (sameStructure) {
-    const keyOf = (row: SpecRow) => JSON.stringify(fields.map((field) => String(row[field] ?? '').trim()));
-    const existing = new Map<string, SpecRow[]>();
-    for (const row of specRows.value) {
-      const key = keyOf(row);
-      existing.set(key, [...(existing.get(key) ?? []), row]);
+  const fields = selectedSpecGroups.value.map((group) => group.field);
+  if (specMode.value === 'layered') {
+    const sources = [
+      ...singleSpecs.value.flatMap((item) => (item.sourceRow ? [item.sourceRow] : [])),
+      ...specSourceRows,
+    ];
+    const matchedKeys = new Set<string>();
+    const unmatched: string[] = [];
+    singleSpecs.value
+      .filter((item) => item.text.trim())
+      .forEach((item) => {
+        const original = item.sourceRow;
+        const identityRow = original?._specDraftIdentity
+          ? rows.find((row) => row._specDraftIdentity === original._specDraftIdentity)
+          : undefined;
+        const values = identityRow
+          ? Object.fromEntries(fields.map((field) => [field, String(identityRow[field])]))
+          : original && fields.every((field) => String(original[field] || '').trim())
+            ? Object.fromEntries(fields.map((field) => [field, String(original[field])]))
+            : matchSpecText(
+                item.text,
+                selectedSpecGroups.value.map((group) => ({
+                  field: group.field,
+                  values: group.values.map((entry) => normalizeLayeredValue(group.field, entry.value)),
+                })),
+              );
+        if (!values || !rows.some((row) => specIdentity(row, fields) === specIdentity(values, fields))) {
+          unmatched.push(item.text);
+          return;
+        }
+        const matchKey = specIdentity(values, fields);
+        if (matchedKeys.has(matchKey)) {
+          unmatched.push(item.text);
+          return;
+        }
+        matchedKeys.add(matchKey);
+        if (original) sources.push({ ...original, ...values });
+      });
+    if (unmatched.length) {
+      unmatchedSpecNames.value = unmatched;
+      adminFeedback.warning('仍有单层规格无法对应，请补充属性值或重置；原数据未被覆盖');
+      return;
     }
+    const used = new Set<number>();
     rows.forEach((row, index) => {
-      const previous = existing.get(keyOf(row))?.shift();
-      if (previous)
+      const previous =
+        sources.find(
+          (source) =>
+            !used.has(source.id) && source._specDraftIdentity && source._specDraftIdentity === row._specDraftIdentity,
+        ) ||
+        sources.find((source) => !used.has(source.id) && specIdentity(source, fields) === specIdentity(row, fields));
+      if (previous) {
+        used.add(previous.id);
         rows[index] = {
-          ...previous,
-          specImage: row.specImage,
+          ...cloneSpecDraft(previous),
+          mode: row.mode,
+          specText: row.specText,
+          ...Object.fromEntries(fields.map((field) => [field, row[field]])),
           materialImage: row.materialImage,
           lengthImage: row.lengthImage,
           colorImage: row.colorImage,
           sizeImage: row.sizeImage,
         };
+      }
     });
   }
+  confirmedSpecDimensions.value =
+    specMode.value === 'layered'
+      ? selectedSpecGroups.value.map((group) => ({
+          key: group.field,
+          name: group.name,
+          values: group.values.map((item) => normalizeLayeredValue(group.field, item.value.trim())),
+        }))
+      : [];
   confirmedSpecMode.value = specMode.value;
   confirmedLayeredFields.value =
     specMode.value === 'layered' ? selectedSpecGroups.value.map((group) => group.field) : [];
@@ -2660,6 +3172,11 @@ const buildLayeredSpecRows = () => {
   return combinations.map((combination) =>
     createBaseSpecRow({
       mode: 'layered',
+      _specDraftIdentity: JSON.stringify(
+        Object.entries(combination)
+          .map(([field, value]) => [field, value?.id])
+          .sort(),
+      ),
       ...Object.fromEntries(Object.entries(combination).map(([key, item]) => [key, item?.value ?? ''])),
       material: combination.material?.value || '',
       materialImage: Boolean(getSpecGroupByField('material')?.withImage && combination.material?.imageUploaded),
@@ -2669,7 +3186,7 @@ const buildLayeredSpecRows = () => {
       colorImage: Boolean(getSpecGroupByField('color')?.withImage && combination.color?.imageUploaded),
       size: combination.size?.value || '',
       sizeImage: Boolean(getSpecGroupByField('size')?.withImage && combination.size?.imageUploaded),
-      quantity: 0,
+      quantity: null,
       merchantCode: '',
     }),
   );
@@ -2685,7 +3202,7 @@ const specToPriceRow = (row: SpecRow): PriceRow => ({
   color: row.color,
   size: row.size,
   merchantCode: row.merchantCode,
-  stock: row.quantity,
+  stock: row.quantity ?? 0,
   costCoefficient: row.costCoefficient,
   cost: row.cost,
   guideCoefficient: row.guideCoefficient,
@@ -2698,6 +3215,10 @@ const specToPriceRow = (row: SpecRow): PriceRow => ({
   level3: row.level3,
 });
 
+const operationLogsVisible = ref(false);
+const canViewOperationLogs = computed(() =>
+  hasPermission(getLoginUser(), 'admin.finished-stock-management.operation-log.view'),
+);
 const priceEditorTarget = ref<StockItem | null>(null);
 const handlePriceEditorSaved = (record: FinishedProductRecord, closeAfterSave = true) => {
   upsertStockItem(record);
@@ -2777,7 +3298,7 @@ const savePriceDrawer = () => {
         ? {
             ...row,
             ...Object.fromEntries(
-              salesAttributeFields.value
+              batchEditableSalesFields.value
                 .filter((field) => batchSalesAttributes.value[field.key]?.trim())
                 .map((field) => [field.key, batchSalesAttributes.value[field.key]]),
             ),
@@ -2840,6 +3361,19 @@ const deleteSpec = (id: number) => {
 };
 
 const validateProductForm = () => {
+  if (confirmedSpecMode.value === 'layered') {
+    if (!confirmedSpecDimensions.value.length) {
+      adminFeedback.error('请先编辑并确认分层规格，补齐属性顺序');
+      return false;
+    }
+    const combinations = specRows.value.map((row) =>
+      JSON.stringify(confirmedLayeredFields.value.map((key) => row[key])),
+    );
+    if (new Set(combinations).size !== combinations.length) {
+      adminFeedback.error('销售规格组合重复，请重新编辑规格');
+      return false;
+    }
+  }
   const pricesComplete = specRows.value.every(
     (row) =>
       isValidSpecPriceNumber(row.cost) &&
@@ -2865,6 +3399,11 @@ const validateProductForm = () => {
     { valid: selectedCategoryId.value != null, tab: 'base', message: '请选择商品分类' },
     { valid: specRows.value.length > 0, tab: 'sales', message: '请创建销售规格' },
     {
+      valid: specRows.value.every((row) => isValidSpecQuantity(row.quantity)),
+      tab: 'sales',
+      message: '请输入每条规格大于 0 的数量',
+    },
+    {
       valid: specRows.value.every((row) =>
         salesAttributeFields.value.every((field) => !field.required || String(row[field.key] ?? '').trim()),
       ),
@@ -2877,7 +3416,6 @@ const validateProductForm = () => {
       message: '请先配置成品指导价默认系数',
     },
     { valid: pricesComplete, tab: 'sales', message: '请完善每条规格的成本价、指导价和商家编码' },
-    { valid: Boolean(productForm.merchantCode.trim()), tab: 'sales', message: '请输入商家编码' },
     { valid: Boolean(productForm.shelfNow), tab: 'sales', message: '请选择上架方式' },
   ];
   const failed = checks.find((item) => !item.valid);
@@ -2891,8 +3429,11 @@ const validateProductForm = () => {
 
 const specVariantLabel = (row: SpecRow) =>
   row.specText ||
-  salesAttributeFields.value
-    .map((field) => String(row[field.key] ?? '').trim())
+  (confirmedSpecMode.value === 'layered'
+    ? confirmedLayeredFields.value
+    : salesAttributeFields.value.map((field) => field.key)
+  )
+    .map((key) => String(row[key] ?? '').trim())
     .filter(Boolean)
     .join(' / ') ||
   row.merchantCode;
@@ -2919,6 +3460,7 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
         value: String(productForm[field.key] ?? '').trim(),
       }))
       .filter((attribute) => attribute.value),
+    specDimensions: confirmedSpecMode.value === 'layered' ? confirmedSpecDimensions.value : [],
     variants: specRows.value.map((row) => ({
       variantKey: row.merchantCode.trim(),
       variantLabel: specVariantLabel(row),
@@ -2955,6 +3497,7 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
       }),
     ),
     offShelfReason: editingProduct.value?.offShelfReason,
+    offShelfDetail: editingProduct.value?.offShelfDetail,
     status,
   };
 };
@@ -3030,11 +3573,15 @@ const submitReason = async () => {
   saving.value = true;
   try {
     if (reasonState.isBatch) {
-      await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'offShelf', reasonForm.reason)));
+      await Promise.all(
+        selectedKeys.value.map((id) =>
+          updateProductStatus(id, 'offShelf', reasonForm.reason, reasonForm.detail.trim()),
+        ),
+      );
       selectedKeys.value = [];
       adminFeedback.success('已批量下架');
     } else if (reasonState.product) {
-      await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason);
+      await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason, reasonForm.detail.trim());
       adminFeedback.success('商品已下架');
     }
   } catch (error) {
@@ -3055,12 +3602,30 @@ const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
 };
 
+const detailAttributeNames = computed(() =>
+  Object.fromEntries(productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name])),
+);
+const openProductDetail = async (row: StockItem) => {
+  try {
+    const products = await listFinishedProducts();
+    const latest = products.find((product) => product.id === row.id);
+    if (!latest) {
+      adminFeedback.error('商品不存在，请刷新列表');
+      return;
+    }
+    detailProduct.value = toStockItem(latest);
+    detailDialogVisible.value = true;
+  } catch {
+    adminFeedback.error('商品详情加载失败，请重试');
+  }
+};
+
 const closeDetailDialog = () => {
   detailDialogVisible.value = false;
   detailProduct.value = null;
 };
 
-const openProductMediaPreview = (media: AdminMediaValue | undefined, type: 'image' | 'video') => {
+const openProductMediaPreview = (media: Pick<AdminMediaValue, 'url'> | undefined, type: 'image' | 'video') => {
   if (!media?.url) return;
   productPreviewType.value = type;
   imagePreviewSrc.value = media.url;
@@ -3080,7 +3645,7 @@ const closeImagePreview = () => {
   imagePreviewSrc.value = '';
 };
 
-const updateProductStatus = async (id: number, status: StockStatus, reason?: string) => {
+const updateProductStatus = async (id: number, status: StockStatus, reason?: string, detail?: string) => {
   const item = dataItems.value.find((product) => product.id === id);
   if (!item) return;
   const afterStock = status === 'soldOut' ? 0 : item.stock;
@@ -3090,6 +3655,7 @@ const updateProductStatus = async (id: number, status: StockStatus, reason?: str
       status,
       stock: afterStock,
       offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,
+      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,
     }),
   );
   upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);
@@ -3147,6 +3713,11 @@ const handleConfirm = async () => {
 </script>
 
 <style scoped>
+.main-image-upload-grid :deep(.admin-media-upload > strong) {
+  font: var(--td-font-body-small);
+  font-weight: 400;
+  color: var(--td-text-color-placeholder);
+}
 .admin-layout {
   min-height: 100vh;
   background: var(--td-bg-color-page);
@@ -3328,6 +3899,27 @@ const handleConfirm = async () => {
 .selection-info {
   color: #6b7280;
   font-size: 13px;
+}
+
+.off-shelf-reason-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.off-shelf-reason-secondary {
+  display: block;
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brown-button {
+  color: #fff;
+  background: #8b5e34;
+  border-color: #8b5e34;
 }
 
 .deep-danger-button {
@@ -3571,12 +4163,14 @@ const handleConfirm = async () => {
 }
 
 .spec-table-block {
+  isolation: isolate;
   width: 100%;
   min-width: 0;
 }
 
 :deep(.spec-table-block .t-table__th),
 :deep(.spec-table-block .t-table__td) {
+  white-space: nowrap;
   border-right: 1px solid var(--td-component-border);
   border-bottom: 1px solid var(--td-component-border);
 }
@@ -3586,8 +4180,22 @@ const handleConfirm = async () => {
   border-left: 1px solid var(--td-component-border);
 }
 
-:deep(.spec-table-block .t-table__header tr:first-child .t-table__th) {
+.spec-table-block :deep(.t-table thead th) {
+  background: var(--td-bg-color-secondarycontainer);
   border-top: 1px solid var(--td-component-border);
+}
+
+.spec-table-block .price-pair {
+  width: max-content;
+  grid-template-columns: 64px 88px;
+}
+
+.spec-table-block .price-pair.with-source {
+  grid-template-columns: 64px 88px 24px;
+}
+
+.spec-table-block .decimal-input {
+  min-width: 88px;
 }
 
 .spec-table-actions {
@@ -3605,10 +4213,7 @@ const handleConfirm = async () => {
 }
 
 .spec-name-cell > span {
-  flex: 1;
-  min-width: 0;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .spec-thumb {
@@ -3662,6 +4267,7 @@ const handleConfirm = async () => {
 }
 
 .form-submit-bar {
+  background: var(--td-bg-color-container);
   box-shadow:
     0 -6px 18px rgb(0 0 0 / 24%),
     0 -2px 4px rgb(0 0 0 / 16%);
@@ -3670,7 +4276,7 @@ const handleConfirm = async () => {
   display: flex;
   justify-content: center;
   gap: 10px;
-  z-index: 1;
+  z-index: 3;
 }
 
 .category-picker {
@@ -3749,15 +4355,37 @@ const handleConfirm = async () => {
 
 .single-spec-list {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.single-spec-row,
-.layered-value-row {
+.single-spec-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
+}
+
+.layered-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.layered-value-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec-value-drag-handle {
+  display: inline-flex;
+  cursor: grab;
+}
+
+.spec-add-hidden {
+  visibility: hidden;
 }
 
 .spec-upload-box {
@@ -3794,6 +4422,9 @@ const handleConfirm = async () => {
 }
 
 .spec-attr-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   height: 28px;
   padding: 0 12px;
   color: #4b5563;
@@ -3833,6 +4464,7 @@ const handleConfirm = async () => {
 }
 
 .spec-group-head {
+  cursor: grab;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3840,6 +4472,9 @@ const handleConfirm = async () => {
 }
 
 .spec-group-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: #111827;
   font-weight: 700;
 }

@@ -25,20 +25,44 @@ import org.springframework.web.multipart.MultipartFile;
 public class FinishedProductController extends AdminCrudController<FinishedProduct> {
   private static final String PERMISSION_PREFIX = "admin.finished-stock-management";
   private final FinishedProductService service;
+  private final FinishedOperationLogService operationLogs;
   private final PermissionGuard permissionGuard;
   private final MediaAssetService mediaAssetService;
   private final StoreLevelPricingDirectory storeLevelDirectory;
 
   public FinishedProductController(
       FinishedProductService service,
+      FinishedOperationLogService operationLogs,
       PermissionGuard permissionGuard,
       MediaAssetService mediaAssetService,
       StoreLevelPricingDirectory storeLevelDirectory) {
     super(service, permissionGuard, PERMISSION_PREFIX);
     this.service = service;
+    this.operationLogs = operationLogs;
     this.permissionGuard = permissionGuard;
     this.mediaAssetService = mediaAssetService;
     this.storeLevelDirectory = storeLevelDirectory;
+  }
+
+  @GetMapping("/operation-logs")
+  public ApiResponse<FinishedOperationLogPage> operationLogs(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String operationType,
+      @RequestParam(required = false) String operatorName,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int pageSize) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
+    permissionGuard.requireAllData();
+    return ApiResponse.ok(operationLogs.listPage(keyword, operationType, operatorName, startDate, endDate, page, pageSize));
+  }
+
+  @GetMapping("/operation-logs/{id}")
+  public ApiResponse<FinishedOperationLog> operationLogDetail(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
+    permissionGuard.requireAllData();
+    return ApiResponse.ok(operationLogs.detail(id));
   }
 
   @GetMapping("/attribute-template-options")

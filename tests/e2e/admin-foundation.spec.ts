@@ -63,7 +63,7 @@ test('uses the official TDesign pagination controls on routed list pages', async
 
   for (const route of routes) {
     await page.goto(route);
-    const pagination = page.locator('.zdm-admin-pagination .t-pagination');
+    const pagination = page.locator('.zdm-admin-pagination:visible .t-pagination');
     await expect(pagination).toBeVisible();
     await expect(page.locator('.custom-pagination')).toHaveCount(0);
 
@@ -82,7 +82,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
     });
   });
   await page.goto('/slab-management');
-  const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('大板名称/ID/SKU', { exact: true });
+  const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('大板名称/ID/大板编号', { exact: true });
   await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
   const primaryLabels = await page.locator('.filter-primary-row .t-form__label').allTextContents();
   expect(primaryLabels.slice(-2)).toEqual(['色系：', '等级：']);
@@ -243,7 +243,7 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
   await expect(main.getByText('装点猫直营租户')).toBeVisible();
 
   await main.getByRole('button', { name: /新增/ }).click();
-  const createDialog = page.locator('.t-dialog').filter({ hasText: '新增' });
+  const createDialog = page.locator('.t-dialog:visible').filter({ hasText: '新增' });
   await expect(createDialog).toBeVisible();
   await expect(createDialog.getByText('租户姓名')).toBeVisible();
   await expect(createDialog.getByText('联系方式')).toBeVisible();
@@ -252,7 +252,7 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
 
   const tenantRow = page.locator('tbody tr').filter({ hasText: '装点猫直营租户' }).first();
   await tenantRow.getByText('业务开通').click();
-  const businessDialog = page.locator('.t-dialog').filter({ hasText: '业务开通' });
+  const businessDialog = page.locator('.t-dialog:visible').filter({ hasText: '业务开通' });
   await expect(businessDialog).toBeVisible();
   await expect(businessDialog.getByText('城市合伙人')).toBeVisible();
   await expect(businessDialog.getByText('大板供应商')).toBeVisible();
@@ -260,7 +260,7 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
   await expect(businessDialog).toBeHidden();
 
   await tenantRow.getByText('编辑').click();
-  const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
+  const editDialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑' });
   await expect(editDialog).toBeVisible();
   await expect(editDialog.locator('input').first()).toHaveValue('装点猫直营租户');
   await editDialog.getByRole('button', { name: '取消' }).click();
@@ -283,7 +283,7 @@ test('gates tenant actions by status and requires the exact name before permanen
   await expect(disabledRow.getByText('恢复运营', { exact: true })).toBeVisible();
   await disabledRow.getByText('彻底删除', { exact: true }).click();
 
-  const dialog = page.locator('.t-dialog').filter({ hasText: '彻底删除租户' });
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '彻底删除租户' });
   await expect(dialog).toContainText('门店2');
   await expect(dialog).toContainText('员工5');
   await expect(dialog).toContainText('删除独立账号4');
@@ -311,7 +311,7 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
   await expect(page.locator('tbody tr').filter({ hasText: '杭州体验门店' }).first()).toContainText('韩健');
 
   await main.getByRole('button', { name: /新增/ }).click();
-  const createDialog = page.locator('.t-dialog').filter({ hasText: '新增' });
+  const createDialog = page.locator('.t-dialog:visible').filter({ hasText: '新增' });
   await expect(createDialog).toBeVisible();
   await expect(createDialog.getByText('选择租户')).toBeVisible();
   await expect(createDialog.getByText('门店类型')).toBeVisible();
@@ -322,14 +322,14 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
   const storeRow = page.locator('tbody tr').filter({ hasText: '杭州体验门店' }).first();
   await storeRow.locator('.level-cell').hover();
   await storeRow.getByLabel('修改门店级别').click();
-  const levelDialog = page.locator('.t-dialog').filter({ hasText: '门店级别' });
+  const levelDialog = page.locator('.t-dialog:visible').filter({ hasText: '门店级别' });
   await expect(levelDialog).toBeVisible();
   await expect(levelDialog.getByText('门店级别').first()).toBeVisible();
   await levelDialog.getByRole('button', { name: '取消' }).click();
   await expect(levelDialog).toBeHidden();
 
   await storeRow.getByText('编辑').click();
-  const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
+  const editDialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑' });
   await expect(editDialog).toBeVisible();
   await expect(editDialog.locator('input').first()).toHaveValue('杭州体验门店');
   await editDialog.getByRole('button', { name: '取消' }).click();
@@ -344,10 +344,10 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   await expect(main.getByText('装点猫大板供应商')).toBeVisible();
 
   await main.getByRole('button', { name: /新增/ }).click();
-  const createDialog = page.locator('.t-dialog').filter({ hasText: '新增' });
+  const createDialog = page.locator('.t-dialog:visible').filter({ hasText: '新增' });
   await expect(createDialog).toBeVisible();
   await expect(createDialog.getByText('供应商名称')).toBeVisible();
-  await expect(createDialog.getByText('供货类型')).toBeVisible();
+  await expect(createDialog.getByText('供货类型', { exact: true })).toBeVisible();
   await expect(createDialog.getByText('联系电话')).toBeVisible();
   await createDialog.getByRole('button', { name: '取消' }).click();
   await expect(createDialog).toBeHidden();
@@ -355,7 +355,7 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   const supplierRow = page.locator('tbody tr').filter({ hasText: '装点猫大板供应商' }).first();
   await expect(supplierRow.getByText('韩健', { exact: true })).toBeVisible();
   await supplierRow.getByText('编辑').click();
-  const editDialog = page.locator('.t-dialog').filter({ hasText: '编辑' });
+  const editDialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑' });
   await expect(editDialog).toBeVisible();
   await expect(editDialog.locator('input').first()).toHaveValue('装点猫大板供应商');
   await editDialog.getByRole('button', { name: '取消' }).click();

@@ -5,7 +5,7 @@
       class="price-source-badge"
       :class="source === 'auto' ? 'is-auto' : 'is-manual'"
       :disabled="readonly"
-      :aria-label="source === 'auto' ? '跟随配置，点击切换手工价格' : '手工价格，点击切换跟随配置'"
+      :aria-label="readonly ? tooltip : source === 'auto' ? '跟随配置，点击切换手工价格' : '手工价格，点击切换跟随配置'"
       @click="toggle"
     >
       {{ source === 'auto' ? '跟' : '手' }}
@@ -33,6 +33,7 @@ const props = defineProps<{
 const emit = defineEmits<{ toggle: [] }>();
 const confirmVisible = ref(false);
 const tooltip = computed(() => {
+  if (props.readonly) return props.source === 'auto' ? '跟随配置' : '手工价格';
   return props.source === 'auto'
     ? '当前价格/系数，跟随价格配置浮动，可点击更改为【不跟随价格配置浮动】'
     : '当前价格/系数，不跟随价格配置浮动，可点击更改为【跟随价格配置浮动】';

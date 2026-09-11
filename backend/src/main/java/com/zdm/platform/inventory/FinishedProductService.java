@@ -38,6 +38,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   private final MediaReferenceService mediaReferenceService;
   private final CurrentIdentityProvider identityProvider;
   private final FinishedProductDetailContent detailContent;
+  private final FinishedOperationLogService operationLogs;
 
   public FinishedProductService(
       FinishedProductPriceService priceService,
@@ -48,7 +49,9 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       MediaAssetService mediaAssetService,
       MediaCleanupService mediaCleanupService,
       MediaReferenceService mediaReferenceService,
-      CurrentIdentityProvider identityProvider) {
+      CurrentIdentityProvider identityProvider,
+      FinishedOperationLogService operationLogs) {
+    this.operationLogs = operationLogs;
     this.priceService = priceService;
     this.guidePriceService = guidePriceService;
     this.variantMapper = variantMapper;
@@ -97,9 +100,14 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
 
   @Transactional
   public FinishedProduct createWithDetails(FinishedProduct product) {
+    if (product.getSpecDimensions() == null && product.getVariants() != null
+        && product.getVariants().stream().anyMatch(v -> "layered".equals(v.getDisplayMode()))) {
+      throw new IllegalArgumentException("请提供分层规格属性及顺序");
+    }
     validateAndNormalize(product);
     CurrentIdentity identity = identityProvider.require();
     product.setId(null);
+    product.setOffShelfAt("offShelf".equals(product.getStatus()) ? LocalDateTime.now() : null);
     product.setPublisherType(PLATFORM_PUBLISHER);
     product.setCreatedByName(identity.displayName());
     product.setCreatedByAccountId(identity.accountId());
@@ -111,7 +119,9 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     }
     replaceDetails(product);
     syncMediaReferences(product);
-    return attachDetails(getById(product.getId()));
+    FinishedProduct created = attachDetails(getById(product.getId()));
+    operationLogs.record(created, null, operationLogs.snapshot(created));
+    return created;
   }
 
   @Transactional
@@ -120,12 +130,21 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (existing == null) {
       throw new IllegalArgumentException("成品现货不存在或已被删除");
     }
+    if (!java.util.Objects.equals(existing.getCategoryId(), product.getCategoryId())) {
+      throw new IllegalArgumentException("编辑商品不能切换分类");
+    }
+    Map<String, Object> before = operationLogs.snapshot(attachDetails(existing));
+    if (product.getSpecDimensions() == null) {
+      product.setSpecDimensions(existing.getSpecDimensions());
+    }
     validateAndNormalize(product);
     product.setId(id);
     product.setPublisherType(PLATFORM_PUBLISHER);
     product.setCreatedByName(existing.getCreatedByName());
     product.setCreatedByAccountId(existing.getCreatedByAccountId());
     product.setCreatedAt(existing.getCreatedAt());
+    product.setOffShelfAt("offShelf".equals(product.getStatus()) && !"offShelf".equals(existing.getStatus())
+        ? LocalDateTime.now() : existing.getOffShelfAt());
     try {
       updateById(product);
     } catch (DuplicateKeyException exception) {
@@ -133,7 +152,9 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     }
     replaceDetails(product);
     syncMediaReferences(product);
-    return attachDetails(getById(id));
+    FinishedProduct updated = attachDetails(getById(id));
+    operationLogs.record(updated, before, operationLogs.snapshot(updated));
+    return updated;
   }
 
   public boolean cleanupTemporaryMedia(Long mediaId) {
@@ -146,6 +167,9 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   @Transactional
   public boolean removeById(Serializable id) {
     FinishedProduct existing = getById(id);
+    if (existing != null) {
+      operationLogs.record(existing, operationLogs.snapshot(attachDetails(existing)), null);
+    }
     boolean removed = super.removeById(id);
     if (removed && existing != null) {
       mediaReferenceService.removeBusiness(MEDIA_DOMAIN, existing.getId(), "成品现货被彻底删除");
@@ -157,14 +181,11 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (!StringUtils.hasText(product.getName())) {
       throw new IllegalArgumentException("请输入商品名称");
     }
-    if (!StringUtils.hasText(product.getSku())) {
-      throw new IllegalArgumentException("请输入商家编码");
-    }
     if (!StringUtils.hasText(product.getDetail())) {
       throw new IllegalArgumentException("请输入宝贝详情");
     }
     product.setName(product.getName().trim());
-    product.setSku(product.getSku().trim());
+    product.setSku(StringUtils.hasText(product.getSku()) ? product.getSku().trim() : null);
     product.setDetail(detailContent.normalize(product.getDetail()));
     if (!ALLOWED_STATUSES.contains(product.getStatus())) {
       throw new IllegalArgumentException("成品现货状态不正确");
@@ -174,6 +195,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     validateMedia(product);
     validateAttributes(product.getAttributes());
     normalizeVariants(product);
+    FinishedSpecValidator.validate(product);
     validatePrices(product);
   }
 
