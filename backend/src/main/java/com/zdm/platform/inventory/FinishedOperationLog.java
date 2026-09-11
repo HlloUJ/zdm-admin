@@ -63,4 +63,7 @@ public class FinishedOperationLog {
   public void setOperatedAt(LocalDateTime operatedAt) { this.operatedAt = operatedAt; }
   public LocalDateTime getCreatedAt() { return createdAt; }
   public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+  private Long productCreatedByAccountId;
+  public Long getProductCreatedByAccountId() { return productCreatedByAccountId; }
+  public void setProductCreatedByAccountId(Long accountId) { this.productCreatedByAccountId = accountId; }
 }

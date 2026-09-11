@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
 @TableName("roles")
-public class Role {
+public class Role implements com.zdm.platform.security.CreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 

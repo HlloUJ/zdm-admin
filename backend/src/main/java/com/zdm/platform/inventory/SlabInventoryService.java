@@ -80,7 +80,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   }
 
   public List<SlabInventory> listWithPrices() {
-    List<SlabInventory> inventory = baseMapper.selectListWithDetails();
+    List<SlabInventory> inventory = com.zdm.platform.security.DataScope.filter(identityProvider.require(), baseMapper.selectListWithDetails());
     Map<Long, List<SlabOffShelfRecord>> recordsBySlabId = offShelfRecordService
         .listBySlabIds(inventory.stream().map(SlabInventory::getId).toList())
         .stream()
@@ -235,6 +235,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       throw new IllegalArgumentException("请选择大板");
     }
     List<SlabInventory> inventory = listByIds(normalizedIds);
+    inventory.forEach(item -> com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), item.getCreatedByAccountId()));
     if (inventory.size() != normalizedIds.size()
         || inventory.stream().anyMatch(item -> !"recycle".equals(item.getStatus()))) {
       throw new IllegalArgumentException("只有回收站中的大板可以彻底删除");
@@ -247,6 +248,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   public int clearRecycle() {
     List<SlabInventory> inventory = lambdaQuery()
         .eq(SlabInventory::getStatus, "recycle")
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), SlabInventory::getCreatedByAccountId, identityProvider.require().accountId())
         .list();
     if (inventory.isEmpty()) {
       return 0;
@@ -295,6 +297,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       throw new IllegalArgumentException("请选择大板");
     }
     List<SlabInventory> inventory = listByIds(normalizedIds);
+    inventory.forEach(item -> com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), item.getCreatedByAccountId()));
     if (inventory.size() != normalizedIds.size()) {
       throw new IllegalArgumentException("部分大板不存在或已被删除");
     }
@@ -594,30 +597,33 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   public SlabPublishOptions listPublishOptions() {
     List<SlabPublishOption> origins = originService.lambdaQuery()
         .eq(SlabOrigin::getStatus, "enabled")
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), SlabOrigin::getCreatedByAccountId, identityProvider.require().accountId())
         .orderByAsc(SlabOrigin::getName)
         .list().stream()
         .map(item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()))
         .toList();
     List<SlabPublishOption> varieties = varietyService.lambdaQuery()
         .eq(SlabVariety::getStatus, "enabled")
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), SlabVariety::getCreatedByAccountId, identityProvider.require().accountId())
         .orderByAsc(SlabVariety::getName)
         .list().stream()
         .map(item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()))
         .toList();
     List<SlabPublishOption> textures = textureService.lambdaQuery()
         .eq(SlabTexture::getStatus, "enabled")
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), SlabTexture::getCreatedByAccountId, identityProvider.require().accountId())
         .orderByAsc(SlabTexture::getName)
         .list().stream()
         .map(item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()))
         .toList();
-    Map<Long, List<SlabPublishOption>> colorsByCategory = colorService.listColors().stream()
+    Map<Long, List<SlabPublishOption>> colorsByCategory = com.zdm.platform.security.DataScope.filter(identityProvider.require(), colorService.listColors()).stream()
         .filter(item -> "enabled".equals(item.getStatus()))
         .collect(Collectors.groupingBy(
             SlabColor::getCategoryId,
             Collectors.mapping(
                 item -> new SlabPublishOption(item.getId(), item.getName(), null, item.getStatus()),
                 Collectors.toList())));
-    List<SlabPublishColorCategoryOption> colorCategories = colorService.listCategories().stream()
+    List<SlabPublishColorCategoryOption> colorCategories = com.zdm.platform.security.DataScope.filter(identityProvider.require(), colorService.listCategories()).stream()
         .filter(category -> "enabled".equals(category.getStatus()))
         .map(category -> new SlabPublishColorCategoryOption(
             category.getId(),
@@ -628,6 +634,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         .toList();
     List<SlabPublishOption> grades = gradeService.lambdaQuery()
         .eq(SlabGrade::getStatus, "enabled")
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), SlabGrade::getCreatedByAccountId, identityProvider.require().accountId())
         .orderByAsc(SlabGrade::getSortOrder)
         .orderByAsc(SlabGrade::getId)
         .list().stream()
@@ -672,7 +679,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       throw new IllegalArgumentException("供应商不存在、已停用或不支持大板供货");
     }
     if (color != null) {
-      SlabColorCategory category = colorService.listCategories().stream()
+      SlabColorCategory category = com.zdm.platform.security.DataScope.filter(identityProvider.require(), colorService.listCategories()).stream()
           .filter(item -> Objects.equals(item.getId(), color.getCategoryId()))
           .findFirst()
           .orElse(null);
@@ -795,4 +802,14 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     inventory.setVideoUrl(mediaAssetService.publicUrl(inventory.getVideoMediaId()));
     inventory.setVideoCoverUrl(mediaAssetService.publicUrl(inventory.getVideoCoverMediaId()));
   }
+  @Override
+  public SlabInventory getById(java.io.Serializable id) {
+    SlabInventory entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

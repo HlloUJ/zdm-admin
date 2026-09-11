@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
 @TableName("suppliers")
-public class Supplier extends BaseEntity {
+public class Supplier extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String name;
 

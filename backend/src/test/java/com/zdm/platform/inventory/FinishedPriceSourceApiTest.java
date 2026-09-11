@@ -56,9 +56,11 @@ class FinishedPriceSourceApiTest {
           VALUES (99101, ?, ?, 3, 10, 30)
           """, key, key);
     }
+    authenticateDirectService();
     assertThat(sync.backfillMissingPrices(configurations.selectById(99101L))).isEqualTo(2);
     List<FinishedProductPrice> existing = prices.listPrices(99101L);
     existing.get(1).setPriceSource("manual");
+    authenticateDirectService();
     prices.replacePrices(99101L, existing);
     updateCoefficient(4);
     assertPrice("A", "40", "auto");
@@ -75,6 +77,7 @@ class FinishedPriceSourceApiTest {
     restored.get(1).setPriceSource("auto");
     restored.get(1).setPriceCoefficient(new BigDecimal("5"));
     restored.get(1).setPrice(new BigDecimal("50"));
+    authenticateDirectService();
     prices.replacePrices(99101L, restored);
     updateCoefficient(6);
     assertPrice("A", "60", "auto");
@@ -96,5 +99,16 @@ class FinishedPriceSourceApiTest {
         .filter(price -> key.equals(price.getVariantKey())).findFirst().orElseThrow();
     assertThat(row.getPrice()).isEqualByComparingTo(value);
     assertThat(row.getPriceSource()).isEqualTo(source);
+  }
+  private void authenticateDirectService() {
+    var identity = new com.zdm.platform.security.CurrentIdentity(1L, 1L, 1L, null, "admin", null, null,
+        "系统管理员", "all", List.of("SUPER_ADMIN"), List.of("all"));
+    org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity, null, List.of()));
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void clearIdentity() {
+    org.springframework.security.core.context.SecurityContextHolder.clearContext();
   }
 }

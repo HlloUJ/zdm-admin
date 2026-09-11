@@ -23,7 +23,7 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     this.identityProvider = identityProvider;
   }
 
-  // 门店分类属于门店：同一门店内共享，不按创建人过滤，不得跨门店读写。
+  // 门店分类属于门店：保留门店隔离，并叠加当前员工的数据权限。
   public List<StoreCategory> listOrdered() {
     Long storeId = requireStoreId();
     return lambdaQuery()
@@ -44,6 +44,7 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     category.setStatus(request.status());
     category.setProductCount(0);
     category.setCreatedByName(identityProvider.require().displayName());
+    category.setCreatedByAccountId(identityProvider.require().accountId());
     validateParent(category.getParentId());
     requireUniqueName(category.getParentId(), category.getName(), null);
     makeRoomForNewest(category.getParentId());
@@ -76,6 +77,7 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     category.setStatus(status);
     updateById(category);
     List<Long> descendantIds = descendantIds(id);
+    descendantIds.forEach(childId -> requireCategory(childId));
     if (!descendantIds.isEmpty()) {
       update(Wrappers.<StoreCategory>lambdaUpdate()
           .in(StoreCategory::getId, descendantIds)
@@ -135,6 +137,7 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     if (category == null) {
       throw new IllegalArgumentException("分类不存在或已被删除");
     }
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), category.getCreatedByAccountId());
     return category;
   }
 
@@ -197,6 +200,7 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     } else {
       updateWrapper.eq(StoreCategory::getParentId, parentId);
     }
+    updateWrapper.eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), StoreCategory::getCreatedByAccountId, identityProvider.require().accountId());
     updateWrapper.setSql("sort_order = sort_order + 1");
     update(updateWrapper);
   }
@@ -208,6 +212,7 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     } else {
       query.eq(StoreCategory::getParentId, parentId);
     }
+    query.eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), StoreCategory::getCreatedByAccountId, identityProvider.require().accountId());
     return query.orderByAsc(StoreCategory::getSortOrder).orderByAsc(StoreCategory::getId).list();
   }
 
@@ -227,4 +232,14 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     }
     return identity.storeId();
   }
+  @Override
+  public StoreCategory getById(java.io.Serializable id) {
+    StoreCategory entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

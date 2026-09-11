@@ -31,7 +31,7 @@ public class ProductAttributeController {
   public ApiResponse<List<ProductAttribute>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
     List<String> scopes = visibleScopes();
-    return ApiResponse.ok(service.listWithTemplateCounts(scopes));
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithTemplateCounts(scopes)));
   }
 
   @PostMapping

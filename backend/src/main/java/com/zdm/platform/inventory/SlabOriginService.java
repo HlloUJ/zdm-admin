@@ -98,4 +98,14 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
     }
   }
+  @Override
+  public SlabOrigin getById(java.io.Serializable id) {
+    SlabOrigin entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

@@ -32,7 +32,7 @@ public class SlabMarkupConfigurationController {
   @GetMapping
   public ApiResponse<List<SlabMarkupConfiguration>> list() {
     permissionGuard.requirePermission(permission("view"));
-    return ApiResponse.ok(service.listConfigurations(false));
+    return ApiResponse.ok(permissionGuard.filterData(service.listConfigurations(false)));
   }
 
   @GetMapping("/options")
@@ -40,7 +40,7 @@ public class SlabMarkupConfigurationController {
     if (!permissionGuard.hasPermission(permission("view"))) {
       permissionGuard.requireView("admin.slab-management");
     }
-    return ApiResponse.ok(service.listConfigurations(true));
+    return ApiResponse.ok(permissionGuard.filterData(service.listConfigurations(true)));
   }
 
   @PostMapping
@@ -61,7 +61,7 @@ public class SlabMarkupConfigurationController {
   public ApiResponse<List<SlabMarkupConfiguration>> reorder(
       @Valid @RequestBody SlabMarkupConfigurationReorderRequest request) {
     permissionGuard.requirePermission(permission("sort"));
-    return ApiResponse.ok(service.reorderConfigurations(request.orderedIds()));
+    return ApiResponse.ok(permissionGuard.filterData(service.reorderConfigurations(request.orderedIds())));
   }
 
   @PatchMapping("/{id}/status")

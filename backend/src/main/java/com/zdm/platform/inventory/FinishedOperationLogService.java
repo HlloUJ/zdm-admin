@@ -156,6 +156,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         "RESTORE", "放回仓库", "DELETE_TO_RECYCLE", "删除至回收站", "PURGE", "彻底删除商品", "SOLD_OUT", "商品售罄");
     var identity = identities.require();
     FinishedOperationLog log = new FinishedOperationLog();
+    log.setProductCreatedByAccountId(product.getCreatedByAccountId());
     log.setProductId(product.getId());
     log.setProductName(product.getName());
     log.setMerchantCode(product.getSku());
@@ -258,6 +259,10 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     int size = Math.clamp(requestedSize, 1, 100);
     List<String> conditions = new ArrayList<>();
     List<Object> args = new ArrayList<>();
+    if (!com.zdm.platform.security.DataScope.isAll(identities.require())) {
+      conditions.add("product_created_by_account_id = ?");
+      args.add(identities.require().accountId());
+    }
     if (keyword != null && !keyword.isBlank()) {
       conditions.add("(product_name LIKE ? OR merchant_code LIKE ? OR CAST(product_id AS CHAR) LIKE ?)");
       for (int i = 0; i < 3; i++) { args.add("%" + keyword.trim() + "%"); }
@@ -278,6 +283,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
   public FinishedOperationLog detail(Long id) {
     FinishedOperationLog log = getById(id);
     if (log == null) { throw new IllegalArgumentException("操作日志不存在"); }
+    com.zdm.platform.security.DataScope.requireAccess(identities.require(), log.getProductCreatedByAccountId());
     try {
       ObjectNode changes = (ObjectNode) json.readTree(log.getChangeDetails());
       resolveLegacyCategory(changes, log.getProductId());

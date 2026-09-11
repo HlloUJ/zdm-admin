@@ -5,7 +5,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("slab_grades")
-public class SlabGrade extends BaseEntity {
+public class SlabGrade extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String code;
 

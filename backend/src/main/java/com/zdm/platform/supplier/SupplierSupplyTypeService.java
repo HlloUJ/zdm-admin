@@ -96,6 +96,7 @@ public class SupplierSupplyTypeService {
       throw new IllegalArgumentException("供货类型不存在");
     }
     type.setReferenced(mapper.countSupplierReferences(id) > 0);
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), type.getCreatedByAccountId());
     return type;
   }
 

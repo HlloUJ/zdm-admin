@@ -5,7 +5,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("master_data")
-public class MasterData extends BaseEntity {
+public class MasterData extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String dataType;
 
@@ -48,4 +48,8 @@ public class MasterData extends BaseEntity {
   public void setExtra(String extra) {
     this.extra = extra;
   }
+  private Long createdByAccountId;
+
+  public Long getCreatedByAccountId() { return createdByAccountId; }
+  public void setCreatedByAccountId(Long accountId) { this.createdByAccountId = accountId; }
 }

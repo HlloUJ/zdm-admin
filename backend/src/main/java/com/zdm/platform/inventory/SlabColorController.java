@@ -29,7 +29,7 @@ public class SlabColorController {
   @GetMapping
   public ApiResponse<List<SlabColor>> list() {
     permissionGuard.requireView(PREFIX);
-    return ApiResponse.ok(service.listColors());
+    return ApiResponse.ok(permissionGuard.filterData(service.listColors()));
   }
 
   @PostMapping
@@ -60,7 +60,7 @@ public class SlabColorController {
   @GetMapping("/categories")
   public ApiResponse<List<SlabColorCategory>> categories() {
     permissionGuard.requireView(PREFIX);
-    return ApiResponse.ok(service.listCategories());
+    return ApiResponse.ok(permissionGuard.filterData(service.listCategories()));
   }
 
   @PostMapping("/categories")

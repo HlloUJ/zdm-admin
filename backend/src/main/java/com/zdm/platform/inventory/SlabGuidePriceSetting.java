@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @TableName("slab_guide_price_settings")
-public class SlabGuidePriceSetting {
+public class SlabGuidePriceSetting implements com.zdm.platform.security.CreatorOwned {
   private Long id;
   private BigDecimal priceCoefficient;
   private String updatedByName;
@@ -25,4 +25,8 @@ public class SlabGuidePriceSetting {
   public void setCreatedAt(LocalDateTime value) { this.createdAt = value; }
   public LocalDateTime getUpdatedAt() { return updatedAt; }
   public void setUpdatedAt(LocalDateTime value) { this.updatedAt = value; }
+  private Long createdByAccountId;
+
+  public Long getCreatedByAccountId() { return createdByAccountId; }
+  public void setCreatedByAccountId(Long accountId) { this.createdByAccountId = accountId; }
 }

@@ -80,7 +80,7 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @GetMapping
   public ApiResponse<List<SlabInventory>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listWithPrices());
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()));
   }
 
   @GetMapping("/operation-logs")

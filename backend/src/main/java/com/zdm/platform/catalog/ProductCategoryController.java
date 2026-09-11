@@ -40,7 +40,7 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
         visibleScopes.add(scope);
       }
     }
-    return ApiResponse.ok(service.listNewestFirst(visibleScopes));
+    return ApiResponse.ok(permissionGuard.filterData(service.listNewestFirst(visibleScopes)));
   }
 
   @Override

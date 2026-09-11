@@ -69,7 +69,7 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
 
   @Transactional
   public List<SlabGrade> reorderGrades(List<Long> orderedIds) {
-    List<SlabGrade> grades = list();
+    List<SlabGrade> grades = com.zdm.platform.security.DataScope.filter(identityProvider.require(), list());
     if (orderedIds == null
         || orderedIds.size() != grades.size()
         || new HashSet<>(orderedIds).size() != grades.size()) {
@@ -131,4 +131,14 @@ public class SlabGradeService extends ServiceImpl<SlabGradeMapper, SlabGrade> {
       throw new IllegalArgumentException("等级名称已存在");
     }
   }
+  @Override
+  public SlabGrade getById(java.io.Serializable id) {
+    SlabGrade entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

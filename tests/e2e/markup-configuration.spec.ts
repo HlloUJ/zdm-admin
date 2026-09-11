@@ -13,7 +13,7 @@ const seedLogin = async (page: import('@playwright/test').Page, permissions: str
           name: '运营管理员',
           roles: roleValues,
           permissions: permissionValues,
-          dataPermission: 'self',
+          dataPermission: 'all',
         }),
       );
     },

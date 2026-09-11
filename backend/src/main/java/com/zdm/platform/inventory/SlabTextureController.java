@@ -29,7 +29,7 @@ public class SlabTextureController {
   @GetMapping
   public ApiResponse<List<SlabTexture>> list() {
     permissionGuard.requireView(PREFIX);
-    return ApiResponse.ok(service.list());
+    return ApiResponse.ok(permissionGuard.filterData(service.list()));
   }
 
   @PostMapping

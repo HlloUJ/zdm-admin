@@ -1267,7 +1267,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void storeCategoryIsSharedWithinStoreAndIsolatedAcrossStores() throws Exception {
+  void storeCategoryAllDataScopeIsIsolatedAcrossStores() throws Exception {
     long accountId = 9022L;
     long employeeId = 9022L;
     long roleId = 9022L;
@@ -1284,7 +1284,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, ?, '门店分类查看员', '15926629022', 'enabled', 'self', '韩健')
+        VALUES (?, ?, 1, ?, '门店分类查看员', '15926629022', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId,
@@ -1468,7 +1468,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '成品分类操作员', '15926629021', 'enabled', 'self', '韩健')
+        VALUES (?, ?, 1, 1, '成品分类操作员', '15926629021', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -2123,13 +2123,13 @@ class PlatformApiSmokeTest {
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
         accountId, "15926629086", "店铺级别只读操作员");
     jdbcTemplate.update(
-        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '店铺级别只读操作员', '15926629086', 'enabled', 'self', '韩健')",
+        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '店铺级别只读操作员', '15926629086', 'enabled', 'all', '韩健')",
         employeeId, accountId);
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
         accountId, employeeId);
     jdbcTemplate.update(
-        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, 1, 1, '店铺级别只读角色', 'STORE_LEVEL_VIEW_TEST', 'self', 'enabled', 'admin.tenant.store-level-management.view', '集成测试')",
+        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, 1, 1, '店铺级别只读角色', 'STORE_LEVEL_VIEW_TEST', 'all', 'enabled', 'admin.tenant.store-level-management.view', '集成测试')",
         roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
@@ -2307,13 +2307,13 @@ class PlatformApiSmokeTest {
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
         accountId, "15926629088", "门店权限测试操作员");
     jdbcTemplate.update(
-        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '门店权限测试操作员', '15926629088', 'enabled', 'self', '韩健')",
+        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '门店权限测试操作员', '15926629088', 'enabled', 'all', '韩健')",
         employeeId, accountId);
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
         accountId, employeeId);
     jdbcTemplate.update(
-        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, 1, 1, '门店编辑测试角色', 'STORE_EDIT_TEST', 'self', 'enabled', 'admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit', '集成测试')",
+        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, 1, 1, '门店编辑测试角色', 'STORE_EDIT_TEST', 'all', 'enabled', 'admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit', '集成测试')",
         roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
@@ -2862,7 +2862,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void slabOriginManagementIgnoresSelfDataScopeWhenListing() throws Exception {
+  void slabOriginManagementListsAllCreatorsWithAllDataScope() throws Exception {
     long accountId = 9081L;
     long employeeId = 9081L;
     long roleId = 9081L;
@@ -2875,7 +2875,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '大板产地自有操作员', '15926629081', 'enabled', 'self', '韩健')
+        VALUES (?, ?, 1, 1, '大板产地自有操作员', '15926629081', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -2891,7 +2891,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO roles
           (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '大板产地自有操作角色', 'SLAB_ORIGIN_SELF_TEST', 'self', 'enabled',
+        VALUES (?, 1, 1, '大板产地自有操作角色', 'SLAB_ORIGIN_SELF_TEST', 'all', 'enabled',
           'admin.product-data-center.slab-origin.view,'
           'admin.product-data-center.slab-origin.create,'
           'admin.product-data-center.slab-origin.edit,'
@@ -3146,7 +3146,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void slabVarietyManagementIgnoresSelfDataScopeWhenListing() throws Exception {
+  void slabVarietyManagementListsAllCreatorsWithAllDataScope() throws Exception {
     long accountId = 9031L;
     long employeeId = 9031L;
     long roleId = 9031L;
@@ -3159,7 +3159,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '大板品种自有操作员', '15926629031', 'enabled', 'self', '韩健')
+        VALUES (?, ?, 1, 1, '大板品种自有操作员', '15926629031', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3175,7 +3175,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO roles
           (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'self', 'enabled',
+        VALUES (?, 1, 1, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'all', 'enabled',
           'admin.product-data-center.slab-variety.view,'
           'admin.product-data-center.slab-variety.create,'
           'admin.product-data-center.slab-variety.edit,'
@@ -3456,7 +3456,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void tenantPermissionsIgnoreDataScopeAndAllowOperationsOnOtherCreatorsData() throws Exception {
+  void tenantAllDataScopeAllowsOperationsOnOtherCreatorsData() throws Exception {
     long accountId = 9012L;
     long employeeId = 9012L;
     jdbcTemplate.update(
@@ -3469,7 +3469,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '租户权限操作员', '15900009012', 'enabled', 'self', '韩健')
+        VALUES (?, ?, 1, 1, '租户权限操作员', '15900009012', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3485,7 +3485,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO roles
           (tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (1, 1, '租户全部查看角色', 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE', 'self', 'enabled',
+        VALUES (1, 1, '租户全部查看角色', 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE', 'all', 'enabled',
           'admin.tenant.tenant-management.view,admin.tenant.tenant-management.edit,
            admin.tenant.tenant-management.open-business,admin.tenant.tenant-management.toggle-status,
            admin.tenant.tenant-management.delete', '韩健')
@@ -3761,7 +3761,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void craftManagementIgnoresCurrentEmployeeDataPermissionWhenListing() throws Exception {
+  void craftManagementListsAllCreatorsWithAllDataScope() throws Exception {
     long accountId = 9003L;
     long employeeId = 9003L;
     long roleId = 9003L;
@@ -3777,7 +3777,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO employees
           (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, ?, '15900009003', 'enabled', 'self', '韩健')
+        VALUES (?, ?, 1, 1, ?, '15900009003', 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId,
@@ -3794,7 +3794,7 @@ class PlatformApiSmokeTest {
         """
         INSERT INTO roles
           (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'self', 'enabled', ?, '集成测试')
+        VALUES (?, 1, 1, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'all', 'enabled', ?, '集成测试')
         """,
         roleId,
         "admin.product-data-center.finished-stock-craft.view");
@@ -4268,7 +4268,7 @@ class PlatformApiSmokeTest {
           (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
            data_permission, created_by_name)
         VALUES
-          (?, ?, 1, 1, '权限配置员', '15926629041', 'enabled', ?, 'self', '韩健'),
+          (?, ?, 1, 1, '权限配置员', '15926629041', 'enabled', ?, 'all', '韩健'),
           (?, ?, 1, 1, '待配置员工', '15926629042', 'enabled', '2', 'all', '权限配置员')
         """,
         managerEmployeeId,
@@ -4303,7 +4303,7 @@ class PlatformApiSmokeTest {
         INSERT INTO roles
           (id, tenant_id, store_id, name, code, data_scope, status,
            function_permissions, created_by_name)
-        VALUES (?, 1, 1, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'self', 'enabled',
+        VALUES (?, 1, 1, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'all', 'enabled',
           'admin.permission-management.employee-management.view,'
           'admin.permission-management.employee-management.edit,'
           'admin.permission-management.employee-management.permission,'
@@ -4350,7 +4350,7 @@ class PlatformApiSmokeTest {
                   "phone": "15926629041",
                   "status": "enabled",
                   "roleIds": "%d",
-                  "dataPermission": "self",
+                  "dataPermission": "all",
                   "remark": ""
                 }
                 """.formatted(managerRoleId)))
@@ -4377,7 +4377,7 @@ class PlatformApiSmokeTest {
                   "phone": "15926629041",
                   "status": "enabled",
                   "roleIds": "2",
-                  "dataPermission": "self",
+                  "dataPermission": "all",
                   "remark": ""
                 }
                 """))
@@ -4393,7 +4393,7 @@ class PlatformApiSmokeTest {
                   "phone": "15926629041",
                   "status": "disabled",
                   "roleIds": "%d",
-                  "dataPermission": "self",
+                  "dataPermission": "all",
                   "remark": ""
                 }
                 """.formatted(managerRoleId)))
@@ -5645,7 +5645,7 @@ class PlatformApiSmokeTest {
   }
 
   @Test
-  void slabManagementIgnoresDataPermissionAndCreatorForAllOperations() throws Exception {
+  void slabManagementAllDataScopeAllowsOtherCreatorsOperations() throws Exception {
     long operatorId = 98996L;
     String token = createStoreScopedEmployee(
         operatorId,
@@ -5655,7 +5655,7 @@ class PlatformApiSmokeTest {
             + "admin.slab-management.warehouse.edit,admin.slab-management.off-shelf.restore,"
             + "admin.slab-management.warehouse.delete,admin.slab-management.recycle.purge,"
             + "admin.slab-management.operation-log.view");
-    jdbcTemplate.update("UPDATE employees SET data_permission = 'self' WHERE id = ?", operatorId);
+    jdbcTemplate.update("UPDATE employees SET data_permission = 'all' WHERE id = ?", operatorId);
     Long mainImageMediaId = uploadSlabMedia("shared-main.png", "image/png");
     Long scanImageMediaId = uploadSlabMedia("shared-scan.png", "image/png");
     Long designImageMediaId = uploadSlabMedia("shared-design.png", "image/png");

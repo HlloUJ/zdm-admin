@@ -143,4 +143,14 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
         ? identity.displayName() : DEFAULT_CREATED_BY_NAME;
   }
 
+  @Override
+  public SlabTexture getById(java.io.Serializable id) {
+    SlabTexture entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

@@ -23,7 +23,9 @@ public class SlabGuidePriceSettingService {
 
   public SlabGuidePriceSetting getSetting() {
     requirePlatformScope();
-    return mapper.selectById(SETTING_ID);
+    SlabGuidePriceSetting result = mapper.selectById(SETTING_ID);
+    if (result != null && !com.zdm.platform.security.DataScope.canAccess(identityProvider.require(), result.getCreatedByAccountId())) { return null; }
+    return result;
   }
 
   @Transactional
@@ -34,7 +36,9 @@ public class SlabGuidePriceSettingService {
     if (creating) {
       setting = new SlabGuidePriceSetting();
       setting.setId(SETTING_ID);
+      setting.setCreatedByAccountId(identity.accountId());
     }
+    com.zdm.platform.security.DataScope.requireAccess(identity, setting.getCreatedByAccountId());
     setting.setPriceCoefficient(coefficient.setScale(4, RoundingMode.HALF_UP));
     setting.setUpdatedByName(identity.displayName());
     setting.setUpdatedByAccountId(identity.accountId());
@@ -43,7 +47,9 @@ public class SlabGuidePriceSettingService {
     } else {
       mapper.updateById(setting);
     }
-    return mapper.selectById(SETTING_ID);
+    SlabGuidePriceSetting result = mapper.selectById(SETTING_ID);
+    if (result != null && !com.zdm.platform.security.DataScope.canAccess(identityProvider.require(), result.getCreatedByAccountId())) { return null; }
+    return result;
   }
 
   private CurrentIdentity requirePlatformScope() {

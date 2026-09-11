@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 
 @TableName("store_categories")
-public class StoreCategory extends BaseEntity {
+public class StoreCategory extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   private Long storeId;
   private Long parentId;
   private String name;
@@ -59,4 +59,8 @@ public class StoreCategory extends BaseEntity {
   public void setCreatedByName(String createdByName) {
     this.createdByName = createdByName;
   }
+  private Long createdByAccountId;
+
+  public Long getCreatedByAccountId() { return createdByAccountId; }
+  public void setCreatedByAccountId(Long accountId) { this.createdByAccountId = accountId; }
 }

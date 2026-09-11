@@ -5,7 +5,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("product_categories")
-public class ProductCategory extends BaseEntity {
+public class ProductCategory extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   private Long tenantId;
   private Long parentId;
 

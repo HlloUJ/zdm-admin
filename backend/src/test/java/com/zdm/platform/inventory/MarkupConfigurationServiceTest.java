@@ -60,7 +60,7 @@ class MarkupConfigurationServiceTest {
   }
 
   @Test
-  void selfDataPermissionStillReadsConfigurationsCreatedByOtherAccounts() {
+  void selfDataPermissionHidesConfigurationsCreatedByOtherAccounts() {
     SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     SlabMarkupConfiguration otherCreatorConfiguration = new SlabMarkupConfiguration();
@@ -80,12 +80,11 @@ class MarkupConfigurationServiceTest {
         Mockito.mock(SlabPriceConfigurationSyncService.class));
 
     assertThat(service.listConfigurations(false))
-        .extracting(SlabMarkupConfiguration::getCreatedByAccountId)
-        .containsExactly(99L);
+        .isEmpty();
   }
 
   @Test
-  void selfDataPermissionCanDeleteConfigurationCreatedByAnotherAccount() {
+  void selfDataPermissionCannotDeleteConfigurationCreatedByAnotherAccount() {
     SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
     CurrentIdentityProvider identityProvider = Mockito.mock(CurrentIdentityProvider.class);
     SlabMarkupConfiguration otherCreatorConfiguration = new SlabMarkupConfiguration();
@@ -105,8 +104,8 @@ class MarkupConfigurationServiceTest {
         storeLevelDirectory,
         Mockito.mock(SlabPriceConfigurationSyncService.class));
 
-    service.deleteConfiguration(21L);
-    verify(mapper).deleteById(21L);
+    assertThatThrownBy(() -> service.deleteConfiguration(21L)).isInstanceOf(AccessDeniedException.class);
+    verify(mapper, Mockito.never()).deleteById(21L);
   }
 
   @Test
@@ -181,6 +180,7 @@ class MarkupConfigurationServiceTest {
       Long id, Long storeLevelId, int sortOrder) {
     FinishedMarkupConfiguration configuration = new FinishedMarkupConfiguration();
     configuration.setId(id);
+    configuration.setCreatedByAccountId(11L);
     configuration.setStoreLevelId(storeLevelId);
     configuration.setSortOrder(sortOrder);
     configuration.setLegacySeeded(false);
@@ -190,6 +190,7 @@ class MarkupConfigurationServiceTest {
   private static SlabMarkupConfiguration slabConfiguration(Long id, Long storeLevelId, int sortOrder) {
     SlabMarkupConfiguration configuration = new SlabMarkupConfiguration();
     configuration.setId(id);
+    configuration.setCreatedByAccountId(11L);
     configuration.setStoreLevelId(storeLevelId);
     configuration.setSortOrder(sortOrder);
     configuration.setLegacySeeded(false);

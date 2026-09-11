@@ -143,14 +143,14 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   }
 
   public ProductAttribute getActiveById(Long id) {
-    return id == null ? null : lambdaQuery()
-        .eq(ProductAttribute::getId, id)
-        .isNull(ProductAttribute::getDeletedAt)
-        .one();
+    ProductAttribute attribute = id == null ? null : getById(id);
+    return attribute == null || attribute.getDeletedAt() != null ? null : attribute;
   }
 
   public ProductAttribute getActiveByIdForShare(Long id) {
-    return id == null ? null : baseMapper.selectActiveByIdForShare(id);
+    ProductAttribute attribute = id == null ? null : baseMapper.selectActiveByIdForShare(id);
+    if (attribute != null) { com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), attribute.getCreatedByAccountId()); }
+    return attribute;
   }
 
   private long referenceCount(String tableName, Long attributeId) {
@@ -189,6 +189,7 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
     if (attribute == null) {
       throw new IllegalArgumentException("属性不存在或已被删除");
     }
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), attribute.getCreatedByAccountId());
     return attribute;
   }
 
@@ -197,6 +198,7 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
     if (attribute == null) {
       throw new IllegalArgumentException("属性不存在或已被删除");
     }
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), attribute.getCreatedByAccountId());
     return attribute;
   }
 
@@ -206,4 +208,14 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
   }
+  @Override
+  public ProductAttribute getById(java.io.Serializable id) {
+    ProductAttribute entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

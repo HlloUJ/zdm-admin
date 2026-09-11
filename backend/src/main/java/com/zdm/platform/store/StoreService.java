@@ -46,6 +46,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     storeLevelService.requireEnabled(store.getStoreLevelId());
     store.setStatus("enabled");
     store.setCreatedBy(identity.displayName());
+    store.setCreatedByAccountId(identity.accountId());
     boolean saved = save(store);
     provisionStoreAdmins(store);
     return saved;
@@ -64,6 +65,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       requireOpenedBusiness(existing.getTenantId(), payload.getType());
     }
     payload.setId(id);
+    payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     payload.setStoreLevelId(existing.getStoreLevelId());
     payload.setStatus(existing.getStatus());
     payload.setCreatedBy(existing.getCreatedBy());
@@ -253,4 +255,14 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       throw new IllegalArgumentException("请先归档门店");
     }
   }
+  @Override
+  public Store getById(java.io.Serializable id) {
+    Store entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

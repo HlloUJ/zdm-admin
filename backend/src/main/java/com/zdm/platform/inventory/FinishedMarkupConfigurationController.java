@@ -30,14 +30,14 @@ public class FinishedMarkupConfigurationController {
   @GetMapping
   public ApiResponse<List<FinishedMarkupConfiguration>> list() {
     permissionGuard.requirePermission(permission("view"));
-    return ApiResponse.ok(service.listConfigurations(false));
+    return ApiResponse.ok(permissionGuard.filterData(service.listConfigurations(false)));
   }
 
   @GetMapping("/options")
   public ApiResponse<List<FinishedMarkupConfiguration>> options() {
     permissionGuard.requireAnyPermission(permission("view"), "admin.finished-stock-management.view",
         "admin.finished-stock-management.create", "admin.finished-stock-management.edit");
-    return ApiResponse.ok(service.listConfigurations(true));
+    return ApiResponse.ok(permissionGuard.filterData(service.listConfigurations(true)));
   }
 
   @PostMapping
@@ -58,7 +58,7 @@ public class FinishedMarkupConfigurationController {
   public ApiResponse<List<FinishedMarkupConfiguration>> reorder(
       @Valid @RequestBody FinishedMarkupConfigurationReorderRequest request) {
     permissionGuard.requirePermission(permission("sort"));
-    return ApiResponse.ok(service.reorderConfigurations(request.orderedIds()));
+    return ApiResponse.ok(permissionGuard.filterData(service.reorderConfigurations(request.orderedIds())));
   }
 
   @PatchMapping("/{id}/status")

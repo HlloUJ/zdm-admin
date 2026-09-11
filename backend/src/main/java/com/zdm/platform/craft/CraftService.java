@@ -119,4 +119,14 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
         ? identity.displayName()
         : DEFAULT_CREATED_BY_NAME;
   }
+  @Override
+  public Craft getById(java.io.Serializable id) {
+    Craft entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

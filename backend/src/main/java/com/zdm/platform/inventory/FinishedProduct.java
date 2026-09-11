@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @TableName(value = "finished_products", autoResultMap = true)
-public class FinishedProduct extends BaseEntity {
+public class FinishedProduct extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
   private List<FinishedSpecDimension> specDimensions;
 

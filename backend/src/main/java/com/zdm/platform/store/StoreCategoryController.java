@@ -29,7 +29,7 @@ public class StoreCategoryController {
   @GetMapping
   public ApiResponse<List<StoreCategory>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listOrdered());
+    return ApiResponse.ok(permissionGuard.filterData(service.listOrdered()));
   }
 
   @PostMapping

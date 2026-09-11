@@ -518,4 +518,14 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
     return value == null ? 0 : value;
   }
+  @Override
+  public Tenant getById(java.io.Serializable id) {
+    Tenant entity = super.getById(id);
+    if (entity != null) {
+      com.zdm.platform.security.DataScope.requireAccess(
+          identityProvider.require(), entity.getCreatedByAccountId());
+    }
+    return entity;
+  }
+
 }

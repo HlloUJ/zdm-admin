@@ -59,13 +59,13 @@ public class TemplateVersionService {
       throw new IllegalArgumentException("模板范围无效");
     }
     guard.requirePermission(PREFIX + scope + ".attributes.view");
-    return categories.lambdaQuery().eq(ProductCategory::getScope, scope)
+    return categories.lambdaQuery().eq(!com.zdm.platform.security.DataScope.isAll(guard.identity()), ProductCategory::getCreatedByAccountId, guard.identity().accountId()).eq(ProductCategory::getScope, scope)
         .isNull(ProductCategory::getTenantId).orderByAsc(ProductCategory::getSortOrder).list();
   }
 
   public List<ProductAttribute> attributeOptions(long categoryId) {
     ProductCategory category = authorize(categoryId, "view");
-    return attributes.lambdaQuery().in(ProductAttribute::getScope, List.of("shared", category.getScope()))
+    return attributes.lambdaQuery().eq(!com.zdm.platform.security.DataScope.isAll(guard.identity()), ProductAttribute::getCreatedByAccountId, guard.identity().accountId()).in(ProductAttribute::getScope, List.of("shared", category.getScope()))
         .isNull(ProductAttribute::getDeletedAt).eq(ProductAttribute::getStatus, "enabled").list();
   }
 
@@ -75,7 +75,7 @@ public class TemplateVersionService {
     if (attribute == null || !Set.of("shared", category.getScope()).contains(attribute.getScope())) {
       throw new IllegalArgumentException("属性不属于当前模板范围");
     }
-    return values.lambdaQuery().eq(ProductAttributeValue::getAttributeId, attributeId)
+    return values.lambdaQuery().eq(!com.zdm.platform.security.DataScope.isAll(guard.identity()), ProductAttributeValue::getCreatedByAccountId, guard.identity().accountId()).eq(ProductAttributeValue::getAttributeId, attributeId)
         .eq(ProductAttributeValue::getStatus, "enabled").list();
   }
 
@@ -95,7 +95,7 @@ public class TemplateVersionService {
     String prefix = PREFIX + category.getScope() + ".attributes.";
     int latest = versions.stream().filter(v -> "published".equals(v.state()))
         .mapToInt(TemplateVersion::versionNo).max().orElse(0);
-    return versions.stream().filter(v -> "draft".equals(v.state())
+    return versions.stream().filter(v -> com.zdm.platform.security.DataScope.canAccess(guard.identity(), v.createdByAccountId())).filter(v -> "draft".equals(v.state())
         ? guard.hasPermission(prefix + "create")
         : v.versionNo() == latest || guard.hasPermission(prefix + "history")).toList();
   }
@@ -159,6 +159,7 @@ public class TemplateVersionService {
       target = create(source.categoryId());
     } else {
       target = drafts.get(0);
+      com.zdm.platform.security.DataScope.requireAccess(guard.identity(), target.createdByAccountId());
       if (!java.util.Objects.equals(draftId, target.id())
           || !java.util.Objects.equals(revision, target.revision())) {
         throw new IllegalArgumentException("已有草稿或草稿已更新，请刷新并确认覆盖后重试");
@@ -311,7 +312,9 @@ public class TemplateVersionService {
     if (rows.isEmpty()) {
       throw new IllegalArgumentException("模板版本不存在");
     }
-    return rows.get(0);
+    TemplateVersion version = rows.get(0);
+    com.zdm.platform.security.DataScope.requireAccess(guard.identity(), version.createdByAccountId());
+    return version;
   }
 
   private TemplateVersion map(ResultSet row, int index) throws SQLException {
@@ -321,7 +324,7 @@ public class TemplateVersionService {
       return new TemplateVersion(id, row.getLong("category_id"),
           row.getObject("version_no", Integer.class), row.getString("state"), row.getInt("revision"), sortedContent( json.readTree(row.getString("content"))),
           row.getString("created_by_name"), row.getString("published_by_name"), row.getString("change_note"), row.getObject("created_at", LocalDateTime.class).atOffset(ZoneOffset.ofHours(8)),
-          published == null ? null : published.atOffset(ZoneOffset.ofHours(8)));
+          published == null ? null : published.atOffset(ZoneOffset.ofHours(8)), row.getObject("created_by_account_id", Long.class));
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("模板快照格式错误", e);
     }

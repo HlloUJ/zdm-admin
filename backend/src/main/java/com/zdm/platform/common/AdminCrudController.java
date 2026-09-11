@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-public abstract class AdminCrudController<T extends Identifiable> {
+public abstract class AdminCrudController<T extends Identifiable & com.zdm.platform.security.CreatorOwned> {
   private final IService<T> service;
   private final PermissionGuard permissionGuard;
   private final String permissionPrefix;
@@ -25,15 +25,16 @@ public abstract class AdminCrudController<T extends Identifiable> {
   @GetMapping
   public ApiResponse<List<T>> list() {
     permissionGuard.requireView(permissionPrefix);
-    permissionGuard.requireAllData();
-    return ApiResponse.ok(service.list());
+    permissionGuard.requireDataPermission();
+    return ApiResponse.ok(permissionGuard.filterData(service.list()));
   }
 
   @PostMapping
   public ApiResponse<T> create(@Valid @RequestBody T entity) {
     permissionGuard.requirePermission(permissionPrefix + ".create");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
     entity.setId(null);
+    entity.setCreatedByAccountId(permissionGuard.identity().accountId());
     service.save(entity);
     return ApiResponse.ok(entity);
   }
@@ -41,7 +42,11 @@ public abstract class AdminCrudController<T extends Identifiable> {
   @PutMapping("/{id}")
   public ApiResponse<T> update(@PathVariable Long id, @Valid @RequestBody T entity) {
     permissionGuard.requirePermission(permissionPrefix + ".edit");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
+    T existing = service.getById(id);
+    if (existing == null) { throw new IllegalArgumentException("数据不存在"); }
+    permissionGuard.requireData(existing);
+    entity.setCreatedByAccountId(existing.getCreatedByAccountId());
     entity.setId(id);
     service.updateById(entity);
     return ApiResponse.ok(service.getById(id));
@@ -50,7 +55,8 @@ public abstract class AdminCrudController<T extends Identifiable> {
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requirePermission(permissionPrefix + ".delete");
-    permissionGuard.requireAllData();
+    permissionGuard.requireDataPermission();
+    permissionGuard.requireData(service.getById(id));
     return ApiResponse.ok(service.removeById(id));
   }
 }

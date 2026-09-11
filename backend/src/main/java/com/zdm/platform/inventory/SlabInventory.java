@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @TableName("slab_inventory")
-public class SlabInventory extends BaseEntity {
+public class SlabInventory extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   private Long supplierId;
   private Long varietyId;
   private Long originId;

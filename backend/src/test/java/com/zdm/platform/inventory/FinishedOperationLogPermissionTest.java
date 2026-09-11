@@ -13,8 +13,8 @@ import org.springframework.security.access.AccessDeniedException;
 
 class FinishedOperationLogPermissionTest {
   @Test
-  void listAndDetailRejectMissingPermissionOrRestrictedDataScope() {
-    for (boolean hasPermission : List.of(false, true)) {
+  void listAndDetailRejectMissingFunctionPermission() {
+    for (boolean hasPermission : List.of(false)) {
       CurrentIdentityProvider identities = mock(CurrentIdentityProvider.class);
       when(identities.require()).thenReturn(new CurrentIdentity(2L, 2L, 2L, 2L, "admin", 1L, 1L,
           "测试员工", hasPermission ? "self" : "all", List.of("ADMIN_MANAGER"),

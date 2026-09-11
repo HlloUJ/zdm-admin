@@ -6,7 +6,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("store_levels")
-public class StoreLevel extends BaseEntity {
+public class StoreLevel extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String name;
   private Integer sortOrder;

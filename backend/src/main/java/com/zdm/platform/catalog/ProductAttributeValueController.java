@@ -36,20 +36,20 @@ public class ProductAttributeValueController {
   public ApiResponse<List<ProductAttributeValue>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
     List<String> scopes = visibleScopes();
-    return ApiResponse.ok(service.listWithUseCounts(scopes));
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithUseCounts(scopes)));
   }
 
   @GetMapping("/attribute-options")
   public ApiResponse<List<ProductAttribute>> listAttributeOptions() {
     permissionGuard.requireView(PERMISSION_PREFIX);
     List<String> scopes = visibleScopes();
-    return ApiResponse.ok(scopes.isEmpty()
+    return ApiResponse.ok(permissionGuard.filterData(scopes.isEmpty()
         ? List.of()
         : attributeService.lambdaQuery()
             .in(ProductAttribute::getScope, scopes)
             .eq(ProductAttribute::getValueType, "select")
             .isNull(ProductAttribute::getDeletedAt)
-            .list());
+            .list()));
   }
 
   @PostMapping

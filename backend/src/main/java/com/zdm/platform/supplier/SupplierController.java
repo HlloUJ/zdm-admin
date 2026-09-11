@@ -33,7 +33,7 @@ public class SupplierController extends AdminCrudController<Supplier> {
   @GetMapping
   public ApiResponse<List<Supplier>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listSuppliers());
+    return ApiResponse.ok(permissionGuard.filterData(service.listSuppliers()));
   }
 
   @Override

@@ -5,7 +5,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("slab_textures")
-public class SlabTexture extends BaseEntity {
+public class SlabTexture extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String name;
   private String createdByName;

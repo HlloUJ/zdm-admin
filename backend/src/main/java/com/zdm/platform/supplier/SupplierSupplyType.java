@@ -6,7 +6,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("supplier_supply_types")
-public class SupplierSupplyType extends BaseEntity {
+public class SupplierSupplyType extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
   private String code;
 
   @NotBlank

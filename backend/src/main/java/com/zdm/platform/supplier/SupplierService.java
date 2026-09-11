@@ -61,8 +61,7 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier>
 
   /**
    * Returns suppliers that can be selected by the slab business form.
-   * Business option lookup intentionally ignores the operator's self/all data permission,
-   * while still keeping the current identity's organization ownership boundary.
+   * Business options use the same data permission and organization boundary as management.
    */
   private List<Supplier> selectableSlabSuppliers() {
     SupplierScope scope = SupplierScope.from(identityProvider.require());
@@ -74,7 +73,7 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier>
         .orderByAsc(Supplier::getId)
         .list();
     enrichSupplyTypes(suppliers);
-    return suppliers.stream().filter(this::suppliesSlabs).toList();
+    return com.zdm.platform.security.DataScope.filter(identityProvider.require(), suppliers).stream().filter(this::suppliesSlabs).toList();
   }
 
   @Override

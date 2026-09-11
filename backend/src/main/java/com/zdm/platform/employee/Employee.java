@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 
 @TableName("employees")
-public class Employee {
+public class Employee implements com.zdm.platform.security.CreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 

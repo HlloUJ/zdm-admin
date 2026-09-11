@@ -30,7 +30,7 @@ public class StoreLevelController {
   @GetMapping
   public ApiResponse<List<StoreLevel>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(service.listLevels());
+    return ApiResponse.ok(permissionGuard.filterData(service.listLevels()));
   }
 
   @GetMapping("/pricing-options")
@@ -40,7 +40,7 @@ public class StoreLevelController {
         "admin.product-data-center.markup-configuration.finished.create",
         "admin.product-data-center.markup-configuration.slab.view",
         "admin.product-data-center.markup-configuration.slab.create");
-    return ApiResponse.ok(service.listEnabled());
+    return ApiResponse.ok(permissionGuard.filterData(service.listEnabled()));
   }
 
   @PostMapping
@@ -81,7 +81,7 @@ public class StoreLevelController {
   public ApiResponse<List<StoreLevel>> reorder(
       @Valid @RequestBody StoreLevelReorderRequest request) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".sort");
-    return ApiResponse.ok(service.reorderLevels(request.orderedIds()));
+    return ApiResponse.ok(permissionGuard.filterData(service.reorderLevels(request.orderedIds())));
   }
 
   @DeleteMapping("/{id}")

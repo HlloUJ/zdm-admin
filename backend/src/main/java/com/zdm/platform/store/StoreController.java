@@ -39,13 +39,13 @@ public class StoreController {
       throw new IllegalArgumentException("门店列表类型错误");
     }
     permissionGuard.requirePermission(PERMISSION_PREFIX + "." + scope + ".view");
-    return ApiResponse.ok(storeService.listForCurrentAdmin("archived".equals(scope)));
+    return ApiResponse.ok(permissionGuard.filterData(storeService.listForCurrentAdmin("archived".equals(scope))));
   }
 
   @GetMapping("/level-options")
   public ApiResponse<List<StoreLevel>> listLevelOptions() {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".operating.view");
-    return ApiResponse.ok(storeLevelService.listEnabled());
+    return ApiResponse.ok(permissionGuard.filterData(storeLevelService.listEnabled()));
   }
 
   @PostMapping
