@@ -13,7 +13,7 @@ class FinishedProductPermissionTest {
   private final FinishedProductService service = mock(FinishedProductService.class);
   private FinishedProductController controller(String... permissions) {
     CurrentIdentityProvider identities = mock(CurrentIdentityProvider.class);
-    when(identities.require()).thenReturn(new CurrentIdentity(2L, 2L, 2L, 2L, "admin", 1L, 1L,
+    when(identities.require()).thenReturn(new CurrentIdentity(2L, 2L, 2L, 2L, "admin", null, null,
         "测试员工", "all", List.of("ADMIN_MANAGER"), java.util.Arrays.stream(permissions).map(permission -> "admin.finished-stock-management." + permission).toList()));
     return new FinishedProductController(service, null, new PermissionGuard(identities), null, null);
   }

@@ -665,7 +665,14 @@ export async function installAdminApiMocks(page: Page) {
   await page.route('**/api/admin/roles/permission-scope', async (route) => {
     await fulfillJson(route, { audience: 'admin', functionPermissions: 'all' });
   });
-  await mockCollection(page, '**/api/admin/terminal-function-policies', terminalFunctionPolicies);
+  const policies = structuredClone(terminalFunctionPolicies);
+  await page.route('**/api/admin/terminal-function-policies', (route) => fulfillJson(route, policies));
+  await page.route('**/api/admin/terminal-function-policies/*', async (route) => {
+    const terminal = new URL(route.request().url()).pathname.split('/').at(-1);
+    const policy = policies.find((item) => item.terminal === terminal);
+    if (policy && route.request().method() === 'PUT') Object.assign(policy, route.request().postDataJSON());
+    await fulfillJson(route, policy);
+  });
   await mockCollection(page, '**/api/admin/employees', employees);
   await mockCollection(page, '**/api/admin/store-categories', storeCategories);
   await mockCollection(page, '**/api/admin/product-categories', productCategories);

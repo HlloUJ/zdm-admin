@@ -1,3 +1,4 @@
+import { getUserFunctionAudience, isFunctionAllowedForAudience } from './functionAudience';
 import type { LoginUser } from './auth';
 
 export interface AdminMenuItem {
@@ -158,6 +159,7 @@ export function isSuperAdmin(user: LoginUser) {
 }
 
 export function hasPermission(user: LoginUser, permission: string) {
+  if (!isFunctionAllowedForAudience(permission, getUserFunctionAudience(user))) return false;
   return (
     isSuperAdmin(user) ||
     user.permissions.includes('all') ||
@@ -166,21 +168,20 @@ export function hasPermission(user: LoginUser, permission: string) {
 }
 
 export function hasAnyPermission(user: LoginUser, permissions: string[]) {
-  return (
-    isSuperAdmin(user) ||
-    user.permissions.includes('all') ||
-    permissions.some((permission) => hasPermission(user, permission))
-  );
+  return permissions.some((permission) => hasPermission(user, permission));
 }
 
 export function hasPermissionPrefix(user: LoginUser, prefix?: string) {
-  if (!prefix || isSuperAdmin(user) || user.permissions.includes('all')) return true;
+  if (!prefix) return true;
+  if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;
+  if (isSuperAdmin(user) || user.permissions.includes('all')) return true;
   return user.permissions.some((permission) => permission === prefix || permission.startsWith(`${prefix}.`));
 }
 
 export function hasMenuPermission(user: LoginUser, prefix?: string) {
+  if (!prefix) return isSuperAdmin(user) || user.permissions.includes('all');
+  if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;
   if (isSuperAdmin(user) || user.permissions.includes('all')) return true;
-  if (!prefix) return false;
   return user.permissions.some(
     (permission) =>
       permission === `${prefix}.view` || (permission.startsWith(`${prefix}.`) && permission.endsWith('.view')),

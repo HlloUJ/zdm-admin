@@ -30,15 +30,19 @@ public class EffectivePermissionResolver {
     List<String> rolePermissions = FunctionPermissionNormalizer.normalize(
         authAccountMapper.findAdminPermissionValues(account.getId(), account.getIdentityId()));
     if (account.getStoreId() == null) {
-      return rolePermissions;
+      return FunctionAudiencePolicy.filter(rolePermissions, "admin");
     }
     return intersect(rolePermissions, terminalPermissions(account));
   }
 
   private List<String> terminalPermissions(AuthAccount account) {
+    if (account.getStoreType() == null
+        || !List.of("cityPartner", "slabSupplier", "finishedSupplier").contains(account.getStoreType())) {
+      return List.of();
+    }
     String value = authAccountMapper.findTerminalPermissionValue(account.getStoreType());
     return StringUtils.hasText(value)
-        ? FunctionPermissionNormalizer.normalize(List.of(value))
+        ? FunctionAudiencePolicy.filter(FunctionPermissionNormalizer.normalize(List.of(value)), "store")
         : List.of();
   }
 

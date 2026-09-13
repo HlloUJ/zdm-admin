@@ -66,7 +66,8 @@ class PlatformApiSmokeTest {
   @BeforeEach
   void exposeAllTerminalFunctionsWithinEachPermissionTest() {
     jdbcTemplate.update(
-        "UPDATE terminal_function_policies SET function_permissions = 'all' WHERE terminal IN ('store', 'supplier')");
+        "UPDATE terminal_function_policies SET function_permissions = ? WHERE terminal IN ('store', 'supplier')",
+        "admin.permission-management.employee-management.create,admin.permission-management.employee-management.delete,admin.permission-management.employee-management.edit,admin.permission-management.employee-management.permission,admin.permission-management.employee-management.toggle-status,admin.permission-management.employee-management.view,admin.permission-management.role-management.create,admin.permission-management.role-management.delete,admin.permission-management.role-management.edit,admin.permission-management.role-management.permission,admin.permission-management.role-management.view,admin.supplier-management.create,admin.supplier-management.delete,admin.supplier-management.edit,admin.supplier-management.manage-supply-types,admin.supplier-management.toggle-status,admin.supplier-management.view,admin.tenant.store-category-management.create-child,admin.tenant.store-category-management.create-root,admin.tenant.store-category-management.delete,admin.tenant.store-category-management.edit,admin.tenant.store-category-management.move-down,admin.tenant.store-category-management.move-up,admin.tenant.store-category-management.toggle-status,admin.tenant.store-category-management.view");
     jdbcTemplate.update(
         """
         INSERT INTO finished_markup_configurations
@@ -406,7 +407,7 @@ class PlatformApiSmokeTest {
         SELECT COUNT(*)
         FROM terminal_function_policies
         WHERE terminal IN ('store', 'supplier')
-          AND function_permissions = 'all'
+          AND function_permissions LIKE '%admin.supplier-management.view%'
         """,
         Integer.class);
     Integer legacyReadPermissionCount = jdbcTemplate.queryForObject(
@@ -698,6 +699,7 @@ class PlatformApiSmokeTest {
         otherValueId,
         attributeId);
 
+    usePlatformTestIdentity(accountId);
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
     mockMvc.perform(get("/api/admin/product-attribute-values")
             .header("Authorization", "Bearer " + token))
@@ -829,6 +831,7 @@ class PlatformApiSmokeTest {
         """,
         sharedAttributeId);
 
+    usePlatformTestIdentity(accountId);
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
     mockMvc.perform(get("/api/admin/product-attributes")
             .header("Authorization", "Bearer " + token))
@@ -1427,7 +1430,7 @@ class PlatformApiSmokeTest {
               .contentType("application/json")
               .content("{\"name\":\"门店越权类型\"}"))
           .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.message").value("仅运营平台可以配置供货类型"));
+          .andExpect(jsonPath("$.message").value("无权执行当前操作"));
 
       mockMvc.perform(patch("/api/admin/supplier-supply-types/{id}/status", createdTypeId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -1694,7 +1697,7 @@ class PlatformApiSmokeTest {
     long roleId = 9022L;
     long storeId = 9022L;
     jdbcTemplate.update(
-        "INSERT INTO stores (id, tenant_id, name, type, status) VALUES (?, 1, '门店分类隔离测试门店', 'partner', 'enabled')",
+        "INSERT INTO stores (id, tenant_id, name, type, status) VALUES (?, 1, '门店分类隔离测试门店', 'cityPartner', 'enabled')",
         storeId);
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
@@ -1922,6 +1925,7 @@ class PlatformApiSmokeTest {
         roleId);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    usePlatformTestIdentity(accountId);
     mockMvc.perform(get("/api/admin/product-categories").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[*].scope", not(hasItem("accessory"))))
@@ -2256,6 +2260,7 @@ class PlatformApiSmokeTest {
 
     try {
       String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      usePlatformTestIdentity(accountId);
       mockMvc.perform(get("/api/admin/slab-colors").header("Authorization", "Bearer " + token))
           .andExpect(status().isOk());
       mockMvc.perform(get("/api/admin/slab-colors/categories").header("Authorization", "Bearer " + token))
@@ -2558,6 +2563,7 @@ class PlatformApiSmokeTest {
 
     try {
       String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      usePlatformTestIdentity(accountId);
       mockMvc.perform(get("/api/admin/store-levels").header("Authorization", "Bearer " + token))
           .andExpect(status().isOk());
       mockMvc.perform(post("/api/admin/store-levels")
@@ -2748,6 +2754,7 @@ class PlatformApiSmokeTest {
 
     try {
       String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      usePlatformTestIdentity(accountId);
       mockMvc.perform(get("/api/admin/stores").header("Authorization", "Bearer " + token))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data[?(@.id == %d)]".formatted(storeId)).isNotEmpty())
@@ -3181,6 +3188,7 @@ class PlatformApiSmokeTest {
 
     try {
       String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      usePlatformTestIdentity(accountId);
       mockMvc.perform(get("/api/admin/slab-grades").header("Authorization", "Bearer " + token))
           .andExpect(status().isOk());
       mockMvc.perform(post("/api/admin/slab-grades")
@@ -3337,6 +3345,7 @@ class PlatformApiSmokeTest {
 
     try {
       String token = TokenAuthenticationFilter.createAccountToken(accountId);
+      usePlatformTestIdentity(accountId);
       mockMvc.perform(get("/api/admin/slab-origins").header("Authorization", "Bearer " + token))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data[*].name", hasItem("本人创建的大板产地")))
@@ -3620,6 +3629,7 @@ class PlatformApiSmokeTest {
         """);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    usePlatformTestIdentity(accountId);
     mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[*].name", hasItem("本人创建的大板品种")))
@@ -3718,6 +3728,7 @@ class PlatformApiSmokeTest {
         accountId);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    usePlatformTestIdentity(accountId);
     mockMvc.perform(get("/api/admin/slab-varieties").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
     mockMvc.perform(post("/api/admin/slab-varieties")
@@ -3923,6 +3934,7 @@ class PlatformApiSmokeTest {
         roleId);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
+    usePlatformTestIdentity(accountId);
     mockMvc.perform(get("/api/admin/tenants")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
@@ -3949,16 +3961,20 @@ class PlatformApiSmokeTest {
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.name").value("其他人创建的测试租户-已编辑"));
+    String storeToken = createStoreScopedEmployee(99111L, "15926629111", "门店越界测试员",
+        "admin.tenant.tenant-management.archived.delete,admin.supplier-management.view");
+    mockMvc.perform(get("/api/admin/suppliers").header("Authorization", "Bearer " + storeToken))
+        .andExpect(status().isOk());
     mockMvc.perform(get("/api/admin/tenants/1/purge-preview")
-            .header("Authorization", "Bearer " + token))
+            .header("Authorization", "Bearer " + storeToken))
         .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("仅平台身份可执行当前操作"));
+        .andExpect(jsonPath("$.message").value("无权执行当前操作"));
     mockMvc.perform(post("/api/admin/tenants/1/purge")
-            .header("Authorization", "Bearer " + token)
+            .header("Authorization", "Bearer " + storeToken)
             .contentType("application/json")
             .content("{\"confirmationName\":\"装点猫直营租户\"}"))
         .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.message").value("仅平台身份可执行当前操作"));
+        .andExpect(jsonPath("$.message").value("无权执行当前操作"));
     jdbcTemplate.update("DELETE FROM account_identities WHERE account_id = 9013");
     jdbcTemplate.update("DELETE FROM tenants WHERE id = 9012");
     jdbcTemplate.update("DELETE FROM accounts WHERE id = 9013");
@@ -4146,6 +4162,7 @@ class PlatformApiSmokeTest {
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
     Long craftId = jdbcTemplate.queryForObject("SELECT id FROM crafts ORDER BY id LIMIT 1", Long.class);
 
+    usePlatformTestIdentity(accountId);
     mockMvc.perform(get("/api/admin/crafts").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
     mockMvc.perform(post("/api/admin/crafts")
@@ -4234,6 +4251,7 @@ class PlatformApiSmokeTest {
         "INSERT INTO crafts (name, type, status, created_by_name) VALUES (?, '边工艺', 'enabled', '韩健')",
         otherCraftName);
 
+    usePlatformTestIdentity(accountId);
     mockMvc.perform(get("/api/admin/crafts")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
         .andExpect(status().isOk())
@@ -4454,17 +4472,60 @@ class PlatformApiSmokeTest {
             .contentType("application/json")
             .content("""
                 {
-                  "functionPermissions": "store.home.view,store.home.view"
+                  "functionPermissions": "admin.supplier-management.view,admin.supplier-management.view"
                 }
                 """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.terminal").value("store"))
-        .andExpect(jsonPath("$.data.functionPermissions").value("store.home.view"));
+        .andExpect(jsonPath("$.data.functionPermissions").value("admin.supplier-management.view"));
 
     String storedPermissions = jdbcTemplate.queryForObject(
         "SELECT function_permissions FROM terminal_function_policies WHERE terminal = 'store'",
         String.class);
-    assertThat(storedPermissions).isEqualTo("store.home.view");
+    assertThat(storedPermissions).isEqualTo("admin.supplier-management.view");
+  }
+
+  @Test
+  void platformAllocationViewAndSavePermissionsAreIndependent() throws Exception {
+    String token = createStoreScopedEmployee(99112L, "15926629112", "终端配置测试员",
+        "admin.permission-management.terminal-function-allocation.view");
+    usePlatformTestIdentity(99112L);
+    mockMvc.perform(get("/api/admin/terminal-function-policies")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+    mockMvc.perform(put("/api/admin/terminal-function-policies/supplier")
+            .header("Authorization", "Bearer " + token).contentType("application/json")
+            .content("{\"functionPermissions\":\"admin.supplier-management.view\"}"))
+        .andExpect(status().isForbidden());
+    jdbcTemplate.update("UPDATE roles SET function_permissions = ? WHERE id = 99112",
+        "admin.permission-management.terminal-function-allocation.view,"
+            + "admin.permission-management.terminal-function-allocation.save");
+    mockMvc.perform(put("/api/admin/terminal-function-policies/supplier")
+            .header("Authorization", "Bearer " + token).contentType("application/json")
+            .content("{\"functionPermissions\":\"admin.supplier-management.view\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.functionPermissions").value("admin.supplier-management.view"));
+  }
+
+  @Test
+  void audienceBoundariesRejectForgedTerminalAndPlatformRoleAssignments() throws Exception {
+    for (String permission : List.of("admin.tenant.tenant-management.unarchived.view",
+        "admin.product-data-center.category.finished.view", "admin.finished-stock-management.warehouse.view",
+        "admin.permission-management.terminal-function-allocation.view", "admin.supplier-management.manage-supply-types", "all")) {
+      mockMvc.perform(put("/api/admin/terminal-function-policies/store")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .contentType("application/json")
+              .content("{\"functionPermissions\":\"" + permission + "\"}"))
+          .andExpect(status().isForbidden());
+    }
+    mockMvc.perform(post("/api/admin/roles")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json")
+            .content("{\"name\":\"禁止平台门店分类授权\",\"code\":\"AUDIENCE_DENIED\",\"dataScope\":\"all\",\"status\":\"enabled\","
+                + "\"functionPermissions\":\"admin.tenant.store-category-management.view\"}"))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(get("/api/admin/store-categories")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -6119,6 +6180,7 @@ class PlatformApiSmokeTest {
           designImageMediaId,
           slabId);
 
+      usePlatformTestIdentity(operatorId);
       mockMvc.perform(get("/api/admin/slabs")
               .header("Authorization", "Bearer " + token))
           .andExpect(status().isOk())
@@ -6450,4 +6512,14 @@ class PlatformApiSmokeTest {
     return Long.valueOf(com.jayway.jsonpath.JsonPath.read(
         result.getResponse().getContentAsString(), "$.data.id").toString());
   }
+  // Platform-only feature fixtures must use a platform organization, never a store identity.
+  private void usePlatformTestIdentity(long accountId) {
+    jdbcTemplate.update("UPDATE roles r JOIN account_roles ar ON ar.role_id = r.id "
+        + "SET r.tenant_id = NULL, r.store_id = NULL WHERE ar.account_id = ?", accountId);
+    jdbcTemplate.update("UPDATE account_roles SET tenant_id = NULL, store_id = NULL WHERE account_id = ?", accountId);
+    jdbcTemplate.update("UPDATE employees SET tenant_id = NULL, store_id = NULL WHERE account_id = ?", accountId);
+    jdbcTemplate.update("UPDATE account_identities SET tenant_id = NULL, store_id = NULL "
+        + "WHERE account_id = ? AND identity_type = 'employee'", accountId);
+  }
+
 }

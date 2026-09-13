@@ -41,7 +41,12 @@ describe('admin menu permissions', () => {
   });
 
   it('exposes store-category menu only with its view permission', () => {
-    const viewUser = createUser(['admin.tenant.store-category-management.view']);
+    const viewUser = {
+      ...createUser(['admin.tenant.store-category-management.view']),
+      tenantId: 1,
+      storeId: 1,
+      storeType: 'cityPartner' as const,
+    };
     const actionOnlyUser = createUser(['admin.tenant.store-category-management.create-root']);
 
     expect(hasMenuPermission(viewUser, 'admin.tenant.store-category-management')).toBe(true);
@@ -73,7 +78,12 @@ describe('admin menu permissions', () => {
   it('accepts legacy category enable and disable permissions for the merged toggle action', () => {
     expect(
       hasPermission(
-        createUser(['admin.tenant.store-category-management.disable']),
+        {
+          ...createUser(['admin.tenant.store-category-management.disable']),
+          tenantId: 1,
+          storeId: 1,
+          storeType: 'cityPartner',
+        },
         'admin.tenant.store-category-management.toggle-status',
       ),
     ).toBe(true);
@@ -103,4 +113,33 @@ describe('super administrator identity', () => {
     expect(isSuperAdmin(user)).toBe(true);
     expect(hasPermission(user, 'admin.supplier-management.edit')).toBe(true);
   });
+});
+
+describe('function audience boundaries', () => {
+  it('never exposes store categories to platform identities including super administrators', () => {
+    for (const roles of [['SUPER_ADMIN'], ['ADMIN_MANAGER']]) {
+      const user = { ...createUser(['all', 'admin.tenant.store-category-management.view']), roles };
+      expect(hasMenuPermission(user, 'admin.tenant.store-category-management')).toBe(false);
+      expect(hasPermission(user, 'admin.tenant.store-category-management.edit')).toBe(false);
+    }
+  });
+
+  it.each(['cityPartner', 'slabSupplier', 'finishedSupplier'] as const)(
+    'limits %s to shared and terminal functions',
+    (storeType) => {
+      const user = { ...createUser(['all']), tenantId: 1, storeId: 2, storeType };
+      for (const prefix of [
+        'admin.tenant.tenant-management',
+        'admin.product-data-center.category',
+        'admin.finished-stock-management',
+        'admin.slab-management',
+        'admin.permission-management.terminal-function-allocation',
+      ]) {
+        expect(hasMenuPermission(user, prefix)).toBe(false);
+        expect(hasPermission(user, `${prefix}.edit`)).toBe(false);
+      }
+      expect(hasMenuPermission(user, 'admin.supplier-management')).toBe(true);
+      expect(hasMenuPermission(user, 'admin.tenant.store-category-management')).toBe(true);
+    },
+  );
 });

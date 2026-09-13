@@ -49,14 +49,18 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
-  it('publishes the confirmed menu hierarchy and exposes the full catalog during development', () => {
+  it('publishes the full catalog but filters terminal modules in every environment', () => {
     expect(fullFunctionCatalog).toHaveLength(5);
-    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual(
-      fullFunctionCatalog.map((module) => module.value),
-    );
-    expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual(
-      fullFunctionCatalog.map((module) => module.value),
-    );
+    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([
+      'admin.supplier-management',
+      'admin.tenant.store-category-management',
+      'admin.permission-management',
+    ]);
+    expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual([
+      'admin.supplier-management',
+      'admin.tenant.store-category-management',
+      'admin.permission-management',
+    ]);
     expect(fullFunctionCatalog.map((module) => module.label)).toEqual([
       '租户与门店',
       '商品管理',
@@ -199,6 +203,7 @@ describe('full function catalog', () => {
             },
           ],
         },
+        { label: '终端功能分配', direct: false, pages: [{ label: '终端功能分配页', tabs: [] }] },
       ],
     });
     expect(
@@ -239,12 +244,12 @@ describe('full function catalog', () => {
       collectFunctionCatalogRows(fullFunctionCatalog[4])
         .filter((row) => row.showMenu)
         .map((row) => row.menuLabel),
-    ).toEqual(['员工管理', '角色管理']);
+    ).toEqual(['员工管理', '角色管理', '终端功能分配']);
     expect(
       collectFunctionCatalogRows(fullFunctionCatalog[4])
         .filter((row) => row.showThirdMenu)
         .map((row) => row.thirdMenuLabel),
-    ).toEqual([undefined, undefined]);
+    ).toEqual([undefined, undefined, undefined]);
     const supplierPage = fullFunctionCatalog[2].menus[0].pages[0];
     expect(supplierPage.actions).toEqual([
       { label: '查看', value: 'admin.supplier-management.view' },
@@ -702,8 +707,19 @@ describe('full function catalog', () => {
       'admin.permission-management.role-management.edit',
       'admin.permission-management.role-management.permission',
       'admin.permission-management.role-management.delete',
+      'admin.permission-management.terminal-function-allocation.view',
+      'admin.permission-management.terminal-function-allocation.save',
     ]);
     expect(initialAllocationValues).toEqual({ store: [], supplier: [] });
+  });
+
+  it('keeps the shared supply type dictionary configuration on the platform only', () => {
+    const action = 'admin.supplier-management.manage-supply-types';
+    expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'))).toContain(action);
+    for (const terminal of ['store', 'supplier'] as const) {
+      expect(getFunctionCatalogPermissionValues(terminalFunctionTrees[terminal])).not.toContain(action);
+      expect(normalizeTerminalPermissions(terminal, [action])).toEqual([]);
+    }
   });
 
   it('keeps terminal names and accepts only permissions present in the published catalog', () => {
@@ -714,21 +730,12 @@ describe('full function catalog', () => {
     expect(
       normalizeTerminalPermissions('store', [
         'admin.tenant.store-category-management.create-root',
-        'admin.product-data-center.category.finished.edit',
         'store.goods.finished-stock.查询',
-        'admin.product-data-center.finished-stock-craft.query',
-        'admin.product-data-center.finished-stock-craft.reset',
-        'admin.product-data-center.finished-stock-craft.create',
-        'admin.product-data-center.finished-stock-craft.preview',
         'admin.permission-management.employee-management.query',
         'admin.permission-management.employee-management.reset',
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
-      'admin.product-data-center.category.finished.view',
-      'admin.product-data-center.category.finished.edit',
-      'admin.product-data-center.finished-stock-craft.view',
-      'admin.product-data-center.finished-stock-craft.create',
       'admin.tenant.store-category-management.view',
       'admin.tenant.store-category-management.create-root',
       'admin.permission-management.employee-management.view',
@@ -769,7 +776,7 @@ describe('full function catalog', () => {
       'admin.slab-management.recycle.price',
     );
 
-    expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.store)).toContain(
+    expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.store)).not.toContain(
       'admin.tenant.store-level-management.view',
     );
     expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.supplier)).toContain(
@@ -792,14 +799,7 @@ describe('full function catalog', () => {
         'admin.product-data-center.category.finished.enable',
         'admin.product-data-center.category.accessory.disable',
       ]),
-    ).toEqual([
-      'admin.product-data-center.category.finished.view',
-      'admin.product-data-center.category.finished.toggle-status',
-      'admin.product-data-center.category.accessory.view',
-      'admin.product-data-center.category.accessory.toggle-status',
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.toggle-status',
-    ]);
+    ).toEqual(['admin.tenant.store-category-management.view', 'admin.tenant.store-category-management.toggle-status']);
   });
 
   it('maps legacy store grants to both tab views but never grants permanent delete implicitly', () => {
