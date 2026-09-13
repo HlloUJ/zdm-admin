@@ -261,6 +261,33 @@ body {
   flex: 0 0 18px;
 }
 
+.admin-layout .side-nav,
+.admin-layout .side-nav .t-menu--scroll {
+  scrollbar-width: none;
+}
+
+.admin-layout .side-nav::-webkit-scrollbar,
+.admin-layout .side-nav .t-menu--scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@media (min-width: 721px) {
+  .admin-layout .side-nav {
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
+    overflow: hidden auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .admin-layout .side-nav .menu {
+    width: 100%;
+  }
+}
+
 @media (max-width: 720px) {
   .admin-layout > .top-nav.top-nav {
     height: auto;
