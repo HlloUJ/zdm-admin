@@ -529,6 +529,33 @@ describe('full function catalog', () => {
       'admin.tenant.store-level-management.toggle-status',
       'admin.tenant.store-level-management.delete',
       'admin.finished-stock-management.operation-log.view',
+      'admin.finished-stock-management.warehouse.view',
+      'admin.finished-stock-management.warehouse.publish',
+      'admin.finished-stock-management.warehouse.batch-shelf',
+      'admin.finished-stock-management.warehouse.price',
+      'admin.finished-stock-management.warehouse.shelf',
+      'admin.finished-stock-management.warehouse.edit',
+      'admin.finished-stock-management.warehouse.delete',
+      'admin.finished-stock-management.selling.view',
+      'admin.finished-stock-management.selling.publish',
+      'admin.finished-stock-management.selling.batch-off-shelf',
+      'admin.finished-stock-management.selling.price',
+      'admin.finished-stock-management.selling.off-shelf',
+      'admin.finished-stock-management.selling.edit',
+      'admin.finished-stock-management.off-shelf.view',
+      'admin.finished-stock-management.off-shelf.batch-restore',
+      'admin.finished-stock-management.off-shelf.detail',
+      'admin.finished-stock-management.off-shelf.restore',
+      'admin.finished-stock-management.off-shelf.delete',
+      'admin.finished-stock-management.sold-out.view',
+      'admin.finished-stock-management.sold-out.price',
+      'admin.finished-stock-management.recycle.view',
+      'admin.finished-stock-management.recycle.batch-restore',
+      'admin.finished-stock-management.recycle.batch-purge',
+      'admin.finished-stock-management.recycle.clear',
+      'admin.finished-stock-management.recycle.price',
+      'admin.finished-stock-management.recycle.restore',
+      'admin.finished-stock-management.recycle.purge',
       'admin.slab-management.operation-log.view',
       'admin.slab-management.warehouse.view',
       'admin.slab-management.warehouse.publish',
@@ -850,5 +877,97 @@ describe('full function catalog', () => {
         tabLabels: ['Tab B'],
       }),
     ]);
+  });
+});
+
+describe('finished stock catalog contract', () => {
+  it('registers the real tabs and actions in page order', () => {
+    const page = fullFunctionCatalog
+      .flatMap((m) => m.menus)
+      .find((m) => m.value === 'admin.finished-stock-management.menu')!.pages[0];
+    expect(
+      page.tabs.map((tab) => [tab.label, tab.value, tab.actions.map((action) => [action.label, action.value])]),
+    ).toEqual([
+      [
+        '仓库中',
+        'admin.finished-stock-management.warehouse',
+        [
+          ['查看', 'admin.finished-stock-management.warehouse.view'],
+          ['发布商品', 'admin.finished-stock-management.warehouse.publish'],
+          ['批量上架', 'admin.finished-stock-management.warehouse.batch-shelf'],
+          ['价格', 'admin.finished-stock-management.warehouse.price'],
+          ['上架', 'admin.finished-stock-management.warehouse.shelf'],
+          ['编辑', 'admin.finished-stock-management.warehouse.edit'],
+          ['删除', 'admin.finished-stock-management.warehouse.delete'],
+        ],
+      ],
+      [
+        '出售中',
+        'admin.finished-stock-management.selling',
+        [
+          ['查看', 'admin.finished-stock-management.selling.view'],
+          ['发布商品', 'admin.finished-stock-management.selling.publish'],
+          ['批量下架', 'admin.finished-stock-management.selling.batch-off-shelf'],
+          ['价格', 'admin.finished-stock-management.selling.price'],
+          ['下架', 'admin.finished-stock-management.selling.off-shelf'],
+          ['编辑', 'admin.finished-stock-management.selling.edit'],
+        ],
+      ],
+      [
+        '已下架',
+        'admin.finished-stock-management.off-shelf',
+        [
+          ['查看', 'admin.finished-stock-management.off-shelf.view'],
+          ['批量放回仓库', 'admin.finished-stock-management.off-shelf.batch-restore'],
+          ['详情', 'admin.finished-stock-management.off-shelf.detail'],
+          ['放回仓库', 'admin.finished-stock-management.off-shelf.restore'],
+          ['删除', 'admin.finished-stock-management.off-shelf.delete'],
+        ],
+      ],
+      [
+        '已售完',
+        'admin.finished-stock-management.sold-out',
+        [
+          ['查看', 'admin.finished-stock-management.sold-out.view'],
+          ['价格', 'admin.finished-stock-management.sold-out.price'],
+        ],
+      ],
+      [
+        '回收站',
+        'admin.finished-stock-management.recycle',
+        [
+          ['查看', 'admin.finished-stock-management.recycle.view'],
+          ['批量放回到仓库', 'admin.finished-stock-management.recycle.batch-restore'],
+          ['批量彻底删除', 'admin.finished-stock-management.recycle.batch-purge'],
+          ['清空回收站', 'admin.finished-stock-management.recycle.clear'],
+          ['价格', 'admin.finished-stock-management.recycle.price'],
+          ['放回到仓库', 'admin.finished-stock-management.recycle.restore'],
+          ['彻底删除', 'admin.finished-stock-management.recycle.purge'],
+        ],
+      ],
+    ]);
+    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(27);
+    expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);
+    const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>
+      value.startsWith('admin.finished-stock-management.'),
+    );
+    expect(values).toHaveLength(28);
+    expect(new Set(values).size).toBe(28);
+    expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(
+      false,
+    );
+    expect(
+      normalizeFunctionCatalogPermissions(fullFunctionCatalog, ['admin.finished-stock-management.selling.edit']),
+    ).toEqual(['admin.finished-stock-management.selling.view', 'admin.finished-stock-management.selling.edit']);
+    expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'))).toEqual(
+      expect.arrayContaining(values),
+    );
+    for (const audience of ['store', 'supplier'] as const) {
+      expect(
+        getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience(audience)).filter((value) =>
+          value.startsWith('admin.finished-stock-management.'),
+        ),
+      ).toEqual([]);
+    }
   });
 });

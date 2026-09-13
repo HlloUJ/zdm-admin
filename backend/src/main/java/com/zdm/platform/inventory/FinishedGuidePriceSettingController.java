@@ -25,7 +25,9 @@ public class FinishedGuidePriceSettingController {
 
   @GetMapping
   public ApiResponse<FinishedGuidePriceSetting> get() {
-    permissionGuard.requireAnyPermission(PREFIX + ".view", "admin.finished-stock-management.view");
+    if (!permissionGuard.hasView("admin.finished-stock-management")) {
+      permissionGuard.requirePermission(PREFIX + ".view");
+    }
     return ApiResponse.ok(service.getSetting());
   }
 

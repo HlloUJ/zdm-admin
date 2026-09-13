@@ -159,6 +159,27 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     return updated;
   }
 
+  @Transactional
+  public FinishedProduct updateOperationWithDetails(Long id, FinishedProduct request, boolean priceOnly) {
+    FinishedProduct existing = getById(id);
+    if (existing == null) {
+      throw new IllegalArgumentException("成品现货不存在或已被删除");
+    }
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), existing.getCreatedByAccountId());
+    FinishedProduct product = new FinishedProduct();
+    org.springframework.beans.BeanUtils.copyProperties(attachDetails(existing), product);
+    if (priceOnly) {
+      product.setGuidePrice(request.getGuidePrice());
+      product.setGuidePrices(request.getGuidePrices());
+      product.setMarkupPrices(request.getMarkupPrices());
+    } else {
+      product.setStatus(request.getStatus());
+      product.setOffShelfReason("offShelf".equals(request.getStatus()) ? request.getOffShelfReason() : null);
+      product.setOffShelfDetail("offShelf".equals(request.getStatus()) ? request.getOffShelfDetail() : null);
+    }
+    return updateWithDetails(id, product);
+  }
+
   public boolean cleanupTemporaryMedia(Long mediaId) {
     mediaAssetService.requireAvailable(mediaId);
     mediaCleanupService.enqueueAfterCommit(List.of(mediaId), "取消未保存的成品现货媒体");

@@ -42,10 +42,10 @@
           >
         </header>
 
-        <template v-if="!formPageVisible">
+        <template v-if="!formPageVisible && finishedTabs.length">
           <section class="filter-card">
-            <t-tabs v-model="activeTab" class="status-tabs" @change="handleTabChange">
-              <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
+            <t-tabs v-if="showFinishedTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
+              <t-tab-panel v-for="tab in finishedTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
             </t-tabs>
 
             <t-form :data="currentFilter" label-width="44px" colon>
@@ -163,7 +163,7 @@
               <template #operation="{ row }">
                 <div class="table-actions">
                   <t-link
-                    v-if="activeTab !== 'offShelf'"
+                    v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
                     theme="primary"
                     hover="color"
                     @click="openPriceDrawer('view', row)"
@@ -194,7 +194,7 @@
           </section>
         </template>
 
-        <template v-else>
+        <template v-else-if="formPageVisible">
           <section class="form-shell">
             <AdminSectionCard class="form-heading-card" aria-label="发布商品信息">
               <div class="form-title-row">
@@ -530,8 +530,8 @@
                 </t-form-item>
                 <t-form-item label="上架" required-mark :status="requiredFieldStatus(productForm.shelfNow)">
                   <t-radio-group v-model="productForm.shelfNow">
-                    <t-radio value="now">立刻上架</t-radio>
-                    <t-radio value="later">暂不上架</t-radio>
+                    <t-radio value="now" :disabled="!canChooseShelfNow">立刻上架</t-radio>
+                    <t-radio value="later" :disabled="!canChooseShelfLater">暂不上架</t-radio>
                   </t-radio-group>
                 </t-form-item>
               </t-form>
@@ -999,6 +999,7 @@ import PriceSourceToggle from './components/PriceSourceToggle.vue';
 import SpecPriceInput from './components/SpecPriceInput.vue';
 import ProductPriceEditor from './components/ProductPriceEditor.vue';
 import FinishedOperationLogs from './components/FinishedOperationLogs.vue';
+import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 
@@ -1025,6 +1026,7 @@ import {
   type FinishedProductPriceLevelOption,
   deleteFinishedProduct,
   listFinishedProducts,
+  listFinishedProductFormOptions,
   releaseTemporaryFinishedProductMedia,
   updateFinishedProduct,
   uploadFinishedProductMedia,
@@ -1036,14 +1038,13 @@ import {
   type FinishedProductPrice,
   type FinishedProductVariant,
 } from '@/services/finishedProducts';
-import { listProductCategories, type ProductCategoryRecord } from '@/services/productCategories';
+import { type ProductCategoryRecord } from '@/services/productCategories';
 import {
   listFinishedProductTemplateAttributes,
   type FinishedProductTemplateAttribute,
 } from '@/services/finishedProducts';
-import { listProductAttributes, type ProductAttributeRecord } from '@/services/productAttributes';
-import { listProductAttributeValues, type ProductAttributeValueRecord } from '@/services/productAttributeValues';
-import { listSuppliers, type SupplierRecord } from '@/services/suppliers';
+import { type ProductAttributeRecord } from '@/services/productAttributes';
+import { type SupplierRecord } from '@/services/suppliers';
 import { sortByOffShelfAtDesc } from './offShelfSorting';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import ProductDetail from './components/ProductDetail.vue';
@@ -1250,6 +1251,37 @@ const pageSizeOptions = [10, 20, 50];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
 
 const activeTab = ref<StockStatus>('warehouse');
+
+const finishedScope: Record<StockStatus, string> = {
+  warehouse: 'warehouse',
+  selling: 'selling',
+  offShelf: 'off-shelf',
+  soldOut: 'sold-out',
+  recycle: 'recycle',
+};
+const hasFinishedAction = (action: string, status = activeTab.value) =>
+  hasPermission(getLoginUser(), `admin.finished-stock-management.${finishedScope[status]}.${action}`);
+const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermissionTabs({
+  tabs,
+  activeTab,
+  canAccess: (tab) => hasFinishedAction('view', tab.value),
+});
+const finishedActionCodes: Record<string, string> = {
+  publish: 'publish',
+  batchShelf: 'batch-shelf',
+  batchOffShelf: 'batch-off-shelf',
+  batchRestore: 'batch-restore',
+  batchPurge: 'batch-purge',
+  clearRecycle: 'clear',
+  shelf: 'shelf',
+  offShelf: 'off-shelf',
+  edit: 'edit',
+  delete: 'delete',
+  detail: 'detail',
+  restore: 'restore',
+  purge: 'purge',
+};
+
 const route = useRoute();
 const router = useRouter();
 const loading = ref(false);
@@ -1377,7 +1409,6 @@ const refreshVisibleProductTemplate = () => {
 };
 watch([formPageVisible, selectedCategoryId], refreshVisibleProductTemplate, { flush: 'post' });
 
-const productAttributeValues = ref<ProductAttributeValueRecord[]>([]);
 const productSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<FinishedMarkupConfigurationRecord[]>([]);
 const enabledPriceLevels = ref<FinishedProductPriceLevelOption[]>([]);
@@ -1864,24 +1895,20 @@ const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): Fini
 };
 
 const loadInventoryData = async () => {
+  if (!finishedTabs.value.length) return;
   loading.value = true;
   try {
-    const [categories, attributes, attributeValues, suppliers, products, markupResult, guideSetting, bindings] =
-      await Promise.all([
-        listProductCategories(),
-        listProductAttributes(),
-        listProductAttributeValues(),
-        listSuppliers(),
-        listFinishedProducts(),
-        listFinishedMarkupConfigurationOptions(),
-        getFinishedGuidePriceSetting(),
-        listFinishedProductTemplateAttributes(),
-      ]);
-    productCategories.value = categories;
-    productAttributes.value = attributes;
+    const [options, products, markupResult, guideSetting, bindings] = await Promise.all([
+      listFinishedProductFormOptions(),
+      listFinishedProducts(),
+      listFinishedMarkupConfigurationOptions(),
+      getFinishedGuidePriceSetting(),
+      listFinishedProductTemplateAttributes(),
+    ]);
+    productCategories.value = options.categories;
+    productAttributes.value = options.attributes;
     categoryAttributeBindings.value = bindings;
-    productAttributeValues.value = attributeValues;
-    productSuppliers.value = suppliers;
+    productSuppliers.value = options.suppliers;
     markupConfigurations.value = markupResult;
     guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
     dataItems.value = products.map(toStockItem);
@@ -1898,6 +1925,18 @@ const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
 const currentPagination = computed(() => paginations[activeTab.value]);
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
 const formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));
+const hasLegacyEditPermission = () => hasPermission(getLoginUser(), 'admin.finished-stock-management.edit');
+const canChooseShelfNow = computed(
+  () =>
+    !editingProduct.value ||
+    editingProduct.value.status === 'selling' ||
+    hasLegacyEditPermission() ||
+    hasFinishedAction('shelf', editingProduct.value.status) ||
+    hasFinishedAction('batch-shelf', editingProduct.value.status),
+);
+const canChooseShelfLater = computed(
+  () => !editingProduct.value || editingProduct.value.status === 'warehouse' || hasLegacyEditPermission(),
+);
 const totalStock = computed(() => specRows.value.reduce((sum, row) => sum + Number(row.quantity || 0), 0));
 const detailMediaUploading = ref(false);
 
@@ -1972,7 +2011,7 @@ const batchButtons = computed(() => {
       { action: 'clearRecycle', label: '清空回收站', theme: 'danger', icon: 'clear' },
     ],
   };
-  return map[activeTab.value];
+  return map[activeTab.value].filter((button) => hasFinishedAction(finishedActionCodes[button.action]));
 });
 
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
@@ -2090,7 +2129,7 @@ const tabLabel = (tab: TabConfig) => {
   return count ? `${tab.label} ${count}` : tab.label;
 };
 
-const rowActions = (): { action: RowAction; label: string; theme: string }[] => {
+const unfilteredRowActions = (): { action: RowAction; label: string; theme: string }[] => {
   if (activeTab.value === 'warehouse') {
     return [
       { action: 'shelf', label: '上架', theme: 'primary' },
@@ -2119,6 +2158,9 @@ const rowActions = (): { action: RowAction; label: string; theme: string }[] => 
     { action: 'purge', label: '彻底删除', theme: 'danger' },
   ];
 };
+
+const rowActions = () =>
+  unfilteredRowActions().filter((action) => hasFinishedAction(finishedActionCodes[action.action]));
 
 const handleTabChange = () => {
   selectedKeys.value = [];

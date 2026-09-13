@@ -67,29 +67,28 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
 
   @GetMapping("/attribute-template-options")
   public ApiResponse<List<FinishedProductService.AttributeTemplateOption>> attributeTemplateOptions() {
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".view", PERMISSION_PREFIX + ".create",
-        PERMISSION_PREFIX + ".edit");
+    permissionGuard.requireView(PERMISSION_PREFIX);
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.attributeTemplateOptions());
   }
 
   @GetMapping("/price-level-options")
   public ApiResponse<List<StoreLevelPricingDirectory.Level>> priceLevelOptions() {
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
+    permissionGuard.requireView(PERMISSION_PREFIX);
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(storeLevelDirectory.listEnabledLevels());
   }
 
   @PostMapping("/media")
   public ApiResponse<MediaUploadResponse> uploadMedia(@RequestParam("file") MultipartFile file) {
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
+    requireProductFormPermission();
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(mediaAssetService.upload(file, MediaStorageService.defaultImageSizeLimit()));
   }
 
   @DeleteMapping("/media")
   public ApiResponse<Boolean> deleteTemporaryMedia(@RequestParam Long mediaId) {
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit");
+    requireProductFormPermission();
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
   }
@@ -99,13 +98,21 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   public ApiResponse<List<FinishedProduct>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
     permissionGuard.requireDataPermission();
-    return ApiResponse.ok(permissionGuard.filterData(service.listWithDetails()));
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithDetails()).stream()
+        .filter(product -> permissionGuard.hasPermission(PERMISSION_PREFIX + ".view")
+            || permissionGuard.hasPermission(permission(scope(product.getStatus()), "view")))
+        .toList());
   }
 
   @Override
   @PostMapping
   public ApiResponse<FinishedProduct> create(@Valid @RequestBody FinishedProduct product) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
+    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create",
+        permission("warehouse", "publish"), permission("selling", "publish"));
+    if (!permissionGuard.hasPermission(PERMISSION_PREFIX + ".create")
+        && !List.of("warehouse", "selling").contains(java.util.Objects.toString(product.getStatus(), ""))) {
+      throw new org.springframework.security.access.AccessDeniedException("发布商品只能暂存仓库或立刻上架");
+    }
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.createWithDetails(product));
   }
@@ -114,20 +121,84 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   @PutMapping("/{id}")
   public ApiResponse<FinishedProduct> update(
       @PathVariable Long id, @Valid @RequestBody FinishedProduct product) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
     permissionGuard.requireDataPermission();
-    return ApiResponse.ok(service.updateWithDetails(id, product));
+    FinishedProduct existing = service.getById(id);
+    if (existing == null) {
+      throw new IllegalArgumentException("成品现货不存在或已被删除");
+    }
+    permissionGuard.requireData(existing);
+    String source = scope(existing.getStatus());
+    if (permissionGuard.hasPermission(PERMISSION_PREFIX + ".edit")) {
+      return ApiResponse.ok(service.updateWithDetails(id, product));
+    }
+    if (!java.util.Objects.equals(existing.getStatus(), product.getStatus())) {
+      String action = transitionAction(existing.getStatus(), product.getStatus());
+      permissionGuard.requireAnyPermission(permission(source, action), permission(source, "batch-" + action));
+      if (("warehouse".equals(source) || "selling".equals(source))
+          && permissionGuard.hasPermission(permission(source, "edit"))) {
+        return ApiResponse.ok(service.updateWithDetails(id, product));
+      }
+      return ApiResponse.ok(service.updateOperationWithDetails(id, product, false));
+    }
+    if (("warehouse".equals(source) || "selling".equals(source))
+        && permissionGuard.hasPermission(permission(source, "edit"))) {
+      return ApiResponse.ok(service.updateWithDetails(id, product));
+    }
+    if (!"warehouse".equals(source) && !"selling".equals(source)) {
+      throw new org.springframework.security.access.AccessDeniedException("当前状态不允许编辑价格");
+    }
+    permissionGuard.requirePermission(permission(source, "price"));
+    return ApiResponse.ok(service.updateOperationWithDetails(id, product, true));
   }
 
   @Override
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".delete",
+        permission("recycle", "purge"), permission("recycle", "batch-purge"), permission("recycle", "clear"));
     permissionGuard.requireDataPermission();
     FinishedProduct product = service.getById(id);
     if (product == null || !"recycle".equals(product.getStatus())) {
       throw new IllegalArgumentException("只有回收站中的成品现货可以彻底删除");
     }
+    permissionGuard.requireData(product);
     return ApiResponse.ok(service.removeById(id));
   }
+  private static String permission(String scope, String action) {
+    return PERMISSION_PREFIX + "." + scope + "." + action;
+  }
+
+  private static String scope(String status) {
+    if (status == null) {
+      return "warehouse";
+    }
+    return switch (status) {
+      case "offShelf" -> "off-shelf";
+      case "soldOut" -> "sold-out";
+      default -> status;
+    };
+  }
+
+  private void requireProductFormPermission() {
+    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit",
+        permission("warehouse", "publish"), permission("selling", "publish"),
+        permission("warehouse", "edit"), permission("selling", "edit"));
+  }
+
+  private static String transitionAction(String source, String target) {
+    if ("warehouse".equals(source) && "selling".equals(target)) {
+      return "shelf";
+    }
+    if ("selling".equals(source) && "offShelf".equals(target)) {
+      return "off-shelf";
+    }
+    if (("offShelf".equals(source) || "recycle".equals(source)) && "warehouse".equals(target)) {
+      return "restore";
+    }
+    if (("warehouse".equals(source) || "offShelf".equals(source)) && "recycle".equals(target)) {
+      return "delete";
+    }
+    throw new org.springframework.security.access.AccessDeniedException("无权执行当前状态操作");
+  }
+
 }
