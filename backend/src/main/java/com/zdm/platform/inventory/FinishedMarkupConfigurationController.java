@@ -35,8 +35,10 @@ public class FinishedMarkupConfigurationController {
 
   @GetMapping("/options")
   public ApiResponse<List<FinishedMarkupConfiguration>> options() {
-    permissionGuard.requireAnyPermission(permission("view"), "admin.finished-stock-management.view",
-        "admin.finished-stock-management.create", "admin.finished-stock-management.edit");
+    if (!permissionGuard.hasView("admin.finished-stock-management")) {
+      permissionGuard.requireAnyPermission(permission("view"), "admin.finished-stock-management.create",
+          "admin.finished-stock-management.edit");
+    }
     return ApiResponse.ok(permissionGuard.filterData(service.listConfigurations(true)));
   }
 

@@ -1,4 +1,16 @@
 import { request } from './http';
+import type { ProductCategoryRecord } from './productCategories';
+import type { ProductAttributeRecord } from './productAttributes';
+import type { SupplierRecord } from './suppliers';
+
+export function listFinishedProductFormOptions() {
+  return request<{
+    categories: ProductCategoryRecord[];
+    attributes: ProductAttributeRecord[];
+    suppliers: Pick<SupplierRecord, 'id' | 'name' | 'status' | 'supplyTypeIds' | 'supplyTypes'>[];
+  }>('/admin/finished-products/form-options');
+}
+
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
 export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
