@@ -153,7 +153,13 @@
           </div>
 
           <footer class="page-actions">
-            <t-button theme="primary" :loading="loading" :disabled="!currentModules.length" @click="saveAllocation">
+            <t-button
+              v-if="canSave"
+              theme="primary"
+              :loading="loading"
+              :disabled="!currentModules.length"
+              @click="saveAllocation"
+            >
               保存
             </t-button>
             <t-button theme="default" variant="base" :disabled="loading" @click="resetAllocation">重置</t-button>
@@ -165,6 +171,8 @@
 </template>
 
 <script setup lang="ts">
+import { getLoginUser } from '@/services/auth';
+import { hasPermission } from '@/services/adminPermissions';
 import { adminFeedback } from '@/components/foundation';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -186,6 +194,10 @@ import {
   saveTerminalFunctionPolicy,
   type TerminalFunctionPolicyRecord,
 } from '@/services/terminalFunctionPolicies';
+
+const canSave = computed(() =>
+  hasPermission(getLoginUser(), 'admin.permission-management.terminal-function-allocation.save'),
+);
 
 const activeTerminal = ref<TerminalType>('store');
 const activeModuleValue = ref(terminalFunctionTrees.store[0]?.value ?? '');
@@ -309,6 +321,7 @@ const resetAllocation = () => {
 };
 
 const saveAllocation = async () => {
+  if (!canSave.value) return;
   const terminal = activeTerminal.value;
   loading.value = true;
   try {

@@ -43,6 +43,35 @@ class EffectivePermissionResolverTest {
         "admin.permission-management.employee-management.edit");
   }
 
+  @Test
+  void legacyTerminalAndRoleGrantsCannotExposePlatformFunctions() {
+    AuthAccount account = employeeAccount(7L, 17L, 3L, "cityPartner");
+    String grants = "admin.supplier-management.view,admin.supplier-management.manage-supply-types,admin.tenant.store-category-management.view,"
+        + "admin.finished-stock-management.warehouse.view,admin.permission-management.terminal-function-allocation.view";
+    when(authAccountMapper.findAdminPermissionValues(7L, 17L)).thenReturn(List.of(grants));
+    when(authAccountMapper.findTerminalPermissionValue("cityPartner")).thenReturn(grants);
+    assertThat(resolver.resolve(account)).containsExactly(
+        "admin.supplier-management.view", "admin.tenant.store-category-management.view");
+    when(authAccountMapper.findTerminalPermissionValue("cityPartner")).thenReturn("");
+    assertThat(resolver.resolve(account)).isEmpty();
+  }
+
+  @Test
+  void platformEmployeeCannotRetainHistoricalStoreCategoryGrants() {
+    AuthAccount account = employeeAccount(8L, 18L, null, null);
+    when(authAccountMapper.findAdminPermissionValues(8L, 18L))
+        .thenReturn(List.of("admin.tenant.store-category-management.view,admin.supplier-management.view"));
+    assertThat(resolver.resolve(account)).containsExactly("admin.supplier-management.view");
+  }
+
+  @Test
+  void unconfiguredTerminalDoesNotFallBackToSupplierPermissions() {
+    AuthAccount account = employeeAccount(7L, 17L, 3L, "factory");
+    when(authAccountMapper.findAdminPermissionValues(7L, 17L)).thenReturn(List.of("admin.supplier-management.view"));
+    assertThat(resolver.resolve(account)).isEmpty();
+    Mockito.verify(authAccountMapper, Mockito.never()).findTerminalPermissionValue("factory");
+  }
+
   private AuthAccount employeeAccount(Long accountId, Long identityId, Long storeId, String storeType) {
     AuthAccount account = new AuthAccount();
     account.setId(accountId);

@@ -1,0 +1,42 @@
+[
+  {
+    "prefix": "admin.supplier-management.manage-supply-types",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.tenant.store-category-management",
+    "scope": "terminal-only"
+  },
+  {
+    "prefix": "admin.tenant",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.product-data-center",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.finished-stock-management",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.slab-management",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.supplier-management",
+    "scope": "shared"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management",
+    "scope": "shared"
+  },
+  {
+    "prefix": "admin.permission-management.role-management",
+    "scope": "shared"
+  },
+  {
+    "prefix": "admin.permission-management.terminal-function-allocation",
+    "scope": "admin-only"
+  }
+]

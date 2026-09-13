@@ -42,7 +42,7 @@ class PermissionGuardTest {
   }
 
   @Test
-  void superAdminBypassesPermissionAndDataChecks() {
+  void superAdminStillRespectsAudienceBoundary() {
     when(identityProvider.require()).thenReturn(new CurrentIdentity(
         1L,
         1L,
@@ -56,7 +56,9 @@ class PermissionGuardTest {
         List.of("SUPER_ADMIN"),
         List.of("all")));
 
-    permissionGuard.requirePermission("admin.anything.delete");
+    permissionGuard.requirePermission("admin.supplier-management.delete");
+    assertThatThrownBy(() -> permissionGuard.requirePermission("admin.slab-management.warehouse.edit"))
+        .isInstanceOf(AccessDeniedException.class);
     permissionGuard.requireAllData();
   }
 

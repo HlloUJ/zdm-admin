@@ -1,3 +1,4 @@
+import { isFunctionAllowedForAudience } from './functionAudience';
 import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 
 export type TerminalType = 'store' | 'supplier';
@@ -145,7 +146,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
   {
     label: '门店分类管理',
     value: 'admin.tenant.store-category-management',
-    audiences: ['store'],
+    audiences: ['store', 'supplier'],
     menus: [
       {
         value: 'admin.tenant.store-category-management.menu',
@@ -522,6 +523,20 @@ const verifiedFunctionCatalog: FunctionModule[] = [
           },
         ],
       },
+      {
+        label: '终端功能分配',
+        value: 'admin.permission-management.terminal-function-allocation.menu',
+        direct: false,
+        pages: [
+          {
+            label: '终端功能分配页',
+            value: 'admin.permission-management.terminal-function-allocation',
+            audiences: ['admin'],
+            actions: [{ label: '保存', value: 'admin.permission-management.terminal-function-allocation.save' }],
+            tabs: [],
+          },
+        ],
+      },
     ],
   },
 ];
@@ -759,20 +774,25 @@ const filterCatalogPagesByAudience = (modules: FunctionModule[], audience: Funct
       menus: module.menus
         .map((menu) => ({
           ...menu,
-          pages: menu.pages.filter((page) => !page.audiences || page.audiences.includes(audience)),
+          pages: menu.pages
+            .filter((page) => isFunctionAllowedForAudience(page.value, audience))
+            .map((page) => ({
+              ...page,
+              actions: page.actions.filter((action) => isFunctionAllowedForAudience(action.value, audience)),
+              tabs: page.tabs.map((tab) => ({
+                ...tab,
+                actions: tab.actions.filter((action) => isFunctionAllowedForAudience(action.value, audience)),
+              })),
+            })),
         }))
         .filter((menu) => menu.pages.length > 0),
     }))
     .filter((module) => module.menus.length > 0);
 
 export const filterFunctionCatalogByAudience = (audience: FunctionAudience) =>
-  filterCatalogPagesByAudience(
-    fullFunctionCatalog.filter((module) => !module.audiences || module.audiences.includes(audience)),
-    audience,
-  );
+  filterCatalogPagesByAudience(fullFunctionCatalog, audience);
 
-export const getRuntimeFunctionCatalog = (audience: FunctionAudience) =>
-  import.meta.env.PROD ? filterFunctionCatalogByAudience(audience) : fullFunctionCatalog;
+export const getRuntimeFunctionCatalog = (audience: FunctionAudience) => filterFunctionCatalogByAudience(audience);
 
 export const terminalFunctionTrees: Record<TerminalType, FunctionModule[]> = {
   store: filterCatalogPagesByAudience(getRuntimeFunctionCatalog('store'), 'store'),

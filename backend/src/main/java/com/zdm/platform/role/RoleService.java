@@ -5,6 +5,7 @@ import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.PermissionGuard;
+import com.zdm.platform.security.FunctionAudiencePolicy;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -213,7 +214,8 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
         "SELECT function_permissions FROM terminal_function_policies WHERE terminal = ?",
         String.class,
         scope.audience());
-    return FunctionPermissionNormalizer.normalizeCsv(value);
+    return String.join(",", FunctionAudiencePolicy.filter(
+        FunctionPermissionNormalizer.normalize(List.of(value == null ? "" : value)), scope.audience()));
   }
 
   private void requireAllowedRolePermissions(Role role, RoleScope scope) {
@@ -221,6 +223,9 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
         List.of(role.getFunctionPermissions() == null ? "" : role.getFunctionPermissions()));
     if (selected.contains("all")) {
       throw new AccessDeniedException("非内置角色不能授予全平台权限");
+    }
+    if (selected.stream().anyMatch(permission -> !FunctionAudiencePolicy.allows(permission, scope.audience()))) {
+      throw new AccessDeniedException("角色权限不适用于当前用户端");
     }
     if (scope.storeId() == null || selected.isEmpty()) {
       return;

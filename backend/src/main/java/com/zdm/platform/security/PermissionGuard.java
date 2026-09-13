@@ -18,11 +18,15 @@ public class PermissionGuard {
 
   public boolean hasPermission(String permission) {
     CurrentIdentity identity = identity();
-    return identity.isSuperAdmin() || identity.permissions().contains("all") || identity.permissions().contains(permission);
+    return FunctionAudiencePolicy.allows(permission, identity)
+        && (identity.isSuperAdmin() || identity.permissions().contains("all") || identity.permissions().contains(permission));
   }
 
   public boolean hasView(String permissionPrefix) {
     CurrentIdentity identity = identity();
+    if (!FunctionAudiencePolicy.allows(permissionPrefix, identity)) {
+      return false;
+    }
     if (identity.isSuperAdmin() || identity.permissions().contains("all")) {
       return true;
     }

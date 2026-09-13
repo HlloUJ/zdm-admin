@@ -1068,6 +1068,18 @@ test('shows the same object-specific success copy for category, store category, 
   const feedbackBox = await productCategoryFeedback.locator('..').boundingBox();
   expect(feedbackBox?.width).toBeLessThan(320);
 
+  await page.addInitScript(() => {
+    const user = JSON.parse(window.localStorage.getItem('zdm-admin-user') ?? '{}');
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        ...user,
+        tenantId: 1,
+        storeId: 1,
+        storeType: 'cityPartner',
+      }),
+    );
+  });
   await page.goto('/store-category-management');
   await page
     .getByRole('row', { name: /石材 1级分类/ })
