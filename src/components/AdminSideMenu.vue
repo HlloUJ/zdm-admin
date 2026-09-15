@@ -1,5 +1,5 @@
 <template>
-  <aside class="side-nav" @click.capture="handleSideNavClick">
+  <aside ref="sideNav" class="side-nav" @click.capture="handleSideNavClick" @scroll.capture="rememberScroll">
     <t-menu
       :value="activeMenu"
       class="menu"
@@ -52,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useSideMenuState } from '@/composables/useSideMenuState';
@@ -66,7 +66,26 @@ import {
 
 const route = useRoute();
 const router = useRouter();
-const { expandedMenus, handleMenuExpand } = useSideMenuState();
+const { expandedMenus, handleMenuExpand, scrollPosition } = useSideMenuState();
+const sideNav = ref<HTMLElement>();
+let restoringScroll = true;
+
+const rememberScroll = () => {
+  if (restoringScroll || !sideNav.value) return;
+  scrollPosition.top = sideNav.value.scrollTop;
+  scrollPosition.menuTop = sideNav.value.querySelector('.t-menu--scroll')?.scrollTop ?? 0;
+};
+
+onMounted(async () => {
+  await nextTick();
+  if (!sideNav.value) return;
+  sideNav.value.scrollTop = scrollPosition.top;
+  const menuScroller = sideNav.value.querySelector('.t-menu--scroll');
+  if (menuScroller) menuScroller.scrollTop = scrollPosition.menuTop;
+  restoringScroll = false;
+});
+
+onBeforeUnmount(rememberScroll);
 
 const activeMenu = computed(() => route.path);
 const loginUser = computed(() => getLoginUser());

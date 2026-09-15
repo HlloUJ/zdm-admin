@@ -2,6 +2,9 @@ import { ref } from 'vue';
 
 type MenuValue = string | number;
 
+// Shared across route-mounted menu instances; each browser tab keeps its own position.
+const scrollPosition = { top: 0, menuTop: 0 };
+
 const STORAGE_KEY = 'zdm-admin-side-menu-expanded';
 
 const readExpandedMenus = () => {
@@ -30,6 +33,7 @@ export const useSideMenuState = () => {
   };
 
   return {
+    scrollPosition,
     expandedMenus,
     handleMenuExpand,
   };
