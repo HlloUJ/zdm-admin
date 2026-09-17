@@ -4619,6 +4619,158 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void supplyChainCannotMutatePlatformCreatedRolesOrForgeCreationSource() throws Exception {
+    String token = supplyChainToken();
+    String grants = "admin.permission-management.role-management.supply-chain.view,"
+        + "admin.permission-management.role-management.supply-chain.create,"
+        + "admin.permission-management.role-management.supply-chain.edit,"
+        + "admin.permission-management.role-management.supply-chain.permission,"
+        + "admin.permission-management.role-management.supply-chain.delete";
+    jdbcTemplate.update("UPDATE roles SET function_permissions=? WHERE id=990000", grants);
+    jdbcTemplate.update("UPDATE terminal_function_policies SET function_permissions=? WHERE terminal='supply-chain'", grants);
+    String body = """
+        {"name":"平台创建来源保护","code":"SOURCE_PROTECTED","clientCode":"supply-chain",
+         "status":"enabled","dataScope":"all","functionPermissions":"",
+         "createdByClientCode":"supply-chain"}
+        """;
+    mockMvc.perform(post("/api/admin/roles").header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json").content(body)).andExpect(status().isOk());
+    Long id = jdbcTemplate.queryForObject("SELECT id FROM roles WHERE code='SOURCE_PROTECTED'", Long.class);
+    assertThat(jdbcTemplate.queryForObject("SELECT created_by_client_code FROM roles WHERE id=?", String.class, id)).isEqualTo("admin");
+    // Same unified account, different active identity: provenance must not follow account id.
+    mockMvc.perform(put("/api/admin/roles/{id}", id).header("Authorization", "Bearer " + token)
+            .contentType("application/json").content(body)).andExpect(status().isForbidden());
+    mockMvc.perform(put("/api/admin/roles/{id}", id).header("Authorization", "Bearer " + token)
+            .contentType("application/json").content(body.replace("\"functionPermissions\":\"\"", "\"functionPermissions\":\"" + grants + "\"")))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/roles/{id}", id).header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    mockMvc.perform(put("/api/admin/roles/{id}", id).header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json").content(body)).andExpect(status().isOk());
+    assertThat(jdbcTemplate.queryForObject("SELECT created_by_client_code FROM roles WHERE id=?", String.class, id)).isEqualTo("admin");
+    jdbcTemplate.update("UPDATE roles SET created_by_client_code=NULL WHERE id=?", id);
+    mockMvc.perform(delete("/api/admin/roles/{id}", id).header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    mockMvc.perform(delete("/api/admin/roles/{id}", id).header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
+    String localBody = body.replace("平台创建来源保护", "供应链自行创建").replace("SOURCE_PROTECTED", "SOURCE_LOCAL").replace("\"createdByClientCode\":\"supply-chain\"", "\"createdByClientCode\":\"admin\"");
+    mockMvc.perform(post("/api/admin/roles").header("Authorization", "Bearer " + token)
+            .contentType("application/json").content(localBody)).andExpect(status().isOk());
+    Long localId = jdbcTemplate.queryForObject("SELECT id FROM roles WHERE code='SOURCE_LOCAL'", Long.class);
+    assertThat(jdbcTemplate.queryForObject("SELECT created_by_client_code FROM roles WHERE id=?", String.class, localId)).isEqualTo("supply-chain");
+    mockMvc.perform(put("/api/admin/roles/{id}", localId).header("Authorization", "Bearer " + token)
+            .contentType("application/json").content(localBody)).andExpect(status().isOk());
+    mockMvc.perform(delete("/api/admin/roles/{id}", localId).header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+  }
+
+  @Test
+  void supplyChainManagementUsesAllocatedPermissionsAndOwnScope() throws Exception {
+    String token = supplyChainToken();
+    String grants = "admin.permission-management.employee-management.supply-chain.view,"
+        + "admin.permission-management.employee-management.supply-chain.create,"
+        + "admin.permission-management.role-management.supply-chain.view,"
+        + "admin.permission-management.role-management.supply-chain.create,"
+        + "admin.permission-management.role-management.supply-chain.permission";
+    mockMvc.perform(put("/api/admin/terminal-function-policies/supply-chain")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .contentType("application/json").content("{\"functionPermissions\":\"" + grants + "\"}"))
+        .andExpect(status().isOk());
+    jdbcTemplate.update("UPDATE roles SET function_permissions=? WHERE id=990000", grants);
+    for (String path : List.of("employees", "roles", "roles/permission-scope")) {
+      mockMvc.perform(get("/api/admin/" + path).param("clientCode", "supply-chain")
+              .header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+      mockMvc.perform(get("/api/admin/" + path).param("clientCode", "admin")
+              .header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    }
+    mockMvc.perform(post("/api/admin/employee-invites").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.clientCode").value("supply-chain"));
+    mockMvc.perform(post("/api/admin/employee-invites").param("clientCode", "admin")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    mockMvc.perform(post("/api/admin/roles").header("Authorization", "Bearer " + token)
+            .contentType("application/json").content("""
+                {"name":"供应链邀请专员","code":"SC_INVITER","clientCode":"supply-chain","status":"enabled","dataScope":"all",
+                 "functionPermissions":"admin.permission-management.employee-management.supply-chain.create"}
+                """)).andExpect(status().isOk());
+    mockMvc.perform(post("/api/admin/roles").header("Authorization", "Bearer " + token)
+            .contentType("application/json").content("""
+                {"name":"越权角色","code":"SC_DENIED","clientCode":"supply-chain","status":"enabled","dataScope":"all",
+                 "functionPermissions":"admin.permission-management.terminal-function-allocation.save"}
+                """)).andExpect(status().isForbidden());
+    jdbcTemplate.update("UPDATE terminal_function_policies SET function_permissions='' WHERE terminal='supply-chain'");
+    mockMvc.perform(get("/api/admin/employees").header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    mockMvc.perform(get("/api/admin/roles").header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    mockMvc.perform(post("/api/admin/employee-invites").header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void internalEmployeeInvitesBindClientAndReuseUnifiedAccount() throws Exception {
+    String phone = "15926628881";
+    String payload = """
+        {"phone":"15926628881","verifyCode":"888888","name":"跨系统邀请员工","gender":"male",
+         "clientCode":"invalid","tenantId":999,"storeId":999}
+        """;
+    for (String client : List.of("admin", "supply-chain")) {
+      MvcResult invitation = mockMvc.perform(post("/api/admin/employee-invites")
+              .param("clientCode", client)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.clientCode").value(client)).andReturn();
+      String token = com.jayway.jsonpath.JsonPath.read(invitation.getResponse().getContentAsString(), "$.data.token");
+      mockMvc.perform(get("/api/open/employee-invites/{token}", token))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.clientCode").value(client));
+      mockMvc.perform(post("/api/open/employee-invites/{token}/register", token)
+              .contentType("application/json").content(payload))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("disabled"));
+      mockMvc.perform(post("/api/open/employee-invites/{token}/register", token)
+              .contentType("application/json").content(payload))
+          .andExpect(status().isBadRequest());
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM employees WHERE phone=? AND client_code=? AND tenant_id IS NULL AND store_id IS NULL AND status='disabled'",
+          Integer.class, phone, client)).isEqualTo(1);
+      MvcResult duplicate = mockMvc.perform(post("/api/admin/employee-invites")
+              .param("clientCode", client)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk()).andReturn();
+      String duplicateToken = com.jayway.jsonpath.JsonPath.read(duplicate.getResponse().getContentAsString(), "$.data.token");
+      mockMvc.perform(post("/api/open/employee-invites/{token}/request-code", duplicateToken)
+              .contentType("application/json").content("{\"phone\":\"" + phone + "\"}"))
+          .andExpect(status().isBadRequest());
+      mockMvc.perform(post("/api/open/employee-invites/{token}/register", duplicateToken)
+              .contentType("application/json").content(payload))
+          .andExpect(status().isBadRequest());
+    }
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(DISTINCT account_id) FROM employees WHERE phone=?", Integer.class, phone)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM account_identities i JOIN accounts a ON a.id=i.account_id WHERE a.phone=? AND i.status='disabled' AND i.client_code IN ('admin','supply-chain')",
+        Integer.class, phone)).isEqualTo(2);
+    mockMvc.perform(post("/api/admin/employee-invites").param("clientCode", "invalid")
+            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void employeeInvitesEnforceIssuerScopeAndTargetPermission() throws Exception {
+    String token = createStoreScopedEmployee(98881L, "15926628882", "邀请范围测试",
+        "admin.permission-management.employee-management.create");
+    mockMvc.perform(post("/api/admin/employee-invites").param("clientCode", "supply-chain")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    // Convert the test identity to platform scope; ordinary admin create permission
+    // must still not grant the separate supply-chain invitation permission.
+    jdbcTemplate.update("UPDATE employees SET tenant_id=NULL,store_id=NULL WHERE id=98881");
+    jdbcTemplate.update("UPDATE account_identities SET tenant_id=NULL,store_id=NULL WHERE account_id=98881");
+    jdbcTemplate.update("UPDATE roles SET tenant_id=NULL,store_id=NULL WHERE id=98881");
+    jdbcTemplate.update("UPDATE account_roles SET tenant_id=NULL,store_id=NULL WHERE account_id=98881");
+    mockMvc.perform(post("/api/admin/employee-invites").param("clientCode", "supply-chain")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    mockMvc.perform(post("/api/admin/employee-invites").param("clientCode", "admin")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+    jdbcTemplate.update("UPDATE roles SET function_permissions=? WHERE id=98881",
+        "admin.permission-management.employee-management.supply-chain.create");
+    mockMvc.perform(post("/api/admin/employee-invites").param("clientCode", "supply-chain")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+    mockMvc.perform(post("/api/admin/employee-invites").param("clientCode", "admin")
+            .header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+  }
+
+  @Test
   void employeeInviteRegistrationActivatesWithCurrentStoreRole() throws Exception {
     String creatorName = "邀请注册测试员";
     String adminToken = createStoreScopedEmployee(

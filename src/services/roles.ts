@@ -1,6 +1,7 @@
 import { request } from './http';
 
 export interface RoleRecord {
+  createdByClientCode?: 'admin' | 'supply-chain' | null;
   clientCode?: 'admin' | 'supply-chain';
   id: number;
   tenantId?: number;

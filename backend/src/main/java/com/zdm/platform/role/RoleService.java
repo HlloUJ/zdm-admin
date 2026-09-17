@@ -80,6 +80,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     RoleScope scope = requireCurrentScope(role.getClientCode());
     requireRoleAction("create",scope.clientCode());
     role.setClientCode(scope.clientCode());
+    role.setCreatedByClientCode(identityProvider.require().clientCode());
     role.setId(null);
     role.setTenantId(scope.tenantId());
     role.setStoreId(scope.storeId());
@@ -105,6 +106,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     authorizeUpdate(existing, payload);
 
     payload.setClientCode(existing.getClientCode());
+    payload.setCreatedByClientCode(existing.getCreatedByClientCode());
     payload.setId(id);
     payload.setCode(existing.getCode());
     payload.setTenantId(existing.getTenantId());
@@ -168,6 +170,10 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
+    if ("supply-chain".equals(identityProvider.require().clientCode())
+        && !"supply-chain".equals(role.getCreatedByClientCode())) {
+      throw new AccessDeniedException("运营平台创建或来源未确认的角色仅可由运营平台维护");
+    }
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), role.getCreatedByAccountId());
     RoleScope scope = requireCurrentScope(role.getClientCode());
     if (!Objects.equals(role.getTenantId(), scope.tenantId())

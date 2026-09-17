@@ -8,7 +8,9 @@ export function isFunctionAllowedForAudience(permission: string, audience: strin
     .sort((a, b) => b.prefix.length - a.prefix.length)[0];
   return Boolean(
     rule &&
-    ((rule.scope === 'shared' && audience !== 'supply-chain') ||
+    ((rule.scope === 'shared-management' && (audience !== 'supply-chain' || permission === rule.prefix)) ||
+      (rule.scope === 'internal-management' && ['admin', 'supply-chain'].includes(audience)) ||
+      (rule.scope === 'shared' && audience !== 'supply-chain') ||
       (rule.scope === 'admin-only' && audience === 'admin') ||
       (rule.scope === 'terminal-only' && ['store', 'supplier'].includes(audience)) ||
       (rule.scope === 'supply-chain-only' && audience === 'supply-chain') ||

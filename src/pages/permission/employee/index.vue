@@ -70,12 +70,7 @@
                 </div>
               </t-form>
               <div v-if="canCreateEmployee" class="table-toolbar">
-                <InternalEmployeeCreate
-                  v-if="isInternalAdministration"
-                  :client-code="managedClient"
-                  @created="loadPermissionCenter"
-                />
-                <t-button v-else theme="primary" :loading="inviteCreating" @click="openInviteDialog">
+                <t-button theme="primary" :loading="inviteCreating" @click="openInviteDialog">
                   <template #icon><t-icon name="add" /></template>
                   邀请员工
                 </t-button>
@@ -272,7 +267,6 @@
 </template>
 
 <script setup lang="ts">
-import InternalEmployeeCreate from './InternalEmployeeCreate.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -338,7 +332,9 @@ interface EmployeeFilter {
 
 const operationRoles = ref<RoleRecord[]>([]);
 const loginUser = computed(() => getLoginUser());
-const managedClient = ref<'admin' | 'supply-chain'>('admin');
+const managedClient = ref<'admin' | 'supply-chain'>(
+  loginUser.value.clientCode === 'supply-chain' ? 'supply-chain' : 'admin',
+);
 const managementPermissionPrefix = computed(
   () =>
     `admin.permission-management.employee-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}`,
@@ -491,8 +487,8 @@ const profileFormRules: Record<string, FormRule[]> = {
 };
 
 const permissionFormRules: Record<string, FormRule[]> = {
-  roleIds: [{ required: true, message: '请选择角色', type: 'error' }],
-  dataPermission: [{ required: true, message: '请选择数据权限', type: 'error' }],
+  roleIds: [{ required: true, message: '请选择角色', type: 'error', trigger: 'submit' }],
+  dataPermission: [{ required: true, message: '请选择数据权限', type: 'error', trigger: 'submit' }],
 };
 
 const confirmDialogVisible = ref(false);
@@ -564,7 +560,16 @@ const toEmployeePayload = (employee: EmployeeItem): EmployeePayload => ({
 const loadPermissionCenter = async () => {
   loading.value = true;
   try {
-    const [roles, records] = await Promise.all([listRoles(managedClient.value), listEmployees(managedClient.value)]);
+    const [roles, records] = await Promise.all([
+      canConfigureEmployeePermission.value ||
+      hasPermission(
+        loginUser.value,
+        `admin.permission-management.role-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}.view`,
+      )
+        ? listRoles(managedClient.value)
+        : Promise.resolve<RoleRecord[]>([]),
+      listEmployees(managedClient.value),
+    ]);
     operationRoles.value = roles.filter((role) => role.status === 'enabled');
     employees.value = sortByCreatedAtDesc(records).map(toEmployeeItem);
   } catch (error) {
@@ -591,8 +596,10 @@ const generateInviteLink = (token: string) => {
 const openInviteDialog = async () => {
   if (inviteCreating.value) return;
   inviteCreating.value = true;
+  const targetClient = managedClient.value;
   try {
-    const invite = await createEmployeeInvite();
+    const invite = await createEmployeeInvite(targetClient);
+    if (managedClient.value !== targetClient) return;
     inviteLink.value = generateInviteLink(invite.token);
     inviteDialogVisible.value = true;
   } catch (error) {
@@ -830,6 +837,7 @@ const handleConfirmSubmit = async () => {
 };
 
 const handleManagedClientChange = () => {
+  closeInviteDialog();
   employees.value = [];
   operationRoles.value = [];
   profileDialogVisible.value = false;

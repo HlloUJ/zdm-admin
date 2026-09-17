@@ -13,12 +13,12 @@
 
       <div v-else-if="submitted" class="state-panel">
         <h1>注册信息已提交</h1>
-        <p>请等待超级管理员确认信息并启用账号。</p>
+        <p>请等待管理员确认信息并启用当前系统的员工身份。</p>
       </div>
 
       <template v-else>
         <div class="page-title">
-          <h1>员工注册</h1>
+          <h1>{{ invitedSystemName }}员工注册</h1>
           <p>请完成信息填写，提交后等待管理员启用。</p>
         </div>
 
@@ -123,6 +123,7 @@ const requestingCode = ref(false);
 const submitting = ref(false);
 const submitted = ref(false);
 const pageError = ref('');
+const invitedSystemName = ref('');
 const step = ref<1 | 2>(1);
 const countDown = ref(0);
 const phoneFormRef = ref<FormInstanceFunctions>();
@@ -245,7 +246,8 @@ onMounted(async () => {
     return;
   }
   try {
-    await inspectEmployeeInvite(token.value);
+    const invite = await inspectEmployeeInvite(token.value);
+    invitedSystemName.value = invite.clientCode === 'supply-chain' ? '供应链协同系统' : '运营管理平台';
   } catch (error) {
     pageError.value = error instanceof Error ? error.message : '邀请链接校验失败';
   } finally {

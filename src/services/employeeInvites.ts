@@ -3,6 +3,7 @@ import { request } from './http';
 export interface EmployeeInviteResponse {
   token: string;
   expiresAt: string;
+  clientCode: 'admin' | 'supply-chain';
 }
 
 export interface VerifyInviteCodePayload {
@@ -24,8 +25,8 @@ export interface EmployeeInviteRegisterResponse {
   status: 'enabled' | 'disabled';
 }
 
-export function createEmployeeInvite() {
-  return request<EmployeeInviteResponse>('/admin/employee-invites', {
+export function createEmployeeInvite(clientCode: 'admin' | 'supply-chain') {
+  return request<EmployeeInviteResponse>(`/admin/employee-invites?clientCode=${encodeURIComponent(clientCode)}`, {
     method: 'POST',
   });
 }

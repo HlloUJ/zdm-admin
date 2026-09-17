@@ -48,9 +48,15 @@
               </template>
               <template #operation="{ row }">
                 <div class="table-actions">
-                  <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                   <t-link
-                    v-if="canManageRolePermission && !isSuperAdminRole(row)"
+                    v-if="canEditRole && canMaintainRole(row)"
+                    theme="primary"
+                    hover="color"
+                    @click="openEditDialog(row)"
+                    >编辑</t-link
+                  >
+                  <t-link
+                    v-if="canManageRolePermission && !isSuperAdminRole(row) && canMaintainRole(row)"
                     theme="primary"
                     hover="color"
                     @click="openPermissionDialog(row)"
@@ -58,7 +64,7 @@
                     权限
                   </t-link>
                   <t-link
-                    v-if="canDeleteRole && !isSuperAdminRole(row)"
+                    v-if="canDeleteRole && !isSuperAdminRole(row) && canMaintainRole(row)"
                     theme="danger"
                     hover="color"
                     @click="openDeleteConfirm(row)"
@@ -67,9 +73,10 @@
                   </t-link>
                   <span
                     v-if="
-                      !canEditRole &&
-                      !(canDeleteRole && !isSuperAdminRole(row)) &&
-                      !(canManageRolePermission && !isSuperAdminRole(row))
+                      !canMaintainRole(row) ||
+                      (!canEditRole &&
+                        !(canDeleteRole && !isSuperAdminRole(row)) &&
+                        !(canManageRolePermission && !isSuperAdminRole(row)))
                     "
                     class="table-action-placeholder"
                   >
@@ -319,6 +326,7 @@ import {
 type DialogMode = 'create' | 'edit';
 
 interface RoleItem {
+  createdByClientCode?: 'admin' | 'supply-chain' | null;
   id: number;
   code: string;
   dataScope: string;
@@ -366,7 +374,9 @@ const permissionModules = computed(() => {
 
 const pageSizeOptions = [10, 20, 50];
 const loginUser = computed(() => getLoginUser());
-const managedClient = ref<'admin' | 'supply-chain'>('admin');
+const managedClient = ref<'admin' | 'supply-chain'>(
+  loginUser.value.clientCode === 'supply-chain' ? 'supply-chain' : 'admin',
+);
 const managementPermissionPrefix = computed(
   () => `admin.permission-management.role-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}`,
 );
@@ -447,6 +457,7 @@ const formatDateTime = (value?: string) => {
 
 const toRoleItem = (record: RoleRecord): RoleItem => ({
   id: record.id,
+  createdByClientCode: record.createdByClientCode,
   code: record.code,
   dataScope: record.dataScope,
   status: record.status,
@@ -469,6 +480,9 @@ const toRolePayload = (role: RoleItem): RolePayload => ({
   functionPermissions: role.functionPermissions.join(','),
 });
 
+const canMaintainRole = (row: RoleItem) =>
+  loginUser.value.clientCode !== 'supply-chain' || row.createdByClientCode === 'supply-chain';
+
 const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 
 const loadRoles = async () => {
@@ -476,7 +490,9 @@ const loadRoles = async () => {
   try {
     const [records, scope] = await Promise.all([
       listRoles(managedClient.value),
-      getRolePermissionScope(managedClient.value),
+      hasPermission(loginUser.value, `${managementPermissionPrefix.value}.permission`)
+        ? getRolePermissionScope(managedClient.value)
+        : Promise.resolve<RolePermissionScope>({ audience: managedClient.value, functionPermissions: '' }),
     ]);
     rolePermissionScope.value = scope;
     activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';

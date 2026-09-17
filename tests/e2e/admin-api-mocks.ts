@@ -632,6 +632,8 @@ export async function installAdminApiMocks(page: Page) {
     await fulfillJson(route, { audience: 'admin', functionPermissions: 'all' });
   });
   const policies = structuredClone(terminalFunctionPolicies);
+  if (!policies.some((p) => p.terminal === 'supply-chain'))
+    policies.push({ id: 3, terminal: 'supply-chain', functionPermissions: '' });
   await page.route('**/api/admin/terminal-function-policies', (route) => fulfillJson(route, policies));
   await page.route('**/api/admin/terminal-function-policies/*', async (route) => {
     const terminal = new URL(route.request().url()).pathname.split('/').at(-1);
@@ -792,10 +794,11 @@ async function mockEmployeeInvites(page: Page) {
     await fulfillJson(route, true);
   });
 
-  await page.route('**/api/admin/employee-invites', async (route) => {
+  await page.route('**/api/admin/employee-invites?*', async (route) => {
     await fulfillJson(route, {
       token: 'e2e-invite-token',
       expiresAt: '2026-08-04T09:00:00',
+      clientCode: 'admin',
     });
   });
 
@@ -803,6 +806,7 @@ async function mockEmployeeInvites(page: Page) {
     await fulfillJson(route, {
       token: 'e2e-invite-token',
       expiresAt: '2026-08-04T09:00:00',
+      clientCode: 'admin',
     });
   });
 
