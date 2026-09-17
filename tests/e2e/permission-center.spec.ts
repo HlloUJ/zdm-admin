@@ -381,6 +381,7 @@ test('shows supplier status without unrelated operations for a status-only accou
       JSON.stringify({
         id: 13,
         name: '受限供应商管理员',
+        clientCode: 'supply-chain',
         phone: '15926620013',
         roles: ['SUPPLIER_STATUS_MANAGER'],
         permissions: ['admin.supplier-management.view', 'admin.supplier-management.toggle-status'],
@@ -408,6 +409,7 @@ test('allows account 15900000002 with all data scope to view all suppliers', asy
       'zdm-admin-user',
       JSON.stringify({
         id: 4,
+        clientCode: 'supply-chain',
         name: '张飞',
         phone: '15900000002',
         roles: ['OPERATION_MANAGER'],
@@ -426,7 +428,7 @@ test('allows account 15900000002 with all data scope to view all suppliers', asy
   await expect(main.locator('.table-actions .t-link')).toHaveCount(0);
 });
 
-test('opens employee invite and edit dialogs', async ({ page }) => {
+test('opens internal employee creation and edit dialogs', async ({ page }) => {
   await page.goto('/employee-management');
   const main = page.getByRole('main');
 
@@ -435,12 +437,12 @@ test('opens employee invite and edit dialogs', async ({ page }) => {
   await expect(main.locator('thead')).toContainText('创建人');
   await expect(main.locator('thead')).toContainText('注册时间');
 
-  await main.getByRole('button', { name: /邀请员工/ }).click();
-  const inviteDialog = page.locator('.t-dialog:visible').filter({ hasText: '邀请员工' });
-  await expect(inviteDialog).toBeVisible();
-  await expect(inviteDialog.getByText('员工邀请链接')).toBeVisible();
-  await expect(inviteDialog.locator('textarea')).toHaveValue(/\/employee-invite\?token=e2e-invite-token/);
-  await inviteDialog.getByRole('button', { name: '关闭' }).click();
+  await main.getByRole('button', { name: '新增员工', exact: true }).click();
+  const createDialog = page.locator('.t-dialog:visible').filter({ hasText: '新增员工' });
+  await expect(createDialog).toBeVisible();
+  await expect(createDialog.getByText('手机号码', { exact: true })).toBeVisible();
+  await expect(createDialog.getByText('姓名', { exact: true })).toBeVisible();
+  await createDialog.getByRole('button', { name: '取消', exact: true }).click();
 
   const firstEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926626945' }).first();
   await expect(firstEmployeeRow).toBeVisible();
@@ -882,19 +884,18 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(permissionDialog.getByRole('heading', { name: '功能权限', exact: true })).toBeVisible();
   const roleModuleList = permissionDialog.locator('.permission-module-list');
   const roleMatrix = permissionDialog.locator('.permission-matrix');
-  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(5);
+  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(4);
   await expect(roleModuleList.locator('.permission-module-item > span:first-child')).toHaveText([
     '租户与门店',
     '商品管理',
     '供应商供货类型管理',
-    '供应商管理',
     '权限管理',
   ]);
   await expect(roleModuleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('门店分类管理', { exact: true })).toHaveCount(0);
   await expect(roleModuleList.getByText('商品管理', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('权限管理', { exact: true })).toBeVisible();
-  await expect(roleModuleList.getByText('供应商管理', { exact: true })).toBeVisible();
+  await expect(roleModuleList.getByText('供应商供货类型管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.locator('thead')).toContainText('二级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('三级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('页面');
@@ -946,11 +947,11 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
-    ['查看', '发布商品', '批量上架', '价格', '上架', '编辑', '删除'],
-    ['查看', '发布商品', '批量下架', '价格', '下架', '编辑'],
-    ['查看', '批量放回仓库', '详情', '放回仓库', '删除'],
+    ['查看', '批量上架', '价格', '上架', '删除'],
+    ['查看', '批量下架', '价格', '下架'],
+    ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],
     ['查看', '价格'],
-    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '价格', '放回到仓库', '彻底删除'],
+    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '价格', '放回仓库', '彻底删除'],
   ];
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
@@ -1075,15 +1076,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('供应商供货类型管理', { exact: true }).click();
-  await expect(roleMatrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
-    '查看',
-    '新增',
-    '编辑',
-    '停用/启用',
-    '删除',
-  ]);
-  await roleModuleList.getByText('供应商管理', { exact: true }).click();
-  const supplierPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '供应商管理页' });
+  const supplierPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '供应商供货类型管理' });
   await expect(supplierPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
@@ -1092,7 +1085,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('权限管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(3);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(5);
   await expect(
     roleMatrix.locator('tbody tr').filter({ hasText: '终端功能分配页' }).locator('.permission-action-grid .t-checkbox'),
   ).toHaveText(['查看', '保存']);
@@ -1101,7 +1094,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const employeePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '员工管理页' });
   await expect(employeePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
-    '邀请员工',
+    '新增员工',
     '编辑',
     '角色',
     '停用/启用',
@@ -1113,7 +1106,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await employeePermissionRow.getByText('查看', { exact: true }).click();
   await expect(employeePermissionRow.locator('.permission-action-grid input[type="checkbox"]:checked')).toHaveCount(0);
   const rolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '角色管理页' });
-  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('—');
+  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('运营管理平台');
   await expect(rolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',

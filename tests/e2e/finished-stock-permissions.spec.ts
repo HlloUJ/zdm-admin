@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
-async function setup(page: Page, permissions: string[]) {
+async function setup(page: Page, permissions: string[], clientCode = 'admin') {
   await installAdminApiMocks(page);
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
@@ -9,13 +9,23 @@ async function setup(page: Page, permissions: string[]) {
   await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
-  await page.addInitScript((permissions) => {
-    localStorage.setItem('zdm-admin-token', 'dev-token');
-    localStorage.setItem(
-      'zdm-admin-user',
-      JSON.stringify({ id: 2, name: '目录测试', roles: ['ADMIN_MANAGER'], permissions, dataPermission: 'all' }),
-    );
-  }, permissions);
+  await page.addInitScript(
+    ({ permissions, clientCode }) => {
+      localStorage.setItem('zdm-admin-token', 'dev-token');
+      localStorage.setItem(
+        'zdm-admin-user',
+        JSON.stringify({
+          id: 2,
+          clientCode,
+          name: '目录测试',
+          roles: ['ADMIN_MANAGER'],
+          permissions,
+          dataPermission: 'all',
+        }),
+      );
+    },
+    { permissions, clientCode },
+  );
 }
 const prefix = 'admin.finished-stock-management.';
 test('hides finished stock menu without its permissions', async ({ page }) => {
@@ -24,8 +34,12 @@ test('hides finished stock menu without its permissions', async ({ page }) => {
   await expect(page.locator('.admin-side-menu').getByText('成品现货管理', { exact: true })).toHaveCount(0);
 });
 test('one tab hides rail and only grants requested row operation', async ({ page }) => {
-  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.edit']);
-  await page.goto('/finished-stock-management');
+  await setup(
+    page,
+    ['supply-chain.finished-stock-management.warehouse.view', 'supply-chain.finished-stock-management.warehouse.edit'],
+    'supply-chain',
+  );
+  await page.goto('/supply-chain/finished-stock-management');
   const main = page.getByRole('main');
   await expect(main.getByText('意式轻奢岩板餐桌', { exact: true })).toBeVisible();
   await expect(main.locator('.status-tabs')).toHaveCount(0);

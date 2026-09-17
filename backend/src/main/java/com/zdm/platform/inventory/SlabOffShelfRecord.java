@@ -9,6 +9,9 @@ import java.time.LocalDateTime;
 public class SlabOffShelfRecord {
   @TableId(type = IdType.AUTO)
   private Long id;
+  private String businessClientCode = "admin";
+  public String getBusinessClientCode() { return businessClientCode; }
+  public void setBusinessClientCode(String value) { businessClientCode=value; }
   private Long slabId;
   private String standardReason;
   private String detailReason;

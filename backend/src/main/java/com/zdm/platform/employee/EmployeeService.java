@@ -39,12 +39,18 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         .usingGeneratedKeyColumns("id");
   }
 
-  public List<Employee> listForCurrentAdmin() {
+  public List<Employee> listForCurrentAdmin() { return listForCurrentAdmin(null); }
+
+  public List<Employee> listForCurrentAdmin(String clientCode) {
     CurrentIdentity identity = requireSupportedOrganizationScope();
+    String client = com.zdm.platform.security.ManagedClientScope.resolve(identity,clientCode);
+    permissionGuard.requirePermission(permissionPrefix(client) + ".view");
     if (identity.storeId() == null) {
-      return lambdaQuery().isNull(Employee::getTenantId).isNull(Employee::getStoreId).list();
+      return lambdaQuery().eq(Employee::getClientCode, com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode)).isNull(Employee::getTenantId).isNull(Employee::getStoreId).list();
     }
+    com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode);
     return lambdaQuery()
+        .eq(Employee::getClientCode, identity.clientCode())
         .eq(Employee::getTenantId, identity.tenantId())
         .eq(Employee::getStoreId, identity.storeId())
         .list();
@@ -52,10 +58,19 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
 
   @Transactional
   public Employee createEmployee(Employee employee) {
+    permissionGuard.requirePermission(permissionPrefix(employee.getClientCode()) + ".create");
     authorizeCreate(employee);
     applyCurrentOrganizationScope(employee);
     Long accountId = findOrCreateAccount(employee.getPhone(), employee.getName());
     employee.setAccountId(accountId);
+    if (lambdaQuery().eq(Employee::getAccountId, accountId)
+        .eq(Employee::getClientCode, employee.getClientCode())
+        .eq(employee.getTenantId() != null, Employee::getTenantId, employee.getTenantId())
+        .isNull(employee.getTenantId() == null, Employee::getTenantId)
+        .eq(employee.getStoreId() != null, Employee::getStoreId, employee.getStoreId())
+        .isNull(employee.getStoreId() == null, Employee::getStoreId).count() > 0) {
+      throw new IllegalArgumentException("该账号已是当前业务端和组织的员工");
+    }
     employee.setCreatedByName(currentEmployeeName());
     employee.setCreatedByAccountId(identityProvider.require().accountId());
     validateBeforeEnabled(employee);
@@ -77,6 +92,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (payload.getStoreId() != null && !Objects.equals(payload.getStoreId(), existing.getStoreId())) {
       throw new AccessDeniedException("不能将员工转移到其他门店");
     }
+    payload.setClientCode(existing.getClientCode());
     payload.setId(id);
     payload.setAccountId(existing.getAccountId());
     if (!StringUtils.hasText(payload.getPhone())) {
@@ -110,7 +126,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (Objects.equals(existing.getId(), identity.employeeId())) {
       throw new AccessDeniedException("不能修改当前登录员工的角色");
     }
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
+    permissionGuard.requirePermission(permissionPrefix(existing.getClientCode()) + ".permission");
 
     existing.setRoleIds(request.roleIds());
     existing.setDataPermission(request.dataPermission());
@@ -126,6 +142,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (existing == null) {
       return false;
     }
+    permissionGuard.requirePermission(permissionPrefix(existing.getClientCode()) + ".delete");
     requireDeletableEmployee(existing);
     removeAdminRoles(existing);
     jdbcTemplate.update(
@@ -133,11 +150,12 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         UPDATE account_identities
         SET status = 'disabled'
         WHERE account_id = ?
-          AND client_code = 'admin'
+          AND client_code = ?
           AND identity_type = 'employee'
           AND subject_id = ?
         """,
         existing.getAccountId(),
+        existing.getClientCode(),
         existing.getId());
     return removeById(id);
   }
@@ -191,31 +209,33 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (employee.getTenantId() != null && !Objects.equals(employee.getTenantId(), identity.tenantId())) {
       throw new AccessDeniedException("不能为其他租户创建员工");
     }
+    employee.setClientCode(com.zdm.platform.security.ManagedClientScope.resolve(identity, employee.getClientCode()));
     employee.setTenantId(identity.tenantId());
     employee.setStoreId(identity.storeId());
   }
 
   private void validateBeforeEnabled(Employee employee) {
-    if (!"enabled".equals(employee.getStatus())) {
-      return;
-    }
-    if (!StringUtils.hasText(employee.getRoleIds())) {
+    boolean enabled = "enabled".equals(employee.getStatus());
+    if (enabled && !StringUtils.hasText(employee.getRoleIds())) {
       throw new IllegalArgumentException("请先为员工配置角色后再启用");
     }
-    if (!StringUtils.hasText(employee.getDataPermission())) {
+    if (enabled && !StringUtils.hasText(employee.getDataPermission())) {
       throw new IllegalArgumentException("请先为员工配置数据权限后再启用");
     }
+    if (!StringUtils.hasText(employee.getRoleIds())) { return; }
     for (Long roleId : parseRoleIds(employee.getRoleIds())) {
       Integer roleCount = jdbcTemplate.queryForObject(
           """
           SELECT COUNT(*)
           FROM roles
           WHERE id = ?
+            AND client_code = ?
             AND tenant_id <=> ?
             AND store_id <=> ?
           """,
           Integer.class,
           roleId,
+          employee.getClientCode(),
           employee.getTenantId(),
           employee.getStoreId());
       if (roleCount == null || roleCount == 0) {
@@ -258,13 +278,14 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         """
         INSERT INTO account_identities
           (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status)
-        VALUES (?, 'admin', 'employee', ?, ?, ?, ?)
+        VALUES (?, ?, 'employee', ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           tenant_id = VALUES(tenant_id),
           store_id = VALUES(store_id),
           status = VALUES(status)
         """,
         employee.getAccountId(),
+        employee.getClientCode(),
         employee.getId(),
         employee.getTenantId(),
         employee.getStoreId(),
@@ -280,10 +301,11 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
       jdbcTemplate.update(
           """
           INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id)
-          VALUES (?, ?, 'admin', ?, ?)
+          VALUES (?, ?, ?, ?, ?)
           """,
           employee.getAccountId(),
           roleId,
+          employee.getClientCode(),
           employee.getTenantId(),
           employee.getStoreId());
     }
@@ -297,11 +319,12 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         """
         DELETE FROM account_roles
         WHERE account_id = ?
-          AND client_code = 'admin'
+          AND client_code = ?
           AND tenant_id <=> ?
           AND store_id <=> ?
         """,
         employee.getAccountId(),
+        employee.getClientCode(),
         employee.getTenantId(),
         employee.getStoreId());
   }
@@ -320,13 +343,16 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         .toList();
   }
 
+  public static String permissionPrefix(String client) {
+    return PERMISSION_PREFIX + ("supply-chain".equals(client)?".supply-chain":"");
+  }
   private void authorizeCreate(Employee employee) {
     if (StringUtils.hasText(employee.getRoleIds())
         || StringUtils.hasText(employee.getDataPermission())) {
-      permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
+      permissionGuard.requirePermission(permissionPrefix(employee.getClientCode()) + ".permission");
     }
     if ("enabled".equals(employee.getStatus())) {
-      permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+      permissionGuard.requirePermission(permissionPrefix(employee.getClientCode()) + ".toggle-status");
     }
   }
 
@@ -342,13 +368,13 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     boolean statusChanged = !Objects.equals(existing.getStatus(), payload.getStatus());
 
     if (profileChanged || (!permissionChanged && !statusChanged)) {
-      permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
+      permissionGuard.requirePermission(permissionPrefix(existing.getClientCode()) + ".edit");
     }
     if (permissionChanged) {
-      permissionGuard.requirePermission(PERMISSION_PREFIX + ".permission");
+      permissionGuard.requirePermission(permissionPrefix(existing.getClientCode()) + ".permission");
     }
     if (statusChanged) {
-      permissionGuard.requirePermission(PERMISSION_PREFIX + ".toggle-status");
+      permissionGuard.requirePermission(permissionPrefix(existing.getClientCode()) + ".toggle-status");
     }
   }
 
@@ -376,6 +402,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
 
   private CurrentIdentity requireEmployeeOrganizationScope(Employee employee) {
     CurrentIdentity identity = requireSupportedOrganizationScope();
+    com.zdm.platform.security.ManagedClientScope.resolve(identity, employee.getClientCode());
     com.zdm.platform.security.DataScope.requireAccess(identity, employee.getCreatedByAccountId());
     if (!Objects.equals(employee.getTenantId(), identity.tenantId())
         || !Objects.equals(employee.getStoreId(), identity.storeId())) {

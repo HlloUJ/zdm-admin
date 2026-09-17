@@ -1,6 +1,7 @@
 import { request } from './http';
 
 export interface EmployeeRecord {
+  clientCode?: 'admin' | 'supply-chain';
   id: number;
   tenantId?: number;
   storeId?: number;
@@ -18,6 +19,7 @@ export interface EmployeeRecord {
 }
 
 export interface EmployeePayload {
+  clientCode?: 'admin' | 'supply-chain';
   tenantId?: number;
   storeId?: number;
   name: string;
@@ -34,8 +36,8 @@ export interface EmployeePermissionPayload {
   dataPermission: 'self' | 'all';
 }
 
-export function listEmployees() {
-  return request<EmployeeRecord[]>('/admin/employees');
+export function listEmployees(clientCode?: string) {
+  return request<EmployeeRecord[]>(`/admin/employees${clientCode ? `?clientCode=${clientCode}` : ''}`);
 }
 
 export function createEmployee(payload: EmployeePayload) {

@@ -7,6 +7,7 @@ public record LoginResponse(String token, LoginUser user) {
       Long id,
       Long identityId,
       String identityType,
+      String clientCode,
       String name,
       String phone,
       List<String> roles,

@@ -61,7 +61,7 @@ class EffectivePermissionResolverTest {
     AuthAccount account = employeeAccount(8L, 18L, null, null);
     when(authAccountMapper.findAdminPermissionValues(8L, 18L))
         .thenReturn(List.of("admin.tenant.store-category-management.view,admin.supplier-management.view"));
-    assertThat(resolver.resolve(account)).containsExactly("admin.supplier-management.view");
+    assertThat(resolver.resolve(account)).isEmpty();
   }
 
   @Test

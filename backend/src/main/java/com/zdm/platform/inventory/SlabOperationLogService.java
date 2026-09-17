@@ -182,9 +182,12 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       String batchNo,
       Map<String, ?> changes) {
     boolean externalOperation = EXTERNAL_API_SOURCE.equals(operationSource);
-    CurrentIdentity identity = externalOperation ? null : identityProvider.require();
+    CurrentIdentity identity = identityProvider.require();
     LocalDateTime now = LocalDateTime.now();
     SlabOperationLog log = new SlabOperationLog();
+    log.setBusinessClientCode(identity == null ? "admin" : identity.clientCode());
+    log.setOperatorClientCode(identity == null ? null : identity.clientCode());
+    log.setOperatorIdentityId(identity == null ? null : identity.identityId());
     log.setProductCreatedByAccountId(slab.getCreatedByAccountId());
     log.setSlabId(slab.getId());
     log.setSlabSerialNo(slab.getSerialNo() == null ? "" : slab.getSerialNo());
@@ -196,7 +199,11 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     log.setAfterStatus(afterStatus);
     log.setStandardReason(standardReason);
     log.setDetailReason(detailReason);
-    log.setChangeDetails(serializeChanges(changes));
+    Map<String,Object> visibleChanges = new LinkedHashMap<>(changes);
+    if (identity != null && "supply-chain".equals(identity.clientCode())) {
+      visibleChanges.keySet().removeIf(key -> key.contains("指导价") || key.contains("价格") || key.endsWith("来源配置ID") || key.contains("加价"));
+    }
+    log.setChangeDetails(serializeChanges(visibleChanges));
     log.setOperationSource(operationSource);
     log.setBatchNo(batchNo);
     log.setOperatorName(externalOperation ? "外部系统" : identity.displayName());
@@ -227,6 +234,8 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       LocalDate endDate,
       List<Object> parameters) {
     List<String> conditions = new ArrayList<>();
+    conditions.add("business_client_code=?");
+    parameters.add(identityProvider.require().clientCode());
     if (!com.zdm.platform.security.DataScope.isAll(identityProvider.require())) {
       conditions.add("product_created_by_account_id = ?");
       parameters.add(identityProvider.require().accountId());

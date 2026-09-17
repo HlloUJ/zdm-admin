@@ -35,7 +35,7 @@ public class FinishedProductOptionsController {
 
   @GetMapping("/form-options")
   public ApiResponse<Options> options() {
-    guard.requireView("admin.finished-stock-management");
+    guard.requireView(("supply-chain".equals(guard.identity().clientCode())?"supply-chain.":"admin.")+"finished-stock-management");
     guard.requireDataPermission();
     return ApiResponse.ok(new Options(catalog.finishedCategories(), catalog.finishedAttributes(), suppliers.suppliers()));
   }

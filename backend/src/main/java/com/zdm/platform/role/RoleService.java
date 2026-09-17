@@ -24,8 +24,8 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   private static final String EMPLOYEE_ASSIGN_PERMISSION =
       "admin.permission-management.employee-management.permission";
 
-  private record AffectedEmployee(Long id, Long accountId, Long tenantId, Long storeId) {}
-  private record RoleScope(Long tenantId, Long storeId, String audience) {}
+  private record AffectedEmployee(Long id, Long accountId, Long tenantId, Long storeId, String clientCode) {}
+  private record RoleScope(Long tenantId, Long storeId, String audience, String clientCode) {}
 
   private final JdbcTemplate jdbcTemplate;
   private final CurrentIdentityProvider identityProvider;
@@ -40,15 +40,17 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     this.permissionGuard = permissionGuard;
   }
 
-  public List<Role> listForCurrentAdmin() {
-    RoleScope scope = requireCurrentScope();
-    boolean canAssignEmployeeRole = permissionGuard.hasPermission(EMPLOYEE_ASSIGN_PERMISSION);
-    boolean canViewRolePage = permissionGuard.hasView(ROLE_PERMISSION_PREFIX);
+  public List<Role> listForCurrentAdmin() { return listForCurrentAdmin(null); }
+
+  public List<Role> listForCurrentAdmin(String clientCode) {
+    RoleScope scope = requireCurrentScope(clientCode);
+    boolean canAssignEmployeeRole = permissionGuard.hasPermission(managedPrefix("admin.permission-management.employee-management", scope.clientCode()) + ".permission");
+    boolean canViewRolePage = permissionGuard.hasPermission(managedPrefix(ROLE_PERMISSION_PREFIX, scope.clientCode()) + ".view");
     if (!identityProvider.require().isSuperAdmin() && !canAssignEmployeeRole && !canViewRolePage) {
       throw new AccessDeniedException("无权访问当前组织角色数据");
     }
 
-    var query = lambdaQuery();
+    var query = lambdaQuery().eq(Role::getClientCode, scope.clientCode());
     if (scope.storeId() == null) {
       query.isNull(Role::getTenantId).isNull(Role::getStoreId);
     } else {
@@ -61,10 +63,12 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
         .list();
   }
 
-  public RolePermissionScope permissionScopeForCurrentAdmin() {
-    RoleScope scope = requireCurrentScope();
-    boolean canAssignEmployeeRole = permissionGuard.hasPermission(EMPLOYEE_ASSIGN_PERMISSION);
-    boolean canManageRolePermission = permissionGuard.hasPermission(ROLE_PERMISSION_PREFIX + ".permission");
+  public RolePermissionScope permissionScopeForCurrentAdmin() { return permissionScopeForCurrentAdmin(null); }
+
+  public RolePermissionScope permissionScopeForCurrentAdmin(String clientCode) {
+    RoleScope scope = requireCurrentScope(clientCode);
+    boolean canAssignEmployeeRole = permissionGuard.hasPermission(managedPrefix("admin.permission-management.employee-management", scope.clientCode()) + ".permission");
+    boolean canManageRolePermission = permissionGuard.hasPermission(managedPrefix(ROLE_PERMISSION_PREFIX, scope.clientCode()) + ".permission");
     if (!identityProvider.require().isSuperAdmin() && !canAssignEmployeeRole && !canManageRolePermission) {
       throw new AccessDeniedException("无权读取当前组织可分配权限");
     }
@@ -73,8 +77,9 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
 
   @Transactional
   public boolean createRole(Role role) {
-    RoleScope scope = requireCurrentScope();
-    requireRoleAction("create");
+    RoleScope scope = requireCurrentScope(role.getClientCode());
+    requireRoleAction("create",scope.clientCode());
+    role.setClientCode(scope.clientCode());
     role.setId(null);
     role.setTenantId(scope.tenantId());
     role.setStoreId(scope.storeId());
@@ -99,6 +104,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     requireAccessibleRole(existing);
     authorizeUpdate(existing, payload);
 
+    payload.setClientCode(existing.getClientCode());
     payload.setId(id);
     payload.setCode(existing.getCode());
     payload.setTenantId(existing.getTenantId());
@@ -113,7 +119,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
       payload.setFunctionPermissions("all");
     } else {
       payload.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(payload.getFunctionPermissions()));
-      requireAllowedRolePermissions(payload, requireCurrentScope());
+      requireAllowedRolePermissions(payload, requireCurrentScope(existing.getClientCode()));
     }
     normalizeAndValidateRoleName(payload, id);
     return updateById(payload);
@@ -126,7 +132,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
       return false;
     }
     requireAccessibleRole(existing);
-    requireRoleAction("delete");
+    requireRoleAction("delete",existing.getClientCode());
     if (isSuperAdminRole(existing)) {
       throw new IllegalArgumentException("超级管理员角色不可删除");
     }
@@ -147,20 +153,23 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
         FunctionPermissionNormalizer.normalizeCsv(payload.getFunctionPermissions()));
 
     if (profileChanged || !permissionChanged) {
-      requireRoleAction("edit");
+      requireRoleAction("edit",existing.getClientCode());
     }
     if (permissionChanged) {
-      requireRoleAction("permission");
+      requireRoleAction("permission",existing.getClientCode());
     }
   }
 
-  private void requireRoleAction(String action) {
-    permissionGuard.requirePermission(ROLE_PERMISSION_PREFIX + "." + action);
+  private static String managedPrefix(String prefix, String client) {
+    return prefix + ("supply-chain".equals(client) ? ".supply-chain" : "");
+  }
+  private void requireRoleAction(String action, String client) {
+    permissionGuard.requirePermission(managedPrefix(ROLE_PERMISSION_PREFIX,client) + "." + action);
   }
 
   private void requireAccessibleRole(Role role) {
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), role.getCreatedByAccountId());
-    RoleScope scope = requireCurrentScope();
+    RoleScope scope = requireCurrentScope(role.getClientCode());
     if (!Objects.equals(role.getTenantId(), scope.tenantId())
         || !Objects.equals(role.getStoreId(), scope.storeId())) {
       throw new AccessDeniedException("当前组织无权操作该角色");
@@ -172,6 +181,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     role.setName(roleName);
     var duplicateQuery = lambdaQuery()
         .eq(Role::getName, roleName)
+        .eq(Role::getClientCode, role.getClientCode())
         .eq(role.getTenantId() != null, Role::getTenantId, role.getTenantId())
         .isNull(role.getTenantId() == null, Role::getTenantId)
         .eq(role.getStoreId() != null, Role::getStoreId, role.getStoreId())
@@ -184,10 +194,11 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     }
   }
 
-  private RoleScope requireCurrentScope() {
+  private RoleScope requireCurrentScope(String clientCode) {
     CurrentIdentity identity = identityProvider.require();
+    String client = com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode);
     if (identity.tenantId() == null && identity.storeId() == null) {
-      return new RoleScope(null, null, "admin");
+      return new RoleScope(null, null, client, client);
     }
     if (identity.tenantId() == null || identity.storeId() == null) {
       throw new AccessDeniedException("请先切换到具体门店身份");
@@ -198,16 +209,16 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
         identity.storeId(),
         identity.tenantId());
     if ("cityPartner".equals(storeType)) {
-      return new RoleScope(identity.tenantId(), identity.storeId(), "store");
+      return new RoleScope(identity.tenantId(), identity.storeId(), "store", client);
     }
     if ("slabSupplier".equals(storeType) || "finishedSupplier".equals(storeType)) {
-      return new RoleScope(identity.tenantId(), identity.storeId(), "supplier");
+      return new RoleScope(identity.tenantId(), identity.storeId(), "supplier", client);
     }
     throw new AccessDeniedException("当前用户端尚未开通角色维护");
   }
 
   private String availableFunctionPermissions(RoleScope scope) {
-    if (scope.storeId() == null) {
+    if (scope.storeId() == null && "admin".equals(scope.clientCode())) {
       return "all";
     }
     String value = jdbcTemplate.queryForObject(
@@ -227,7 +238,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     if (selected.stream().anyMatch(permission -> !FunctionAudiencePolicy.allows(permission, scope.audience()))) {
       throw new AccessDeniedException("角色权限不适用于当前用户端");
     }
-    if (scope.storeId() == null || selected.isEmpty()) {
+    if ((scope.storeId() == null && "admin".equals(scope.clientCode())) || selected.isEmpty()) {
       return;
     }
     Set<String> available = new HashSet<>(FunctionPermissionNormalizer.normalize(
@@ -240,7 +251,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   private void clearAffectedEmployeeRolesAndDisableIdentity(Long roleId) {
     List<AffectedEmployee> affectedEmployees = jdbcTemplate.query(
         """
-        SELECT DISTINCT e.id, e.account_id, e.tenant_id, e.store_id
+        SELECT DISTINCT e.id, e.account_id, e.tenant_id, e.store_id, e.client_code
         FROM employees e
         WHERE FIND_IN_SET(?, e.role_ids)
            OR EXISTS (
@@ -248,7 +259,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
              FROM account_roles ar
              WHERE ar.role_id = ?
                AND ar.account_id = e.account_id
-               AND ar.client_code = 'admin'
+               AND ar.client_code = e.client_code
                AND ar.tenant_id <=> e.tenant_id
                AND ar.store_id <=> e.store_id
            )
@@ -257,7 +268,7 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
             rs.getLong("id"),
             rs.getObject("account_id", Long.class),
             rs.getObject("tenant_id", Long.class),
-            rs.getObject("store_id", Long.class)),
+            rs.getObject("store_id", Long.class), rs.getString("client_code")),
         roleId,
         roleId);
 
@@ -273,21 +284,23 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
           UPDATE account_identities
           SET status = 'disabled'
           WHERE account_id = ?
-            AND client_code = 'admin'
+            AND client_code = ?
             AND identity_type = 'employee'
             AND subject_id = ?
           """,
           employee.accountId(),
+          employee.clientCode(),
           employee.id());
       jdbcTemplate.update(
           """
           DELETE FROM account_roles
           WHERE account_id = ?
-            AND client_code = 'admin'
+            AND client_code = ?
             AND tenant_id <=> ?
             AND store_id <=> ?
           """,
           employee.accountId(),
+          employee.clientCode(),
           employee.tenantId(),
           employee.storeId());
     }

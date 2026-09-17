@@ -13,7 +13,7 @@
           borderless
           :options="identityOptions"
           :loading="switchingIdentity"
-          aria-label="切换当前店铺"
+          aria-label="切换平台或组织"
           @change="handleIdentityChange"
         />
         <div v-else class="brand-subtitle">{{ currentIdentityLabel }}</div>
@@ -61,6 +61,7 @@ const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string>
 const formatStoreLabel = (storeName: string, storeType?: IdentityContext['storeType']) =>
   storeType ? `${storeName} · ${storeTypeLabels[storeType]}` : storeName;
 const currentIdentityLabel = computed(() => {
+  if (loginUser.value.clientCode === 'supply-chain') return '供应链协同系统';
   if (loginUser.value.storeName) return formatStoreLabel(loginUser.value.storeName, loginUser.value.storeType);
   return loginUser.value.tenantName ?? '运营管理平台';
 });
@@ -71,6 +72,8 @@ const roleText = computed(() => {
     : loginUser.value.roles.join('、') || '管理后台';
 });
 const identityLabel = (context: IdentityContext) => {
+  if (context.clientCode === 'supply-chain') return '供应链协同系统';
+  if (!context.tenantId && !context.storeId) return '运营管理平台';
   if (context.identityType === 'platform_admin') return '运营管理平台';
   if (context.storeName) {
     return formatStoreLabel(context.storeName, context.storeType);
@@ -80,7 +83,8 @@ const identityLabel = (context: IdentityContext) => {
 const switchableIdentityContexts = computed(() =>
   identityContexts.value.filter(
     (context) =>
-      context.identityType === 'platform_admin' ||
+      !context.tenantId ||
+      context.identityType === 'tenant_admin' ||
       Boolean(context.storeId) ||
       context.identityId === loginUser.value.identityId,
   ),

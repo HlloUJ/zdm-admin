@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { installAdminApiMocks } from './admin-api-mocks';
+import { installAdminApiMocks, setMockBusinessClient } from './admin-api-mocks';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -9,6 +9,7 @@ test.beforeEach(async ({ page }) => {
       'zdm-admin-user',
       JSON.stringify({
         id: 1,
+        clientCode: window.localStorage.getItem('zdm-e2e-client') ?? 'admin',
         name: '韩健',
         phone: '15926626945',
         roles: ['SUPER_ADMIN'],
@@ -62,6 +63,7 @@ test('uses the official TDesign pagination controls on routed list pages', async
   ];
 
   for (const route of routes) {
+    await setMockBusinessClient(page, route === '/supplier-management' ? 'supply-chain' : 'admin');
     await page.goto(route);
     const pagination = page.locator('.zdm-admin-pagination:visible .t-pagination');
     await expect(pagination).toBeVisible();
@@ -161,7 +163,7 @@ test('orders the requested management lists by creation time descending', async 
     },
     {
       path: '/employee-management',
-      endpoint: '**/api/admin/employees',
+      endpoint: /\/api\/admin\/employees(?:\?.*)?$/,
       newerName: '较新员工',
       records: [
         {
@@ -188,7 +190,7 @@ test('orders the requested management lists by creation time descending', async 
     },
     {
       path: '/role-management',
-      endpoint: '**/api/admin/roles',
+      endpoint: /\/api\/admin\/roles(?:\?.*)?$/,
       newerName: '较新角色',
       records: [
         {
@@ -337,6 +339,7 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
 });
 
 test('opens supplier create and edit dialogs', async ({ page }) => {
+  await setMockBusinessClient(page, 'supply-chain');
   await page.goto('/supplier-management');
   const main = page.getByRole('main');
 

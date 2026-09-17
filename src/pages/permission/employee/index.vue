@@ -15,6 +15,13 @@
           </div>
         </header>
 
+        <t-tabs
+          v-if="isInternalAdministration && managementTabs.length > 1"
+          v-model="managedClient"
+          :list="managementTabs"
+          @change="handleManagedClientChange"
+        />
+
         <section class="filter-card">
           <t-form :data="filterDraft" label-width="84px" colon>
             <div class="filter-row">
@@ -64,7 +71,12 @@
 
         <section class="table-card">
           <div v-if="canCreateEmployee" class="table-toolbar">
-            <t-button theme="primary" :loading="inviteCreating" @click="openInviteDialog">
+            <InternalEmployeeCreate
+              v-if="isInternalAdministration"
+              :client-code="managedClient"
+              @created="loadPermissionCenter"
+            />
+            <t-button v-else theme="primary" :loading="inviteCreating" @click="openInviteDialog">
               <template #icon><t-icon name="add" /></template>
               邀请员工
             </t-button>
@@ -255,6 +267,7 @@
 </template>
 
 <script setup lang="ts">
+import InternalEmployeeCreate from './InternalEmployeeCreate.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -320,21 +333,34 @@ interface EmployeeFilter {
 
 const operationRoles = ref<RoleRecord[]>([]);
 const loginUser = computed(() => getLoginUser());
-const canCreateEmployee = computed(() =>
-  hasPermission(loginUser.value, 'admin.permission-management.employee-management.create'),
+const managedClient = ref<'admin' | 'supply-chain'>('admin');
+const managementPermissionPrefix = computed(
+  () =>
+    `admin.permission-management.employee-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}`,
 );
-const canEditEmployee = computed(() =>
-  hasPermission(loginUser.value, 'admin.permission-management.employee-management.edit'),
+const managementTabs = computed(() =>
+  [
+    { label: '运营管理平台', value: 'admin', permission: 'admin.permission-management.employee-management.view' },
+    {
+      label: '供应链协同系统',
+      value: 'supply-chain',
+      permission: 'admin.permission-management.employee-management.supply-chain.view',
+    },
+  ].filter((tab) => hasPermission(loginUser.value, tab.permission)),
 );
+const isInternalAdministration = computed(
+  () => !loginUser.value.tenantId && !loginUser.value.storeId && loginUser.value.clientCode !== 'supply-chain',
+);
+
+const canCreateEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.create`));
+const canEditEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.edit`));
 const canConfigureEmployeePermission = computed(() =>
-  hasPermission(loginUser.value, 'admin.permission-management.employee-management.permission'),
+  hasPermission(loginUser.value, `${managementPermissionPrefix.value}.permission`),
 );
 const canToggleEmployeeStatus = computed(() =>
-  hasPermission(loginUser.value, 'admin.permission-management.employee-management.toggle-status'),
+  hasPermission(loginUser.value, `${managementPermissionPrefix.value}.toggle-status`),
 );
-const canDeleteEmployee = computed(() =>
-  hasPermission(loginUser.value, 'admin.permission-management.employee-management.delete'),
-);
+const canDeleteEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.delete`));
 const operationRoleOptions = computed(() =>
   operationRoles.value.map((role) => ({
     label: role.name,
@@ -527,7 +553,7 @@ const toEmployeePayload = (employee: EmployeeItem): EmployeePayload => ({
 const loadPermissionCenter = async () => {
   loading.value = true;
   try {
-    const [roles, records] = await Promise.all([listRoles(), listEmployees()]);
+    const [roles, records] = await Promise.all([listRoles(managedClient.value), listEmployees(managedClient.value)]);
     operationRoles.value = roles.filter((role) => role.status === 'enabled');
     employees.value = sortByCreatedAtDesc(records).map(toEmployeeItem);
   } catch (error) {
@@ -792,7 +818,19 @@ const handleConfirmSubmit = async () => {
   closeConfirmDialog();
 };
 
-onMounted(loadPermissionCenter);
+const handleManagedClientChange = () => {
+  employees.value = [];
+  operationRoles.value = [];
+  profileDialogVisible.value = false;
+  permissionDialogVisible.value = false;
+  handleReset();
+  void loadPermissionCenter();
+};
+onMounted(() => {
+  if (isInternalAdministration.value)
+    managedClient.value = managementTabs.value[0]?.value === 'supply-chain' ? 'supply-chain' : 'admin';
+  void loadPermissionCenter();
+});
 </script>
 
 <style scoped>

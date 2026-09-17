@@ -28,6 +28,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   private static final Set<String> ALLOWED_STATUSES =
       Set.of("warehouse", "selling", "offShelf", "soldOut", "recycle");
 
+  private final ProductLifecycleService lifecycle;
   private final FinishedProductPriceService priceService;
   private final FinishedProductGuidePriceService guidePriceService;
   private final FinishedProductVariantMapper variantMapper;
@@ -50,7 +51,8 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       MediaCleanupService mediaCleanupService,
       MediaReferenceService mediaReferenceService,
       CurrentIdentityProvider identityProvider,
-      FinishedOperationLogService operationLogs) {
+      FinishedOperationLogService operationLogs, ProductLifecycleService lifecycle) {
+    this.lifecycle = lifecycle;
     this.operationLogs = operationLogs;
     this.priceService = priceService;
     this.guidePriceService = guidePriceService;
@@ -91,6 +93,8 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
 
   public List<FinishedProduct> listWithDetails() {
     return lambdaQuery()
+        .ne(lifecycle.isSupplyChain(), FinishedProduct::getSourceStatus, "purged")
+        .eq(!lifecycle.isSupplyChain(), FinishedProduct::getOperationsDeleted, false)
         .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), FinishedProduct::getCreatedByAccountId, identityProvider.require().accountId())
         .orderByDesc(FinishedProduct::getCreatedAt)
         .orderByDesc(FinishedProduct::getId)
@@ -102,6 +106,12 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
 
   @Transactional
   public FinishedProduct createWithDetails(FinishedProduct product) {
+    lifecycle.requireSupplyChain();
+    boolean publishNow="selling".equals(product.getStatus()) && !"接口获取".equals(product.getPublisherType());
+    String publisher="接口获取".equals(product.getPublisherType())?"接口获取":PLATFORM_PUBLISHER;
+    product.setStatus("warehouse");
+    product.setSourceStatus("warehouse");
+    product.setOperationsDeleted(true);
     if (product.getSpecDimensions() == null && product.getVariants() != null
         && product.getVariants().stream().anyMatch(v -> "layered".equals(v.getDisplayMode()))) {
       throw new IllegalArgumentException("请提供分层规格属性及顺序");
@@ -110,7 +120,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     CurrentIdentity identity = identityProvider.require();
     product.setId(null);
     product.setOffShelfAt("offShelf".equals(product.getStatus()) ? LocalDateTime.now() : null);
-    product.setPublisherType(PLATFORM_PUBLISHER);
+    product.setPublisherType(publisher);
     product.setCreatedByName(identity.displayName());
     product.setCreatedByAccountId(identity.accountId());
     product.setCreatedAt(LocalDateTime.now());
@@ -120,6 +130,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       throw new IllegalArgumentException("商品编码已存在", exception);
     }
     replaceDetails(product);
+    if(publishNow) { lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,product.getId(),"selling"); }
     syncMediaReferences(product);
     FinishedProduct created = attachDetails(getById(product.getId()));
     operationLogs.record(created, null, operationLogs.snapshot(created));
@@ -128,7 +139,12 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
 
   @Transactional
   public FinishedProduct updateWithDetails(Long id, FinishedProduct product) {
-    FinishedProduct existing = getById(id);
+    lifecycle.requireSupplyChain();
+    lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
+    FinishedProduct existing = attachDetails(getById(id));
+    if (existing != null && !List.of("warehouse","selling").contains(existing.getSourceStatus())) {
+      throw new IllegalArgumentException("只有供应链仓库中或已上架的商品可以编辑");
+    }
     if (existing == null) {
       throw new IllegalArgumentException("成品现货不存在或已被删除");
     }
@@ -139,9 +155,20 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (product.getSpecDimensions() == null) {
       product.setSpecDimensions(existing.getSpecDimensions());
     }
+    String requestedStatus=product.getStatus();
+    product.setStatus(existing.getStatus());
+    product.setSourceStatus(existing.getSourceStatus());
+    product.setOperationsDeleted(existing.getOperationsDeleted());
+    product.setSourceOffShelfReason(existing.getSourceOffShelfReason());
+    product.setSourceOffShelfDetail(existing.getSourceOffShelfDetail());
+    product.setSourceOffShelfAt(existing.getSourceOffShelfAt());
+    boolean costChanged = !sourceCosts(existing).equals(sourceCosts(product));
     validateAndNormalize(product);
+    product.setGuidePrice(existing.getGuidePrice());
+    product.setOffShelfReason(existing.getOffShelfReason());
+    product.setOffShelfDetail(existing.getOffShelfDetail());
     product.setId(id);
-    product.setPublisherType(PLATFORM_PUBLISHER);
+    product.setPublisherType(existing.getPublisherType());
     product.setCreatedByName(existing.getCreatedByName());
     product.setCreatedByAccountId(existing.getCreatedByAccountId());
     product.setCreatedAt(existing.getCreatedAt());
@@ -153,31 +180,61 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       throw new IllegalArgumentException("商品编码已存在", exception);
     }
     replaceDetails(product);
+    if (costChanged) { lifecycle.reprice(ProductLifecycleService.Kind.FINISHED, id, true); }
     syncMediaReferences(product);
     FinishedProduct updated = attachDetails(getById(id));
     operationLogs.record(updated, before, operationLogs.snapshot(updated));
+    if(lifecycle.isSupplyChain() && !requestedStatus.equals(existing.getSourceStatus())) {
+      lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,id,requestedStatus);
+      updated=attachDetails(getById(id));
+    }
     return updated;
   }
 
   @Transactional
   public FinishedProduct updateOperationWithDetails(Long id, FinishedProduct request, boolean priceOnly) {
-    FinishedProduct existing = getById(id);
-    if (existing == null) {
-      throw new IllegalArgumentException("成品现货不存在或已被删除");
-    }
-    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), existing.getCreatedByAccountId());
-    FinishedProduct product = new FinishedProduct();
-    org.springframework.beans.BeanUtils.copyProperties(attachDetails(existing), product);
+    lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
+    FinishedProduct existing = attachDetails(getById(id));
+    if (existing == null) { throw new IllegalArgumentException("运营商品不存在"); }
+    lifecycle.requireOperational(existing.getSourceStatus(), existing.getOperationsDeleted());
+    Map<String,Object> before = operationLogs.snapshot(existing);
     if (priceOnly) {
-      product.setGuidePrice(request.getGuidePrice());
-      product.setGuidePrices(request.getGuidePrices());
-      product.setMarkupPrices(request.getMarkupPrices());
+      Map<String,java.math.BigDecimal> costs = sourceCosts(existing);
+      if (request.getGuidePrices() == null || request.getMarkupPrices() == null) { throw new IllegalArgumentException("请完善价格"); }
+      request.getGuidePrices().forEach(price -> requireSourceCost(costs.get(price.getVariantKey()), price.getCostPrice()));
+      request.getMarkupPrices().forEach(price -> requireSourceCost(costs.get(price.getVariantKey()), price.getCostPrice()));
+      existing.setGuidePrices(request.getGuidePrices());
+      existing.setMarkupPrices(request.getMarkupPrices());
+      validatePrices(existing);
+      priceService.replacePrices(id, existing.getMarkupPrices());
+      guidePriceService.replacePrices(id, existing.getGuidePrices());
+      lambdaUpdate().eq(FinishedProduct::getId,id).set(FinishedProduct::getGuidePrice,existing.getGuidePrice()).update();
     } else {
-      product.setStatus(request.getStatus());
-      product.setOffShelfReason("offShelf".equals(request.getStatus()) ? request.getOffShelfReason() : null);
-      product.setOffShelfDetail("offShelf".equals(request.getStatus()) ? request.getOffShelfDetail() : null);
+      existing.setStatus(request.getStatus());
+      existing.setOffShelfReason("offShelf".equals(request.getStatus()) ? request.getOffShelfReason() : null);
+      existing.setOffShelfDetail("offShelf".equals(request.getStatus()) ? request.getOffShelfDetail() : null);
+      if ("offShelf".equals(request.getStatus())) { existing.setOffShelfAt(LocalDateTime.now()); }
+      updateById(existing);
     }
-    return updateWithDetails(id, product);
+    FinishedProduct updated = attachDetails(getById(id));
+    operationLogs.record(updated, before, operationLogs.snapshot(updated));
+    return updated;
+  }
+
+  private Map<String,java.math.BigDecimal> sourceCosts(FinishedProduct product) {
+    Map<String,java.math.BigDecimal> costs = new LinkedHashMap<>();
+    if (product.getVariants() != null) { product.getVariants().forEach(v -> costs.put(v.getVariantKey(), v.getCostPrice()==null?null:v.getCostPrice().setScale(2,java.math.RoundingMode.HALF_UP))); }
+    return costs;
+  }
+  private void requireSourceCost(java.math.BigDecimal cost, java.math.BigDecimal requested) {
+    if (cost == null || requested == null || cost.compareTo(requested) != 0) {
+      throw new org.springframework.security.access.AccessDeniedException("运营端不能修改来源商品成本价");
+    }
+  }
+  @Transactional
+  public FinishedProduct sourceTransition(Long id, String target, String reason, String detail) {
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,id,target,reason,detail);
+    return attachDetails(getById(id));
   }
 
   public boolean cleanupTemporaryMedia(Long mediaId) {
@@ -189,15 +246,15 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   @Override
   @Transactional
   public boolean removeById(Serializable id) {
-    FinishedProduct existing = getById(id);
-    if (existing != null) {
-      operationLogs.record(existing, operationLogs.snapshot(attachDetails(existing)), null);
+    Long productId = Long.valueOf(id.toString());
+    boolean release = lifecycle.isSupplyChain()
+        ? lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,productId,"purged")
+        : lifecycle.purgeOperations(ProductLifecycleService.Kind.FINISHED,productId);
+    if (release) {
+      super.removeById(id);
+      mediaReferenceService.removeBusiness(MEDIA_DOMAIN,productId,"两端商品均已彻底删除");
     }
-    boolean removed = super.removeById(id);
-    if (removed && existing != null) {
-      mediaReferenceService.removeBusiness(MEDIA_DOMAIN, existing.getId(), "成品现货被彻底删除");
-    }
-    return removed;
+    return true;
   }
 
   private void validateAndNormalize(FinishedProduct product) {
@@ -219,7 +276,10 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     validateAttributes(product.getAttributes());
     normalizeVariants(product);
     FinishedSpecValidator.validate(product);
-    validatePrices(product);
+    if (lifecycle.isSupplyChain()) {
+      product.setSourceStatus(product.getTotalStock() == 0 ? "soldOut" : product.getSourceStatus());
+      if (product.getTotalStock() == 0 && !"recycle".equals(product.getStatus())) { product.setStatus("soldOut"); }
+    } else { validatePrices(product); }
   }
 
   private void validateCategory(Long categoryId) {
@@ -315,6 +375,9 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       if (!keys.add(key)) {
         throw new IllegalArgumentException("规格商家编码不能重复");
       }
+      if (lifecycle.isSupplyChain() && (variant.getCostPrice() != null && variant.getCostPrice().signum() < 0)) {
+        throw new IllegalArgumentException("请完善每个规格的成本价");
+      }
       variant.setVariantKey(key);
       variant.setVariantLabel(label);
       variant.setDisplayMode("layered".equals(variant.getDisplayMode()) ? "layered" : "single");
@@ -362,8 +425,10 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       });
     }
 
-    priceService.replacePrices(productId, product.getMarkupPrices());
-    guidePriceService.replacePrices(productId, product.getGuidePrices());
+    if (!lifecycle.isSupplyChain()) {
+      priceService.replacePrices(productId, product.getMarkupPrices());
+      guidePriceService.replacePrices(productId, product.getGuidePrices());
+    }
   }
 
   private void syncMediaReferences(FinishedProduct product) {

@@ -42,13 +42,13 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     values.put("商家编码", product.getSku());
     values.put("供应商", name("suppliers", product.getSupplierId()));
     values.put("总库存", product.getTotalStock());
-    values.put("状态", product.getStatus());
+    values.put("状态", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceStatus() : product.getStatus());
     values.put("发布类型", product.getPublisherType());
     values.put("创建人", product.getCreatedByName());
     values.put("创建时间", product.getCreatedAt());
-    values.put("下架原因", product.getOffShelfReason());
-    values.put("详细说明", product.getOffShelfDetail());
-    values.put("下架时间", product.getOffShelfAt());
+    values.put("下架原因", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfReason() : product.getOffShelfReason());
+    values.put("详细说明", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
+    values.put("下架时间", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfAt() : product.getOffShelfAt());
     values.put("规格维度", product.getSpecDimensions());
     values.put("销售规格", cleanRows(product.getVariants()));
     values.put("销售属性名称", salesAttributeNames(json.valueToTree(product.getVariants())));
@@ -61,6 +61,9 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       media.add(Map.of("field", row.getString(1), "mediaId", row.getLong(2)));
     }, product.getId());
     values.put("媒体", media);
+    if ("supply-chain".equals(identities.require().clientCode())) {
+      values.remove("指导价"); values.remove("层级价格");
+    }
     return values;
   }
 
@@ -157,6 +160,9 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     var identity = identities.require();
     FinishedOperationLog log = new FinishedOperationLog();
     log.setProductCreatedByAccountId(product.getCreatedByAccountId());
+    log.setBusinessClientCode(identity.clientCode());
+    log.setOperatorClientCode(identity.clientCode());
+    log.setOperatorIdentityId(identity.identityId());
     log.setProductId(product.getId());
     log.setProductName(product.getName());
     log.setMerchantCode(product.getSku());
@@ -165,8 +171,8 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     log.setOperationSummary(labels.get(type));
     log.setBeforeStatus(previousStatus);
     log.setAfterStatus(nextStatus);
-    log.setStandardReason(product.getOffShelfReason());
-    log.setDetailReason(product.getOffShelfDetail());
+    log.setStandardReason("supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfReason() : product.getOffShelfReason());
+    log.setDetailReason("supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
     log.setOperationSource("MANUAL");
     log.setOperatorName(identity.displayName());
     log.setOperatorAccountId(identity.accountId());
@@ -259,6 +265,8 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     int size = Math.clamp(requestedSize, 1, 100);
     List<String> conditions = new ArrayList<>();
     List<Object> args = new ArrayList<>();
+    conditions.add("business_client_code=?");
+    args.add(identities.require().clientCode());
     if (!com.zdm.platform.security.DataScope.isAll(identities.require())) {
       conditions.add("product_created_by_account_id = ?");
       args.add(identities.require().accountId());
@@ -282,7 +290,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
 
   public FinishedOperationLog detail(Long id) {
     FinishedOperationLog log = getById(id);
-    if (log == null) { throw new IllegalArgumentException("操作日志不存在"); }
+    if (log == null || !identities.require().clientCode().equals(log.getBusinessClientCode())) { throw new IllegalArgumentException("操作日志不存在"); }
     com.zdm.platform.security.DataScope.requireAccess(identities.require(), log.getProductCreatedByAccountId());
     try {
       ObjectNode changes = (ObjectNode) json.readTree(log.getChangeDetails());

@@ -10,6 +10,7 @@ export interface LoginPayload {
 }
 
 export interface LoginUser {
+  clientCode?: 'admin' | 'supply-chain';
   id: number;
   identityId?: number;
   identityType?: 'platform_admin' | 'tenant_admin' | 'store_admin' | 'employee';
@@ -29,6 +30,7 @@ export interface LoginUser {
 
 export interface IdentityContext {
   identityId: number;
+  clientCode?: 'admin' | 'supply-chain';
   identityType: 'platform_admin' | 'tenant_admin' | 'store_admin' | 'employee';
   tenantId?: number;
   storeId?: number;
@@ -82,6 +84,7 @@ function readLoginUser() {
     return {
       id: Number(user.id ?? 0),
       identityId: user.identityId,
+      clientCode: user.clientCode,
       identityType: user.identityType,
       name: user.name,
       phone: user.phone ?? '',

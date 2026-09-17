@@ -104,14 +104,14 @@ describe('super administrator identity', () => {
   it('keeps all function permissions separate from super administrator status', () => {
     const user = { ...createUser(['all']), dataPermission: 'self' as const };
     expect(isSuperAdmin(user)).toBe(false);
-    expect(hasPermission(user, 'admin.supplier-management.edit')).toBe(true);
-    expect(hasMenuPermission(user, 'admin.supplier-management')).toBe(true);
+    expect(hasPermission(user, 'admin.supplier-supply-type-management.edit')).toBe(true);
+    expect(hasMenuPermission(user, 'admin.supplier-supply-type-management')).toBe(true);
   });
 
   it('recognizes a real super administrator without separately assigned functions', () => {
     const user = { ...createUser([]), roles: ['SUPER_ADMIN'] };
     expect(isSuperAdmin(user)).toBe(true);
-    expect(hasPermission(user, 'admin.supplier-management.edit')).toBe(true);
+    expect(hasPermission(user, 'admin.supplier-supply-type-management.edit')).toBe(true);
   });
 });
 

@@ -20,7 +20,7 @@
               label="系数"
               placeholder="系数"
               :submitted="submitted"
-              :disabled="readonly"
+              :disabled="readonly || index === 0"
               @change="updateCoefficient(row, row.rows[index], false)"
               @commit="markManual(row.rows[index])"
             />
@@ -29,7 +29,7 @@
               label="价格"
               placeholder="价格"
               :submitted="submitted"
-              :disabled="readonly"
+              :disabled="readonly || index === 0"
               @change="updatePrice(row, row.rows[index], index)"
               @commit="markManual(row.rows[index])"
             />

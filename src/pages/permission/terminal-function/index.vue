@@ -206,6 +206,7 @@ const loading = ref(false);
 const savedAllocationValues = reactive<Record<TerminalType, string[]>>({
   store: [...initialAllocationValues.store],
   supplier: [...initialAllocationValues.supplier],
+  'supply-chain': [...initialAllocationValues['supply-chain']],
 });
 const terminalPolicies = reactive<Partial<Record<TerminalType, TerminalFunctionPolicyRecord>>>({});
 
@@ -297,7 +298,7 @@ const loadAllocation = async () => {
   loading.value = true;
   try {
     const policies = await listTerminalFunctionPolicies();
-    (['store', 'supplier'] as TerminalType[]).forEach((terminal) => {
+    (['store', 'supplier', 'supply-chain'] as TerminalType[]).forEach((terminal) => {
       const policy = policies.find((item) => item.terminal === terminal);
       if (policy) {
         terminalPolicies[terminal] = policy;
