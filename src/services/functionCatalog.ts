@@ -838,7 +838,7 @@ const supplyTypeModule: FunctionModule = {
           value: 'admin.supplier-supply-type-management',
           tabs: [],
           actions: [
-            ['create', '新增供货类型'],
+            ['create', '新增'],
             ['edit', '编辑'],
             ['toggle-status', '停用/启用'],
             ['delete', '删除'],

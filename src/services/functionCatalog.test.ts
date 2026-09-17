@@ -99,7 +99,7 @@ describe('full function catalog', () => {
     expect(menu).toMatchObject({ direct: true });
     expect(menu?.pages[0]?.actions.map((action) => [action.label, action.value])).toEqual([
       ['查看', 'admin.supplier-supply-type-management.view'],
-      ['新增供货类型', 'admin.supplier-supply-type-management.create'],
+      ['新增', 'admin.supplier-supply-type-management.create'],
       ['编辑', 'admin.supplier-supply-type-management.edit'],
       ['停用/启用', 'admin.supplier-supply-type-management.toggle-status'],
       ['删除', 'admin.supplier-supply-type-management.delete'],
@@ -354,6 +354,24 @@ describe('finished stock catalog contract', () => {
           value.startsWith('admin.finished-stock-management.'),
         ),
       ).toEqual([]);
+    }
+  });
+});
+
+describe('supplier supply type catalog', () => {
+  it('registers exactly the page actions and excludes business terminals', () => {
+    const module = fullFunctionCatalog.find((item) => item.value === 'admin.supplier-supply-type-management');
+    expect(module?.menus[0].direct).toBe(true);
+    expect(module?.menus[0].pages[0].tabs).toEqual([]);
+    expect(module?.menus[0].pages[0].actions).toEqual([
+      { label: '查看', value: 'admin.supplier-supply-type-management.view' },
+      { label: '新增', value: 'admin.supplier-supply-type-management.create' },
+      { label: '编辑', value: 'admin.supplier-supply-type-management.edit' },
+      { label: '停用/启用', value: 'admin.supplier-supply-type-management.toggle-status' },
+      { label: '删除', value: 'admin.supplier-supply-type-management.delete' },
+    ]);
+    for (const tree of Object.values(terminalFunctionTrees)) {
+      expect(tree.some((item) => item.value === module?.value)).toBe(false);
     }
   });
 });

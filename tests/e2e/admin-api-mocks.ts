@@ -560,6 +560,18 @@ const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
   2: [],
 };
 
+export async function setMockBusinessClient(page: Page, clientCode: 'admin' | 'supply-chain') {
+  if (page.url() === 'about:blank') await page.goto('/login');
+  await page.evaluate((client) => {
+    localStorage.setItem('zdm-e2e-client', client);
+    const user = JSON.parse(localStorage.getItem('zdm-admin-user') ?? '{}');
+    delete user.tenantId;
+    delete user.storeId;
+    delete user.storeType;
+    localStorage.setItem('zdm-admin-user', JSON.stringify({ ...user, clientCode: client }));
+  }, clientCode);
+}
+
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
   await page.route('**/api/admin/auth/contexts', async (route) => {
@@ -670,7 +682,11 @@ export async function installAdminApiMocks(page: Page) {
   });
   await mockCollection(page, '**/api/admin/crafts', crafts);
   await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
-  await mockCollection(page, '**/api/admin/slabs', slabs);
+  await mockCollection(
+    page,
+    '**/api/admin/slabs',
+    slabs.map((slab) => ({ ...slab, sourceStatus: slab.status })),
+  );
   await mockCollection(page, '**/api/admin/slab-origins', slabOrigins);
   await mockCollection(page, '**/api/admin/slab-textures', slabTextures);
   await mockCollection(page, '**/api/admin/slab-colors', slabColors);

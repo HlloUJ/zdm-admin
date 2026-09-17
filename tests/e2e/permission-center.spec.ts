@@ -1048,7 +1048,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const supplierPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '供应商供货类型管理' });
   await expect(supplierPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
-    '新增供货类型',
+    '新增',
     '编辑',
     '停用/启用',
     '删除',
