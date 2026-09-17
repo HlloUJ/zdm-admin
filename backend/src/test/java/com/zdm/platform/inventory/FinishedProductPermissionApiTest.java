@@ -51,9 +51,10 @@ class FinishedProductPermissionApiTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
 
-  private void identity(String scope, String... actions) {
-    var user = new CurrentIdentity(1L, 1L, 1L, 1L, "admin", null, null, "权限测试", scope,
-        List.of("OPERATOR"), java.util.Arrays.stream(actions).map(action -> PREFIX + action).toList());
+  private void identity(String scope, String... actions) { identityFor("admin",scope,actions); }
+  private void identityFor(String client,String scope,String... actions) {
+    var user = new CurrentIdentity(1L, 1L, 1L, 1L, client, null, null, "权限测试", scope,
+        List.of("OPERATOR"), java.util.Arrays.stream(actions).map(action -> client+".finished-stock-management." + action).toList());
     SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
   }
   @AfterEach void clear() { SecurityContextHolder.clearContext(); }
@@ -100,13 +101,14 @@ class FinishedProductPermissionApiTest {
     jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id,created_by_account_id) VALUES (99001,'测试供应商','platform',0,1)");
     jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99001,2)");
     jdbc.update("UPDATE store_levels SET status='disabled'");
-    identity("all", "warehouse.view", "warehouse.publish");
+    jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    identityFor("supply-chain","all", "warehouse.view", "warehouse.publish", "warehouse.shelf");
     long image = upload("image/png", "test.png");
     long video = upload("video/webm", "test.webm");
     ObjectNode payload = (ObjectNode) json.readTree("""
         {"name":"原始商品","categoryId":99001,"supplierId":99001,"detail":"<p>原始详情</p>",
-         "sku":"permission-test","status":"warehouse","attributes":[],"markupPrices":[],
-         "variants":[{"variantKey":"one","variantLabel":"单规格","displayMode":"single","stock":5}],
+         "sku":"permission-test","status":"selling","attributes":[],"markupPrices":[],
+         "variants":[{"variantKey":"one","variantLabel":"单规格","displayMode":"single","stock":5,"costPrice":10}],
          "guidePrices":[{"variantKey":"one","priceCoefficient":2,"costPrice":10,"price":20}]}
         """);
     payload.put("mainImageMediaId", image).put("videoMediaId", video);
@@ -145,6 +147,93 @@ class FinishedProductPermissionApiTest {
         .file(new MockMultipartFile("file", name, type, "fixture-content".getBytes(java.nio.charset.StandardCharsets.UTF_8)))))
         .path("id").asLong();
   }
+  private void fullIdentity(String client) {
+    var user=new CurrentIdentity(1L,1L,1L,1L,client,null,null,"跨端测试","all",List.of("OPERATOR"),List.of("all"));
+    SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user,null,List.of()));
+  }
+  private ObjectNode sourceFixture(String publisher,String status) throws Exception {
+    jdbc.update("INSERT INTO product_categories (id,name,scope,created_by_account_id) VALUES (99010,'跨端测试分类','finished',1)");
+    jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id,created_by_account_id) VALUES (99010,'跨端测试供应商','platform',0,1)");
+    jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99010,2)");
+    jdbc.update("UPDATE store_levels SET status='disabled'");
+    jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    fullIdentity("supply-chain");
+    ObjectNode payload=(ObjectNode)json.readTree("""
+        {"name":"跨端商品","categoryId":99010,"supplierId":99010,"detail":"<p>待核对商品资料</p>",
+         "attributes":[],"variants":[{"variantKey":"one","variantLabel":"单规格","displayMode":"single","stock":5,"costPrice":10}]}
+        """);
+    payload.put("mainImageMediaId",upload("image/png","source.png")).put("videoMediaId",upload("video/webm","source.webm"));
+    payload.put("publisherType",publisher).put("status",status);
+    return (ObjectNode)data(mvc.perform(post("/api/admin/finished-products").contentType("application/json").content(json.writeValueAsBytes(payload))));
+  }
+  private ObjectNode sourceRecord(long id) throws Exception {
+    fullIdentity("supply-chain");
+    for(JsonNode row:data(mvc.perform(get("/api/admin/finished-products")))) if(row.path("id").asLong()==id) return (ObjectNode)row;
+    throw new AssertionError("来源商品不存在");
+  }
+  private JsonNode operationRecord(long id) throws Exception {
+    fullIdentity("admin");
+    for(JsonNode row:data(mvc.perform(get("/api/admin/finished-products")))) if(row.path("id").asLong()==id) return row;
+    return null;
+  }
+  private void sourceStatus(long id,String target) throws Exception {
+    ObjectNode row=sourceRecord(id);row.put("status",target).put("offShelfReason","库存异常");
+    data(mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))));
+  }
+  @Test void publicationGateAndIndependentLifecyclesSurviveDeletionAndRepublication() throws Exception {
+    long id=sourceFixture("平台发布","warehouse").path("id").asLong();
+    assertThat(operationRecord(id)).isNull();
+    sourceStatus(id,"selling");
+    ObjectNode ops=(ObjectNode)operationRecord(id);
+    assertThat(ops.path("status").asText()).isEqualTo("warehouse");
+    assertThat(ops.path("guidePrices").get(0).path("price").asInt()).isEqualTo(20);
+    ops.put("status","selling");
+    data(mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(ops))));
+    sourceStatus(id,"offShelf");
+    assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
+    assertThat(operationRecord(id).path("status").asText()).isEqualTo("selling");
+    mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(ops))).andExpect(status().isBadRequest());
+    sourceStatus(id,"warehouse");
+    assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
+    sourceStatus(id,"selling");
+    assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isFalse();
+    assertThat(operationRecord(id).path("status").asText()).isEqualTo("selling");
+    sourceStatus(id,"offShelf");fullIdentity("admin");
+    data(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/finished-products/{id}",id)));
+    assertThat(operationRecord(id)).isNull();
+    sourceStatus(id,"warehouse");assertThat(operationRecord(id)).isNull();
+    ObjectNode row=sourceRecord(id);row.put("status","warehouse");((ObjectNode)row.path("variants").get(0)).put("costPrice",30);
+    data(mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))));
+    assertThat(operationRecord(id)).isNull();
+    sourceStatus(id,"recycle");sourceStatus(id,"warehouse");assertThat(operationRecord(id)).isNull();
+    sourceStatus(id,"selling");
+    assertThat(operationRecord(id).path("status").asText()).isEqualTo("warehouse");
+    assertThat(operationRecord(id).path("guidePrices").get(0).path("price").asInt()).isEqualTo(60);
+    ObjectNode edited=sourceRecord(id);edited.put("status","selling");((ObjectNode)edited.path("variants").get(0)).put("costPrice",40);
+    data(mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(edited))));
+    assertThat(operationRecord(id).path("guidePrices").get(0).path("price").asInt()).isEqualTo(80);
+    sourceStatus(id,"offShelf");sourceStatus(id,"recycle");fullIdentity("supply-chain");
+    data(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/finished-products/{id}",id)));
+    assertThat(operationRecord(id).path("sourceStatus").asText()).isEqualTo("purged");
+    assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
+    data(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/finished-products/{id}",id)));
+    assertThat(operationRecord(id)).isNull();
+  }
+  @Test void importedProductsAlwaysEnterSourceWarehouseEvenWhenRequestAsksToPublish() throws Exception {
+    ObjectNode created=sourceFixture("接口获取","selling");long id=created.path("id").asLong();
+    assertThat(created.path("sourceStatus").asText()).isEqualTo("warehouse");
+    assertThat(operationRecord(id)).isNull();
+    sourceStatus(id,"selling");assertThat(operationRecord(id)).isNotNull();
+  }
+  @Test void soldOutSourceCannotBeEditedDeletedOrReplenished() throws Exception {
+    long id=sourceFixture("平台发布","warehouse").path("id").asLong();
+    jdbc.update("UPDATE finished_products SET source_status='soldOut',total_stock=0 WHERE id=?",id);
+    ObjectNode row=sourceRecord(id);row.put("status","soldOut");
+    mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))).andExpect(status().isBadRequest());
+    row.put("status","recycle");
+    mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))).andExpect(status().isForbidden());
+  }
+
   private JsonNode data(ResultActions result) throws Exception {
     JsonNode response = json.readTree(result.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
     assertThat(response.path("code").asInt()).as(response.toString()).isZero();

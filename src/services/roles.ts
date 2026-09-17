@@ -1,6 +1,7 @@
 import { request } from './http';
 
 export interface RoleRecord {
+  clientCode?: 'admin' | 'supply-chain';
   id: number;
   tenantId?: number;
   storeId?: number;
@@ -17,11 +18,12 @@ export interface RoleRecord {
 }
 
 export interface RolePermissionScope {
-  audience: 'admin' | 'store' | 'supplier';
+  audience: 'admin' | 'store' | 'supplier' | 'supply-chain';
   functionPermissions: string;
 }
 
 export interface RolePayload {
+  clientCode?: 'admin' | 'supply-chain';
   name: string;
   code: string;
   dataScope: string;
@@ -30,12 +32,12 @@ export interface RolePayload {
   functionPermissions?: string;
 }
 
-export function listRoles() {
-  return request<RoleRecord[]>('/admin/roles');
+export function listRoles(clientCode?: string) {
+  return request<RoleRecord[]>(`/admin/roles${clientCode ? `?clientCode=${clientCode}` : ''}`);
 }
 
-export function getRolePermissionScope() {
-  return request<RolePermissionScope>('/admin/roles/permission-scope');
+export function getRolePermissionScope(clientCode?: string) {
+  return request<RolePermissionScope>(`/admin/roles/permission-scope${clientCode ? `?clientCode=${clientCode}` : ''}`);
 }
 
 export function createRole(payload: RolePayload) {

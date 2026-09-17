@@ -28,6 +28,9 @@ export interface SlabOffShelfRecord {
 }
 
 export interface SlabRecord {
+  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
+  sourceUnavailable?: boolean;
+  operationsDeleted?: boolean;
   stock?: number;
   id: number;
   supplierId?: number;
@@ -147,7 +150,8 @@ export type SlabOperationType =
   | 'DELETE_TO_RECYCLE'
   | 'PHYSICAL_DELETE'
   | 'PURGE'
-  | 'STATUS_UPDATE';
+  | 'STATUS_UPDATE'
+  | 'SOURCE_SYNC';
 
 export interface SlabOperationChange {
   before?: unknown;
@@ -167,7 +171,7 @@ export interface SlabOperationLogRecord {
   standardReason?: string;
   detailReason?: string;
   changeDetails?: string;
-  operationSource: 'MANUAL' | 'EXTERNAL_API' | 'SYSTEM';
+  operationSource: 'MANUAL' | 'EXTERNAL_API' | 'SYSTEM' | 'SUPPLY_CHAIN';
   batchNo?: string;
   operatorName: string;
   operatorAccountId?: number;

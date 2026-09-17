@@ -7,6 +7,15 @@ import java.time.LocalDateTime;
 
 @TableName("finished_operation_logs")
 public class FinishedOperationLog {
+  private String businessClientCode = "admin";
+  private String operatorClientCode;
+  private Long operatorIdentityId;
+  public String getBusinessClientCode() { return businessClientCode; }
+  public void setBusinessClientCode(String value) { businessClientCode = value; }
+  public String getOperatorClientCode() { return operatorClientCode; }
+  public void setOperatorClientCode(String value) { operatorClientCode = value; }
+  public Long getOperatorIdentityId() { return operatorIdentityId; }
+  public void setOperatorIdentityId(Long value) { operatorIdentityId = value; }
   @TableId(type = IdType.AUTO)
   private Long id;
   private Long productId;

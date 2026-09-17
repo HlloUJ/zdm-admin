@@ -1,7 +1,7 @@
 import { isFunctionAllowedForAudience } from './functionAudience';
 import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 
-export type TerminalType = 'store' | 'supplier';
+export type TerminalType = 'store' | 'supplier' | 'supply-chain';
 export type FunctionAudience = 'admin' | TerminalType;
 
 export interface FunctionAction {
@@ -62,6 +62,7 @@ export interface FunctionCatalogRow {
 export const terminalTabs = [
   { label: '城市合伙人门店管理后台', value: 'store' },
   { label: '大板供应商门店管理后台', value: 'supplier' },
+  { label: '供应链协同系统', value: 'supply-chain' },
 ];
 
 const isLegacyReadAction = (action: FunctionAction) =>
@@ -132,7 +133,6 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             value: 'admin.supplier-management',
             actions: [
               { label: '新增', value: 'admin.supplier-management.create' },
-              { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
               { label: '编辑', value: 'admin.supplier-management.edit' },
               { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
               { label: '删除', value: 'admin.supplier-management.delete' },
@@ -189,11 +189,9 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '仓库中',
                 value: 'admin.slab-management.warehouse',
                 actions: [
-                  { label: '发布商品', value: 'admin.slab-management.warehouse.publish' },
                   { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
                   { label: '价格', value: 'admin.slab-management.warehouse.price' },
                   { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
-                  { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
                   { label: '删除', value: 'admin.slab-management.warehouse.delete' },
                 ],
               },
@@ -201,18 +199,16 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '出售中',
                 value: 'admin.slab-management.selling',
                 actions: [
-                  { label: '发布商品', value: 'admin.slab-management.selling.publish' },
                   { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
                   { label: '价格', value: 'admin.slab-management.selling.price' },
                   { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
-                  { label: '编辑', value: 'admin.slab-management.selling.edit' },
                 ],
               },
               {
                 label: '已下架',
                 value: 'admin.slab-management.off-shelf',
                 actions: [
-                  { label: '批量放回仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
+                  { label: '批量放回到仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
                   { label: '详情', value: 'admin.slab-management.off-shelf.detail' },
                   { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },
                   { label: '删除', value: 'admin.slab-management.off-shelf.delete' },
@@ -227,7 +223,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '回收站',
                 value: 'admin.slab-management.recycle',
                 actions: [
-                  { label: '批量放回仓库', value: 'admin.slab-management.recycle.batch-restore' },
+                  { label: '批量放回到仓库', value: 'admin.slab-management.recycle.batch-restore' },
                   { label: '批量彻底删除', value: 'admin.slab-management.recycle.batch-purge' },
                   { label: '清空回收站', value: 'admin.slab-management.recycle.clear' },
                   { label: '价格', value: 'admin.slab-management.recycle.price' },
@@ -669,11 +665,9 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.finished-stock-management.warehouse',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.warehouse.view' },
-                    { label: '发布商品', value: 'admin.finished-stock-management.warehouse.publish' },
                     { label: '批量上架', value: 'admin.finished-stock-management.warehouse.batch-shelf' },
                     { label: '价格', value: 'admin.finished-stock-management.warehouse.price' },
                     { label: '上架', value: 'admin.finished-stock-management.warehouse.shelf' },
-                    { label: '编辑', value: 'admin.finished-stock-management.warehouse.edit' },
                     { label: '删除', value: 'admin.finished-stock-management.warehouse.delete' },
                   ],
                 },
@@ -682,11 +676,9 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.finished-stock-management.selling',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.selling.view' },
-                    { label: '发布商品', value: 'admin.finished-stock-management.selling.publish' },
                     { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },
                     { label: '价格', value: 'admin.finished-stock-management.selling.price' },
                     { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },
-                    { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },
                   ],
                 },
                 {
@@ -694,7 +686,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.finished-stock-management.off-shelf',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.off-shelf.view' },
-                    { label: '批量放回仓库', value: 'admin.finished-stock-management.off-shelf.batch-restore' },
+                    { label: '批量放回到仓库', value: 'admin.finished-stock-management.off-shelf.batch-restore' },
                     { label: '详情', value: 'admin.finished-stock-management.off-shelf.detail' },
                     { label: '放回仓库', value: 'admin.finished-stock-management.off-shelf.restore' },
                     { label: '删除', value: 'admin.finished-stock-management.off-shelf.delete' },
@@ -717,7 +709,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                     { label: '批量彻底删除', value: 'admin.finished-stock-management.recycle.batch-purge' },
                     { label: '清空回收站', value: 'admin.finished-stock-management.recycle.clear' },
                     { label: '价格', value: 'admin.finished-stock-management.recycle.price' },
-                    { label: '放回到仓库', value: 'admin.finished-stock-management.recycle.restore' },
+                    { label: '放回仓库', value: 'admin.finished-stock-management.recycle.restore' },
                     { label: '彻底删除', value: 'admin.finished-stock-management.recycle.purge' },
                   ],
                 },
@@ -749,6 +741,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
 const navigationModuleOrder = [
   'admin.tenant',
   'admin.product-data-center',
+  'admin.supplier-supply-type-management',
   'admin.supplier-management',
   'admin.tenant.store-category-management',
   'admin.permission-management',
@@ -763,8 +756,142 @@ const orderModulesByNavigation = (modules: FunctionModule[]) => {
   );
 };
 
+const supplyChainProducts: FunctionModule = {
+  label: '供应链商品管理',
+  value: 'supply-chain.products',
+  audiences: ['supply-chain'],
+  menus: (['finished-stock-management', 'slab-management'] as const).map((key) => {
+    const prefix = `supply-chain.${key}`;
+    const actions = (tab: string, entries: [string, string][]): FunctionAction[] =>
+      entries.map(([value, label]) => ({ label, value: `${prefix}.${tab}.${value}` }));
+    return {
+      value: `${prefix}.menu`,
+      label: key === 'slab-management' ? '大板管理' : '成品现货管理',
+      direct: false,
+      pages: [
+        {
+          label: key === 'slab-management' ? '大板管理页' : '成品现货管理页',
+          value: prefix,
+          audiences: ['supply-chain'],
+          actions: [{ label: '操作日志', value: `${prefix}.operation-log.view` }],
+          tabs: [
+            {
+              label: '仓库中',
+              value: `${prefix}.warehouse`,
+              actions: actions('warehouse', [
+                ['publish', '发布商品'],
+                ['edit', '编辑'],
+                ['shelf', '上架'],
+                ['batch-shelf', '批量上架'],
+                ['delete', '删除'],
+              ]),
+            },
+            {
+              label: '已上架',
+              value: `${prefix}.selling`,
+              actions: actions('selling', [
+                ['publish', '发布商品'],
+                ['edit', '编辑'],
+                ['off-shelf', '下架'],
+                ['batch-off-shelf', '批量下架'],
+              ]),
+            },
+            {
+              label: '已下架',
+              value: `${prefix}.off-shelf`,
+              actions: actions('off-shelf', [
+                ['detail', '详情'],
+                ['restore', '放回仓库'],
+                ['batch-restore', '批量放回到仓库'],
+                ['delete', '删除'],
+              ]),
+            },
+            { label: '已售完', value: `${prefix}.sold-out`, actions: [] },
+            {
+              label: '回收站',
+              value: `${prefix}.recycle`,
+              actions: actions('recycle', [
+                ['restore', '放回仓库'],
+                ['purge', '彻底删除'],
+                ['batch-restore', '批量放回到仓库'],
+                ['batch-purge', '批量彻底删除'],
+                ['clear', '清空回收站'],
+              ]),
+            },
+          ],
+        },
+      ],
+    };
+  }),
+};
+const supplyTypeModule: FunctionModule = {
+  label: '供应商供货类型管理',
+  value: 'admin.supplier-supply-type-management',
+  audiences: ['admin'],
+  menus: [
+    {
+      value: 'admin.supplier-supply-type-management.menu',
+      direct: true,
+      pages: [
+        {
+          label: '供应商供货类型管理',
+          value: 'admin.supplier-supply-type-management',
+          tabs: [],
+          actions: [
+            ['create', '新增供货类型'],
+            ['edit', '编辑'],
+            ['toggle-status', '停用/启用'],
+            ['delete', '删除'],
+          ].map(([action, label]) => ({ label, value: `admin.supplier-supply-type-management.${action}` })),
+        },
+      ],
+    },
+  ],
+};
+
+const withAdministrationTabs = (modules: FunctionModule[]): FunctionModule[] =>
+  modules.map((module) => ({
+    ...module,
+    menus: module.menus.map((menu) => ({
+      ...menu,
+      pages: menu.pages.map((page) => {
+        if (
+          !['admin.permission-management.role-management', 'admin.permission-management.employee-management'].includes(
+            page.value,
+          )
+        )
+          return page;
+        return {
+          ...page,
+          actions: [],
+          tabs: [
+            {
+              label: '运营管理平台',
+              value: page.value,
+              actions: page.actions.map((action) => ({
+                ...action,
+                label: action.label === '邀请员工' ? '新增员工' : action.label,
+              })),
+            },
+            {
+              label: '供应链协同系统',
+              value: `${page.value}.supply-chain`,
+              actions: page.actions.map((action) => ({
+                label: action.label === '邀请员工' ? '新增员工' : action.label,
+                value: action.value.replace(page.value, `${page.value}.supply-chain`),
+              })),
+            },
+          ],
+        };
+      }),
+    })),
+  }));
 export const fullFunctionCatalog = applyConfirmedNavigationStructure(
-  orderModulesByNavigation(withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog])),
+  orderModulesByNavigation(
+    withDefaultViewPermissions(
+      withAdministrationTabs([storeLevelModule, ...verifiedFunctionCatalog, supplyChainProducts, supplyTypeModule]),
+    ),
+  ),
 );
 
 const filterCatalogPagesByAudience = (modules: FunctionModule[], audience: FunctionAudience) =>
@@ -779,10 +906,22 @@ const filterCatalogPagesByAudience = (modules: FunctionModule[], audience: Funct
             .map((page) => ({
               ...page,
               actions: page.actions.filter((action) => isFunctionAllowedForAudience(action.value, audience)),
-              tabs: page.tabs.map((tab) => ({
-                ...tab,
-                actions: tab.actions.filter((action) => isFunctionAllowedForAudience(action.value, audience)),
-              })),
+              tabs: page.tabs
+                .map((tab) => ({
+                  ...tab,
+                  label: audience !== 'admin' && page.value.includes('permission-management') ? '' : tab.label,
+                  actions: tab.actions
+                    .filter((action) => isFunctionAllowedForAudience(action.value, audience))
+                    .map((action) => ({
+                      ...action,
+                      label:
+                        audience !== 'admin' &&
+                        action.value === 'admin.permission-management.employee-management.create'
+                          ? '邀请员工'
+                          : action.label,
+                    })),
+                }))
+                .filter((tab) => tab.actions.length > 0),
             })),
         }))
         .filter((menu) => menu.pages.length > 0),
@@ -797,6 +936,7 @@ export const getRuntimeFunctionCatalog = (audience: FunctionAudience) => filterF
 export const terminalFunctionTrees: Record<TerminalType, FunctionModule[]> = {
   store: filterCatalogPagesByAudience(getRuntimeFunctionCatalog('store'), 'store'),
   supplier: filterCatalogPagesByAudience(getRuntimeFunctionCatalog('supplier'), 'supplier'),
+  'supply-chain': filterCatalogPagesByAudience(getRuntimeFunctionCatalog('supply-chain'), 'supply-chain'),
 };
 
 export const getFunctionModulePermissionValues = (module?: FunctionModule) =>
@@ -949,4 +1089,5 @@ export const filterFunctionCatalogByPermissions = (
 export const initialAllocationValues: Record<TerminalType, string[]> = {
   store: [],
   supplier: [],
+  'supply-chain': [],
 };

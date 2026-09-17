@@ -82,12 +82,13 @@ public class SessionTokenService {
         LEFT JOIN employees e
           ON ai.identity_type = 'employee'
          AND e.id = ai.subject_id
+         AND e.client_code = ai.client_code
          AND e.account_id = a.id
          AND e.status = 'enabled'
         LEFT JOIN tenants t ON t.id = ai.tenant_id
         LEFT JOIN stores st ON st.id = ai.store_id
         WHERE s.token_hash = ?
-          AND s.client_code = 'admin'
+          AND s.client_code IN ('admin', 'supply-chain')
           AND s.revoked_at IS NULL
           AND s.expires_at > CURRENT_TIMESTAMP
           AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)

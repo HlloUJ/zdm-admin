@@ -15,6 +15,13 @@
           </div>
         </header>
 
+        <t-tabs
+          v-if="isInternalAdministration && managementTabs.length > 1"
+          v-model="managedClient"
+          :list="managementTabs"
+          @change="handleManagedClientChange"
+        />
+
         <section class="table-card">
           <div v-if="canCreateRole" class="table-toolbar">
             <t-button theme="primary" @click="openCreateDialog">
@@ -290,7 +297,7 @@ import {
   type FunctionModule,
 } from '@/services/functionCatalog';
 import { getLoginUser } from '@/services/auth';
-import { hasAnyPermission } from '@/services/adminPermissions';
+import { hasAnyPermission, hasPermission } from '@/services/adminPermissions';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createRole,
@@ -348,6 +355,24 @@ const permissionModules = computed(() => {
 
 const pageSizeOptions = [10, 20, 50];
 const loginUser = computed(() => getLoginUser());
+const managedClient = ref<'admin' | 'supply-chain'>('admin');
+const managementPermissionPrefix = computed(
+  () => `admin.permission-management.role-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}`,
+);
+const managementTabs = computed(() =>
+  [
+    { label: '运营管理平台', value: 'admin', permission: 'admin.permission-management.role-management.view' },
+    {
+      label: '供应链协同系统',
+      value: 'supply-chain',
+      permission: 'admin.permission-management.role-management.supply-chain.view',
+    },
+  ].filter((tab) => hasPermission(loginUser.value, tab.permission)),
+);
+const isInternalAdministration = computed(
+  () => !loginUser.value.tenantId && !loginUser.value.storeId && loginUser.value.clientCode !== 'supply-chain',
+);
+
 const activePermissionModuleValue = ref(permissionModules.value[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
@@ -375,7 +400,7 @@ const formRules: Record<string, FormRule[]> = {
 };
 
 const getRoleActionPermissions = (action: 'create' | 'permission' | 'edit' | 'delete') => {
-  return [`admin.permission-management.role-management.${action}`];
+  return [`${managementPermissionPrefix.value}.${action}`];
 };
 const canCreateRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('create')));
 const canManageRolePermission = computed(() =>
@@ -438,7 +463,10 @@ const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 const loadRoles = async () => {
   loading.value = true;
   try {
-    const [records, scope] = await Promise.all([listRoles(), getRolePermissionScope()]);
+    const [records, scope] = await Promise.all([
+      listRoles(managedClient.value),
+      getRolePermissionScope(managedClient.value),
+    ]);
     rolePermissionScope.value = scope;
     activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
     roles.value = sortByCreatedAtDesc(records.filter((record) => record.status === 'enabled')).map(toRoleItem);
@@ -546,6 +574,7 @@ const handleSubmit = async () => {
   try {
     if (dialogMode.value === 'create') {
       await createRole({
+        clientCode: managedClient.value,
         name: roleName,
         code: createRoleCode(roleName),
         dataScope: 'all',
@@ -653,7 +682,19 @@ const handlePermissionSave = async () => {
   }
 };
 
-onMounted(loadRoles);
+const handleManagedClientChange = () => {
+  roles.value = [];
+  pagination.current = 1;
+  formDialogVisible.value = false;
+  permissionDialogVisible.value = false;
+  deleteDialogVisible.value = false;
+  void loadRoles();
+};
+onMounted(() => {
+  if (isInternalAdministration.value)
+    managedClient.value = managementTabs.value[0]?.value === 'supply-chain' ? 'supply-chain' : 'admin';
+  void loadRoles();
+});
 </script>
 
 <style scoped>

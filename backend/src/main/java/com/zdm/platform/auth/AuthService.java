@@ -50,6 +50,7 @@ public class AuthService {
         .map(account -> new IdentityContextResponse(
             account.getIdentityId(),
             account.getIdentityType(),
+        account.getClientCode(),
             account.getTenantId(),
             account.getStoreId(),
             account.getTenantName(),
@@ -83,6 +84,7 @@ public class AuthService {
         account.getId(),
         account.getIdentityId(),
         account.getIdentityType(),
+        account.getClientCode(),
         account.getDisplayName(),
         account.getPhone(),
         roles,

@@ -103,7 +103,7 @@ public class SupplierSupplyTypeService {
   private CurrentIdentity requirePlatformScope() {
     CurrentIdentity identity = identityProvider.require();
     SupplierScope scope = SupplierScope.from(identity);
-    if (!"platform".equals(scope.ownerScope())) {
+    if (!"admin".equals(identity.clientCode()) || !"platform".equals(scope.ownerScope())) {
       throw new AccessDeniedException("仅运营平台可以配置供货类型");
     }
     return identity;

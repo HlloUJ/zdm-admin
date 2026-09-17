@@ -22,6 +22,24 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
     specDimensions = value == null ? null : List.copyOf(value);
   }
 
+
+  private String sourceOffShelfReason;
+  private String sourceOffShelfDetail;
+  private java.time.LocalDateTime sourceOffShelfAt;
+  public String getSourceOffShelfReason() { return sourceOffShelfReason; }
+  public void setSourceOffShelfReason(String value) { sourceOffShelfReason=value; }
+  public String getSourceOffShelfDetail() { return sourceOffShelfDetail; }
+  public void setSourceOffShelfDetail(String value) { sourceOffShelfDetail=value; }
+  public java.time.LocalDateTime getSourceOffShelfAt() { return sourceOffShelfAt; }
+  public void setSourceOffShelfAt(java.time.LocalDateTime value) { sourceOffShelfAt=value; }
+  private String sourceStatus = "warehouse";
+  private Boolean operationsDeleted = false;
+  public String getSourceStatus() { return sourceStatus; }
+  public void setSourceStatus(String value) { sourceStatus = value; }
+  public Boolean getOperationsDeleted() { return operationsDeleted; }
+  public void setOperationsDeleted(Boolean value) { operationsDeleted = value; }
+  public boolean isSourceUnavailable() { return ProductLifecycleService.unavailable(sourceStatus); }
+
   private Long categoryId;
   private Long supplierId;
 

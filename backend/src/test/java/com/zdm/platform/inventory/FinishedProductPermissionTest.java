@@ -11,15 +11,18 @@ import org.springframework.security.access.AccessDeniedException;
 
 class FinishedProductPermissionTest {
   private final FinishedProductService service = mock(FinishedProductService.class);
-  private FinishedProductController controller(String... permissions) {
+  private FinishedProductController controller(String... permissions) { return controllerFor("admin",permissions); }
+  private FinishedProductController sourceController(String... permissions) { return controllerFor("supply-chain",permissions); }
+  private FinishedProductController controllerFor(String client,String... permissions) {
     CurrentIdentityProvider identities = mock(CurrentIdentityProvider.class);
-    when(identities.require()).thenReturn(new CurrentIdentity(2L, 2L, 2L, 2L, "admin", null, null,
-        "测试员工", "all", List.of("ADMIN_MANAGER"), java.util.Arrays.stream(permissions).map(permission -> "admin.finished-stock-management." + permission).toList()));
+    when(identities.require()).thenReturn(new CurrentIdentity(2L, 2L, 2L, 2L, client, null, null,
+        "测试员工", "all", List.of("ADMIN_MANAGER"), java.util.Arrays.stream(permissions).map(permission -> client+".finished-stock-management." + permission).toList()));
     return new FinishedProductController(service, null, new PermissionGuard(identities), null, null);
   }
   private FinishedProduct product(String status) {
     FinishedProduct value = new FinishedProduct();
     value.setStatus(status);
+    value.setSourceStatus("selling");
     return value;
   }
   @Test void viewCannotEditOrPublish() {
@@ -29,16 +32,16 @@ class FinishedProductPermissionTest {
     verify(service, never()).updateWithDetails(any(), any());
     verify(service, never()).updateOperationWithDetails(any(), any(), anyBoolean());
   }
-  @Test void publishSupportsBothFormChoicesAndEditUsesSourceTab() {
-    FinishedProduct request = product("selling");
-    controller("selling.publish").create(request);
+  @Test void onlySourceClientCanPublishAndEdit() {
+    FinishedProduct request=product("selling");
+    sourceController("selling.publish").create(request);
     verify(service).createWithDetails(request);
-    controller("warehouse.publish").create(request);
-    assertThatThrownBy(() -> controller("warehouse.view").create(request)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> controller("selling.publish").create(request)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> sourceController("warehouse.publish").create(request)).isInstanceOf(AccessDeniedException.class);
     when(service.getById(1L)).thenReturn(product("selling"));
-    controller("selling.edit").update(1L, request);
-    verify(service).updateWithDetails(1L, request);
-    assertThatThrownBy(() -> controller("warehouse.edit").update(1L, request)).isInstanceOf(AccessDeniedException.class);
+    sourceController("selling.edit").update(1L,request);
+    verify(service).updateWithDetails(1L,request);
+    assertThatThrownBy(() -> controller("selling.edit").update(1L,request)).isInstanceOf(AccessDeniedException.class);
   }
   @Test void statusPermissionsUseRestrictedUpdateAndRejectOtherOperations() {
     for (String permission : List.of("warehouse.shelf", "warehouse.batch-shelf")) {
@@ -67,16 +70,12 @@ class FinishedProductPermissionTest {
     controller("recycle.purge").delete(1L);
     verify(service).removeById(1L);
   }
-  @Test void editingAndShelvingTogetherPersistTheWholeAuthorizedForm() {
-    when(service.getById(1L)).thenReturn(product("warehouse"));
-    FinishedProduct request = product("selling");
-    controller("warehouse.edit", "warehouse.shelf").update(1L, request);
-    verify(service).updateWithDetails(1L, request);
-    verify(service, never()).updateOperationWithDetails(any(), any(), anyBoolean());
-    assertThatThrownBy(() -> controller("warehouse.edit").update(1L, request))
-        .isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> controller("warehouse.publish").create(product("recycle")))
-        .isInstanceOf(AccessDeniedException.class);
+  @Test void sourceEditingAndShelvingRequiresBothPermissions() {
+    FinishedProduct existing=product("warehouse"); existing.setSourceStatus("warehouse");
+    when(service.getById(1L)).thenReturn(existing);
+    FinishedProduct request=product("selling");
+    sourceController("warehouse.edit","warehouse.shelf").update(1L,request);
+    verify(service).updateWithDetails(1L,request);
+    assertThatThrownBy(() -> sourceController("warehouse.edit").update(1L,request)).isInstanceOf(AccessDeniedException.class);
   }
-
 }

@@ -616,7 +616,7 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
   await mockCollection(page, '**/api/admin/supplier-supply-types', supplierSupplyTypes);
   await mockCollection(page, '**/api/admin/roles', roles);
-  await page.route('**/api/admin/roles/permission-scope', async (route) => {
+  await page.route(/\/api\/admin\/roles\/permission-scope(?:\?.*)?$/, async (route) => {
     await fulfillJson(route, { audience: 'admin', functionPermissions: 'all' });
   });
   const policies = structuredClone(terminalFunctionPolicies);
@@ -818,13 +818,16 @@ async function mockEmployeeInvites(page: Page) {
 
 async function mockCollection(page: Page, pattern: string, records: unknown[]) {
   const collection = structuredClone(records);
-  await page.route(pattern, async (route) => {
-    if (route.request().method() === 'GET') {
-      await fulfillJson(route, collection);
-      return;
-    }
-    await fulfillJson(route, collection[0] ?? {});
-  });
+  await page.route(
+    (url) => url.pathname === pattern.replace('**', ''),
+    async (route) => {
+      if (route.request().method() === 'GET') {
+        await fulfillJson(route, collection);
+        return;
+      }
+      await fulfillJson(route, collection[0] ?? {});
+    },
+  );
 
   await page.route(`${pattern}/**`, async (route) => {
     if (route.request().method() === 'DELETE') {

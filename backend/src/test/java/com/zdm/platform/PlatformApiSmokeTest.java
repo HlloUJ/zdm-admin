@@ -62,6 +62,10 @@ class PlatformApiSmokeTest {
 
   @Autowired
   private SlabPriceService slabPriceService;
+  @Autowired private com.zdm.platform.auth.AuthAccountMapper authAccounts;
+  @Autowired private com.zdm.platform.security.SessionTokenService sessionTokens;
+  private String supplyChainToken() { return SupplyChainTestSession.create(jdbcTemplate,authAccounts,sessionTokens); }
+
 
   @BeforeEach
   void exposeAllTerminalFunctionsWithinEachPermissionTest() {
@@ -114,7 +118,7 @@ class PlatformApiSmokeTest {
     try {
       for (int i = 0; i < 2; i++) {
         MvcResult result = mockMvc.perform(post("/api/admin/slabs")
-                .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+                .header("Authorization", "Bearer " + supplyChainToken())
                 .contentType("application/json").content(payload))
             .andExpect(status().isOk()).andReturn();
         long id = mapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
@@ -133,7 +137,7 @@ class PlatformApiSmokeTest {
         assertThat(details.has("扣角4宽")).isTrue();
         assertThat(details.has("面积")).isTrue();
         assertThat(details.has("创建时间")).isTrue();
-        assertThat(details.path("价格层级").path("after").size()).isEqualTo(prices.size());
+        assertThat(details.has("价格层级")).isFalse();
         assertThat(jdbcTemplate.queryForObject("SELECT serial_no FROM slab_inventory WHERE id = ?", String.class, id)).isNull();
       }
       long id = ids.getFirst();
@@ -141,7 +145,7 @@ class PlatformApiSmokeTest {
         var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload);
         body.put("serialNo", value);
         mockMvc.perform(put("/api/admin/slabs/{id}", id)
-                .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+                .header("Authorization", "Bearer " + supplyChainToken())
                 .contentType("application/json").content(mapper.writeValueAsBytes(body)))
             .andExpect(status().isOk());
         assertThat(jdbcTemplate.queryForObject("SELECT serial_no FROM slab_inventory WHERE id = ?", String.class, id))
@@ -150,7 +154,7 @@ class PlatformApiSmokeTest {
       var stockBody = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload);
       stockBody.put("stock", 9);
       mockMvc.perform(put("/api/admin/slabs/{id}", id)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json").content(mapper.writeValueAsBytes(stockBody)))
           .andExpect(status().isOk()).andExpect(jsonPath("$.data.stock").value(9));
       assertThat(jdbcTemplate.queryForObject("SELECT stock FROM slab_inventory WHERE id=?", Integer.class, id)).isEqualTo(9);
@@ -160,7 +164,7 @@ class PlatformApiSmokeTest {
       assertThat(stockChanges.path("库存").path("after").asInt()).isEqualTo(9);
       Long logCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=?", Long.class, id);
       mockMvc.perform(put("/api/admin/slabs/{id}", id)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json").content(mapper.writeValueAsBytes(stockBody)))
           .andExpect(status().isOk());
       assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=?", Long.class, id)).isEqualTo(logCount);
@@ -182,7 +186,7 @@ class PlatformApiSmokeTest {
   void slabPriceSourceChangesAreLoggedWithoutChangingAmounts() throws Exception {
     var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
     var payload = mapper.createObjectNode();
-    payload.put("name", "价格来源日志测试").put("status", "warehouse");
+    payload.put("name", "价格来源日志测试").put("status", "warehouse").put("costPrice",100).put("guidePrice",100).put("guidePriceCoefficient",1);
     payload.put("mainImageMediaId", uploadSlabMedia("source-main.png", "image/png"));
     payload.put("scanImageMediaId", uploadSlabMedia("source-scan.png", "image/png"));
     payload.put("designImageMediaId", uploadSlabMedia("source-design.png", "image/png"));
@@ -195,11 +199,14 @@ class PlatformApiSmokeTest {
           .put("price", ratio.multiply(new BigDecimal("100"))).put("priceSource", "auto");
     }
     MvcResult created = mockMvc.perform(post("/api/admin/slabs")
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+            .header("Authorization", "Bearer " + supplyChainToken())
             .contentType("application/json").content(mapper.writeValueAsBytes(payload)))
         .andExpect(status().isOk()).andReturn();
     long id = mapper.readTree(created.getResponse().getContentAsString()).path("data").path("id").asLong();
     assertThat(id).isPositive();
+    // Fixture starts with an already published source and an independent operations record.
+    jdbcTemplate.update("UPDATE slab_inventory SET source_status='selling',operations_deleted=FALSE,guide_price=100,guide_price_coefficient=1 WHERE id=?",id);
+    jdbcTemplate.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source,source_configuration_id) SELECT ?,l.id,l.name,c.price_coefficient,100,100*c.price_coefficient,'auto',c.id FROM store_levels l JOIN slab_markup_configurations c ON c.store_level_id=l.id WHERE c.status='enabled'",id);
     try {
       var target = (com.fasterxml.jackson.databind.node.ObjectNode) prices.get(0);
       for (String source : List.of("manual", "auto")) {
@@ -365,7 +372,7 @@ class PlatformApiSmokeTest {
 
     MvcResult uploadResult = mockMvc.perform(multipart("/api/admin/slabs/images")
             .file(image)
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+            .header("Authorization", "Bearer " + supplyChainToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.url", containsString("/api/open/media/")))
         .andReturn();
@@ -382,7 +389,7 @@ class PlatformApiSmokeTest {
         new byte[] {0x00, 0x00, 0x00, 0x18});
     MvcResult videoUploadResult = mockMvc.perform(multipart("/api/admin/slabs/images")
             .file(video)
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+            .header("Authorization", "Bearer " + supplyChainToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.url", containsString("/api/open/media/")))
         .andReturn();
@@ -450,7 +457,7 @@ class PlatformApiSmokeTest {
         SELECT COUNT(*) FROM information_schema.columns
         WHERE table_schema = DATABASE()
           AND table_name = 'roles'
-          AND column_name IN ('category', 'client_code', 'store_scope_key')
+          AND column_name IN ('category', 'store_scope_key')
         """,
         Integer.class);
     Integer scopedRoleColumnCount = jdbcTemplate.queryForObject(
@@ -511,7 +518,7 @@ class PlatformApiSmokeTest {
   void supplierCrudPersistsThroughApi() throws Exception {
     String suffix = Long.toString(System.nanoTime());
     String supplierName = "数据库集成测试供应商-" + suffix;
-    String token = TokenAuthenticationFilter.DEV_TOKEN;
+    String token = supplyChainToken();
     String creatorName = jdbcTemplate.queryForObject(
         """
         SELECT name
@@ -631,12 +638,12 @@ class PlatformApiSmokeTest {
 
     try {
       mockMvc.perform(delete("/api/admin/suppliers/9220")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.message")
               .value("该供应商已关联大板库存，不能删除，请先停用该供应商"));
       mockMvc.perform(delete("/api/admin/suppliers/9221")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.message")
               .value("该供应商已关联成品，不能删除，请先停用该供应商"));
@@ -655,7 +662,7 @@ class PlatformApiSmokeTest {
     String suffix = Long.toString(System.nanoTime());
     String existingName = "供应商重名校验-" + suffix;
     String otherName = "供应商重名编辑-" + suffix;
-    String token = TokenAuthenticationFilter.DEV_TOKEN;
+    String token = supplyChainToken();
 
     MvcResult existingResult = mockMvc.perform(post("/api/admin/suppliers")
             .header("Authorization", "Bearer " + token)
@@ -1017,7 +1024,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.status").value("enabled"));
 
       MvcResult supplierResult = mockMvc.perform(post("/api/admin/suppliers")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {"name":"%s","supplyTypeIds":[%d],"status":"enabled"}
@@ -1039,7 +1046,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.message").value("供货类型“" + typeName + "”已被供应商使用，无法删除"));
 
       mockMvc.perform(delete("/api/admin/suppliers/{id}", supplierId)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isOk());
       supplierId = null;
 
@@ -3856,7 +3863,7 @@ class PlatformApiSmokeTest {
         .andExpect(jsonPath("$.data[?(@.code == 'OPERATOR')].createdByName").value(hasItem("韩健")))
         .andExpect(jsonPath("$.data[?(@.status == 'enabled')].code").value(not(hasItem("CUSTOMER_SERVICE"))))
         .andExpect(jsonPath("$.data[0].category").doesNotExist())
-        .andExpect(jsonPath("$.data[0].clientCode").doesNotExist())
+        .andExpect(jsonPath("$.data[0].clientCode").value("admin"))
         .andExpect(jsonPath("$.data[0].tenantId").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data[0].storeId").value(org.hamcrest.Matchers.nullValue()));
 
@@ -3864,7 +3871,7 @@ class PlatformApiSmokeTest {
         """
         SELECT name
         FROM employees
-        WHERE account_id = 1
+        WHERE account_id = 1 AND client_code = 'admin'
           AND status = 'enabled'
         ORDER BY id DESC
         LIMIT 1
@@ -5062,6 +5069,7 @@ class PlatformApiSmokeTest {
 
   @Test
   void slabPublishOptionsComeFromReferenceTablesAndSelectionsArePersisted() throws Exception {
+    jdbcTemplate.update("INSERT INTO slab_guide_price_settings (id,price_coefficient) VALUES (1,1.6) ON DUPLICATE KEY UPDATE price_coefficient=1.6");
     String suffix = String.valueOf(System.nanoTime());
     String colorCategoryName = "大板发布色系分类-" + suffix;
     String colorName = "大板发布色系-" + suffix;
@@ -5149,7 +5157,7 @@ class PlatformApiSmokeTest {
     Long deletedInterfaceSlabId = null;
     try {
       mockMvc.perform(get("/api/admin/slabs/form-options")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.varieties[0].id").exists())
           .andExpect(jsonPath("$.data.varieties[*].label", hasItem(enabledVarietyName)))
@@ -5164,7 +5172,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.storeLevels[*].label", hasItem("1级")));
 
       MvcResult slabResult = mockMvc.perform(post("/api/admin/slabs")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {
@@ -5245,9 +5253,9 @@ class PlatformApiSmokeTest {
       jdbcTemplate.update(
           """
           INSERT INTO slab_operation_logs
-            (slab_id, slab_serial_no, slab_name, publisher_type, operation_type,
+            (business_client_code,slab_id, slab_serial_no, slab_name, publisher_type, operation_type,
              operation_summary, change_details, operation_source, operator_name, operated_at)
-          VALUES (?, ?, '大板发布选项测试', '平台发布', 'UPDATE', '编辑大板', ?,
+          VALUES ('supply-chain',?, ?, '大板发布选项测试', '平台发布', 'UPDATE', '编辑大板', ?,
                   'MANUAL', '超级管理员', NOW())
           """,
           slabId,
@@ -5277,7 +5285,7 @@ class PlatformApiSmokeTest {
       mockMvc.perform(get("/api/admin/slabs/operation-logs")
               .param("keyword", serialNo)
               .param("operationType", "UPDATE")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.records[0].changeDetails", containsString(supplierName)))
           .andExpect(jsonPath("$.data.records[0].changeDetails", containsString(varietyName)))
@@ -5292,7 +5300,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.records[0].changeDetails", containsString("\"mediaType\":\"video\"")));
 
       mockMvc.perform(post("/api/admin/slabs")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {
@@ -5308,7 +5316,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.message").value("大板编号已存在"));
 
       MvcResult interfaceSlabResult = mockMvc.perform(post("/api/admin/slabs")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {
@@ -5352,14 +5360,14 @@ class PlatformApiSmokeTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.publisherType").value("接口获取"))
           .andExpect(jsonPath("$.data.createdByName").value("外部系统"))
-          .andExpect(jsonPath("$.data.createdByAccountId").doesNotExist())
+          .andExpect(jsonPath("$.data.createdByAccountId").value(1))
           .andExpect(jsonPath("$.data.status").value("warehouse"))
           .andReturn();
       interfaceSlabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
           interfaceSlabResult.getResponse().getContentAsString(), "$.data.id").toString());
 
       MvcResult deletedInterfaceSlabResult = mockMvc.perform(post("/api/admin/slabs")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {
@@ -5407,7 +5415,7 @@ class PlatformApiSmokeTest {
           deletedInterfaceSlabResult.getResponse().getContentAsString(), "$.data.id").toString());
 
       mockMvc.perform(post("/api/admin/slabs/{id}/delete", deletedInterfaceSlabId)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {"reason":"资料不完整"}
@@ -5416,23 +5424,22 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data").value(true));
       Integer deletedInterfaceCount = jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM slab_inventory WHERE id = ?", Integer.class, deletedInterfaceSlabId);
-      assertThat(deletedInterfaceCount).isZero();
+      assertThat(deletedInterfaceCount).isEqualTo(1);
+      assertThat(jdbcTemplate.queryForObject("SELECT source_status FROM slab_inventory WHERE id=?",String.class,deletedInterfaceSlabId)).isEqualTo("recycle");
       mockMvc.perform(get("/api/admin/slabs/operation-logs")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.records[?(@.slabId == " + deletedInterfaceSlabId
-              + ")].operationType", hasItem("PHYSICAL_DELETE")))
-          .andExpect(jsonPath("$.data.records[?(@.slabId == " + deletedInterfaceSlabId
-              + ")].standardReason", hasItem("资料不完整")))
+              + ")].operationType", hasItem("DELETE_TO_RECYCLE")))
           .andExpect(jsonPath("$.data.records[?(@.slabId == " + deletedInterfaceSlabId
               + ")].operatorName", hasItem("超级管理员")));
       assertThat(jdbcTemplate.queryForObject(
-          "SELECT detail_reason FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'PHYSICAL_DELETE'",
+          "SELECT detail_reason FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'DELETE_TO_RECYCLE'",
           String.class,
           deletedInterfaceSlabId)).isNull();
 
       mockMvc.perform(put("/api/admin/slabs/batch-status")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {"ids":[%d,%d],"status":"selling"}
@@ -5440,7 +5447,7 @@ class PlatformApiSmokeTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").value(true));
       Integer sellingCount = jdbcTemplate.queryForObject(
-          "SELECT COUNT(*) FROM slab_inventory WHERE id IN (?, ?) AND status = 'selling'",
+          "SELECT COUNT(*) FROM slab_inventory WHERE id IN (?, ?) AND source_status = 'selling'",
           Integer.class,
           slabId,
           interfaceSlabId);
@@ -5451,7 +5458,7 @@ class PlatformApiSmokeTest {
           slabId);
       assertThat(unchangedPriceCount).isEqualTo(3);
       mockMvc.perform(put("/api/admin/slabs/batch-status")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {"ids":[%d,%d],"status":"offShelf","reason":"价格调整","detail":"批量调整指导价"}
@@ -5459,7 +5466,7 @@ class PlatformApiSmokeTest {
           .andExpect(status().isOk());
       Map<String, Object> offShelfRecord = jdbcTemplate.queryForMap(
           """
-          SELECT inventory.status, record.standard_reason, record.detail_reason, record.off_shelved_by_name
+          SELECT inventory.source_status AS status, record.standard_reason, record.detail_reason, record.off_shelved_by_name
           FROM slab_inventory inventory
           INNER JOIN slab_off_shelf_records record ON record.slab_id = inventory.id
           WHERE inventory.id = ?
@@ -5470,7 +5477,7 @@ class PlatformApiSmokeTest {
       assertThat(offShelfRecord.get("detail_reason")).isEqualTo("批量调整指导价");
       assertThat(offShelfRecord.get("off_shelved_by_name")).isEqualTo("超级管理员");
       mockMvc.perform(put("/api/admin/slabs/batch-status")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {"ids":[%d,%d],"status":"warehouse"}
@@ -5482,14 +5489,14 @@ class PlatformApiSmokeTest {
           slabId);
       assertThat(retainedHistoryCount).isEqualTo(1);
       mockMvc.perform(put("/api/admin/slabs/batch-status")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {"ids":[%d],"status":"selling"}
                   """.formatted(slabId)))
           .andExpect(status().isOk());
       mockMvc.perform(put("/api/admin/slabs/batch-status")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {"ids":[%d],"status":"offShelf","reason":"库存异常","detail":"盘点数量不一致"}
@@ -5554,7 +5561,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.priceCoefficient").value(1.61));
 
       mockMvc.perform(get("/api/admin/slabs")
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].originName", hasItem("巴西")))
           .andExpect(jsonPath(
@@ -5576,8 +5583,10 @@ class PlatformApiSmokeTest {
           String.class,
           slabId)).isEqualTo("1.6000:160.00");
 
+      mockMvc.perform(put("/api/admin/slabs/batch-status").header("Authorization","Bearer "+supplyChainToken())
+          .contentType("application/json").content("{\"ids\":["+slabId+"],\"status\":\"warehouse\"}")).andExpect(status().isOk());
       mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
                   {
@@ -5602,17 +5611,19 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.message").value("纹理不存在"));
 
       mockMvc.perform(post("/api/admin/slabs/{id}/delete", slabId)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+              .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("{}"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").value(true));
       assertThat(jdbcTemplate.queryForObject(
-          "SELECT status FROM slab_inventory WHERE id = ?", String.class, slabId)).isEqualTo("recycle");
+          "SELECT source_status FROM slab_inventory WHERE id = ?", String.class, slabId)).isEqualTo("recycle");
       mockMvc.perform(delete("/api/admin/slabs/{id}", slabId)
-              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+              .header("Authorization", "Bearer " + supplyChainToken()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data").value(true));
+      assertThat(jdbcTemplate.queryForObject("SELECT source_status FROM slab_inventory WHERE id=?",String.class,slabId)).isEqualTo("purged");
+      mockMvc.perform(delete("/api/admin/slabs/{id}",slabId).header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
       assertThat(jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM slab_inventory WHERE id = ?", Integer.class, slabId)).isZero();
       assertThat(jdbcTemplate.queryForObject(
@@ -5631,6 +5642,7 @@ class PlatformApiSmokeTest {
         jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", interfaceSlabId);
       }
       if (deletedInterfaceSlabId != null) {
+        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id=?",deletedInterfaceSlabId);
         jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", deletedInterfaceSlabId);
       }
       jdbcTemplate.update(
@@ -5674,7 +5686,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data").value(2));
 
       assertThat(jdbcTemplate.queryForObject(
-          "SELECT COUNT(*) FROM slab_inventory WHERE id IN (?, ?)",
+          "SELECT COUNT(*) FROM slab_inventory WHERE id IN (?, ?) AND operations_deleted=FALSE",
           Integer.class,
           firstSlabId,
           secondSlabId)).isZero();
@@ -5695,7 +5707,7 @@ class PlatformApiSmokeTest {
       assertThat(clearLogs).extracting(row -> row.get("operation_type"))
           .containsOnly("PURGE");
       assertThat(clearLogs).extracting(row -> row.get("operation_summary"))
-          .containsOnly("清空回收站");
+          .containsOnly("彻底删除运营商品");
       assertThat(clearLogs.get(0).get("batch_no")).isEqualTo(clearLogs.get(1).get("batch_no"));
     } finally {
       jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id IN (?, ?)", firstSlabId, secondSlabId);
@@ -5710,10 +5722,10 @@ class PlatformApiSmokeTest {
         operatorId,
         "15926628996",
         "大板共享操作员",
-        "admin.slab-management.view,admin.slab-management.warehouse.publish,"
-            + "admin.slab-management.warehouse.edit,admin.slab-management.off-shelf.restore,"
-            + "admin.slab-management.warehouse.delete,admin.slab-management.recycle.purge,"
-            + "admin.slab-management.operation-log.view");
+        "supply-chain.slab-management.view,supply-chain.slab-management.warehouse.publish,"
+            + "supply-chain.slab-management.warehouse.edit,supply-chain.slab-management.off-shelf.restore,"
+            + "supply-chain.slab-management.warehouse.delete,supply-chain.slab-management.recycle.purge,"
+            + "supply-chain.slab-management.operation-log.view");
     jdbcTemplate.update("UPDATE employees SET data_permission = 'all' WHERE id = ?", operatorId);
     Long mainImageMediaId = uploadSlabMedia("shared-main.png", "image/png");
     Long scanImageMediaId = uploadSlabMedia("shared-scan.png", "image/png");
@@ -5758,6 +5770,10 @@ class PlatformApiSmokeTest {
           slabId);
 
       usePlatformTestIdentity(operatorId);
+      jdbcTemplate.update("UPDATE employees SET client_code='supply-chain' WHERE account_id=?",operatorId);
+      jdbcTemplate.update("UPDATE account_identities SET client_code='supply-chain' WHERE account_id=?",operatorId);
+      jdbcTemplate.update("UPDATE roles r JOIN account_roles ar ON ar.role_id=r.id SET r.client_code='supply-chain' WHERE ar.account_id=?",operatorId);
+      jdbcTemplate.update("UPDATE account_roles SET client_code='supply-chain' WHERE account_id=?",operatorId);
       mockMvc.perform(get("/api/admin/slabs")
               .header("Authorization", "Bearer " + token))
           .andExpect(status().isOk())
@@ -5780,7 +5796,7 @@ class PlatformApiSmokeTest {
           .andExpect(jsonPath("$.data.name").value("其他用户大板-已编辑"))
           .andExpect(jsonPath("$.data.createdByAccountId").value(1));
 
-      jdbcTemplate.update("UPDATE slab_inventory SET status = 'offShelf' WHERE id = ?", slabId);
+      jdbcTemplate.update("UPDATE slab_inventory SET source_status = 'offShelf' WHERE id = ?", slabId);
       mockMvc.perform(put("/api/admin/slabs/batch-status")
               .header("Authorization", "Bearer " + token)
               .contentType("application/json")
@@ -6081,7 +6097,7 @@ class PlatformApiSmokeTest {
         "file", filename, mimeType, new byte[] {0x01, 0x02, 0x03, 0x04});
     MvcResult result = mockMvc.perform(multipart("/api/admin/slabs/images")
             .file(file)
-            .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+            .header("Authorization", "Bearer " + supplyChainToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.id").isNumber())
         .andExpect(jsonPath("$.data.url", containsString("/api/open/media/")))

@@ -26,12 +26,12 @@ public interface AuthAccountMapper {
       FROM accounts a
       JOIN account_identities ai
         ON ai.account_id = a.id
-       AND ai.client_code = 'admin'
+       AND ai.client_code IN ('admin', 'supply-chain')
        AND ai.status = 'enabled'
       LEFT JOIN employees e
         ON ai.identity_type = 'employee'
        AND e.id = ai.subject_id
-       AND e.account_id = a.id
+       AND e.client_code = ai.client_code AND e.account_id = a.id
        AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
       LEFT JOIN stores s ON s.id = ai.store_id
@@ -54,11 +54,11 @@ public interface AuthAccountMapper {
       SELECT COUNT(*)
       FROM accounts a
       JOIN account_identities ai
-        ON ai.account_id = a.id AND ai.client_code = 'admin' AND ai.status = 'enabled'
+        ON ai.account_id = a.id AND ai.client_code IN ('admin', 'supply-chain') AND ai.status = 'enabled'
       JOIN stores s ON s.id = ai.store_id AND s.status = 'disabled'
       LEFT JOIN employees e
         ON ai.identity_type = 'employee' AND e.id = ai.subject_id
-       AND e.account_id = a.id AND e.status = 'enabled'
+       AND e.client_code = ai.client_code AND e.account_id = a.id AND e.status = 'enabled'
       WHERE a.phone = #{phone}
         AND a.status = 'enabled'
         AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)
@@ -69,7 +69,7 @@ public interface AuthAccountMapper {
       SELECT COUNT(*)
       FROM accounts a
       JOIN account_identities ai
-        ON ai.account_id = a.id AND ai.client_code = 'admin' AND ai.status = 'enabled'
+        ON ai.account_id = a.id AND ai.client_code IN ('admin', 'supply-chain') AND ai.status = 'enabled'
       JOIN tenants t ON t.id = ai.tenant_id AND t.status = 'disabled'
       WHERE a.phone = #{phone} AND a.status = 'enabled'
       """)
@@ -94,12 +94,12 @@ public interface AuthAccountMapper {
       FROM accounts a
       JOIN account_identities ai
         ON ai.account_id = a.id
-       AND ai.client_code = 'admin'
+       AND ai.client_code IN ('admin', 'supply-chain')
        AND ai.status = 'enabled'
       LEFT JOIN employees e
         ON ai.identity_type = 'employee'
        AND e.id = ai.subject_id
-       AND e.account_id = a.id
+       AND e.client_code = ai.client_code AND e.account_id = a.id
        AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
       LEFT JOIN stores s ON s.id = ai.store_id
@@ -151,12 +151,12 @@ public interface AuthAccountMapper {
       FROM accounts a
       JOIN account_identities ai
         ON ai.account_id = a.id
-       AND ai.client_code = 'admin'
+       AND ai.client_code IN ('admin', 'supply-chain')
        AND ai.status = 'enabled'
       LEFT JOIN employees e
         ON ai.identity_type = 'employee'
        AND e.id = ai.subject_id
-       AND e.account_id = a.id
+       AND e.client_code = ai.client_code AND e.account_id = a.id
        AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
       LEFT JOIN stores s ON s.id = ai.store_id
@@ -193,10 +193,10 @@ public interface AuthAccountMapper {
         s.type AS storeType
       FROM accounts a
       JOIN account_identities ai
-        ON ai.account_id = a.id AND ai.client_code = 'admin' AND ai.status = 'enabled'
+        ON ai.account_id = a.id AND ai.client_code IN ('admin', 'supply-chain') AND ai.status = 'enabled'
       LEFT JOIN employees e
         ON ai.identity_type = 'employee' AND e.id = ai.subject_id
-       AND e.account_id = a.id AND e.status = 'enabled'
+       AND e.client_code = ai.client_code AND e.account_id = a.id AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
       LEFT JOIN stores s ON s.id = ai.store_id
       WHERE a.id = #{accountId} AND a.status = 'enabled'
@@ -205,6 +205,7 @@ public interface AuthAccountMapper {
         AND (ai.store_id IS NULL OR s.status = 'enabled')
         AND NOT (
           ai.identity_type = 'employee'
+          AND ai.client_code = 'admin'
           AND ai.tenant_id IS NULL
           AND ai.store_id IS NULL
           AND EXISTS (
@@ -222,6 +223,7 @@ public interface AuthAccountMapper {
       SELECT function_permissions
       FROM terminal_function_policies
       WHERE terminal = CASE
+          WHEN #{storeType} = 'supply-chain' THEN 'supply-chain'
           WHEN #{storeType} = 'cityPartner' THEN 'store'
           ELSE 'supplier'
         END
@@ -242,10 +244,11 @@ public interface AuthAccountMapper {
        AND ((ai.store_id = ar.store_id) OR (ai.store_id IS NULL AND ar.store_id IS NULL))
       JOIN roles r
         ON r.id = ar.role_id
+       AND r.client_code = ai.client_code
        AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
        AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
       WHERE ar.account_id = #{accountId}
-        AND ar.client_code = 'admin'
+        AND ar.client_code IN ('admin', 'supply-chain')
         AND r.status = 'enabled'
       """)
   List<String> findAdminRoleCodes(
@@ -265,10 +268,11 @@ public interface AuthAccountMapper {
        AND ((ai.store_id = ar.store_id) OR (ai.store_id IS NULL AND ar.store_id IS NULL))
       JOIN roles r
         ON r.id = ar.role_id
+       AND r.client_code = ai.client_code
        AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
        AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
       WHERE ar.account_id = #{accountId}
-        AND ar.client_code = 'admin'
+        AND ar.client_code IN ('admin', 'supply-chain')
         AND r.status = 'enabled'
       """)
   List<String> findAdminRoleNames(
@@ -290,10 +294,11 @@ public interface AuthAccountMapper {
          AND ((ai.store_id = ar.store_id) OR (ai.store_id IS NULL AND ar.store_id IS NULL))
         JOIN roles r
           ON r.id = ar.role_id
-         AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
+         AND r.client_code = ai.client_code
+       AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
          AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
         WHERE ar.account_id = #{accountId}
-          AND ar.client_code = 'admin'
+          AND ar.client_code IN ('admin', 'supply-chain')
           AND r.status = 'enabled'
           AND r.function_permissions IS NOT NULL
           AND r.function_permissions <> ''
@@ -313,12 +318,13 @@ public interface AuthAccountMapper {
         JOIN roles r
           ON r.id = ar.role_id
          AND r.status = 'enabled'
-         AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
+         AND r.client_code = ai.client_code
+       AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
          AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
         JOIN role_permissions rp ON rp.role_id = r.id
         JOIN permissions p ON p.code = rp.permission_code AND p.status = 'enabled'
         WHERE ar.account_id = #{accountId}
-          AND ar.client_code = 'admin'
+          AND ar.client_code IN ('admin', 'supply-chain')
       ) permission_values
       """)
   List<String> findAdminPermissionValues(
