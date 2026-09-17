@@ -52,7 +52,12 @@ test('one tab hides rail and only grants requested row operation', async ({ page
 });
 test('multiple tabs exclude unauthorized default and fall back to selling', async ({ page }) => {
   await setup(page, [prefix + 'selling.view', prefix + 'sold-out.view']);
+  const formOptionsLoaded = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/admin/finished-products/form-options' && response.ok(),
+  );
   await page.goto('/finished-stock-management');
+  // The tab rail renders before its option request finishes; keep the mocked route alive until it settles.
+  await (await formOptionsLoaded).finished();
   const main = page.getByRole('main');
   await expect(main.locator('.status-tabs .t-tabs__nav-item')).toHaveText([/出售中/, /已售完/]);
   await expect(main.locator('.status-tabs .t-tabs__nav-item.t-is-active')).toContainText('出售中');
