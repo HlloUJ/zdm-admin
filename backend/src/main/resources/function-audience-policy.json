@@ -1,5 +1,9 @@
 [
   {
+    "prefix": "admin.supplier-supply-type-management",
+    "scope": "admin-only"
+  },
+  {
     "prefix": "admin.supplier-management.manage-supply-types",
     "scope": "admin-only"
   },

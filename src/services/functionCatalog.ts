@@ -132,7 +132,6 @@ const verifiedFunctionCatalog: FunctionModule[] = [
             value: 'admin.supplier-management',
             actions: [
               { label: '新增', value: 'admin.supplier-management.create' },
-              { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
               { label: '编辑', value: 'admin.supplier-management.edit' },
               { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
               { label: '删除', value: 'admin.supplier-management.delete' },
@@ -749,6 +748,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
 const navigationModuleOrder = [
   'admin.tenant',
   'admin.product-data-center',
+  'admin.supplier-supply-type-management',
   'admin.supplier-management',
   'admin.tenant.store-category-management',
   'admin.permission-management',
@@ -763,8 +763,35 @@ const orderModulesByNavigation = (modules: FunctionModule[]) => {
   );
 };
 
+const supplyTypeModule: FunctionModule = {
+  label: '供应商供货类型管理',
+  value: 'admin.supplier-supply-type-management',
+  audiences: ['admin'],
+  menus: [
+    {
+      value: 'admin.supplier-supply-type-management.menu',
+      direct: true,
+      pages: [
+        {
+          label: '供应商供货类型管理',
+          value: 'admin.supplier-supply-type-management',
+          tabs: [],
+          actions: [
+            ['create', '新增'],
+            ['edit', '编辑'],
+            ['toggle-status', '停用/启用'],
+            ['delete', '删除'],
+          ].map(([action, label]) => ({ label, value: `admin.supplier-supply-type-management.${action}` })),
+        },
+      ],
+    },
+  ],
+};
+
 export const fullFunctionCatalog = applyConfirmedNavigationStructure(
-  orderModulesByNavigation(withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog])),
+  orderModulesByNavigation(
+    withDefaultViewPermissions([storeLevelModule, ...verifiedFunctionCatalog, supplyTypeModule]),
+  ),
 );
 
 const filterCatalogPagesByAudience = (modules: FunctionModule[], audience: FunctionAudience) =>
