@@ -12,13 +12,13 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showStoreTabRail" v-model="activeTab" :list="storeTabs" />
-              <t-form :data="searchForm" label-width="84px" colon>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店名称" name="shopName">
                       <t-input v-model="searchForm.shopName" clearable placeholder="请输入" />
                     </t-form-item>
-                    <t-form-item label="门店类型" name="shopType">
+                    <t-form-item label="门店类型" name="shopType" class="shop-type-filter">
                       <t-select v-model="searchForm.shopType" clearable placeholder="请选择">
                         <t-option
                           v-for="item in shopTypeOptions"
@@ -28,7 +28,7 @@
                         />
                       </t-select>
                     </t-form-item>
-                    <t-form-item label="租户姓名" name="tenantName">
+                    <t-form-item label="租户姓名" name="tenantName" class="compact-select-filter">
                       <t-select v-model="searchForm.tenantName" clearable filterable placeholder="请选择">
                         <t-option
                           v-for="item in tenantOptions"
@@ -770,6 +770,14 @@ onMounted(loadStorePage);
 .filter-fields :deep(.t-form__item) {
   width: 260px;
   margin-bottom: 0;
+}
+
+.filter-fields :deep(.t-form__item.shop-type-filter) {
+  width: 220px;
+}
+
+.filter-fields :deep(.t-form__item.compact-select-filter) {
+  width: 168px;
 }
 
 .filter-actions {

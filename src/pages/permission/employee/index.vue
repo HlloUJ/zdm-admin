@@ -25,7 +25,7 @@
                 @change="handleManagedClientChange"
               />
 
-              <t-form :data="filterDraft" label-width="84px" colon>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filterDraft" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="姓名" name="name" class="name-filter">
@@ -40,7 +40,7 @@
                         @update:model-value="handleFilterPhoneChange"
                       />
                     </t-form-item>
-                    <t-form-item label="角色" name="role" label-width="44px" class="role-filter">
+                    <t-form-item label="角色" name="role" class="role-filter">
                       <t-select v-model="filterDraft.role" clearable placeholder="请选择">
                         <t-option
                           v-for="role in operationRoleOptions"
@@ -50,7 +50,7 @@
                         />
                       </t-select>
                     </t-form-item>
-                    <t-form-item label="状态" name="status" label-width="44px" class="status-filter">
+                    <t-form-item label="状态" name="status" class="zdm-status-filter status-filter">
                       <t-select v-model="filterDraft.status" clearable placeholder="请选择">
                         <t-option label="启用" value="normal" />
                         <t-option label="停用" value="disabled" />

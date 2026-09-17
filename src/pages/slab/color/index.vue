@@ -14,7 +14,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="72px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="色系" name="name">
@@ -25,7 +25,7 @@
                     <t-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
                   </t-select>
                 </t-form-item>
-                <t-form-item label="状态" name="status">
+                <t-form-item class="zdm-status-filter" label="状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />

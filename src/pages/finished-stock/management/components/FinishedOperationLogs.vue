@@ -7,20 +7,20 @@
     @update:visible="emit('update:visible', $event)"
   >
     <t-space direction="vertical" size="large" style="width: 100%">
-      <t-form :data="filter" label-width="44px" colon>
+      <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
         <div class="operation-log-filters">
           <t-form-item label="商品" class="operation-log-keyword-filter">
             <t-input v-model="filter.keyword" clearable placeholder="商品名称/ID/商家编码" />
           </t-form-item>
-          <t-form-item label="操作类型" label-width="72px">
+          <t-form-item label="操作类型">
             <t-select v-model="filter.operationType" clearable placeholder="请选择">
               <t-option v-for="item in typeOptions" :key="item.value" v-bind="item" />
             </t-select>
           </t-form-item>
-          <t-form-item label="操作人" label-width="60px" class="operation-log-operator-filter">
+          <t-form-item label="操作人" class="operation-log-operator-filter">
             <t-input v-model="filter.operatorName" clearable placeholder="请输入操作人" />
           </t-form-item>
-          <t-form-item label="操作时间" label-width="72px" class="operation-log-date-filter">
+          <t-form-item label="操作时间" class="operation-log-date-filter">
             <t-date-range-picker
               v-model="dateRange"
               class="operation-log-date-picker"

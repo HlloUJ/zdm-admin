@@ -87,7 +87,8 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('大板名称/ID/大板编号', { exact: true });
   await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
   const primaryLabels = await page.locator('.filter-primary-row .t-form__label').allTextContents();
-  expect(primaryLabels.slice(-2)).toEqual(['色系：', '等级：']);
+  expect(primaryLabels.slice(-2)).toEqual(['纹理：', '色系：']);
+  await expect(page.locator('.filter-secondary-row .t-form__label')).toHaveText(['等级：', '供应商：']);
   const primaryGap = await page.locator('.filter-primary-row').evaluate((element) => {
     const styles = getComputedStyle(element);
     return { columnGap: styles.columnGap, rowGap: styles.rowGap };
@@ -96,7 +97,8 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   const keywordBox = await page.locator('.slab-keyword-filter').boundingBox();
   const supplierBox = await page.locator('.supplier-filter').boundingBox();
   const searchBox = await page.getByRole('button', { name: '查询', exact: true }).boundingBox();
-  expect(supplierBox?.x).toBe(keywordBox?.x);
+  expect((await page.locator('.grade-filter').boundingBox())?.x).toBe(keywordBox?.x);
+  expect(supplierBox?.x).toBeGreaterThan(keywordBox?.x ?? 0);
   expect(searchBox?.y).toBe(supplierBox?.y);
   expect(searchBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
 
@@ -119,7 +121,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   await expect(page.getByRole('row', { name: /回收站大板 07/ })).toHaveCount(0);
 });
 
-test('aligns supplier with the slab filter while keeping actions on the right', async ({ page }) => {
+test('aligns grade before supplier while keeping slab filter actions on the right', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/slab-management');
 
@@ -135,7 +137,9 @@ test('aligns supplier with the slab filter while keeping actions on the right', 
 
   const supplierBox = await page.locator('.supplier-filter').boundingBox();
   const resetBox = await page.locator('.reset-filter-button').boundingBox();
-  expect(supplierBox?.x).toBe((await page.locator('.slab-keyword-filter').boundingBox())?.x);
+  const gradeBox = await page.locator('.grade-filter').boundingBox();
+  expect(gradeBox?.x).toBe((await page.locator('.slab-keyword-filter').boundingBox())?.x);
+  expect(supplierBox!.x - gradeBox!.x - gradeBox!.width).toBeCloseTo(20, 0);
   expect(resetBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
   await expect(page.locator('.supplier-filter')).toHaveCSS('width', '234px');
   await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
@@ -363,4 +367,157 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   await expect(editDialog.locator('input').first()).toHaveValue('装点猫大板供应商');
   await editDialog.getByRole('button', { name: '取消' }).click();
   await expect(editDialog).toBeHidden();
+});
+
+test('uses consistent label and condition spacing across list filters', async ({ page }) => {
+  await page.setViewportSize({ width: 1393, height: 868 });
+  for (const route of [
+    '/employee-management',
+    '/finished-stock-craft',
+    '/product-category',
+    '/product-attribute',
+    '/product-attribute-value',
+    '/markup-configuration',
+    '/tenant-management',
+    '/tenant-store-management',
+    '/store-level-management',
+    '/slab-management',
+    '/finished-stock-management',
+    '/supplier-supply-type-management',
+    '/supplier-management',
+    '/slab-variety',
+    '/slab-origin',
+    '/slab-texture',
+    '/slab-color',
+    '/slab-grade',
+  ]) {
+    await setMockBusinessClient(page, route === '/supplier-management' ? 'supply-chain' : 'admin');
+    await page.goto(route);
+    const fields = page
+      .locator('.zdm-admin-filter-form .filter-fields, .zdm-admin-filter-form .supply-type-filter-fields')
+      .first();
+    await expect(fields).toBeVisible();
+    const result = await fields.evaluate((root) => {
+      const items = Array.from(root.querySelectorAll<HTMLElement>('.t-form__item'));
+      return items.map((item) => {
+        const label = item.querySelector<HTMLElement>('.t-form__label')!;
+        const control = item.querySelector<HTMLElement>('.t-form__controls')!;
+        const labelBox = label.getBoundingClientRect();
+        const controlBox = control.getBoundingClientRect();
+        return {
+          gap: controlBox.left - labelBox.right + parseFloat(getComputedStyle(label).paddingRight),
+          width: controlBox.width,
+          statusFilter: item.classList.contains('zdm-status-filter'),
+          groupGap: getComputedStyle(
+            item.closest('.filter-primary-row, .filter-secondary-row, .filter-fields, .supply-type-filter-fields')!,
+          ).columnGap,
+        };
+      });
+    });
+    for (const item of result) {
+      expect(item.gap, route).toBeCloseTo(5, 0);
+      expect(item.groupGap, route).toBe('20px');
+      expect(item.width, route).toBeGreaterThan(40);
+      if (item.statusFilter) expect(item.width, route).toBeCloseTo(103, 0);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), route).toBe(true);
+  }
+});
+
+test('resets category browsing and keeps the four-level filter popup stable', async ({ page }) => {
+  await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [] } }),
+  );
+  await page.setViewportSize({ width: 1393, height: 868 });
+  await page.goto('/finished-stock-management');
+  const category = page.locator('.filter-fields .t-form__item').nth(1);
+  await category.locator('.t-input').click();
+  const panel = page.locator('.t-cascader__panel:visible');
+  await expect(panel).toBeVisible();
+  const initial = await panel.boundingBox();
+  await panel.getByText('成品现货', { exact: true }).hover();
+  await panel.getByText('餐桌', { exact: true }).hover();
+  await panel.getByText('石材餐桌', { exact: true }).hover();
+  await expect(panel.getByText('奢石餐桌', { exact: true })).toBeVisible();
+  const expanded = await panel.boundingBox();
+  expect(Math.abs(expanded!.x - initial!.x)).toBeLessThan(2);
+  expect(initial!.width).toBeLessThan(250);
+  expect(expanded!.width).toBeGreaterThan(initial!.width * 3);
+  await panel.getByText('奢石餐桌', { exact: true }).click();
+  await expect(category).toContainText('奢石餐桌');
+  await expect(category).not.toContainText('成品现货 /');
+  await category.locator('.t-input').click();
+  await expect(panel.getByText('成品现货', { exact: true })).toBeVisible();
+  await expect(panel.getByText('餐桌', { exact: true })).toHaveCount(0);
+  await page.getByText('成品现货管理', { exact: true }).last().click();
+  await expect(category).toContainText('奢石餐桌');
+  await category.locator('.t-input').hover();
+  await category.locator('.t-input__suffix-clear').click();
+  await expect(category).not.toContainText('奢石餐桌');
+});
+
+test('keeps slab filters inside the card across status tabs', async ({ page }) => {
+  await page.setViewportSize({ width: 1393, height: 868 });
+  await page.goto('/slab-management');
+  for (const tab of ['已下架', '仓库中', '出售中', '已售完', '回收站']) {
+    await page
+      .locator('.status-tabs')
+      .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
+      .click();
+    const fields = page.locator('.filter-fields');
+    const overflow = await fields.evaluate((host) => {
+      const right = host.getBoundingClientRect().right;
+      return Array.from(host.querySelectorAll('.t-form__item, .filter-actions')).some(
+        (item) => item.getBoundingClientRect().right > right + 1,
+      );
+    });
+    expect(overflow, tab).toBe(false);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tab).toBe(true);
+    if (tab === '已下架') {
+      await expect(page.locator('.filter-secondary-row')).toContainText('下架时间');
+    } else {
+      await expect(page.locator('.filter-secondary-row')).toContainText('等级');
+      await expect(page.locator('.filter-primary-row')).not.toContainText('等级');
+    }
+  }
+});
+
+test('shows off-shelf actor and reason before time instead of creator metadata', async ({ page }) => {
+  await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [] } }),
+  );
+  await page.route('**/api/admin/finished-products', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            id: 71,
+            name: '下架展示测试商品',
+            sku: 'OFF-71',
+            status: 'offShelf',
+            createdByName: '商品创建者',
+            createdAt: '2026-07-01T01:00:00',
+            offShelfByName: '实际下架人',
+            offShelfAt: '2026-09-17T02:00:00',
+            offShelfReason: '商品信息有误',
+            offShelfDetail: '待核对尺寸',
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/finished-stock-management');
+  await page
+    .locator('.status-tabs')
+    .getByText(/^已下架(?: [0-9]+)?$/)
+    .click();
+  const headers = await page.locator('thead th').allTextContents();
+  expect(headers.join('|')).toContain('下架原因/详细说明|下架人|下架时间');
+  expect(headers.join('|')).not.toContain('创建人');
+  expect(headers.join('|')).not.toContain('创建时间');
+  const row = page.locator('tbody tr').filter({ hasText: '下架展示测试商品' });
+  await expect(row).toContainText('实际下架人');
+  await expect(row).toContainText('2026/09/17 10:00');
+  await expect(row).not.toContainText('商品创建者');
 });

@@ -358,3 +358,39 @@ body {
 .admin-layout .zdm-row-sort-table td:nth-child(2) {
   padding-left: 0;
 }
+
+/* Shared spacing for all list filters. */
+.t-form.zdm-admin-filter-form .supply-type-filter-fields,
+.t-form.zdm-admin-filter-form .operation-log-filters,
+.t-form.zdm-admin-filter-form .filter-fields,
+.t-form.zdm-admin-filter-form .filter-primary-row,
+.t-form.zdm-admin-filter-form .filter-secondary-row {
+  gap: 20px;
+}
+
+.t-form.zdm-admin-filter-form .t-form__item {
+  display: flex;
+  align-items: flex-start;
+}
+
+.t-form.zdm-admin-filter-form .t-form__label {
+  flex-shrink: 0;
+  float: none;
+  padding-right: 5px;
+}
+
+.t-form.zdm-admin-filter-form .t-form__controls {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Match the employee status filter control across all list pages. */
+.t-form.zdm-admin-filter-form .t-form__item.zdm-status-filter {
+  flex: 0 0 auto;
+  width: max-content;
+}
+
+.t-form.zdm-admin-filter-form .zdm-status-filter .t-form__controls {
+  flex: 0 0 103px;
+  width: 103px;
+}

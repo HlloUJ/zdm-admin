@@ -26,7 +26,7 @@
                 <t-tab-panel v-for="tab in slabTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
               </t-tabs>
 
-              <t-form :data="currentFilter" label-width="44px" colon>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="currentFilter" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
@@ -39,24 +39,13 @@
                         </t-select>
                       </t-form-item>
                       <template v-if="activeTab === 'offShelf'">
-                        <t-form-item label="下架原因" label-width="72px">
+                        <t-form-item label="下架原因">
                           <t-select v-model="currentFilter.offShelfReason" clearable filterable placeholder="请选择">
                             <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
                           </t-select>
                         </t-form-item>
-                        <t-form-item label="下架人" label-width="60px">
+                        <t-form-item label="下架人">
                           <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
-                        </t-form-item>
-                        <t-form-item label="下架时间" label-width="72px" class="off-shelf-date-filter">
-                          <t-date-range-picker
-                            v-model="currentFilter.offShelfDateRange"
-                            clearable
-                            allow-input
-                            value-type="YYYY-MM-DD"
-                            start="day"
-                            end="day"
-                            :placeholder="['开始日期', '结束日期']"
-                          />
                         </t-form-item>
                       </template>
                       <template v-else>
@@ -84,25 +73,31 @@
                             value-type="single"
                           />
                         </t-form-item>
-                        <t-form-item label="等级">
-                          <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择">
-                            <t-option
-                              v-for="item in gradeFilterOptions"
-                              :key="item.value"
-                              :label="item.label"
-                              :value="item.value"
-                            />
-                          </t-select>
-                        </t-form-item>
                       </template>
                     </div>
                     <div class="filter-secondary-row">
-                      <t-form-item
-                        v-if="activeTab !== 'offShelf'"
-                        label="供应商"
-                        label-width="60px"
-                        class="supplier-filter"
-                      >
+                      <t-form-item v-if="activeTab === 'offShelf'" label="下架时间" class="off-shelf-date-filter">
+                        <t-date-range-picker
+                          v-model="currentFilter.offShelfDateRange"
+                          clearable
+                          allow-input
+                          value-type="YYYY-MM-DD"
+                          start="day"
+                          end="day"
+                          :placeholder="['开始日期', '结束日期']"
+                        />
+                      </t-form-item>
+                      <t-form-item v-if="activeTab !== 'offShelf'" label="等级" class="grade-filter">
+                        <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择">
+                          <t-option
+                            v-for="item in gradeFilterOptions"
+                            :key="item.value"
+                            :label="item.label"
+                            :value="item.value"
+                          />
+                        </t-select>
+                      </t-form-item>
+                      <t-form-item v-if="activeTab !== 'offShelf'" label="供应商" class="supplier-filter">
                         <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
                           <t-option
                             v-for="item in supplierFilterOptions"
@@ -657,20 +652,20 @@
       :footer="false"
     >
       <div class="operation-log-drawer">
-        <t-form :data="operationLogFilter" label-width="44px" colon>
+        <t-form class="zdm-admin-filter-form" label-width="auto" :data="operationLogFilter" colon>
           <div class="operation-log-filters">
             <t-form-item label="大板" class="operation-log-keyword-filter">
               <t-input v-model="operationLogFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
             </t-form-item>
-            <t-form-item label="操作类型" label-width="72px">
+            <t-form-item label="操作类型">
               <t-select v-model="operationLogFilter.operationType" clearable placeholder="请选择">
                 <t-option v-for="item in operationTypeOptions" :key="item.value" v-bind="item" />
               </t-select>
             </t-form-item>
-            <t-form-item label="操作人" label-width="60px" class="operation-log-operator-filter">
+            <t-form-item label="操作人" class="operation-log-operator-filter">
               <t-input v-model="operationLogFilter.operatorName" clearable placeholder="请输入操作人" />
             </t-form-item>
-            <t-form-item label="操作时间" label-width="72px" class="operation-log-date-filter">
+            <t-form-item label="操作时间" class="operation-log-date-filter">
               <t-date-range-picker
                 v-model="operationLogFilter.dateRange"
                 class="operation-log-date-picker"
@@ -3765,7 +3760,7 @@ const saveBatchPrice = async () => {
 }
 
 .operation-log-date-filter {
-  width: 332px;
+  width: 335px;
 }
 
 .operation-log-date-picker {
@@ -4004,12 +3999,12 @@ const saveBatchPrice = async () => {
 
 .filter-primary-row {
   display: grid;
-  grid-template-columns: 234px repeat(5, minmax(0, 1fr));
+  grid-template-columns: 234px repeat(4, minmax(0, 1fr));
   width: 100%;
 }
 
 .filter-primary-row.off-shelf-filter-row {
-  grid-template-columns: 234px repeat(3, minmax(160px, 1fr)) minmax(300px, 1.5fr);
+  grid-template-columns: 234px repeat(3, minmax(0, 1fr));
 }
 
 .filter-secondary-row {
@@ -4026,12 +4021,16 @@ const saveBatchPrice = async () => {
   width: auto;
 }
 
+.filter-secondary-row :deep(.t-form__item.grade-filter) {
+  width: 184px;
+}
+
 .filter-secondary-row :deep(.t-form__item.supplier-filter) {
   width: 234px;
 }
 
-.filter-primary-row :deep(.t-form__item.off-shelf-date-filter) {
-  min-width: 300px;
+.filter-secondary-row :deep(.t-form__item.off-shelf-date-filter) {
+  width: 380px;
 }
 
 .filter-actions {

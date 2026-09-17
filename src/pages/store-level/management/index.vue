@@ -13,13 +13,13 @@
           <t-tag theme="primary" variant="light">门店统一级别数据源</t-tag>
         </header>
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="84px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="级别名称" name="name"
                   ><t-input v-model="searchForm.name" clearable placeholder="请输入"
                 /></t-form-item>
-                <t-form-item label="状态" name="status">
+                <t-form-item label="状态" name="status" class="zdm-status-filter status-filter">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
                     <t-option label="启用" value="normal" /><t-option label="停用" value="disabled" />
                   </t-select>
@@ -373,6 +373,9 @@ onMounted(loadLevels);
 .filter-fields :deep(.t-form__item) {
   width: 240px;
   margin-bottom: 0;
+}
+.filter-fields :deep(.t-form__item.status-filter) {
+  width: 150px;
 }
 .filter-actions,
 .table-actions {
