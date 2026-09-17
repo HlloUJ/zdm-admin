@@ -18,6 +18,7 @@ public class ProductAttribute extends BaseEntity implements com.zdm.platform.sec
   private String valueType;
 
   private String attributeRole;
+
   private String createdByName;
   private Long createdByAccountId;
   private LocalDateTime deletedAt;

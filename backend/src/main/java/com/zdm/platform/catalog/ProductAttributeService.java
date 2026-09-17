@@ -17,7 +17,6 @@ import org.springframework.util.StringUtils;
 @Service
 public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper, ProductAttribute> {
   private static final String DEFAULT_CREATED_BY_NAME = "韩健";
-  private static final String DUPLICATE_NAME_MESSAGE = "属性名称已存在";
   private static final String TEMPLATE_REFERENCED_MESSAGE = "该属性已被分类属性模板使用，不能删除";
   private static final String PRODUCT_REFERENCED_MESSAGE =
       "该属性仍被未售完商品使用，不能删除，请先处理关联商品。";
@@ -45,10 +44,6 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
   @Transactional
   public ProductAttribute createAttribute(ProductAttribute attribute) {
     attribute.setId(null);
-    attribute.setName(attribute.getName().trim());
-    if (lambdaQuery().eq(ProductAttribute::getName, attribute.getName()).count() > 0) {
-      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE);
-    }
     attribute.setDeletedAt(null);
     attribute.setDeletedByName(null);
     attribute.setDeletedByAccountId(null);
@@ -57,7 +52,7 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
     try {
       save(attribute);
     } catch (DuplicateKeyException exception) {
-      throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
+      throw new IllegalArgumentException("属性名称已存在，请勿重复创建", exception);
     }
     return getById(attribute.getId());
   }

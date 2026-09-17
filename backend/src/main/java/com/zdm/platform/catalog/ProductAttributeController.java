@@ -30,13 +30,8 @@ public class ProductAttributeController {
   @GetMapping
   public ApiResponse<List<ProductAttribute>> list() {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    List<String> visibleScopes = new ArrayList<>();
-    for (String scope : List.of("shared", "finished", "accessory")) {
-      if (permissionGuard.hasPermission(scopePermissionPrefix(scope) + ".view")) {
-        visibleScopes.add(scope);
-      }
-    }
-    return ApiResponse.ok(permissionGuard.filterData(service.listWithTemplateCounts(visibleScopes)));
+    List<String> scopes = visibleScopes();
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithTemplateCounts(scopes)));
   }
 
   @PostMapping
@@ -70,6 +65,16 @@ public class ProductAttributeController {
       throw new IllegalArgumentException(preview.message());
     }
     return ApiResponse.ok(service.deleteAttribute(id));
+  }
+
+  private List<String> visibleScopes() {
+    List<String> scopes = new ArrayList<>();
+    for (String scope : List.of("shared", "finished", "accessory")) {
+      if (permissionGuard.hasPermission(scopePermissionPrefix(scope) + ".view")) {
+        scopes.add(scope);
+      }
+    }
+    return scopes;
   }
 
   private ProductAttribute requireAttribute(Long id) {

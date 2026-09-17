@@ -136,8 +136,7 @@ test('uses the same action-specific confirmation foundation across modules', asy
 });
 
 test('shows the product attribute deletion mode returned by the server', async ({ page }) => {
-  await page.unroute('**/api/admin/product-attributes/*/delete-preview');
-  await page.route('**/api/admin/product-attributes/*/delete-preview', async (route) => {
+  await page.route('**/api/admin/product-attributes/1/delete-preview', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
@@ -167,8 +166,7 @@ test('shows the product attribute deletion mode returned by the server', async (
 
 test('does not open a deletion dialog when an unfinished product still uses the attribute', async ({ page }) => {
   const message = '该属性仍被未售完商品使用，不能删除，请先处理关联商品。';
-  await page.unroute('**/api/admin/product-attributes/*/delete-preview');
-  await page.route('**/api/admin/product-attributes/*/delete-preview', async (route) => {
+  await page.route('**/api/admin/product-attributes/1/delete-preview', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
@@ -1144,8 +1142,8 @@ const deletionCases = [
   { path: '/employee-management', target: '测试员工' },
   { path: '/finished-stock-craft', target: 'E2E 边工艺' },
   { path: '/slab-variety', target: '潘多拉' },
-  { path: '/product-attribute', target: 'E2E 共享属性' },
-  { path: '/product-attribute-value', target: 'E2E 共享属性值' },
+  { path: '/product-attribute', target: 'E2E 共享属性', targetPattern: /E2E (?:全局)?共享属性/ },
+  { path: '/product-attribute-value', target: 'E2E 共享属性值', targetPattern: /E2E (?:全局)?共享属性值/ },
 ];
 
 test('archives an operating store and warns before permanently deleting an archived store', async ({ page }) => {
@@ -1192,9 +1190,10 @@ for (const item of deletionCases) {
   test(`shows 已删除加名称 after deleting ${item.target}`, async ({ page }) => {
     if (item.path === '/supplier-management') await setMockBusinessClient(page, 'supply-chain');
     await page.goto(item.path);
-    const row = page.locator('tbody tr').filter({ hasText: item.target });
+    const row = page.locator('tbody tr').filter({ hasText: item.targetPattern ?? item.target });
+    const targetName = item.targetPattern ? await row.locator('td').first().innerText() : item.target;
     await row.getByText('删除', { exact: true }).click();
     await page.getByRole('button', { name: '确认删除', exact: true }).click();
-    await expect(page.getByText(`已删除“${item.target}”`, { exact: true })).toBeVisible();
+    await expect(page.getByText(`已删除“${targetName}”`, { exact: true })).toBeVisible();
   });
 }

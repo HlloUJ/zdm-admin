@@ -18,26 +18,22 @@
               <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
-                    <t-form-item label="属性名称" name="keyword">
-                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
-                    </t-form-item>
+                    <t-form-item label="属性名称"
+                      ><t-input v-model="searchForm.keyword" clearable placeholder="请输入"
+                    /></t-form-item>
                   </div>
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="search">
-                      <template #icon><t-icon name="search" /></template>
-                      查询
-                    </t-button>
-                    <t-button theme="default" variant="base" @click="reset">
-                      <template #icon><t-icon name="refresh" /></template>
-                      重置
-                    </t-button>
+                    <t-button theme="primary" @click="search"
+                      ><template #icon><t-icon name="search" /></template>查询</t-button
+                    ><t-button theme="default" variant="base" @click="reset"
+                      ><template #icon><t-icon name="refresh" /></template>重置</t-button
+                    >
                   </div>
                 </div>
               </t-form>
               <div class="table-toolbar">
                 <t-button v-if="canCreateAttribute" theme="primary" @click="openCreate">
-                  <template #icon><t-icon name="add" /></template>
-                  新增
+                  <template #icon><t-icon name="add" /></template>新增
                 </t-button>
               </div>
             </div>
@@ -242,16 +238,15 @@ const pageData = computed(() =>
 );
 const totalCount = computed(() => filteredData.value.length);
 const valueTypeLabel = (type: ValueType) => ({ select: '标准选项', number: '数值 + 单位', text: '文本输入' })[type];
-const normalizeStatus = (status?: ProductAttributeRecord['status']): Status =>
-  status === 'disabled' ? 'disabled' : 'enabled';
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value.replace(/-/g, '/').replace('T', ' ').slice(0, 16);
-
-  const pad = (num: number) => num.toString().padStart(2, '0');
+  const pad = (number: number) => number.toString().padStart(2, '0');
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+const normalizeStatus = (status?: ProductAttributeRecord['status']): Status =>
+  status === 'disabled' ? 'disabled' : 'enabled';
 const createAttributeCode = (record: ProductAttributeRecord) => `attribute-${record.id}`;
 const toAttribute = (record: ProductAttributeRecord): Attribute => ({
   id: record.id,
@@ -302,6 +297,7 @@ const restorePageScroll = () => {
   if (typeof window !== 'undefined') window.requestAnimationFrame(() => window.scrollTo(0, pageScrollTop.value));
 };
 const openCreate = () => {
+  if (!canCreateAttribute.value) return;
   form.scope = activeScope.value;
   form.name = '';
   form.valueType = '';
@@ -527,7 +523,6 @@ onMounted(loadAttributes);
   display: flex;
   align-items: center;
   gap: 12px;
-  white-space: nowrap;
 }
 .table-action-placeholder {
   color: var(--td-text-color-placeholder);
@@ -540,20 +535,5 @@ onMounted(loadAttributes);
 :deep(.t-table td) {
   padding-left: 24px;
   padding-right: 24px;
-}
-@media (max-width: 1120px) {
-  .filter-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .filter-actions {
-    flex-wrap: wrap;
-  }
-}
-@media (max-width: 720px) {
-  .filter-fields :deep(.t-form__item) {
-    width: 100%;
-  }
 }
 </style>

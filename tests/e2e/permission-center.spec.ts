@@ -53,119 +53,88 @@ test.beforeEach(async ({ page }) => {
   await installAdminApiMocks(page);
 });
 
-test('shows global attribute data and only granted attribute operation buttons', async ({ page }) => {
+test('allows account 15900000001 to operate the granted attribute tab', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
       JSON.stringify({
-        id: 11,
-        name: '受限属性库管理员',
-        phone: '15926620011',
-        roles: ['ATTRIBUTE_STATUS_OPERATOR'],
+        id: 3,
+        name: '张飞',
+        phone: '15900000001',
+        roles: ['ATTRIBUTE_OPERATOR'],
         permissions: [
           'admin.product-data-center.attribute.shared.view',
+          'admin.product-data-center.attribute.shared.create',
           'admin.product-data-center.attribute.shared.toggle-status',
+          'admin.product-data-center.attribute.shared.delete',
         ],
-        dataPermission: 'self',
+        dataPermission: 'all',
       }),
     );
   });
 
   await page.goto('/product-attribute');
   const main = page.getByRole('main');
-  const attributeRow = main.locator('tbody tr').filter({ hasText: 'E2E 全局共享属性' });
-  const attributeActions = attributeRow.locator('.table-actions');
+  const row = main.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
+  const actions = row.locator('.table-actions');
 
-  await expect(attributeRow).toContainText('其他管理员');
-  await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
-  await expect(attributeActions.locator('.t-link')).toHaveCount(1);
-  await expect(attributeActions.locator('.t-link')).toHaveText(/^(停用|启用)$/);
-  await expect(attributeActions.getByText('删除', { exact: true })).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '新增' })).toBeVisible();
+  await expect(actions.locator('.t-link')).toHaveText([/^(停用|启用)$/, '删除']);
+  await expect(row).toContainText('韩健');
+  await expect(row).toContainText('2026/08/04 09:00');
+  await expect(main.locator('thead th')).toContainText([
+    '属性名称',
+    '值类型',
+    '被引用次数',
+    '状态',
+    '创建人',
+    '创建时间',
+    '操作',
+  ]);
   await expect(main.locator('.scope-controls .t-tabs')).toHaveCount(0);
+  await expect(main.getByText('E2E 成品现货专属属性', { exact: true })).toHaveCount(0);
 });
 
-test('shows only granted attribute tabs and falls back to the first accessible tab', async ({ page }) => {
+test('allows account 15900000001 to operate the granted attribute-value tab', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
       JSON.stringify({
-        id: 12,
-        name: '属性库多 Tab 管理员',
-        phone: '15926620012',
-        roles: ['ATTRIBUTE_TAB_VIEWER'],
-        permissions: [
-          'admin.product-data-center.attribute.finished.view',
-          'admin.product-data-center.attribute.accessory.view',
-        ],
-        dataPermission: 'self',
-      }),
-    );
-  });
-
-  await page.goto('/product-attribute');
-  const main = page.getByRole('main');
-
-  await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属属性', '配件专属属性']);
-  await expect(main.getByText('E2E 成品现货专属属性', { exact: true })).toBeVisible();
-  await expect(main.getByText('E2E 全局共享属性', { exact: true })).toHaveCount(0);
-  await expect(main.getByText('成品现货属性库', { exact: true })).toBeVisible();
-});
-
-test('shows global attribute values and only granted attribute-value operation buttons', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'zdm-admin-user',
-      JSON.stringify({
-        id: 13,
-        name: '受限属性值管理员',
-        phone: '15926620013',
-        roles: ['ATTRIBUTE_VALUE_STATUS_OPERATOR'],
+        id: 3,
+        name: '张飞',
+        phone: '15900000001',
+        roles: ['ATTRIBUTE_VALUE_OPERATOR'],
         permissions: [
           'admin.product-data-center.attribute-value.shared.view',
+          'admin.product-data-center.attribute-value.shared.create',
           'admin.product-data-center.attribute-value.shared.toggle-status',
+          'admin.product-data-center.attribute-value.shared.delete',
         ],
-        dataPermission: 'self',
+        dataPermission: 'all',
       }),
     );
   });
 
   await page.goto('/product-attribute-value');
   const main = page.getByRole('main');
-  const valueRow = main.locator('tbody tr').filter({ hasText: 'E2E 全局共享属性值' });
-  const valueActions = valueRow.locator('.table-actions');
+  const row = main.locator('tbody tr').filter({ hasText: 'E2E 共享属性值' });
+  const actions = row.locator('.table-actions');
 
-  await expect(valueRow).toContainText('其他管理员');
-  await expect(main.getByRole('button', { name: '新增' })).toHaveCount(0);
-  await expect(valueActions.locator('.t-link')).toHaveCount(1);
-  await expect(valueActions.locator('.t-link')).toHaveText(/^(停用|启用)$/);
-  await expect(valueActions.getByText('删除', { exact: true })).toHaveCount(0);
-  await expect(main.locator('.scope-controls .t-tabs')).toHaveCount(0);
-});
-
-test('shows only granted attribute-value tabs and falls back to the first accessible tab', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'zdm-admin-user',
-      JSON.stringify({
-        id: 14,
-        name: '属性值多 Tab 管理员',
-        phone: '15926620014',
-        roles: ['ATTRIBUTE_VALUE_TAB_VIEWER'],
-        permissions: [
-          'admin.product-data-center.attribute-value.finished.view',
-          'admin.product-data-center.attribute-value.accessory.view',
-        ],
-        dataPermission: 'self',
-      }),
-    );
-  });
-
-  await page.goto('/product-attribute-value');
-  const main = page.getByRole('main');
-
-  await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属值', '配件专属值']);
-  await expect(main.getByText('E2E 成品现货专属值', { exact: true })).toBeVisible();
-  await expect(main.getByText('E2E 全局共享属性值', { exact: true })).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '新增' })).toBeVisible();
+  await expect(actions.locator('.t-link')).toHaveText([/^(停用|启用)$/, '删除']);
+  await expect(row).toContainText('韩健');
+  await expect(row).toContainText('2026/08/04 09:20');
+  await expect(main.locator('thead th')).toContainText([
+    '属性值名称',
+    '所属属性',
+    '被引用次数',
+    '状态',
+    '创建人',
+    '创建时间',
+    '操作',
+  ]);
+  await expect(main.locator('.source-card .t-tabs')).toHaveCount(0);
+  await expect(main.getByText('E2E 成品现货专属值', { exact: true })).toHaveCount(0);
 });
 
 test('shows only granted craft operation buttons for a restricted account', async ({ page }) => {
@@ -652,7 +621,6 @@ test('filters menu and employee actions by logged-in permissions', async ({ page
   await expect(sideNav.getByText('员工管理')).toBeVisible();
   await expect(sideNav.getByText('角色管理')).toHaveCount(0);
   await expect(sideNav.getByText('商品分类管理')).toHaveCount(0);
-  await expect(sideNav.getByText('属性库管理')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /邀请员工/ })).toHaveCount(0);
   await expect(firstEmployeeActions.getByText('编辑', { exact: true })).toBeVisible();
   await expect(firstEmployeeActions.getByText('角色', { exact: true })).toHaveCount(0);
@@ -1032,16 +1000,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(accessoryCategoryPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     categoryCatalogActionLabels,
   );
-  const finishedTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货模板' });
-  const accessoryTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件模板' });
-  await expect(finishedTemplatePermissionRow.getByText('分类属性模板', { exact: true })).toBeVisible();
-  const templateActionLabels = ['查看', '创建新版本草稿', '版本记录', '排序'];
-  await expect(finishedTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
-    templateActionLabels,
-  );
-  await expect(accessoryTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
-    templateActionLabels,
-  );
+  const attributeActionLabels = ['查看', '新增', '停用/启用', '删除'];
   const sharedAttributePermissionRow = roleMatrix
     .locator('tbody tr')
     .filter({ has: page.getByText('共享基础属性', { exact: true }) });
@@ -1049,7 +1008,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const accessoryAttributePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件专属属性' });
   await expect(sharedAttributePermissionRow.getByText('属性库管理', { exact: true })).toBeVisible();
   for (const row of [sharedAttributePermissionRow, finishedAttributePermissionRow, accessoryAttributePermissionRow]) {
-    await expect(row.locator('.permission-action-grid .t-checkbox')).toHaveText(['查看', '新增', '停用/启用', '删除']);
+    await expect(row.locator('.permission-action-grid .t-checkbox')).toHaveText(attributeActionLabels);
   }
   const sharedAttributeValuePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '共享基础属性值' });
   const finishedAttributeValuePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货专属值' });
@@ -1060,8 +1019,18 @@ test('opens role permission configuration dialog', async ({ page }) => {
     finishedAttributeValuePermissionRow,
     accessoryAttributeValuePermissionRow,
   ]) {
-    await expect(row.locator('.permission-action-grid .t-checkbox')).toHaveText(['查看', '新增', '停用/启用', '删除']);
+    await expect(row.locator('.permission-action-grid .t-checkbox')).toHaveText(attributeActionLabels);
   }
+  const finishedTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货模板' });
+  const accessoryTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件模板' });
+  await expect(finishedTemplatePermissionRow.getByText('分类属性模板', { exact: true })).toBeVisible();
+  const templateActionLabels = ['查看', '创建新版本草稿', '版本记录', '排序'];
+  await expect(finishedTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    templateActionLabels,
+  );
+  await expect(accessoryTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    templateActionLabels,
+  );
   const markupActionLabels = ['查看', '保存指导价', '新增', '编辑', '停用/启用', '排序', '删除'];
   const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品价格配置' });
   const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板价格配置' });
