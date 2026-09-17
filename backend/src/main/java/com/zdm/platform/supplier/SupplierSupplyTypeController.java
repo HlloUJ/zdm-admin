@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/supplier-supply-types")
 public class SupplierSupplyTypeController {
-  private static final String PREFIX = "admin.supplier-management";
+  private static final String PREFIX = "admin.supplier-supply-type-management";
   private final SupplierSupplyTypeService service;
   private final PermissionGuard permissionGuard;
 
@@ -30,13 +30,16 @@ public class SupplierSupplyTypeController {
 
   @GetMapping
   public ApiResponse<List<SupplierSupplyType>> list() {
-    permissionGuard.requireView(PREFIX);
-    return ApiResponse.ok(permissionGuard.filterData(service.listTypes()));
+    if (permissionGuard.hasView(PREFIX)) {
+      return ApiResponse.ok(permissionGuard.filterData(service.listTypes()));
+    }
+    permissionGuard.requireView("admin.supplier-management");
+    return ApiResponse.ok(service.listTypes());
   }
 
   @PostMapping
   public ApiResponse<SupplierSupplyType> create(@Valid @RequestBody SupplierSupplyType type) {
-    permissionGuard.requirePermission(PREFIX + ".manage-supply-types");
+    permissionGuard.requirePermission(PREFIX + ".create");
     return ApiResponse.ok(service.createType(type));
   }
 
@@ -44,7 +47,7 @@ public class SupplierSupplyTypeController {
   public ApiResponse<SupplierSupplyType> update(
       @PathVariable Long id,
       @Valid @RequestBody SupplierSupplyType type) {
-    permissionGuard.requirePermission(PREFIX + ".manage-supply-types");
+    permissionGuard.requirePermission(PREFIX + ".edit");
     return ApiResponse.ok(service.updateType(id, type));
   }
 
@@ -52,13 +55,13 @@ public class SupplierSupplyTypeController {
   public ApiResponse<SupplierSupplyType> updateStatus(
       @PathVariable Long id,
       @Valid @RequestBody SupplierStatusRequest request) {
-    permissionGuard.requirePermission(PREFIX + ".manage-supply-types");
+    permissionGuard.requirePermission(PREFIX + ".toggle-status");
     return ApiResponse.ok(service.updateStatus(id, request.status()));
   }
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    permissionGuard.requirePermission(PREFIX + ".manage-supply-types");
+    permissionGuard.requirePermission(PREFIX + ".delete");
     service.deleteType(id);
     return ApiResponse.ok(true);
   }

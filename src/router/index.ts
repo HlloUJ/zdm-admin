@@ -9,6 +9,11 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/supplier-supply-type-management',
+      name: 'supplierSupplyTypeManagement',
+      component: () => import('@/pages/supplier/supply-type/index.vue'),
+    },
+    {
       path: '/',
       redirect: '/login',
     },

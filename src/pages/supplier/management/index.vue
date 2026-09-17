@@ -56,9 +56,6 @@
                 <template #icon><t-icon name="add" /></template>
                 新增
               </t-button>
-              <t-button v-if="canManageSupplyTypes" theme="default" variant="outline" @click="openSupplyTypeManagement">
-                供货类型配置
-              </t-button>
             </div>
           </div>
 
@@ -148,70 +145,6 @@
       </t-form>
     </AdminDialog>
 
-    <AdminDialog
-      v-model:visible="supplyTypeManagementVisible"
-      header="供货类型配置"
-      width="900px"
-      confirm-btn="关闭"
-      :cancel-btn="null"
-      @confirm="supplyTypeManagementVisible = false"
-      @close="supplyTypeManagementVisible = false"
-    >
-      <div class="table-toolbar">
-        <t-button theme="primary" @click="openSupplyTypeForm()">
-          <template #icon><t-icon name="add" /></template>
-          新增供货类型
-        </t-button>
-      </div>
-      <t-table row-key="id" :data="supplyTypes" :columns="supplyTypeColumns" table-layout="fixed">
-        <template #status="{ row }">
-          <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
-            {{ row.status === 'enabled' ? '启用' : '停用' }}
-          </t-tag>
-        </template>
-        <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-        <template #operation="{ row }">
-          <div class="table-actions">
-            <t-link theme="primary" hover="color" @click="openSupplyTypeForm(row)">编辑</t-link>
-            <t-link
-              :theme="row.status === 'enabled' ? 'warning' : 'success'"
-              hover="color"
-              @click="toggleSupplyTypeStatus(row)"
-            >
-              {{ row.status === 'enabled' ? '停用' : '启用' }}
-            </t-link>
-            <t-link theme="danger" hover="color" @click="openSupplyTypeDeleteConfirm(row)">删除</t-link>
-          </div>
-        </template>
-      </t-table>
-    </AdminDialog>
-
-    <AdminDialog
-      v-model:visible="supplyTypeFormVisible"
-      :header="editingSupplyTypeId ? '编辑供货类型' : '新增供货类型'"
-      @confirm="submitSupplyType"
-      @cancel="closeSupplyTypeForm"
-      @close="closeSupplyTypeForm"
-    >
-      <t-form ref="supplyTypeFormRef" :data="supplyTypeForm" :rules="supplyTypeRules" label-width="96px" colon>
-        <t-form-item label="类型名称" name="name">
-          <t-input v-model="supplyTypeForm.name" clearable placeholder="请输入供货类型名称" />
-        </t-form-item>
-      </t-form>
-    </AdminDialog>
-
-    <AdminConfirmDialog
-      v-model:visible="supplyTypeDeleteConfirmVisible"
-      action="删除"
-      object-type="供货类型"
-      :object-name="pendingSupplyTypeDelete?.name"
-      @confirm="confirmSupplyTypeDelete"
-      @cancel="closeSupplyTypeDeleteConfirm"
-      @close="closeSupplyTypeDeleteConfirm"
-    >
-      删除后不可恢复，确定删除该供货类型吗？
-    </AdminConfirmDialog>
-
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
       :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
@@ -235,18 +168,13 @@ import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
   createSupplier,
-  createSupplierSupplyType,
   deleteSupplier,
-  deleteSupplierSupplyType,
   listSupplierSupplyTypes,
   listSuppliers,
   updateSupplier,
-  updateSupplierSupplyType,
-  updateSupplierSupplyTypeStatus,
   updateSupplierStatus,
   type SupplierPayload,
   type SupplierRecord,
-  type SupplierSupplyTypePayload,
   type SupplierSupplyTypeRecord,
 } from '@/services/suppliers';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -286,14 +214,8 @@ const canToggleSupplierStatus = computed(() =>
   hasPermission(loginUser.value, `${supplierPermissionPrefix}.toggle-status`),
 );
 const canDeleteSupplier = computed(() => hasPermission(loginUser.value, `${supplierPermissionPrefix}.delete`));
-const canManageSupplyTypes = computed(
-  () =>
-    !loginUser.value.tenantId &&
-    !loginUser.value.storeId &&
-    hasPermission(loginUser.value, `${supplierPermissionPrefix}.manage-supply-types`),
-);
 const currentOrganizationLabel = computed(
-  () => loginUser.value.storeName ?? (loginUser.value.tenantId ? loginUser.value.tenantName : '运营管理平台'),
+  () => loginUser.value.storeName ?? (loginUser.value.tenantId ? loginUser.value.tenantName : '供应链协同系统'),
 );
 const selectableSupplyTypes = computed(() =>
   supplyTypes.value.filter((item) => item.status === 'enabled' || formData.supplyTypeIds.includes(item.id)),
@@ -310,14 +232,6 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'operation', title: '操作', width: 200, align: 'left', fixed: 'right' },
 ];
-const supplyTypeColumns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '类型名称', minWidth: 180 },
-  { colKey: 'status', title: '状态', width: 100, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 190, fixed: 'right' },
-];
-
 const searchForm = reactive({
   name: '',
   supplyTypeId: '' as number | '',
@@ -364,17 +278,6 @@ const confirmState = reactive<{
   type: 'disable',
   row: null,
 });
-
-const supplyTypeManagementVisible = ref(false);
-const supplyTypeFormVisible = ref(false);
-const supplyTypeFormRef = ref<FormInstanceFunctions>();
-const editingSupplyTypeId = ref<number | null>(null);
-const supplyTypeForm = reactive<SupplierSupplyTypePayload>({ name: '' });
-const supplyTypeRules: Record<string, FormRule[]> = {
-  name: [{ required: true, message: '请输入供货类型名称', type: 'error' }],
-};
-const supplyTypeDeleteConfirmVisible = ref(false);
-const pendingSupplyTypeDelete = ref<SupplierSupplyTypeRecord | null>(null);
 
 const filteredData = computed(() => {
   const name = appliedSearchForm.name.trim();
@@ -593,78 +496,6 @@ const handleConfirm = async () => {
         target: targetName,
       });
     }
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
-  }
-};
-
-const openSupplyTypeManagement = async () => {
-  await loadSupplyTypes();
-  supplyTypeManagementVisible.value = true;
-};
-
-const openSupplyTypeForm = (row?: SupplierSupplyTypeRecord) => {
-  editingSupplyTypeId.value = row?.id ?? null;
-  Object.assign(supplyTypeForm, { name: row?.name ?? '' });
-  supplyTypeFormVisible.value = true;
-};
-
-const closeSupplyTypeForm = () => {
-  supplyTypeFormVisible.value = false;
-  supplyTypeFormRef.value?.clearValidate();
-};
-
-const submitSupplyType = async () => {
-  if ((await supplyTypeFormRef.value?.validate()) !== true) return;
-  const payload = { name: supplyTypeForm.name.trim() };
-  try {
-    if (editingSupplyTypeId.value) {
-      await updateSupplierSupplyType(editingSupplyTypeId.value, payload);
-      adminFeedback.actionSuccess({ action: '保存', target: payload.name });
-    } else {
-      await createSupplierSupplyType(payload);
-      adminFeedback.created(payload.name);
-    }
-    await loadSupplyTypes();
-    closeSupplyTypeForm();
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
-  }
-};
-
-const openSupplyTypeDeleteConfirm = (row: SupplierSupplyTypeRecord) => {
-  if (row.referenced) {
-    adminFeedback.error(`供货类型“${row.name}”已被供应商使用，无法删除`);
-    return;
-  }
-  pendingSupplyTypeDelete.value = row;
-  supplyTypeDeleteConfirmVisible.value = true;
-};
-
-const closeSupplyTypeDeleteConfirm = () => {
-  supplyTypeDeleteConfirmVisible.value = false;
-  pendingSupplyTypeDelete.value = null;
-};
-
-const confirmSupplyTypeDelete = async () => {
-  const row = pendingSupplyTypeDelete.value;
-  if (!row) return;
-  try {
-    await deleteSupplierSupplyType(row.id);
-    await loadSupplyTypes();
-    closeSupplyTypeDeleteConfirm();
-    adminFeedback.deleted(row.name);
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '删除失败');
-  }
-};
-
-const toggleSupplyTypeStatus = async (row: SupplierSupplyTypeRecord) => {
-  const nextStatus = row.status === 'enabled' ? 'disabled' : 'enabled';
-  try {
-    await updateSupplierSupplyTypeStatus(row.id, nextStatus);
-    await loadSupplyTypes();
-    adminFeedback.actionSuccess({ action: nextStatus === 'enabled' ? '启用' : '停用', target: row.name });
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
