@@ -133,6 +133,7 @@
             <template #table>
               <t-table
                 :key="activeTab"
+                class="finished-stock-table"
                 :row-class-name="({ row }: { row: StockItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
                 row-key="id"
                 :data="pageData"
@@ -4030,6 +4031,11 @@ const handleConfirm = async () => {
   flex: 0 0 auto;
   gap: var(--td-comp-margin-s);
   align-self: flex-start;
+}
+
+/* The full-width empty state already includes the visible table width. */
+.finished-stock-table :deep(.t-table__empty-row > td) {
+  padding-inline: 0;
 }
 
 .table-empty {

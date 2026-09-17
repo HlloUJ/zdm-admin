@@ -521,3 +521,45 @@ test('shows off-shelf actor and reason before time instead of creator metadata',
   await expect(row).toContainText('2026/09/17 10:00');
   await expect(row).not.toContainText('商品创建者');
 });
+
+test('does not add empty-cell padding to the finished stock horizontal scroll width', async ({ page }) => {
+  await page.setViewportSize({ width: 1393, height: 868 });
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [] } }));
+  await page.goto('/finished-stock-management');
+  for (const tab of ['仓库中', '出售中', '已下架', '已售完', '回收站']) {
+    await page.locator('.status-tabs').getByText(tab, { exact: true }).click();
+    const table = page.locator('.finished-stock-table');
+    await expect(table.getByText('暂无数据')).toBeVisible();
+    const sizes = await table.evaluate((root) => {
+      const content = root.querySelector('.t-table__content')!;
+      const grid = root.querySelector('table')!;
+      const empty = root.querySelector('.t-table__empty')!;
+      return {
+        scrollWidth: content.scrollWidth,
+        expectedWidth: Math.max(content.clientWidth, Math.ceil(grid.getBoundingClientRect().width)),
+        emptyLeft: empty.getBoundingClientRect().left,
+        contentLeft: content.getBoundingClientRect().left,
+      };
+    });
+    expect(sizes.scrollWidth, tab).toBeLessThanOrEqual(sizes.expectedWidth + 1);
+    expect(sizes.emptyLeft, tab).toBeCloseTo(sizes.contentLeft, 0);
+    if (tab === '已下架') {
+      const operation = table.locator('thead th').last();
+      await expect
+        .poll(async () => {
+          const header = await operation.boundingBox();
+          const content = await table.locator('.t-table__content').boundingBox();
+          return Math.abs(header!.x + header!.width - content!.x - content!.width);
+        })
+        .toBeLessThan(1);
+      const before = await operation.boundingBox();
+      await table.locator('.t-table__content').evaluate((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+      await expect
+        .poll(() => table.locator('.t-table__content').evaluate((node) => node.scrollLeft))
+        .toBeGreaterThan(0);
+      expect((await operation.boundingBox())!.x).toBeCloseTo(before!.x, 0);
+    }
+  }
+});
