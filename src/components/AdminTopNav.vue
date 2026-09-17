@@ -4,18 +4,24 @@
       <div class="brand-logo">装</div>
       <div>
         <div class="brand-title">装点猫</div>
-        <t-select
+        <div
           v-if="switchableIdentityContexts.length > 1"
-          v-model="selectedIdentityId"
-          class="brand-context-select"
-          size="small"
-          auto-width
-          borderless
-          :options="identityOptions"
-          :loading="switchingIdentity"
-          aria-label="切换平台或组织"
-          @change="handleIdentityChange"
-        />
+          class="brand-context-switcher"
+          :class="{ 'is-open': identitySelectorOpen }"
+        >
+          <span class="brand-context-label" aria-hidden="true">{{ currentIdentityLabel }}</span>
+          <t-select
+            v-model="selectedIdentityId"
+            v-model:popup-visible="identitySelectorOpen"
+            class="brand-context-select"
+            size="small"
+            auto-width
+            :options="identityOptions"
+            :loading="switchingIdentity"
+            aria-label="切换平台或组织"
+            @change="handleIdentityChange"
+          />
+        </div>
         <div v-else class="brand-subtitle">{{ currentIdentityLabel }}</div>
       </div>
     </div>
@@ -51,6 +57,7 @@ const loginUser = computed(() => getLoginUser());
 const identityContexts = ref<IdentityContext[]>([]);
 const selectedIdentityId = ref<number>();
 const switchingIdentity = ref(false);
+const identitySelectorOpen = ref(false);
 const avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');
 const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string> = {
   cityPartner: '城市合伙人',
@@ -99,7 +106,6 @@ const handleIdentityChange = async (value: string | number) => {
   switchingIdentity.value = true;
   try {
     await switchIdentity(identityId);
-    adminFeedback.success('已切换业务身份');
     await router.replace('/dashboard');
     window.location.reload();
   } catch (error) {
@@ -127,8 +133,37 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.brand-context-select {
+.brand-context-switcher {
+  display: grid;
+  align-items: center;
   margin-top: 2px;
+}
+
+.brand-context-label,
+.brand-context-select {
+  grid-area: 1 / 1;
+}
+
+.brand-context-label {
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
+  white-space: nowrap;
+}
+
+.brand-context-select {
+  opacity: 0;
+}
+
+.brand-context-switcher:hover .brand-context-select,
+.brand-context-switcher:focus-within .brand-context-select,
+.brand-context-switcher.is-open .brand-context-select {
+  opacity: 1;
+}
+
+.brand-context-switcher:hover .brand-context-label,
+.brand-context-switcher:focus-within .brand-context-label,
+.brand-context-switcher.is-open .brand-context-label {
+  visibility: hidden;
 }
 
 .user-entry {
