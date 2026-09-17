@@ -50,7 +50,7 @@ const catalogFixture: FunctionModule[] = [
 
 describe('full function catalog', () => {
   it('publishes the full catalog but filters terminal modules in every environment', () => {
-    expect(fullFunctionCatalog).toHaveLength(5);
+    expect(fullFunctionCatalog).toHaveLength(6);
     expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([
       'admin.supplier-management',
       'admin.tenant.store-category-management',
@@ -64,6 +64,7 @@ describe('full function catalog', () => {
     expect(fullFunctionCatalog.map((module) => module.label)).toEqual([
       '租户与门店',
       '商品管理',
+      '供应商供货类型管理',
       '供应商管理',
       '门店分类管理',
       '权限管理',
@@ -88,7 +89,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[2]).toMatchObject({
+    expect(fullFunctionCatalog[3]).toMatchObject({
       label: '供应商管理',
       value: 'admin.supplier-management',
       menus: [
@@ -98,7 +99,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[3]).toMatchObject({
+    expect(fullFunctionCatalog[4]).toMatchObject({
       label: '门店分类管理',
       value: 'admin.tenant.store-category-management',
       menus: [
@@ -185,7 +186,7 @@ describe('full function catalog', () => {
         },
       ],
     });
-    expect(fullFunctionCatalog[4]).toMatchObject({
+    expect(fullFunctionCatalog[5]).toMatchObject({
       label: '权限管理',
       menus: [
         {
@@ -241,25 +242,24 @@ describe('full function catalog', () => {
       '等级管理',
     ]);
     expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[4])
+      collectFunctionCatalogRows(fullFunctionCatalog[5])
         .filter((row) => row.showMenu)
         .map((row) => row.menuLabel),
     ).toEqual(['员工管理', '角色管理', '终端功能分配']);
     expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[4])
+      collectFunctionCatalogRows(fullFunctionCatalog[5])
         .filter((row) => row.showThirdMenu)
         .map((row) => row.thirdMenuLabel),
     ).toEqual([undefined, undefined, undefined]);
-    const supplierPage = fullFunctionCatalog[2].menus[0].pages[0];
+    const supplierPage = fullFunctionCatalog[3].menus[0].pages[0];
     expect(supplierPage.actions).toEqual([
       { label: '查看', value: 'admin.supplier-management.view' },
       { label: '新增', value: 'admin.supplier-management.create' },
-      { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
       { label: '编辑', value: 'admin.supplier-management.edit' },
       { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
       { label: '删除', value: 'admin.supplier-management.delete' },
     ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[2])).toEqual([
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[3])).toEqual([
       expect.objectContaining({
         direct: true,
         menuLabel: undefined,
@@ -268,7 +268,7 @@ describe('full function catalog', () => {
         actions: supplierPage.actions,
       }),
     ]);
-    const storeCategoryPage = fullFunctionCatalog[3].menus[0].pages[0];
+    const storeCategoryPage = fullFunctionCatalog[4].menus[0].pages[0];
     expect(storeCategoryPage.actions).toEqual([
       { label: '查看', value: 'admin.tenant.store-category-management.view' },
       { label: '新增一级分类', value: 'admin.tenant.store-category-management.create-root' },
@@ -279,7 +279,7 @@ describe('full function catalog', () => {
       { label: '停用/启用', value: 'admin.tenant.store-category-management.toggle-status' },
       { label: '删除', value: 'admin.tenant.store-category-management.delete' },
     ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[3])).toEqual([
+    expect(collectFunctionCatalogRows(fullFunctionCatalog[4])).toEqual([
       expect.objectContaining({
         direct: true,
         menuLabel: undefined,
@@ -682,9 +682,13 @@ describe('full function catalog', () => {
       'admin.product-data-center.slab-grade.edit',
       'admin.product-data-center.slab-grade.toggle-status',
       'admin.product-data-center.slab-grade.delete',
+      'admin.supplier-supply-type-management.view',
+      'admin.supplier-supply-type-management.create',
+      'admin.supplier-supply-type-management.edit',
+      'admin.supplier-supply-type-management.toggle-status',
+      'admin.supplier-supply-type-management.delete',
       'admin.supplier-management.view',
       'admin.supplier-management.create',
-      'admin.supplier-management.manage-supply-types',
       'admin.supplier-management.edit',
       'admin.supplier-management.toggle-status',
       'admin.supplier-management.delete',
@@ -714,7 +718,7 @@ describe('full function catalog', () => {
   });
 
   it('keeps the shared supply type dictionary configuration on the platform only', () => {
-    const action = 'admin.supplier-management.manage-supply-types';
+    const action = 'admin.supplier-supply-type-management.create';
     expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'))).toContain(action);
     for (const terminal of ['store', 'supplier'] as const) {
       expect(getFunctionCatalogPermissionValues(terminalFunctionTrees[terminal])).not.toContain(action);
@@ -968,6 +972,24 @@ describe('finished stock catalog contract', () => {
           value.startsWith('admin.finished-stock-management.'),
         ),
       ).toEqual([]);
+    }
+  });
+});
+
+describe('supplier supply type catalog', () => {
+  it('registers exactly the page actions and excludes business terminals', () => {
+    const module = fullFunctionCatalog.find((item) => item.value === 'admin.supplier-supply-type-management');
+    expect(module?.menus[0].direct).toBe(true);
+    expect(module?.menus[0].pages[0].tabs).toEqual([]);
+    expect(module?.menus[0].pages[0].actions).toEqual([
+      { label: '查看', value: 'admin.supplier-supply-type-management.view' },
+      { label: '新增', value: 'admin.supplier-supply-type-management.create' },
+      { label: '编辑', value: 'admin.supplier-supply-type-management.edit' },
+      { label: '停用/启用', value: 'admin.supplier-supply-type-management.toggle-status' },
+      { label: '删除', value: 'admin.supplier-supply-type-management.delete' },
+    ]);
+    for (const tree of Object.values(terminalFunctionTrees)) {
+      expect(tree.some((item) => item.value === module?.value)).toBe(false);
     }
   });
 });

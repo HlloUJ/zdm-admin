@@ -106,6 +106,12 @@ export const adminMenuEntries: AdminMenuEntry[] = [
     ],
   },
   {
+    label: '供应商供货类型管理',
+    path: '/supplier-supply-type-management',
+    icon: 'tag',
+    permissionPrefix: 'admin.supplier-supply-type-management',
+  },
+  {
     label: '供应商管理',
     path: '/supplier-management',
     icon: 'usergroup',

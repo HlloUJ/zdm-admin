@@ -850,10 +850,11 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(permissionDialog.getByRole('heading', { name: '功能权限', exact: true })).toBeVisible();
   const roleModuleList = permissionDialog.locator('.permission-module-list');
   const roleMatrix = permissionDialog.locator('.permission-matrix');
-  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(4);
+  await expect(roleModuleList.locator('.permission-module-item')).toHaveCount(5);
   await expect(roleModuleList.locator('.permission-module-item > span:first-child')).toHaveText([
     '租户与门店',
     '商品管理',
+    '供应商供货类型管理',
     '供应商管理',
     '权限管理',
   ]);
@@ -1042,12 +1043,19 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '停用/启用',
     '删除',
   ]);
+  await roleModuleList.getByText('供应商供货类型管理', { exact: true }).click();
+  await expect(roleMatrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '编辑',
+    '停用/启用',
+    '删除',
+  ]);
   await roleModuleList.getByText('供应商管理', { exact: true }).click();
   const supplierPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '供应商管理页' });
   await expect(supplierPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
-    '供货类型配置',
     '编辑',
     '停用/启用',
     '删除',
