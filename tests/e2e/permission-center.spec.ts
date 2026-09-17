@@ -1368,3 +1368,56 @@ test('supply chain hides mutations on platform roles but retains local role acti
     page.locator('tbody tr').filter({ hasText: '供应链自建角色' }).locator('.table-actions .t-link'),
   ).toHaveText(['编辑', '权限', '删除']);
 });
+
+test('shows only granted attribute tabs and falls back to the first accessible tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 12,
+        name: '属性库多 Tab 管理员',
+        phone: '15926620012',
+        roles: ['ATTRIBUTE_TAB_VIEWER'],
+        permissions: [
+          'admin.product-data-center.attribute.finished.view',
+          'admin.product-data-center.attribute.accessory.view',
+        ],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/product-attribute');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属属性', '配件专属属性']);
+  await expect(main.getByText('E2E 成品现货专属属性', { exact: true })).toBeVisible();
+  await expect(main.getByText('E2E 共享属性', { exact: true })).toHaveCount(0);
+  await expect(main.getByText('成品现货属性库', { exact: true })).toBeVisible();
+});
+
+test('shows only granted attribute-value tabs and falls back to the first accessible tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 14,
+        name: '属性值多 Tab 管理员',
+        phone: '15926620014',
+        roles: ['ATTRIBUTE_VALUE_TAB_VIEWER'],
+        permissions: [
+          'admin.product-data-center.attribute-value.finished.view',
+          'admin.product-data-center.attribute-value.accessory.view',
+        ],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/product-attribute-value');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属值', '配件专属值']);
+  await expect(main.getByText('E2E 成品现货专属值', { exact: true })).toBeVisible();
+  await expect(main.getByText('E2E 共享属性值', { exact: true })).toHaveCount(0);
+});
