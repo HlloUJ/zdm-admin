@@ -285,15 +285,21 @@ const canArchiveTenant = computed(() => hasTenantAction('unarchived', 'archive')
 const canRestoreTenant = computed(() => hasTenantAction('archived', 'restore'));
 const canDeleteTenant = computed(() => hasTenantAction('archived', 'delete'));
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', minWidth: 150, align: 'left' },
   { colKey: 'phone', title: '联系方式', width: 150, align: 'center' },
   { colKey: 'businesses', title: '开通业务', minWidth: 260, align: 'left' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 280, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: activeTab.value === 'unarchived' ? 184 : 172,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const searchForm = reactive({
   tenantName: '',

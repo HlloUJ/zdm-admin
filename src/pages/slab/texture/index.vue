@@ -150,7 +150,9 @@
       @cancel="confirmVisible = false"
       @close="confirmVisible = false"
     >
-      {{ confirmType === 'delete' ? '删除标准纹理后，其全部别名也会被删除。' : '' }}
+      <template v-if="confirmType === 'delete'" #default>
+        是否删除纹理“{{ confirmRow?.name }}”？删除标准纹理后，其全部别名也会被删除。
+      </template>
     </AdminConfirmDialog>
   </div>
 </template>
@@ -193,18 +195,24 @@ const aliasesByTexture = reactive<Record<number, SlabTextureAliasRecord[]>>({});
 const searchForm = reactive({ name: '', alias: '', status: '' });
 const applied = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '标准纹理', minWidth: 200, align: 'left' },
   { colKey: 'aliasCount', title: '别名数量', width: 120, align: 'center' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 220, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 196,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const aliasColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'name', title: '别名', minWidth: 260, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 140, align: 'left' },
+  { colKey: 'operation', title: '操作', width: 116, align: 'left' },
 ];
 const filteredData = computed(() =>
   tableData.value.filter(

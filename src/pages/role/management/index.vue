@@ -15,73 +15,79 @@
           </div>
         </header>
 
-        <t-tabs
-          v-if="isInternalAdministration && managementTabs.length > 1"
-          v-model="managedClient"
-          :list="managementTabs"
-          @change="handleManagedClientChange"
-        />
+        <AdminListLayout class="role-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs
+                v-if="isInternalAdministration && managementTabs.length > 1"
+                v-model="managedClient"
+                :list="managementTabs"
+                @change="handleManagedClientChange"
+              />
 
-        <section class="table-card">
-          <div v-if="canCreateRole" class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
-              <template #icon><t-icon name="add" /></template>
-              新增
-            </t-button>
-          </div>
-
-          <t-table
-            row-key="id"
-            :data="pageData"
-            :columns="columns"
-            :loading="loading"
-            hover
-            table-layout="fixed"
-            class="role-table"
-          >
-            <template #index="{ rowIndex }">
-              {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
-            </template>
-            <template #operation="{ row }">
-              <div class="table-actions">
-                <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                <t-link
-                  v-if="canManageRolePermission && !isSuperAdminRole(row)"
-                  theme="primary"
-                  hover="color"
-                  @click="openPermissionDialog(row)"
-                >
-                  权限
-                </t-link>
-                <t-link
-                  v-if="canDeleteRole && !isSuperAdminRole(row)"
-                  theme="danger"
-                  hover="color"
-                  @click="openDeleteConfirm(row)"
-                >
-                  删除
-                </t-link>
-                <span
-                  v-if="
-                    !canEditRole &&
-                    !(canDeleteRole && !isSuperAdminRole(row)) &&
-                    !(canManageRolePermission && !isSuperAdminRole(row))
-                  "
-                  class="table-action-placeholder"
-                >
-                  -
-                </span>
+              <div v-if="canCreateRole" class="table-toolbar">
+                <t-button theme="primary" @click="openCreateDialog">
+                  <template #icon><t-icon name="add" /></template>
+                  新增
+                </t-button>
               </div>
-            </template>
-          </t-table>
-
-          <AdminPagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="paginationTotal"
-            :page-size-options="pageSizeOptions"
-          />
-        </section>
+            </div>
+          </template>
+          <template #table>
+            <t-table
+              row-key="id"
+              :data="pageData"
+              :columns="columns"
+              :loading="loading"
+              hover
+              table-layout="fixed"
+              class="role-table"
+            >
+              <template #index="{ rowIndex }">
+                {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
+              </template>
+              <template #operation="{ row }">
+                <div class="table-actions">
+                  <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                  <t-link
+                    v-if="canManageRolePermission && !isSuperAdminRole(row)"
+                    theme="primary"
+                    hover="color"
+                    @click="openPermissionDialog(row)"
+                  >
+                    权限
+                  </t-link>
+                  <t-link
+                    v-if="canDeleteRole && !isSuperAdminRole(row)"
+                    theme="danger"
+                    hover="color"
+                    @click="openDeleteConfirm(row)"
+                  >
+                    删除
+                  </t-link>
+                  <span
+                    v-if="
+                      !canEditRole &&
+                      !(canDeleteRole && !isSuperAdminRole(row)) &&
+                      !(canManageRolePermission && !isSuperAdminRole(row))
+                    "
+                    class="table-action-placeholder"
+                  >
+                    -
+                  </span>
+                </div>
+              </template>
+            </t-table>
+          </template>
+          <template #pagination>
+            <AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
@@ -284,7 +290,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminListLayout, AdminPagination } from '@/components/foundation';
 import {
   collectFunctionCatalogRows,
   filterFunctionCatalogByAudience,
@@ -338,13 +344,18 @@ const roles = ref<RoleItem[]>([]);
 const loading = ref(false);
 const parsePermissions = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
 
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'index', title: '序号', width: '14%', align: 'left' },
-  { colKey: 'name', title: '角色名称', width: '24%', align: 'left' },
-  { colKey: 'createdByName', title: '创建人', width: '16%', align: 'left' },
-  { colKey: 'createdAt', title: '创建时间', width: '24%', align: 'left' },
-  { colKey: 'operation', title: '操作', width: '22%', align: 'left' },
-];
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  { colKey: 'index', title: '序号', width: 100, align: 'left' },
+  { colKey: 'name', title: '角色名称', minWidth: 160, align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: 140, align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: 220, align: 'left' },
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 180,
+    align: 'left',
+  },
+]);
 
 const rolePermissionScope = ref<RolePermissionScope>({ audience: 'admin', functionPermissions: 'all' });
 const permissionModules = computed(() => {
@@ -706,11 +717,15 @@ onMounted(() => {
   margin-bottom: var(--td-comp-margin-l);
 }
 
-.table-card {
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  border: 1px solid var(--td-component-border);
+.role-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.list-controls {
+  min-width: 0;
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
 
 .role-table :deep(th),
@@ -747,7 +762,6 @@ onMounted(() => {
   align-items: center;
   justify-content: flex-start;
   gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
 }
 
 .table-actions {
@@ -755,7 +769,8 @@ onMounted(() => {
   justify-content: flex-start;
   align-items: center;
   gap: var(--td-comp-margin-s);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .table-action-placeholder {

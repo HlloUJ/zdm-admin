@@ -2,7 +2,17 @@ import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
 
-const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '上移', '下移', '停用/启用', '删除'];
+const storeCategoryCatalogActionLabels = [
+  '查看',
+  '新增一级分类',
+  '新增下级',
+  '编辑',
+  '上移',
+  '下移',
+  '停用/启用',
+  '删除',
+];
+const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '排序', '停用/启用', '删除'];
 const productSecondMenuLabels = ['商品公共基础数据', '成品现货基础数据', '大板基础数据'];
 const adminProductSecondMenuLabels = ['成品现货管理', '大板管理', ...productSecondMenuLabels];
 const productThirdMenuLabels = [
@@ -220,8 +230,9 @@ test('shows only granted category operation buttons for a restricted account', a
   await expect(main.getByRole('button', { name: '新增一级分类' })).toHaveCount(0);
   await expect(categoryActions.getByText('新增下级', { exact: true })).toHaveCount(0);
   await expect(categoryActions.getByText('编辑', { exact: true })).toBeVisible();
-  await expect(categoryActions.getByText('上移', { exact: true })).toBeVisible();
-  await expect(categoryActions.getByText('下移', { exact: true })).toBeVisible();
+  await expect(categoryActions.getByText('上移', { exact: true })).toHaveCount(0);
+  await expect(categoryRow.locator('[data-category-id]')).toBeVisible();
+  await expect(categoryActions.getByText('下移', { exact: true })).toHaveCount(0);
   await expect(categoryActions.locator('.t-link').filter({ hasText: /^(停用|启用)$/ })).toBeVisible();
   await expect(categoryActions.getByText('删除', { exact: true })).toHaveCount(0);
   await expect(main.locator('.scope-tabs')).toContainText('成品现货分类');
@@ -437,7 +448,7 @@ test('opens internal employee creation and edit dialogs', async ({ page }) => {
   await expect(main.locator('thead')).toContainText('创建人');
   await expect(main.locator('thead')).toContainText('注册时间');
 
-  await main.getByRole('button', { name: '新增员工', exact: true }).click();
+  await main.getByRole('button', { name: '新增', exact: true }).click();
   const createDialog = page.locator('.t-dialog:visible').filter({ hasText: '新增员工' });
   await expect(createDialog).toBeVisible();
   await expect(createDialog.getByText('手机号码', { exact: true })).toBeVisible();
@@ -634,6 +645,8 @@ test('shows employee permission action without edit action for permission-only u
   const permissionOnlyEmployeeActions = permissionOnlyEmployeeRow.locator('.table-actions');
   await expect(permissionOnlyEmployeeActions.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(permissionOnlyEmployeeActions.getByText('角色', { exact: true })).toBeVisible();
+  // Hiding the other actions must not shrink the reserved four-button column.
+  await expect(page.getByRole('columnheader', { name: '操作', exact: true })).toHaveCSS('width', '184px');
 });
 
 test('allows granted employee operations for records created by another account', async ({ page }) => {
@@ -974,7 +987,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const finishedTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货模板' });
   const accessoryTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件模板' });
   await expect(finishedTemplatePermissionRow.getByText('分类属性模板', { exact: true })).toBeVisible();
-  const templateActionLabels = ['查看', '创建新版本草稿', '版本记录'];
+  const templateActionLabels = ['查看', '创建新版本草稿', '版本记录', '排序'];
   await expect(finishedTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     templateActionLabels,
   );
@@ -1152,7 +1165,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       '删除',
     ]);
     await moduleList.getByText('门店分类管理', { exact: true }).click();
-    await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(categoryCatalogActionLabels);
+    await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(storeCategoryCatalogActionLabels);
     await moduleList.getByText('权限管理', { exact: true }).click();
     await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
     await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();

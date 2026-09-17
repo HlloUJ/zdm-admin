@@ -19,7 +19,7 @@
     @confirm="confirmToggle"
     @cancel="confirmVisible = false"
   >
-    <p>{{ source === 'auto' ? '确定更改价格不跟随价格配置浮动？' : '确定更改价格跟随价格配置浮动？' }}</p>
+    <p>{{ source === 'auto' ? '是否更改价格不跟随价格配置浮动？' : '是否更改价格跟随价格配置浮动？' }}</p>
   </AdminDialog>
 </template>
 <script setup lang="ts">

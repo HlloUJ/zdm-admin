@@ -1,6 +1,6 @@
 <template>
   <t-button theme="primary" @click="visible = true"
-    ><template #icon><t-icon name="add" /></template>新增员工</t-button
+    ><template #icon><t-icon name="add" /></template>新增</t-button
   >
   <AdminDialog v-model:visible="visible" header="新增员工" :confirm-loading="saving" @confirm="submit">
     <t-form ref="form" :data="draft" :rules="rules" label-width="96px">

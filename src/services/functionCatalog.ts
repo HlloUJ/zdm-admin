@@ -82,8 +82,7 @@ const productCategoryTabActions = (scope: string): FunctionAction[] => [
   { label: '新增一级分类', value: `${scope}.create-root` },
   { label: '新增下级', value: `${scope}.create-child` },
   { label: '编辑', value: `${scope}.edit` },
-  { label: '上移', value: `${scope}.move-up` },
-  { label: '下移', value: `${scope}.move-down` },
+  { label: '排序', value: `${scope}.sort` },
   { label: '停用/启用', value: `${scope}.toggle-status` },
   { label: '删除', value: `${scope}.delete` },
 ];
@@ -97,6 +96,7 @@ const productAttributeTabActions = (scope: string): FunctionAction[] => [
 const categoryAttributeTemplateTabActions = (scope: string): FunctionAction[] => [
   { label: '创建新版本草稿', value: `${scope}.create` },
   { label: '版本记录', value: `${scope}.history` },
+  { label: '排序', value: `${scope}.sort` },
 ];
 
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>

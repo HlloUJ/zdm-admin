@@ -85,3 +85,26 @@ test('hides texture operations without operation permissions', async ({ page }) 
   await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);
   await expect(main.locator('.table-actions .t-link')).toHaveCount(0);
 });
+
+test('shows texture confirmation text for disabling, enabling and deleting', async ({ page }) => {
+  await page.goto('/slab-texture');
+  const row = page.getByRole('main').locator('tbody tr').filter({ hasText: '细纹' });
+  const dialog = page.locator('.zdm-admin-confirm-dialog:visible');
+  await row.getByText('停用', { exact: true }).click();
+  await expect(dialog).toContainText('是否停用纹理“细纹”？');
+  await dialog.getByRole('button', { name: '确认停用', exact: true }).click();
+  await expect(row.locator('.table-actions .t-link').filter({ hasText: /^启用$/ })).toBeVisible();
+
+  await row
+    .locator('.table-actions .t-link')
+    .filter({ hasText: /^启用$/ })
+    .click();
+  await expect(dialog).toContainText('是否启用纹理“细纹”？');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(row.locator('.table-actions .t-link').filter({ hasText: /^启用$/ })).toBeVisible();
+
+  await row.getByText('删除', { exact: true }).click();
+  await expect(dialog).toContainText('是否删除纹理“细纹”？删除标准纹理后，其全部别名也会被删除。');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(row).toBeVisible();
+});

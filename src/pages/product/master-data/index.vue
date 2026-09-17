@@ -123,7 +123,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'extra', title: config.value.extraColumn, minWidth: 180 },
   { colKey: 'useCount', title: config.value.useColumn, width: 120, align: 'right' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 116, fixed: 'right' },
 ]);
 const filteredData = computed(() =>
   data.value.filter(
@@ -298,7 +298,7 @@ onMounted(loadData);
   padding: 24px;
   background: var(--td-bg-color-container);
   border-radius: 6px;
-  box-shadow: var(--td-shadow-1);
+  border: 1px solid var(--td-component-border);
 }
 .filter-row,
 .filter-fields,

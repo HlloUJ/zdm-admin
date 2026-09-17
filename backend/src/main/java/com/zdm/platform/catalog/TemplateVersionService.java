@@ -201,7 +201,7 @@ public class TemplateVersionService {
   @Transactional
   public TemplateVersion reorder(long id, int revision, List<Long> attributeIds) {
     TemplateVersion version = require(id, true);
-    authorize(version.categoryId(), "create");
+    authorize(version.categoryId(), "sort");
     if (!"published".equals(version.state())) {
       throw new IllegalArgumentException("仅已发布属性模板支持调整显示顺序");
     }

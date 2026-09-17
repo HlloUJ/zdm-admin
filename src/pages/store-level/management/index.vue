@@ -47,8 +47,13 @@
             :data="pageData"
             :columns="columns"
             :loading="loading"
-            :drag-sort="canSort ? 'row-handler' : undefined"
-            :drag-sort-options="{ animation: 200 }"
+            :class="{ 'zdm-row-sort-table': canSort }"
+            :drag-sort="canSort ? 'row' : undefined"
+            :drag-sort-options="{
+              animation: 200,
+              filter: 'a, button, input, textarea, select, .t-link, .t-select, .t-checkbox, .t-switch',
+              preventOnFilter: false,
+            }"
             hover
             table-layout="fixed"
             @drag-sort="handleDragSort"
@@ -160,14 +165,20 @@ const searchForm = reactive({ name: '', status: '' });
 const appliedSearchForm = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 52, align: 'center' as const }] : []),
+  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '级别名称', minWidth: 220, align: 'left' },
   { colKey: 'priceComplete', title: '价格状态', width: 130, align: 'center' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 156,
+    align: 'left',
+    fixed: 'right',
+  },
 ]);
 const filteredData = computed(() =>
   tableData.value.filter(

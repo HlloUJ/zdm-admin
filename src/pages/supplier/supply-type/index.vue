@@ -99,7 +99,7 @@
     </AdminDialog>
     <AdminDialog
       :visible="statusDialogVisible"
-      :header="`确认${statusAction}`"
+      :header="`是否${statusAction}`"
       width="440px"
       :confirm-btn="{ content: `确认${statusAction}`, loading: changingStatus }"
       :cancel-btn="{ content: '取消', disabled: changingStatus }"
@@ -107,7 +107,7 @@
       @cancel="closeStatusDialog"
       @close="closeStatusDialog"
     >
-      确认{{ statusAction }}供货类型“{{ statusTarget?.name }}”吗？
+      是否{{ statusAction }}供货类型“{{ statusTarget?.name }}”？
     </AdminDialog>
     <AdminDialog
       :visible="Boolean(deleting)"
@@ -117,7 +117,7 @@
       @cancel="deleting = undefined"
       @close="deleting = undefined"
     >
-      确定删除供货类型“{{ deleting?.name }}”吗？
+      是否删除供货类型“{{ deleting?.name }}”？
     </AdminDialog>
   </div>
 </template>
@@ -171,14 +171,20 @@ const formatDateTime = (value?: string) => {
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '供货类型', minWidth: 220, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 164,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const loading = ref(false);
 const saving = ref(false);
 const visible = ref(false);

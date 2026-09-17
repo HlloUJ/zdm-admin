@@ -49,9 +49,7 @@ test('manages slab grades below color management', async ({ page }) => {
   const reorderRequest = page.waitForRequest(
     (request) => request.method() === 'PATCH' && request.url().endsWith('/api/admin/slab-grades/reorder'),
   );
-  await firstGradeRow
-    .locator('.t-table__handle-draggable')
-    .dragTo(secondGradeRow.locator('.t-table__handle-draggable'));
+  await firstGradeRow.locator('td').nth(1).dragTo(secondGradeRow.locator('td').nth(1));
   expect((await reorderRequest).postDataJSON()).toEqual({ orderedIds: [2, 1, 3] });
   await expect(page.getByText('已更新排序“A+ 超精品料”', { exact: true })).toBeVisible();
 
@@ -87,7 +85,7 @@ test('manages slab grades below color management', async ({ page }) => {
   await expect(page.getByText('编辑等级', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await gradeRow.getByText('停用', { exact: true }).click();
-  await expect(page.getByText('确认停用等级“A+ 超精品料”吗？', { exact: true })).toBeVisible();
+  await expect(page.getByText('是否停用等级“A+ 超精品料”？', { exact: true })).toBeVisible();
 });
 
 test('hides grade operations without their permissions', async ({ page }) => {
@@ -111,5 +109,5 @@ test('hides grade operations without their permissions', async ({ page }) => {
   await expect(main.getByText('超精品料', { exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);
   await expect(main.locator('.table-actions .t-link')).toHaveCount(0);
-  await expect(main.locator('.t-table__handle-draggable')).toHaveCount(0);
+  await expect(main.locator('.zdm-row-sort-table')).toHaveCount(0);
 });

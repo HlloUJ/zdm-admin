@@ -8,7 +8,7 @@
         <t-alert theme="info" class="page-tip"
           >属性库仅维护属性定义和值类型；必填及 SKU 规则统一在类目属性模板中配置。</t-alert
         >
-        <AdminListLayout>
+        <AdminListLayout class="attribute-list-layout">
           <template #toolbar>
             <div class="list-controls">
               <div v-if="!lockedScope" class="scope-controls">
@@ -217,15 +217,21 @@ const formRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入属性名称', type: 'error' }],
   valueType: [{ required: true, message: '请选择值类型', type: 'error' }],
 };
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '属性名称', width: 260, align: 'left' },
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  { colKey: 'name', title: '属性名称', minWidth: 260, align: 'left' },
   { colKey: 'valueType', title: '值类型', width: 220, align: 'left' },
   { colKey: 'templateCount', title: '被引用次数', width: 190, align: 'left' },
   { colKey: 'status', title: '状态', width: 150, align: 'left' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 160, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 116,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const filteredData = computed(() =>
   data.value.filter(
     (item) => item.scope === activeScope.value && (!applied.keyword || item.name.includes(applied.keyword)),
@@ -465,6 +471,9 @@ onMounted(loadAttributes);
   flex: 1;
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
 }
+.attribute-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
 .page-tip {
   margin-bottom: 16px;
 }
@@ -517,7 +526,7 @@ onMounted(loadAttributes);
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-s);
+  gap: 12px;
   white-space: nowrap;
 }
 .table-action-placeholder {

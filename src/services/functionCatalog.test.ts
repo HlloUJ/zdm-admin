@@ -375,3 +375,21 @@ describe('supplier supply type catalog', () => {
     }
   });
 });
+
+describe('category sorting permissions', () => {
+  it('registers sorting for both category and template scopes and removes movement actions', () => {
+    const values = getFunctionCatalogPermissionValues(fullFunctionCatalog);
+    for (const scope of ['finished', 'accessory']) {
+      const prefix = `admin.product-data-center.category.${scope}`;
+      expect(values).toContain(`${prefix}.sort`);
+      expect(values).not.toContain(`${prefix}.move-up`);
+      expect(values).not.toContain(`${prefix}.move-down`);
+      expect(values).toContain(`admin.product-data-center.category-attribute-template.${scope}.attributes.sort`);
+      expect(
+        normalizeFunctionCatalogPermissions(fullFunctionCatalog, [`${prefix}.move-up`, `${prefix}.move-down`]),
+      ).toEqual([`${prefix}.view`, `${prefix}.sort`]);
+    }
+    expect(values).toContain('admin.tenant.store-category-management.move-up');
+    expect(values).toContain('admin.tenant.store-category-management.move-down');
+  });
+});

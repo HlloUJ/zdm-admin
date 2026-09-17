@@ -19,248 +19,254 @@
           </div>
         </header>
 
-        <section class="filter-card">
-          <t-tabs v-if="showSlabTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
-            <t-tab-panel v-for="tab in slabTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
-          </t-tabs>
+        <AdminListLayout class="slab-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs v-if="showSlabTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
+                <t-tab-panel v-for="tab in slabTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
+              </t-tabs>
 
-          <t-form :data="currentFilter" label-width="44px" colon>
-            <div class="filter-row">
-              <div class="filter-fields">
-                <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
-                  <t-form-item label="大板" class="slab-keyword-filter">
-                    <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
-                  </t-form-item>
-                  <t-form-item label="品种">
-                    <t-select v-model="currentFilter.variety" clearable filterable placeholder="请选择">
-                      <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
-                    </t-select>
-                  </t-form-item>
-                  <template v-if="activeTab === 'offShelf'">
-                    <t-form-item label="下架原因" label-width="72px">
-                      <t-select v-model="currentFilter.offShelfReason" clearable filterable placeholder="请选择">
-                        <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
-                      </t-select>
-                    </t-form-item>
-                    <t-form-item label="下架人" label-width="60px">
-                      <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
-                    </t-form-item>
-                    <t-form-item label="下架时间" label-width="72px" class="off-shelf-date-filter">
-                      <t-date-range-picker
-                        v-model="currentFilter.offShelfDateRange"
-                        clearable
-                        allow-input
-                        value-type="YYYY-MM-DD"
-                        start="day"
-                        end="day"
-                        :placeholder="['开始日期', '结束日期']"
-                      />
-                    </t-form-item>
-                  </template>
-                  <template v-else>
-                    <t-form-item label="产地">
-                      <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择">
-                        <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
-                      </t-select>
-                    </t-form-item>
-                    <t-form-item label="纹理">
-                      <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择">
-                        <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
-                      </t-select>
-                    </t-form-item>
-                    <t-form-item label="色系">
-                      <t-cascader
-                        v-model="currentFilter.color"
-                        :options="colorFilterCascaderOptions"
-                        :show-all-levels="false"
-                        :check-strictly="false"
-                        clearable
-                        filterable
-                        placeholder="请选择"
-                        trigger="hover"
-                        value-mode="onlyLeaf"
-                        value-type="single"
-                      />
-                    </t-form-item>
-                    <t-form-item label="等级">
-                      <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择">
-                        <t-option
-                          v-for="item in gradeFilterOptions"
-                          :key="item.value"
-                          :label="item.label"
-                          :value="item.value"
-                        />
-                      </t-select>
-                    </t-form-item>
-                  </template>
-                </div>
-                <div class="filter-secondary-row">
-                  <t-form-item
-                    v-if="activeTab !== 'offShelf'"
-                    label="供应商"
-                    label-width="60px"
-                    class="supplier-filter"
-                  >
-                    <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
-                      <t-option
-                        v-for="item in supplierFilterOptions"
-                        :key="item.id"
-                        :label="item.name"
-                        :value="item.name"
-                      />
-                    </t-select>
-                  </t-form-item>
-                  <div class="filter-actions">
-                    <t-button theme="primary" @click="handleSearch">
-                      <template #icon><t-icon name="search" /></template>
-                      查询
-                    </t-button>
-                    <t-button class="reset-filter-button" theme="default" variant="base" @click="handleReset">
-                      <template #icon><t-icon name="refresh" /></template>
-                      重置
-                    </t-button>
+              <t-form :data="currentFilter" label-width="44px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
+                      <t-form-item label="大板" class="slab-keyword-filter">
+                        <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
+                      </t-form-item>
+                      <t-form-item label="品种">
+                        <t-select v-model="currentFilter.variety" clearable filterable placeholder="请选择">
+                          <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
+                        </t-select>
+                      </t-form-item>
+                      <template v-if="activeTab === 'offShelf'">
+                        <t-form-item label="下架原因" label-width="72px">
+                          <t-select v-model="currentFilter.offShelfReason" clearable filterable placeholder="请选择">
+                            <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
+                          </t-select>
+                        </t-form-item>
+                        <t-form-item label="下架人" label-width="60px">
+                          <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
+                        </t-form-item>
+                        <t-form-item label="下架时间" label-width="72px" class="off-shelf-date-filter">
+                          <t-date-range-picker
+                            v-model="currentFilter.offShelfDateRange"
+                            clearable
+                            allow-input
+                            value-type="YYYY-MM-DD"
+                            start="day"
+                            end="day"
+                            :placeholder="['开始日期', '结束日期']"
+                          />
+                        </t-form-item>
+                      </template>
+                      <template v-else>
+                        <t-form-item label="产地">
+                          <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择">
+                            <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
+                          </t-select>
+                        </t-form-item>
+                        <t-form-item label="纹理">
+                          <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择">
+                            <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
+                          </t-select>
+                        </t-form-item>
+                        <t-form-item label="色系">
+                          <t-cascader
+                            v-model="currentFilter.color"
+                            :options="colorFilterCascaderOptions"
+                            :show-all-levels="false"
+                            :check-strictly="false"
+                            clearable
+                            filterable
+                            placeholder="请选择"
+                            trigger="hover"
+                            value-mode="onlyLeaf"
+                            value-type="single"
+                          />
+                        </t-form-item>
+                        <t-form-item label="等级">
+                          <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择">
+                            <t-option
+                              v-for="item in gradeFilterOptions"
+                              :key="item.value"
+                              :label="item.label"
+                              :value="item.value"
+                            />
+                          </t-select>
+                        </t-form-item>
+                      </template>
+                    </div>
+                    <div class="filter-secondary-row">
+                      <t-form-item
+                        v-if="activeTab !== 'offShelf'"
+                        label="供应商"
+                        label-width="60px"
+                        class="supplier-filter"
+                      >
+                        <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
+                          <t-option
+                            v-for="item in supplierFilterOptions"
+                            :key="item.id"
+                            :label="item.name"
+                            :value="item.name"
+                          />
+                        </t-select>
+                      </t-form-item>
+                      <div class="filter-actions">
+                        <t-button theme="primary" @click="handleSearch">
+                          <template #icon><t-icon name="search" /></template>
+                          查询
+                        </t-button>
+                        <t-button class="reset-filter-button" theme="default" variant="base" @click="handleReset">
+                          <template #icon><t-icon name="refresh" /></template>
+                          重置
+                        </t-button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </t-form>
-        </section>
+              </t-form>
 
-        <section class="table-card">
-          <div class="table-toolbar">
-            <div class="toolbar-buttons">
-              <t-button
-                v-for="button in batchButtons"
-                :key="button.action"
-                :theme="button.theme"
-                :class="button.className"
-                @click="handleBatchAction(button.action)"
-              >
-                <template #icon>
-                  <t-icon :name="button.icon" />
-                </template>
-                {{ button.label }}
-              </t-button>
-            </div>
-            <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
-          </div>
-
-          <t-table
-            :row-class-name="({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
-            row-key="id"
-            :data="pageData"
-            :columns="columns"
-            :loading="loading"
-            hover
-            table-layout="fixed"
-          >
-            <template #selectTitle>
-              <t-checkbox
-                :checked="pageAllSelected"
-                :indeterminate="pagePartiallySelected"
-                @change="toggleCurrentPage"
-              />
-            </template>
-            <template #select="{ row }">
-              <t-checkbox
-                :disabled="sourceBlocked(row)"
-                :checked="selectedKeySet.has(row.id)"
-                @change="(checked: boolean) => toggleRow(row.id, checked)"
-              />
-            </template>
-            <template #image="{ row }">
-              <div class="slab-image">
-                <img
-                  v-if="row.image"
-                  :src="row.image"
-                  :alt="row.name"
-                  role="button"
-                  :tabindex="sourceBlocked(row) ? -1 : 0"
-                  @click="!sourceBlocked(row) && openTableImage(row)"
-                  @keydown.enter="!sourceBlocked(row) && openTableImage(row)"
-                />
-                <span v-else class="slab-image-placeholder">暂无主图</span>
-              </div>
-            </template>
-            <template #slab="{ row }">
-              <div class="slab-meta">
-                <div class="slab-name">{{ row.name }}</div>
-                <t-tag v-if="sourceBlocked(row)" variant="light">{{
-                  ['recycle', 'purged'].includes(row.sourceStatus || '')
-                    ? '该商品已被供应链删除'
-                    : '该商品已被供应链下架'
-                }}</t-tag>
-                <div class="slab-code">ID：{{ row.id }}</div>
-                <div class="slab-code">大板编号：{{ row.code }}</div>
-              </div>
-            </template>
-            <template #tenant="{ row }">
-              <div class="tenant-cell">
-                <span>{{ row.tenant }}</span>
-                <span class="store-text">{{ row.store }}</span>
-              </div>
-            </template>
-            <template #offShelfReason="{ row }">
-              <div class="off-shelf-reason-cell">
-                <span class="off-shelf-reason-primary">{{ latestOffShelfRecord(row)?.standardReason || '-' }}</span>
-                <div class="off-shelf-reason-detail-row">
-                  <t-tooltip
-                    class="off-shelf-detail-tooltip"
-                    :content="latestOffShelfRecord(row)?.detailReason || '-'"
-                    placement="bottom-left"
+              <div class="table-toolbar">
+                <div class="toolbar-buttons">
+                  <t-button
+                    v-for="button in batchButtons"
+                    :key="button.action"
+                    :theme="button.theme"
+                    :class="button.className"
+                    @click="handleBatchAction(button.action)"
                   >
-                    <span class="off-shelf-reason-secondary">{{ latestOffShelfRecord(row)?.detailReason || '-' }}</span>
-                  </t-tooltip>
-                  <t-tooltip content="查看历史下架原因">
-                    <t-button
-                      class="off-shelf-history-trigger"
-                      variant="text"
-                      shape="square"
-                      size="small"
-                      aria-label="查看历史下架原因"
-                      @click="openOffShelfHistory(row)"
-                    >
-                      <template #icon><t-icon name="browse" /></template>
-                    </t-button>
-                  </t-tooltip>
+                    <template #icon>
+                      <t-icon :name="button.icon" />
+                    </template>
+                    {{ button.label }}
+                  </t-button>
                 </div>
+                <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
               </div>
-            </template>
-            <template #offShelvedByName="{ row }">
-              {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}
-            </template>
-            <template #offShelvedAt="{ row }">
-              {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
-            </template>
-            <template #operation="{ row }">
-              <t-link
-                v-if="sourceBlocked(row) && hasSlabAction('recycle', 'purge')"
-                class="source-purge"
-                theme="danger"
-                @click="handleRowAction('purge', row)"
-                >彻底删除</t-link
-              >
-              <div class="table-actions">
+            </div>
+          </template>
+          <template #table>
+            <t-table
+              :row-class-name="({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
+              row-key="id"
+              :data="pageData"
+              :columns="columns"
+              :loading="loading"
+              hover
+              table-layout="fixed"
+            >
+              <template #selectTitle>
+                <t-checkbox
+                  :checked="pageAllSelected"
+                  :indeterminate="pagePartiallySelected"
+                  @change="toggleCurrentPage"
+                />
+              </template>
+              <template #select="{ row }">
+                <t-checkbox
+                  :disabled="sourceBlocked(row)"
+                  :checked="selectedKeySet.has(row.id)"
+                  @change="(checked: boolean) => toggleRow(row.id, checked)"
+                />
+              </template>
+              <template #image="{ row }">
+                <div class="slab-image">
+                  <img
+                    v-if="row.image"
+                    :src="row.image"
+                    :alt="row.name"
+                    role="button"
+                    :tabindex="sourceBlocked(row) ? -1 : 0"
+                    @click="!sourceBlocked(row) && openTableImage(row)"
+                    @keydown.enter="!sourceBlocked(row) && openTableImage(row)"
+                  />
+                  <span v-else class="slab-image-placeholder">暂无主图</span>
+                </div>
+              </template>
+              <template #slab="{ row }">
+                <div class="slab-meta">
+                  <div class="slab-name">{{ row.name }}</div>
+                  <t-tag v-if="sourceBlocked(row)" variant="light">{{
+                    ['recycle', 'purged'].includes(row.sourceStatus || '')
+                      ? '该商品已被供应链删除'
+                      : '该商品已被供应链下架'
+                  }}</t-tag>
+                  <div class="slab-code">ID：{{ row.id }}</div>
+                  <div class="slab-code">大板编号：{{ row.code }}</div>
+                </div>
+              </template>
+              <template #tenant="{ row }">
+                <div class="tenant-cell">
+                  <span>{{ row.tenant }}</span>
+                  <span class="store-text">{{ row.store }}</span>
+                </div>
+              </template>
+              <template #offShelfReason="{ row }">
+                <div class="off-shelf-reason-cell">
+                  <span class="off-shelf-reason-primary">{{ latestOffShelfRecord(row)?.standardReason || '-' }}</span>
+                  <div class="off-shelf-reason-detail-row">
+                    <t-tooltip
+                      class="off-shelf-detail-tooltip"
+                      :content="latestOffShelfRecord(row)?.detailReason || '-'"
+                      placement="bottom-left"
+                    >
+                      <span class="off-shelf-reason-secondary">{{
+                        latestOffShelfRecord(row)?.detailReason || '-'
+                      }}</span>
+                    </t-tooltip>
+                    <t-tooltip content="查看历史下架原因">
+                      <t-button
+                        class="off-shelf-history-trigger"
+                        variant="text"
+                        shape="square"
+                        size="small"
+                        aria-label="查看历史下架原因"
+                        @click="openOffShelfHistory(row)"
+                      >
+                        <template #icon><t-icon name="browse" /></template>
+                      </t-button>
+                    </t-tooltip>
+                  </div>
+                </div>
+              </template>
+              <template #offShelvedByName="{ row }">
+                {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}
+              </template>
+              <template #offShelvedAt="{ row }">
+                {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
+              </template>
+              <template #operation="{ row }">
                 <t-link
-                  v-for="action in sourceBlocked(row) ? [] : rowActions()"
-                  :key="action.action"
-                  :theme="action.theme"
-                  hover="color"
-                  @click="handleRowAction(action.action, row)"
+                  v-if="sourceBlocked(row) && hasSlabAction('recycle', 'purge')"
+                  class="source-purge"
+                  theme="danger"
+                  @click="handleRowAction('purge', row)"
+                  >彻底删除</t-link
                 >
-                  {{ action.label }}
-                </t-link>
-              </div>
-            </template>
-          </t-table>
-
-          <AdminPagination
-            v-model:current="currentPagination.current"
-            v-model:page-size="currentPagination.pageSize"
-            :total="paginationTotal"
-            :page-size-options="pageSizeOptions"
-          />
-        </section>
+                <div class="table-actions">
+                  <t-link
+                    v-for="action in sourceBlocked(row) ? [] : rowActions()"
+                    :key="action.action"
+                    :theme="action.theme"
+                    hover="color"
+                    @click="handleRowAction(action.action, row)"
+                  >
+                    {{ action.label }}
+                  </t-link>
+                </div>
+              </template>
+            </t-table>
+          </template>
+          <template #pagination>
+            <AdminPagination
+              v-model:current="currentPagination.current"
+              v-model:page-size="currentPagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
@@ -1090,6 +1096,7 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminMediaUpload,
+  AdminListLayout,
   AdminPagination,
   type AdminMediaValue,
 } from '@/components/foundation';
@@ -1493,7 +1500,7 @@ const operationLogColumns: PrimaryTableCol<SlabOperationLogRecord>[] = [
   { colKey: 'summary', title: '操作内容', minWidth: 220 },
   { colKey: 'operatorName', title: '操作人', width: 110 },
   { colKey: 'operatedAt', title: '操作时间', width: 170 },
-  { colKey: 'operation', title: '操作', width: 72, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 76, fixed: 'right' },
 ];
 const formatPriceTierChanges = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null;
@@ -2050,8 +2057,8 @@ const confirmAction = computed(() => {
   return actionMap[confirmState.type];
 });
 const confirmTitle = computed(() => {
-  if (confirmState.type === 'restore') return '确认放回仓库';
-  if (confirmState.type === 'batchRestore') return '确认批量放回到仓库';
+  if (confirmState.type === 'restore') return '是否放回仓库';
+  if (confirmState.type === 'batchRestore') return '是否批量放回到仓库';
   return '';
 });
 
@@ -2281,6 +2288,15 @@ const productRules: Record<string, FormRule[]> = {
   ...Object.fromEntries(cornerFields.map((item) => [item.key, [createOptionalMeasurementRule(item.key, item.label)]])),
 };
 
+// Fixed pixel widths; update only when the tab action buttons change.
+const operationWidths = {
+  warehouse: 184,
+  selling: 148,
+  offShelf: 176,
+  soldOut: 104,
+  recycle: 204,
+};
+
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   if (activeTab.value === 'offShelf') {
     return [
@@ -2291,7 +2307,13 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },
       { colKey: 'offShelvedByName', title: '下架人', width: 120, align: 'center' },
       { colKey: 'offShelvedAt', title: '下架时间', width: 180, align: 'center' },
-      { colKey: 'operation', title: '操作', width: 190, align: 'left', fixed: 'right' },
+      {
+        colKey: 'operation',
+        title: '操作',
+        width: operationWidths[activeTab.value],
+        align: 'left',
+        fixed: 'right',
+      },
     ];
   }
 
@@ -2310,7 +2332,13 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   ];
 
-  baseColumns.push({ colKey: 'operation', title: '操作', width: 230, align: 'left', fixed: 'right' });
+  baseColumns.push({
+    colKey: 'operation',
+    title: '操作',
+    width: operationWidths[activeTab.value],
+    align: 'left',
+    fixed: 'right',
+  });
 
   return baseColumns;
 });
@@ -3947,20 +3975,15 @@ const saveBatchPrice = async () => {
   margin-bottom: var(--td-comp-margin-l);
 }
 
-.filter-card,
-.table-card {
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  border: 1px solid var(--td-component-border);
+.slab-list-layout {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.table-card {
-  margin-top: var(--td-comp-margin-l);
-}
-
-.status-tabs {
-  margin-bottom: var(--td-comp-margin-l);
+.list-controls {
+  min-width: 0;
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
 
 .filter-row {
@@ -4025,7 +4048,6 @@ const saveBatchPrice = async () => {
   justify-content: space-between;
   align-items: center;
   gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
 }
 
 .toolbar-buttons {
