@@ -15,7 +15,7 @@
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
                 <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-              <t-form :data="searchForm" label-width="84px" colon>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="属性名称" name="keyword">

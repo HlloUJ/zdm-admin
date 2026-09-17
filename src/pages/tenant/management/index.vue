@@ -12,7 +12,7 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showTenantTabRail" v-model="activeTab" :list="tenantTabs" />
-              <t-form :data="searchForm" label-width="84px" colon>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="租户姓名" name="tenantName">

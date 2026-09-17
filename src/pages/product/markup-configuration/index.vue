@@ -50,7 +50,7 @@
                   </t-form>
                 </div>
               </div>
-              <t-form :data="searchForm" label-width="88px" colon>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店级别" name="name">

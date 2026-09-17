@@ -71,6 +71,11 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
   private String publisherType;
   private Integer totalStock;
   private BigDecimal guidePrice;
+  @TableField(exist = false)
+  private String offShelfByName;
+  public String getOffShelfByName() { return offShelfByName; }
+  public void setOffShelfByName(String value) { offShelfByName = value; }
+
   private String offShelfReason;
   private java.time.LocalDateTime offShelfAt;
   public java.time.LocalDateTime getOffShelfAt() { return offShelfAt; }

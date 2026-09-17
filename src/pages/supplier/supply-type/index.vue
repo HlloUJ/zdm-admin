@@ -9,7 +9,7 @@
         </AdminPageHeader>
         <AdminListLayout>
           <template #filters>
-            <t-form :data="searchForm" label-width="84px" colon @submit="handleSearch">
+            <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon @submit="handleSearch">
               <div class="supply-type-filter-row">
                 <div class="supply-type-filter-fields">
                   <div class="supply-type-name-filter">
@@ -18,7 +18,7 @@
                     </t-form-item>
                   </div>
                   <div class="supply-type-status-filter">
-                    <t-form-item label="状态" name="status" label-width="56px">
+                    <t-form-item class="zdm-status-filter" label="状态" name="status">
                       <t-select v-model="searchForm.status" clearable placeholder="请选择">
                         <t-option label="启用" value="enabled" />
                         <t-option label="停用" value="disabled" />

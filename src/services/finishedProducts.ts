@@ -92,6 +92,7 @@ export interface FinishedProductRecord {
   offShelfReason?: string;
   offShelfAt?: string;
   offShelfDetail?: string;
+  offShelfByName?: string;
   createdByName?: string;
   createdByAccountId?: number;
   status?: FinishedProductStatus;

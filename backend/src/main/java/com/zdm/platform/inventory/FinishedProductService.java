@@ -442,10 +442,27 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     mediaReferenceService.replace(MEDIA_DOMAIN, product.getId(), media);
   }
 
+  void attachOffShelfOperator(FinishedProduct product) {
+    product.setOffShelfByName(null);
+    boolean supplyChain = lifecycle.isSupplyChain();
+    if (!"offShelf".equals(supplyChain ? product.getSourceStatus() : product.getStatus())) {
+      return;
+    }
+    List<String> names = jdbcTemplate.queryForList("""
+        SELECT operator_name FROM finished_operation_logs
+        WHERE product_id = ? AND business_client_code = ? AND operation_type = 'OFF_SHELF'
+        ORDER BY operated_at DESC, id DESC LIMIT 1
+        """, String.class, product.getId(), supplyChain ? "supply-chain" : "admin");
+    if (!names.isEmpty()) {
+      product.setOffShelfByName(names.getFirst());
+    }
+  }
+
   private FinishedProduct attachDetails(FinishedProduct product) {
     if (product == null) {
       return null;
     }
+    attachOffShelfOperator(product);
     List<Long> imageIds = jdbcTemplate.queryForList("""
         SELECT media_id FROM media_references
         WHERE business_domain = ? AND business_id = ?

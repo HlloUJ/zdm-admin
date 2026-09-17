@@ -23,13 +23,13 @@
           <t-tabs v-model="activeTab" class="attribute-tabs" :list="tabList" @change="handleTabChange" />
 
           <section class="filter-card">
-            <t-form :data="currentState.searchForm" label-width="56px" colon>
+            <t-form class="zdm-admin-filter-form" label-width="auto" :data="currentState.searchForm" colon>
               <div class="filter-row">
                 <div class="filter-fields">
                   <t-form-item label="属性" name="name">
                     <t-input v-model="currentState.searchForm.name" clearable placeholder="请输入" />
                   </t-form-item>
-                  <t-form-item label="状态" name="status">
+                  <t-form-item class="zdm-status-filter" label="状态" name="status">
                     <t-select v-model="currentState.searchForm.status" clearable placeholder="请选择">
                       <t-option label="正常" value="normal" />
                       <t-option label="停用" value="disabled" />

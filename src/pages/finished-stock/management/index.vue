@@ -50,7 +50,7 @@
                   <t-tab-panel v-for="tab in finishedTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
                 </t-tabs>
 
-                <t-form :data="currentFilter" label-width="44px" colon>
+                <t-form class="zdm-admin-filter-form" label-width="auto" :data="currentFilter" colon>
                   <div class="filter-row">
                     <div class="filter-fields">
                       <t-form-item label="商品">
@@ -61,17 +61,37 @@
                           @enter="handleSearch"
                         />
                       </t-form-item>
-                      <t-form-item label="商品分类" label-width="72px">
-                        <t-cascader
-                          v-model="currentFilter.category"
-                          :options="categoryCascaderOptions"
+                      <t-form-item label="商品分类">
+                        <t-select-input
+                          :value="currentFilter.category"
+                          :value-display="currentFilter.category?.split(' / ').at(-1)"
+                          :popup-visible="categoryFilterVisible"
+                          :popup-props="{
+                            placement: 'bottom-left',
+                            overlayInnerStyle: { width: 'auto' },
+                            popperOptions: { modifiers: [{ name: 'flip', enabled: false }] },
+                          }"
                           clearable
-                          :check-strictly="false"
                           placeholder="请选择"
-                          trigger="hover"
-                        />
+                          @popup-visible-change="categoryFilterVisible = $event"
+                          @clear="currentFilter.category = ''"
+                        >
+                          <template #suffixIcon
+                            ><t-icon :name="categoryFilterVisible ? 'chevron-up' : 'chevron-down'"
+                          /></template>
+                          <template #panel>
+                            <t-cascader-panel
+                              v-if="categoryFilterVisible"
+                              :value="''"
+                              :options="categoryCascaderOptions"
+                              :check-strictly="false"
+                              trigger="hover"
+                              @change="handleCategoryFilterChange"
+                            />
+                          </template>
+                        </t-select-input>
                       </t-form-item>
-                      <t-form-item label="供应商" label-width="60px">
+                      <t-form-item label="供应商">
                         <t-select v-model="currentFilter.supplier" clearable placeholder="请选择">
                           <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
                         </t-select>
@@ -1123,6 +1143,7 @@ interface StockItem {
   sourceStatus?: string;
   id: number;
   createdByName: string;
+  offShelfByName?: string;
   createdAt?: string;
   code: string;
   image: string;
@@ -1885,6 +1906,7 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     sourceStatus: record.sourceStatus,
     code: record.sku ?? '',
     createdByName: record.createdByName?.trim() || '-',
+    offShelfByName: record.offShelfByName?.trim() || '未记录',
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
@@ -1965,7 +1987,13 @@ const loadInventoryData = async () => {
   }
 };
 
+const categoryFilterVisible = ref(false);
 const currentFilter = computed(() => filters[activeTab.value]);
+const handleCategoryFilterChange = (value: unknown) => {
+  if (typeof value !== 'string' || !value) return;
+  currentFilter.value.category = value;
+  categoryFilterVisible.value = false;
+};
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
 const currentPagination = computed(() => paginations[activeTab.value]);
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
@@ -2077,7 +2105,12 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'product', title: '商品名称/ID/商家编码', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
-    { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
+    {
+      colKey: activeTab.value === 'offShelf' ? 'offShelfByName' : 'createdByName',
+      title: activeTab.value === 'offShelf' ? '下架人' : '创建人',
+      width: 120,
+      align: 'center',
+    },
     {
       colKey: activeTab.value === 'offShelf' ? 'offShelfAt' : 'createdAt',
       title: activeTab.value === 'offShelf' ? '下架时间' : '创建时间',
@@ -2089,7 +2122,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
   if (activeTab.value === 'offShelf') {
-    base.splice(5, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
+    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
   }
   base.push({
     colKey: 'operation',
@@ -3984,7 +4017,7 @@ const handleConfirm = async () => {
 .filter-fields {
   display: grid;
   flex: 1;
-  grid-template-columns: minmax(290px, 1.6fr) repeat(2, minmax(170px, 1fr));
+  grid-template-columns: 258px 230px 240px;
   gap: var(--td-comp-margin-m);
 }
 

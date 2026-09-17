@@ -9,13 +9,13 @@
         <AdminPageHeader :breadcrumbs="['门店分类管理']" />
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="84px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="分类名称" name="keyword">
                   <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
                 </t-form-item>
-                <t-form-item label="分类状态" name="status">
+                <t-form-item class="zdm-status-filter" label="分类状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="全部">
                     <t-option label="启用" value="enabled" />
                     <t-option label="停用" value="disabled" />
