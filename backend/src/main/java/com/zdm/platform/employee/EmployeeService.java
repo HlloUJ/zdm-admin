@@ -165,10 +165,13 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
       EmployeeInvite invite,
       EmployeeInviteRegisterRequest request) {
     Long accountId = findOrCreateAccount(request.phone(), request.name().trim());
+    // Serialize registrations for the same person across distinct invitation links.
+    jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE id = ? FOR UPDATE", Long.class, accountId);
     requireNoExistingEmployee(invite, accountId);
 
     Employee employee = new Employee();
     employee.setAccountId(accountId);
+    employee.setClientCode(invite.getClientCode());
     employee.setTenantId(invite.getTenantId());
     employee.setStoreId(invite.getStoreId());
     employee.setName(request.name().trim());
@@ -189,15 +192,18 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   private void requireNoExistingEmployee(EmployeeInvite invite, Long accountId) {
     Employee duplicate = lambdaQuery()
         .eq(Employee::getAccountId, accountId)
-        .eq(Employee::getTenantId, invite.getTenantId())
-        .eq(Employee::getStoreId, invite.getStoreId())
-        .last("LIMIT 1")
+        .eq(Employee::getClientCode, invite.getClientCode())
+        .eq(invite.getTenantId() != null, Employee::getTenantId, invite.getTenantId())
+        .isNull(invite.getTenantId() == null, Employee::getTenantId)
+        .eq(invite.getStoreId() != null, Employee::getStoreId, invite.getStoreId())
+        .isNull(invite.getStoreId() == null, Employee::getStoreId)
+        .last("LIMIT 1 FOR UPDATE")
         .one();
     if (duplicate != null) {
       throw new IllegalArgumentException(
           "enabled".equals(duplicate.getStatus())
               ? "该手机号已是当前组织员工"
-              : "该手机号已提交员工注册，请等待超级管理员审核");
+              : "该手机号已提交员工注册，请等待管理员审核");
     }
   }
 
@@ -255,7 +261,13 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     values.put("display_name", displayName);
     values.put("account_type", "person");
     values.put("status", "enabled");
-    return accountInsert.executeAndReturnKey(values).longValue();
+    try {
+      return accountInsert.executeAndReturnKey(values).longValue();
+    } catch (org.springframework.dao.DuplicateKeyException exception) {
+      // A concurrent registration may have just created the same unified account.
+      return jdbcTemplate.queryForObject(
+          "SELECT id FROM accounts WHERE phone = ? FOR UPDATE", Long.class, phone);
+    }
   }
 
   private Optional<Long> findAccountId(String phone) {

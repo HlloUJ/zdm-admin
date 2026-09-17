@@ -53,10 +53,10 @@ describe('full function catalog', () => {
       'admin.tenant',
       'admin.product-data-center',
       'admin.supplier-supply-type-management',
+      'supply-chain.products',
       'admin.supplier-management',
       'admin.tenant.store-category-management',
       'admin.permission-management',
-      'supply-chain.products',
     ]);
     for (const terminal of ['store', 'supplier'] as const) {
       expect(terminalFunctionTrees[terminal].map((module) => module.value)).toEqual([
@@ -88,6 +88,25 @@ describe('full function catalog', () => {
       expect(operations).not.toContain(`admin.${module}.warehouse.publish`);
       expect(operations).not.toContain(`admin.${module}.selling.edit`);
       expect(normalizeTerminalPermissions('supply-chain', [`admin.${module}.warehouse.price`])).toEqual([]);
+    }
+  });
+
+  it('publishes supply-chain staff management without platform or store access', () => {
+    const pages = terminalFunctionTrees['supply-chain'].flatMap((m) => m.menus).flatMap((m) => m.pages);
+    for (const [key, labels] of Object.entries({
+      'employee-management': ['查看', '邀请员工', '编辑', '角色', '停用/启用', '删除'],
+      'role-management': ['查看', '新增', '编辑', '权限', '删除'],
+    })) {
+      const prefix = `admin.permission-management.${key}`;
+      const page = pages.find((p) => p.value === prefix)!;
+      expect(page.tabs).toHaveLength(1);
+      expect(page.tabs[0].label).toBe('');
+      expect(page.tabs[0].actions.map((a) => a.label)).toEqual(labels);
+      expect(page.tabs[0].actions.every((a) => a.value.startsWith(`${prefix}.supply-chain.`))).toBe(true);
+      expect(normalizeTerminalPermissions('supply-chain', [`${prefix}.view`])).toEqual([]);
+      for (const terminal of ['store', 'supplier'] as const) {
+        expect(normalizeTerminalPermissions(terminal, [`${prefix}.supply-chain.view`])).toEqual([]);
+      }
     }
   });
 

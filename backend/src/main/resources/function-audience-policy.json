@@ -29,11 +29,11 @@
   },
   {
     "prefix": "admin.permission-management.employee-management",
-    "scope": "shared"
+    "scope": "shared-management"
   },
   {
     "prefix": "admin.permission-management.role-management",
-    "scope": "shared"
+    "scope": "shared-management"
   },
   {
     "prefix": "admin.permission-management.terminal-function-allocation",
@@ -105,10 +105,10 @@
   },
   {
     "prefix": "admin.permission-management.role-management.supply-chain",
-    "scope": "admin-only"
+    "scope": "internal-management"
   },
   {
     "prefix": "admin.permission-management.employee-management.supply-chain",
-    "scope": "admin-only"
+    "scope": "internal-management"
   }
 ]

@@ -742,6 +742,7 @@ const navigationModuleOrder = [
   'admin.tenant',
   'admin.product-data-center',
   'admin.supplier-supply-type-management',
+  'supply-chain.products',
   'admin.supplier-management',
   'admin.tenant.store-category-management',
   'admin.permission-management',
@@ -757,7 +758,7 @@ const orderModulesByNavigation = (modules: FunctionModule[]) => {
 };
 
 const supplyChainProducts: FunctionModule = {
-  label: '供应链商品管理',
+  label: '商品管理',
   value: 'supply-chain.products',
   audiences: ['supply-chain'],
   menus: (['finished-stock-management', 'slab-management'] as const).map((key) => {
@@ -870,14 +871,14 @@ const withAdministrationTabs = (modules: FunctionModule[]): FunctionModule[] =>
               value: page.value,
               actions: page.actions.map((action) => ({
                 ...action,
-                label: action.label === '邀请员工' ? '新增员工' : action.label,
+                label: action.label,
               })),
             },
             {
               label: '供应链协同系统',
               value: `${page.value}.supply-chain`,
               actions: page.actions.map((action) => ({
-                label: action.label === '邀请员工' ? '新增员工' : action.label,
+                label: action.label,
                 value: action.value.replace(page.value, `${page.value}.supply-chain`),
               })),
             },

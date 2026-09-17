@@ -31,6 +31,8 @@ public final class FunctionAudiencePolicy {
         .filter(rule -> permission.equals(rule.prefix()) || permission.startsWith(rule.prefix() + "."))
         .max(Comparator.comparingInt(rule -> rule.prefix().length()))
         .map(rule -> switch (rule.scope()) {
+          case "shared-management" -> !"supply-chain".equals(audience) || permission.equals(rule.prefix());
+          case "internal-management" -> List.of("admin", "supply-chain").contains(audience);
           case "shared" -> !"supply-chain".equals(audience);
           case "admin-only" -> "admin".equals(audience);
           case "terminal-only" -> List.of("store", "supplier").contains(audience);
