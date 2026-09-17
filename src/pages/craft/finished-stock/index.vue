@@ -24,7 +24,7 @@
                 <t-form-item label="工艺名称">
                   <t-input v-model="searchForm.name" clearable placeholder="请输入" />
                 </t-form-item>
-                <t-form-item label="工艺类型">
+                <t-form-item label="工艺类型" class="craft-type-filter">
                   <t-select v-model="searchForm.type" clearable placeholder="请选择">
                     <t-option
                       v-for="item in craftTypeOptions"
@@ -53,7 +53,7 @@
                     />
                   </div>
                 </t-form-item>
-                <t-form-item label="状态">
+                <t-form-item label="状态" label-width="44px" class="craft-status-filter">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
@@ -276,7 +276,7 @@ const canEditCraft = computed(() => hasPermission(loginUser.value, `${craftPermi
 const canToggleCraftStatus = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.toggle-status`));
 const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.delete`));
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 72, align: 'left' },
   { colKey: 'image', title: '工艺图片', width: 112, align: 'center' },
   { colKey: 'name', title: '工艺名称', minWidth: 160 },
@@ -285,8 +285,14 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 156,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const searchForm = reactive({
   name: '',
@@ -731,6 +737,14 @@ onMounted(loadCrafts);
   margin-bottom: 0;
 }
 
+.filter-fields :deep(.t-form__item.craft-type-filter) {
+  width: 180px;
+}
+
+.filter-fields :deep(.t-form__item.craft-status-filter) {
+  width: 150px;
+}
+
 .width-range {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -743,6 +757,7 @@ onMounted(loadCrafts);
 }
 
 .filter-actions {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
@@ -880,6 +895,8 @@ onMounted(loadCrafts);
 
   .filter-fields,
   .filter-fields :deep(.t-form__item),
+  .filter-fields :deep(.t-form__item.craft-type-filter),
+  .filter-fields :deep(.t-form__item.craft-status-filter),
   .filter-actions {
     width: 100%;
   }

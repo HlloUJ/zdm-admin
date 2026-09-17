@@ -296,7 +296,7 @@ const tableData = ref<AttributeItem[]>([
   },
 ]);
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '属性', minWidth: 160, align: 'left' },
   { colKey: 'attributeCode', title: '属性编码', minWidth: 132, align: 'left' },
@@ -304,8 +304,14 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'valueSource', title: '值来源', minWidth: 140, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 280, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 184,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const optionColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
@@ -313,7 +319,7 @@ const optionColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'value', title: '选项名称', minWidth: 160, align: 'left' },
   { colKey: 'status', title: '状态', width: 96, align: 'center' },
   { colKey: 'sort', title: '排序', width: 80, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 96, align: 'left' },
+  { colKey: 'operation', title: '操作', width: 76, align: 'left' },
 ];
 
 const searchForm = reactive({

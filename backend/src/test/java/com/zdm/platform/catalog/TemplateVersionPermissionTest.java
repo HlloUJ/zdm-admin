@@ -15,9 +15,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 
 class TemplateVersionPermissionTest {
-  @Test
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"view", "create", "sort", "accessory-sort"})
   @SuppressWarnings("unchecked")
-  void viewPermissionCannotReorderPublishedAttributes() {
+  void onlySameScopeSortPermissionCanReorderPublishedAttributes(String action) {
     JdbcTemplate jdbc = mock(JdbcTemplate.class);
     ProductCategoryService categories = mock(ProductCategoryService.class);
     ProductCategory category = new ProductCategory();
@@ -26,7 +27,10 @@ class TemplateVersionPermissionTest {
     when(categories.getById(1L)).thenReturn(category);
     CurrentIdentityProvider identity = mock(CurrentIdentityProvider.class);
     when(identity.require()).thenReturn(new CurrentIdentity(1L, 1L, 1L, 1L, "admin", null, null,
-        "测试", "all", List.of(), List.of("admin.product-data-center.category-attribute-template.finished.attributes.view")));
+        "测试", "all", List.of(), List.of("admin.product-data-center.category-attribute-template.finished.attributes.view",
+            action.equals("accessory-sort")
+                ? "admin.product-data-center.category-attribute-template.accessory.attributes.sort"
+                : "admin.product-data-center.category-attribute-template.finished.attributes." + action)));
     TemplateVersion version = new TemplateVersion(1L, 1L, 1, "published", 0,
         new ObjectMapper().createArrayNode(), "测试", "测试", "", null, null, 1L);
     when(jdbc.query(org.mockito.ArgumentMatchers.anyString(),
@@ -34,6 +38,12 @@ class TemplateVersionPermissionTest {
         org.mockito.ArgumentMatchers.eq(1L))).thenReturn(List.of(version));
     TemplateVersionService service = new TemplateVersionService(jdbc, new ObjectMapper(), new PermissionGuard(identity),
         categories, mock(ProductAttributeService.class), mock(ProductAttributeValueService.class));
+    if (action.equals("sort")) {
+      org.assertj.core.api.Assertions.assertThat(service.reorder(1L, 0, List.of())).isEqualTo(version);
+      org.mockito.Mockito.verify(jdbc).update(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.eq("[]"), org.mockito.ArgumentMatchers.eq(1L));
+      return;
+    }
     assertThatThrownBy(() -> service.reorder(1L, 0, List.of())).isInstanceOf(AccessDeniedException.class);
     org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never()).update(
         org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.<Object[]>any());

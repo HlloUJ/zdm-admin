@@ -25,7 +25,7 @@ test.beforeEach(async ({ page }) => {
 async function expectUnifiedConfirmDialog(page: Page, options: { action: string; content: string; danger?: boolean }) {
   const dialog = page.locator('.zdm-admin-confirm-dialog:visible');
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText(`确认${options.action}`);
+  await expect(dialog).toContainText(`是否${options.action}`);
   await expect(dialog).toContainText(options.content);
 
   const confirmButton = dialog.getByRole('button', { name: `确认${options.action}`, exact: true });
@@ -782,7 +782,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(page.getByText('已批量下架“1 个大板”', { exact: true })).toBeVisible();
 
   await page.getByText('已下架 2', { exact: true }).click();
-  const filterCard = page.locator('.filter-card');
+  const filterCard = page.locator('.list-controls');
   await expect(filterCard.getByText('下架原因', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('下架人', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('下架时间', { exact: true })).toBeVisible();
@@ -791,7 +791,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(filterCard.getByText('色系', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('等级', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('供应商', { exact: true })).toHaveCount(0);
-  expect((await page.locator('.table-card thead th').allTextContents()).map((text) => text.trim())).toEqual([
+  expect((await page.locator('.slab-list-layout thead th').allTextContents()).map((text) => text.trim())).toEqual([
     '',
     '商品主图',
     '大板名称/ID/大板编号',
@@ -801,7 +801,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
     '下架时间',
     '操作',
   ]);
-  const offShelfRows = page.locator('.table-card tbody tr');
+  const offShelfRows = page.locator('.slab-list-layout tbody tr');
   await expect(offShelfRows).toHaveCount(2);
   await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
   await expect(offShelfRows.nth(1)).toContainText('已下架大板 62');

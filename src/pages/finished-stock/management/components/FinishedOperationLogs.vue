@@ -175,7 +175,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'operationSummary', title: '操作内容', minWidth: 180 },
   { colKey: 'operatorName', title: '操作人', width: 120 },
   { colKey: 'operatedAt', title: '操作时间', width: 180 },
-  { colKey: 'operation', title: '操作', width: 80, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 76, fixed: 'right' },
 ];
 let requestId = 0;
 async function load() {

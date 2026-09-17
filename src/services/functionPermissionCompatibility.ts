@@ -22,6 +22,11 @@ const legacyAttributeActionMap: Record<string, string> = {
 };
 
 export const expandLegacyScopedPermission = (permission: string) => {
+  const categorySortPrefix = ['finished', 'accessory']
+    .map((scope) => `admin.product-data-center.category.${scope}`)
+    .find((prefix) => permission === `${prefix}.move-up` || permission === `${prefix}.move-down`);
+  if (categorySortPrefix) return [`${categorySortPrefix}.sort`];
+
   const legacyCategoryStatusPrefix = categoryStatusPermissionPrefixes.find(
     (candidate) => permission === `${candidate}.disable` || permission === `${candidate}.enable`,
   );

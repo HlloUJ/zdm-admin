@@ -143,7 +143,14 @@
                               row-key="attributeId"
                               :data="attributePageRows"
                               :columns="attributeColumns"
-                              :drag-sort="canSortAttributes ? 'row-handler' : undefined"
+                              :class="{ 'zdm-row-sort-table': canSortAttributes }"
+                              :drag-sort="canSortAttributes ? 'row' : undefined"
+                              :drag-sort-options="{
+                                animation: 200,
+                                filter:
+                                  'a, button, input, textarea, select, .t-link, .t-select, .t-checkbox, .t-switch',
+                                preventOnFilter: false,
+                              }"
                               @drag-sort="sortAttributes"
                             >
                               <template #serialNumber="{ rowIndex }">{{
@@ -433,7 +440,9 @@ const selected = computed(() => versions.value.find((v) => v.id === selectedId.v
 const draft = computed(() => versions.value.find((v) => v.state === 'draft'));
 const isDraft = computed(() => selected.value?.state === 'draft');
 const editable = computed(() => isDraft.value && can('create') && !busy.value);
-const canSortAttributes = computed(() => !!selected.value && can('create') && !busy.value && !loading.value);
+const canSortAttributes = computed(
+  () => !!selected.value && can('sort') && (!isDraft.value || editable.value) && !busy.value && !loading.value,
+);
 const specificationCount = computed(
   () => rows.value.filter((row) => row.attributeRole === 'sales' && row.skuFlag).length,
 );
@@ -508,7 +517,7 @@ const attributeColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
       isDraft.value ? h('span', ['选项值', h('span', { style: { color: 'var(--td-error-color)' } }, ' *')]) : '选项值',
     width: 110,
   },
-  ...(editable.value ? [{ colKey: 'operation', title: '操作', width: 80, fixed: 'right' as const }] : []),
+  ...(editable.value ? [{ colKey: 'operation', title: '操作', width: 76, fixed: 'right' as const }] : []),
 ]);
 const addColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'row-select', type: 'multiple' },
@@ -529,12 +538,12 @@ const formatDateTime = (value?: string) => {
     hourCycle: 'h23',
   }).format(date);
 };
-const historyColumns: PrimaryTableCol<TableRowData>[] = [
+const historyColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'versionNo', title: '版本', width: 160 },
   { colKey: 'publishedByName', title: '创建人' },
   { colKey: 'publishedAt', title: '创建时间' },
-  { colKey: 'operation', title: '操作', width: 190 },
-];
+  { colKey: 'operation', title: '操作', width: 112 },
+]);
 const pendingEdits = new Map<
   number,
   {

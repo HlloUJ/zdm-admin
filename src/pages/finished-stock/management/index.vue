@@ -43,177 +43,182 @@
         </header>
 
         <template v-if="!formPageVisible && finishedTabs.length">
-          <section class="filter-card">
-            <t-tabs v-if="showFinishedTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
-              <t-tab-panel v-for="tab in finishedTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
-            </t-tabs>
+          <AdminListLayout class="finished-list-layout">
+            <template #toolbar>
+              <div class="list-controls">
+                <t-tabs v-if="showFinishedTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
+                  <t-tab-panel v-for="tab in finishedTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
+                </t-tabs>
 
-            <t-form :data="currentFilter" label-width="44px" colon>
-              <div class="filter-row">
-                <div class="filter-fields">
-                  <t-form-item label="商品">
-                    <t-input
-                      v-model="currentFilter.keyword"
-                      clearable
-                      placeholder="商品名称 / ID / 商家编码"
-                      @enter="handleSearch"
-                    />
-                  </t-form-item>
-                  <t-form-item label="商品分类" label-width="72px">
-                    <t-cascader
-                      v-model="currentFilter.category"
-                      :options="categoryCascaderOptions"
-                      clearable
-                      :check-strictly="false"
-                      placeholder="请选择"
-                      trigger="hover"
-                    />
-                  </t-form-item>
-                  <t-form-item label="供应商" label-width="60px">
-                    <t-select v-model="currentFilter.supplier" clearable placeholder="请选择">
-                      <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
-                    </t-select>
-                  </t-form-item>
-                </div>
+                <t-form :data="currentFilter" label-width="44px" colon>
+                  <div class="filter-row">
+                    <div class="filter-fields">
+                      <t-form-item label="商品">
+                        <t-input
+                          v-model="currentFilter.keyword"
+                          clearable
+                          placeholder="商品名称 / ID / 商家编码"
+                          @enter="handleSearch"
+                        />
+                      </t-form-item>
+                      <t-form-item label="商品分类" label-width="72px">
+                        <t-cascader
+                          v-model="currentFilter.category"
+                          :options="categoryCascaderOptions"
+                          clearable
+                          :check-strictly="false"
+                          placeholder="请选择"
+                          trigger="hover"
+                        />
+                      </t-form-item>
+                      <t-form-item label="供应商" label-width="60px">
+                        <t-select v-model="currentFilter.supplier" clearable placeholder="请选择">
+                          <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
+                        </t-select>
+                      </t-form-item>
+                    </div>
 
-                <div class="filter-actions">
-                  <t-button theme="primary" @click="handleSearch">
-                    <template #icon><t-icon name="search" /></template>
-                    查询
-                  </t-button>
-                  <t-button theme="default" variant="base" @click="handleReset">
-                    <template #icon><t-icon name="refresh" /></template>
-                    重置
-                  </t-button>
+                    <div class="filter-actions">
+                      <t-button theme="primary" @click="handleSearch">
+                        <template #icon><t-icon name="search" /></template>
+                        查询
+                      </t-button>
+                      <t-button theme="default" variant="base" @click="handleReset">
+                        <template #icon><t-icon name="refresh" /></template>
+                        重置
+                      </t-button>
+                    </div>
+                  </div>
+                </t-form>
+
+                <div v-if="batchButtons.length" class="table-toolbar">
+                  <div class="toolbar-buttons">
+                    <t-button
+                      v-for="button in batchButtons"
+                      :key="button.action"
+                      :theme="button.theme"
+                      :class="button.className"
+                      @click="handleBatchAction(button.action)"
+                    >
+                      <template #icon>
+                        <t-icon :name="button.icon" />
+                      </template>
+                      {{ button.label }}
+                    </t-button>
+                  </div>
+                  <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
                 </div>
               </div>
-            </t-form>
-          </section>
-
-          <section class="table-card">
-            <div v-if="batchButtons.length" class="table-toolbar">
-              <div class="toolbar-buttons">
-                <t-button
-                  v-for="button in batchButtons"
-                  :key="button.action"
-                  :theme="button.theme"
-                  :class="button.className"
-                  @click="handleBatchAction(button.action)"
-                >
-                  <template #icon>
-                    <t-icon :name="button.icon" />
-                  </template>
-                  {{ button.label }}
-                </t-button>
-              </div>
-              <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
-            </div>
-
-            <t-table
-              :row-class-name="({ row }: { row: StockItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
-              row-key="id"
-              :data="pageData"
-              :columns="columns"
-              :loading="loading"
-              hover
-              table-layout="fixed"
-            >
-              <template #selectTitle>
-                <t-checkbox
-                  :checked="pageAllSelected"
-                  :indeterminate="pagePartiallySelected"
-                  @change="toggleCurrentPage"
-                />
-              </template>
-              <template #select="{ row }">
-                <t-checkbox
-                  :disabled="sourceBlocked(row)"
-                  :checked="selectedKeySet.has(row.id)"
-                  @change="(checked: boolean) => toggleRow(row.id, checked)"
-                />
-              </template>
-              <template #image="{ row }">
-                <button
-                  class="product-image preview-trigger"
-                  type="button"
-                  title="点击查看大图"
-                  :disabled="sourceBlocked(row)"
-                  @click="openImagePreview(row)"
-                >
-                  <img v-if="row.image" :src="row.image" :alt="row.name" />
-                  <t-icon v-else name="image-off" />
-                </button>
-              </template>
-              <template #product="{ row }">
-                <div class="product-meta">
-                  <div class="product-name">{{ row.name }}</div>
-                  <t-tag v-if="sourceBlocked(row)" theme="default" variant="light">{{
-                    ['recycle', 'purged'].includes(row.sourceStatus || '')
-                      ? '该商品已被供应链删除'
-                      : '该商品已被供应链下架'
-                  }}</t-tag>
-                  <div class="product-code">ID：{{ row.id }}</div>
-                  <div class="product-code">商家编码：{{ row.code }}</div>
-                </div>
-              </template>
-              <template #supplier="{ row }">
-                <div class="tenant-cell">
-                  <span>{{ row.supplier }}</span>
-                  <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->
-                  <span class="store-text">平台仓</span>
-                </div>
-              </template>
-              <template #offShelfAt="{ row }">{{
-                row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
-              }}</template>
-              <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-              <template #offShelfReason="{ row }">
-                <div class="off-shelf-reason-cell">
-                  <span>{{ row.offShelfReason || '—' }}</span>
-                  <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
-                    <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
-                  </t-tooltip>
-                </div>
-              </template>
-              <template #operation="{ row }">
-                <t-link
-                  v-if="sourceBlocked(row) && hasFinishedAction('purge', 'recycle')"
-                  class="source-purge"
-                  theme="danger"
-                  @click="handleRowAction('purge', row)"
-                  >彻底删除</t-link
-                >
-                <div v-else-if="!sourceBlocked(row)" class="table-actions">
-                  <t-link
-                    v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
-                    theme="primary"
-                    hover="color"
-                    @click="openPriceDrawer('view', row)"
-                    >价格</t-link
+            </template>
+            <template #table>
+              <t-table
+                :key="activeTab"
+                :row-class-name="({ row }: { row: StockItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
+                row-key="id"
+                :data="pageData"
+                :columns="columns"
+                :loading="loading"
+                hover
+                table-layout="fixed"
+              >
+                <template #selectTitle>
+                  <t-checkbox
+                    :checked="pageAllSelected"
+                    :indeterminate="pagePartiallySelected"
+                    @change="toggleCurrentPage"
+                  />
+                </template>
+                <template #select="{ row }">
+                  <t-checkbox
+                    :disabled="sourceBlocked(row)"
+                    :checked="selectedKeySet.has(row.id)"
+                    @change="(checked: boolean) => toggleRow(row.id, checked)"
+                  />
+                </template>
+                <template #image="{ row }">
+                  <button
+                    class="product-image preview-trigger"
+                    type="button"
+                    title="点击查看大图"
+                    :disabled="sourceBlocked(row)"
+                    @click="openImagePreview(row)"
                   >
+                    <img v-if="row.image" :src="row.image" :alt="row.name" />
+                    <t-icon v-else name="image-off" />
+                  </button>
+                </template>
+                <template #product="{ row }">
+                  <div class="product-meta">
+                    <div class="product-name">{{ row.name }}</div>
+                    <t-tag v-if="sourceBlocked(row)" theme="default" variant="light">{{
+                      ['recycle', 'purged'].includes(row.sourceStatus || '')
+                        ? '该商品已被供应链删除'
+                        : '该商品已被供应链下架'
+                    }}</t-tag>
+                    <div class="product-code">ID：{{ row.id }}</div>
+                    <div class="product-code">商家编码：{{ row.code }}</div>
+                  </div>
+                </template>
+                <template #supplier="{ row }">
+                  <div class="tenant-cell">
+                    <span>{{ row.supplier }}</span>
+                    <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->
+                    <span class="store-text">平台仓</span>
+                  </div>
+                </template>
+                <template #offShelfAt="{ row }">{{
+                  row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
+                }}</template>
+                <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+                <template #offShelfReason="{ row }">
+                  <div class="off-shelf-reason-cell">
+                    <span>{{ row.offShelfReason || '—' }}</span>
+                    <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
+                      <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
+                    </t-tooltip>
+                  </div>
+                </template>
+                <template #operation="{ row }">
                   <t-link
-                    v-for="action in rowActions()"
-                    :key="action.action"
-                    :theme="action.theme"
-                    hover="color"
-                    @click="handleRowAction(action.action, row)"
+                    v-if="sourceBlocked(row) && hasFinishedAction('purge', 'recycle')"
+                    class="source-purge"
+                    theme="danger"
+                    @click="handleRowAction('purge', row)"
+                    >彻底删除</t-link
                   >
-                    {{ action.label }}
-                  </t-link>
-                </div>
-              </template>
-              <template #empty>
-                <div class="table-empty">暂无数据</div>
-              </template>
-            </t-table>
-
-            <AdminPagination
-              v-model:current="currentPagination.current"
-              v-model:page-size="currentPagination.pageSize"
-              :total="paginationTotal"
-              :page-size-options="pageSizeOptions"
-            />
-          </section>
+                  <div v-else-if="!sourceBlocked(row)" class="table-actions">
+                    <t-link
+                      v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
+                      theme="primary"
+                      hover="color"
+                      @click="openPriceDrawer('view', row)"
+                      >价格</t-link
+                    >
+                    <t-link
+                      v-for="action in rowActions()"
+                      :key="action.action"
+                      :theme="action.theme"
+                      hover="color"
+                      @click="handleRowAction(action.action, row)"
+                    >
+                      {{ action.label }}
+                    </t-link>
+                  </div>
+                </template>
+                <template #empty>
+                  <div class="table-empty">暂无数据</div>
+                </template>
+              </t-table>
+            </template>
+            <template #pagination>
+              <AdminPagination
+                v-model:current="currentPagination.current"
+                v-model:page-size="currentPagination.pageSize"
+                :total="paginationTotal"
+                :page-size-options="pageSizeOptions"
+              />
+            </template>
+          </AdminListLayout>
         </template>
 
         <template v-else-if="formPageVisible">
@@ -1033,6 +1038,7 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminMediaUpload,
+  AdminListLayout,
   AdminPagination,
   AdminSectionCard,
   type AdminMediaValue,
@@ -1359,7 +1365,8 @@ const scrollToFormSection = (key: FormSectionKey) => {
   const section = document.getElementById(`finished-product-${key}`);
   if (!section) return;
   activeFormSection.value = key;
-  const offset = formAnchorHeight.value + 16;
+  updateFormAnchorPosition();
+  const offset = Number.parseFloat(formAnchorStyle.value.top) + formAnchorHeight.value + 16;
   window.scrollTo({
     top: Math.max(0, window.scrollY + section.getBoundingClientRect().top - offset),
     behavior: 'smooth',
@@ -2056,6 +2063,15 @@ const batchButtons = computed(() => {
   return map[activeTab.value].filter((button) => hasFinishedAction(finishedActionCodes[button.action]));
 });
 
+// Fixed pixel widths; update only when the tab action buttons change.
+const operationWidths = {
+  warehouse: 190,
+  selling: 152,
+  offShelf: 180,
+  soldOut: 104,
+  recycle: 208,
+};
+
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const base: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'image', title: '商品主图', width: 96 },
@@ -2078,7 +2094,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   base.push({
     colKey: 'operation',
     title: '操作',
-    width: activeTab.value === 'soldOut' ? 100 : 230,
+    width: operationWidths[activeTab.value],
     align: 'left',
     fixed: 'right',
   });
@@ -2101,7 +2117,7 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   ];
   const tailColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'merchantCode', title: '商家编码', minWidth: 112 },
-    { colKey: 'operation', title: '操作', minWidth: 64, align: 'left', fixed: 'right' },
+    { colKey: 'operation', title: '操作', width: 76, align: 'left', fixed: 'right' },
   ];
 
   const createSalesColumn = (field: (typeof salesAttributeFields.value)[number]): PrimaryTableCol<TableRowData> => ({
@@ -3949,20 +3965,15 @@ const handleConfirm = async () => {
   color: var(--td-brand-color);
 }
 
-.filter-card,
-.table-card {
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+.finished-list-layout {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.filter-card {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  margin-bottom: var(--td-comp-margin-l);
-}
-
-.status-tabs {
-  margin-bottom: var(--td-comp-margin-l);
+.list-controls {
+  min-width: 0;
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
 
 .filter-row {
@@ -3977,15 +3988,15 @@ const handleConfirm = async () => {
   gap: var(--td-comp-margin-m);
 }
 
+.filter-fields :deep(.t-form__item) {
+  margin-bottom: 0;
+}
+
 .filter-actions {
   display: flex;
   flex: 0 0 auto;
   gap: var(--td-comp-margin-s);
   align-self: flex-start;
-}
-
-.table-card {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
 }
 
 .table-empty {
@@ -3995,15 +4006,8 @@ const handleConfirm = async () => {
   text-align: center;
 }
 
-:deep(.table-card .t-table__empty) {
-  height: auto;
-  padding: 0;
-}
-
 .table-toolbar {
   justify-content: space-between;
-  min-height: 34px;
-  margin-bottom: 14px;
 }
 
 .toolbar-buttons {

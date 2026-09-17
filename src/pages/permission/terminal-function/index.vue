@@ -522,6 +522,7 @@ onMounted(loadAllocation);
 
 .permission-matrix__table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -545,31 +546,31 @@ onMounted(loadAllocation);
 
 .permission-menu-column,
 .permission-menu-cell {
-  width: 12%;
+  width: 132px;
   border-right: 1px solid var(--td-component-border);
 }
 
 .permission-third-menu-column,
 .permission-third-menu-cell {
-  width: 12%;
+  width: 100px;
   border-right: 1px solid var(--td-component-border);
 }
 
 .permission-page-column,
 .permission-page-cell {
-  width: 16%;
+  width: 124px;
   border-right: 1px solid var(--td-component-border);
 }
 
 .permission-tab-column,
 .permission-tab-cell {
-  width: 11.5762%;
+  width: 90px;
   border-right: 1px solid var(--td-component-border);
 }
 
 .permission-action-column,
 .permission-action-cell {
-  width: 48.4238%;
+  width: auto;
 }
 
 .permission-menu-name,

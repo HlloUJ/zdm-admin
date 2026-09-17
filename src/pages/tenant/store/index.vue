@@ -336,7 +336,7 @@ const shopLevelLabel = (levelId: number) =>
 const tableData = ref<StoreItem[]>([]);
 const loading = ref(false);
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'shopName', title: '门店名称', minWidth: 180, align: 'left' },
   { colKey: 'shopType', title: '门店类型', width: 130, align: 'center' },
@@ -346,8 +346,14 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'tenantName', title: '租户姓名', width: 120, align: 'center' },
   { colKey: 'createdBy', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 170, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 190, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: activeTab.value === 'operating' ? 116 : 172,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const searchForm = reactive({
   shopName: '',

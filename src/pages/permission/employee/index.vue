@@ -15,153 +15,158 @@
           </div>
         </header>
 
-        <t-tabs
-          v-if="isInternalAdministration && managementTabs.length > 1"
-          v-model="managedClient"
-          :list="managementTabs"
-          @change="handleManagedClientChange"
-        />
+        <AdminListLayout class="employee-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs
+                v-if="isInternalAdministration && managementTabs.length > 1"
+                v-model="managedClient"
+                :list="managementTabs"
+                @change="handleManagedClientChange"
+              />
 
-        <section class="filter-card">
-          <t-form :data="filterDraft" label-width="84px" colon>
-            <div class="filter-row">
-              <div class="filter-fields">
-                <t-form-item label="姓名" name="name">
-                  <t-input v-model="filterDraft.name" clearable placeholder="请输入" />
-                </t-form-item>
-                <t-form-item label="手机号码" name="phone">
-                  <t-input
-                    :model-value="filterDraft.phone"
-                    clearable
-                    :maxlength="11"
-                    placeholder="请输入手机号"
-                    @update:model-value="handleFilterPhoneChange"
-                  />
-                </t-form-item>
-                <t-form-item label="角色" name="role">
-                  <t-select v-model="filterDraft.role" clearable placeholder="请选择">
-                    <t-option
-                      v-for="role in operationRoleOptions"
-                      :key="role.value"
-                      :label="role.label"
-                      :value="role.value"
-                    />
-                  </t-select>
-                </t-form-item>
-                <t-form-item label="状态" name="status">
-                  <t-select v-model="filterDraft.status" clearable placeholder="请选择">
-                    <t-option label="启用" value="normal" />
-                    <t-option label="停用" value="disabled" />
-                  </t-select>
-                </t-form-item>
-              </div>
-              <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
-                  <template #icon><t-icon name="search" /></template>
-                  查询
-                </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
-                  <template #icon><t-icon name="refresh" /></template>
-                  重置
+              <t-form :data="filterDraft" label-width="84px" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="姓名" name="name" class="name-filter">
+                      <t-input v-model="filterDraft.name" clearable placeholder="请输入" />
+                    </t-form-item>
+                    <t-form-item label="手机号码" name="phone">
+                      <t-input
+                        :model-value="filterDraft.phone"
+                        clearable
+                        :maxlength="11"
+                        placeholder="请输入手机号"
+                        @update:model-value="handleFilterPhoneChange"
+                      />
+                    </t-form-item>
+                    <t-form-item label="角色" name="role" label-width="44px" class="role-filter">
+                      <t-select v-model="filterDraft.role" clearable placeholder="请选择">
+                        <t-option
+                          v-for="role in operationRoleOptions"
+                          :key="role.value"
+                          :label="role.label"
+                          :value="role.value"
+                        />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item label="状态" name="status" label-width="44px" class="status-filter">
+                      <t-select v-model="filterDraft.status" clearable placeholder="请选择">
+                        <t-option label="启用" value="normal" />
+                        <t-option label="停用" value="disabled" />
+                      </t-select>
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="handleSearch">
+                      <template #icon><t-icon name="search" /></template>
+                      查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="handleReset">
+                      <template #icon><t-icon name="refresh" /></template>
+                      重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div v-if="canCreateEmployee" class="table-toolbar">
+                <InternalEmployeeCreate
+                  v-if="isInternalAdministration"
+                  :client-code="managedClient"
+                  @created="loadPermissionCenter"
+                />
+                <t-button v-else theme="primary" :loading="inviteCreating" @click="openInviteDialog">
+                  <template #icon><t-icon name="add" /></template>
+                  邀请员工
                 </t-button>
               </div>
             </div>
-          </t-form>
-        </section>
-
-        <section class="table-card">
-          <div v-if="canCreateEmployee" class="table-toolbar">
-            <InternalEmployeeCreate
-              v-if="isInternalAdministration"
-              :client-code="managedClient"
-              @created="loadPermissionCenter"
+          </template>
+          <template #table>
+            <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
+              <template #index="{ rowIndex }">
+                {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
+              </template>
+              <template #gender="{ row }">
+                {{ genderLabel(row.gender) }}
+              </template>
+              <template #roles="{ row }">
+                <span>{{ roleNames(row.roleIds) }}</span>
+              </template>
+              <template #status="{ row }">
+                <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
+                  {{ row.status === 'normal' ? '启用' : '停用' }}
+                </t-tag>
+              </template>
+              <template #remark="{ row }">
+                <t-tooltip :content="row.remark" :disabled="!row.remark" placement="bottom-left">
+                  <span class="remark-cell">{{ row.remark || '-' }}</span>
+                </t-tooltip>
+              </template>
+              <template #operation="{ row }">
+                <div class="table-actions">
+                  <t-link
+                    v-if="canEditEmployee && row.id !== loginUser.employeeId"
+                    theme="primary"
+                    hover="color"
+                    @click="openProfileDialog(row)"
+                  >
+                    编辑
+                  </t-link>
+                  <t-link
+                    v-if="
+                      canConfigureEmployeePermission && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId
+                    "
+                    theme="primary"
+                    hover="color"
+                    @click="openPermissionDialog(row)"
+                  >
+                    角色
+                  </t-link>
+                  <t-link
+                    v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
+                    :theme="row.status === 'normal' ? 'warning' : 'success'"
+                    hover="color"
+                    @click="openStatusConfirm(row)"
+                  >
+                    {{ row.status === 'normal' ? '停用' : '启用' }}
+                  </t-link>
+                  <t-link
+                    v-if="canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
+                    theme="danger"
+                    hover="color"
+                    @click="openDeleteConfirm(row)"
+                  >
+                    删除
+                  </t-link>
+                  <span
+                    v-if="
+                      !(canEditEmployee && row.id !== loginUser.employeeId) &&
+                      !(
+                        canConfigureEmployeePermission &&
+                        !isSuperAdminEmployee(row) &&
+                        row.id !== loginUser.employeeId
+                      ) &&
+                      !(canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId) &&
+                      !(canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId)
+                    "
+                    class="table-action-placeholder"
+                  >
+                    -
+                  </span>
+                </div>
+              </template>
+            </t-table>
+          </template>
+          <template #pagination>
+            <AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
             />
-            <t-button v-else theme="primary" :loading="inviteCreating" @click="openInviteDialog">
-              <template #icon><t-icon name="add" /></template>
-              邀请员工
-            </t-button>
-          </div>
-
-          <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
-            <template #index="{ rowIndex }">
-              {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
-            </template>
-            <template #gender="{ row }">
-              {{ genderLabel(row.gender) }}
-            </template>
-            <template #roles="{ row }">
-              <span>{{ roleNames(row.roleIds) }}</span>
-            </template>
-            <template #status="{ row }">
-              <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'normal' ? '启用' : '停用' }}
-              </t-tag>
-            </template>
-            <template #remark="{ row }">
-              <t-tooltip :content="row.remark" :disabled="!row.remark" placement="bottom-left">
-                <span class="remark-cell">{{ row.remark || '-' }}</span>
-              </t-tooltip>
-            </template>
-            <template #operation="{ row }">
-              <div class="table-actions">
-                <t-link
-                  v-if="canEditEmployee && row.id !== loginUser.employeeId"
-                  theme="primary"
-                  hover="color"
-                  @click="openProfileDialog(row)"
-                >
-                  编辑
-                </t-link>
-                <t-link
-                  v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
-                  theme="primary"
-                  hover="color"
-                  @click="openPermissionDialog(row)"
-                >
-                  角色
-                </t-link>
-                <t-link
-                  v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
-                  :theme="row.status === 'normal' ? 'warning' : 'success'"
-                  hover="color"
-                  @click="openStatusConfirm(row)"
-                >
-                  {{ row.status === 'normal' ? '停用' : '启用' }}
-                </t-link>
-                <t-link
-                  v-if="canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
-                  theme="danger"
-                  hover="color"
-                  @click="openDeleteConfirm(row)"
-                >
-                  删除
-                </t-link>
-                <span
-                  v-if="
-                    !(canEditEmployee && row.id !== loginUser.employeeId) &&
-                    !(
-                      canConfigureEmployeePermission &&
-                      !isSuperAdminEmployee(row) &&
-                      row.id !== loginUser.employeeId
-                    ) &&
-                    !(canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId) &&
-                    !(canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId)
-                  "
-                  class="table-action-placeholder"
-                >
-                  -
-                </span>
-              </div>
-            </template>
-          </t-table>
-
-          <AdminPagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="paginationTotal"
-            :page-size-options="pageSizeOptions"
-          />
-        </section>
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
@@ -273,7 +278,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminListLayout, AdminPagination } from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
@@ -413,9 +418,9 @@ const pagination = reactive({
 
 const pageSizeOptions = [10, 20, 50];
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 72, align: 'left' },
-  { colKey: 'name', title: '姓名', width: 112, align: 'left' },
+  { colKey: 'name', title: '姓名', minWidth: 112, align: 'left' },
   { colKey: 'gender', title: '性别', width: 80, align: 'left' },
   { colKey: 'phone', title: '手机号码', width: 140, align: 'left' },
   { colKey: 'roles', title: '角色', width: 160, align: 'left' },
@@ -423,8 +428,14 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'createdByName', title: '创建人', width: 112, align: 'left' },
   { colKey: 'registeredAt', title: '注册时间', width: 160, align: 'left' },
   { colKey: 'remark', title: '备注', width: 150, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 200, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 184,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const filteredEmployees = computed(() => {
   const name = activeFilter.name.trim();
@@ -842,12 +853,15 @@ onMounted(() => {
   margin-bottom: var(--td-comp-margin-l);
 }
 
-.filter-card,
-.table-card {
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
+.employee-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.list-controls {
+  min-width: 0;
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
 
 .filter-row {
@@ -858,6 +872,8 @@ onMounted(() => {
 }
 
 .filter-fields {
+  min-width: 0;
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -865,33 +881,41 @@ onMounted(() => {
 }
 
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
+  width: 220px;
   margin-bottom: 0;
 }
 
+.filter-fields :deep(.t-form__item.name-filter) {
+  width: 200px;
+}
+
+.filter-fields :deep(.t-form__item.role-filter) {
+  width: 180px;
+}
+
+.filter-fields :deep(.t-form__item.status-filter) {
+  width: 150px;
+}
+
 .filter-actions {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
-}
-
-.table-card {
-  margin-top: var(--td-comp-margin-l);
 }
 
 .table-toolbar {
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  margin-bottom: var(--td-comp-margin-l);
 }
 
-.table-card :deep(.t-table) {
+.employee-list-layout :deep(.t-table) {
   width: 100%;
 }
 
-.table-card :deep(.t-table__th-cell),
-.table-card :deep(.t-table__td-cell) {
+.employee-list-layout :deep(.t-table__th-cell),
+.employee-list-layout :deep(.t-table__td-cell) {
   padding-left: 16px;
   padding-right: 16px;
 }
@@ -951,7 +975,10 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
-  .filter-fields :deep(.t-form__item) {
+  .filter-fields :deep(.t-form__item),
+  .filter-fields :deep(.t-form__item.name-filter),
+  .filter-fields :deep(.t-form__item.role-filter),
+  .filter-fields :deep(.t-form__item.status-filter) {
     width: 100%;
   }
 }

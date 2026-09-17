@@ -8,7 +8,7 @@
         <t-alert theme="info" class="page-tip"
           >用于维护各属性的可选值。适用于枚举 / 下拉类型属性；停用后不再允许新商品选择。</t-alert
         >
-        <AdminListLayout>
+        <AdminListLayout class="attribute-value-list-layout">
           <template #toolbar>
             <div class="list-controls">
               <div v-if="!lockedScope" class="scope-controls">
@@ -246,15 +246,21 @@ const formRules: Record<string, FormRule[]> = {
   attribute: [{ required: true, message: '请选择所属属性', type: 'error' }],
   name: [{ required: true, message: '请输入值名称', type: 'error' }],
 };
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '属性值名称', width: 190, align: 'left' },
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  { colKey: 'name', title: '属性值名称', minWidth: 190, align: 'left' },
   { colKey: 'attribute', title: '所属属性', width: 160, align: 'left' },
   { colKey: 'useCount', title: '被引用次数', width: 150, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'left' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 112,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const filteredData = computed(() =>
   data.value.filter(
     (item) =>
@@ -493,7 +499,11 @@ onMounted(loadValues);
 .page-tip {
   margin-bottom: 16px;
 }
+.attribute-value-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
 .list-controls {
+  min-width: 0;
   display: grid;
   width: 100%;
   gap: var(--td-comp-margin-l);
@@ -517,6 +527,8 @@ onMounted(loadValues);
   gap: var(--td-comp-margin-l);
 }
 .filter-fields {
+  min-width: 0;
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -531,6 +543,7 @@ onMounted(loadValues);
   width: 100%;
 }
 .filter-actions {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);

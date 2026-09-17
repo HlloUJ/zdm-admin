@@ -88,7 +88,7 @@ test('shows finished stock actions without inventory movements', async ({ page }
     }),
   );
   await page.goto('/supply-chain/finished-stock-management');
-  const categoryFilter = page.locator('.filter-card .t-form__item').filter({ hasText: '商品分类' });
+  const categoryFilter = page.locator('.list-controls .t-form__item').filter({ hasText: '商品分类' });
   await categoryFilter.locator('input').click();
   await expect(page.locator('.t-cascader__panel:visible').getByText('有效商品分类', { exact: true })).toBeVisible();
   await expect(page.getByText('已停用分类', { exact: true })).toHaveCount(0);
@@ -107,6 +107,8 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await expect(firstProductRow.getByText('2026/07/27 17:00', { exact: true })).toBeVisible();
   await expect(page.getByText('流水', { exact: true })).toHaveCount(0);
   await expect(page.getByText('库存流水', { exact: true })).toHaveCount(0);
+  const operationHeader = page.getByRole('columnheader', { name: '操作', exact: true });
+  const operationWidth = await operationHeader.evaluate((element) => element.getBoundingClientRect().width);
   const keyword = page.getByPlaceholder('商品名称 / ID / 商家编码', { exact: true });
   for (const text of ['轻奢', '1', 'fp-20260727', '  岩板  ']) {
     await keyword.fill(text);
@@ -117,6 +119,9 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await keyword.fill('不存在的商品');
   await keyword.press('Enter');
   await expect(firstProductRow).toHaveCount(0);
+  await expect
+    .poll(() => operationHeader.evaluate((element) => element.getBoundingClientRect().width))
+    .toBe(operationWidth);
   await page.getByRole('button', { name: '重置', exact: true }).click();
   await expect(keyword).toHaveValue('');
   await expect(firstProductRow).toBeVisible();
@@ -716,7 +721,7 @@ test('edits prices in a specification table and preserves product details on sav
 
   await visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }).click();
   await expect(
-    page.locator('.t-dialog:visible').getByText('确定更改价格不跟随价格配置浮动？', { exact: true }),
+    page.locator('.t-dialog:visible').getByText('是否更改价格不跟随价格配置浮动？', { exact: true }),
   ).toBeVisible();
   await page.locator('.t-dialog:visible .t-dialog__cancel').click();
   expect(saves).toBe(0);
@@ -767,4 +772,29 @@ test('edits prices in a specification table and preserves product details on sav
   await page.getByText('价格', { exact: true }).click();
   await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
   await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toBeDisabled();
+});
+
+test('restores the initial horizontal layout after visiting the off-shelf tab', async ({ page }) => {
+  await page.setViewportSize({ width: 1393, height: 868 });
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  await page.goto('/supply-chain/finished-stock-management');
+  await expect(page.locator('tbody tr').filter({ hasText: '编码：' }).first()).toBeVisible();
+  const content = page.locator('main .t-table__content');
+  const dimensions = () =>
+    content.evaluate((element) => ({ width: element.clientWidth, scrollWidth: element.scrollWidth }));
+  const warehouse = await dimensions();
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+  const selling = await dimensions();
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+  await expect
+    .poll(async () => {
+      const size = await dimensions();
+      return size.scrollWidth > size.width;
+    })
+    .toBe(true);
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '仓库中' }).click();
+  await expect.poll(dimensions).toEqual(warehouse);
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+  await expect.poll(dimensions).toEqual(selling);
 });

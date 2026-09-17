@@ -221,7 +221,7 @@ const selectableSupplyTypes = computed(() =>
   supplyTypes.value.filter((item) => item.status === 'enabled' || formData.supplyTypeIds.includes(item.id)),
 );
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'name', title: '供应商名称', minWidth: 220, align: 'left' },
   { colKey: 'type', title: '供货类型', minWidth: 180, align: 'left' },
@@ -230,8 +230,14 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 200, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 156,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const searchForm = reactive({
   name: '',
   supplyTypeId: '' as number | '',
