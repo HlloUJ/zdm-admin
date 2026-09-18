@@ -223,9 +223,10 @@ for (const platformIdentityType of ['platform_admin', 'employee']) {
     ]) {
       await page.locator('.brand-context-select').click();
       await expect(page.getByText('测试租户', { exact: true })).toHaveCount(0);
-      await page.getByText(label, { exact: true }).click();
+      // Switching reloads the document; arm the next load event before clicking.
+      // A late waitForLoadState can accept the old document and race context teardown.
+      await Promise.all([page.waitForEvent('load'), page.getByText(label, { exact: true }).click()]);
       await expect(page.locator('.brand-context-label')).toHaveText(label);
-      await page.waitForLoadState('load');
     }
     expect(switchedIds).toEqual([21, 24, 25, 26, 23]);
   });
