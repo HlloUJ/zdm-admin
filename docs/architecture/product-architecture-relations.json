@@ -1,0 +1,312 @@
+{
+  "diagram_version": "v23",
+  "confirmed_on": "2026-09-15",
+  "authoritative_notion_page": "https://app.notion.com/p/3dc572fed032819aa21ee1a095e9018f",
+  "source_snapshot": "zdm-product-architecture-v23-relations.json",
+  "relationships": [
+    {
+      "id": "R01",
+      "from": "city_partner",
+      "to": ["store_enablement"],
+      "type": "support",
+      "meaning": "线下合作网络治理与门店运营协同",
+      "basis": "notion_explicit",
+      "status": "documented"
+    },
+    {
+      "id": "R02",
+      "from": "designer_community",
+      "to": ["design_collaboration"],
+      "type": "support",
+      "meaning": "设计师生态支撑设计协同",
+      "basis": "user_confirmation_1",
+      "status": "user_confirmed"
+    },
+    {
+      "id": "R03",
+      "from": "customer_service",
+      "to": [
+        "city_partner",
+        "designer_community",
+        "after_sales",
+        "store_enablement",
+        "design_collaboration",
+        "production_mes",
+        "fulfillment",
+        "finance",
+        "supply_chain_collaboration"
+      ],
+      "type": "coverage",
+      "meaning": "覆盖定向业务支撑及核心业务主线，共同形成客户服务闭环",
+      "basis": "user_v5_correction_1",
+      "status": "user_confirmed",
+      "scope_extension": "新增供应链协同系统，沿用已确认的全范围支撑规则"
+    },
+    {
+      "id": "R04",
+      "from": "customer_service",
+      "to": ["after_sales"],
+      "type": "coverage",
+      "meaning": "客户服务与售后系统共同形成客户服务闭环；客服负责全流程服务支撑，售后负责补单返工、维修等业务闭环",
+      "basis": "notion_service_closure_and_user_correction_2",
+      "status": "user_confirmed",
+      "limitation": "未进一步定义具体工单移交触发条件"
+    },
+    {
+      "id": "R05",
+      "from": "store_enablement",
+      "to": ["design_collaboration"],
+      "type": "collaboration",
+      "direction": "bidirectional",
+      "meaning": "门店客户经营与设计师协同",
+      "basis": "notion_responsibilities",
+      "status": "documented_summary"
+    },
+    {
+      "id": "R06",
+      "from": "design_collaboration",
+      "to": ["production_mes"],
+      "type": "business_handoff",
+      "meaning": "输出生产图纸与材料清单",
+      "basis": "notion_explicit",
+      "status": "documented"
+    },
+    {
+      "id": "R07",
+      "from": "production_mes",
+      "to": ["fulfillment"],
+      "type": "business_handoff",
+      "meaning": "生产反馈结果，履约完成交付",
+      "basis": "notion_explicit",
+      "status": "documented"
+    },
+    {
+      "id": "R08",
+      "from": "fulfillment",
+      "to": ["finance"],
+      "type": "business_handoff",
+      "meaning": "履约交付与财务闭环衔接",
+      "basis": "notion_explicit",
+      "status": "documented_summary",
+      "limitation": "不表示财务仅在交付后参与；具体收付款及核算时间由业务规则定义"
+    },
+    {
+      "id": "R09",
+      "from": "after_sales",
+      "to": ["production_mes"],
+      "type": "support",
+      "meaning": "补单、返工回流生产 MES",
+      "basis": "user_confirmation_3",
+      "status": "user_confirmed"
+    },
+    {
+      "id": "R10",
+      "from": "after_sales",
+      "to": ["fulfillment"],
+      "type": "support",
+      "meaning": "维修、再履约回流履约系统",
+      "basis": "user_confirmation_3",
+      "status": "user_confirmed"
+    },
+    {
+      "id": "R11",
+      "from": "system_management",
+      "to": [
+        "city_partner",
+        "designer_community",
+        "customer_service",
+        "after_sales",
+        "store_enablement",
+        "design_collaboration",
+        "production_mes",
+        "fulfillment",
+        "finance",
+        "supply_chain_collaboration"
+      ],
+      "type": "coverage",
+      "meaning": "平台经营与运营规则；全平台账号、权限、规则、参数、菜单、日志与系统对接配置，覆盖全部核心与辅助系统",
+      "basis": "notion_explicit",
+      "status": "documented",
+      "scope_extension": "新增供应链协同系统，沿用已确认的全范围支撑规则",
+      "placement_confirmation": "用户要求将平台经营与运营规则放入系统管理中心"
+    },
+    {
+      "id": "R12",
+      "from": "technical_support_platform",
+      "to": [
+        "store_enablement",
+        "design_collaboration",
+        "production_mes",
+        "fulfillment",
+        "finance",
+        "supply_chain_collaboration"
+      ],
+      "type": "shared_capability",
+      "meaning": "AI、XR技术能力是所有核心业务系统的通用能力",
+      "basis": "user_v5_annotation_2",
+      "status": "user_confirmed",
+      "scope_extension": "新增供应链协同系统，沿用已确认的全范围支撑规则"
+    },
+    {
+      "id": "R13",
+      "from": "all_business_systems",
+      "to": ["business_support_platform"],
+      "type": "data_access_constraint",
+      "meaning": "唯一的数据操作入口；所有业务系统必须通过中台API操作数据，禁止直连数据库",
+      "basis": "user_v5_annotation_3",
+      "status": "user_confirmed"
+    },
+    {
+      "id": "R14",
+      "from": "consumer_order",
+      "to": ["store_enablement"],
+      "type": "sales_ownership",
+      "meaning": "成品现货与定制订单均由门店承接销售和客户服务",
+      "basis": "user_order_flow_confirmation",
+      "status": "user_confirmed"
+    },
+    {
+      "id": "R15",
+      "from": "store_enablement",
+      "to": ["store_order_handling"],
+      "type": "finished_stock_branch",
+      "meaning": "消费者购买成品现货，订单直接下单到门店并由门店处理",
+      "basis": "user_finished_stock_order_rule",
+      "status": "user_confirmed",
+      "limitation": "销售承接与实际供货分开；门店本地现货、供应商共享商品直发及加工供货按S01—S03说明，具体安装与交接规则另行细化。"
+    },
+    {
+      "id": "R16",
+      "from": "store_enablement",
+      "to": ["supply_chain_collaboration"],
+      "type": "supply_collaboration",
+      "meaning": "门店承接销售与客户服务，供应链承接关联供货需求；支持无需生产的成品或标品采购，也支持需要加工时的备料与生产组织",
+      "basis": "user_v14_supply_modes_clarification",
+      "status": "user_confirmed",
+      "responsibility_label": "货源、采购与供货",
+      "placement_confirmation": "用户要求将货源、采购与供货放入供应链协同系统",
+      "supply_modes": ["无需生产：采购成品或标品，直接供货", "需要生产：组织备料与工厂生产"],
+      "limitation": "不改变门店承接销售订单的规则；不同供货需求的采购触发条件和交接细节尚未定义",
+      "confirmed_scenario_extension": "供应商选取自身商品共享，门店选品上架销售，由供应链承接关联供货需求；门店无本地库存时可由供应商直接发货。"
+    },
+    {
+      "id": "R17",
+      "from": "supply_chain_collaboration",
+      "to": ["production_mes"],
+      "type": "production_collaboration",
+      "meaning": "仅在供货需求需要加工生产时，由供应链协同组织备料与生产，MES 承接生产执行；无需生产的成品或标品采购不进入 MES",
+      "basis": "user_v14_supply_modes_clarification",
+      "status": "user_confirmed_scope",
+      "limitation": "备料、任务下达和开工排程的具体触发条件，以及自产或委外方式尚未细化",
+      "condition": "需要加工生产"
+    },
+    {
+      "id": "R18",
+      "from": "supply_chain_collaboration",
+      "to": ["supplier_supply_party"],
+      "type": "procurement_collaboration",
+      "meaning": "供应链管理内部采购协作；采购既可用于成品及标品直接供货，也可用于生产所需的大板和配件等备料；采购与生产并非互斥",
+      "basis": "user_v14_supply_modes_clarification",
+      "status": "user_confirmed",
+      "target_kind": "external_collaborating_party",
+      "limitation": "供应商属于内部采购协作涉及的外部主体，不在平台架构图中单独画为节点；收货、验收与物流路径尚未定义"
+    },
+    {
+      "id": "R19",
+      "from": "supply_chain_collaboration",
+      "to": ["fulfillment"],
+      "type": "direct_fulfillment_collaboration",
+      "meaning": "无需加工生产的成品或标品采购，由供应链协同直接衔接履约系统，不经过生产 MES",
+      "condition": "无需加工生产",
+      "basis": "user_v15_direct_fulfillment_confirmation",
+      "status": "user_confirmed",
+      "limitation": "该连线明确系统协同归属，具体采购收货、验收与履约交接触发条件尚未细化",
+      "confirmed_scenario_extension": "包含门店选售供应商共享商品后，由供应商直接发货并衔接履约的场景，不经过MES。"
+    },
+    {
+      "id": "R20",
+      "from": "store_enablement",
+      "to": ["fulfillment"],
+      "type": "store_stock_fulfillment_collaboration",
+      "meaning": "门店已有可供销售订单使用的成品现货时，门店直接衔接履约，不经过供应链协同与生产 MES",
+      "condition": "门店已有成品现货",
+      "basis": "user_v18_in_stock_store_rule_with_confirmed_fulfillment_responsibility",
+      "status": "user_confirmed_scope",
+      "limitation": "此图表达系统协同关系；库存可用性核验和履约交接的具体触发条件未细化"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S01",
+      "condition": "门店已有可用成品现货",
+      "route": ["store_enablement", "fulfillment"],
+      "sales_and_customer_service": "store_enablement",
+      "related_relations": ["R14", "R15", "R20"]
+    },
+    {
+      "id": "S02",
+      "condition": "门店选售供应商共享商品，本地无货且无需加工",
+      "catalog_flow": ["供应商选品共享", "门店选品上架", "门店售出", "供应链承接供货", "供应商直发并衔接履约"],
+      "route": ["store_enablement", "supply_chain_collaboration", "fulfillment"],
+      "sales_and_customer_service": "store_enablement",
+      "related_relations": ["R14", "R16", "R18", "R19"]
+    },
+    {
+      "id": "S03",
+      "condition": "供货需要加工生产",
+      "route": ["store_enablement", "supply_chain_collaboration", "production_mes", "fulfillment"],
+      "design_data_relation": "R06",
+      "sales_and_customer_service": "store_enablement",
+      "related_relations": ["R06", "R07", "R14", "R16", "R17", "R18"]
+    }
+  ],
+  "diagram_projection": {
+    "granularity": "platform_product_overview",
+    "detail_only_relation_ids": ["R06", "R14", "R15", "R18", "R19", "R20"],
+    "macro_edge_labels": {
+      "R05": "设计协同",
+      "R16": "需求协同",
+      "R17": "生产协同",
+      "R07": "交付协同",
+      "R08": "财务协同"
+    },
+    "note": "核心系统横向平级排列；箭头表示主要协作，不表示每笔订单必须经过所有系统。设计到 MES 的生产资料关系，以及库存、生产条件和绕行路径留在明细中，关系定义未变。",
+    "internal_supply_modes": ["无需生产：采购成品 / 标品", "需要生产：备料 · 组织生产"],
+    "conditional_relations": {
+      "R17": "需要生产时才进入 MES",
+      "R19": "无需生产时直接进入履约系统",
+      "R20": "门店已有成品现货时，不经供应链或 MES，直接衔接履约"
+    },
+    "layout": "single_row_peer_core_systems",
+    "line_styles": {
+      "business": "蓝色短横线，主要业务协作",
+      "support": "紫色细竖线，定向业务支撑",
+      "cross_layer": "成对上下箭头，层间双向交互"
+    },
+    "shared_connector_tails": [],
+    "placement_groups": [
+      [
+        "design_collaboration",
+        "store_enablement",
+        "supply_chain_collaboration",
+        "production_mes",
+        "fulfillment",
+        "finance"
+      ]
+    ],
+    "business_groups": [],
+    "grouped_connectors": [],
+    "textual_support_relations": ["R03", "R04", "R11", "R12", "R13"],
+    "visible_business_connector_count": 5,
+    "conditional_labels_visible": false,
+    "visible_support_relation_ids": ["R01", "R02", "R09", "R10"],
+    "visible_support_connector_count": 4
+  },
+  "pending_items": [
+    "采购到货、验收、材料就绪、生产任务与排程交接",
+    "自产或委外方式、单据和状态模型",
+    "客服与售后工单移交条件",
+    "现有模块的具体页面、接口、数据与权限迁移方案"
+  ],
+  "maintenance_rule": "架构未调整时，直接复用已确认的v23原图；仅经用户确认的架构变化才生成后续版本。"
+}
