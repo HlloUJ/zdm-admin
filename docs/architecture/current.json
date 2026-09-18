@@ -1,0 +1,17 @@
+{
+  "version": "v23",
+  "status": "current_final",
+  "confirmed_on": "2026-09-15",
+  "paths_relative_to": "repository_root",
+  "png": "docs/architecture/zdm-product-architecture-v23.png",
+  "svg": "docs/architecture/zdm-product-architecture-v23.svg",
+  "relationships": "docs/architecture/product-architecture-relations.json",
+  "notion_architecture": "https://app.notion.com/p/39f572fed032804f8bf1d6d2e48e1c9a",
+  "notion_relations": "https://app.notion.com/p/3dc572fed032819aa21ee1a095e9018f",
+  "reuse_rule": "架构未调整时直接展示已确认的原图，保持布局、文字和连线；用户确认架构变化后另建版本并更新索引，保留旧版。",
+  "sha256": {
+    "zdm-product-architecture-v23.svg": "dd671fa22f1b3a6e2ca532f4b3eb1066f3037fe7c551218f607ad440e8212b8d",
+    "zdm-product-architecture-v23.png": "ebd212ded05a970a4fbdf88bf3e8a680b7ada4b1189072ed028dd7a29a5a74f6"
+  },
+  "source_manifest": "/Users/uj/.codex/visualizations/2026/09/15/01a0a2bb-1787-7ed3-a001-f6433deccbf2/final-v23/manifest.json"
+}
