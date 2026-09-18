@@ -5,7 +5,7 @@
       <div>
         <div class="brand-title">装点猫</div>
         <div
-          v-if="switchableIdentityContexts.length > 1"
+          v-if="switchableIdentityContexts.some((context) => context.identityId !== loginUser.identityId)"
           class="brand-context-switcher"
           :class="{ 'is-open': identitySelectorOpen }"
         >
@@ -18,7 +18,7 @@
             auto-width
             :options="identityOptions"
             :loading="switchingIdentity"
-            aria-label="切换平台或组织"
+            aria-label="切换业务身份"
             @change="handleIdentityChange"
           />
         </div>
@@ -89,11 +89,7 @@ const identityLabel = (context: IdentityContext) => {
 };
 const switchableIdentityContexts = computed(() =>
   identityContexts.value.filter(
-    (context) =>
-      !context.tenantId ||
-      context.identityType === 'tenant_admin' ||
-      Boolean(context.storeId) ||
-      context.identityId === loginUser.value.identityId,
+    (context) => !context.tenantId || context.identityType === 'platform_admin' || Boolean(context.storeId),
   ),
 );
 const identityOptions = computed(() =>

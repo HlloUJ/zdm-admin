@@ -70,70 +70,163 @@ test('logs out and clears the local account session', async ({ page }) => {
   expect(await page.evaluate(() => window.localStorage.getItem('zdm-admin-user'))).toBeNull();
 });
 
-test('places the available store switcher under the brand', async ({ page }) => {
-  await installAdminApiMocks(page);
-  await page.route('**/api/admin/auth/contexts', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        code: 0,
-        message: 'ok',
-        data: [
-          {
-            identityId: 1,
-            identityType: 'platform_admin',
-            tenantId: null,
-            storeId: null,
-            tenantName: null,
-            storeName: null,
-            storeType: null,
-          },
-          {
-            identityId: 11,
-            identityType: 'store_admin',
-            tenantId: 1,
-            storeId: 1,
-            tenantName: '华东石材',
-            storeName: '杭州体验门店',
-            storeType: 'cityPartner',
-          },
-          {
-            identityId: 12,
-            identityType: 'store_admin',
-            tenantId: 1,
-            storeId: 2,
-            tenantName: '华东石材',
-            storeName: '宁波体验门店',
-            storeType: 'cityPartner',
-          },
-        ],
-      }),
+for (const storeCount of [1, 2]) {
+  test(`shows only stores in the brand switcher with ${storeCount} stores`, async ({ page }) => {
+    await installAdminApiMocks(page);
+    await page.route('**/api/admin/auth/contexts', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          data: [
+            {
+              identityId: 1,
+              identityType: 'tenant_admin',
+              tenantId: 1,
+              storeId: null,
+              tenantName: '华东石材',
+              storeName: null,
+              storeType: null,
+            },
+            {
+              identityId: 11,
+              identityType: 'store_admin',
+              tenantId: 1,
+              storeId: 1,
+              tenantName: '华东石材',
+              storeName: '杭州体验门店',
+              storeType: 'cityPartner',
+            },
+            {
+              identityId: 12,
+              identityType: 'store_admin',
+              tenantId: 1,
+              storeId: 2,
+              tenantName: '华东石材',
+              storeName: '宁波体验门店',
+              storeType: 'cityPartner',
+            },
+          ].slice(0, storeCount + 1),
+        }),
+      });
     });
+    await page.addInitScript(() => {
+      window.localStorage.setItem('zdm-admin-token', 'dev-token:1');
+      window.localStorage.setItem(
+        'zdm-admin-user',
+        JSON.stringify({
+          id: 1,
+          identityId: 11,
+          identityType: 'store_admin',
+          tenantId: 1,
+          tenantName: '华东石材',
+          storeId: 1,
+          storeName: '杭州体验门店',
+          storeType: 'cityPartner',
+          name: '超级管理员',
+          phone: '15926626945',
+          roles: ['SUPER_ADMIN'],
+          permissions: ['all'],
+          dataPermission: 'all',
+        }),
+      );
+    });
+
+    await page.goto('/dashboard');
+
+    await expect(page.locator('.top-actions .t-select')).toHaveCount(0);
+    if (storeCount === 1) {
+      await expect(page.locator('.brand-subtitle')).toHaveText('杭州体验门店 · 城市合伙人');
+      await expect(page.locator('.brand .brand-context-select')).toHaveCount(0);
+    } else {
+      await expect(page.locator('.brand .brand-context-select')).toBeVisible();
+      await page.locator('.brand .brand-context-select').click();
+      await expect(page.getByText('华东石材', { exact: true })).toHaveCount(0);
+      await expect(page.getByText('宁波体验门店 · 城市合伙人', { exact: true })).toBeVisible();
+    }
   });
-  await page.addInitScript(() => {
-    window.localStorage.setItem('zdm-admin-token', 'dev-token:1');
-    window.localStorage.setItem(
-      'zdm-admin-user',
-      JSON.stringify({
-        id: 1,
-        identityId: 1,
-        identityType: 'platform_admin',
-        name: '超级管理员',
-        phone: '15926626945',
-        roles: ['SUPER_ADMIN'],
-        permissions: ['all'],
-        dataPermission: 'all',
-      }),
+}
+
+for (const platformIdentityType of ['platform_admin', 'employee']) {
+  test(`switches among platform, partner, suppliers and factory for ${platformIdentityType}`, async ({ page }) => {
+    await installAdminApiMocks(page);
+    const contexts = [
+      { identityId: 21, identityType: platformIdentityType, clientCode: 'admin', tenantId: null, storeId: null },
+      {
+        identityId: 22,
+        identityType: 'tenant_admin',
+        clientCode: 'admin',
+        tenantId: 1,
+        tenantName: '测试租户',
+        storeId: null,
+      },
+      {
+        identityId: 23,
+        identityType: 'store_admin',
+        clientCode: 'admin',
+        tenantId: 1,
+        tenantName: '测试租户',
+        storeId: 1,
+        storeName: '测试城市合伙人门店',
+        storeType: 'cityPartner',
+      },
+      ...[
+        { storeType: 'slabSupplier', storeName: '测试大板供应商' },
+        { storeType: 'finishedSupplier', storeName: '测试成品供应商' },
+        { storeType: 'factory', storeName: '测试工厂' },
+      ].map((store, index) => ({
+        identityId: 24 + index,
+        identityType: 'store_admin',
+        clientCode: 'admin',
+        tenantId: 2 + index,
+        tenantName: `测试经营主体${index}`,
+        storeId: 2 + index,
+        ...store,
+      })),
+    ];
+    const user = {
+      id: 2,
+      name: '多身份测试账号',
+      phone: '15900000001',
+      roles: ['SUPER_ADMIN'],
+      permissions: ['all'],
+      dataPermission: 'all',
+    };
+    const switchedIds: number[] = [];
+    await page.route('**/api/admin/auth/contexts', (route) => route.fulfill({ json: { code: 0, data: contexts } }));
+    await page.route('**/api/admin/auth/switch-identity', async (route) => {
+      const identityId = route.request().postDataJSON().identityId;
+      switchedIds.push(identityId);
+      const context = contexts.find((entry) => entry.identityId === identityId);
+      await route.fulfill({
+        json: { code: 0, data: { token: 'mock-dual-identity-token', user: { ...user, ...context } } },
+      });
+    });
+    await page.addInitScript(
+      (initialUser) => {
+        if (!window.localStorage.getItem('zdm-admin-token')) {
+          window.localStorage.setItem('zdm-admin-token', 'mock-dual-identity-token');
+          window.localStorage.setItem('zdm-admin-user', JSON.stringify(initialUser));
+        }
+      },
+      { ...user, ...contexts[2] },
     );
+    await page.goto('/dashboard');
+    for (const label of [
+      '运营管理平台',
+      '测试大板供应商 · 大板供应商',
+      '测试成品供应商 · 成品供应商',
+      '测试工厂 · 工厂',
+      '测试城市合伙人门店 · 城市合伙人',
+    ]) {
+      await page.locator('.brand-context-select').click();
+      await expect(page.getByText('测试租户', { exact: true })).toHaveCount(0);
+      await page.getByText(label, { exact: true }).click();
+      await expect(page.locator('.brand-context-label')).toHaveText(label);
+      await page.waitForLoadState('load');
+    }
+    expect(switchedIds).toEqual([21, 24, 25, 26, 23]);
   });
-
-  await page.goto('/dashboard');
-
-  await expect(page.locator('.brand .brand-context-select')).toBeVisible();
-  await expect(page.locator('.top-actions .t-select')).toHaveCount(0);
-  await page.locator('.brand .brand-context-select').click();
-  await expect(page.getByText('运营管理平台', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('杭州体验门店 · 城市合伙人', { exact: true })).toBeVisible();
-  await expect(page.getByText('宁波体验门店 · 城市合伙人', { exact: true })).toBeVisible();
-});
+}
