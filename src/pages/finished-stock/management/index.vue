@@ -57,7 +57,7 @@
                         <t-input
                           v-model="currentFilter.keyword"
                           clearable
-                          placeholder="商品名称 / ID / 商家编码"
+                          placeholder="商品名称 / ID"
                           @enter="handleSearch"
                         />
                       </t-form-item>
@@ -177,7 +177,6 @@
                         : '该商品已被供应链下架'
                     }}</t-tag>
                     <div class="product-code">ID：{{ row.id }}</div>
-                    <div class="product-code">商家编码：{{ row.code }}</div>
                   </div>
                 </template>
                 <template #supplier="{ row }">
@@ -549,9 +548,6 @@
                           />
                         </div>
                       </template>
-                      <template #merchantCode="{ row }">
-                        <t-input v-model="row.merchantCode" placeholder="请输入" />
-                      </template>
                       <template #operation="{ row }">
                         <div class="table-actions">
                           <t-link theme="danger" hover="color" @click="deleteSpec(row.id)">删除</t-link>
@@ -572,9 +568,6 @@
                 </t-form-item>
                 <t-form-item label="总库存">
                   <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
-                </t-form-item>
-                <t-form-item label="商家编码">
-                  <t-input v-model="productForm.merchantCode" clearable placeholder="请输入" :maxlength="60" />
                 </t-form-item>
                 <t-form-item label="上架" required-mark :status="requiredFieldStatus(productForm.shelfNow)">
                   <t-radio-group v-model="productForm.shelfNow">
@@ -935,9 +928,6 @@
                   <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
                 </t-select>
                 <t-input v-else v-model="batchSalesAttributes[field.key]" clearable placeholder="请输入" />
-              </t-form-item>
-              <t-form-item label="商家编码">
-                <t-input v-model="batchFillForm.merchantCode" placeholder="请输入" />
               </t-form-item>
             </div>
           </section>
@@ -2104,7 +2094,7 @@ const operationWidths = {
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const base: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'image', title: '商品主图', width: 96 },
-    { colKey: 'product', title: '商品名称/ID/商家编码', minWidth: 220 },
+    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
     {
       colKey: activeTab.value === 'offShelf' ? 'offShelfByName' : 'createdByName',
@@ -2150,7 +2140,6 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'quantity', title: requiredColumnTitle('数量'), minWidth: 80 },
   ];
   const tailColumns: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'merchantCode', title: '商家编码', minWidth: 112 },
     { colKey: 'operation', title: '操作', width: 76, align: 'left', fixed: 'right' },
   ];
 
@@ -2495,9 +2484,9 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
   level3Coefficient: '',
   level3: '',
   quantity: null,
-  merchantCode: '',
   markupPrices: createMarkupEditors(),
   ...partial,
+  merchantCode: partial.merchantCode || crypto.randomUUID(),
 });
 
 const createEditSpecRows = (row: StockItem): SpecRow[] => {
@@ -2938,7 +2927,7 @@ const handleSpecModeChange = (value: unknown) => {
     singleSpecs.value.push(...unmatchedDrafts);
     unmatchedSpecNames.value = [];
     specConversionNotice.value =
-      '已将原属性值文本自动拼接预填，您可根据实际情况自行修改。原规格关联的价格、库存和商家编码将保留。';
+      '已将原属性值文本自动拼接预填，您可根据实际情况自行修改。原规格关联的价格和库存将保留。';
   } else {
     unmatchedSpecNames.value = [];
     const candidates = knownConversionGroups();
@@ -3559,7 +3548,11 @@ const validateProductForm = () => {
       tab: 'sales',
       message: '请先配置成品指导价默认系数',
     },
-    { valid: pricesComplete, tab: 'sales', message: '请完善每条规格的成本价、指导价和商家编码' },
+    {
+      valid: pricesComplete,
+      tab: 'sales',
+      message: isSupplyChain.value ? '请完善每条规格的成本价' : '请完善每条规格的成本价和指导价',
+    },
     { valid: isSupplyChain.value || Boolean(productForm.shelfNow), tab: 'sales', message: '请选择上架方式' },
   ];
   const failed = checks.find((item) => !item.valid);

@@ -8,7 +8,7 @@
     :rowspan-and-colspan="span"
     bordered
     table-layout="auto"
-    table-content-width="max-content"
+    table-content-width="100%"
   />
 </template>
 <script setup lang="ts">
@@ -28,6 +28,7 @@ const props = defineProps<{
   snapshot: Record<string, unknown>;
   other: Record<string, unknown>;
   highlightChanges?: boolean;
+  priceOnly?: boolean;
 }>();
 const isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');
 function list<T>(field: string): T[] {
@@ -113,8 +114,8 @@ const rows = computed(() =>
 );
 const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...(dimensions.value.length
-    ? dimensions.value.map((d) => ({ colKey: d.key, title: d.name, width: 130, fixed: 'left' as const }))
-    : [{ colKey: 'specText', title: '商品规格', width: 180, fixed: 'left' as const }]),
+    ? dimensions.value.map((d) => ({ colKey: d.key, title: d.name, minWidth: 130, fixed: 'left' as const }))
+    : [{ colKey: 'specText', title: '商品规格', minWidth: 180, fixed: 'left' as const }]),
   { colKey: 'cost', title: '成本价', minWidth: 100, cell: (_h, { row }) => money(row.cost) },
   {
     colKey: 'guide',
@@ -129,9 +130,17 @@ const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
     cell: (_h: unknown, { row }: { row: TableRowData }) =>
       priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),
   })),
-  { colKey: 'quantity', title: '数量', minWidth: 80, cell: (_h, { row }) => text(row.quantity) },
+  ...(!props.priceOnly
+    ? [
+        {
+          colKey: 'quantity',
+          title: '数量',
+          minWidth: 80,
+          cell: (_h: unknown, { row }: { row: TableRowData }) => text(row.quantity),
+        },
+      ]
+    : []),
   ...extraFields.value.map((key) => ({ colKey: key, title: attributeName(key), minWidth: 130 })),
-  { colKey: 'merchantCode', title: '商家编码', minWidth: 130 },
 ]);
 function comparableCell(snapshot: Record<string, unknown>, variant: FinishedProductVariant, key: string): unknown {
   const guides = (snapshot['指导价'] || []) as FinishedProductGuidePrice[];
@@ -189,6 +198,12 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol<TableR
   );
 </script>
 <style scoped>
+/* Keep sticky rowspan cells inside the table scrollport's paint boundary,
+   including when the table starts below the dialog's visible area. */
+.sales-log-table :deep(.t-table__content) {
+  contain: paint;
+}
+
 .sales-log-table :deep(.sales-value-changed) {
   color: var(--td-error-color);
 }
