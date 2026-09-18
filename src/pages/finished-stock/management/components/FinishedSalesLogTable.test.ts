@@ -25,7 +25,7 @@ it('joins historical prices by variant and uses edit form column order', () => {
     },
   });
   const vm = wrapper.vm as unknown as { rows: any[]; columns: { title: string }[] };
-  expect(vm.columns.map((c) => c.title)).toEqual(['商品规格', '成本价', '指导价', '1级合伙人', '数量', '商家编码']);
+  expect(vm.columns.map((c) => c.title)).toEqual(['商品规格', '成本价', '指导价', '1级合伙人', '数量']);
   expect(vm.rows[0]).toMatchObject({
     specText: '规格2',
     cost: 1200,
@@ -91,7 +91,7 @@ it('shows supply-chain historical variant costs without platform pricing columns
     rows: any[];
     columns: { title: string; cell: (render: null, context: { row: any }) => { children: unknown } }[];
   };
-  expect(vm.columns.map((c) => c.title)).toEqual(['商品规格', '成本价', '数量', '商家编码']);
+  expect(vm.columns.map((c) => c.title)).toEqual(['商品规格', '成本价', '数量']);
   expect(vm.rows.map((row) => row.cost)).toEqual([0, 1200, undefined]);
   const cost = vm.columns.find((column) => column.title === '成本价')!;
   expect(cost.cell(null, { row: vm.rows[0] }).children).toEqual(['0.00']);

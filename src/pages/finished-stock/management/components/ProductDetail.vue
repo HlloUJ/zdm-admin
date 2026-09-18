@@ -19,7 +19,6 @@
       <t-descriptions bordered :column="2">
         <t-descriptions-item label="商品名称" :span="2">{{ product.name }}</t-descriptions-item>
         <t-descriptions-item label="ID">{{ product.id }}</t-descriptions-item>
-        <t-descriptions-item label="商家编码">{{ product.code || '未填写' }}</t-descriptions-item>
         <t-descriptions-item label="商品分类" :span="2">{{ product.category || '未填写' }}</t-descriptions-item>
         <t-descriptions-item
           v-for="attribute in product.attributes"
@@ -123,7 +122,6 @@ const columns = computed<PrimaryTableCol[]>(() => [
     ? dimensions.value.map((dimension) => ({ colKey: dimension.key, title: dimension.name, minWidth: 120 }))
     : [{ colKey: 'label', title: '商品规格', minWidth: 180 }]),
   { colKey: 'skuId', title: 'SKU ID', minWidth: 90 },
-  { colKey: 'merchantCode', title: '商家编码', minWidth: 120 },
   { colKey: 'stock', title: '库存', minWidth: 80 },
   ...extraFields.value.map((key) => ({ colKey: key, title: props.attributeNames[key] || key, minWidth: 120 })),
   { colKey: 'cost', title: '成本价', minWidth: 100 },

@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLogMapper, FinishedOperationLog> {
+  static final String SOURCE_SHELF_SUMMARY = "供应链已上架，商品进入运营管理平台仓库";
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final CurrentIdentityProvider identities;
@@ -275,7 +276,14 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       conditions.add("(product_name LIKE ? OR merchant_code LIKE ? OR CAST(product_id AS CHAR) LIKE ?)");
       for (int i = 0; i < 3; i++) { args.add("%" + keyword.trim() + "%"); }
     }
-    if (type != null && !type.isBlank()) { conditions.add("operation_type=?"); args.add(type); }
+    String legacyShelf = "(operation_type='SOURCE_SYNC' AND business_client_code='admin'"
+        + " AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')='selling')";
+    if ("SOURCE_SHELF".equals(type)) {
+      conditions.add("(operation_type='SOURCE_SHELF' OR " + legacyShelf + ")");
+    } else if (type != null && !type.isBlank()) {
+      conditions.add("operation_type=?"); args.add(type);
+      if ("SOURCE_SYNC".equals(type)) { conditions.add("NOT " + legacyShelf); }
+    }
     if (operator != null && !operator.isBlank()) { conditions.add("operator_name LIKE ?"); args.add("%" + operator.trim() + "%"); }
     if (start != null) { conditions.add("operated_at>=?"); args.add(start.atStartOfDay()); }
     if (end != null) { conditions.add("operated_at<?"); args.add(end.plusDays(1).atStartOfDay()); }
@@ -285,6 +293,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     args.add((page - 1) * size);
     List<FinishedOperationLog> records = jdbc.query("SELECT * FROM finished_operation_logs" + where
         + " ORDER BY operated_at DESC,id DESC LIMIT ? OFFSET ?", BeanPropertyRowMapper.newInstance(FinishedOperationLog.class), args.toArray());
+    records.forEach(this::normalizeSupplyShelf);
     return new FinishedOperationLogPage(records, count == null ? 0 : count, page, size);
   }
 
@@ -321,6 +330,23 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       }
       log.setChangeDetails(json.writeValueAsString(changes));
     } catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("操作日志读取失败", error); }
+    normalizeSupplyShelf(log);
     return log;
+  }
+
+  private void normalizeSupplyShelf(FinishedOperationLog log) {
+    if (!"admin".equals(log.getBusinessClientCode()) || !("SOURCE_SYNC".equals(log.getOperationType()) || "SOURCE_SHELF".equals(log.getOperationType()))) { return; }
+    try {
+      JsonNode changes = json.readTree(log.getChangeDetails());
+      if (changes == null || !"selling".equals(changes.path("来源状态").path("after").asText())) { return; }
+      log.setOperationType("SOURCE_SHELF");
+      if (changes.has("入仓价格")) {
+        log.setOperationSummary(SOURCE_SHELF_SUMMARY);
+        log.setBeforeStatus(null);
+        log.setAfterStatus("warehouse");
+      }
+    } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+      throw new IllegalStateException("操作日志读取失败", error);
+    }
   }
 }

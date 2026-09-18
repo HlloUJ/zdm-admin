@@ -69,15 +69,7 @@ describe('creation snapshot layout', () => {
     expect(vm.rows.map((row) => row.merchantCode)).toEqual(['red', 'blue']);
     expect(vm.rows[0].guide?.price).toBe(20);
     expect(vm.rows[0].level_1?.price).toBe(11);
-    expect(vm.columns.map((col) => col.title)).toEqual([
-      '颜色',
-      '成本价',
-      '指导价',
-      '一级合伙人',
-      '数量',
-      '表面处理',
-      '商家编码',
-    ]);
+    expect(vm.columns.map((col) => col.title)).toEqual(['颜色', '成本价', '指导价', '一级合伙人', '数量', '表面处理']);
     expect(wrapper.findAll('t-table-stub')).toHaveLength(1);
     expect(wrapper.find('input').exists()).toBe(false);
     expect(wrapper.find('select').exists()).toBe(false);

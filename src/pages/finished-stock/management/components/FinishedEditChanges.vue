@@ -9,9 +9,10 @@
       </header>
       <div class="change-section-body" :class="{ 'change-section-body--media': group.title === '图文描述' }">
         <component
-          :is="row.field === '销售规格' ? SalesLogFullscreen : 'article'"
+          :is="isPriceTable(row.field) ? SalesLogFullscreen : 'article'"
           v-for="row in group.rows"
           :key="row.field"
+          :title="row.label"
           class="change-field"
           @resize="measureSalesScroll"
         >
@@ -79,6 +80,13 @@
                   highlight-changes
                   :other="salesSnapshot(side === 'before' ? 'after' : 'before')"
                 />
+                <FinishedSalesLogTable
+                  v-else-if="row.field === '价格联动' || row.field === '入仓价格'"
+                  :snapshot="priceLogSnapshot(row[side])"
+                  :other="priceLogSnapshot(row[side === 'before' ? 'after' : 'before'])"
+                  highlight-changes
+                  price-only
+                />
                 <FinishedLogValue
                   v-else
                   :value="row[side]"
@@ -104,6 +112,8 @@
 </template>
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { priceLogSnapshot } from '../priceLogSnapshot';
+const isPriceTable = (field: string) => ['销售规格', '价格联动', '入仓价格'].includes(field);
 import SalesLogFullscreen from './SalesLogFullscreen.vue';
 import HistoricalRichText from './HistoricalRichText.vue';
 import FinishedLogValue from './FinishedLogValue.vue';
@@ -202,7 +212,7 @@ const groups = computed(() => {
         ];
   });
   const base = ['商品名称', '商品分类', '商品属性', '供应商'];
-  const sales = ['销售规格', '总库存', '商家编码', '状态', '下架原因', '详细说明', '下架时间'];
+  const sales = ['销售规格', '总库存', '状态', '下架原因', '详细说明', '下架时间'];
   const displayChanges: Record<string, Change> = { ...props.changes };
   if (['销售规格', '规格维度', '指导价', '层级价格'].some((field) => props.changes[field])) {
     displayChanges['销售规格'] = { before: salesSnapshot('before'), after: salesSnapshot('after') };
@@ -211,10 +221,20 @@ const groups = computed(() => {
     field,
     label: field === '状态' ? '上架状态' : field === '层级价格' ? '合伙人价格' : field,
     ...displayChanges[field],
-    wide: ['商品属性', '规格维度', '销售规格', '成本价', '指导价', '层级价格'].includes(field),
+    wide: ['商品属性', '规格维度', '销售规格', '成本价', '指导价', '层级价格', '价格联动', '入仓价格'].includes(field),
   });
   if (props.changes['宝贝详情']) imageRows.push(row('宝贝详情'));
-  const known = new Set([...base, ...sales, '媒体', '宝贝详情', '销售属性名称', '规格维度', '指导价', '层级价格']);
+  const known = new Set([
+    ...base,
+    ...sales,
+    '媒体',
+    '宝贝详情',
+    '销售属性名称',
+    '规格维度',
+    '指导价',
+    '层级价格',
+    '商家编码',
+  ]);
   return [
     { title: '图文描述', rows: imageRows },
     { title: '基础信息', rows: base.filter((field) => props.changes[field]).map(row) },

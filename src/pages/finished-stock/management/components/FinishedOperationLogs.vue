@@ -10,7 +10,7 @@
       <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
         <div class="operation-log-filters">
           <t-form-item label="商品" class="operation-log-keyword-filter">
-            <t-input v-model="filter.keyword" clearable placeholder="商品名称/ID/商家编码" />
+            <t-input v-model="filter.keyword" clearable placeholder="商品名称/ID" />
           </t-form-item>
           <t-form-item label="操作类型">
             <t-select v-model="filter.operationType" clearable placeholder="请选择">
@@ -46,8 +46,7 @@
         <template #productName="{ row }"
           ><div>{{ row.productName }}</div>
           <div>ID：{{ row.productId }}</div>
-          <div>商家编码：{{ row.merchantCode || '—' }}</div></template
-        >
+        </template>
         <template #operationType="{ row }">{{ finishedLogTypes[row.operationType] || row.operationType }}</template>
         <template #operatedAt="{ row }">{{ time(row.operatedAt) }}</template>
         <template #operation="{ row }"><t-link theme="primary" @click="showDetail(row.id)">详情</t-link></template>
@@ -72,17 +71,16 @@
     <t-space v-if="detail" direction="vertical" size="large" style="width: 100%">
       <t-descriptions title="操作信息" bordered :column="3">
         <t-descriptions-item label="商品名称">{{ detail.productName }}</t-descriptions-item>
-        <t-descriptions-item label="商家编码">{{ detail.merchantCode || '—' }}</t-descriptions-item>
         <t-descriptions-item label="操作类型">{{ finishedLogTypes[detail.operationType] }}</t-descriptions-item>
         <t-descriptions-item label="操作人">{{ detail.operatorName }}</t-descriptions-item>
         <t-descriptions-item label="操作时间">{{ time(detail.operatedAt) }}</t-descriptions-item>
-        <t-descriptions-item label="操作来源">{{
+        <t-descriptions-item label="操作来源" :span="2">{{
           detail.operationSource === 'MANUAL'
             ? getLoginUser().clientCode === 'supply-chain'
               ? '供应链协同系统'
               : '运营管理平台'
             : detail.operationSource === 'SUPPLY_CHAIN'
-              ? '供应链联动'
+              ? '供应链协同系统'
               : detail.operationSource
         }}</t-descriptions-item>
         <t-descriptions-item label="操作内容" :span="2">{{ detail.operationSummary }}</t-descriptions-item>
@@ -90,6 +88,9 @@
           >{{ state(detail.beforeStatus) }} → {{ state(detail.afterStatus) }}</t-descriptions-item
         >
       </t-descriptions>
+      <SalesLogFullscreen v-if="initialWarehousePrice" title="入仓价格">
+        <FinishedSalesLogTable :snapshot="priceLogSnapshot(changes['入仓价格'].after)" :other="{}" price-only />
+      </SalesLogFullscreen>
       <FinishedCreationSnapshot
         v-if="detail.operationType === 'CREATE'"
         :snapshot="creationSnapshot"
@@ -146,6 +147,9 @@ import {
   finishedLogStates,
   type FinishedOperationLog,
 } from '@/services/finishedOperationLogs';
+import SalesLogFullscreen from './SalesLogFullscreen.vue';
+import FinishedSalesLogTable from './FinishedSalesLogTable.vue';
+import { priceLogSnapshot } from '../priceLogSnapshot';
 import FinishedEditChanges from './FinishedEditChanges.vue';
 import FinishedCreationSnapshot from './FinishedCreationSnapshot.vue';
 const props = defineProps<{ visible: boolean }>();
@@ -170,7 +174,7 @@ type Media = { field: string; mediaId: number; resource?: Resource };
 const preview = ref<Resource | null>(null);
 const typeOptions = Object.entries(finishedLogTypes).map(([value, label]) => ({ value, label }));
 const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'productName', title: '商品名称/ID/商家编码', minWidth: 220 },
+  { colKey: 'productName', title: '商品名称/ID', minWidth: 220 },
   { colKey: 'operationType', title: '操作类型', width: 140 },
   { colKey: 'operationSummary', title: '操作内容', minWidth: 180 },
   { colKey: 'operatorName', title: '操作人', width: 120 },
@@ -225,7 +229,17 @@ const changes = computed<Record<string, { before: unknown; after: unknown; hint?
     return {};
   }
 });
+const initialWarehousePrice = computed(
+  () =>
+    getLoginUser().clientCode === 'admin' &&
+    detail.value?.operationType === 'SOURCE_SHELF' &&
+    !!changes.value['入仓价格'],
+);
 const displayChanges = computed(() => {
+  if (initialWarehousePrice.value)
+    return Object.fromEntries(
+      Object.entries(changes.value).filter(([field]) => !['来源状态', '入仓价格'].includes(field)),
+    );
   const operationType = detail.value?.operationType || '';
   if (['DELETE_TO_RECYCLE', 'PURGE'].includes(operationType)) return {};
   return ['SHELF', 'OFF_SHELF', 'RESTORE', 'RESTORE_WAREHOUSE'].includes(operationType)
