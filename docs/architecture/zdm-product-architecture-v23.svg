@@ -1,0 +1,224 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2800" height="1586" viewBox="0 0 2800 1586" role="img" aria-labelledby="diagram-title diagram-desc">
+<title id="diagram-title">装点猫产品架构图</title>
+<desc id="diagram-desc">装点猫四层产品架构总览。六个核心业务系统横向平级排列，上方的设计师社区、城市合伙人及售后系统用四条短竖线连接对应支撑对象。五条短横线表示主要业务协作，不展开订单条件与绕行路径。</desc>
+<rect width="2800" height="1586" fill="#ffffff"/>
+<defs><marker id="collaboration" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" viewBox="0 0 12 12" refX="10" refY="6" orient="auto-start-reverse"><path d="M1 1L11 6L1 11Z" fill="#3b647f"/></marker><marker id="support" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" viewBox="0 0 12 12" refX="10" refY="6" orient="auto"><path d="M1 1L11 6L1 11Z" fill="#91819f"/></marker></defs>
+<text x="40" y="60" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="38" font-weight="600" fill="#294156" text-anchor="start">装点猫产品架构图</text>
+<text x="40" y="100" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="400" fill="#61778a" text-anchor="start">全平台总览 · 系统组成、职责分工与主要协作</text>
+<path d="M1930 87H1990" fill="none" stroke="#3b647f" stroke-width="2.2" marker-end="url(#collaboration)"/>
+<text x="2010" y="95" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="start">主要业务协作</text>
+<path d="M2320 87H2380" fill="none" stroke="#91819f" stroke-width="1.4" marker-end="url(#support)"/>
+<text x="2400" y="95" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#766a83" text-anchor="start">定向业务支撑</text>
+<g data-layer="01">
+<rect x="40" y="130" width="2720" height="130" rx="7" fill="#f2f7fb" stroke="#d3dfe8" stroke-width="1"/>
+<rect x="40" y="130" width="190" height="130" rx="7" fill="#e5edf5" stroke="none" stroke-width="1"/>
+<text x="135" y="163.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="500" fill="#5a7182" text-anchor="middle">01</text>
+<text x="135" y="205.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="26" font-weight="600" fill="#356b98" text-anchor="middle">生态入口层</text>
+<text x="135" y="241.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="400" fill="#5a7182" text-anchor="middle">用户与业务入口</text>
+</g>
+<rect x="270.0" y="166" width="337.0" height="58" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="438.5" y="203.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">设计师端</text>
+<rect x="623.0" y="166" width="337.0" height="58" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="791.5" y="203.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">门店端</text>
+<rect x="976.0" y="166" width="337.0" height="58" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1144.5" y="203.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">客户小程序</text>
+<rect x="1329.0" y="166" width="337.0" height="58" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1497.5" y="203.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">工厂端</text>
+<rect x="1682.0" y="166" width="337.0" height="58" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1850.5" y="203.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">安装端</text>
+<rect x="2035.0" y="166" width="337.0" height="58" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2203.5" y="203.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">供应商端</text>
+<rect x="2388.0" y="166" width="337.0" height="58" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2556.5" y="203.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">管理后台</text>
+<g data-layer-interaction="bidirectional" aria-label="上下双向交互">
+<path d="M1422 267V298L1414 290 M1434 298V267L1442 275" fill="none" stroke="#434259" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1465" y="289.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#445c70" text-anchor="start">业务请求 / 结果反馈</text>
+</g>
+<g data-layer="02">
+<rect x="40" y="305" width="2720" height="635" rx="7" fill="#f3f8f8" stroke="#d3dfe8" stroke-width="1"/>
+<rect x="40" y="305" width="190" height="635" rx="7" fill="#e5eef0" stroke="none" stroke-width="1"/>
+<text x="135" y="590.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="500" fill="#5a7182" text-anchor="middle">02</text>
+<text x="135" y="632.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="26" font-weight="600" fill="#397e86" text-anchor="middle">业务应用层</text>
+<text x="135" y="668.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="400" fill="#5a7182" text-anchor="middle">系统分工与协作</text>
+</g>
+<g data-relationships="R03 R04" data-representation="coverage-band">
+<g data-system="customer_service">
+<rect x="270" y="331" width="2455" height="78" rx="5" fill="#f6f2f9" stroke="#d8cde1" stroke-width="1"/>
+<text x="410" y="379" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="500" fill="#71647e" text-anchor="middle">客户服务系统</text>
+<text x="720" y="379" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="500" fill="#655575" text-anchor="start">售前 / 售中 / 售后服务支撑</text>
+<text x="2695" y="379" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#786c85" text-anchor="end">覆盖定向业务支撑及核心业务主线，共同形成客户服务闭环</text>
+</g>
+</g>
+<text x="290" y="446" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="600" fill="#77618d" text-anchor="start">定向业务支撑</text>
+<g data-system="designer_community">
+<rect x="290" y="461" width="310" height="96" rx="5" fill="#f6f2f9" stroke="#ddd4e5" stroke-width="1"/>
+<text x="445.0" y="494" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="500" fill="#71647e" text-anchor="middle">设计师社区系统</text>
+<text x="445.0" y="521" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#6c617b" text-anchor="middle">认证 · 内容</text>
+<text x="445.0" y="546" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#6c617b" text-anchor="middle">成长 · 合作</text>
+</g>
+<g data-system="city_partner">
+<rect x="711" y="461" width="310" height="96" rx="5" fill="#f6f2f9" stroke="#ddd4e5" stroke-width="1"/>
+<text x="866.0" y="494" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="500" fill="#71647e" text-anchor="middle">城市合伙人系统</text>
+<text x="866.0" y="521" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#6c617b" text-anchor="middle">招商 · 签约</text>
+<text x="866.0" y="546" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#6c617b" text-anchor="middle">评级 · 权益</text>
+</g>
+<g data-system="after_sales">
+<rect x="1553" y="461" width="731" height="96" rx="5" fill="#f6f2f9" stroke="#ddd4e5" stroke-width="1"/>
+<text x="1918.5" y="494" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="500" fill="#71647e" text-anchor="middle">售后系统</text>
+<text x="1918.5" y="531" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#6c617b" text-anchor="middle">售后服务管理 · 返工维修协同 · 售后成本闭环</text>
+</g>
+<text x="290" y="606" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="600" fill="#2d648e" text-anchor="start">核心业务系统</text>
+<text x="2705" y="606" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#61788a" text-anchor="end">六个同层系统</text>
+<rect x="270" y="630" width="2455" height="185" rx="6" fill="#ffffff" stroke="#dae4eb" stroke-width="1"/>
+<g data-system="design_collaboration" data-core-system="true">
+<rect x="290" y="655" width="310" height="140" rx="5" fill="#f2f7fc" stroke="#cddfea" stroke-width="1"/>
+<text x="445" y="696" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="600" fill="#244c6c" text-anchor="middle">设计协同系统</text>
+<text x="445" y="737" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">方案设计 · 算量报价</text>
+<text x="445" y="768" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">设计数据 · 版本协作</text>
+</g>
+<g data-system="store_enablement" data-core-system="true">
+<rect x="711" y="655" width="310" height="140" rx="5" fill="#f2f7fc" stroke="#cddfea" stroke-width="1"/>
+<text x="866" y="696" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="600" fill="#244c6c" text-anchor="middle">门店赋能系统</text>
+<text x="866" y="737" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">销售订单 · 客户服务</text>
+<text x="866" y="768" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">客户经营 · 门店运营</text>
+</g>
+<g data-system="supply_chain_collaboration" data-core-system="true">
+<rect x="1132" y="655" width="310" height="140" rx="5" fill="#f2f7fc" stroke="#cddfea" stroke-width="1"/>
+<text x="1287" y="696" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="600" fill="#244c6c" text-anchor="middle">供应链协同系统</text>
+<text x="1287" y="737" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">货源、采购与供货</text>
+<text x="1287" y="768" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">供应商协作 · 生产组织</text>
+</g>
+<g data-system="production_mes" data-core-system="true">
+<rect x="1553" y="655" width="310" height="140" rx="5" fill="#f2f7fc" stroke="#cddfea" stroke-width="1"/>
+<text x="1708" y="696" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="600" fill="#244c6c" text-anchor="middle">生产 MES 系统</text>
+<text x="1708" y="737" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">排产 · 工序执行 · 报工</text>
+<text x="1708" y="768" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">质量追溯 · 物料消耗</text>
+</g>
+<g data-system="fulfillment" data-core-system="true">
+<rect x="1974" y="655" width="310" height="140" rx="5" fill="#f2f7fc" stroke="#cddfea" stroke-width="1"/>
+<text x="2129" y="696" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="600" fill="#244c6c" text-anchor="middle">履约系统</text>
+<text x="2129" y="737" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">物流配送 · 安装调度</text>
+<text x="2129" y="768" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">交付服务 · 履约质量</text>
+</g>
+<g data-system="finance" data-core-system="true">
+<rect x="2395" y="655" width="310" height="140" rx="5" fill="#f2f7fc" stroke="#cddfea" stroke-width="1"/>
+<text x="2550" y="696" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="600" fill="#244c6c" text-anchor="middle">财务系统</text>
+<text x="2550" y="737" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">收付款 · 对账 · 核算</text>
+<text x="2550" y="768" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#5a7082" text-anchor="middle">成本与财务分析</text>
+</g>
+<g data-relationships="R02" data-representation="support-connector">
+<path data-support-connector="true" data-target="design_collaboration" d="M445 557V652" fill="none" stroke="#91819f" stroke-width="1.4" stroke-linecap="round" marker-end="url(#support)"/>
+</g>
+<g data-relationships="R01" data-representation="support-connector">
+<path data-support-connector="true" data-target="store_enablement" d="M866 557V652" fill="none" stroke="#91819f" stroke-width="1.4" stroke-linecap="round" marker-end="url(#support)"/>
+</g>
+<g data-relationships="R09" data-representation="support-connector">
+<path data-support-connector="true" data-target="production_mes" d="M1708 557V652" fill="none" stroke="#91819f" stroke-width="1.4" stroke-linecap="round" marker-end="url(#support)"/>
+</g>
+<g data-relationships="R10" data-representation="support-connector">
+<path data-support-connector="true" data-target="fulfillment" d="M2129 557V652" fill="none" stroke="#91819f" stroke-width="1.4" stroke-linecap="round" marker-end="url(#support)"/>
+</g>
+<g data-relationships="R05" data-representation="business-connector">
+<path data-business-connector="true" d="M606 725H705" fill="none" stroke="#3b647f" stroke-width="2.2" stroke-linecap="round" marker-end="url(#collaboration)" marker-start="url(#collaboration)"/>
+</g>
+<text x="655.5" y="707" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="500" fill="#315e7b" text-anchor="middle">设计协同</text>
+<g data-relationships="R16" data-representation="business-connector">
+<path data-business-connector="true" d="M1027 725H1126" fill="none" stroke="#3b647f" stroke-width="2.2" stroke-linecap="round" marker-end="url(#collaboration)"/>
+</g>
+<text x="1076.5" y="707" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="500" fill="#315e7b" text-anchor="middle">需求协同</text>
+<g data-relationships="R17" data-representation="business-connector">
+<path data-business-connector="true" d="M1448 725H1547" fill="none" stroke="#3b647f" stroke-width="2.2" stroke-linecap="round" marker-end="url(#collaboration)"/>
+</g>
+<text x="1497.5" y="707" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="500" fill="#315e7b" text-anchor="middle">生产协同</text>
+<g data-relationships="R07" data-representation="business-connector">
+<path data-business-connector="true" d="M1869 725H1968" fill="none" stroke="#3b647f" stroke-width="2.2" stroke-linecap="round" marker-end="url(#collaboration)"/>
+</g>
+<text x="1918.5" y="707" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="500" fill="#315e7b" text-anchor="middle">交付协同</text>
+<g data-relationships="R08" data-representation="business-connector">
+<path data-business-connector="true" d="M2290 725H2389" fill="none" stroke="#3b647f" stroke-width="2.2" stroke-linecap="round" marker-end="url(#collaboration)"/>
+</g>
+<text x="2339.5" y="707" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="500" fill="#315e7b" text-anchor="middle">财务协同</text>
+<g transform="translate(0 -100)">
+<g data-relationships="R11" data-representation="coverage-band">
+<g data-system="system_management">
+<rect x="270" y="938" width="2455" height="78" rx="5" fill="#f6f2f9" stroke="#d8cde1" stroke-width="1"/>
+<text x="410" y="986" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="500" fill="#71647e" text-anchor="middle">系统管理中心</text>
+<text x="710" y="970" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="23" font-weight="500" fill="#655575" text-anchor="start">平台经营与运营规则</text>
+<text x="710" y="1001" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#655575" text-anchor="start">账号 · 权限 · 规则 · 参数 · 菜单 · 日志 · 系统对接</text>
+<text x="2695" y="986" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#786c85" text-anchor="end">覆盖全部核心与辅助系统</text>
+</g>
+</g>
+<g data-layer-interaction="bidirectional" aria-label="上下双向交互">
+<path d="M1422 1047V1078L1414 1070 M1434 1078V1047L1442 1055" fill="none" stroke="#434259" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1465" y="1069.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#445c70" text-anchor="start">统一 API / 能力调用</text>
+</g>
+<g data-layer="03">
+<rect x="40" y="1085" width="2720" height="281" rx="7" fill="#f6f3fa" stroke="#d3dfe8" stroke-width="1"/>
+<rect x="40" y="1085" width="190" height="281" rx="7" fill="#ede9f3" stroke="none" stroke-width="1"/>
+<text x="135" y="1193.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="500" fill="#5a7182" text-anchor="middle">03</text>
+<text x="135" y="1235.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="26" font-weight="600" fill="#6b6090" text-anchor="middle">智能中台层</text>
+<text x="135" y="1271.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="400" fill="#5a7182" text-anchor="middle">共享能力与协同</text>
+</g>
+<g data-relationships="R12" data-representation="shared-capability-band">
+<rect x="270" y="1103" width="680" height="245" rx="5" fill="#eeebf5" stroke="#d9d1e4" stroke-width="1"/>
+<text x="610" y="1135" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="500" fill="#445c70" text-anchor="middle">技术支撑中台</text>
+<text x="610" y="1174" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="500" fill="#655575" text-anchor="middle">AI、XR技术能力是所有核心业务系统的通用能力</text>
+<rect x="290.0" y="1200" width="640.0" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="610.0" y="1235.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">AI 能力中台</text>
+<rect x="290.0" y="1274" width="640.0" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="610.0" y="1309.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">XR 数字孪生中台</text>
+</g>
+<g data-relationships="R13" data-representation="shared-capability-band">
+<rect x="970" y="1103" width="1755" height="245" rx="5" fill="#eeebf5" stroke="#d9d1e4" stroke-width="1"/>
+<text x="1847" y="1135" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="500" fill="#445c70" text-anchor="middle">业务支撑中台</text>
+<text x="1847" y="1174" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="500" fill="#655575" text-anchor="middle">唯一的数据操作入口；所有业务系统必须通过中台API操作数据，禁止直连数据库</text>
+<rect x="990.0" y="1200" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1198.375" y="1235.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">订单中心</text>
+<rect x="1422.75" y="1200" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1631.125" y="1235.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">商品中心</text>
+<rect x="1855.5" y="1200" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2063.875" y="1235.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">库存中心</text>
+<rect x="2288.25" y="1200" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2496.625" y="1235.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">客户中心</text>
+<rect x="990.0" y="1274" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1198.375" y="1309.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">工艺中心</text>
+<rect x="1422.75" y="1274" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1631.125" y="1309.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">结算中心</text>
+<rect x="1855.5" y="1274" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2063.875" y="1309.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">流程引擎</text>
+<rect x="2288.25" y="1274" width="416.75" height="54" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2496.625" y="1309.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">消息中心</text>
+</g>
+<g data-layer-interaction="bidirectional" aria-label="上下双向交互">
+<path d="M1422 1373V1404L1414 1396 M1434 1404V1373L1442 1381" fill="none" stroke="#434259" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1465" y="1395.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#445c70" text-anchor="start">业务数据沉淀 / 可信数据支撑</text>
+</g>
+<g data-layer="04">
+<rect x="40" y="1411" width="2720" height="200" rx="7" fill="#f2f6f8" stroke="#d3dfe8" stroke-width="1"/>
+<rect x="40" y="1411" width="190" height="200" rx="7" fill="#e6edf1" stroke="none" stroke-width="1"/>
+<text x="135" y="1479.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="500" fill="#5a7182" text-anchor="middle">04</text>
+<text x="135" y="1521.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="26" font-weight="600" fill="#5a7586" text-anchor="middle">数据资产层</text>
+<text x="135" y="1557.0" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="400" fill="#5a7182" text-anchor="middle">数据治理与沉淀</text>
+</g>
+<text x="290" y="1448" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="500" fill="#445c70" text-anchor="start">核心数据资产</text>
+<rect x="270.0" y="1464" width="571.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="555.5" y="1498.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">全球石材数字资产库</text>
+<rect x="857.0" y="1464" width="571.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1142.5" y="1498.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">供应链数据库</text>
+<rect x="1444.0" y="1464" width="571.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1729.5" y="1498.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">生产工艺库</text>
+<rect x="270.0" y="1536" width="571.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="555.5" y="1570.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">案例库</text>
+<rect x="857.0" y="1536" width="571.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1142.5" y="1570.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">设计趋势库</text>
+<rect x="1444.0" y="1536" width="571.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="1729.5" y="1570.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">用户行为库</text>
+<text x="2075" y="1448" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="500" fill="#445c70" text-anchor="start">数据能力</text>
+<rect x="2055.0" y="1464" width="670.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2390.0" y="1498.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">产业大数据平台</text>
+<rect x="2055.0" y="1536" width="670.0" height="53" rx="5" fill="#fff" stroke="#d4e1eb" stroke-width="1"/>
+<text x="2390.0" y="1570.5" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="400" fill="#526c80" text-anchor="middle">知识图谱</text>
+<text x="40" y="1651" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#65798c" text-anchor="start">依据：Notion 产品文档及本次已确认调整。连线表示主要业务协作，具体业务路径按场景展开。</text>
+<text x="2760" y="1651" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="400" fill="#65798c" text-anchor="end">v23 · 核心系统横向总览</text>
+</g>
+</svg>
