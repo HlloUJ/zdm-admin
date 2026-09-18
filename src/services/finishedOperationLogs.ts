@@ -46,6 +46,7 @@ export const finishedLogTypes: Record<string, string> = {
   DELETE_TO_RECYCLE: '删除至回收站',
   PURGE: '彻底删除商品',
   SOLD_OUT: '商品售罄',
+  SOURCE_SHELF: '供应链上架',
   SOURCE_SYNC: '供应链联动',
   RESTORE_WAREHOUSE: '放回仓库',
 };

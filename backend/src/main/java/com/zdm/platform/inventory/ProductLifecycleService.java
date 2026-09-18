@@ -102,7 +102,12 @@ public class ProductLifecycleService {
       Map<String,Object> changes=new LinkedHashMap<>();
       changes.put("来源状态",Map.of("before",source,"after",target));
       if(recreate) { changes.put("入仓价格",Map.of("before",List.of(),"after",priceSnapshot(kind,id))); }
-      record(kind,row,"admin","SOURCE_SYNC",result,(String)row.get("status"),recreate?"warehouse":(String)row.get("status"),changes);
+      String operationsType = "SOURCE_SYNC";
+      if (kind == Kind.FINISHED && publish) {
+        operationsType = "SOURCE_SHELF";
+        if (recreate) { result = FinishedOperationLogService.SOURCE_SHELF_SUMMARY; }
+      }
+      record(kind,row,"admin",operationsType,result,kind == Kind.FINISHED && recreate ? null : (String)row.get("status"),recreate?"warehouse":(String)row.get("status"),changes);
     }
     sqlSession.clearCache();
     return "purged".equals(target) && deleted(row);

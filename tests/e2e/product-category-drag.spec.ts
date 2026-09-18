@@ -30,8 +30,16 @@ test('sorts siblings, retains children and rejects cross-parent or cross-level d
   await page.goto('/product-category');
   const rows = page.locator('main tbody tr');
   const row = (name: string) => rows.filter({ hasText: name });
-  const drag = async (from: string, to: string) =>
-    row(from).locator('.category-name-cell').dragTo(row(to).locator('.category-name-cell'));
+  const drag = async (from: string, to: string) => {
+    // TDesign registers Sortable after rendering the rows; visible rows alone
+    // do not mean that the drag listeners are attached yet.
+    await expect
+      .poll(() =>
+        page.locator('main tbody').evaluate((body) => Object.keys(body).some((key) => key.startsWith('Sortable'))),
+      )
+      .toBe(true);
+    await row(from).locator('.category-name-cell').dragTo(row(to).locator('.category-name-cell'));
+  };
   await expect(rows).toHaveCount(2);
   await expect(page.getByText('上移', { exact: true })).toHaveCount(0);
   await expect(page.getByText('下移', { exact: true })).toHaveCount(0);

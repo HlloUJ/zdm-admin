@@ -29,8 +29,8 @@ describe('edit log layout', () => {
       '基础信息',
       '销售信息',
     ]);
-    expect(wrapper.findAll('h4').map((el) => el.text())).toEqual(['商品主图1', '商品名称', '销售规格', '商家编码']);
-    expect(wrapper.find('.change-summary').text().replace(/\s+/g, '')).toBe('变更对比4项');
+    expect(wrapper.findAll('h4').map((el) => el.text())).toEqual(['商品主图1', '商品名称', '销售规格']);
+    expect(wrapper.find('.change-summary').text().replace(/\s+/g, '')).toBe('变更对比3项');
     expect(wrapper.text()).not.toContain('点击查看大图');
     expect(wrapper.findAll('.change-side--media')).toHaveLength(2);
     expect(wrapper.findAll('.change-pair--wide')).toHaveLength(1);

@@ -93,13 +93,13 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await expect(page.locator('.t-cascader__panel:visible').getByText('有效商品分类', { exact: true })).toBeVisible();
   await expect(page.getByText('已停用分类', { exact: true })).toHaveCount(0);
   await expect(page.getByText('辅料分类', { exact: true })).toHaveCount(0);
-  await page.getByPlaceholder('商品名称 / ID / 商家编码', { exact: true }).click();
+  await page.getByPlaceholder('商品名称 / ID', { exact: true }).click();
 
   await expect(page.getByText(/仓库中/)).toBeVisible();
   await expect(page.getByText('供应商', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('租户', { exact: true })).toHaveCount(0);
   await expect(page.getByText('门店', { exact: true })).toHaveCount(0);
-  const firstProductRow = page.locator('tbody tr').filter({ hasText: '编码：' }).first();
+  const firstProductRow = page.locator('tbody tr').filter({ hasText: 'ID：' }).first();
   await expect(firstProductRow).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
@@ -109,7 +109,7 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await expect(page.getByText('库存流水', { exact: true })).toHaveCount(0);
   const operationHeader = page.getByRole('columnheader', { name: '操作', exact: true });
   const operationWidth = await operationHeader.evaluate((element) => element.getBoundingClientRect().width);
-  const keyword = page.getByPlaceholder('商品名称 / ID / 商家编码', { exact: true });
+  const keyword = page.getByPlaceholder('商品名称 / ID', { exact: true });
   for (const text of ['轻奢', '1', 'fp-20260727', '  岩板  ']) {
     await keyword.fill(text);
     await page.getByRole('button', { name: '查询', exact: true }).click();
@@ -779,7 +779,7 @@ test('restores the initial horizontal layout after visiting the off-shelf tab', 
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
   await page.goto('/supply-chain/finished-stock-management');
-  await expect(page.locator('tbody tr').filter({ hasText: '编码：' }).first()).toBeVisible();
+  await expect(page.locator('tbody tr').filter({ hasText: 'ID：' }).first()).toBeVisible();
   const content = page.locator('main .t-table__content');
   const dimensions = () =>
     content.evaluate((element) => ({ width: element.clientWidth, scrollWidth: element.scrollWidth }));
@@ -797,4 +797,222 @@ test('restores the initial horizontal layout after visiting the off-shelf tab', 
   await expect.poll(dimensions).toEqual(warehouse);
   await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
   await expect.poll(dimensions).toEqual(selling);
+});
+
+for (const client of ['admin', 'supply-chain']) {
+  test(`hides merchant codes in ${client} lists, publish forms and log details`, async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+    await installFinishedMocks(page, client);
+    const path = client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management';
+    const records = ['CREATE', 'UPDATE', ...(client === 'admin' ? ['SOURCE_SHELF'] : [])].map(
+      (operationType, index) => ({
+        id: index + 1,
+        productId: 1,
+        productName: '日志测试商品',
+        merchantCode: 'hidden-product-code',
+        operationType,
+        operationSummary: operationType === 'SOURCE_SHELF' ? '供应链已上架，商品进入运营管理平台仓库' : '商品信息',
+        operatorName: '测试人员',
+        operatedAt: '2026-09-18T10:00:00',
+        operationSource: 'MANUAL',
+        changeDetails: JSON.stringify({
+          商家编码: { before: 'hidden-old-code', after: 'hidden-product-code' },
+          销售规格: {
+            before: [{ variantKey: 'hidden-variant-code', variantLabel: '规格A', costPrice: 10, stock: 1 }],
+            after: [{ variantKey: 'hidden-variant-code', variantLabel: '规格A', costPrice: 20, stock: 1 }],
+          },
+          入仓价格: { before: [], after: [{ variant_key: 'hidden-sql-code', cost_price: 20, price: 40 }] },
+        }),
+      }),
+    );
+    await page.route('**/api/admin/finished-products/operation-logs?*', (route) =>
+      route.fulfill({ json: { code: 0, data: { records, total: records.length } } }),
+    );
+    await page.route(/\/api\/admin\/finished-products\/operation-logs\/\d+$/, (route) => {
+      const id = Number(route.request().url().split('/').pop());
+      return route.fulfill({ json: { code: 0, data: records.find((record) => record.id === id) } });
+    });
+    await page.goto(path);
+    await expect(page.getByRole('main')).not.toContainText('商家编码');
+    await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+    for (const record of records) {
+      const row = page
+        .getByRole('row')
+        .filter({ hasText: '日志测试商品' })
+        .nth(record.id - 1);
+      await expect(row).not.toContainText('hidden-product-code');
+      if (record.operationType === 'SOURCE_SHELF') {
+        await expect(row).toContainText('供应链上架');
+        await expect(row).toContainText(record.operationSummary);
+      }
+      await row.getByText('详情', { exact: true }).click();
+      const detail = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
+      await expect(detail).toBeVisible();
+      await expect(detail).not.toContainText('商家编码');
+      await expect(detail).not.toContainText('hidden-');
+      await detail.getByRole('button', { name: '关闭', exact: true }).click();
+    }
+    if (client !== 'supply-chain') return;
+    await page.goto(path);
+    await page.getByRole('button', { name: '发布商品', exact: true }).click();
+    const picker = page.getByTestId('finished-category-picker');
+    for (const name of ['成品现货', '餐桌', '石材餐桌', '奢石餐桌']) await picker.getByRole('button', { name }).click();
+    await page.getByRole('button', { name: '确认，下一步' }).click();
+    await expect(page.locator('.form-shell')).not.toContainText('商家编码');
+  });
+}
+
+test('shows initial warehouse prices without comparison and stacks later prices with fullscreen', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page, 'admin');
+  const priceRows = (cost: number) => [
+    { variant_key: 'private-key', variant_label: '规格A', cost_price: cost, price_coefficient: 2, price: cost * 2 },
+    {
+      variant_key: 'private-key',
+      variant_label: '规格A',
+      store_level_id: 7,
+      store_level_name: '城市合伙人',
+      cost_price: cost,
+      price_coefficient: 3,
+      price: cost * 3,
+    },
+  ];
+  const records = [
+    {
+      id: 101,
+      productId: 1,
+      productName: '首次入仓商品',
+      operationType: 'SOURCE_SHELF',
+      operationSource: 'SUPPLY_CHAIN',
+      operationSummary: '供应链已上架，商品进入运营管理平台仓库',
+      beforeStatus: null,
+      afterStatus: 'warehouse',
+      operatorName: '供应链人员',
+      changeDetails: JSON.stringify({
+        来源状态: { before: 'warehouse', after: 'selling' },
+        入仓价格: { before: [], after: priceRows(10) },
+      }),
+    },
+    {
+      id: 102,
+      productId: 1,
+      productName: '价格联动商品',
+      operationType: 'PRICE_UPDATE',
+      operationSource: 'SUPPLY_CHAIN',
+      operationSummary: '供应链成本变更，按当前系数重算售价',
+      beforeStatus: 'warehouse',
+      afterStatus: 'warehouse',
+      operatorName: '供应链人员',
+      changeDetails: JSON.stringify({ 价格联动: { before: priceRows(10), after: priceRows(20) } }),
+    },
+  ];
+  await page.route('**/api/admin/finished-products/operation-logs?*', (route) =>
+    route.fulfill({ json: { code: 0, data: { records, total: 2 } } }),
+  );
+  await page.route(/\/api\/admin\/finished-products\/operation-logs\/\d+$/, (route) =>
+    route.fulfill({
+      json: { code: 0, data: records.find((row) => row.id === Number(route.request().url().split('/').pop())) },
+    }),
+  );
+  await page.goto('/finished-stock-management');
+  await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  await page.getByRole('row').filter({ hasText: '首次入仓商品' }).getByText('详情', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
+  await expect(dialog).toContainText('— → 仓库中');
+  for (const text of ['修改前', '修改后', '来源状态', '商家编码', 'variant_key'])
+    await expect(dialog).not.toContainText(text);
+  await expect(dialog.getByRole('columnheader')).toHaveText(['商品规格', '成本价', '指导价', '城市合伙人']);
+  await expect(
+    dialog.getByRole('row').filter({ hasText: '操作来源' }).getByRole('cell', { name: '供应链协同系统', exact: true }),
+  ).toHaveAttribute('colspan', '3');
+  await dialog.getByRole('button', { name: '全屏显示', exact: true }).click();
+  const fullscreen = page.locator('.sales-fullscreen-panel.is-fullscreen');
+  await expect(fullscreen).toContainText('价格：20.00');
+  const tableWidth = await fullscreen.locator('table').evaluate((el) => el.getBoundingClientRect().width);
+  const contentWidth = await fullscreen.locator('.t-table__content').evaluate((el) => el.getBoundingClientRect().width);
+  expect(tableWidth).toBeGreaterThanOrEqual(contentWidth - 2);
+  await fullscreen.getByRole('button', { name: '还原', exact: true }).click();
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.getByRole('row').filter({ hasText: '价格联动商品' }).getByText('详情', { exact: true }).click();
+  await expect(dialog.locator('.change-side-title')).toHaveText(['修改前', '修改后']);
+  const before = await dialog.locator('.change-side--before').boundingBox();
+  const after = await dialog.locator('.change-side--after').boundingBox();
+  expect(after!.y).toBeGreaterThanOrEqual(before!.y + before!.height);
+  await dialog.getByRole('button', { name: '全屏显示', exact: true }).click();
+  await expect(fullscreen.locator('.change-side--before')).toContainText('价格：20.00');
+  await expect(fullscreen.locator('.change-side--after')).toContainText('价格：40.00');
+  await fullscreen.getByRole('button', { name: '还原', exact: true }).click();
+});
+
+test('aligns layered log cells on first display and after fullscreen without a corrective click', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page, 'supply-chain');
+  const dimensions = ['a', 'b', 'c'].map((key) => ({ key, name: `销售属性${key}`, values: ['选项1', '选项2'] }));
+  const variants = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
+    variantKey: `key-${i}`,
+    variantLabel: `规格${i}`,
+    displayMode: 'layered',
+    stock: 1,
+    costPrice: 10,
+    salesAttributes: {
+      a: `选项${Math.floor(i / 4) + 1}`,
+      b: `选项${(Math.floor(i / 2) % 2) + 1}`,
+      c: `选项${(i % 2) + 1}`,
+      extra: '额外销售属性',
+    },
+  }));
+  const record = {
+    id: 501,
+    productId: 1,
+    productName: '分层日志',
+    operationType: 'UPDATE',
+    operationSource: 'MANUAL',
+    operatorName: '测试人员',
+    changeDetails: JSON.stringify({
+      销售规格: { before: variants, after: variants.map((v) => ({ ...v, costPrice: 20 })) },
+      规格维度: { before: dimensions, after: dimensions },
+    }),
+  };
+  await page.route('**/api/admin/finished-products/operation-logs?*', (route) =>
+    route.fulfill({ json: { code: 0, data: { records: [record], total: 1 } } }),
+  );
+  await page.route('**/api/admin/finished-products/operation-logs/501', (route) =>
+    route.fulfill({ json: { code: 0, data: record } }),
+  );
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  await page.getByRole('row').filter({ hasText: '分层日志' }).getByText('详情', { exact: true }).click();
+  const tables = page.locator('.sales-log-table');
+  const aligned = async () => {
+    await expect
+      .poll(() =>
+        tables.evaluateAll((elements) =>
+          elements.every((el) => {
+            const headers = Array.from(el.querySelectorAll('thead th')).slice(0, 3);
+            const cells = Array.from(el.querySelectorAll('tbody tr:first-child td')).slice(0, 3);
+            return (
+              headers.length === 3 &&
+              cells.length === 3 &&
+              headers.every((header, i) => {
+                const rect = header.getBoundingClientRect();
+                const cell = cells[i].getBoundingClientRect();
+                const expectedLeft = headers.slice(0, i).reduce((sum, h) => sum + h.getBoundingClientRect().width, 0);
+                return (
+                  rect.width >= 129 &&
+                  Math.abs(cell.x - rect.x) < 2 &&
+                  Math.abs(parseFloat(getComputedStyle(header).left) - expectedLeft) < 2
+                );
+              })
+            );
+          }),
+        ),
+      )
+      .toBe(true);
+    await expect(tables.first().locator('tbody tr:first-child td').first()).toHaveAttribute('rowspan', '4');
+  };
+  await aligned();
+  await page.getByRole('button', { name: '全屏显示', exact: true }).click();
+  await aligned();
+  await page.getByRole('button', { name: '还原', exact: true }).click();
+  await aligned();
 });

@@ -39,6 +39,7 @@ const names: Record<string, string> = {
   color: '颜色',
   sizeValue: '尺寸',
 };
+const hiddenCodes = new Set(['variantKey', 'variant_key', 'merchantCode', 'merchant_code', 'sku', '商家编码']);
 const enums: Record<string, string> = {
   ...finishedLogStates,
   auto: '跟随配置',
@@ -51,6 +52,7 @@ function display(value: unknown): string {
   if (Array.isArray(value)) return value.map(display).join('、') || '—';
   if (typeof value === 'object')
     return Object.entries(value)
+      .filter(([key]) => !hiddenCodes.has(key))
       .map(([key, val]) => `${props.fieldNames?.[key] || names[key] || key}：${display(val)}`)
       .join('；');
   return typeof value === 'string' ? enums[value] || value : String(value);
@@ -60,7 +62,8 @@ const rows = computed(() =>
 );
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const keys = [...new Set(rows.value.flatMap((row) => Object.keys(row)))].filter(
-    (key) => !['_index', 'attributeId', 'key', 'storeLevelId', 'sourceConfigurationId'].includes(key),
+    (key) =>
+      !hiddenCodes.has(key) && !['_index', 'attributeId', 'key', 'storeLevelId', 'sourceConfigurationId'].includes(key),
   );
   return keys
     .filter((key) => !props.hiddenColumns?.includes(key))

@@ -72,7 +72,6 @@
       </SalesLogFullscreen>
       <t-descriptions bordered :column="3" class="creation-sales-summary">
         <t-descriptions-item label="总库存">{{ text(snapshot['总库存']) }}</t-descriptions-item>
-        <t-descriptions-item label="商家编码">{{ text(snapshot['商家编码']) }}</t-descriptions-item>
         <t-descriptions-item label="上架">{{
           snapshot['状态'] === 'selling'
             ? '立即上架'

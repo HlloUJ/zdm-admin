@@ -3,7 +3,7 @@
     <Teleport to="body" :disabled="!fullscreen">
       <div ref="panel" class="sales-fullscreen-panel" :class="{ 'is-fullscreen': fullscreen }">
         <div v-if="fullscreen || !titleTarget" ref="toolbar" class="sales-fullscreen-toolbar">
-          <span v-if="fullscreen">销售规格</span>
+          <span>{{ title }}</span>
         </div>
         <div ref="content" class="sales-fullscreen-content"><slot /></div>
       </div>
@@ -25,6 +25,7 @@
 </template>
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
+withDefaults(defineProps<{ title?: string }>(), { title: '销售规格' });
 const emit = defineEmits<{ resize: [] }>();
 const fullscreen = ref(false);
 const originalHeight = ref(0);
