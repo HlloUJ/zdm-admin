@@ -13,6 +13,7 @@
 </template>
 <script setup lang="ts">
 import { computed, h } from 'vue';
+import { getLoginUser } from '@/services/auth';
 import PriceSourceToggle from './PriceSourceToggle.vue';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';
@@ -28,6 +29,7 @@ const props = defineProps<{
   other: Record<string, unknown>;
   highlightChanges?: boolean;
 }>();
+const isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');
 function list<T>(field: string): T[] {
   return Array.isArray(props.snapshot[field]) ? (props.snapshot[field] as T[]) : [];
 }
@@ -94,7 +96,7 @@ const rows = computed(() =>
         ...variant.salesAttributes,
         rowKey: index,
         specText: variant.variantLabel,
-        cost: guide?.costPrice ?? prices.value.find((price) => price.variantKey === variant.variantKey)?.costPrice,
+        cost: comparableCell(props.snapshot, variant, 'cost'),
         guide,
         quantity: variant.stock,
         merchantCode: variant.variantKey,
@@ -138,8 +140,10 @@ function comparableCell(snapshot: Record<string, unknown>, variant: FinishedProd
   if (key === 'specText') return variant.variantLabel;
   if (key === 'merchantCode') return variant.variantKey;
   if (key === 'quantity') return variant.stock;
-  if (key === 'cost')
+  if (key === 'cost') {
+    if (isSupplyChain.value) return variant.costPrice;
     return guide?.costPrice ?? partners.find((item) => item.variantKey === variant.variantKey)?.costPrice;
+  }
   if (key === 'guide') return [guide?.priceCoefficient, guide?.price];
   if (key.startsWith('level_')) {
     const price = partners.find(
@@ -165,13 +169,17 @@ function changedCell(row: TableRowData, key: string): boolean {
   );
 }
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() =>
-  baseColumns.value.map((column) => ({
-    ...column,
-    cell: (render, context) => {
-      const content = typeof column.cell === 'function' ? column.cell(render, context) : context.row[column.colKey!];
-      return h('div', { class: { 'sales-value-changed': changedCell(context.row, column.colKey!) } }, [content]);
-    },
-  })),
+  baseColumns.value
+    .filter(
+      (column) => !isSupplyChain.value || (column.colKey !== 'guide' && !String(column.colKey).startsWith('level_')),
+    )
+    .map((column) => ({
+      ...column,
+      cell: (render, context) => {
+        const content = typeof column.cell === 'function' ? column.cell(render, context) : context.row[column.colKey!];
+        return h('div', { class: { 'sales-value-changed': changedCell(context.row, column.colKey!) } }, [content]);
+      },
+    })),
 );
 const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol<TableRowData> }) =>
   layeredCellSpan(
