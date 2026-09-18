@@ -12,7 +12,7 @@
         </header>
         <t-alert theme="info" class="page-tip">{{ config.tip }}</t-alert>
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="72px" colon
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon
             ><div class="filter-row">
               <div class="filter-fields">
                 <t-form-item :label="config.entityName"
@@ -20,7 +20,7 @@
                     v-model="searchForm.keyword"
                     clearable
                     :placeholder="`名称或${config.codeLabel}`" /></t-form-item
-                ><t-form-item label="状态"
+                ><t-form-item class="zdm-status-filter" label="状态"
                   ><t-select v-model="searchForm.status" clearable placeholder="全部"
                     ><t-option label="启用" value="enabled" /><t-option label="停用" value="disabled" /></t-select
                 ></t-form-item>
@@ -123,7 +123,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'extra', title: config.value.extraColumn, minWidth: 180 },
   { colKey: 'useCount', title: config.value.useColumn, width: 120, align: 'right' },
   { colKey: 'status', title: '状态', width: 90, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 140, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 116, fixed: 'right' },
 ]);
 const filteredData = computed(() =>
   data.value.filter(
@@ -298,7 +298,7 @@ onMounted(loadData);
   padding: 24px;
   background: var(--td-bg-color-container);
   border-radius: 6px;
-  box-shadow: var(--td-shadow-1);
+  border: 1px solid var(--td-component-border);
 }
 .filter-row,
 .filter-fields,

@@ -10,20 +10,20 @@
         <t-alert v-if="tipVisible" theme="info" class="page-tip" close-btn @close="tipVisible = false">
           商品分类最多支持 4 级；已关联商品的分类不支持删除；停用后不可用于新商品发布，历史商品保留原分类。
         </t-alert>
-        <AdminListLayout>
+        <AdminListLayout class="category-list-layout">
           <template #toolbar>
             <div class="list-controls">
               <div v-if="!lockedScope" class="scope-controls">
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
                 <div class="source-caption">通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</div>
               </div>
-              <t-form :data="searchForm" label-width="84px" colon>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="分类名称" name="keyword">
                       <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
                     </t-form-item>
-                    <t-form-item label="分类状态" name="status">
+                    <t-form-item class="zdm-status-filter" label="状态" name="status">
                       <t-select v-model="searchForm.status" clearable placeholder="全部">
                         <t-option label="启用" value="enabled" />
                         <t-option label="停用" value="disabled" />
@@ -53,13 +53,25 @@
           <template #table>
             <t-table
               v-if="displayRows.length"
+              :class="{ 'category-table--sortable': canSortCategory }"
               row-key="key"
               :data="displayRows"
               :columns="columns"
-              :loading="loading"
+              :loading="loading || sorting"
+              :drag-sort="canSortCategory && !hasSearch && !sorting ? 'row' : undefined"
+              :drag-sort-options="categoryDragOptions"
               hover
               table-layout="fixed"
+              @drag-sort="handleCategoryDragSort"
             >
+              <template #dragTitle><t-icon name="move" title="同级拖拽排序" /></template>
+              <template #drag="{ row }">
+                <t-icon
+                  name="move"
+                  :title="hasSearch ? '请重置筛选后拖拽排序' : '拖动整行可在同一父分类下排序'"
+                  :data-category-id="row.node.id"
+                />
+              </template>
               <template #name="{ row }">
                 <div :class="['category-name-cell', `level-${row.level}`]">
                   <t-button
@@ -99,20 +111,6 @@
                   >
                   <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row)">编辑</t-link>
                   <t-link
-                    v-if="canMoveUpCategory"
-                    theme="primary"
-                    :disabled="siblingIndex(row) === 0"
-                    @click="moveCategory(row, -1)"
-                    >上移</t-link
-                  >
-                  <t-link
-                    v-if="canMoveDownCategory"
-                    theme="primary"
-                    :disabled="siblingIndex(row) === siblingNodes(row).length - 1"
-                    @click="moveCategory(row, 1)"
-                    >下移</t-link
-                  >
-                  <t-link
                     v-if="canToggleCategoryStatus"
                     :theme="row.status === 'enabled' ? 'warning' : 'success'"
                     @click="openStatusConfirm(row.node)"
@@ -141,7 +139,7 @@
       @opened="restorePageScroll"
       @closed="restorePageScroll"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form v-if="formVisible" ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
         <t-form-item v-if="formData.parentId" label="上级分类"><t-input :value="parentName" disabled /></t-form-item>
         <t-form-item label="分类名称" name="name" required-mark
           ><t-input v-model="formData.name" :maxlength="20" clearable placeholder="请输入，最多20个字符"
@@ -272,8 +270,8 @@ const hasCategoryAction = (action: string) =>
 const canCreateRootCategory = computed(() => hasCategoryAction('create-root'));
 const canCreateChildCategory = computed(() => hasCategoryAction('create-child'));
 const canEditCategory = computed(() => hasCategoryAction('edit'));
-const canMoveUpCategory = computed(() => hasCategoryAction('move-up'));
-const canMoveDownCategory = computed(() => hasCategoryAction('move-down'));
+const canSortCategory = computed(() => hasCategoryAction('sort'));
+const sorting = ref(false);
 const canToggleCategoryStatus = computed(() => hasCategoryAction('toggle-status'));
 const canDeleteCategory = computed(() => hasCategoryAction('delete'));
 
@@ -301,16 +299,23 @@ const formRules: Record<string, FormRule[]> = {
   ],
 };
 
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '分类名称', width: 155, align: 'left' },
-  { colKey: 'level', title: '分类级别', width: 90, align: 'left' },
-  { colKey: 'productCount', title: '关联商品', width: 90, align: 'center' },
-  { colKey: 'status', title: '状态', width: 60, align: 'center' },
-  { colKey: 'sort', title: '排序', width: 60, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 90, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 150, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 240, align: 'left', fixed: 'right' },
-];
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),
+  { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },
+  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },
+  { colKey: 'productCount', title: '关联商品', width: 120, align: 'center' },
+  { colKey: 'status', title: '状态', width: 100, align: 'center' },
+  { colKey: 'sort', title: '排序', width: 100, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
+  { colKey: 'createdAt', title: '创建时间', width: 200, align: 'center' },
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 200,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const activeNodes = computed(() => categoryData.value[activeScope.value]);
 const hasSearch = computed(() => Boolean(appliedSearch.keyword.trim() || appliedSearch.status));
@@ -339,8 +344,6 @@ function hasVisibleRowAction(row: CategoryRow) {
   return (
     (canCreateChildCategory.value && row.level < maxCategoryLevel) ||
     canEditCategory.value ||
-    canMoveUpCategory.value ||
-    canMoveDownCategory.value ||
     canToggleCategoryStatus.value ||
     canDeleteCategory.value
   );
@@ -442,7 +445,12 @@ function buildCategoryTree(records: ProductCategoryRecord[], scope: Scope) {
   const nodes = records
     .filter((record) => record.scope === scope)
     .map(toNode)
-    .sort((first, second) => createdAtTimestamp(second) - createdAtTimestamp(first) || second.id - first.id);
+    .sort(
+      (first, second) =>
+        first.sortOrder - second.sortOrder ||
+        createdAtTimestamp(second) - createdAtTimestamp(first) ||
+        second.id - first.id,
+    );
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const roots: CategoryNode[] = [];
   nodes.forEach((node) => {
@@ -534,8 +542,6 @@ function openEditDialog(row: CategoryRow) {
 }
 function closeFormDialog() {
   formVisible.value = false;
-  resetForm();
-  formRef.value?.clearValidate();
 }
 async function handleSubmit() {
   const result = await formRef.value?.validate();
@@ -570,25 +576,72 @@ async function handleSubmit() {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 }
-async function moveCategory(row: CategoryRow, offset: number) {
-  const siblings = siblingNodes(row);
-  const index = siblingIndex(row);
-  const targetIndex = index + offset;
-  if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
+let dragDestination: { row: CategoryRow; after: boolean } | null = null;
+function rowFromDragElement(element: HTMLElement): CategoryRow | undefined {
+  const id = Number(element.querySelector('[data-category-id]')?.getAttribute('data-category-id'));
+  return displayRows.value.find((row) => row.node.id === id);
+}
+function canMoveBetween(current: CategoryRow, target: CategoryRow) {
+  if (
+    sorting.value ||
+    hasSearch.value ||
+    current.level !== target.level ||
+    current.node.parentId !== target.node.parentId
+  )
+    return false;
+  const from = siblingIndex(current);
+  const to = siblingIndex(target);
+  return from !== to && canSortCategory.value;
+}
+const categoryDragOptions = {
+  animation: 200,
+  filter: 'a, button, input, textarea, select, .t-link',
+  preventOnFilter: false,
+  onStart: () => {
+    dragDestination = null;
+  },
+  onMove: (event: { dragged: HTMLElement; related: HTMLElement; willInsertAfter: boolean }) => {
+    const current = rowFromDragElement(event.dragged);
+    const target = rowFromDragElement(event.related);
+    if (!current || !target || !canMoveBetween(current, target)) return false;
+    dragDestination = { row: target, after: event.willInsertAfter };
+    return true;
+  },
+};
+async function handleCategoryDragSort(context: { current: CategoryRow }) {
+  const destination = dragDestination;
+  dragDestination = null;
+  if (!destination || !canMoveBetween(context.current, destination.row)) return;
+  const siblings = siblingNodes(context.current);
+  const from = siblingIndex(context.current);
+  let to = siblingIndex(destination.row) + (destination.after ? 1 : 0);
+  if (from < to) to -= 1;
+  if (from === to) return;
+  const reordered = [...siblings];
+  const [moved] = reordered.splice(from, 1);
+  reordered.splice(to, 0, moved);
   rememberPageScroll();
-  [siblings[index], siblings[targetIndex]] = [siblings[targetIndex], siblings[index]];
-  siblings.forEach((node, nodeIndex) => {
-    node.sortOrder = nodeIndex + 1;
-  });
+  sorting.value = true;
   try {
+    // Do not submit unchanged rows: the existing API treats them as an edit.
     await Promise.all(
-      siblings.map((node) => updateProductCategory(node.id, toCategoryPayload(node, row.parent?.id ?? null))),
+      reordered.map((node, index) =>
+        node.sortOrder === index + 1
+          ? Promise.resolve()
+          : updateProductCategory(node.id, { ...toCategoryPayload(node, node.parentId), sortOrder: index + 1 }),
+      ),
     );
+    reordered.forEach((node, index) => {
+      node.sortOrder = index + 1;
+    });
+    siblings.splice(0, siblings.length, ...reordered);
     void nextTick(restoreSortScroll);
     adminFeedback.success('排序已更新');
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '排序保存失败');
     await loadCategories();
+  } finally {
+    sorting.value = false;
   }
 }
 function openStatusConfirm(node: CategoryNode) {
@@ -739,6 +792,9 @@ onMounted(loadCategories);
 .page-tip {
   margin-bottom: 16px;
 }
+.category-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
 .list-controls {
   display: grid;
   width: 100%;
@@ -797,6 +853,17 @@ onMounted(loadCategories);
 :deep(.t-table td) {
   padding-left: 24px;
   padding-right: 24px;
+}
+
+/* Keep the drag marker at the row edge without a full data-column gutter. */
+.category-list-layout :deep(.category-table--sortable th:first-child),
+.category-list-layout :deep(.category-table--sortable td:first-child) {
+  padding-left: 0;
+  padding-right: 8px;
+}
+.category-list-layout :deep(.category-table--sortable th:nth-child(2)),
+.category-list-layout :deep(.category-table--sortable td:nth-child(2)) {
+  padding-left: 0;
 }
 .category-name-cell {
   gap: var(--td-comp-margin-s);

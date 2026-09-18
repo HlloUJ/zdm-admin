@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,13 +23,13 @@ public class RoleController {
   }
 
   @GetMapping
-  public ApiResponse<List<Role>> list() {
-    return ApiResponse.ok(roleService.listForCurrentAdmin());
+  public ApiResponse<List<Role>> list(@RequestParam(required = false) String clientCode) {
+    return ApiResponse.ok(roleService.listForCurrentAdmin(clientCode));
   }
 
   @GetMapping("/permission-scope")
-  public ApiResponse<RolePermissionScope> permissionScope() {
-    return ApiResponse.ok(roleService.permissionScopeForCurrentAdmin());
+  public ApiResponse<RolePermissionScope> permissionScope(@RequestParam(required = false) String clientCode) {
+    return ApiResponse.ok(roleService.permissionScopeForCurrentAdmin(clientCode));
   }
 
   @PostMapping

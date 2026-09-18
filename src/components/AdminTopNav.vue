@@ -4,18 +4,24 @@
       <div class="brand-logo">装</div>
       <div>
         <div class="brand-title">装点猫</div>
-        <t-select
-          v-if="switchableIdentityContexts.length > 1"
-          v-model="selectedIdentityId"
-          class="brand-context-select"
-          size="small"
-          auto-width
-          borderless
-          :options="identityOptions"
-          :loading="switchingIdentity"
-          aria-label="切换当前店铺"
-          @change="handleIdentityChange"
-        />
+        <div
+          v-if="switchableIdentityContexts.some((context) => context.identityId !== loginUser.identityId)"
+          class="brand-context-switcher"
+          :class="{ 'is-open': identitySelectorOpen }"
+        >
+          <span class="brand-context-label" aria-hidden="true">{{ currentIdentityLabel }}</span>
+          <t-select
+            v-model="selectedIdentityId"
+            v-model:popup-visible="identitySelectorOpen"
+            class="brand-context-select"
+            size="small"
+            auto-width
+            :options="identityOptions"
+            :loading="switchingIdentity"
+            aria-label="切换业务身份"
+            @change="handleIdentityChange"
+          />
+        </div>
         <div v-else class="brand-subtitle">{{ currentIdentityLabel }}</div>
       </div>
     </div>
@@ -51,6 +57,7 @@ const loginUser = computed(() => getLoginUser());
 const identityContexts = ref<IdentityContext[]>([]);
 const selectedIdentityId = ref<number>();
 const switchingIdentity = ref(false);
+const identitySelectorOpen = ref(false);
 const avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');
 const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string> = {
   cityPartner: '城市合伙人',
@@ -61,6 +68,7 @@ const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string>
 const formatStoreLabel = (storeName: string, storeType?: IdentityContext['storeType']) =>
   storeType ? `${storeName} · ${storeTypeLabels[storeType]}` : storeName;
 const currentIdentityLabel = computed(() => {
+  if (loginUser.value.clientCode === 'supply-chain') return '供应链协同系统';
   if (loginUser.value.storeName) return formatStoreLabel(loginUser.value.storeName, loginUser.value.storeType);
   return loginUser.value.tenantName ?? '运营管理平台';
 });
@@ -71,6 +79,8 @@ const roleText = computed(() => {
     : loginUser.value.roles.join('、') || '管理后台';
 });
 const identityLabel = (context: IdentityContext) => {
+  if (context.clientCode === 'supply-chain') return '供应链协同系统';
+  if (!context.tenantId && !context.storeId) return '运营管理平台';
   if (context.identityType === 'platform_admin') return '运营管理平台';
   if (context.storeName) {
     return formatStoreLabel(context.storeName, context.storeType);
@@ -79,10 +89,7 @@ const identityLabel = (context: IdentityContext) => {
 };
 const switchableIdentityContexts = computed(() =>
   identityContexts.value.filter(
-    (context) =>
-      context.identityType === 'platform_admin' ||
-      Boolean(context.storeId) ||
-      context.identityId === loginUser.value.identityId,
+    (context) => !context.tenantId || context.identityType === 'platform_admin' || Boolean(context.storeId),
   ),
 );
 const identityOptions = computed(() =>
@@ -95,7 +102,6 @@ const handleIdentityChange = async (value: string | number) => {
   switchingIdentity.value = true;
   try {
     await switchIdentity(identityId);
-    adminFeedback.success('已切换业务身份');
     await router.replace('/dashboard');
     window.location.reload();
   } catch (error) {
@@ -123,8 +129,37 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.brand-context-select {
+.brand-context-switcher {
+  display: grid;
+  align-items: center;
   margin-top: 2px;
+}
+
+.brand-context-label,
+.brand-context-select {
+  grid-area: 1 / 1;
+}
+
+.brand-context-label {
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
+  white-space: nowrap;
+}
+
+.brand-context-select {
+  opacity: 0;
+}
+
+.brand-context-switcher:hover .brand-context-select,
+.brand-context-switcher:focus-within .brand-context-select,
+.brand-context-switcher.is-open .brand-context-select {
+  opacity: 1;
+}
+
+.brand-context-switcher:hover .brand-context-label,
+.brand-context-switcher:focus-within .brand-context-label,
+.brand-context-switcher.is-open .brand-context-label {
+  visibility: hidden;
 }
 
 .user-entry {

@@ -24,19 +24,27 @@ public final class FunctionAudiencePolicy {
   }
 
   public static boolean allows(String permission, String audience) {
-    if (!List.of("admin", "store", "supplier").contains(audience)) {
+    if (!List.of("admin", "store", "supplier", "supply-chain").contains(audience)) {
       return false;
     }
     return RULES.stream()
         .filter(rule -> permission.equals(rule.prefix()) || permission.startsWith(rule.prefix() + "."))
         .max(Comparator.comparingInt(rule -> rule.prefix().length()))
-        .map(rule -> "shared".equals(rule.scope())
-            || ("admin".equals(audience) ? "admin-only" : "terminal-only").equals(rule.scope()))
+        .map(rule -> switch (rule.scope()) {
+          case "shared-management" -> !"supply-chain".equals(audience) || permission.equals(rule.prefix());
+          case "internal-management" -> List.of("admin", "supply-chain").contains(audience);
+          case "shared" -> !"supply-chain".equals(audience);
+          case "admin-only" -> "admin".equals(audience);
+          case "terminal-only" -> List.of("store", "supplier").contains(audience);
+          case "supply-chain-only" -> "supply-chain".equals(audience);
+          case "supplier-directory" -> !"admin".equals(audience);
+          default -> false;
+        })
         .orElse(false);
   }
 
   public static boolean allows(String permission, CurrentIdentity identity) {
-    String audience = identity.storeId() != null ? "store" : identity.tenantId() == null ? "admin" : "";
+    String audience = "supply-chain".equals(identity.clientCode()) ? "supply-chain" : identity.storeId() != null ? "store" : identity.tenantId() == null ? "admin" : "";
     return allows(permission, audience);
   }
 

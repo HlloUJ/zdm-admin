@@ -7,20 +7,20 @@
     @update:visible="emit('update:visible', $event)"
   >
     <t-space direction="vertical" size="large" style="width: 100%">
-      <t-form :data="filter" label-width="44px" colon>
+      <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
         <div class="operation-log-filters">
           <t-form-item label="商品" class="operation-log-keyword-filter">
             <t-input v-model="filter.keyword" clearable placeholder="商品名称/ID/商家编码" />
           </t-form-item>
-          <t-form-item label="操作类型" label-width="72px">
+          <t-form-item label="操作类型">
             <t-select v-model="filter.operationType" clearable placeholder="请选择">
               <t-option v-for="item in typeOptions" :key="item.value" v-bind="item" />
             </t-select>
           </t-form-item>
-          <t-form-item label="操作人" label-width="60px" class="operation-log-operator-filter">
+          <t-form-item label="操作人" class="operation-log-operator-filter">
             <t-input v-model="filter.operatorName" clearable placeholder="请输入操作人" />
           </t-form-item>
-          <t-form-item label="操作时间" label-width="72px" class="operation-log-date-filter">
+          <t-form-item label="操作时间" class="operation-log-date-filter">
             <t-date-range-picker
               v-model="dateRange"
               class="operation-log-date-picker"
@@ -77,7 +77,13 @@
         <t-descriptions-item label="操作人">{{ detail.operatorName }}</t-descriptions-item>
         <t-descriptions-item label="操作时间">{{ time(detail.operatedAt) }}</t-descriptions-item>
         <t-descriptions-item label="操作来源">{{
-          detail.operationSource === 'MANUAL' ? '运营管理平台' : detail.operationSource
+          detail.operationSource === 'MANUAL'
+            ? getLoginUser().clientCode === 'supply-chain'
+              ? '供应链协同系统'
+              : '运营管理平台'
+            : detail.operationSource === 'SUPPLY_CHAIN'
+              ? '供应链联动'
+              : detail.operationSource
         }}</t-descriptions-item>
         <t-descriptions-item label="操作内容" :span="2">{{ detail.operationSummary }}</t-descriptions-item>
         <t-descriptions-item label="状态变化"
@@ -130,6 +136,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
+import { getLoginUser } from '@/services/auth';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { AdminDialog, AdminPagination, adminFeedback } from '@/components/foundation';
 import {
@@ -168,7 +175,7 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'operationSummary', title: '操作内容', minWidth: 180 },
   { colKey: 'operatorName', title: '操作人', width: 120 },
   { colKey: 'operatedAt', title: '操作时间', width: 180 },
-  { colKey: 'operation', title: '操作', width: 80, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 76, fixed: 'right' },
 ];
 let requestId = 0;
 async function load() {
@@ -221,7 +228,7 @@ const changes = computed<Record<string, { before: unknown; after: unknown; hint?
 const displayChanges = computed(() => {
   const operationType = detail.value?.operationType || '';
   if (['DELETE_TO_RECYCLE', 'PURGE'].includes(operationType)) return {};
-  return ['SHELF', 'OFF_SHELF', 'RESTORE'].includes(operationType)
+  return ['SHELF', 'OFF_SHELF', 'RESTORE', 'RESTORE_WAREHOUSE'].includes(operationType)
     ? Object.fromEntries(
         Object.entries(changes.value).filter(
           ([field]) => !['状态', '下架原因', '详细说明', '下架时间'].includes(field),
@@ -251,7 +258,12 @@ function richText(side: 'before' | 'after') {
     { ADD_TAGS: ['video'], ADD_ATTR: ['controls'] },
   );
 }
-const state = (value?: string) => (value ? finishedLogStates[value] || value : '—');
+const state = (value?: string) =>
+  value === 'selling' && getLoginUser().clientCode === 'supply-chain'
+    ? '已上架'
+    : value
+      ? finishedLogStates[value] || value
+      : '—';
 const time = (value?: string) => {
   if (!value) return '-';
   const timestamp = new Date(`${value.replace(' ', 'T').replace(/Z$/, '')}Z`);

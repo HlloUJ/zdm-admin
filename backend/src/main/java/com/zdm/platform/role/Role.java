@@ -11,6 +11,14 @@ public class Role implements com.zdm.platform.security.CreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 
+  private String clientCode = "admin";
+  public String getClientCode() { return clientCode; }
+  public void setClientCode(String value) { clientCode = value; }
+
+  private String createdByClientCode;
+  public String getCreatedByClientCode() { return createdByClientCode; }
+  public void setCreatedByClientCode(String value) { createdByClientCode = value; }
+
   private Long tenantId;
   private Long storeId;
 

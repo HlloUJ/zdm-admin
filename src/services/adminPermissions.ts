@@ -28,6 +28,19 @@ export type AdminMenuEntry = AdminMenuItem | AdminMenuGroup;
 export const adminMenuEntries: AdminMenuEntry[] = [
   { label: '工作台', path: '/dashboard', icon: 'dashboard' },
   {
+    label: '商品管理',
+    value: 'supply-chain-products',
+    icon: 'layers',
+    children: [
+      {
+        label: '成品现货管理',
+        path: '/supply-chain/finished-stock-management',
+        permissionPrefix: 'supply-chain.finished-stock-management',
+      },
+      { label: '大板管理', path: '/supply-chain/slab-management', permissionPrefix: 'supply-chain.slab-management' },
+    ],
+  },
+  {
     label: '租户与门店',
     value: 'tenant-management',
     icon: 'usergroup',
@@ -104,6 +117,12 @@ export const adminMenuEntries: AdminMenuEntry[] = [
         ],
       },
     ],
+  },
+  {
+    label: '供应商供货类型管理',
+    path: '/supplier-supply-type-management',
+    icon: 'tag',
+    permissionPrefix: 'admin.supplier-supply-type-management',
   },
   {
     label: '供应商管理',

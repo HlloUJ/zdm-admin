@@ -14,7 +14,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="56px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="纹理" name="name">
@@ -23,7 +23,7 @@
                 <t-form-item label="别名" name="alias">
                   <t-input v-model="searchForm.alias" clearable placeholder="请输入" />
                 </t-form-item>
-                <t-form-item label="状态" name="status">
+                <t-form-item class="zdm-status-filter" label="状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
@@ -150,7 +150,9 @@
       @cancel="confirmVisible = false"
       @close="confirmVisible = false"
     >
-      {{ confirmType === 'delete' ? '删除标准纹理后，其全部别名也会被删除。' : '' }}
+      <template v-if="confirmType === 'delete'" #default>
+        是否删除纹理“{{ confirmRow?.name }}”？删除标准纹理后，其全部别名也会被删除。
+      </template>
     </AdminConfirmDialog>
   </div>
 </template>
@@ -193,18 +195,24 @@ const aliasesByTexture = reactive<Record<number, SlabTextureAliasRecord[]>>({});
 const searchForm = reactive({ name: '', alias: '', status: '' });
 const applied = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '标准纹理', minWidth: 200, align: 'left' },
   { colKey: 'aliasCount', title: '别名数量', width: 120, align: 'center' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 220, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 196,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const aliasColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'name', title: '别名', minWidth: 260, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 140, align: 'left' },
+  { colKey: 'operation', title: '操作', width: 116, align: 'left' },
 ];
 const filteredData = computed(() =>
   tableData.value.filter(

@@ -442,7 +442,7 @@ test('published drag order saves automatically and survives refresh', async ({ p
   }));
   await page.goto('/category-attribute-template');
   await page.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
-  const handles = page.locator('.attribute-table .t-icon-move');
+  const handles = page.locator('.attribute-table tbody tr td:nth-child(2)');
   await handles.first().dragTo(handles.nth(1), { targetPosition: { x: 8, y: 13 } });
   await expect(page.getByText('已调整“字段显示顺序”', { exact: true })).toBeVisible();
   expect((version.content as Array<{ attributeId: number }>)[10]!.attributeId).toBe(1011);
@@ -461,7 +461,7 @@ test('failed display order save restores rows', async ({ page }) => {
     route.fulfill({ status: 400, json: { code: 400, message: '排序保存失败' } }),
   );
   await page.goto('/category-attribute-template');
-  const handles = page.locator('.attribute-table .t-icon-move');
+  const handles = page.locator('.attribute-table tbody tr td:nth-child(2)');
   await handles.first().dragTo(handles.nth(1), { targetPosition: { x: 8, y: 13 } });
   await expect(page.getByText('调整“字段显示顺序”失败：排序保存失败', { exact: true })).toBeVisible();
   await expect(page.locator('.attribute-table tbody tr').first()).toContainText('颜色');
@@ -675,3 +675,13 @@ test('copy creates a draft immediately when none exists', async ({ page }) => {
   await expect(page.locator('.attribute-table')).toContainText('颜色');
   await expect(page.getByRole('button', { name: '确认复制', exact: true })).toHaveCount(0);
 });
+
+for (const action of ['create', 'sort']) {
+  test(`published sorting uses its own permission: ${action}`, async ({ page }) => {
+    const prefix = 'admin.product-data-center.category-attribute-template.finished.attributes';
+    await setup(page, [`${prefix}.view`, `${prefix}.${action}`]);
+    await page.goto('/category-attribute-template');
+    await expect(page.locator('.attribute-table').getByText('颜色', { exact: true })).toBeVisible();
+    await expect(page.locator('.attribute-table .t-icon-move')).toHaveCount(action === 'sort' ? 1 : 0);
+  });
+}

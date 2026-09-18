@@ -48,6 +48,7 @@ export interface FinishedSpecDimension {
 }
 
 export interface FinishedProductVariant {
+  costPrice?: number;
   id?: number;
   variantKey: string;
   variantLabel: string;
@@ -61,6 +62,12 @@ export interface FinishedProductVariant {
 }
 
 export interface FinishedProductRecord {
+  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
+  sourceUnavailable?: boolean;
+  sourceOffShelfReason?: string;
+  sourceOffShelfDetail?: string;
+  sourceOffShelfAt?: string;
+  operationsDeleted?: boolean;
   id: number;
   categoryId?: number;
   supplierId?: number;
@@ -85,6 +92,7 @@ export interface FinishedProductRecord {
   offShelfReason?: string;
   offShelfAt?: string;
   offShelfDetail?: string;
+  offShelfByName?: string;
   createdByName?: string;
   createdByAccountId?: number;
   status?: FinishedProductStatus;

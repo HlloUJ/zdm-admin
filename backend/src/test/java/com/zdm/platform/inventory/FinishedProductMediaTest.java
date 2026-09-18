@@ -18,7 +18,7 @@ class FinishedProductMediaTest {
   private final MediaAssetService assets = mock(MediaAssetService.class);
   private final MediaReferenceService references = mock(MediaReferenceService.class);
   private final FinishedProductService service = new FinishedProductService(
-      null, null, null, null, null, assets, null, references, null, mock(FinishedOperationLogService.class));
+      null, null, null, null, null, assets, null, references, null, mock(FinishedOperationLogService.class), mock(ProductLifecycleService.class));
 
   @Test
   void savesFiveImagesAndUsesFirstAsCover() {

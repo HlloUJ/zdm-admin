@@ -29,6 +29,9 @@ public class EffectivePermissionResolver {
   private List<String> employeePermissions(AuthAccount account) {
     List<String> rolePermissions = FunctionPermissionNormalizer.normalize(
         authAccountMapper.findAdminPermissionValues(account.getId(), account.getIdentityId()));
+    if ("supply-chain".equals(account.getClientCode())) {
+      return intersect(FunctionAudiencePolicy.filter(rolePermissions, "supply-chain"), terminalPermissions(account));
+    }
     if (account.getStoreId() == null) {
       return FunctionAudiencePolicy.filter(rolePermissions, "admin");
     }
@@ -36,6 +39,11 @@ public class EffectivePermissionResolver {
   }
 
   private List<String> terminalPermissions(AuthAccount account) {
+    if ("supply-chain".equals(account.getClientCode())) {
+      String value = authAccountMapper.findTerminalPermissionValue("supply-chain");
+      return FunctionAudiencePolicy.filter(FunctionPermissionNormalizer.normalize(
+          List.of(value == null ? "" : value)), "supply-chain");
+    }
     if (account.getStoreType() == null
         || !List.of("cityPartner", "slabSupplier", "finishedSupplier").contains(account.getStoreType())) {
       return List.of();

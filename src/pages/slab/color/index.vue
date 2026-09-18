@@ -14,7 +14,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="72px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="色系" name="name">
@@ -25,7 +25,7 @@
                     <t-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
                   </t-select>
                 </t-form-item>
-                <t-form-item label="状态" name="status">
+                <t-form-item class="zdm-status-filter" label="状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
@@ -236,21 +236,27 @@ const searchForm = reactive<{ name: string; categoryId: number | ''; status: str
 const appliedSearchForm = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '色系名称', minWidth: 180, align: 'left' },
   { colKey: 'categoryName', title: '色系分类', minWidth: 160, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 156,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const categoryColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'name', title: '分类名称', minWidth: 180 },
   { colKey: 'createdByName', title: '创建人', width: 140, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
   { colKey: 'remark', title: '备注', minWidth: 220, ellipsis: true },
-  { colKey: 'operation', title: '操作', width: 120, fixed: 'right' },
+  { colKey: 'operation', title: '操作', width: 116, fixed: 'right' },
 ];
 
 const filteredData = computed(() => {

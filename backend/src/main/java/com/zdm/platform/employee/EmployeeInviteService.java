@@ -3,6 +3,8 @@ package com.zdm.platform.employee;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.ManagedClientScope;
+import com.zdm.platform.security.PermissionGuard;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
@@ -21,19 +23,25 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
   private final EmployeeService employeeService;
   private final CurrentIdentityProvider identityProvider;
 
-  public EmployeeInviteService(EmployeeService employeeService, CurrentIdentityProvider identityProvider) {
+  private final PermissionGuard permissionGuard;
+
+  public EmployeeInviteService(EmployeeService employeeService, CurrentIdentityProvider identityProvider, PermissionGuard permissionGuard) {
+    this.permissionGuard = permissionGuard;
     this.employeeService = employeeService;
     this.identityProvider = identityProvider;
   }
 
   @Transactional
-  public EmployeeInviteResponse createInvite() {
+  public EmployeeInviteResponse createInvite(String clientCode) {
     CurrentIdentity identity = identityProvider.require();
-    if (identity.tenantId() == null || identity.storeId() == null) {
-      throw new AccessDeniedException("当前身份未关联门店");
+    String client = ManagedClientScope.resolve(identity, clientCode);
+    permissionGuard.requirePermission(EmployeeService.permissionPrefix(client) + ".create");
+    if ((identity.tenantId() == null) != (identity.storeId() == null)) {
+      throw new AccessDeniedException("请先切换到具体门店身份");
     }
     EmployeeInvite invite = new EmployeeInvite();
     invite.setToken(generateToken());
+    invite.setClientCode(client);
     invite.setTenantId(identity.tenantId());
     invite.setStoreId(identity.storeId());
     invite.setCreatedByAccountId(identity.accountId());
@@ -41,12 +49,12 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     invite.setStatus(ACTIVE);
     invite.setExpiresAt(LocalDateTime.now().plusDays(7));
     save(invite);
-    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt());
+    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode());
   }
 
   public EmployeeInviteResponse inspectInvite(String token) {
     EmployeeInvite invite = requireActiveInvite(token);
-    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt());
+    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode());
   }
 
   public Boolean requestCode(String token, RequestInviteCodeRequest request) {
@@ -63,7 +71,8 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
 
   @Transactional
   public EmployeeInviteRegisterResponse register(String token, EmployeeInviteRegisterRequest request) {
-    EmployeeInvite invite = requireActiveInvite(token);
+    EmployeeInvite locked = lambdaQuery().eq(EmployeeInvite::getToken, token).last("FOR UPDATE").one();
+    EmployeeInvite invite = validateActiveInvite(locked);
     requireDevCode(request.verifyCode());
     EmployeeInviteRegisterResponse response = employeeService.registerInvitedEmployee(invite, request);
     invite.setStatus(USED);
@@ -74,6 +83,10 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
 
   private EmployeeInvite requireActiveInvite(String token) {
     EmployeeInvite invite = lambdaQuery().eq(EmployeeInvite::getToken, token).one();
+    return validateActiveInvite(invite);
+  }
+
+  private EmployeeInvite validateActiveInvite(EmployeeInvite invite) {
     if (invite == null) {
       throw new IllegalArgumentException("邀请链接不存在");
     }

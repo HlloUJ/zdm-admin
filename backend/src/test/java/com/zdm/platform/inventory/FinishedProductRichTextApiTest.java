@@ -40,7 +40,12 @@ class FinishedProductRichTextApiTest {
   @Autowired private MockMvc mvc;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
-  private final String token = "Bearer " + TokenAuthenticationFilter.createAccountToken(1L);
+  @Autowired private com.zdm.platform.auth.AuthAccountMapper authAccounts;
+  @Autowired private com.zdm.platform.security.SessionTokenService sessions;
+  private String token;
+  @org.junit.jupiter.api.BeforeEach void sourceIdentity() {
+    token="Bearer "+com.zdm.platform.SupplyChainTestSession.create(jdbc,authAccounts,sessions);
+  }
 
   @DynamicPropertySource
   static void datasource(DynamicPropertyRegistry registry) {
@@ -83,7 +88,7 @@ class FinishedProductRichTextApiTest {
     ObjectNode payload = (ObjectNode) json.readTree("""
         {"categoryId":99001,"supplierId":99001,"name":"富文本验收","sku":"rich-test",
          "status":"warehouse","attributes":[],
-         "variants":[{"variantKey":"one","variantLabel":"规格","displayMode":"single","salesAttributes":{"attribute_99001":"胡桃木","attribute_99002":"大号"},"stock":0}],
+         "variants":[{"variantKey":"one","variantLabel":"规格","displayMode":"single","salesAttributes":{"attribute_99001":"胡桃木","attribute_99002":"大号"},"stock":5,"costPrice":1}],
          "guidePrices":[{"variantKey":"one","priceCoefficient":1,"costPrice":1,"price":1}]}
         """);
     payload.put("mainImageMediaId", images.getFirst().path("id").asLong());
@@ -131,19 +136,8 @@ class FinishedProductRichTextApiTest {
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=?", Integer.class, id)).isEqualTo(1);
     }
     mvc.perform(get("/api/admin/finished-products/operation-logs")).andExpect(status().isUnauthorized());
-    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99009,'日志验证价格层级',1,'enabled')");
-    jdbc.update("INSERT INTO finished_markup_configurations (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order) VALUES (99009,'日志验证价格层级',99009,2,'enabled',false,1)");
-    payload.set("markupPrices", json.readTree("[{\"variantKey\":\"one\",\"storeLevelId\":99009,\"costPrice\":1,\"priceCoefficient\":2,\"price\":2,\"priceSource\":\"auto\"}]"));
-    data(mvc.perform(put("/api/admin/finished-products/{id}", id).header("Authorization", token)
-        .contentType("application/json").content(json.writeValueAsBytes(payload))));
-    ((ObjectNode) payload.path("markupPrices").get(0)).put("priceSource", "manual");
-    data(mvc.perform(put("/api/admin/finished-products/{id}", id).header("Authorization", token)
-        .contentType("application/json").content(json.writeValueAsBytes(payload))));
-    String sourceChanges = jdbc.queryForObject("SELECT change_details FROM finished_operation_logs WHERE product_id=? AND operation_type='PRICE_UPDATE' ORDER BY id DESC LIMIT 1", String.class, id);
-    JsonNode priceDiff = json.readTree(sourceChanges).path("层级价格");
-    assertThat(priceDiff.path("before").get(0).path("priceSource").asText()).isEqualTo("auto");
-    assertThat(priceDiff.path("after").get(0).path("priceSource").asText()).isEqualTo("manual");
-
+    // Source updates cannot apply an operations pricing payload.
+    payload.set("markupPrices",json.readTree("[]"));
 
     assertThat(created.path("sku").isNull()).isTrue();
     JsonNode second = data(mvc.perform(post("/api/admin/finished-products").header("Authorization", token)
@@ -158,6 +152,7 @@ class FinishedProductRichTextApiTest {
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     assertThat(cleared.path("sku").isNull()).isTrue();
     assertThat(jdbc.queryForObject("SELECT sku FROM finished_products WHERE id = ?", String.class, secondId)).isNull();
+    jdbc.update("UPDATE finished_products SET source_status='selling' WHERE id=?",secondId);
     payload.put("status", "offShelf");
     payload.put("offShelfReason", "价格调整");
     payload.put("offShelfDetail", "供应商调整价格，待复核");
@@ -165,15 +160,14 @@ class FinishedProductRichTextApiTest {
     payload.put("offShelfAt", "2000-01-01T00:00:00");
     JsonNode offShelf = data(mvc.perform(put("/api/admin/finished-products/{id}", secondId).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
-    assertThat(LocalDateTime.parse(offShelf.path("offShelfAt").asText())).isBetween(beforeOffShelf, LocalDateTime.now().plusSeconds(1));
-    assertThat(offShelf.path("offShelfDetail").asText()).isEqualTo("供应商调整价格，待复核");
-    assertThat(jdbc.queryForObject("SELECT off_shelf_detail FROM finished_products WHERE id=?", String.class, secondId))
+    assertThat(LocalDateTime.parse(offShelf.path("sourceOffShelfAt").asText())).isBetween(beforeOffShelf, LocalDateTime.now().plusSeconds(1));
+    assertThat(offShelf.path("sourceOffShelfDetail").asText()).isEqualTo("供应商调整价格，待复核");
+    assertThat(jdbc.queryForObject("SELECT source_off_shelf_detail FROM finished_products WHERE id=?", String.class, secondId))
         .isEqualTo("供应商调整价格，待复核");
-    payload.put("offShelfDetail", "");
-    JsonNode withoutDetail = data(mvc.perform(put("/api/admin/finished-products/{id}", secondId).header("Authorization", token)
-        .contentType("application/json").content(json.writeValueAsBytes(payload))));
-    assertThat(withoutDetail.path("offShelfAt")).isEqualTo(offShelf.path("offShelfAt"));
-    assertThat(withoutDetail.path("offShelfDetail").asText()).isEmpty();
+    payload.putNull("offShelfDetail");
+    mvc.perform(put("/api/admin/finished-products/{id}",secondId).header("Authorization",token)
+        .contentType("application/json").content(json.writeValueAsBytes(payload))).andExpect(status().isForbidden());
+    assertThat(jdbc.queryForObject("SELECT source_off_shelf_detail FROM finished_products WHERE id=?",String.class,secondId)).isEqualTo("供应商调整价格，待复核");
     payload.put("status", "recycle");
     data(mvc.perform(put("/api/admin/finished-products/{id}", secondId).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
@@ -194,7 +188,7 @@ class FinishedProductRichTextApiTest {
         "https://example.com", "<table>", images.get(5).path("url").asText(), video.path("url").asText());
     assertThat(referenceCount(id, "detailMedia%")).isEqualTo(2);
     payload.put("detail", "<p><em>更新后的详情</em></p>");
-    payload.put("status", "recycle");
+    payload.put("status", "warehouse");
     JsonNode updated = data(mvc.perform(put("/api/admin/finished-products/{id}", id).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     assertThat(updated.path("createdByName")).isEqualTo(created.path("createdByName"));
@@ -204,6 +198,9 @@ class FinishedProductRichTextApiTest {
     assertThat(updated.path("detail").asText()).contains("<em>更新后的详情</em>").doesNotContain("<img", "<video");
     assertThat(referenceCount(id, "detailMedia%")).isZero();
     assertThat(referenceCount(id, "%")).isEqualTo(6);
+    payload.put("status","recycle");
+    data(mvc.perform(put("/api/admin/finished-products/{id}",id).header("Authorization",token)
+        .contentType("application/json").content(json.writeValueAsBytes(payload))));
     data(mvc.perform(delete("/api/admin/finished-products/{id}", id).header("Authorization", token)));
     assertThat(referenceCount(id, "%")).isZero();
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=? AND operation_type='PURGE'", Integer.class, id)).isEqualTo(1);

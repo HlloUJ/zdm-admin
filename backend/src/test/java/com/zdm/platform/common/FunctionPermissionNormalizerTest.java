@@ -7,6 +7,18 @@ import org.junit.jupiter.api.Test;
 
 class FunctionPermissionNormalizerTest {
   @Test
+  void categoryMovementGrantsBecomeSortWithoutChangingStoreCategories() {
+    for (String scope : List.of("finished", "accessory")) {
+      String prefix = "admin.product-data-center.category." + scope;
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix + ".move-up", prefix + ".move-down")))
+          .containsExactly(prefix + ".view", prefix + ".sort");
+    }
+    assertThat(FunctionPermissionNormalizer.normalize(List.of("admin.tenant.store-category-management.move-up")))
+        .contains("admin.tenant.store-category-management.move-up")
+        .doesNotContain("admin.tenant.store-category-management.sort");
+  }
+
+  @Test
   void replacesQueryAndDropsResetPermissions() {
     assertThat(FunctionPermissionNormalizer.normalize(List.of(
         "admin.permission-management.employee-management.query,"

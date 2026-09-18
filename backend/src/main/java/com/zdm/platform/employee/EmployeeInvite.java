@@ -11,6 +11,10 @@ public class EmployeeInvite {
   private Long id;
 
   private String token;
+  private String clientCode;
+
+  public String getClientCode() { return clientCode; }
+  public void setClientCode(String clientCode) { this.clientCode = clientCode; }
   private Long tenantId;
   private Long storeId;
   private Long createdByAccountId;

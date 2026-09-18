@@ -560,6 +560,18 @@ const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
   2: [],
 };
 
+export async function setMockBusinessClient(page: Page, clientCode: 'admin' | 'supply-chain') {
+  if (page.url() === 'about:blank') await page.goto('/login');
+  await page.evaluate((client) => {
+    localStorage.setItem('zdm-e2e-client', client);
+    const user = JSON.parse(localStorage.getItem('zdm-admin-user') ?? '{}');
+    delete user.tenantId;
+    delete user.storeId;
+    delete user.storeType;
+    localStorage.setItem('zdm-admin-user', JSON.stringify({ ...user, clientCode: client }));
+  }, clientCode);
+}
+
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
   await page.route('**/api/admin/auth/contexts', async (route) => {
@@ -616,10 +628,12 @@ export async function installAdminApiMocks(page: Page) {
   await mockCollection(page, '**/api/admin/suppliers', suppliers);
   await mockCollection(page, '**/api/admin/supplier-supply-types', supplierSupplyTypes);
   await mockCollection(page, '**/api/admin/roles', roles);
-  await page.route('**/api/admin/roles/permission-scope', async (route) => {
+  await page.route(/\/api\/admin\/roles\/permission-scope(?:\?.*)?$/, async (route) => {
     await fulfillJson(route, { audience: 'admin', functionPermissions: 'all' });
   });
   const policies = structuredClone(terminalFunctionPolicies);
+  if (!policies.some((p) => p.terminal === 'supply-chain'))
+    policies.push({ id: 3, terminal: 'supply-chain', functionPermissions: '' });
   await page.route('**/api/admin/terminal-function-policies', (route) => fulfillJson(route, policies));
   await page.route('**/api/admin/terminal-function-policies/*', async (route) => {
     const terminal = new URL(route.request().url()).pathname.split('/').at(-1);
@@ -670,7 +684,11 @@ export async function installAdminApiMocks(page: Page) {
   });
   await mockCollection(page, '**/api/admin/crafts', crafts);
   await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
-  await mockCollection(page, '**/api/admin/slabs', slabs);
+  await mockCollection(
+    page,
+    '**/api/admin/slabs',
+    slabs.map((slab) => ({ ...slab, sourceStatus: slab.status })),
+  );
   await mockCollection(page, '**/api/admin/slab-origins', slabOrigins);
   await mockCollection(page, '**/api/admin/slab-textures', slabTextures);
   await mockCollection(page, '**/api/admin/slab-colors', slabColors);
@@ -776,10 +794,11 @@ async function mockEmployeeInvites(page: Page) {
     await fulfillJson(route, true);
   });
 
-  await page.route('**/api/admin/employee-invites', async (route) => {
+  await page.route('**/api/admin/employee-invites?*', async (route) => {
     await fulfillJson(route, {
       token: 'e2e-invite-token',
       expiresAt: '2026-08-04T09:00:00',
+      clientCode: 'admin',
     });
   });
 
@@ -787,6 +806,7 @@ async function mockEmployeeInvites(page: Page) {
     await fulfillJson(route, {
       token: 'e2e-invite-token',
       expiresAt: '2026-08-04T09:00:00',
+      clientCode: 'admin',
     });
   });
 
@@ -818,13 +838,16 @@ async function mockEmployeeInvites(page: Page) {
 
 async function mockCollection(page: Page, pattern: string, records: unknown[]) {
   const collection = structuredClone(records);
-  await page.route(pattern, async (route) => {
-    if (route.request().method() === 'GET') {
-      await fulfillJson(route, collection);
-      return;
-    }
-    await fulfillJson(route, collection[0] ?? {});
-  });
+  await page.route(
+    (url) => url.pathname === pattern.replace('**', ''),
+    async (route) => {
+      if (route.request().method() === 'GET') {
+        await fulfillJson(route, collection);
+        return;
+      }
+      await fulfillJson(route, collection[0] ?? {});
+    },
+  );
 
   await page.route(`${pattern}/**`, async (route) => {
     if (route.request().method() === 'DELETE') {

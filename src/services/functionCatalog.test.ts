@@ -6,7 +6,6 @@ import {
   filterFunctionCatalogByPermissions,
   fullFunctionCatalog,
   getFunctionCatalogPermissionValues,
-  initialAllocationValues,
   normalizeFunctionCatalogPermissions,
   normalizeTerminalPermissions,
   terminalFunctionTrees,
@@ -49,672 +48,81 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
-  it('publishes the full catalog but filters terminal modules in every environment', () => {
-    expect(fullFunctionCatalog).toHaveLength(5);
-    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([
+  it('keeps platform, supplier and store capabilities in their respective audiences', () => {
+    expect(fullFunctionCatalog.map((module) => module.value)).toEqual([
+      'admin.tenant',
+      'admin.product-data-center',
+      'admin.supplier-supply-type-management',
+      'supply-chain.products',
       'admin.supplier-management',
       'admin.tenant.store-category-management',
       'admin.permission-management',
     ]);
-    expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual([
-      'admin.supplier-management',
-      'admin.tenant.store-category-management',
-      'admin.permission-management',
-    ]);
-    expect(fullFunctionCatalog.map((module) => module.label)).toEqual([
-      '租户与门店',
-      '商品管理',
-      '供应商管理',
-      '门店分类管理',
-      '权限管理',
-    ]);
-    expect(fullFunctionCatalog[0]).toMatchObject({
-      label: '租户与门店',
-      value: 'admin.tenant',
-      menus: [
-        {
-          label: '租户管理',
-          direct: false,
-          pages: [{ label: '租户管理页', tabs: [{ label: '运营中' }, { label: '已归档' }] }],
-        },
-        {
-          label: '门店管理',
-          direct: false,
-          pages: [{ label: '门店管理页', tabs: [{ label: '运营中' }, { label: '已归档' }] }],
-        },
-        {
-          label: '门店基础数据',
-          pages: [{ label: '门店级别管理页', thirdMenuLabel: '门店级别管理', tabs: [] }],
-        },
-      ],
-    });
-    expect(fullFunctionCatalog[2]).toMatchObject({
-      label: '供应商管理',
-      value: 'admin.supplier-management',
-      menus: [
-        {
-          direct: true,
-          pages: [{ label: '供应商管理页', tabs: [] }],
-        },
-      ],
-    });
-    expect(fullFunctionCatalog[3]).toMatchObject({
-      label: '门店分类管理',
-      value: 'admin.tenant.store-category-management',
-      menus: [
-        {
-          direct: true,
-          pages: [{ label: '门店分类管理页', tabs: [] }],
-        },
-      ],
-    });
-    expect(fullFunctionCatalog[1]).toMatchObject({
-      label: '商品管理',
-      menus: [
-        {
-          label: '成品现货管理',
-          pages: [
-            {
-              label: '成品现货管理页',
-              actions: [{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }],
-            },
-          ],
-        },
-        {
-          label: '大板管理',
-          direct: false,
-          pages: [
-            {
-              label: '大板管理页',
-              tabs: [
-                { label: '仓库中' },
-                { label: '出售中' },
-                { label: '已下架' },
-                { label: '已售完' },
-                { label: '回收站' },
-              ],
-            },
-          ],
-        },
-        {
-          label: '商品公共基础数据',
-          direct: false,
-          pages: [
-            {
-              label: '商品分类管理页',
-              thirdMenuLabel: '商品分类管理',
-              tabs: [{ label: '成品现货分类' }, { label: '配件分类' }],
-            },
-            {
-              label: '属性库管理页',
-              thirdMenuLabel: '属性库管理',
-              tabs: [{ label: '共享基础属性' }, { label: '成品现货专属属性' }, { label: '配件专属属性' }],
-            },
-            {
-              label: '属性值管理页',
-              thirdMenuLabel: '属性值管理',
-              tabs: [{ label: '共享基础属性值' }, { label: '成品现货专属值' }, { label: '配件专属值' }],
-            },
-            {
-              label: '分类属性模板页',
-              thirdMenuLabel: '分类属性模板',
-              tabs: [{ label: '成品现货模板' }, { label: '配件模板' }],
-            },
-            {
-              label: '价格配置页',
-              thirdMenuLabel: '价格配置',
-              tabs: [{ label: '成品价格配置' }, { label: '大板价格配置' }],
-            },
-          ],
-        },
-        {
-          label: '成品现货基础数据',
-          direct: false,
-          pages: [{ label: '成品现货工艺管理页', thirdMenuLabel: '工艺管理', tabs: [] }],
-        },
-        {
-          label: '大板基础数据',
-          direct: false,
-          pages: [
-            { label: '品种管理页', thirdMenuLabel: '品种管理', tabs: [] },
-            { label: '产地管理页', thirdMenuLabel: '产地管理', tabs: [] },
-            { label: '纹理管理页', thirdMenuLabel: '纹理管理', tabs: [] },
-            { label: '色系管理页', thirdMenuLabel: '色系管理', tabs: [] },
-            { label: '等级管理页', thirdMenuLabel: '等级管理', tabs: [] },
-          ],
-        },
-      ],
-    });
-    expect(fullFunctionCatalog[4]).toMatchObject({
-      label: '权限管理',
-      menus: [
-        {
-          label: '员工管理',
-          direct: false,
-          pages: [{ label: '员工管理页', tabs: [] }],
-        },
-        {
-          label: '角色管理',
-          direct: false,
-          pages: [
-            {
-              label: '角色管理页',
-              tabs: [],
-            },
-          ],
-        },
-        { label: '终端功能分配', direct: false, pages: [{ label: '终端功能分配页', tabs: [] }] },
-      ],
-    });
-    expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[0])
-        .filter((row) => row.showMenu)
-        .map((row) => row.menuLabel),
-    ).toEqual(['租户管理', '门店管理', '门店基础数据']);
-    expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[0])
-        .filter((row) => row.showThirdMenu)
-        .map((row) => row.thirdMenuLabel),
-    ).toEqual([undefined, undefined, '门店级别管理']);
-    expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[1])
-        .filter((row) => row.showMenu)
-        .map((row) => row.menuLabel),
-    ).toEqual(['成品现货管理', '大板管理', '商品公共基础数据', '成品现货基础数据', '大板基础数据']);
-    expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[1])
-        .filter((row) => row.showThirdMenu)
-        .map((row) => row.thirdMenuLabel),
-    ).toEqual([
-      undefined,
-      undefined,
-      '商品分类管理',
-      '属性库管理',
-      '属性值管理',
-      '分类属性模板',
-      '价格配置',
-      '工艺管理',
-      '品种管理',
-      '产地管理',
-      '纹理管理',
-      '色系管理',
-      '等级管理',
-    ]);
-    expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[4])
-        .filter((row) => row.showMenu)
-        .map((row) => row.menuLabel),
-    ).toEqual(['员工管理', '角色管理', '终端功能分配']);
-    expect(
-      collectFunctionCatalogRows(fullFunctionCatalog[4])
-        .filter((row) => row.showThirdMenu)
-        .map((row) => row.thirdMenuLabel),
-    ).toEqual([undefined, undefined, undefined]);
-    const supplierPage = fullFunctionCatalog[2].menus[0].pages[0];
-    expect(supplierPage.actions).toEqual([
-      { label: '查看', value: 'admin.supplier-management.view' },
-      { label: '新增', value: 'admin.supplier-management.create' },
-      { label: '供货类型配置', value: 'admin.supplier-management.manage-supply-types' },
-      { label: '编辑', value: 'admin.supplier-management.edit' },
-      { label: '停用/启用', value: 'admin.supplier-management.toggle-status' },
-      { label: '删除', value: 'admin.supplier-management.delete' },
-    ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[2])).toEqual([
-      expect.objectContaining({
-        direct: true,
-        menuLabel: undefined,
-        pageLabel: '供应商管理页',
-        tabLabels: [],
-        actions: supplierPage.actions,
-      }),
-    ]);
-    const storeCategoryPage = fullFunctionCatalog[3].menus[0].pages[0];
-    expect(storeCategoryPage.actions).toEqual([
-      { label: '查看', value: 'admin.tenant.store-category-management.view' },
-      { label: '新增一级分类', value: 'admin.tenant.store-category-management.create-root' },
-      { label: '新增下级', value: 'admin.tenant.store-category-management.create-child' },
-      { label: '编辑', value: 'admin.tenant.store-category-management.edit' },
-      { label: '上移', value: 'admin.tenant.store-category-management.move-up' },
-      { label: '下移', value: 'admin.tenant.store-category-management.move-down' },
-      { label: '停用/启用', value: 'admin.tenant.store-category-management.toggle-status' },
-      { label: '删除', value: 'admin.tenant.store-category-management.delete' },
-    ]);
-    expect(collectFunctionCatalogRows(fullFunctionCatalog[3])).toEqual([
-      expect.objectContaining({
-        direct: true,
-        menuLabel: undefined,
-        pageLabel: '门店分类管理页',
-        tabLabels: [],
-        actions: storeCategoryPage.actions,
-      }),
-    ]);
-    const productModule = fullFunctionCatalog[1];
-    const productPages = productModule.menus.flatMap((menu) => menu.pages);
-    const slabPage = productPages.find((page) => page.value === 'admin.slab-management');
-    expect(slabPage?.actions).toEqual([{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }]);
-    expect(slabPage?.tabs).toEqual([
-      {
-        label: '仓库中',
-        value: 'admin.slab-management.warehouse',
-        actions: [
-          { label: '查看', value: 'admin.slab-management.warehouse.view' },
-          { label: '发布商品', value: 'admin.slab-management.warehouse.publish' },
-          { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
-          { label: '价格', value: 'admin.slab-management.warehouse.price' },
-          { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
-          { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
-          { label: '删除', value: 'admin.slab-management.warehouse.delete' },
-        ],
-      },
-      {
-        label: '出售中',
-        value: 'admin.slab-management.selling',
-        actions: [
-          { label: '查看', value: 'admin.slab-management.selling.view' },
-          { label: '发布商品', value: 'admin.slab-management.selling.publish' },
-          { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
-          { label: '价格', value: 'admin.slab-management.selling.price' },
-          { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
-          { label: '编辑', value: 'admin.slab-management.selling.edit' },
-        ],
-      },
-      {
-        label: '已下架',
-        value: 'admin.slab-management.off-shelf',
-        actions: [
-          { label: '查看', value: 'admin.slab-management.off-shelf.view' },
-          { label: '批量放回仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
-          { label: '详情', value: 'admin.slab-management.off-shelf.detail' },
-          { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },
-          { label: '删除', value: 'admin.slab-management.off-shelf.delete' },
-        ],
-      },
-      {
-        label: '已售完',
-        value: 'admin.slab-management.sold-out',
-        actions: [
-          { label: '查看', value: 'admin.slab-management.sold-out.view' },
-          { label: '价格', value: 'admin.slab-management.sold-out.price' },
-        ],
-      },
-      {
-        label: '回收站',
-        value: 'admin.slab-management.recycle',
-        actions: [
-          { label: '查看', value: 'admin.slab-management.recycle.view' },
-          { label: '批量放回仓库', value: 'admin.slab-management.recycle.batch-restore' },
-          { label: '批量彻底删除', value: 'admin.slab-management.recycle.batch-purge' },
-          { label: '清空回收站', value: 'admin.slab-management.recycle.clear' },
-          { label: '价格', value: 'admin.slab-management.recycle.price' },
-          { label: '放回仓库', value: 'admin.slab-management.recycle.restore' },
-          { label: '彻底删除', value: 'admin.slab-management.recycle.purge' },
-        ],
-      },
-    ]);
-    const slabRows = collectFunctionCatalogRows(productModule).filter((row) => row.pageLabel === '大板管理页');
-    expect(slabRows.map((row) => row.tabLabels)).toEqual([
-      ['页面全局'],
-      ['仓库中'],
-      ['出售中'],
-      ['已下架'],
-      ['已售完'],
-      ['回收站'],
-    ]);
-    expect(slabRows[0]).toEqual(
-      expect.objectContaining({
-        showPage: true,
-        pageRowspan: 6,
-        selectionLabel: '页面全局权限',
-        actions: [{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }],
-      }),
-    );
-    slabRows.slice(1).forEach((row) => {
-      expect(row.actions).not.toContainEqual(
-        expect.objectContaining({ value: 'admin.slab-management.operation-log.view' }),
-      );
-    });
-    const tenantPage = fullFunctionCatalog[0].menus
-      .flatMap((menu) => menu.pages)
-      .find((page) => page.value === 'admin.tenant.tenant-management');
-    expect(tenantPage?.actions).toEqual([]);
-    expect(tenantPage?.tabs).toEqual([
-      {
-        label: '运营中',
-        value: 'admin.tenant.tenant-management.unarchived',
-        actions: [
-          { label: '查看', value: 'admin.tenant.tenant-management.unarchived.view' },
-          { label: '新增', value: 'admin.tenant.tenant-management.unarchived.create' },
-          { label: '业务开通', value: 'admin.tenant.tenant-management.unarchived.open-business' },
-          { label: '编辑', value: 'admin.tenant.tenant-management.unarchived.edit' },
-          { label: '归档', value: 'admin.tenant.tenant-management.unarchived.archive' },
-        ],
-      },
-      {
-        label: '已归档',
-        value: 'admin.tenant.tenant-management.archived',
-        actions: [
-          { label: '查看', value: 'admin.tenant.tenant-management.archived.view' },
-          { label: '恢复运营', value: 'admin.tenant.tenant-management.archived.restore' },
-          { label: '彻底删除', value: 'admin.tenant.tenant-management.archived.delete' },
-        ],
-      },
-    ]);
-    const storePage = fullFunctionCatalog[0].menus
-      .flatMap((menu) => menu.pages)
-      .find((page) => page.value === 'admin.tenant.tenant-store-management');
-    expect(storePage?.actions).toEqual([]);
-    expect(storePage?.tabs).toEqual([
-      {
-        label: '运营中',
-        value: 'admin.tenant.tenant-store-management.operating',
-        actions: [
-          { label: '查看', value: 'admin.tenant.tenant-store-management.operating.view' },
-          { label: '新增', value: 'admin.tenant.tenant-store-management.operating.create' },
-          { label: '修改门店级别', value: 'admin.tenant.tenant-store-management.operating.edit-level' },
-          { label: '编辑', value: 'admin.tenant.tenant-store-management.operating.edit' },
-          { label: '归档', value: 'admin.tenant.tenant-store-management.operating.archive' },
-        ],
-      },
-      {
-        label: '已归档',
-        value: 'admin.tenant.tenant-store-management.archived',
-        actions: [
-          { label: '查看', value: 'admin.tenant.tenant-store-management.archived.view' },
-          { label: '恢复运营', value: 'admin.tenant.tenant-store-management.archived.restore' },
-          { label: '彻底删除', value: 'admin.tenant.tenant-store-management.archived.delete' },
-        ],
-      },
-    ]);
-    const categoryPage = productPages.find((page) => page.value === 'admin.product-data-center.category');
-    expect(categoryPage?.tabs).toEqual([
-      {
-        label: '成品现货分类',
-        value: 'admin.product-data-center.category.finished',
-        actions: [
-          { label: '查看', value: 'admin.product-data-center.category.finished.view' },
-          { label: '新增一级分类', value: 'admin.product-data-center.category.finished.create-root' },
-          { label: '新增下级', value: 'admin.product-data-center.category.finished.create-child' },
-          { label: '编辑', value: 'admin.product-data-center.category.finished.edit' },
-          { label: '上移', value: 'admin.product-data-center.category.finished.move-up' },
-          { label: '下移', value: 'admin.product-data-center.category.finished.move-down' },
-          { label: '停用/启用', value: 'admin.product-data-center.category.finished.toggle-status' },
-          { label: '删除', value: 'admin.product-data-center.category.finished.delete' },
-        ],
-      },
-      {
-        label: '配件分类',
-        value: 'admin.product-data-center.category.accessory',
-        actions: [
-          { label: '查看', value: 'admin.product-data-center.category.accessory.view' },
-          { label: '新增一级分类', value: 'admin.product-data-center.category.accessory.create-root' },
-          { label: '新增下级', value: 'admin.product-data-center.category.accessory.create-child' },
-          { label: '编辑', value: 'admin.product-data-center.category.accessory.edit' },
-          { label: '上移', value: 'admin.product-data-center.category.accessory.move-up' },
-          { label: '下移', value: 'admin.product-data-center.category.accessory.move-down' },
-          { label: '停用/启用', value: 'admin.product-data-center.category.accessory.toggle-status' },
-          { label: '删除', value: 'admin.product-data-center.category.accessory.delete' },
-        ],
-      },
-    ]);
-    const productAttributeActions = (scope: string) => [
-      { label: '查看', value: `${scope}.view` },
-      { label: '新增', value: `${scope}.create` },
-      { label: '停用/启用', value: `${scope}.toggle-status` },
-      { label: '删除', value: `${scope}.delete` },
-    ];
-    const attributePage = productPages.find((page) => page.value === 'admin.product-data-center.attribute');
-    expect(attributePage?.actions).toEqual([]);
-    expect(attributePage?.tabs).toEqual(
-      ['shared', 'finished', 'accessory'].map((scope, index) => ({
-        label: ['共享基础属性', '成品现货专属属性', '配件专属属性'][index],
-        value: `admin.product-data-center.attribute.${scope}`,
-        actions: productAttributeActions(`admin.product-data-center.attribute.${scope}`),
-      })),
-    );
-    const attributeValuePage = productPages.find((page) => page.value === 'admin.product-data-center.attribute-value');
-    expect(attributeValuePage?.actions).toEqual([]);
-    expect(attributeValuePage?.tabs).toEqual(
-      ['shared', 'finished', 'accessory'].map((scope, index) => ({
-        label: ['共享基础属性值', '成品现货专属值', '配件专属值'][index],
-        value: `admin.product-data-center.attribute-value.${scope}`,
-        actions: productAttributeActions(`admin.product-data-center.attribute-value.${scope}`),
-      })),
-    );
-    const categoryAttributePage = productPages.find(
-      (page) => page.value === 'admin.product-data-center.category-attribute-template',
-    );
-    expect(categoryAttributePage?.actions).toEqual([]);
-    expect(categoryAttributePage?.tabs).toEqual(
-      ['finished', 'accessory'].map((scope) => ({
-        label: scope === 'finished' ? '成品现货模板' : '配件模板',
-        value: `admin.product-data-center.category-attribute-template.${scope}.attributes`,
-        actions: [
-          { label: '查看', value: `admin.product-data-center.category-attribute-template.${scope}.attributes.view` },
-          {
-            label: '创建新版本草稿',
-            value: `admin.product-data-center.category-attribute-template.${scope}.attributes.create`,
-          },
-          {
-            label: '版本记录',
-            value: `admin.product-data-center.category-attribute-template.${scope}.attributes.history`,
-          },
-        ],
-      })),
-    );
-    const slabGradePage = productPages.find((page) => page.value === 'admin.product-data-center.slab-grade');
-    expect(slabGradePage?.actions).toEqual([
-      { label: '查看', value: 'admin.product-data-center.slab-grade.view' },
-      { label: '新增', value: 'admin.product-data-center.slab-grade.create' },
-      { label: '排序', value: 'admin.product-data-center.slab-grade.sort' },
-      { label: '编辑', value: 'admin.product-data-center.slab-grade.edit' },
-      { label: '停用/启用', value: 'admin.product-data-center.slab-grade.toggle-status' },
-      { label: '删除', value: 'admin.product-data-center.slab-grade.delete' },
-    ]);
-    expect(getFunctionCatalogPermissionValues(fullFunctionCatalog)).toEqual([
-      'admin.tenant.tenant-management.unarchived.view',
-      'admin.tenant.tenant-management.unarchived.create',
-      'admin.tenant.tenant-management.unarchived.open-business',
-      'admin.tenant.tenant-management.unarchived.edit',
-      'admin.tenant.tenant-management.unarchived.archive',
-      'admin.tenant.tenant-management.archived.view',
-      'admin.tenant.tenant-management.archived.restore',
-      'admin.tenant.tenant-management.archived.delete',
-      'admin.tenant.tenant-store-management.operating.view',
-      'admin.tenant.tenant-store-management.operating.create',
-      'admin.tenant.tenant-store-management.operating.edit-level',
-      'admin.tenant.tenant-store-management.operating.edit',
-      'admin.tenant.tenant-store-management.operating.archive',
-      'admin.tenant.tenant-store-management.archived.view',
-      'admin.tenant.tenant-store-management.archived.restore',
-      'admin.tenant.tenant-store-management.archived.delete',
-      'admin.tenant.store-level-management.view',
-      'admin.tenant.store-level-management.create',
-      'admin.tenant.store-level-management.edit',
-      'admin.tenant.store-level-management.sort',
-      'admin.tenant.store-level-management.toggle-status',
-      'admin.tenant.store-level-management.delete',
-      'admin.finished-stock-management.operation-log.view',
-      'admin.finished-stock-management.warehouse.view',
-      'admin.finished-stock-management.warehouse.publish',
-      'admin.finished-stock-management.warehouse.batch-shelf',
-      'admin.finished-stock-management.warehouse.price',
-      'admin.finished-stock-management.warehouse.shelf',
-      'admin.finished-stock-management.warehouse.edit',
-      'admin.finished-stock-management.warehouse.delete',
-      'admin.finished-stock-management.selling.view',
-      'admin.finished-stock-management.selling.publish',
-      'admin.finished-stock-management.selling.batch-off-shelf',
-      'admin.finished-stock-management.selling.price',
-      'admin.finished-stock-management.selling.off-shelf',
-      'admin.finished-stock-management.selling.edit',
-      'admin.finished-stock-management.off-shelf.view',
-      'admin.finished-stock-management.off-shelf.batch-restore',
-      'admin.finished-stock-management.off-shelf.detail',
-      'admin.finished-stock-management.off-shelf.restore',
-      'admin.finished-stock-management.off-shelf.delete',
-      'admin.finished-stock-management.sold-out.view',
-      'admin.finished-stock-management.sold-out.price',
-      'admin.finished-stock-management.recycle.view',
-      'admin.finished-stock-management.recycle.batch-restore',
-      'admin.finished-stock-management.recycle.batch-purge',
-      'admin.finished-stock-management.recycle.clear',
-      'admin.finished-stock-management.recycle.price',
-      'admin.finished-stock-management.recycle.restore',
-      'admin.finished-stock-management.recycle.purge',
-      'admin.slab-management.operation-log.view',
-      'admin.slab-management.warehouse.view',
-      'admin.slab-management.warehouse.publish',
-      'admin.slab-management.warehouse.batch-shelf',
-      'admin.slab-management.warehouse.price',
-      'admin.slab-management.warehouse.shelf',
-      'admin.slab-management.warehouse.edit',
-      'admin.slab-management.warehouse.delete',
-      'admin.slab-management.selling.view',
-      'admin.slab-management.selling.publish',
-      'admin.slab-management.selling.batch-off-shelf',
-      'admin.slab-management.selling.price',
-      'admin.slab-management.selling.off-shelf',
-      'admin.slab-management.selling.edit',
-      'admin.slab-management.off-shelf.view',
-      'admin.slab-management.off-shelf.batch-restore',
-      'admin.slab-management.off-shelf.detail',
-      'admin.slab-management.off-shelf.restore',
-      'admin.slab-management.off-shelf.delete',
-      'admin.slab-management.sold-out.view',
-      'admin.slab-management.sold-out.price',
-      'admin.slab-management.recycle.view',
-      'admin.slab-management.recycle.batch-restore',
-      'admin.slab-management.recycle.batch-purge',
-      'admin.slab-management.recycle.clear',
-      'admin.slab-management.recycle.price',
-      'admin.slab-management.recycle.restore',
-      'admin.slab-management.recycle.purge',
-      'admin.product-data-center.category.finished.view',
-      'admin.product-data-center.category.finished.create-root',
-      'admin.product-data-center.category.finished.create-child',
-      'admin.product-data-center.category.finished.edit',
-      'admin.product-data-center.category.finished.move-up',
-      'admin.product-data-center.category.finished.move-down',
-      'admin.product-data-center.category.finished.toggle-status',
-      'admin.product-data-center.category.finished.delete',
-      'admin.product-data-center.category.accessory.view',
-      'admin.product-data-center.category.accessory.create-root',
-      'admin.product-data-center.category.accessory.create-child',
-      'admin.product-data-center.category.accessory.edit',
-      'admin.product-data-center.category.accessory.move-up',
-      'admin.product-data-center.category.accessory.move-down',
-      'admin.product-data-center.category.accessory.toggle-status',
-      'admin.product-data-center.category.accessory.delete',
-      'admin.product-data-center.attribute.shared.view',
-      'admin.product-data-center.attribute.shared.create',
-      'admin.product-data-center.attribute.shared.toggle-status',
-      'admin.product-data-center.attribute.shared.delete',
-      'admin.product-data-center.attribute.finished.view',
-      'admin.product-data-center.attribute.finished.create',
-      'admin.product-data-center.attribute.finished.toggle-status',
-      'admin.product-data-center.attribute.finished.delete',
-      'admin.product-data-center.attribute.accessory.view',
-      'admin.product-data-center.attribute.accessory.create',
-      'admin.product-data-center.attribute.accessory.toggle-status',
-      'admin.product-data-center.attribute.accessory.delete',
-      'admin.product-data-center.attribute-value.shared.view',
-      'admin.product-data-center.attribute-value.shared.create',
-      'admin.product-data-center.attribute-value.shared.toggle-status',
-      'admin.product-data-center.attribute-value.shared.delete',
-      'admin.product-data-center.attribute-value.finished.view',
-      'admin.product-data-center.attribute-value.finished.create',
-      'admin.product-data-center.attribute-value.finished.toggle-status',
-      'admin.product-data-center.attribute-value.finished.delete',
-      'admin.product-data-center.attribute-value.accessory.view',
-      'admin.product-data-center.attribute-value.accessory.create',
-      'admin.product-data-center.attribute-value.accessory.toggle-status',
-      'admin.product-data-center.attribute-value.accessory.delete',
-      'admin.product-data-center.category-attribute-template.finished.attributes.view',
-      'admin.product-data-center.category-attribute-template.finished.attributes.create',
-      'admin.product-data-center.category-attribute-template.finished.attributes.history',
-      'admin.product-data-center.category-attribute-template.accessory.attributes.view',
-      'admin.product-data-center.category-attribute-template.accessory.attributes.create',
-      'admin.product-data-center.category-attribute-template.accessory.attributes.history',
-      'admin.product-data-center.markup-configuration.finished.view',
-      'admin.product-data-center.markup-configuration.finished.guide-price.edit',
-      'admin.product-data-center.markup-configuration.finished.create',
-      'admin.product-data-center.markup-configuration.finished.edit',
-      'admin.product-data-center.markup-configuration.finished.toggle-status',
-      'admin.product-data-center.markup-configuration.finished.sort',
-      'admin.product-data-center.markup-configuration.finished.delete',
-      'admin.product-data-center.markup-configuration.slab.view',
-      'admin.product-data-center.markup-configuration.slab.guide-price.edit',
-      'admin.product-data-center.markup-configuration.slab.create',
-      'admin.product-data-center.markup-configuration.slab.edit',
-      'admin.product-data-center.markup-configuration.slab.toggle-status',
-      'admin.product-data-center.markup-configuration.slab.sort',
-      'admin.product-data-center.markup-configuration.slab.delete',
-      'admin.product-data-center.finished-stock-craft.view',
-      'admin.product-data-center.finished-stock-craft.create',
-      'admin.product-data-center.finished-stock-craft.edit',
-      'admin.product-data-center.finished-stock-craft.toggle-status',
-      'admin.product-data-center.finished-stock-craft.delete',
-      'admin.product-data-center.slab-variety.view',
-      'admin.product-data-center.slab-variety.create',
-      'admin.product-data-center.slab-variety.edit',
-      'admin.product-data-center.slab-variety.toggle-status',
-      'admin.product-data-center.slab-variety.delete',
-      'admin.product-data-center.slab-origin.view',
-      'admin.product-data-center.slab-origin.create',
-      'admin.product-data-center.slab-origin.edit',
-      'admin.product-data-center.slab-origin.toggle-status',
-      'admin.product-data-center.slab-origin.delete',
-      'admin.product-data-center.slab-texture.view',
-      'admin.product-data-center.slab-texture.create',
-      'admin.product-data-center.slab-texture.manage-aliases',
-      'admin.product-data-center.slab-texture.edit',
-      'admin.product-data-center.slab-texture.toggle-status',
-      'admin.product-data-center.slab-texture.delete',
-      'admin.product-data-center.slab-color.view',
-      'admin.product-data-center.slab-color.create',
-      'admin.product-data-center.slab-color.manage-categories',
-      'admin.product-data-center.slab-color.edit',
-      'admin.product-data-center.slab-color.toggle-status',
-      'admin.product-data-center.slab-color.delete',
-      'admin.product-data-center.slab-grade.view',
-      'admin.product-data-center.slab-grade.create',
-      'admin.product-data-center.slab-grade.sort',
-      'admin.product-data-center.slab-grade.edit',
-      'admin.product-data-center.slab-grade.toggle-status',
-      'admin.product-data-center.slab-grade.delete',
-      'admin.supplier-management.view',
-      'admin.supplier-management.create',
-      'admin.supplier-management.manage-supply-types',
-      'admin.supplier-management.edit',
-      'admin.supplier-management.toggle-status',
-      'admin.supplier-management.delete',
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.create-root',
-      'admin.tenant.store-category-management.create-child',
-      'admin.tenant.store-category-management.edit',
-      'admin.tenant.store-category-management.move-up',
-      'admin.tenant.store-category-management.move-down',
-      'admin.tenant.store-category-management.toggle-status',
-      'admin.tenant.store-category-management.delete',
-      'admin.permission-management.employee-management.view',
-      'admin.permission-management.employee-management.create',
-      'admin.permission-management.employee-management.edit',
-      'admin.permission-management.employee-management.permission',
-      'admin.permission-management.employee-management.toggle-status',
-      'admin.permission-management.employee-management.delete',
-      'admin.permission-management.role-management.view',
-      'admin.permission-management.role-management.create',
-      'admin.permission-management.role-management.edit',
-      'admin.permission-management.role-management.permission',
-      'admin.permission-management.role-management.delete',
-      'admin.permission-management.terminal-function-allocation.view',
-      'admin.permission-management.terminal-function-allocation.save',
-    ]);
-    expect(initialAllocationValues).toEqual({ store: [], supplier: [] });
+    for (const terminal of ['store', 'supplier'] as const) {
+      expect(terminalFunctionTrees[terminal].map((module) => module.value)).toEqual([
+        'admin.supplier-management',
+        'admin.tenant.store-category-management',
+        'admin.permission-management',
+      ]);
+    }
+    const operations = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));
+    const source = getFunctionCatalogPermissionValues(terminalFunctionTrees['supply-chain']);
+    expect(operations).toContain('admin.product-data-center.markup-configuration.slab.guide-price.edit');
+    expect(operations).not.toContain('admin.supplier-management.view');
+    expect(source).toContain('admin.supplier-management.create');
+    expect(source).not.toContain('admin.supplier-supply-type-management.create');
+    for (const module of ['finished-stock-management', 'slab-management']) {
+      const sourcePage = terminalFunctionTrees['supply-chain']
+        .flatMap((m) => m.menus)
+        .flatMap((m) => m.pages)
+        .find((p) => p.value === `supply-chain.${module}`)!;
+      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已下架', '已售完', '回收站']);
+      expect(source).toContain(`supply-chain.${module}.warehouse.publish`);
+      expect(source).toContain(`supply-chain.${module}.warehouse.shelf`);
+      expect(source).toContain(`supply-chain.${module}.selling.off-shelf`);
+      expect(source).toContain(`supply-chain.${module}.off-shelf.restore`);
+      expect(source).not.toContain(`supply-chain.${module}.sold-out.edit`);
+      expect(source).not.toContain(`supply-chain.${module}.sold-out.delete`);
+      expect(source).not.toContain(`supply-chain.${module}.warehouse.price`);
+      expect(operations).toContain(`admin.${module}.warehouse.price`);
+      expect(operations).not.toContain(`admin.${module}.warehouse.publish`);
+      expect(operations).not.toContain(`admin.${module}.selling.edit`);
+      expect(normalizeTerminalPermissions('supply-chain', [`admin.${module}.warehouse.price`])).toEqual([]);
+    }
+  });
+
+  it('publishes supply-chain staff management without platform or store access', () => {
+    const pages = terminalFunctionTrees['supply-chain'].flatMap((m) => m.menus).flatMap((m) => m.pages);
+    for (const [key, labels] of Object.entries({
+      'employee-management': ['查看', '邀请员工', '编辑', '角色', '停用/启用', '删除'],
+      'role-management': ['查看', '新增', '编辑', '权限', '删除'],
+    })) {
+      const prefix = `admin.permission-management.${key}`;
+      const page = pages.find((p) => p.value === prefix)!;
+      expect(page.tabs).toHaveLength(1);
+      expect(page.tabs[0].label).toBe('');
+      expect(page.tabs[0].actions.map((a) => a.label)).toEqual(labels);
+      expect(page.tabs[0].actions.every((a) => a.value.startsWith(`${prefix}.supply-chain.`))).toBe(true);
+      expect(normalizeTerminalPermissions('supply-chain', [`${prefix}.view`])).toEqual([]);
+      for (const terminal of ['store', 'supplier'] as const) {
+        expect(normalizeTerminalPermissions(terminal, [`${prefix}.supply-chain.view`])).toEqual([]);
+      }
+    }
   });
 
   it('keeps the shared supply type dictionary configuration on the platform only', () => {
-    const action = 'admin.supplier-management.manage-supply-types';
+    const action = 'admin.supplier-supply-type-management.create';
+    const menu = fullFunctionCatalog
+      .find((module) => module.value === 'admin.supplier-supply-type-management')
+      ?.menus.find((entry) => entry.value === 'admin.supplier-supply-type-management.menu');
+    expect(menu).toMatchObject({ direct: true });
+    expect(menu?.pages[0]?.actions.map((action) => [action.label, action.value])).toEqual([
+      ['查看', 'admin.supplier-supply-type-management.view'],
+      ['新增', 'admin.supplier-supply-type-management.create'],
+      ['编辑', 'admin.supplier-supply-type-management.edit'],
+      ['停用/启用', 'admin.supplier-supply-type-management.toggle-status'],
+      ['删除', 'admin.supplier-supply-type-management.delete'],
+    ]);
     expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'))).toContain(action);
     for (const terminal of ['store', 'supplier'] as const) {
       expect(getFunctionCatalogPermissionValues(terminalFunctionTrees[terminal])).not.toContain(action);
@@ -726,6 +134,7 @@ describe('full function catalog', () => {
     expect(terminalTabs).toEqual([
       { label: '城市合伙人门店管理后台', value: 'store' },
       { label: '大板供应商门店管理后台', value: 'supplier' },
+      { label: '供应链协同系统', value: 'supply-chain' },
     ]);
     expect(
       normalizeTerminalPermissions('store', [
@@ -893,11 +302,9 @@ describe('finished stock catalog contract', () => {
         'admin.finished-stock-management.warehouse',
         [
           ['查看', 'admin.finished-stock-management.warehouse.view'],
-          ['发布商品', 'admin.finished-stock-management.warehouse.publish'],
           ['批量上架', 'admin.finished-stock-management.warehouse.batch-shelf'],
           ['价格', 'admin.finished-stock-management.warehouse.price'],
           ['上架', 'admin.finished-stock-management.warehouse.shelf'],
-          ['编辑', 'admin.finished-stock-management.warehouse.edit'],
           ['删除', 'admin.finished-stock-management.warehouse.delete'],
         ],
       ],
@@ -906,11 +313,9 @@ describe('finished stock catalog contract', () => {
         'admin.finished-stock-management.selling',
         [
           ['查看', 'admin.finished-stock-management.selling.view'],
-          ['发布商品', 'admin.finished-stock-management.selling.publish'],
           ['批量下架', 'admin.finished-stock-management.selling.batch-off-shelf'],
           ['价格', 'admin.finished-stock-management.selling.price'],
           ['下架', 'admin.finished-stock-management.selling.off-shelf'],
-          ['编辑', 'admin.finished-stock-management.selling.edit'],
         ],
       ],
       [
@@ -918,7 +323,7 @@ describe('finished stock catalog contract', () => {
         'admin.finished-stock-management.off-shelf',
         [
           ['查看', 'admin.finished-stock-management.off-shelf.view'],
-          ['批量放回仓库', 'admin.finished-stock-management.off-shelf.batch-restore'],
+          ['批量放回到仓库', 'admin.finished-stock-management.off-shelf.batch-restore'],
           ['详情', 'admin.finished-stock-management.off-shelf.detail'],
           ['放回仓库', 'admin.finished-stock-management.off-shelf.restore'],
           ['删除', 'admin.finished-stock-management.off-shelf.delete'],
@@ -941,24 +346,24 @@ describe('finished stock catalog contract', () => {
           ['批量彻底删除', 'admin.finished-stock-management.recycle.batch-purge'],
           ['清空回收站', 'admin.finished-stock-management.recycle.clear'],
           ['价格', 'admin.finished-stock-management.recycle.price'],
-          ['放回到仓库', 'admin.finished-stock-management.recycle.restore'],
+          ['放回仓库', 'admin.finished-stock-management.recycle.restore'],
           ['彻底删除', 'admin.finished-stock-management.recycle.purge'],
         ],
       ],
     ]);
-    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(27);
+    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(23);
     expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);
     const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>
       value.startsWith('admin.finished-stock-management.'),
     );
-    expect(values).toHaveLength(28);
-    expect(new Set(values).size).toBe(28);
+    expect(values).toHaveLength(24);
+    expect(new Set(values).size).toBe(24);
     expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(
       false,
     );
     expect(
       normalizeFunctionCatalogPermissions(fullFunctionCatalog, ['admin.finished-stock-management.selling.edit']),
-    ).toEqual(['admin.finished-stock-management.selling.view', 'admin.finished-stock-management.selling.edit']);
+    ).toEqual([]);
     expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'))).toEqual(
       expect.arrayContaining(values),
     );
@@ -969,5 +374,41 @@ describe('finished stock catalog contract', () => {
         ),
       ).toEqual([]);
     }
+  });
+});
+
+describe('supplier supply type catalog', () => {
+  it('registers exactly the page actions and excludes business terminals', () => {
+    const module = fullFunctionCatalog.find((item) => item.value === 'admin.supplier-supply-type-management');
+    expect(module?.menus[0].direct).toBe(true);
+    expect(module?.menus[0].pages[0].tabs).toEqual([]);
+    expect(module?.menus[0].pages[0].actions).toEqual([
+      { label: '查看', value: 'admin.supplier-supply-type-management.view' },
+      { label: '新增', value: 'admin.supplier-supply-type-management.create' },
+      { label: '编辑', value: 'admin.supplier-supply-type-management.edit' },
+      { label: '停用/启用', value: 'admin.supplier-supply-type-management.toggle-status' },
+      { label: '删除', value: 'admin.supplier-supply-type-management.delete' },
+    ]);
+    for (const tree of Object.values(terminalFunctionTrees)) {
+      expect(tree.some((item) => item.value === module?.value)).toBe(false);
+    }
+  });
+});
+
+describe('category sorting permissions', () => {
+  it('registers sorting for both category and template scopes and removes movement actions', () => {
+    const values = getFunctionCatalogPermissionValues(fullFunctionCatalog);
+    for (const scope of ['finished', 'accessory']) {
+      const prefix = `admin.product-data-center.category.${scope}`;
+      expect(values).toContain(`${prefix}.sort`);
+      expect(values).not.toContain(`${prefix}.move-up`);
+      expect(values).not.toContain(`${prefix}.move-down`);
+      expect(values).toContain(`admin.product-data-center.category-attribute-template.${scope}.attributes.sort`);
+      expect(
+        normalizeFunctionCatalogPermissions(fullFunctionCatalog, [`${prefix}.move-up`, `${prefix}.move-down`]),
+      ).toEqual([`${prefix}.view`, `${prefix}.sort`]);
+    }
+    expect(values).toContain('admin.tenant.store-category-management.move-up');
+    expect(values).toContain('admin.tenant.store-category-management.move-down');
   });
 });

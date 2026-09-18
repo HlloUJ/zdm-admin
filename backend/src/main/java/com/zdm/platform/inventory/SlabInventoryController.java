@@ -46,8 +46,8 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @PostMapping("/images")
   public ApiResponse<MediaUploadResponse> uploadImage(@RequestParam("file") MultipartFile file) {
     permissionGuard.requireAnyPermission(
-        PERMISSION_PREFIX + ".create",
-        PERMISSION_PREFIX + ".edit",
+        prefix() + ".create",
+        prefix() + ".edit",
         permission("warehouse", "publish"),
         permission("selling", "publish"),
         permission("warehouse", "edit"),
@@ -59,9 +59,9 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @DeleteMapping("/images")
   public ApiResponse<Boolean> deleteUnreferencedImage(@RequestParam Long mediaId) {
     permissionGuard.requireAnyPermission(
-        PERMISSION_PREFIX + ".create",
-        PERMISSION_PREFIX + ".edit",
-        PERMISSION_PREFIX + ".delete",
+        prefix() + ".create",
+        prefix() + ".edit",
+        prefix() + ".delete",
         permission("warehouse", "publish"),
         permission("selling", "publish"),
         permission("warehouse", "edit"),
@@ -72,14 +72,14 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
 
   @GetMapping("/form-options")
   public ApiResponse<SlabPublishOptions> formOptions() {
-    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requireView(prefix());
     return ApiResponse.ok(service.listPublishOptions());
   }
 
   @Override
   @GetMapping
   public ApiResponse<List<SlabInventory>> list() {
-    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requireView(prefix());
     return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()));
   }
 
@@ -94,7 +94,7 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int pageSize) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
+    permissionGuard.requirePermission(prefix() + ".operation-log.view");
     return ApiResponse.ok(operationLogService.listPage(
         keyword, operationType, operatorName, startDate, endDate, page, pageSize));
   }
@@ -102,14 +102,8 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @Override
   @PostMapping
   public ApiResponse<SlabInventory> create(@Valid @RequestBody SlabInventory inventory) {
-    String targetStatus = inventory.getStatus();
-    if (targetStatus == null || "warehouse".equals(targetStatus)) {
-      permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", permission("warehouse", "publish"));
-    } else if ("selling".equals(targetStatus)) {
-      permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", permission("selling", "publish"));
-    } else {
-      permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
-    }
+    permissionGuard.requireAnyPermission(permission("warehouse","publish"),permission("selling","publish"));
+    if(isSupplyChain() && "selling".equals(inventory.getStatus()) && !"接口获取".equals(inventory.getPublisherType())) { permissionGuard.requireAnyPermission(permission("warehouse","shelf"),permission("selling","publish")); }
     return ApiResponse.ok(service.createWithPrices(inventory));
   }
 
@@ -118,22 +112,18 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   public ApiResponse<SlabInventory> update(
       @PathVariable Long id, @Valid @RequestBody SlabInventory inventory) {
     SlabInventory existing = service.getById(id);
-    String scope = statusScope(existing == null ? null : existing.getStatus());
-    if (scope == null || (!"warehouse".equals(scope) && !"selling".equals(scope))) {
-      permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
-    } else {
-      permissionGuard.requireAnyPermission(
-          PERMISSION_PREFIX + ".edit",
-          permission(scope, "edit"),
-          permission(scope, "price"));
-    }
+    if(existing==null) { throw new IllegalArgumentException("大板不存在"); }
+    String scope = statusScope(isSupplyChain()?existing.getSourceStatus():existing.getStatus());
+    if (!List.of("warehouse","selling").contains(scope)) { throw new IllegalArgumentException("当前状态不能编辑"); }
+    permissionGuard.requirePermission(permission(scope,isSupplyChain()?"edit":"price"));
+    if(isSupplyChain() && !Objects.equals(existing.getSourceStatus(),inventory.getStatus())) { requireStatusTransition(existing.getSourceStatus(),inventory.getStatus()); }
     return ApiResponse.ok(service.updateWithPrices(id, inventory));
   }
 
   @PutMapping("/batch-status")
   public ApiResponse<Boolean> updateBatchStatus(@Valid @RequestBody SlabInventoryBatchStatusRequest request) {
     service.listByIds(request.ids()).stream()
-        .map(SlabInventory::getStatus)
+        .map(item -> isSupplyChain()?item.getSourceStatus():item.getStatus())
         .filter(Objects::nonNull)
         .distinct()
         .forEach(status -> requireStatusTransition(status, request.status()));
@@ -145,12 +135,12 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
     permissionGuard.requireAnyPermission(
-        PERMISSION_PREFIX + ".delete",
+        prefix() + ".delete",
         permission("recycle", "purge"),
         permission("recycle", "batch-purge"),
         permission("recycle", "clear"));
     SlabInventory inventory = service.getById(id);
-    if (inventory == null || !"recycle".equals(inventory.getStatus())) {
+    if (inventory == null || (isSupplyChain() ? !"recycle".equals(inventory.getSourceStatus()) : (Boolean.TRUE.equals(inventory.getOperationsDeleted()) || (!"recycle".equals(inventory.getStatus()) && !inventory.isSourceUnavailable())))) {
       throw new IllegalArgumentException("只有回收站中的大板可以彻底删除");
     }
     return ApiResponse.ok(service.purgeFromRecycle(id));
@@ -177,11 +167,11 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     if (inventory == null) {
       throw new IllegalArgumentException("大板不存在或已被删除");
     }
-    String scope = statusScope(inventory.getStatus());
+    String scope = statusScope(isSupplyChain()?inventory.getSourceStatus():inventory.getStatus());
     if (!"warehouse".equals(scope) && !"off-shelf".equals(scope)) {
       throw new IllegalArgumentException("只有仓库中或已下架的大板可以删除");
     }
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".delete", permission(scope, "delete"));
+    permissionGuard.requireAnyPermission(prefix() + ".delete", permission(scope, "delete"));
     return ApiResponse.ok(service.deleteFromManagement(
         id, request == null ? null : request.reason(), request == null ? null : request.detail()));
   }
@@ -203,12 +193,12 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
       requireEditOr(permission("recycle", "restore"), permission("recycle", "batch-restore"));
       return;
     }
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".edit");
+    permissionGuard.requirePermission(prefix() + ".edit");
   }
 
   private void requireEditOr(String... permissions) {
     String[] candidates = new String[permissions.length + 1];
-    candidates[0] = PERMISSION_PREFIX + ".edit";
+    candidates[0] = prefix() + ".edit";
     System.arraycopy(permissions, 0, candidates, 1, permissions.length);
     permissionGuard.requireAnyPermission(candidates);
   }
@@ -222,7 +212,9 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     };
   }
 
+  private boolean isSupplyChain() { return "supply-chain".equals(permissionGuard.identity().clientCode()); }
+  private String prefix() { return (isSupplyChain()?"supply-chain.":"admin.")+"slab-management"; }
   private String permission(String scope, String action) {
-    return PERMISSION_PREFIX + "." + scope + "." + action;
+    return prefix() + "." + scope + "." + action;
   }
 }

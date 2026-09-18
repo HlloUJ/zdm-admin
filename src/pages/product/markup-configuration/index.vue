@@ -13,113 +13,120 @@
           <t-tag theme="primary" variant="light">商品默认价格规则</t-tag>
         </header>
 
-        <t-tabs v-if="showTabRail" v-model="activeType" class="configuration-tabs" :list="visibleTabs" />
-        <t-alert class="pricing-alert" theme="info" :message="pricingRuleMessage" />
+        <AdminListLayout class="pricing-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs v-if="showTabRail" v-model="activeType" class="configuration-tabs" :list="visibleTabs" />
 
-        <section class="guide-card">
-          <div class="guide-setting-section">
-            <div class="guide-setting-copy">
-              <strong>指导价设置</strong>
-              <span>不区分门店级别，仅用于新商品初始化，不影响已保存商品。</span>
-            </div>
-            <t-form ref="guideFormRef" class="guide-setting-form" :data="guideForm" label-width="0">
-              <span><span class="required-star">*</span>价格系数</span>
-              <t-form-item
-                class="guide-form-item"
-                name="priceCoefficient"
-                :rules="guidePriceCoefficientRules"
-                :required-mark="false"
-              >
-                <t-input-number
-                  v-model="guideForm.priceCoefficient"
-                  class="guide-coefficient-input"
-                  large-number
-                  :disabled="!canEditGuide"
-                  :decimal-places="2"
-                  theme="normal"
-                  placeholder="请输入"
-                  @change="handleGuideCoefficientChange"
-                  @keydown="handlePriceCoefficientKeydown"
-                />
-              </t-form-item>
-              <t-button v-if="canEditGuide" theme="primary" :loading="guideSaving" @click="saveGuidePriceSetting">
-                保存指导价
-              </t-button>
-            </t-form>
-          </div>
-        </section>
-
-        <section class="partner-card">
-          <div class="partner-card-header">
-            <div class="partner-card-copy">
-              <strong>门店级别价格</strong>
-              <span>引用门店级别管理中的启用级别，并为当前商品类型设置价格系数。</span>
-            </div>
-            <t-button v-if="canCreate" theme="primary" @click="openCreate">
-              <template #icon><t-icon name="add" /></template>新增
-            </t-button>
-          </div>
-          <t-form :data="searchForm" label-width="72px" colon>
-            <div class="filter-row">
-              <div class="filter-fields">
-                <t-form-item label="门店级别" name="name">
-                  <t-input v-model="searchForm.name" clearable placeholder="请输入" />
-                </t-form-item>
+              <div class="guide-card">
+                <div class="guide-setting-section">
+                  <div class="guide-setting-copy">
+                    <strong>指导价设置</strong>
+                    <span>不区分门店级别，仅用于新商品初始化，不影响已保存商品。</span>
+                  </div>
+                  <t-form ref="guideFormRef" class="guide-setting-form" :data="guideForm" label-width="0">
+                    <span><span class="required-star">*</span>价格系数</span>
+                    <t-form-item
+                      class="guide-form-item"
+                      name="priceCoefficient"
+                      :rules="guidePriceCoefficientRules"
+                      :required-mark="false"
+                    >
+                      <t-input-number
+                        v-model="guideForm.priceCoefficient"
+                        class="guide-coefficient-input"
+                        large-number
+                        :disabled="!canEditGuide"
+                        :decimal-places="2"
+                        theme="normal"
+                        placeholder="请输入"
+                        @change="handleGuideCoefficientChange"
+                        @keydown="handlePriceCoefficientKeydown"
+                      />
+                    </t-form-item>
+                    <t-button v-if="canEditGuide" theme="primary" :loading="guideSaving" @click="saveGuidePriceSetting">
+                      保存指导价
+                    </t-button>
+                  </t-form>
+                </div>
               </div>
-              <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
-                  <template #icon><t-icon name="search" /></template>查询
-                </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
-                  <template #icon><t-icon name="refresh" /></template>重置
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="门店级别" name="name">
+                      <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="handleSearch">
+                      <template #icon><t-icon name="search" /></template>查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="handleReset">
+                      <template #icon><t-icon name="refresh" /></template>重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div class="table-toolbar">
+                <t-button v-if="canCreate" theme="primary" @click="openCreate">
+                  <template #icon><t-icon name="add" /></template>新增
                 </t-button>
               </div>
             </div>
-          </t-form>
-          <t-table
-            row-key="id"
-            :data="pageData"
-            :columns="columns"
-            :loading="loading"
-            :drag-sort="canSort ? 'row-handler' : undefined"
-            :drag-sort-options="{ animation: 200 }"
-            hover
-            table-layout="fixed"
-            @drag-sort="handleDragSort"
-          >
-            <template #dragTitle><t-icon name="move" title="拖拽排序" /></template>
-            <template #drag><t-icon name="move" title="拖拽排序" /></template>
-            <template #index="{ rowIndex }">
-              {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
-            </template>
-            <template #priceCoefficient="{ row }">{{ formatNumber(row.priceCoefficient, 4) }}</template>
-            <template #status="{ row }">
-              <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
-                {{ row.status === 'enabled' ? '已启用' : '已停用' }}
-              </t-tag>
-            </template>
-            <template #operation="{ row }">
-              <div class="table-actions">
-                <t-link v-if="canEdit" theme="primary" hover="color" @click="openEdit(row)"> 编辑 </t-link>
-                <t-link
-                  v-if="canToggleStatus"
-                  :theme="row.status === 'enabled' ? 'warning' : 'success'"
-                  hover="color"
-                  @click="openStatusConfirm(row)"
-                >
-                  {{ row.status === 'enabled' ? '停用' : '启用' }}
-                </t-link>
-                <t-link v-if="canDelete" theme="danger" hover="color" @click="openConfirm(row)">删除</t-link>
-              </div>
-            </template>
-          </t-table>
-          <AdminPagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="filteredData.length"
-            :page-size-options="[10, 20, 50]"
-          />
-        </section>
+          </template>
+          <template #table>
+            <t-table
+              row-key="id"
+              :data="pageData"
+              :columns="columns"
+              :loading="loading"
+              :class="{ 'zdm-row-sort-table': canSort }"
+              :drag-sort="canSort ? 'row' : undefined"
+              :drag-sort-options="{
+                animation: 200,
+                filter: 'a, button, input, textarea, select, .t-link, .t-select, .t-checkbox, .t-switch',
+                preventOnFilter: false,
+              }"
+              hover
+              table-layout="fixed"
+              @drag-sort="handleDragSort"
+            >
+              <template #dragTitle><t-icon name="move" title="拖拽排序" /></template>
+              <template #drag><t-icon name="move" title="拖拽排序" /></template>
+              <template #index="{ rowIndex }">
+                {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
+              </template>
+              <template #priceCoefficient="{ row }">{{ formatNumber(row.priceCoefficient, 4) }}</template>
+              <template #status="{ row }">
+                <t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">
+                  {{ row.status === 'enabled' ? '已启用' : '已停用' }}
+                </t-tag>
+              </template>
+              <template #operation="{ row }">
+                <div class="table-actions">
+                  <t-link v-if="canEdit" theme="primary" hover="color" @click="openEdit(row)"> 编辑 </t-link>
+                  <t-link
+                    v-if="canToggleStatus"
+                    :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                    hover="color"
+                    @click="openStatusConfirm(row)"
+                  >
+                    {{ row.status === 'enabled' ? '停用' : '启用' }}
+                  </t-link>
+                  <t-link v-if="canDelete" theme="danger" hover="color" @click="openConfirm(row)">删除</t-link>
+                </div>
+              </template>
+            </t-table>
+          </template>
+          <template #pagination>
+            <AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="filteredData.length"
+              :page-size-options="[10, 20, 50]"
+            />
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
@@ -191,7 +198,13 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { AdminConfirmDialog, AdminDialog, AdminPagination, adminFeedback } from '@/components/foundation';
+import {
+  AdminConfirmDialog,
+  AdminDialog,
+  AdminListLayout,
+  AdminPagination,
+  adminFeedback,
+} from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -241,11 +254,6 @@ const canSort = computed(() => hasPermission(loginUser.value, `${activePrefix.va
 const canEditGuide = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.guide-price.edit`));
 const canDelete = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.delete`));
 const canToggleStatus = computed(() => hasPermission(loginUser.value, `${activePrefix.value}.toggle-status`));
-const pricingRuleMessage = computed(() =>
-  activeType.value === 'slab'
-    ? '大板自动价格跟随当前配置；手工价格不会被覆盖。在用配置只能停用，不能删除。'
-    : '成品价格配置只用于新商品初始化；停用后不再用于新商品，已保存商品不受影响。',
-);
 
 const loading = ref(false);
 const guideSaving = ref(false);
@@ -304,14 +312,20 @@ const searchForm = reactive({ name: '' });
 const appliedSearchForm = reactive({ ...searchForm });
 const pagination = reactive({ current: 1, pageSize: 10 });
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 52, align: 'center' as const }] : []),
+  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },
   { colKey: 'priceCoefficient', title: '价格系数', width: 130, align: 'right' },
   { colKey: 'status', title: '状态', width: 100, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 220, align: 'left', fixed: 'right' },
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 156,
+    align: 'left',
+    fixed: 'right',
+  },
 ]);
 const filteredData = computed(() => {
   const name = appliedSearchForm.name.trim();
@@ -557,8 +571,7 @@ onMounted(loadData);
 .page-header,
 .filter-row,
 .filter-actions,
-.table-actions,
-.partner-card-header {
+.table-actions {
   display: flex;
   align-items: center;
 }
@@ -570,46 +583,38 @@ onMounted(loadData);
 .page-header {
   margin-bottom: var(--td-comp-margin-l);
 }
-.guide-card,
-.partner-card {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+.guide-card {
+  padding-bottom: var(--td-comp-margin-l);
+  border-bottom: 1px solid var(--td-component-border);
 }
-.configuration-tabs,
-.pricing-alert,
-.guide-card,
-.partner-card {
-  margin-bottom: var(--td-comp-margin-l);
+.pricing-list-layout {
+  grid-template-columns: minmax(0, 1fr);
 }
-.partner-card > * + * {
-  margin-top: var(--td-comp-margin-l);
+.list-controls {
+  min-width: 0;
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
 .guide-setting-section,
 .guide-setting-form,
-.guide-setting-copy,
-.partner-card-copy {
+.guide-setting-copy {
   display: flex;
 }
 .guide-setting-section {
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--td-comp-margin-xl);
 }
-.guide-setting-copy,
-.partner-card-copy {
+.guide-setting-copy {
+  font: var(--td-font-body-medium);
   flex-direction: column;
   gap: var(--td-comp-margin-xs);
   color: var(--td-text-color-secondary);
 }
-.guide-setting-copy strong,
-.partner-card-copy strong {
+.guide-setting-copy strong {
   color: var(--td-text-color-primary);
-}
-.partner-card-header {
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xl);
 }
 .guide-setting-form {
   align-items: center;
@@ -627,15 +632,20 @@ onMounted(loadData);
   margin-bottom: 0;
 }
 .filter-fields {
+  min-width: 0;
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: var(--td-comp-margin-l);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 240px;
+  width: 260px;
   margin-bottom: 0;
 }
-.filter-actions,
+.filter-actions {
+  flex-shrink: 0;
+  gap: var(--td-comp-margin-s);
+}
 .table-actions {
   gap: var(--td-comp-margin-m);
 }

@@ -8,32 +8,36 @@
         <t-alert theme="info" class="page-tip"
           >属性库仅维护属性定义和值类型；必填及 SKU 规则统一在类目属性模板中配置。</t-alert
         >
-        <section v-if="!lockedScope" class="table-card source-card">
-          <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
-          <div class="source-caption">{{ sourceDescription }}</div>
-        </section>
-        <AdminListLayout>
-          <template #filters>
-            <t-form :data="searchForm" label-width="72px" colon>
-              <div class="filter-row">
-                <div class="filter-fields">
-                  <t-form-item label="属性名称"
-                    ><t-input v-model="searchForm.keyword" clearable placeholder="请输入"
-                  /></t-form-item>
-                </div>
-                <div class="filter-actions">
-                  <t-button theme="primary" @click="search"
-                    ><template #icon><t-icon name="search" /></template>查询</t-button
-                  ><t-button variant="base" @click="reset">重置</t-button>
-                </div>
+        <AdminListLayout class="attribute-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <div v-if="!lockedScope" class="scope-controls">
+                <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
+                <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-            </t-form>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="属性名称"
+                      ><t-input v-model="searchForm.keyword" clearable placeholder="请输入"
+                    /></t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="search"
+                      ><template #icon><t-icon name="search" /></template>查询</t-button
+                    ><t-button theme="default" variant="base" @click="reset"
+                      ><template #icon><t-icon name="refresh" /></template>重置</t-button
+                    >
+                  </div>
+                </div>
+              </t-form>
+              <div class="table-toolbar">
+                <t-button v-if="canCreateAttribute" theme="primary" @click="openCreate">
+                  <template #icon><t-icon name="add" /></template>新增
+                </t-button>
+              </div>
+            </div>
           </template>
-          <template #toolbar
-            ><t-button v-if="canCreateAttribute" theme="primary" @click="openCreate"
-              ><template #icon><t-icon name="add" /></template>新增</t-button
-            ></template
-          >
           <template #table>
             <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
               <template #valueType="{ row }">{{ valueTypeLabel(row.valueType) }}</template>
@@ -209,15 +213,21 @@ const formRules: Record<string, FormRule[]> = {
   name: [{ required: true, message: '请输入属性名称', type: 'error' }],
   valueType: [{ required: true, message: '请选择值类型', type: 'error' }],
 };
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '属性名称', width: 260, align: 'left' },
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  { colKey: 'name', title: '属性名称', minWidth: 260, align: 'left' },
   { colKey: 'valueType', title: '值类型', width: 220, align: 'left' },
   { colKey: 'templateCount', title: '被引用次数', width: 190, align: 'left' },
   { colKey: 'status', title: '状态', width: 150, align: 'left' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'left' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'left' },
-  { colKey: 'operation', title: '操作', width: 160, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 116,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 const filteredData = computed(() =>
   data.value.filter(
     (item) => item.scope === activeScope.value && (!applied.keyword || item.name.includes(applied.keyword)),
@@ -457,44 +467,61 @@ onMounted(loadAttributes);
   flex: 1;
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
 }
-.page-tip,
-.source-card {
+.attribute-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.page-tip {
   margin-bottom: 16px;
 }
-.source-card {
-  padding: 24px 24px 14px;
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  box-shadow: var(--td-shadow-1);
+.list-controls {
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
+}
+.scope-controls {
+  min-width: 0;
 }
 .source-caption {
-  margin-top: 12px;
+  margin-top: var(--td-comp-margin-s);
   color: var(--td-text-color-secondary);
   font-size: 13px;
 }
-.filter-row,
-.filter-fields,
-.filter-actions,
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+:deep(.zdm-admin-list-layout__toolbar) {
+  display: block;
+  min-height: 0;
 }
 .filter-row {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields {
-  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--td-comp-margin-l);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 280px;
+  width: 260px;
   margin-bottom: 0;
 }
 .filter-fields :deep(.t-input),
 .filter-fields :deep(.t-select) {
   width: 100%;
 }
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+}
+.table-toolbar {
+  display: flex;
+  align-items: center;
+}
 .table-actions {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 .table-action-placeholder {

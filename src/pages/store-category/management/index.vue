@@ -9,13 +9,13 @@
         <AdminPageHeader :breadcrumbs="['门店分类管理']" />
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="84px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="分类名称" name="keyword">
                   <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
                 </t-form-item>
-                <t-form-item label="分类状态" name="status">
+                <t-form-item class="zdm-status-filter" label="分类状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="全部">
                     <t-option label="启用" value="enabled" />
                     <t-option label="停用" value="disabled" />
@@ -168,7 +168,7 @@
       <template v-else-if="deleteTarget?.children.length">
         分类“{{ deleteTarget.name }}”包含下级分类，请先删除或转移下级分类。
       </template>
-      <template v-else>删除后不可恢复，确认删除分类“{{ deleteTarget?.name }}”吗？</template>
+      <template v-else>是否删除分类“{{ deleteTarget?.name }}”？删除后不可恢复。</template>
     </AdminConfirmDialog>
 
     <AdminConfirmDialog
@@ -274,16 +274,22 @@ const formRules: Record<string, FormRule[]> = {
   ],
 };
 
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'name', title: '分类名称', width: 155, align: 'left' },
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  { colKey: 'name', title: '分类名称', minWidth: 155, align: 'left' },
   { colKey: 'level', title: '分类级别', width: 90, align: 'left' },
   { colKey: 'productCount', title: '关联商品', width: 90, align: 'center' },
   { colKey: 'status', title: '状态', width: 60, align: 'center' },
   { colKey: 'sort', title: '排序', width: 60, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 90, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 150, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 240, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 264,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const displayRows = computed<CategoryRow[]>(() => {
   const keyword = appliedSearch.keyword.trim();

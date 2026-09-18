@@ -71,6 +71,13 @@ public final class FunctionPermissionNormalizer {
   }
 
   private static Stream<String> expandLegacyScopedPermission(String permission) {
+    String categorySortPrefix = Stream.of("finished", "accessory")
+        .map(scope -> "admin.product-data-center.category." + scope)
+        .filter(prefix -> permission.equals(prefix + ".move-up") || permission.equals(prefix + ".move-down"))
+        .findFirst().orElse(null);
+    if (categorySortPrefix != null) {
+      return Stream.of(categorySortPrefix + ".sort");
+    }
     String legacyCategoryStatusPrefix = CATEGORY_STATUS_PERMISSION_PREFIXES.stream()
         .filter(prefix -> permission.equals(prefix + ".disable") || permission.equals(prefix + ".enable"))
         .findFirst()

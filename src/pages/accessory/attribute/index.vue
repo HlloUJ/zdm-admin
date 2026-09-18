@@ -21,13 +21,13 @@
         </t-alert>
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="56px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="属性" name="name">
                   <t-input v-model="searchForm.name" clearable placeholder="请输入" />
                 </t-form-item>
-                <t-form-item label="状态" name="status">
+                <t-form-item class="zdm-status-filter" label="状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
                     <t-option label="正常" value="normal" />
                     <t-option label="停用" value="disabled" />
@@ -296,7 +296,7 @@ const tableData = ref<AttributeItem[]>([
   },
 ]);
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '属性', minWidth: 160, align: 'left' },
   { colKey: 'attributeCode', title: '属性编码', minWidth: 132, align: 'left' },
@@ -304,8 +304,14 @@ const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'valueSource', title: '值来源', minWidth: 140, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 280, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 184,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const optionColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
@@ -313,7 +319,7 @@ const optionColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'value', title: '选项名称', minWidth: 160, align: 'left' },
   { colKey: 'status', title: '状态', width: 96, align: 'center' },
   { colKey: 'sort', title: '排序', width: 80, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 96, align: 'left' },
+  { colKey: 'operation', title: '操作', width: 76, align: 'left' },
 ];
 
 const searchForm = reactive({

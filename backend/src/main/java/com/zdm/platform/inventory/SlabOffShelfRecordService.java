@@ -8,11 +8,14 @@ import org.springframework.stereotype.Service;
 public class SlabOffShelfRecordService
     extends ServiceImpl<SlabOffShelfRecordMapper, SlabOffShelfRecord> {
 
+  private final com.zdm.platform.security.CurrentIdentityProvider identities;
+  public SlabOffShelfRecordService(com.zdm.platform.security.CurrentIdentityProvider identities) { this.identities=identities; }
   public List<SlabOffShelfRecord> listBySlabIds(List<Long> slabIds) {
     if (slabIds.isEmpty()) {
       return List.of();
     }
     return lambdaQuery()
+        .eq(SlabOffShelfRecord::getBusinessClientCode, identities.require().clientCode())
         .in(SlabOffShelfRecord::getSlabId, slabIds)
         .orderByDesc(SlabOffShelfRecord::getOffShelvedAt)
         .orderByDesc(SlabOffShelfRecord::getId)

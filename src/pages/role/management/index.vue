@@ -15,66 +15,86 @@
           </div>
         </header>
 
-        <section class="table-card">
-          <div v-if="canCreateRole" class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
-              <template #icon><t-icon name="add" /></template>
-              新增
-            </t-button>
-          </div>
+        <AdminListLayout class="role-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs
+                v-if="isInternalAdministration && managementTabs.length > 1"
+                v-model="managedClient"
+                :list="managementTabs"
+                @change="handleManagedClientChange"
+              />
 
-          <t-table
-            row-key="id"
-            :data="pageData"
-            :columns="columns"
-            :loading="loading"
-            hover
-            table-layout="fixed"
-            class="role-table"
-          >
-            <template #index="{ rowIndex }">
-              {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
-            </template>
-            <template #operation="{ row }">
-              <div class="table-actions">
-                <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                <t-link
-                  v-if="canManageRolePermission && !isSuperAdminRole(row)"
-                  theme="primary"
-                  hover="color"
-                  @click="openPermissionDialog(row)"
-                >
-                  权限
-                </t-link>
-                <t-link
-                  v-if="canDeleteRole && !isSuperAdminRole(row)"
-                  theme="danger"
-                  hover="color"
-                  @click="openDeleteConfirm(row)"
-                >
-                  删除
-                </t-link>
-                <span
-                  v-if="
-                    !canEditRole &&
-                    !(canDeleteRole && !isSuperAdminRole(row)) &&
-                    !(canManageRolePermission && !isSuperAdminRole(row))
-                  "
-                  class="table-action-placeholder"
-                >
-                  -
-                </span>
+              <div v-if="canCreateRole" class="table-toolbar">
+                <t-button theme="primary" @click="openCreateDialog">
+                  <template #icon><t-icon name="add" /></template>
+                  新增
+                </t-button>
               </div>
-            </template>
-          </t-table>
-
-          <AdminPagination
-            v-model:current="pagination.current"
-            v-model:page-size="pagination.pageSize"
-            :total="paginationTotal"
-            :page-size-options="pageSizeOptions"
-          />
-        </section>
+            </div>
+          </template>
+          <template #table>
+            <t-table
+              row-key="id"
+              :data="pageData"
+              :columns="columns"
+              :loading="loading"
+              hover
+              table-layout="fixed"
+              class="role-table"
+            >
+              <template #index="{ rowIndex }">
+                {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
+              </template>
+              <template #operation="{ row }">
+                <div class="table-actions">
+                  <t-link
+                    v-if="canEditRole && canMaintainRole(row)"
+                    theme="primary"
+                    hover="color"
+                    @click="openEditDialog(row)"
+                    >编辑</t-link
+                  >
+                  <t-link
+                    v-if="canManageRolePermission && !isSuperAdminRole(row) && canMaintainRole(row)"
+                    theme="primary"
+                    hover="color"
+                    @click="openPermissionDialog(row)"
+                  >
+                    权限
+                  </t-link>
+                  <t-link
+                    v-if="canDeleteRole && !isSuperAdminRole(row) && canMaintainRole(row)"
+                    theme="danger"
+                    hover="color"
+                    @click="openDeleteConfirm(row)"
+                  >
+                    删除
+                  </t-link>
+                  <span
+                    v-if="
+                      !canMaintainRole(row) ||
+                      (!canEditRole &&
+                        !(canDeleteRole && !isSuperAdminRole(row)) &&
+                        !(canManageRolePermission && !isSuperAdminRole(row)))
+                    "
+                    class="table-action-placeholder"
+                  >
+                    -
+                  </span>
+                </div>
+              </template>
+            </t-table>
+          </template>
+          <template #pagination>
+            <AdminPagination
+              v-model:current="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :total="paginationTotal"
+              :page-size-options="pageSizeOptions"
+            />
+          </template>
+        </AdminListLayout>
       </main>
     </div>
 
@@ -277,7 +297,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import { adminFeedback, AdminConfirmDialog, AdminPagination } from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminListLayout, AdminPagination } from '@/components/foundation';
 import {
   collectFunctionCatalogRows,
   filterFunctionCatalogByAudience,
@@ -290,7 +310,7 @@ import {
   type FunctionModule,
 } from '@/services/functionCatalog';
 import { getLoginUser } from '@/services/auth';
-import { hasAnyPermission } from '@/services/adminPermissions';
+import { hasAnyPermission, hasPermission } from '@/services/adminPermissions';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import {
   createRole,
@@ -306,6 +326,7 @@ import {
 type DialogMode = 'create' | 'edit';
 
 interface RoleItem {
+  createdByClientCode?: 'admin' | 'supply-chain' | null;
   id: number;
   code: string;
   dataScope: string;
@@ -331,13 +352,18 @@ const roles = ref<RoleItem[]>([]);
 const loading = ref(false);
 const parsePermissions = (value?: string) => (value ? value.split(',').filter(Boolean) : []);
 
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'index', title: '序号', width: '14%', align: 'left' },
-  { colKey: 'name', title: '角色名称', width: '24%', align: 'left' },
-  { colKey: 'createdByName', title: '创建人', width: '16%', align: 'left' },
-  { colKey: 'createdAt', title: '创建时间', width: '24%', align: 'left' },
-  { colKey: 'operation', title: '操作', width: '22%', align: 'left' },
-];
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
+  { colKey: 'index', title: '序号', width: 100, align: 'left' },
+  { colKey: 'name', title: '角色名称', minWidth: 160, align: 'left' },
+  { colKey: 'createdByName', title: '创建人', width: 140, align: 'left' },
+  { colKey: 'createdAt', title: '创建时间', width: 220, align: 'left' },
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 180,
+    align: 'left',
+  },
+]);
 
 const rolePermissionScope = ref<RolePermissionScope>({ audience: 'admin', functionPermissions: 'all' });
 const permissionModules = computed(() => {
@@ -348,6 +374,26 @@ const permissionModules = computed(() => {
 
 const pageSizeOptions = [10, 20, 50];
 const loginUser = computed(() => getLoginUser());
+const managedClient = ref<'admin' | 'supply-chain'>(
+  loginUser.value.clientCode === 'supply-chain' ? 'supply-chain' : 'admin',
+);
+const managementPermissionPrefix = computed(
+  () => `admin.permission-management.role-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}`,
+);
+const managementTabs = computed(() =>
+  [
+    { label: '运营管理平台', value: 'admin', permission: 'admin.permission-management.role-management.view' },
+    {
+      label: '供应链协同系统',
+      value: 'supply-chain',
+      permission: 'admin.permission-management.role-management.supply-chain.view',
+    },
+  ].filter((tab) => hasPermission(loginUser.value, tab.permission)),
+);
+const isInternalAdministration = computed(
+  () => !loginUser.value.tenantId && !loginUser.value.storeId && loginUser.value.clientCode !== 'supply-chain',
+);
+
 const activePermissionModuleValue = ref(permissionModules.value[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
@@ -375,7 +421,7 @@ const formRules: Record<string, FormRule[]> = {
 };
 
 const getRoleActionPermissions = (action: 'create' | 'permission' | 'edit' | 'delete') => {
-  return [`admin.permission-management.role-management.${action}`];
+  return [`${managementPermissionPrefix.value}.${action}`];
 };
 const canCreateRole = computed(() => hasAnyPermission(loginUser.value, getRoleActionPermissions('create')));
 const canManageRolePermission = computed(() =>
@@ -411,6 +457,7 @@ const formatDateTime = (value?: string) => {
 
 const toRoleItem = (record: RoleRecord): RoleItem => ({
   id: record.id,
+  createdByClientCode: record.createdByClientCode,
   code: record.code,
   dataScope: record.dataScope,
   status: record.status,
@@ -433,12 +480,20 @@ const toRolePayload = (role: RoleItem): RolePayload => ({
   functionPermissions: role.functionPermissions.join(','),
 });
 
+const canMaintainRole = (row: RoleItem) =>
+  loginUser.value.clientCode !== 'supply-chain' || row.createdByClientCode === 'supply-chain';
+
 const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 
 const loadRoles = async () => {
   loading.value = true;
   try {
-    const [records, scope] = await Promise.all([listRoles(), getRolePermissionScope()]);
+    const [records, scope] = await Promise.all([
+      listRoles(managedClient.value),
+      hasPermission(loginUser.value, `${managementPermissionPrefix.value}.permission`)
+        ? getRolePermissionScope(managedClient.value)
+        : Promise.resolve<RolePermissionScope>({ audience: managedClient.value, functionPermissions: '' }),
+    ]);
     rolePermissionScope.value = scope;
     activePermissionModuleValue.value = permissionModules.value[0]?.value ?? '';
     roles.value = sortByCreatedAtDesc(records.filter((record) => record.status === 'enabled')).map(toRoleItem);
@@ -546,6 +601,7 @@ const handleSubmit = async () => {
   try {
     if (dialogMode.value === 'create') {
       await createRole({
+        clientCode: managedClient.value,
         name: roleName,
         code: createRoleCode(roleName),
         dataScope: 'all',
@@ -653,7 +709,19 @@ const handlePermissionSave = async () => {
   }
 };
 
-onMounted(loadRoles);
+const handleManagedClientChange = () => {
+  roles.value = [];
+  pagination.current = 1;
+  formDialogVisible.value = false;
+  permissionDialogVisible.value = false;
+  deleteDialogVisible.value = false;
+  void loadRoles();
+};
+onMounted(() => {
+  if (isInternalAdministration.value)
+    managedClient.value = managementTabs.value[0]?.value === 'supply-chain' ? 'supply-chain' : 'admin';
+  void loadRoles();
+});
 </script>
 
 <style scoped>
@@ -665,11 +733,15 @@ onMounted(loadRoles);
   margin-bottom: var(--td-comp-margin-l);
 }
 
-.table-card {
-  background: var(--td-bg-color-container);
-  border-radius: 6px;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  border: 1px solid var(--td-component-border);
+.role-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.list-controls {
+  min-width: 0;
+  display: grid;
+  width: 100%;
+  gap: var(--td-comp-margin-l);
 }
 
 .role-table :deep(th),
@@ -706,7 +778,6 @@ onMounted(loadRoles);
   align-items: center;
   justify-content: flex-start;
   gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
 }
 
 .table-actions {
@@ -714,7 +785,8 @@ onMounted(loadRoles);
   justify-content: flex-start;
   align-items: center;
   gap: var(--td-comp-margin-s);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .table-action-placeholder {

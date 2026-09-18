@@ -2,7 +2,17 @@ import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
 
-const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '上移', '下移', '停用/启用', '删除'];
+const storeCategoryCatalogActionLabels = [
+  '查看',
+  '新增一级分类',
+  '新增下级',
+  '编辑',
+  '上移',
+  '下移',
+  '停用/启用',
+  '删除',
+];
+const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '排序', '停用/启用', '删除'];
 const productSecondMenuLabels = ['商品公共基础数据', '成品现货基础数据', '大板基础数据'];
 const adminProductSecondMenuLabels = ['成品现货管理', '大板管理', ...productSecondMenuLabels];
 const productThirdMenuLabels = [
@@ -81,7 +91,7 @@ test('allows account 15900000001 to operate the granted attribute tab', async ({
     '创建时间',
     '操作',
   ]);
-  await expect(main.locator('.source-card .t-tabs')).toHaveCount(0);
+  await expect(main.locator('.scope-controls .t-tabs')).toHaveCount(0);
   await expect(main.getByText('E2E 成品现货专属属性', { exact: true })).toHaveCount(0);
 });
 
@@ -189,8 +199,9 @@ test('shows only granted category operation buttons for a restricted account', a
   await expect(main.getByRole('button', { name: '新增一级分类' })).toHaveCount(0);
   await expect(categoryActions.getByText('新增下级', { exact: true })).toHaveCount(0);
   await expect(categoryActions.getByText('编辑', { exact: true })).toBeVisible();
-  await expect(categoryActions.getByText('上移', { exact: true })).toBeVisible();
-  await expect(categoryActions.getByText('下移', { exact: true })).toBeVisible();
+  await expect(categoryActions.getByText('上移', { exact: true })).toHaveCount(0);
+  await expect(categoryRow.locator('[data-category-id]')).toBeVisible();
+  await expect(categoryActions.getByText('下移', { exact: true })).toHaveCount(0);
   await expect(categoryActions.locator('.t-link').filter({ hasText: /^(停用|启用)$/ })).toBeVisible();
   await expect(categoryActions.getByText('删除', { exact: true })).toHaveCount(0);
   await expect(main.locator('.scope-tabs')).toContainText('成品现货分类');
@@ -350,6 +361,7 @@ test('shows supplier status without unrelated operations for a status-only accou
       JSON.stringify({
         id: 13,
         name: '受限供应商管理员',
+        clientCode: 'supply-chain',
         phone: '15926620013',
         roles: ['SUPPLIER_STATUS_MANAGER'],
         permissions: ['admin.supplier-management.view', 'admin.supplier-management.toggle-status'],
@@ -377,6 +389,7 @@ test('allows account 15900000002 with all data scope to view all suppliers', asy
       'zdm-admin-user',
       JSON.stringify({
         id: 4,
+        clientCode: 'supply-chain',
         name: '张飞',
         phone: '15900000002',
         roles: ['OPERATION_MANAGER'],
@@ -395,7 +408,7 @@ test('allows account 15900000002 with all data scope to view all suppliers', asy
   await expect(main.locator('.table-actions .t-link')).toHaveCount(0);
 });
 
-test('opens employee invite and edit dialogs', async ({ page }) => {
+test('opens employee invitation and edit dialogs', async ({ page }) => {
   await page.goto('/employee-management');
   const main = page.getByRole('main');
 
@@ -404,12 +417,12 @@ test('opens employee invite and edit dialogs', async ({ page }) => {
   await expect(main.locator('thead')).toContainText('创建人');
   await expect(main.locator('thead')).toContainText('注册时间');
 
-  await main.getByRole('button', { name: /邀请员工/ }).click();
+  await main.getByRole('button', { name: '邀请员工', exact: true }).click();
   const inviteDialog = page.locator('.t-dialog:visible').filter({ hasText: '邀请员工' });
   await expect(inviteDialog).toBeVisible();
-  await expect(inviteDialog.getByText('员工邀请链接')).toBeVisible();
-  await expect(inviteDialog.locator('textarea')).toHaveValue(/\/employee-invite\?token=e2e-invite-token/);
-  await inviteDialog.getByRole('button', { name: '关闭' }).click();
+  await expect(inviteDialog.locator('textarea')).toHaveValue(/employee-invite\?token=e2e-invite-token/);
+  await expect(inviteDialog.getByText('复制链接', { exact: true })).toBeVisible();
+  await inviteDialog.getByRole('button', { name: '关闭', exact: true }).click();
 
   const firstEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926626945' }).first();
   await expect(firstEmployeeRow).toBeVisible();
@@ -459,10 +472,42 @@ test('opens employee invite and edit dialogs', async ({ page }) => {
   await employeePermissionDialog.getByRole('button', { name: '取消' }).click();
 });
 
+test('employee invitation follows the selected system tab', async ({ page }) => {
+  await page.goto('/employee-management');
+  for (const [label, client] of [
+    ['运营管理平台', 'admin'],
+    ['供应链协同系统', 'supply-chain'],
+  ]) {
+    await page.getByRole('main').locator('.t-tabs__nav-item').filter({ hasText: label }).click();
+    const request = page.waitForRequest(
+      (item) => item.url().includes('/api/admin/employee-invites?') && item.method() === 'POST',
+    );
+    await page.getByRole('button', { name: '邀请员工', exact: true }).click();
+    expect(new URL((await request).url()).searchParams.get('clientCode')).toBe(client);
+    const dialog = page.locator('.t-dialog:visible').filter({ hasText: '邀请员工' });
+    await expect(dialog.getByText('复制链接', { exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  }
+});
+
+test('supply chain invitation displays its server-bound system', async ({ page }) => {
+  await page.route('**/api/open/employee-invites/e2e-invite-token', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: { token: 'e2e-invite-token', clientCode: 'supply-chain', expiresAt: '2099-01-01' },
+      }),
+    }),
+  );
+  await page.goto('/employee-invite?token=e2e-invite-token&clientCode=admin');
+  await expect(page.getByRole('heading', { name: '供应链协同系统员工注册' })).toBeVisible();
+});
+
 test('registers from employee invite link', async ({ page }) => {
   await page.goto('/employee-invite?token=e2e-invite-token');
 
-  await expect(page.getByRole('heading', { name: '员工注册' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '运营管理平台员工注册' })).toBeVisible();
   await page.getByPlaceholder('请输入手机号').fill('15926629999');
   await page.getByRole('button', { name: '获取验证码' }).click();
   await expect(page.getByText('验证码已发送')).toBeVisible();
@@ -474,7 +519,7 @@ test('registers from employee invite link', async ({ page }) => {
   await page.getByRole('button', { name: '提交注册' }).click();
 
   await expect(page.getByRole('heading', { name: '注册信息已提交' })).toBeVisible();
-  await expect(page.getByText('请等待超级管理员确认信息并启用账号。')).toBeVisible();
+  await expect(page.getByText('请等待管理员确认信息并启用当前系统的员工身份。')).toBeVisible();
 });
 
 test('rejects an existing organization employee before requesting a verification code', async ({ page }) => {
@@ -488,6 +533,22 @@ test('rejects an existing organization employee before requesting a verification
   await expect(requestCodeButton).toHaveText('获取验证码');
   await expect(requestCodeButton).toBeEnabled();
   await expect(page.getByPlaceholder('请输入验证码')).toHaveValue('');
+});
+
+test('employee permission dialog validates only after submit and clears errors on reopen', async ({ page }) => {
+  await page.goto('/employee-management');
+  const row = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
+  await row.getByText('角色', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '配置权限' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.t-is-error')).toHaveCount(0);
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(dialog.getByText('请选择角色', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('请选择数据权限', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await row.getByText('角色', { exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.t-is-error')).toHaveCount(0);
 });
 
 test('validates role and data permission before enabling employee', async ({ page }) => {
@@ -600,6 +661,8 @@ test('shows employee permission action without edit action for permission-only u
   const permissionOnlyEmployeeActions = permissionOnlyEmployeeRow.locator('.table-actions');
   await expect(permissionOnlyEmployeeActions.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(permissionOnlyEmployeeActions.getByText('角色', { exact: true })).toBeVisible();
+  // Hiding the other actions must not shrink the reserved four-button column.
+  await expect(page.getByRole('columnheader', { name: '操作', exact: true })).toHaveCSS('width', '184px');
 });
 
 test('allows granted employee operations for records created by another account', async ({ page }) => {
@@ -854,14 +917,14 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleModuleList.locator('.permission-module-item > span:first-child')).toHaveText([
     '租户与门店',
     '商品管理',
-    '供应商管理',
+    '供应商供货类型管理',
     '权限管理',
   ]);
   await expect(roleModuleList.getByText('租户与门店', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('门店分类管理', { exact: true })).toHaveCount(0);
   await expect(roleModuleList.getByText('商品管理', { exact: true })).toBeVisible();
   await expect(roleModuleList.getByText('权限管理', { exact: true })).toBeVisible();
-  await expect(roleModuleList.getByText('供应商管理', { exact: true })).toBeVisible();
+  await expect(roleModuleList.getByText('供应商供货类型管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.locator('thead')).toContainText('二级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('三级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('页面');
@@ -913,11 +976,11 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
-    ['查看', '发布商品', '批量上架', '价格', '上架', '编辑', '删除'],
-    ['查看', '发布商品', '批量下架', '价格', '下架', '编辑'],
-    ['查看', '批量放回仓库', '详情', '放回仓库', '删除'],
+    ['查看', '批量上架', '价格', '上架', '删除'],
+    ['查看', '批量下架', '价格', '下架'],
+    ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],
     ['查看', '价格'],
-    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '价格', '放回到仓库', '彻底删除'],
+    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '价格', '放回仓库', '彻底删除'],
   ];
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
@@ -961,7 +1024,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const finishedTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货模板' });
   const accessoryTemplatePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件模板' });
   await expect(finishedTemplatePermissionRow.getByText('分类属性模板', { exact: true })).toBeVisible();
-  const templateActionLabels = ['查看', '创建新版本草稿', '版本记录'];
+  const templateActionLabels = ['查看', '创建新版本草稿', '版本记录', '排序'];
   await expect(finishedTemplatePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     templateActionLabels,
   );
@@ -1042,18 +1105,17 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '停用/启用',
     '删除',
   ]);
-  await roleModuleList.getByText('供应商管理', { exact: true }).click();
-  const supplierPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '供应商管理页' });
+  await roleModuleList.getByText('供应商供货类型管理', { exact: true }).click();
+  const supplierPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '供应商供货类型管理' });
   await expect(supplierPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
-    '供货类型配置',
     '编辑',
     '停用/启用',
     '删除',
   ]);
   await roleModuleList.getByText('权限管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(3);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(5);
   await expect(
     roleMatrix.locator('tbody tr').filter({ hasText: '终端功能分配页' }).locator('.permission-action-grid .t-checkbox'),
   ).toHaveText(['查看', '保存']);
@@ -1074,7 +1136,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await employeePermissionRow.getByText('查看', { exact: true }).click();
   await expect(employeePermissionRow.locator('.permission-action-grid input[type="checkbox"]:checked')).toHaveCount(0);
   const rolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '角色管理页' });
-  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('—');
+  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('运营管理平台');
   await expect(rolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
@@ -1120,7 +1182,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       '删除',
     ]);
     await moduleList.getByText('门店分类管理', { exact: true }).click();
-    await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(categoryCatalogActionLabels);
+    await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(storeCategoryCatalogActionLabels);
     await moduleList.getByText('权限管理', { exact: true }).click();
     await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
     await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();
@@ -1197,4 +1259,165 @@ test('allows platform allocation viewers to inspect without a save action', asyn
   await page.goto('/terminal-function-allocation');
   await expect(page.getByRole('main').locator('.permission-module-item')).toHaveCount(3);
   await expect(page.getByRole('main').getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+});
+
+test('allocates supply chain employee and role management and persists selection', async ({ page }) => {
+  await page.goto('/terminal-function-allocation');
+  const main = page.getByRole('main');
+  await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
+  await main.locator('.permission-module-list').getByText('权限管理', { exact: true }).click();
+  const matrix = main.locator('.permission-matrix');
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '邀请员工',
+    '编辑',
+    '角色',
+    '停用/启用',
+    '删除',
+    '查看',
+    '新增',
+    '编辑',
+    '权限',
+    '删除',
+  ]);
+  await expect(matrix.getByText('终端功能分配页', { exact: true })).toHaveCount(0);
+  await main.getByRole('button', { name: '清空全部', exact: true }).click();
+  await matrix.getByText('全选当前模块', { exact: true }).click();
+  const saved = page.waitForRequest(
+    (r) => r.method() === 'PUT' && r.url().endsWith('/terminal-function-policies/supply-chain'),
+  );
+  await main.getByRole('button', { name: '保存', exact: true }).click();
+  const permissions = (await saved).postDataJSON().functionPermissions.split(',');
+  expect(permissions).toHaveLength(11);
+  expect(
+    permissions.every((p: string) => /^(admin.permission-management.(employee|role)-management.supply-chain.)/.test(p)),
+  ).toBe(true);
+  await expect(page.getByText('终端功能分配已保存', { exact: true })).toBeVisible();
+  await page.reload();
+  await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
+  await main.locator('.permission-module-list').getByText('权限管理', { exact: true }).click();
+  await expect(matrix.locator('.module-allocation-count')).toHaveText('已下放 11 / 11');
+});
+
+test('supply chain view-only staff pages use own system and hide actions and platform tabs', async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 100,
+        clientCode: 'supply-chain',
+        name: '供应链查看员',
+        roles: ['VIEWER'],
+        dataPermission: 'all',
+        permissions: [
+          'admin.permission-management.employee-management.supply-chain.view',
+          'admin.permission-management.role-management.supply-chain.view',
+        ],
+      }),
+    ),
+  );
+  for (const [path, api] of [
+    ['employee-management', 'employees'],
+    ['role-management', 'roles'],
+  ]) {
+    const request = page.waitForRequest((r) => r.url().includes(`/api/admin/${api}?`));
+    await page.goto('/' + path);
+    expect(new URL((await request).url()).searchParams.get('clientCode')).toBe('supply-chain');
+    await expect(page.getByRole('main').locator('.t-tabs__nav')).toHaveCount(0);
+    await expect(page.getByRole('main').getByRole('button', { name: /邀请员工|新增/ })).toHaveCount(0);
+  }
+  await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
+});
+
+test('supply chain hides mutations on platform roles but retains local role actions', async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 1,
+        clientCode: 'supply-chain',
+        name: '供应链负责人',
+        roles: ['MANAGER'],
+        dataPermission: 'all',
+        permissions: ['view', 'create', 'edit', 'permission', 'delete'].map(
+          (action) => `admin.permission-management.role-management.supply-chain.${action}`,
+        ),
+      }),
+    ),
+  );
+  await page.route(/\/api\/admin\/roles\?clientCode=supply-chain$/, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: [
+          { id: 300, name: '平台创建角色', code: 'PLATFORM', status: 'enabled', createdByClientCode: 'admin' },
+          { id: 301, name: '供应链自建角色', code: 'LOCAL', status: 'enabled', createdByClientCode: 'supply-chain' },
+          { id: 302, name: '历史来源未确认', code: 'LEGACY', status: 'enabled' },
+        ],
+      }),
+    }),
+  );
+  await page.goto('/role-management');
+  for (const name of ['平台创建角色', '历史来源未确认']) {
+    const row = page.locator('tbody tr').filter({ hasText: name });
+    await expect(row).toBeVisible();
+    await expect(row.locator('.table-actions .t-link')).toHaveCount(0);
+  }
+  await expect(
+    page.locator('tbody tr').filter({ hasText: '供应链自建角色' }).locator('.table-actions .t-link'),
+  ).toHaveText(['编辑', '权限', '删除']);
+});
+
+test('shows only granted attribute tabs and falls back to the first accessible tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 12,
+        name: '属性库多 Tab 管理员',
+        phone: '15926620012',
+        roles: ['ATTRIBUTE_TAB_VIEWER'],
+        permissions: [
+          'admin.product-data-center.attribute.finished.view',
+          'admin.product-data-center.attribute.accessory.view',
+        ],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/product-attribute');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属属性', '配件专属属性']);
+  await expect(main.getByText('E2E 成品现货专属属性', { exact: true })).toBeVisible();
+  await expect(main.getByText('E2E 共享属性', { exact: true })).toHaveCount(0);
+  await expect(main.getByText('成品现货属性库', { exact: true })).toBeVisible();
+});
+
+test('shows only granted attribute-value tabs and falls back to the first accessible tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 14,
+        name: '属性值多 Tab 管理员',
+        phone: '15926620014',
+        roles: ['ATTRIBUTE_VALUE_TAB_VIEWER'],
+        permissions: [
+          'admin.product-data-center.attribute-value.finished.view',
+          'admin.product-data-center.attribute-value.accessory.view',
+        ],
+        dataPermission: 'self',
+      }),
+    );
+  });
+
+  await page.goto('/product-attribute-value');
+  const main = page.getByRole('main');
+
+  await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属值', '配件专属值']);
+  await expect(main.getByText('E2E 成品现货专属值', { exact: true })).toBeVisible();
+  await expect(main.getByText('E2E 共享属性值', { exact: true })).toHaveCount(0);
 });

@@ -67,7 +67,7 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
       operationDetected = true;
     }
     if (!Objects.equals(existing.getSortOrder(), category.getSortOrder())) {
-      requireAnyCategoryPermission(existing.getScope(), List.of("move-up", "move-down"));
+      requireCategoryPermission(existing.getScope(), "sort");
       operationDetected = true;
     }
     if (!Objects.equals(existing.getStatus(), category.getStatus())) {
@@ -99,14 +99,6 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
 
   private void requireCategoryPermission(String scope, String operation) {
     permissionGuard.requirePermission(scopePermissionPrefix(scope) + "." + operation);
-  }
-
-  private void requireAnyCategoryPermission(
-      String scope,
-      List<String> operations) {
-    List<String> permissions = new ArrayList<>();
-    operations.forEach(operation -> permissions.add(scopePermissionPrefix(scope) + "." + operation));
-    permissionGuard.requireAnyPermission(permissions.toArray(String[]::new));
   }
 
   private String scopePermissionPrefix(String scope) {

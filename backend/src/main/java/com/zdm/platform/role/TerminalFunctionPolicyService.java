@@ -29,7 +29,7 @@ public class TerminalFunctionPolicyService
   @Transactional
   public TerminalFunctionPolicy savePolicy(String terminal, String functionPermissions) {
     permissionGuard.requirePermission("admin.permission-management.terminal-function-allocation.save");
-    if (!"store".equals(terminal) && !"supplier".equals(terminal)) {
+    if (!List.of("store", "supplier", "supply-chain").contains(terminal)) {
       throw new IllegalArgumentException("未知的用户端类型");
     }
     List<String> selected = FunctionPermissionNormalizer.normalize(

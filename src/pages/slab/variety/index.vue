@@ -18,13 +18,13 @@
         </header>
 
         <section class="filter-card">
-          <t-form :data="searchForm" label-width="56px" colon>
+          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="品种" name="name">
                   <t-input v-model="searchForm.name" clearable placeholder="请输入" />
                 </t-form-item>
-                <t-form-item label="状态" name="status">
+                <t-form-item class="zdm-status-filter" label="状态" name="status">
                   <t-select v-model="searchForm.status" clearable placeholder="请选择">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
@@ -181,14 +181,20 @@ const canToggleVarietyStatus = computed(() =>
 );
 const canDeleteVariety = computed(() => hasPermission(loginUser.value, `${varietyPermissionPrefix}.delete`));
 
-const columns: PrimaryTableCol<TableRowData>[] = [
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '品种名称', minWidth: 220, align: 'left' },
   { colKey: 'status', title: '状态', width: 120, align: 'center' },
   { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
   { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  { colKey: 'operation', title: '操作', width: 180, align: 'left', fixed: 'right' },
-];
+  {
+    colKey: 'operation',
+    title: '操作',
+    width: 156,
+    align: 'left',
+    fixed: 'right',
+  },
+]);
 
 const searchForm = reactive({
   name: '',

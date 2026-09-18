@@ -11,6 +11,9 @@ import jakarta.validation.constraints.NotBlank;
 
 @TableName(value = "finished_product_variants", autoResultMap = true)
 public class FinishedProductVariant extends BaseEntity {
+  private java.math.BigDecimal costPrice;
+  public java.math.BigDecimal getCostPrice() { return costPrice; }
+  public void setCostPrice(java.math.BigDecimal value) { costPrice = value; }
   private Long finishedProductId;
 
   @NotBlank

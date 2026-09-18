@@ -62,7 +62,7 @@ const targetText = computed(() => {
   return `${props.objectType}${name}`;
 });
 const dialogTitle = computed(
-  () => props.title || (props.mode === 'blocked' ? `无法${props.action}` : `确认${props.action}`),
+  () => props.title || (props.mode === 'blocked' ? `无法${props.action}` : `是否${props.action}`),
 );
 const confirmText = computed<ButtonProps>(() => ({
   content: props.mode === 'blocked' ? '我知道了' : `确认${props.action}`,
@@ -72,7 +72,7 @@ const dialogDescription = computed(() => {
   if (props.description) return props.description;
   return props.mode === 'blocked'
     ? `${targetText.value || '当前对象'}暂时无法${props.action}。`
-    : `确认${props.action}${targetText.value}吗？`;
+    : `是否${props.action}${targetText.value}？`;
 });
 
 function handleConfirm() {

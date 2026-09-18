@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,14 +29,14 @@ public class EmployeeController {
   }
 
   @GetMapping
-  public ApiResponse<List<Employee>> list() {
+  public ApiResponse<List<Employee>> list(@RequestParam(required = false) String clientCode) {
     permissionGuard.requireView(PERMISSION_PREFIX);
-    return ApiResponse.ok(permissionGuard.filterData(employeeService.listForCurrentAdmin()));
+    return ApiResponse.ok(permissionGuard.filterData(employeeService.listForCurrentAdmin(clientCode)));
   }
 
   @PostMapping
   public ApiResponse<Employee> create(@Valid @RequestBody Employee employee) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".create");
+    permissionGuard.requirePermission(EmployeeService.permissionPrefix(employee.getClientCode()) + ".create");
     employee.setId(null);
     return ApiResponse.ok(employeeService.createEmployee(employee));
   }
@@ -54,7 +55,8 @@ public class EmployeeController {
 
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    Employee target = employeeService.getById(id);
+    permissionGuard.requirePermission(EmployeeService.permissionPrefix(target == null ? "admin" : target.getClientCode()) + ".delete");
     return ApiResponse.ok(employeeService.deleteEmployee(id));
   }
 }

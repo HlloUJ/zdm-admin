@@ -13,6 +13,10 @@ public class Employee implements com.zdm.platform.security.CreatorOwned {
   private Long id;
 
   private Long accountId;
+  private String clientCode = "admin";
+  public String getClientCode() { return clientCode; }
+  public void setClientCode(String value) { clientCode = value; }
+
   private Long tenantId;
   private Long storeId;
 

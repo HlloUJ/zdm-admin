@@ -177,7 +177,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
     (request) => request.method() === 'PATCH' && request.url().endsWith('/finished-markup-configurations/3/status'),
   );
   await finishedRow.getByText('停用', { exact: true }).click();
-  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('确认停用成品价格配置“城市中心店”吗？');
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('是否停用成品价格配置“城市中心店”？');
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
   expect((await finishedStatusRequest).postDataJSON()).toEqual({ status: 'disabled' });
   await expect(page.getByText('已停用“城市中心店”', { exact: true })).toBeVisible();
@@ -192,8 +192,9 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await page
     .getByRole('row')
     .filter({ hasText: '城市中心店' })
-    .locator('.t-table__handle-draggable')
-    .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('.t-table__handle-draggable'));
+    .locator('td')
+    .nth(1)
+    .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('td').nth(1));
   expect((await finishedReorderRequest).postDataJSON()).toEqual({ orderedIds: [4, 3] });
   await expect(page.getByText('已更新排序“城市中心店”', { exact: true })).toBeVisible();
 
@@ -238,8 +239,9 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await page
     .getByRole('row')
     .filter({ hasText: '城市中心店' })
-    .locator('.t-table__handle-draggable')
-    .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('.t-table__handle-draggable'));
+    .locator('td')
+    .nth(1)
+    .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('td').nth(1));
   expect((await slabReorderRequest).postDataJSON()).toEqual({ orderedIds: [6, 2] });
   await expect(page.getByText('已更新排序“城市中心店”', { exact: true })).toBeVisible();
 
@@ -260,7 +262,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
 
   const unusedSlabRow = page.getByRole('row').filter({ hasText: '区域合作店' });
   await unusedSlabRow.getByText('删除', { exact: true }).click();
-  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('确认删除价格配置“区域合作店”吗？');
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('是否删除价格配置“区域合作店”？');
 });
 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
@@ -291,10 +293,10 @@ test('价格配置无排序和停启权限时隐藏对应操作', async ({ page 
   await expect(row.getByText('编辑', { exact: true })).toBeVisible();
   await expect(row.getByText('删除', { exact: true })).toBeVisible();
   await expect(row.getByText('停用', { exact: true })).toHaveCount(0);
-  await expect(page.locator('.t-table__handle-draggable')).toHaveCount(0);
+  await expect(page.locator('.zdm-row-sort-table')).toHaveCount(0);
 
   await row.getByText('删除', { exact: true }).click();
-  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('确认删除价格配置“城市中心店”吗？');
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toContainText('是否删除价格配置“城市中心店”？');
   const deleteRequest = page.waitForRequest(
     (request) => request.method() === 'DELETE' && request.url().endsWith('/api/admin/finished-markup-configurations/3'),
   );
@@ -359,19 +361,16 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
   await expect(drawer.locator('input[value="175.00"]')).toBeVisible();
 
   await page.reload();
-  await page
-    .getByRole('row', { name: /独立价格大板/ })
-    .getByText('编辑', { exact: true })
-    .click();
-  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑商品' });
-  await productDialog.getByText('销售信息', { exact: true }).click();
-  const historicalRow = productDialog.locator('.price-editor__row').filter({ hasText: '历史门店级别' });
+  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
+  await row.getByText('价格', { exact: true }).click();
+  await expect(drawer).toBeVisible();
+  const historicalRow = drawer.locator('.price-table__row').filter({ hasText: '历史门店级别' });
   await expect(historicalRow.getByRole('textbox').first()).toHaveValue('1.75');
   await expect(historicalRow.getByRole('textbox').last()).toHaveValue('175.00');
-  const configuredCurrentLevel = productDialog.locator('.price-editor__row').filter({ hasText: '1级' });
+  const configuredCurrentLevel = drawer.locator('.price-table__row').filter({ hasText: '1级' });
   await expect(configuredCurrentLevel.getByRole('textbox').first()).toHaveValue('1.20');
   await expect(configuredCurrentLevel.getByRole('textbox').last()).toHaveValue('120.00');
-  const unconfiguredCurrentLevel = productDialog.locator('.price-editor__row').filter({ hasText: '2级' });
+  const unconfiguredCurrentLevel = drawer.locator('.price-table__row').filter({ hasText: '2级' });
   await expect(unconfiguredCurrentLevel.getByRole('textbox').first()).toHaveValue('');
   await expect(unconfiguredCurrentLevel.getByRole('textbox').last()).toHaveValue('');
 });

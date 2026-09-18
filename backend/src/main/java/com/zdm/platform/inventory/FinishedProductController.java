@@ -53,28 +53,28 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
       @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int pageSize) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
+    permissionGuard.requirePermission(prefix() + ".operation-log.view");
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(operationLogs.listPage(keyword, operationType, operatorName, startDate, endDate, page, pageSize));
   }
 
   @GetMapping("/operation-logs/{id}")
   public ApiResponse<FinishedOperationLog> operationLogDetail(@PathVariable Long id) {
-    permissionGuard.requirePermission(PERMISSION_PREFIX + ".operation-log.view");
+    permissionGuard.requirePermission(prefix() + ".operation-log.view");
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(operationLogs.detail(id));
   }
 
   @GetMapping("/attribute-template-options")
   public ApiResponse<List<FinishedProductService.AttributeTemplateOption>> attributeTemplateOptions() {
-    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requireView(prefix());
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(service.attributeTemplateOptions());
   }
 
   @GetMapping("/price-level-options")
   public ApiResponse<List<StoreLevelPricingDirectory.Level>> priceLevelOptions() {
-    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requireView(prefix());
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(storeLevelDirectory.listEnabledLevels());
   }
@@ -96,24 +96,20 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   @Override
   @GetMapping
   public ApiResponse<List<FinishedProduct>> list() {
-    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requireView(prefix());
     permissionGuard.requireDataPermission();
     return ApiResponse.ok(permissionGuard.filterData(service.listWithDetails()).stream()
-        .filter(product -> permissionGuard.hasPermission(PERMISSION_PREFIX + ".view")
-            || permissionGuard.hasPermission(permission(scope(product.getStatus()), "view")))
+        .filter(product -> permissionGuard.hasPermission(prefix() + ".view")
+            || permissionGuard.hasPermission(permission(scope(isSupplyChain() ? product.getSourceStatus() : product.getStatus()), "view")))
         .toList());
   }
 
   @Override
   @PostMapping
   public ApiResponse<FinishedProduct> create(@Valid @RequestBody FinishedProduct product) {
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create",
-        permission("warehouse", "publish"), permission("selling", "publish"));
-    if (!permissionGuard.hasPermission(PERMISSION_PREFIX + ".create")
-        && !List.of("warehouse", "selling").contains(java.util.Objects.toString(product.getStatus(), ""))) {
-      throw new org.springframework.security.access.AccessDeniedException("发布商品只能暂存仓库或立刻上架");
-    }
+    permissionGuard.requireAnyPermission(permission("warehouse","publish"),permission("selling","publish"));
     permissionGuard.requireDataPermission();
+    if(isSupplyChain() && "selling".equals(product.getStatus()) && !"接口获取".equals(product.getPublisherType())) { permissionGuard.requireAnyPermission(permission("warehouse","shelf"),permission("selling","publish")); }
     return ApiResponse.ok(service.createWithDetails(product));
   }
 
@@ -127,8 +123,21 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
       throw new IllegalArgumentException("成品现货不存在或已被删除");
     }
     permissionGuard.requireData(existing);
+    if (isSupplyChain()) {
+      if (!java.util.Objects.equals(existing.getSourceStatus(),product.getStatus())) {
+        String action = transitionAction(existing.getSourceStatus(),product.getStatus());
+        permissionGuard.requireAnyPermission(permission(scope(existing.getSourceStatus()),action),permission(scope(existing.getSourceStatus()),"batch-"+action));
+        if("selling".equals(product.getStatus()) && permissionGuard.hasPermission(permission(scope(existing.getSourceStatus()),"edit"))) { return ApiResponse.ok(service.updateWithDetails(id,product)); }
+        return ApiResponse.ok(service.sourceTransition(id,product.getStatus(),product.getOffShelfReason(),product.getOffShelfDetail()));
+      }
+      permissionGuard.requirePermission(permission(scope(existing.getSourceStatus()),"edit"));
+      return ApiResponse.ok(service.updateWithDetails(id,product));
+    }
+    if (existing.isSourceUnavailable() || Boolean.TRUE.equals(existing.getOperationsDeleted())) {
+      throw new IllegalArgumentException("该商品已被供应链删除或运营已彻底删除，不能执行此操作");
+    }
     String source = scope(existing.getStatus());
-    if (permissionGuard.hasPermission(PERMISSION_PREFIX + ".edit")) {
+    if (permissionGuard.hasPermission(prefix() + ".edit")) {
       return ApiResponse.ok(service.updateWithDetails(id, product));
     }
     if (!java.util.Objects.equals(existing.getStatus(), product.getStatus())) {
@@ -154,18 +163,20 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   @Override
   @DeleteMapping("/{id}")
   public ApiResponse<Boolean> delete(@PathVariable Long id) {
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".delete",
+    permissionGuard.requireAnyPermission(prefix() + ".delete",
         permission("recycle", "purge"), permission("recycle", "batch-purge"), permission("recycle", "clear"));
     permissionGuard.requireDataPermission();
     FinishedProduct product = service.getById(id);
-    if (product == null || !"recycle".equals(product.getStatus())) {
+    if (product == null || (isSupplyChain() ? !"recycle".equals(product.getSourceStatus()) : (Boolean.TRUE.equals(product.getOperationsDeleted()) || (!"recycle".equals(product.getStatus()) && !product.isSourceUnavailable())))) {
       throw new IllegalArgumentException("只有回收站中的成品现货可以彻底删除");
     }
     permissionGuard.requireData(product);
     return ApiResponse.ok(service.removeById(id));
   }
-  private static String permission(String scope, String action) {
-    return PERMISSION_PREFIX + "." + scope + "." + action;
+  private boolean isSupplyChain() { return "supply-chain".equals(permissionGuard.identity().clientCode()); }
+  private String prefix() { return (isSupplyChain()?"supply-chain.":"admin.")+"finished-stock-management"; }
+  private String permission(String scope, String action) {
+    return prefix() + "." + scope + "." + action;
   }
 
   private static String scope(String status) {
@@ -180,7 +191,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   }
 
   private void requireProductFormPermission() {
-    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".create", PERMISSION_PREFIX + ".edit",
+    permissionGuard.requireAnyPermission(prefix() + ".create", prefix() + ".edit",
         permission("warehouse", "publish"), permission("selling", "publish"),
         permission("warehouse", "edit"), permission("selling", "edit"));
   }

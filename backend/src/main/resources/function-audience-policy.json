@@ -25,18 +25,90 @@
   },
   {
     "prefix": "admin.supplier-management",
-    "scope": "shared"
+    "scope": "supplier-directory"
   },
   {
     "prefix": "admin.permission-management.employee-management",
-    "scope": "shared"
+    "scope": "shared-management"
   },
   {
     "prefix": "admin.permission-management.role-management",
-    "scope": "shared"
+    "scope": "shared-management"
   },
   {
     "prefix": "admin.permission-management.terminal-function-allocation",
     "scope": "admin-only"
+  },
+  {
+    "prefix": "supply-chain",
+    "scope": "supply-chain-only"
+  },
+  {
+    "prefix": "admin.supplier-supply-type-management",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.finished-stock-management.create",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.finished-stock-management.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.finished-stock-management.warehouse.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.finished-stock-management.selling.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.finished-stock-management.warehouse.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.finished-stock-management.selling.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.finished-stock-management.off-shelf.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.create",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.warehouse.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.selling.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.warehouse.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.selling.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.off-shelf.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.permission-management.role-management.supply-chain",
+    "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain",
+    "scope": "internal-management"
   }
 ]
