@@ -600,6 +600,7 @@ export async function installAdminApiMocks(page: Page) {
       roleCount: 3,
       accountDeleteCount: 4,
       accountRetainCount: 1,
+      phoneReleaseCount: 4,
       blockers: tenant.status === 'disabled' ? [] : ['请先归档租户'],
     });
   });
@@ -611,6 +612,7 @@ export async function installAdminApiMocks(page: Page) {
       roleDeleteCount: 3,
       accountDeleteCount: 4,
       accountRetainCount: 1,
+      phoneReleaseCount: 4,
     });
   });
   await mockCollection(page, '**/api/admin/stores', stores);
@@ -782,15 +784,6 @@ export async function installAdminApiMocks(page: Page) {
 
 async function mockEmployeeInvites(page: Page) {
   await page.route('**/api/open/employee-invites/e2e-invite-token/request-code', async (route) => {
-    const payload = route.request().postDataJSON() as { phone?: string };
-    if (payload.phone === '15926626945') {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({ code: 400, message: '该手机号已是当前组织员工', data: null }),
-      });
-      return;
-    }
     await fulfillJson(route, true);
   });
 
@@ -825,13 +818,16 @@ async function mockEmployeeInvites(page: Page) {
       });
       return;
     }
-    await fulfillJson(route, true);
+    await fulfillJson(route, { requiresProfile: true, registration: null });
   });
 
   await page.route('**/api/open/employee-invites/e2e-invite-token/register', async (route) => {
     await fulfillJson(route, {
       employeeId: 2,
       status: 'disabled',
+      existingAccount: false,
+      existingEmployee: false,
+      canLogin: false,
     });
   });
 }

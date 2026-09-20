@@ -6,4 +6,5 @@ public record TenantPurgeResult(
     int employeeDeleteCount,
     int roleDeleteCount,
     int accountDeleteCount,
-    int accountRetainCount) {}
+    int accountRetainCount,
+    int phoneReleaseCount) {}

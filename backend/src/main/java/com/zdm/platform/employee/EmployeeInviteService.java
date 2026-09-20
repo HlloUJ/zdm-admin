@@ -24,9 +24,13 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
   private final CurrentIdentityProvider identityProvider;
 
   private final PermissionGuard permissionGuard;
+  private final EmployeeInviteAccess inviteAccess;
+  private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
-  public EmployeeInviteService(EmployeeService employeeService, CurrentIdentityProvider identityProvider, PermissionGuard permissionGuard) {
+  public EmployeeInviteService(EmployeeService employeeService, CurrentIdentityProvider identityProvider, PermissionGuard permissionGuard, EmployeeInviteAccess inviteAccess, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
     this.permissionGuard = permissionGuard;
+    this.inviteAccess = inviteAccess;
+    this.jdbcTemplate = jdbcTemplate;
     this.employeeService = employeeService;
     this.identityProvider = identityProvider;
   }
@@ -45,40 +49,65 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     invite.setTenantId(identity.tenantId());
     invite.setStoreId(identity.storeId());
     invite.setCreatedByAccountId(identity.accountId());
+    invite.setCreatedByIdentityId(identity.identityId());
     invite.setCreatedByName(identity.displayName());
     invite.setStatus(ACTIVE);
-    invite.setExpiresAt(LocalDateTime.now().plusDays(7));
+    LocalDateTime createdAt = LocalDateTime.now().withNano(0);
+    invite.setCreatedAt(createdAt);
+    invite.setExpiresAt(createdAt.plusMinutes(5));
     save(invite);
     return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode());
   }
 
   public EmployeeInviteResponse inspectInvite(String token) {
     EmployeeInvite invite = requireActiveInvite(token);
+    inviteAccess.requireValidIssuer(invite);
     return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode());
   }
 
   public Boolean requestCode(String token, RequestInviteCodeRequest request) {
     EmployeeInvite invite = requireActiveInvite(token);
-    employeeService.validateInvitedEmployeePhone(invite, request.phone());
-    return true;
-  }
-
-  public Boolean verifyCode(String token, VerifyInviteCodeRequest request) {
-    requireActiveInvite(token);
-    requireDevCode(request.verifyCode());
+    inviteAccess.requireValidIssuer(invite);
     return true;
   }
 
   @Transactional
-  public EmployeeInviteRegisterResponse register(String token, EmployeeInviteRegisterRequest request) {
-    EmployeeInvite locked = lambdaQuery().eq(EmployeeInvite::getToken, token).last("FOR UPDATE").one();
-    EmployeeInvite invite = validateActiveInvite(locked);
+  public EmployeeInviteVerifyResponse verifyCode(String token, VerifyInviteCodeRequest request) {
+    EmployeeInvite invite = lockActiveInvite(token);
     requireDevCode(request.verifyCode());
+    inviteAccess.requireValidIssuer(invite);
+    if (!employeeService.hasAccount(request.phone())) {
+      return new EmployeeInviteVerifyResponse(true, null);
+    }
+    EmployeeInviteRegisterResponse response = employeeService.registerInvitedEmployee(invite,
+        new EmployeeInviteRegisterRequest(request.phone(), request.verifyCode(), null, null));
+    recordAcceptance(invite, response);
+    return new EmployeeInviteVerifyResponse(false, response);
+  }
+
+  @Transactional
+  public EmployeeInviteRegisterResponse register(String token, EmployeeInviteRegisterRequest request) {
+    EmployeeInvite invite = lockActiveInvite(token);
+    requireDevCode(request.verifyCode());
+    inviteAccess.requireValidIssuer(invite);
     EmployeeInviteRegisterResponse response = employeeService.registerInvitedEmployee(invite, request);
-    invite.setStatus(USED);
-    invite.setUsedAt(LocalDateTime.now());
-    updateById(invite);
+    recordAcceptance(invite, response);
     return response;
+  }
+
+  private EmployeeInvite lockActiveInvite(String token) {
+    return validateActiveInvite(lambdaQuery().eq(EmployeeInvite::getToken, token).last("FOR UPDATE").one());
+  }
+
+  private void recordAcceptance(EmployeeInvite invite, EmployeeInviteRegisterResponse response) {
+    // One audit record per person; retries neither overwrite the first result nor extend the link.
+    jdbcTemplate.update("""
+        INSERT INTO employee_invite_acceptances
+          (invite_id, account_id, employee_id, employee_status, existing_employee)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE id = id
+        """, invite.getId(), invite.getAcceptedAccountId(), response.employeeId(),
+        response.status(), response.existingEmployee());
   }
 
   private EmployeeInvite requireActiveInvite(String token) {
@@ -93,7 +122,7 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     if (USED.equals(invite.getStatus())) {
       throw new IllegalArgumentException("邀请链接已使用");
     }
-    if (!ACTIVE.equals(invite.getStatus()) || invite.getExpiresAt().isBefore(LocalDateTime.now())) {
+    if (!ACTIVE.equals(invite.getStatus()) || !invite.getExpiresAt().isAfter(LocalDateTime.now())) {
       if (!EXPIRED.equals(invite.getStatus())) {
         invite.setStatus(EXPIRED);
         updateById(invite);

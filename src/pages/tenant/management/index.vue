@@ -181,7 +181,10 @@
         <t-descriptions-item label="员工">{{ purgePreview.employeeCount }}</t-descriptions-item>
         <t-descriptions-item label="角色">{{ purgePreview.roleCount }}</t-descriptions-item>
         <t-descriptions-item label="删除独立账号">{{ purgePreview.accountDeleteCount }}</t-descriptions-item>
-        <t-descriptions-item label="保留共享账号">{{ purgePreview.accountRetainCount }}</t-descriptions-item>
+        <t-descriptions-item label="保留账号（共享或历史引用）">{{
+          purgePreview.accountRetainCount
+        }}</t-descriptions-item>
+        <t-descriptions-item label="释放手机号">{{ purgePreview.phoneReleaseCount }}</t-descriptions-item>
       </t-descriptions>
       <t-alert
         v-for="blocker in purgePreview?.blockers ?? []"

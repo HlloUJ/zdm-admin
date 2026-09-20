@@ -31,7 +31,7 @@ public class OpenEmployeeInviteController {
   }
 
   @PostMapping("/{token}/verify-code")
-  public ApiResponse<Boolean> verifyCode(
+  public ApiResponse<EmployeeInviteVerifyResponse> verifyCode(
       @PathVariable String token,
       @Valid @RequestBody VerifyInviteCodeRequest request) {
     return ApiResponse.ok(inviteService.verifyCode(token, request));
