@@ -21,8 +21,16 @@ export interface EmployeeInviteRegisterPayload extends VerifyInviteCodePayload {
 }
 
 export interface EmployeeInviteRegisterResponse {
-  employeeId: number;
+  employeeId: number | null;
   status: 'enabled' | 'disabled';
+  existingAccount: boolean;
+  existingEmployee: boolean;
+  canLogin: boolean;
+}
+
+export interface EmployeeInviteVerifyResponse {
+  requiresProfile: boolean;
+  registration: EmployeeInviteRegisterResponse | null;
 }
 
 export function createEmployeeInvite(clientCode: 'admin' | 'supply-chain') {
@@ -43,7 +51,7 @@ export function requestEmployeeInviteCode(token: string, payload: RequestInviteC
 }
 
 export function verifyEmployeeInviteCode(token: string, payload: VerifyInviteCodePayload) {
-  return request<boolean>(`/open/employee-invites/${encodeURIComponent(token)}/verify-code`, {
+  return request<EmployeeInviteVerifyResponse>(`/open/employee-invites/${encodeURIComponent(token)}/verify-code`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });

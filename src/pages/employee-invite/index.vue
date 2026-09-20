@@ -12,8 +12,8 @@
       </div>
 
       <div v-else-if="submitted" class="state-panel">
-        <h1>注册信息已提交</h1>
-        <p>请等待管理员确认信息并启用当前系统的员工身份。</p>
+        <h1>{{ resultTitle }}</h1>
+        <p>{{ resultMessage }}</p>
       </div>
 
       <template v-else>
@@ -110,6 +110,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 import {
+  type EmployeeInviteRegisterResponse,
   inspectEmployeeInvite,
   registerEmployeeInvite,
   requestEmployeeInviteCode,
@@ -122,6 +123,22 @@ const loading = ref(true);
 const requestingCode = ref(false);
 const submitting = ref(false);
 const submitted = ref(false);
+const resultTitle = ref('注册信息已提交');
+const resultMessage = ref('注册信息已提交，请等待管理员分配权限并启用本平台员工身份，启用后即可登录。');
+
+const showRegistrationResult = (result: EmployeeInviteRegisterResponse) => {
+  if (result.existingEmployee && !result.canLogin && result.status === 'disabled') {
+    resultTitle.value = '当前员工身份尚未启用';
+    resultMessage.value =
+      '该手机号码已在本平台存在员工身份，无需重复注册。当前身份尚未启用，请联系本平台管理员确认权限配置及启用状态。';
+  } else if (result.existingAccount) {
+    resultTitle.value = result.canLogin ? '无需重复注册' : '等待管理员分配权限';
+    resultMessage.value = result.canLogin
+      ? '该手机号码已在系统中存在账号，且已具备本平台访问权限，无需重复注册。您可直接使用原有账号登录本平台。'
+      : '该手机号码已在系统中存在账号，无需重新完成注册信息填写，待管理员分配角色权限后，可登录系统。';
+  }
+  submitted.value = true;
+};
 const pageError = ref('');
 const invitedSystemName = ref('');
 const step = ref<1 | 2>(1);
@@ -212,8 +229,14 @@ const handlePhoneSubmit = async (ctx: SubmitContext) => {
   if (ctx.validateResult !== true || submitting.value) return;
   submitting.value = true;
   try {
-    await verifyEmployeeInviteCode(token.value, phoneForm);
-    step.value = 2;
+    const result = await verifyEmployeeInviteCode(token.value, phoneForm);
+    if (result.requiresProfile) {
+      step.value = 2;
+    } else if (result.registration) {
+      showRegistrationResult(result.registration);
+    } else {
+      throw new Error('邀请处理失败，请重试');
+    }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '验证码校验失败');
   } finally {
@@ -225,13 +248,13 @@ const handleProfileSubmit = async (ctx: SubmitContext) => {
   if (ctx.validateResult !== true || submitting.value || profileForm.gender === '') return;
   submitting.value = true;
   try {
-    await registerEmployeeInvite(token.value, {
+    const result = await registerEmployeeInvite(token.value, {
       phone: phoneForm.phone,
       verifyCode: phoneForm.verifyCode,
       name: profileForm.name.trim(),
       gender: profileForm.gender,
     });
-    submitted.value = true;
+    showRegistrationResult(result);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '注册提交失败');
   } finally {

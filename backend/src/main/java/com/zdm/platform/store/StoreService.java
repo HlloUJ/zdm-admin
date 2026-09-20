@@ -19,14 +19,16 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   private final CurrentIdentityProvider identityProvider;
   private final StoreLevelService storeLevelService;
   private final JdbcTemplate jdbcTemplate;
+  private final com.zdm.platform.account.AccountLifecycleService accountLifecycle;
 
   public StoreService(
       CurrentIdentityProvider identityProvider,
       StoreLevelService storeLevelService,
-      JdbcTemplate jdbcTemplate) {
+      JdbcTemplate jdbcTemplate, com.zdm.platform.account.AccountLifecycleService accountLifecycle) {
     this.identityProvider = identityProvider;
     this.storeLevelService = storeLevelService;
     this.jdbcTemplate = jdbcTemplate;
+    this.accountLifecycle = accountLifecycle;
   }
 
   public List<Store> listForCurrentAdmin(boolean archived) {
@@ -122,6 +124,13 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     }
     requireArchived(existing);
     requireStoreSuppliersUnreferenced(id);
+    List<Long> accountIds = jdbcTemplate.queryForList("""
+        SELECT account_id FROM account_identities WHERE store_id=?
+        UNION SELECT account_id FROM employees WHERE store_id=? AND account_id IS NOT NULL
+        UNION SELECT account_id FROM account_roles WHERE store_id=? ORDER BY account_id
+        """, Long.class, id, id, id);
+    accountIds.forEach(accountLifecycle::lockAccount);
+    var protectedAccounts = accountIds.stream().filter(accountLifecycle::isProtected).toList();
     try {
       jdbcTemplate.update(
           "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)",
@@ -139,7 +148,12 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
       jdbcTemplate.update("DELETE FROM roles WHERE store_id = ?", id);
       jdbcTemplate.update("DELETE FROM suppliers WHERE store_id = ?", id);
       deleteStoreCategories(id);
-      return removeById(id);
+      boolean removed = removeById(id);
+      if (removed) {
+        accountIds.stream().filter(accountId -> !protectedAccounts.contains(accountId))
+            .forEach(accountLifecycle::releaseIfUnbound);
+      }
+      return removed;
     } catch (DataIntegrityViolationException exception) {
       throw new IllegalArgumentException(DELETE_FAILED_MESSAGE, exception);
     }

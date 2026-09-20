@@ -2894,7 +2894,7 @@ class PlatformApiSmokeTest {
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM account_identities WHERE store_id = ?", Integer.class, storeId)).isZero();
     assertThat(jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM accounts WHERE id = ?", Integer.class, storeId)).isEqualTo(1);
+        "SELECT COUNT(*) FROM accounts WHERE id = ?", Integer.class, storeId)).isZero();
     jdbcTemplate.update("DELETE FROM roles WHERE id = ?", roleId);
     jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", storeId);
   }
@@ -5007,7 +5007,7 @@ class PlatformApiSmokeTest {
           .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("disabled"));
       mockMvc.perform(post("/api/open/employee-invites/{token}/register", token)
               .contentType("application/json").content(payload))
-          .andExpect(status().isBadRequest());
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.existingEmployee").value(true));
       assertThat(jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM employees WHERE phone=? AND client_code=? AND tenant_id IS NULL AND store_id IS NULL AND status='disabled'",
           Integer.class, phone, client)).isEqualTo(1);
@@ -5018,10 +5018,10 @@ class PlatformApiSmokeTest {
       String duplicateToken = com.jayway.jsonpath.JsonPath.read(duplicate.getResponse().getContentAsString(), "$.data.token");
       mockMvc.perform(post("/api/open/employee-invites/{token}/request-code", duplicateToken)
               .contentType("application/json").content("{\"phone\":\"" + phone + "\"}"))
-          .andExpect(status().isBadRequest());
+          .andExpect(status().isOk());
       mockMvc.perform(post("/api/open/employee-invites/{token}/register", duplicateToken)
               .contentType("application/json").content(payload))
-          .andExpect(status().isBadRequest());
+          .andExpect(status().isOk());
     }
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isEqualTo(1);
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(DISTINCT account_id) FROM employees WHERE phone=?", Integer.class, phone)).isEqualTo(1);
@@ -5087,8 +5087,7 @@ class PlatformApiSmokeTest {
                   "phone": "15926628002"
                 }
                 """))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("该手机号已是当前组织员工"));
+        .andExpect(status().isOk());
 
     mockMvc.perform(post("/api/open/employee-invites/{token}/request-code", token)
             .contentType("application/json")
@@ -5142,8 +5141,7 @@ class PlatformApiSmokeTest {
     assertThat(createdByName).isEqualTo(creatorName);
 
     mockMvc.perform(get("/api/open/employee-invites/{token}", token))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("邀请链接已使用"));
+        .andExpect(status().isOk());
 
     mockMvc.perform(post("/api/admin/auth/login")
             .contentType("application/json")
@@ -5476,8 +5474,9 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.eligible").value(true))
         .andExpect(jsonPath("$.data.storeCount").value(2))
-        .andExpect(jsonPath("$.data.accountDeleteCount").value(1))
-        .andExpect(jsonPath("$.data.accountRetainCount").value(0));
+        .andExpect(jsonPath("$.data.accountDeleteCount").value(0))
+        .andExpect(jsonPath("$.data.phoneReleaseCount").value(1))
+        .andExpect(jsonPath("$.data.accountRetainCount").value(1));
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenantIdValue)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
@@ -5491,11 +5490,14 @@ class PlatformApiSmokeTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.tenantDeleteCount").value(1))
         .andExpect(jsonPath("$.data.storeDeleteCount").value(2))
-        .andExpect(jsonPath("$.data.accountDeleteCount").value(1));
+        .andExpect(jsonPath("$.data.accountDeleteCount").value(0))
+        .andExpect(jsonPath("$.data.phoneReleaseCount").value(1));
     assertThat(jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM accounts WHERE id = ?",
+        "SELECT COUNT(*) FROM accounts WHERE id = ? AND phone IS NULL AND status='disabled'",
         Integer.class,
-        tenantAccountId)).isZero();
+        tenantAccountId)).isEqualTo(1);
+    // The owner used authenticated operations; its audit history stays linked to the old account.
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM security_audit_logs WHERE account_id=?", Integer.class, tenantAccountId)).isPositive();
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM stores WHERE id = ?",
         Integer.class,
@@ -6460,6 +6462,376 @@ class PlatformApiSmokeTest {
             .contentType("application/json")
             .content("{\"confirmationName\":\"装点猫直营租户\"}"))
         .andExpect(status().isOk());
+  }
+
+  private String createInvitation(String client, String authToken) throws Exception {
+    MvcResult result = mockMvc.perform(post("/api/admin/employee-invites")
+            .param("clientCode", client).header("Authorization", "Bearer " + authToken))
+        .andExpect(status().isOk()).andReturn();
+    return com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.token");
+  }
+
+  private org.springframework.test.web.servlet.ResultActions verifyInvitation(String token, String phone) throws Exception {
+    return mockMvc.perform(post("/api/open/employee-invites/{token}/verify-code", token)
+        .contentType("application/json")
+        .content("{\"phone\":\"" + phone + "\",\"verifyCode\":\"888888\",\"clientCode\":\"invalid\",\"storeId\":999}"));
+  }
+
+  @Test
+  void employeeInviteExistingAccountSkipsProfileAndNeverRestoresOtherIdentities() throws Exception {
+    String phone = "15926628931";
+    createStoreScopedEmployee(98931L, phone, "张飞原姓名", "admin.permission-management.employee-management.create");
+    jdbcTemplate.update("UPDATE employees SET status='disabled',gender='male' WHERE id=98931");
+    jdbcTemplate.update("UPDATE account_identities SET status='disabled' WHERE account_id=98931");
+    String token = createInvitation("supply-chain", TokenAuthenticationFilter.DEV_TOKEN);
+    verifyInvitation(token, phone).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.requiresProfile").value(false))
+        .andExpect(jsonPath("$.data.registration.existingAccount").value(true))
+        .andExpect(jsonPath("$.data.registration.existingEmployee").value(false))
+        .andExpect(jsonPath("$.data.registration.canLogin").value(false))
+        .andExpect(jsonPath("$.data.registration.status").value("disabled"));
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isEqualTo(1);
+    Map<String, Object> employee = jdbcTemplate.queryForMap(
+        "SELECT name,gender,status,role_ids,data_permission,tenant_id,store_id FROM employees WHERE account_id=98931 AND client_code='supply-chain'");
+    assertThat(employee.get("name")).isEqualTo("张飞原姓名");
+    for (String field : List.of("gender", "role_ids", "data_permission", "tenant_id", "store_id")) {
+      assertThat(employee.get(field)).isNull();
+    }
+    assertThat(jdbcTemplate.queryForObject("SELECT status FROM employees WHERE id=98931", String.class)).isEqualTo("disabled");
+    assertThat(jdbcTemplate.queryForObject("SELECT a.account_id FROM employee_invite_acceptances a JOIN employee_invites i ON i.id=a.invite_id WHERE i.token=?", Long.class, token)).isEqualTo(98931L);
+    verifyInvitation(token, phone).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.registration.existingEmployee").value(true));
+    mockMvc.perform(get("/api/open/employee-invites/{token}", token)).andExpect(status().isOk());
+    String duplicate = createInvitation("supply-chain", TokenAuthenticationFilter.DEV_TOKEN);
+    verifyInvitation(duplicate, phone).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.registration.existingEmployee").value(true))
+        .andExpect(jsonPath("$.data.registration.status").value("disabled"))
+        .andExpect(jsonPath("$.data.registration.canLogin").value(false));
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE account_id=98931 AND client_code='supply-chain'", Integer.class)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_roles WHERE account_id=98931 AND client_code='supply-chain'", Integer.class)).isZero();
+    mockMvc.perform(post("/api/admin/auth/login").contentType("application/json")
+        .content("{\"phone\":\"" + phone + "\",\"verifyCode\":\"888888\"}")).andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void employeeInvitePreservesEnabledAccessAndSeparatesOrganizations() throws Exception {
+    String phone = "15926628932";
+    String owner = createStoreScopedEmployee(98932L, phone, "已启用员工", "admin.permission-management.employee-management.create");
+    String token = createInvitation("admin", owner);
+    Map<String, Object> before = jdbcTemplate.queryForMap("SELECT * FROM employees WHERE id=98932");
+    verifyInvitation(token, phone).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.registration.canLogin").value(true))
+        .andExpect(jsonPath("$.data.registration.employeeId").value(98932));
+    assertThat(jdbcTemplate.queryForMap("SELECT * FROM employees WHERE id=98932")).isEqualTo(before);
+    String anotherOwner = createStoreScopedEmployee(98933L, "15926628933", "另一门店", "admin.permission-management.employee-management.create");
+    String other = createInvitation("admin", anotherOwner);
+    verifyInvitation(other, phone).andExpect(status().isOk()).andExpect(jsonPath("$.data.registration.canLogin").value(false));
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE account_id=98932 AND store_id=98933 AND status='disabled'", Integer.class)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_roles WHERE account_id=98932 AND store_id=98933", Integer.class)).isZero();
+  }
+
+  @Test
+  void employeeInviteRejectsDisabledAccountExpiredLinkAndRevokedIssuer() throws Exception {
+    String owner = createStoreScopedEmployee(98934L, "15926628934", "邀请人", "admin.permission-management.employee-management.create");
+    String token = createInvitation("admin", owner);
+    Integer seconds = jdbcTemplate.queryForObject("SELECT TIMESTAMPDIFF(SECOND,created_at,expires_at) FROM employee_invites WHERE token=?", Integer.class, token);
+    assertThat(seconds).isBetween(299, 300);
+    jdbcTemplate.update("INSERT INTO accounts (id,phone,display_name,account_type,status) VALUES (98935,'15926628935','全局停用','person','disabled')");
+    verifyInvitation(token, "15926628935").andExpect(status().isBadRequest());
+    assertThat(jdbcTemplate.queryForObject("SELECT status FROM employee_invites WHERE token=?", String.class, token)).isEqualTo("active");
+    jdbcTemplate.update("UPDATE roles SET function_permissions='' WHERE id=98934");
+    verifyInvitation(token, "15926628935").andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("邀请已失效，请联系管理员重新邀请"));
+    String expired = createInvitation("admin", TokenAuthenticationFilter.DEV_TOKEN);
+    jdbcTemplate.update("UPDATE employee_invites SET expires_at=DATE_SUB(NOW(),INTERVAL 1 SECOND) WHERE token=?", expired);
+    verifyInvitation(expired, "15926628935").andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("邀请链接已过期"));
+    mockMvc.perform(post("/api/open/employee-invites/{token}/register", expired).contentType("application/json")
+        .content("{\"phone\":\"15926628936\",\"verifyCode\":\"888888\",\"name\":\"过期\",\"gender\":\"male\"}"))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE account_id=98935", Integer.class)).isZero();
+  }
+
+  @Test
+  void employeeInviteNewAccountRequiresProfileAndRechecksAccountAtSubmit() throws Exception {
+    String phone = "15926628937";
+    String token = createInvitation("admin", TokenAuthenticationFilter.DEV_TOKEN);
+    verifyInvitation(token, phone).andExpect(status().isOk()).andExpect(jsonPath("$.data.requiresProfile").value(true));
+    assertThat(jdbcTemplate.queryForObject("SELECT status FROM employee_invites WHERE token=?", String.class, token)).isEqualTo("active");
+    mockMvc.perform(post("/api/open/employee-invites/{token}/register", token).contentType("application/json")
+        .content("{\"phone\":\"" + phone + "\",\"verifyCode\":\"888888\"}"))
+        .andExpect(status().isBadRequest());
+    // Another business creates the account while the employee is on the profile step.
+    jdbcTemplate.update("INSERT INTO accounts (phone,display_name,account_type,status) VALUES (?,'原有姓名','person','enabled')", phone);
+    mockMvc.perform(post("/api/open/employee-invites/{token}/register", token).contentType("application/json")
+        .content("{\"phone\":\"" + phone + "\",\"verifyCode\":\"888888\",\"name\":\"不可覆盖\",\"gender\":\"male\"}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.existingAccount").value(true));
+    assertThat(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE phone=?", String.class, phone)).isEqualTo("原有姓名");
+    assertThat(jdbcTemplate.queryForObject("SELECT name FROM employees WHERE phone=?", String.class, phone)).isEqualTo("原有姓名");
+  }
+
+  @Test
+  void employeeInviteConcurrentAcceptanceDoesNotDuplicateEmployee() throws Exception {
+    String phone = "15926628938";
+    jdbcTemplate.update("INSERT INTO accounts (phone,display_name,account_type,status) VALUES (?,'并发邀请','person','enabled')", phone);
+    String token = createInvitation("admin", TokenAuthenticationFilter.DEV_TOKEN);
+    try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var start = new java.util.concurrent.CountDownLatch(1);
+      java.util.concurrent.Callable<Integer> accept = () -> {
+        start.await();
+        return verifyInvitation(token, phone).andReturn().getResponse().getStatus();
+      };
+      var first = executor.submit(accept);
+      var second = executor.submit(accept);
+      start.countDown();
+      assertThat(List.of(first.get(20, java.util.concurrent.TimeUnit.SECONDS), second.get(20, java.util.concurrent.TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder(200, 200);
+    }
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE phone=?", Integer.class, phone)).isEqualTo(1);
+  }
+
+  @Test
+  void employeeInviteAcceptsTenEmployeesWithoutExtendingExpiry() throws Exception {
+    String token = createInvitation("supply-chain", TokenAuthenticationFilter.DEV_TOKEN);
+    Map<String, Object> initial = jdbcTemplate.queryForMap("SELECT id,expires_at FROM employee_invites WHERE token=?", token);
+    for (int index = 0; index < 10; index++) {
+      String phone = "1592662930" + index;
+      if (index < 5) {
+        jdbcTemplate.update("INSERT INTO accounts (phone,display_name,account_type,status) VALUES (?,'已有账号','person','enabled')", phone);
+        verifyInvitation(token, phone).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.requiresProfile").value(false))
+            .andExpect(jsonPath("$.data.registration.status").value("disabled"));
+      } else {
+        verifyInvitation(token, phone).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.requiresProfile").value(true));
+        mockMvc.perform(post("/api/open/employee-invites/{token}/register", token)
+            .contentType("application/json").content("{\"phone\":\"" + phone
+                + "\",\"verifyCode\":\"888888\",\"name\":\"新员工\",\"gender\":\"male\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("disabled"));
+      }
+      verifyInvitation(token, phone).andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.registration.existingEmployee").value(true))
+          .andExpect(jsonPath("$.data.registration.canLogin").value(false));
+      assertThat(jdbcTemplate.queryForMap("SELECT id,expires_at FROM employee_invites WHERE token=?", token)).isEqualTo(initial);
+    }
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employee_invite_acceptances WHERE invite_id=?", Integer.class, initial.get("id"))).isEqualTo(10);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE phone LIKE '1592662930%' AND client_code='supply-chain' AND status='disabled' AND role_ids IS NULL AND data_permission IS NULL", Integer.class)).isEqualTo(10);
+    assertThat(jdbcTemplate.queryForObject("SELECT status FROM employee_invites WHERE token=?", String.class, token)).isEqualTo("active");
+    jdbcTemplate.update("UPDATE employee_invites SET expires_at=DATE_SUB(NOW(),INTERVAL 1 SECOND) WHERE token=?", token);
+    verifyInvitation(token, "15926629300").andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("邀请链接已过期"));
+    verifyInvitation(token, "15926629310").andExpect(status().isBadRequest());
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employee_invite_acceptances WHERE invite_id=?", Integer.class, initial.get("id"))).isEqualTo(10);
+  }
+
+  private long createExitEmployee(String phone, String client) throws Exception {
+    MvcResult result = mockMvc.perform(post("/api/admin/employees")
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+        .contentType("application/json").content("""
+          {"name":"退出规则员工","phone":"%s","gender":"male","status":"disabled","clientCode":"%s"}
+          """.formatted(phone, client))).andExpect(status().isOk()).andReturn();
+    return Long.parseLong(com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id").toString());
+  }
+
+  private void deleteExitEmployee(long id) throws Exception {
+    mockMvc.perform(delete("/api/admin/employees/{id}", id)
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(true));
+  }
+
+  private long createExitTenant(String phone, String name) throws Exception {
+    MvcResult result = mockMvc.perform(post("/api/admin/tenants")
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+        .contentType("application/json").content("""
+          {"name":"%s","contactPhone":"%s","contactName":"退出规则联系人","status":"enabled"}
+          """.formatted(name, phone))).andExpect(status().isOk()).andReturn();
+    long id = Long.parseLong(com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id").toString());
+    mockMvc.perform(patch("/api/admin/tenants/{id}/status", id)
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+        .contentType("application/json").content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isOk());
+    return id;
+  }
+
+  @Test
+  void accountExitPreservesDisabledOtherPlatformThenReleasesPhoneWithoutTransferringHistory() throws Exception {
+    String phone = "15926629201";
+    long adminEmployee = createExitEmployee(phone, "admin");
+    long supplyEmployee = createExitEmployee(phone, "supply-chain");
+    Long oldId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    jdbcTemplate.update("""
+        INSERT INTO roles (id,name,code,status,function_permissions,created_by_account_id)
+        VALUES (99201,'原员工创建的角色','EXIT_HISTORY_99201','enabled','admin.permission-management.role-management.view',?)
+        """, oldId);
+    // Configure a real old session in admin scope; deleting it must not touch the disabled supply-chain identity.
+    jdbcTemplate.update("UPDATE employees SET status='enabled',role_ids='99201',data_permission='self' WHERE id=?", adminEmployee);
+    jdbcTemplate.update("UPDATE account_identities SET status='enabled' WHERE account_id=? AND client_code='admin'", oldId);
+    jdbcTemplate.update("INSERT INTO account_roles (account_id,role_id,client_code) VALUES (?,99201,'admin')", oldId);
+    Long identityId = jdbcTemplate.queryForObject("SELECT id FROM account_identities WHERE account_id=? AND client_code='admin'", Long.class, oldId);
+    String oldSession = sessionTokens.issue(authAccounts.findByIdentityId(identityId));
+    deleteExitEmployee(adminEmployee);
+    assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isEqualTo(phone);
+    assertThat(jdbcTemplate.queryForObject("SELECT status FROM employees WHERE id=?", String.class, supplyEmployee)).isEqualTo("disabled");
+    mockMvc.perform(get("/api/admin/auth/contexts").header("Authorization", "Bearer " + oldSession)).andExpect(status().isUnauthorized());
+    // Simulate a legacy dangling identity left by the old employee deletion implementation.
+    jdbcTemplate.update("INSERT INTO account_identities (account_id,client_code,identity_type,subject_id,status) VALUES (?,'admin','employee',?,'disabled')", oldId, adminEmployee);
+    deleteExitEmployee(supplyEmployee);
+    assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isNull();
+    assertThat(jdbcTemplate.queryForObject("SELECT status FROM accounts WHERE id=?", String.class, oldId)).isEqualTo("disabled");
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_identities WHERE account_id=?", Integer.class, oldId)).isZero();
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM auth_sessions WHERE account_id=?", Integer.class, oldId)).isZero();
+    String invite = createInvitation("admin", TokenAuthenticationFilter.DEV_TOKEN);
+    verifyInvitation(invite, phone).andExpect(status().isOk()).andExpect(jsonPath("$.data.requiresProfile").value(true));
+    MvcResult registration = mockMvc.perform(post("/api/open/employee-invites/{token}/register", invite)
+        .contentType("application/json").content("""
+          {"phone":"%s","verifyCode":"888888","name":"新持有人","gender":"female"}
+          """.formatted(phone))).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.existingAccount").value(false)).andExpect(jsonPath("$.data.status").value("disabled")).andReturn();
+    Long newId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    assertThat(newId).isNotEqualTo(oldId);
+    assertThat(jdbcTemplate.queryForObject("SELECT created_by_account_id FROM roles WHERE id=99201", Long.class)).isEqualTo(oldId);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_roles WHERE account_id=?", Integer.class, newId)).isZero();
+    long newEmployee = Long.parseLong(com.jayway.jsonpath.JsonPath.read(registration.getResponse().getContentAsString(), "$.data.employeeId").toString());
+    jdbcTemplate.update("UPDATE employees SET status='enabled',role_ids='99201',data_permission='self' WHERE id=?", newEmployee);
+    jdbcTemplate.update("UPDATE account_identities SET status='enabled' WHERE account_id=?", newId);
+    jdbcTemplate.update("INSERT INTO account_roles (account_id,role_id,client_code) VALUES (?,99201,'admin')", newId);
+    mockMvc.perform(get("/api/admin/roles").header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(newId)))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.id == 99201)]").isEmpty());
+  }
+
+  @Test
+  void accountExitDeletesUnreferencedAccountAndKeepsProtectedAccount() throws Exception {
+    String phone = "15926629202";
+    long employee = createExitEmployee(phone, "admin");
+    Long id = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    deleteExitEmployee(employee);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE id=?", Integer.class, id)).isZero();
+    long next = createExitEmployee(phone, "admin");
+    assertThat(jdbcTemplate.queryForObject("SELECT account_id FROM employees WHERE id=?", Long.class, next)).isNotEqualTo(id);
+    String systemPhone = "15926629209";
+    long systemEmployee = createExitEmployee(systemPhone, "admin");
+    jdbcTemplate.update("UPDATE accounts SET account_type='system' WHERE phone=?", systemPhone);
+    deleteExitEmployee(systemEmployee);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, systemPhone)).isEqualTo(1);
+  }
+
+  @Test
+  void accountExitKeepsArchivedTenantBindingAndReleasesHistoricalOwnerOnPurge() throws Exception {
+    String phone = "15926629203";
+    long employee = createExitEmployee(phone, "admin");
+    long tenant = createExitTenant(phone, "退出规则历史引用租户");
+    Long oldId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    jdbcTemplate.update("INSERT INTO roles (name,code,status,created_by_account_id) VALUES ('历史归属','EXIT_HISTORY_99203','enabled',?)", oldId);
+    deleteExitEmployee(employee);
+    assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isEqualTo(phone);
+    mockMvc.perform(get("/api/admin/tenants/{id}/purge-preview", tenant)
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.accountDeleteCount").value(0))
+        .andExpect(jsonPath("$.data.accountRetainCount").value(1)).andExpect(jsonPath("$.data.phoneReleaseCount").value(1));
+    mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenant)
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+        .contentType("application/json").content("{\"confirmationName\":\"退出规则历史引用租户\"}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.phoneReleaseCount").value(1));
+    assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isNull();
+    assertThat(jdbcTemplate.queryForObject("SELECT created_by_account_id FROM roles WHERE code='EXIT_HISTORY_99203'", Long.class)).isEqualTo(oldId);
+    long newEmployee = createExitEmployee(phone, "admin");
+    assertThat(jdbcTemplate.queryForObject("SELECT account_id FROM employees WHERE id=?", Long.class, newEmployee)).isNotEqualTo(oldId);
+  }
+
+  @Test
+  void accountExitTenantPurgeKeepsOtherDisabledPlatformPhone() throws Exception {
+    String phone = "15926629204";
+    long employee = createExitEmployee(phone, "supply-chain");
+    long tenant = createExitTenant(phone, "退出规则共享租户");
+    Long oldId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenant)
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+        .contentType("application/json").content("{\"confirmationName\":\"退出规则共享租户\"}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.phoneReleaseCount").value(0));
+    assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isEqualTo(phone);
+    assertThat(jdbcTemplate.queryForObject("SELECT status FROM employees WHERE id=?", String.class, employee)).isEqualTo("disabled");
+  }
+
+  @Test
+  void accountExitStorePurgeReleasesLastEmployeePhone() throws Exception {
+    createStoreScopedEmployee(99205L, "15926629205", "门店退出", "admin.permission-management.employee-management.view");
+    mockMvc.perform(patch("/api/admin/stores/99205/archive")
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
+    mockMvc.perform(delete("/api/admin/stores/99205")
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone='15926629205'", Integer.class)).isZero();
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tenants WHERE id=1", Integer.class)).isEqualTo(1);
+  }
+
+  @Autowired private org.springframework.transaction.PlatformTransactionManager accountExitTransactions;
+
+  @Test
+  void accountExitRollbackRestoresPhoneEmployeeAndIdentity() throws Exception {
+    String phone = "15926629206";
+    long employee = createExitEmployee(phone, "admin");
+    Long oldId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    new org.springframework.transaction.support.TransactionTemplate(accountExitTransactions).executeWithoutResult(transaction -> {
+      try {
+        deleteExitEmployee(employee);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isZero();
+        transaction.setRollbackOnly();
+      } catch (Exception exception) {
+        throw new IllegalStateException(exception);
+      }
+    });
+    assertThat(jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone)).isEqualTo(oldId);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE id=?", Integer.class, employee)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_identities WHERE account_id=?", Integer.class, oldId)).isEqualTo(1);
+  }
+
+  @Autowired private com.zdm.platform.account.AccountLifecycleService exitAccounts;
+
+  @Test
+  void accountExitConcurrentPhoneReuseNeverReattachesReleasedAccount() throws Exception {
+    String phone = "15926629207";
+    Long oldId = exitAccounts.findOrCreate(phone, "原持有人").id();
+    try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var locked = new java.util.concurrent.CountDownLatch(1);
+      var registering = new java.util.concurrent.CountDownLatch(1);
+      var deletion = executor.submit(() -> new org.springframework.transaction.support.TransactionTemplate(accountExitTransactions).execute(transaction -> {
+        exitAccounts.lockAccount(oldId);
+        locked.countDown();
+        try {
+          if (!registering.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("registration did not start");
+        } catch (InterruptedException exception) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException(exception);
+        }
+        return exitAccounts.releaseIfUnbound(oldId);
+      }));
+      var registration = executor.submit(() -> {
+        if (!locked.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("account not locked");
+        registering.countDown();
+        return exitAccounts.findOrCreate(phone, "新持有人");
+      });
+      assertThat(deletion.get(20, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(com.zdm.platform.account.AccountLifecycleService.Disposition.DELETE);
+      var created = registration.get(20, java.util.concurrent.TimeUnit.SECONDS);
+      assertThat(created.id()).isNotEqualTo(oldId);
+      assertThat(created.created()).isTrue();
+      assertThat(jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone)).isEqualTo(created.id());
+    }
+  }
+
+  @Test
+  void accountExitConcurrentRegistrationUsesCurrentAccountAfterSnapshot() throws Exception {
+    String phone = "15926629208";
+    try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      new org.springframework.transaction.support.TransactionTemplate(accountExitTransactions).executeWithoutResult(transaction -> {
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isZero();
+        try {
+          var first = executor.submit(() -> exitAccounts.findOrCreate(phone, "首个注册者"))
+              .get(20, java.util.concurrent.TimeUnit.SECONDS);
+          var reused = exitAccounts.findOrCreate(phone, "并发注册者");
+          assertThat(reused.id()).isEqualTo(first.id());
+          assertThat(reused.created()).isFalse();
+        } catch (Exception exception) {
+          throw new IllegalStateException(exception);
+        }
+      });
+    }
   }
 
   private String createStoreScopedEmployee(

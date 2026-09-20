@@ -293,7 +293,8 @@ test('gates tenant actions by status and requires the exact name before permanen
   await expect(dialog).toContainText('门店2');
   await expect(dialog).toContainText('员工5');
   await expect(dialog).toContainText('删除独立账号4');
-  await expect(dialog).toContainText('保留共享账号1');
+  await expect(dialog).toContainText('保留账号（共享或历史引用）1');
+  await expect(dialog).toContainText('释放手机号4');
   const confirmButton = dialog.getByRole('button', { name: '确认彻底删除', exact: true });
   await expect(confirmButton).toBeDisabled();
   await dialog.getByPlaceholder('请输入完整租户名称').fill('错误名称');

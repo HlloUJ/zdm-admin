@@ -5,13 +5,10 @@ import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.PermissionGuard;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,21 +19,21 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   private static final String PERMISSION_PREFIX = "admin.permission-management.employee-management";
 
   private final JdbcTemplate jdbcTemplate;
-  private final SimpleJdbcInsert accountInsert;
+  private final com.zdm.platform.account.AccountLifecycleService accountLifecycle;
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
+  private final EmployeeInviteAccess inviteAccess;
 
   public EmployeeService(
       JdbcTemplate jdbcTemplate,
       CurrentIdentityProvider identityProvider,
-      PermissionGuard permissionGuard) {
+      PermissionGuard permissionGuard, EmployeeInviteAccess inviteAccess,
+      com.zdm.platform.account.AccountLifecycleService accountLifecycle) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
-    this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
-        .withTableName("accounts")
-        .usingColumns("phone", "display_name", "account_type", "status")
-        .usingGeneratedKeyColumns("id");
+    this.inviteAccess = inviteAccess;
+    this.accountLifecycle = accountLifecycle;
   }
 
   public List<Employee> listForCurrentAdmin() { return listForCurrentAdmin(null); }
@@ -88,6 +85,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     CurrentIdentity identity = requireEmployeeOrganizationScope(existing);
     requireSelfUpdateAllowed(identity, existing, payload);
+    lockExistingEmployee(existing);
 
     if (payload.getStoreId() != null && !Objects.equals(payload.getStoreId(), existing.getStoreId())) {
       throw new AccessDeniedException("不能将员工转移到其他门店");
@@ -128,6 +126,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     permissionGuard.requirePermission(permissionPrefix(existing.getClientCode()) + ".permission");
 
+    lockExistingEmployee(existing);
     existing.setRoleIds(request.roleIds());
     existing.setDataPermission(request.dataPermission());
     validateBeforeEnabled(existing);
@@ -144,53 +143,71 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     permissionGuard.requirePermission(permissionPrefix(existing.getClientCode()) + ".delete");
     requireDeletableEmployee(existing);
+    lockExistingEmployee(existing);
+    boolean protectedAccount = accountLifecycle.isProtected(existing.getAccountId());
     removeAdminRoles(existing);
-    jdbcTemplate.update(
-        """
-        UPDATE account_identities
-        SET status = 'disabled'
-        WHERE account_id = ?
-          AND client_code = ?
-          AND identity_type = 'employee'
-          AND subject_id = ?
-        """,
-        existing.getAccountId(),
-        existing.getClientCode(),
-        existing.getId());
-    return removeById(id);
+    jdbcTemplate.update("""
+        DELETE FROM auth_sessions WHERE identity_id IN (
+          SELECT id FROM account_identities WHERE account_id=? AND client_code=?
+            AND identity_type='employee' AND subject_id=?)
+        """, existing.getAccountId(), existing.getClientCode(), existing.getId());
+    jdbcTemplate.update("""
+        DELETE FROM account_identities WHERE account_id=? AND client_code=?
+          AND identity_type='employee' AND subject_id=?
+        """, existing.getAccountId(), existing.getClientCode(), existing.getId());
+    boolean removed = removeById(id);
+    if (removed && !protectedAccount) {
+      accountLifecycle.releaseIfUnbound(existing.getAccountId());
+    }
+    return removed;
   }
 
   @Transactional
   public EmployeeInviteRegisterResponse registerInvitedEmployee(
       EmployeeInvite invite,
       EmployeeInviteRegisterRequest request) {
-    Long accountId = findOrCreateAccount(request.phone(), request.name().trim());
-    // Serialize registrations for the same person across distinct invitation links.
-    jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE id = ? FOR UPDATE", Long.class, accountId);
-    requireNoExistingEmployee(invite, accountId);
+    var existing = accountLifecycle.findByPhoneForUpdate(request.phone());
+    if (existing.isEmpty() && (!StringUtils.hasText(request.name())
+        || !List.of("male", "female").contains(request.gender() == null ? "" : request.gender()))) {
+      throw new IllegalArgumentException("请填写姓名并选择性别");
+    }
+    var account = existing.orElseGet(() -> accountLifecycle.findOrCreate(request.phone(), request.name().trim()));
+    boolean existingAccount = !account.created();
+    Long accountId = account.id();
+    if (!"enabled".equals(account.status())) {
+      throw new IllegalArgumentException("该手机号码对应的账号已被停用，暂时无法接受邀请，请联系管理员处理。");
+    }
+    invite.setAcceptedAccountId(accountId);
+    Employee duplicate = findInvitedEmployee(invite, accountId);
+    boolean canLogin = inviteAccess.canLogin(accountId, invite);
+    if (duplicate != null || canLogin) {
+      return new EmployeeInviteRegisterResponse(duplicate == null ? null : duplicate.getId(),
+          duplicate == null ? "enabled" : duplicate.getStatus(), true, duplicate != null, canLogin);
+    }
 
     Employee employee = new Employee();
     employee.setAccountId(accountId);
     employee.setClientCode(invite.getClientCode());
     employee.setTenantId(invite.getTenantId());
     employee.setStoreId(invite.getStoreId());
-    employee.setName(request.name().trim());
-    employee.setGender(request.gender());
+    employee.setName(account.name());
+    // Gender is not an account-level field. Do not guess it from another organization's profile.
+    employee.setGender(existingAccount ? null : request.gender());
     employee.setPhone(request.phone());
     employee.setStatus("disabled");
     employee.setCreatedByName(invite.getCreatedByName());
     employee.setCreatedByAccountId(invite.getCreatedByAccountId());
     save(employee);
     syncAdminIdentity(employee);
-    return new EmployeeInviteRegisterResponse(employee.getId(), employee.getStatus());
+    return new EmployeeInviteRegisterResponse(employee.getId(), employee.getStatus(), existingAccount, false, false);
   }
 
-  public void validateInvitedEmployeePhone(EmployeeInvite invite, String phone) {
-    findAccountId(phone).ifPresent(accountId -> requireNoExistingEmployee(invite, accountId));
+  public boolean hasAccount(String phone) {
+    return findAccountId(phone).isPresent();
   }
 
-  private void requireNoExistingEmployee(EmployeeInvite invite, Long accountId) {
-    Employee duplicate = lambdaQuery()
+  private Employee findInvitedEmployee(EmployeeInvite invite, Long accountId) {
+    return lambdaQuery()
         .eq(Employee::getAccountId, accountId)
         .eq(Employee::getClientCode, invite.getClientCode())
         .eq(invite.getTenantId() != null, Employee::getTenantId, invite.getTenantId())
@@ -199,12 +216,6 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         .isNull(invite.getStoreId() == null, Employee::getStoreId)
         .last("LIMIT 1 FOR UPDATE")
         .one();
-    if (duplicate != null) {
-      throw new IllegalArgumentException(
-          "enabled".equals(duplicate.getStatus())
-              ? "该手机号已是当前组织员工"
-              : "该手机号已提交员工注册，请等待管理员审核");
-    }
   }
 
   private void applyCurrentOrganizationScope(Employee employee) {
@@ -251,23 +262,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   }
 
   private Long findOrCreateAccount(String phone, String displayName) {
-    Optional<Long> existingAccountId = findAccountId(phone);
-    if (existingAccountId.isPresent()) {
-      return existingAccountId.get();
-    }
-
-    Map<String, Object> values = new HashMap<>();
-    values.put("phone", phone);
-    values.put("display_name", displayName);
-    values.put("account_type", "person");
-    values.put("status", "enabled");
-    try {
-      return accountInsert.executeAndReturnKey(values).longValue();
-    } catch (org.springframework.dao.DuplicateKeyException exception) {
-      // A concurrent registration may have just created the same unified account.
-      return jdbcTemplate.queryForObject(
-          "SELECT id FROM accounts WHERE phone = ? FOR UPDATE", Long.class, phone);
-    }
+    return accountLifecycle.findOrCreate(phone, displayName).id();
   }
 
   private Optional<Long> findAccountId(String phone) {
@@ -403,6 +398,13 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
       throw new AccessDeniedException("不能停用当前登录员工");
     }
     throw new AccessDeniedException("不能编辑当前登录员工");
+  }
+
+  private void lockExistingEmployee(Employee employee) {
+    accountLifecycle.lockAccount(employee.getAccountId());
+    if (jdbcTemplate.queryForList("SELECT id FROM employees WHERE id=? FOR UPDATE", Long.class, employee.getId()).isEmpty()) {
+      throw new IllegalArgumentException("员工已删除，请刷新后重试");
+    }
   }
 
   private void requireDeletableEmployee(Employee employee) {

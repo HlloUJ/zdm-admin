@@ -422,6 +422,7 @@ test('opens employee invitation and edit dialogs', async ({ page }) => {
   await expect(inviteDialog).toBeVisible();
   await expect(inviteDialog.locator('textarea')).toHaveValue(/employee-invite\?token=e2e-invite-token/);
   await expect(inviteDialog.getByText('复制链接', { exact: true })).toBeVisible();
+  await expect(inviteDialog).toContainText('链接生成后5分钟内有效，可供多名员工使用，使用后不延长有效期。');
   await inviteDialog.getByRole('button', { name: '关闭', exact: true }).click();
 
   const firstEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926626945' }).first();
@@ -519,21 +520,76 @@ test('registers from employee invite link', async ({ page }) => {
   await page.getByRole('button', { name: '提交注册' }).click();
 
   await expect(page.getByRole('heading', { name: '注册信息已提交' })).toBeVisible();
-  await expect(page.getByText('请等待管理员确认信息并启用当前系统的员工身份。')).toBeVisible();
+  await expect(
+    page.getByText('注册信息已提交，请等待管理员分配权限并启用本平台员工身份，启用后即可登录。'),
+  ).toBeVisible();
 });
 
-test('rejects an existing organization employee before requesting a verification code', async ({ page }) => {
-  await page.goto('/employee-invite?token=e2e-invite-token');
-  await page.getByPlaceholder('请输入手机号').fill('15926626945');
+for (const { canLogin, existingEmployee } of [
+  { canLogin: false, existingEmployee: false },
+  { canLogin: false, existingEmployee: true },
+  { canLogin: true, existingEmployee: true },
+]) {
+  test(`existing employee invite skips profile and reports access ${canLogin}, existing identity ${existingEmployee}`, async ({
+    page,
+  }) => {
+    let registerCalls = 0;
+    await page.route('**/api/open/employee-invites/e2e-invite-token/verify-code', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: {
+            requiresProfile: false,
+            registration: {
+              employeeId: 2,
+              status: canLogin ? 'enabled' : 'disabled',
+              existingAccount: true,
+              existingEmployee,
+              canLogin,
+            },
+          },
+        }),
+      }),
+    );
+    page.on('request', (request) => {
+      if (request.url().endsWith('/register')) registerCalls += 1;
+    });
+    await page.goto('/employee-invite?token=e2e-invite-token');
+    await page.getByPlaceholder('请输入手机号').fill('15926626945');
+    await page.getByRole('button', { name: '获取验证码' }).click();
+    await expect(page.getByText('验证码已发送')).toBeVisible();
+    await page.getByPlaceholder('请输入验证码').fill('888888');
+    await page.getByRole('button', { name: '下一步' }).click();
+    await expect(
+      page.getByText(
+        canLogin
+          ? '该手机号码已在系统中存在账号，且已具备本平台访问权限，无需重复注册。您可直接使用原有账号登录本平台。'
+          : existingEmployee
+            ? '该手机号码已在本平台存在员工身份，无需重复注册。当前身份尚未启用，请联系本平台管理员确认权限配置及启用状态。'
+            : '该手机号码已在系统中存在账号，无需重新完成注册信息填写，待管理员分配角色权限后，可登录系统。',
+      ),
+    ).toBeVisible();
+    await expect(page.getByPlaceholder('请输入姓名')).toHaveCount(0);
+    expect(registerCalls).toBe(0);
+  });
+}
 
-  const requestCodeButton = page.getByRole('button', { name: '获取验证码' });
-  await requestCodeButton.click();
-
-  await expect(page.getByText('该手机号已是当前组织员工')).toBeVisible();
-  await expect(requestCodeButton).toHaveText('获取验证码');
-  await expect(requestCodeButton).toBeEnabled();
-  await expect(page.getByPlaceholder('请输入验证码')).toHaveValue('');
-});
+for (const message of ['邀请链接已使用', '邀请链接已过期']) {
+  test(`employee invite displays ${message}`, async ({ page }) => {
+    await page.route('**/api/open/employee-invites/e2e-invite-token', (route) =>
+      route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 400, message, data: null }),
+      }),
+    );
+    await page.goto('/employee-invite?token=e2e-invite-token');
+    await expect(page.getByRole('heading', { name: '邀请链接不可用' })).toBeVisible();
+    await expect(page.getByText(message)).toBeVisible();
+    await expect(page.getByRole('button', { name: '下一步' })).toHaveCount(0);
+  });
+}
 
 test('employee permission dialog validates only after submit and clears errors on reopen', async ({ page }) => {
   await page.goto('/employee-management');

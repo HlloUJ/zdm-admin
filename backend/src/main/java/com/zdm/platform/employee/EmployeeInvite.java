@@ -18,6 +18,13 @@ public class EmployeeInvite {
   private Long tenantId;
   private Long storeId;
   private Long createdByAccountId;
+  private Long createdByIdentityId;
+  private Long acceptedAccountId;
+
+  public Long getCreatedByIdentityId() { return createdByIdentityId; }
+  public void setCreatedByIdentityId(Long value) { createdByIdentityId = value; }
+  public Long getAcceptedAccountId() { return acceptedAccountId; }
+  public void setAcceptedAccountId(Long value) { acceptedAccountId = value; }
   private String createdByName;
   private String status;
   private LocalDateTime expiresAt;

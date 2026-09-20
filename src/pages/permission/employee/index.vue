@@ -173,7 +173,9 @@
       @close="closeInviteDialog"
     >
       <div class="invite-dialog">
-        <p class="invite-tip">下方链接为员工邀请链接，他人通过链接可完成员工账号入驻</p>
+        <p class="invite-tip">
+          下方链接为员工邀请链接，他人通过链接可完成员工账号入驻。链接生成后5分钟内有效，可供多名员工使用，使用后不延长有效期。
+        </p>
         <div class="invite-link-field">
           <t-textarea
             :model-value="inviteLink"
@@ -800,7 +802,7 @@ const confirmText = computed(() => {
   const name = confirmEmployee.value?.name ?? '';
   if (confirmType.value === 'disable') return `是否停用员工“${name}”？停用后该员工无法登录后台。`;
   if (confirmType.value === 'enable') return `是否启用员工“${name}”？启用后恢复登录权限。`;
-  return `是否删除员工“${name}”？删除后账号数据不可恢复。`;
+  return `是否删除员工“${name}”？删除后将解除当前平台及组织的员工身份；若无其他身份或组织关系，将释放手机号，历史业务记录保留。`;
 });
 
 const handleConfirmSubmit = async () => {
