@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,18 +25,16 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
       Set.of("cityPartner", "slabSupplier", "finishedSupplier", "factory");
 
   private final JdbcTemplate jdbcTemplate;
-  private final SimpleJdbcInsert accountInsert;
+  private final com.zdm.platform.account.AccountLifecycleService accountLifecycle;
   private final CurrentIdentityProvider identityProvider;
 
   public TenantService(
       JdbcTemplate jdbcTemplate,
-      CurrentIdentityProvider identityProvider) {
+      CurrentIdentityProvider identityProvider,
+      com.zdm.platform.account.AccountLifecycleService accountLifecycle) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
-    this.accountInsert = new SimpleJdbcInsert(jdbcTemplate)
-        .withTableName("accounts")
-        .usingColumns("phone", "display_name", "account_type", "status")
-        .usingGeneratedKeyColumns("id");
+    this.accountLifecycle = accountLifecycle;
   }
 
   public List<Tenant> listTenants() {
@@ -72,7 +69,9 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     if (existing == null) {
       throw new IllegalArgumentException("租户不存在");
     }
+    existing = lockTenant(id);
     Long ownerAccountId = requireOwnerAccountId(id);
+    accountLifecycle.lockAccount(ownerAccountId);
     requireAvailableTenantPhone(payload.getContactPhone(), id);
     requireAvailablePhone(payload.getContactPhone(), ownerAccountId);
     payload.setId(id);
@@ -152,21 +151,18 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     if (!existing.getName().equals(confirmationName)) {
       throw new IllegalArgumentException("请输入完整租户名称确认删除");
     }
+    List<Long> candidateAccountIds = findTenantAccountIds(id);
+    candidateAccountIds.forEach(accountLifecycle::lockAccount);
     TenantPurgePreview preview = buildPurgePreview(existing);
     if (!preview.eligible()) {
       throw new IllegalArgumentException(preview.blockers().getFirst());
     }
-
-    List<Long> candidateAccountIds = findTenantAccountIds(id);
-    Set<Long> retainedAccountIds = findRetainedAccountIds(id, candidateAccountIds);
-    List<Long> deletedAccountIds = candidateAccountIds.stream()
-        .filter(accountId -> !retainedAccountIds.contains(accountId))
-        .toList();
+    Set<Long> protectedAccounts = new HashSet<>();
+    candidateAccountIds.stream().filter(accountLifecycle::isProtected).forEach(protectedAccounts::add);
 
     jdbcTemplate.update(
         "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE tenant_id = ?)",
         id);
-    deleteSessionsForAccounts(deletedAccountIds);
     jdbcTemplate.update("DELETE FROM account_roles WHERE tenant_id = ?", id);
     jdbcTemplate.update(
         "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE tenant_id = ?)",
@@ -180,14 +176,27 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     int storeDeleteCount = jdbcTemplate.update("DELETE FROM stores WHERE tenant_id = ?", id);
     jdbcTemplate.update("DELETE FROM tenant_businesses WHERE tenant_id = ?", id);
     int tenantDeleteCount = jdbcTemplate.update("DELETE FROM tenants WHERE id = ?", id);
-    deleteAccounts(deletedAccountIds);
+    int deletedAccounts = 0;
+    int releasedPhones = 0;
+    for (Long accountId : candidateAccountIds) {
+      var disposition = protectedAccounts.contains(accountId)
+          ? com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP
+          : accountLifecycle.releaseIfUnbound(accountId);
+      if (disposition == com.zdm.platform.account.AccountLifecycleService.Disposition.DELETE) {
+        deletedAccounts++;
+      }
+      if (disposition != com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP) {
+        releasedPhones++;
+      }
+    }
     return new TenantPurgeResult(
         tenantDeleteCount,
         storeDeleteCount,
         employeeDeleteCount,
         roleDeleteCount,
-        deletedAccountIds.size(),
-        retainedAccountIds.size());
+        deletedAccounts,
+        candidateAccountIds.size() - deletedAccounts,
+        releasedPhones);
   }
 
   public boolean hasEnabledBusiness(Long tenantId, String businessType) {
@@ -242,16 +251,7 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   }
 
   private Long findOrCreateAccount(String phone, String displayName) {
-    Optional<Long> accountId = findAccountId(phone);
-    if (accountId.isPresent()) {
-      return accountId.get();
-    }
-    Map<String, Object> values = new HashMap<>();
-    values.put("phone", phone);
-    values.put("display_name", displayName);
-    values.put("account_type", "person");
-    values.put("status", "enabled");
-    return accountInsert.executeAndReturnKey(values).longValue();
+    return accountLifecycle.findOrCreate(phone, displayName).id();
   }
 
   private Optional<Long> findAccountId(String phone) {
@@ -357,8 +357,17 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     }
 
     List<Long> candidateAccountIds = findTenantAccountIds(tenantId);
-    Set<Long> retainedAccountIds = findRetainedAccountIds(tenantId, candidateAccountIds);
-    int accountDeleteCount = candidateAccountIds.size() - retainedAccountIds.size();
+    int accountDeleteCount = 0;
+    int phoneReleaseCount = 0;
+    for (Long accountId : candidateAccountIds) {
+      var disposition = accountLifecycle.assess(accountId, tenantId);
+      if (disposition == com.zdm.platform.account.AccountLifecycleService.Disposition.DELETE) {
+        accountDeleteCount++;
+      }
+      if (disposition != com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP) {
+        phoneReleaseCount++;
+      }
+    }
     return new TenantPurgePreview(
         blockers.isEmpty(),
         tenant.getName(),
@@ -366,7 +375,8 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
         count("SELECT COUNT(*) FROM employees WHERE tenant_id = ?", tenantId),
         count("SELECT COUNT(*) FROM roles WHERE tenant_id = ?", tenantId),
         accountDeleteCount,
-        retainedAccountIds.size(),
+        candidateAccountIds.size() - accountDeleteCount,
+        phoneReleaseCount,
         blockers);
   }
 
@@ -388,71 +398,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
         tenantId,
         tenantId,
         tenantId);
-  }
-
-  private Set<Long> findRetainedAccountIds(Long tenantId, List<Long> accountIds) {
-    Set<Long> retained = new HashSet<>();
-    for (Long accountId : accountIds) {
-      if (hasExternalAccountReference(tenantId, accountId)) {
-        retained.add(accountId);
-      }
-    }
-    return retained;
-  }
-
-  private boolean hasExternalAccountReference(Long tenantId, Long accountId) {
-    if (count(
-        "SELECT COUNT(*) FROM account_identities WHERE account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
-        accountId,
-        tenantId) > 0
-        || count(
-            "SELECT COUNT(*) FROM employees WHERE account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
-            accountId,
-            tenantId) > 0
-        || count(
-            "SELECT COUNT(*) FROM account_roles WHERE account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
-            accountId,
-            tenantId) > 0
-        || count(
-            "SELECT COUNT(*) FROM tenants WHERE created_by_account_id = ? AND id <> ?",
-            accountId,
-            tenantId) > 0
-        || count(
-            "SELECT COUNT(*) FROM employee_invites WHERE created_by_account_id = ? AND tenant_id <> ?",
-            accountId,
-            tenantId) > 0
-        || count(
-            "SELECT COUNT(*) FROM employees WHERE created_by_account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
-            accountId,
-            tenantId) > 0
-        || count(
-            "SELECT COUNT(*) FROM roles WHERE created_by_account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
-            accountId,
-            tenantId) > 0
-        || count(
-            "SELECT COUNT(*) FROM product_categories WHERE created_by_account_id = ? AND (tenant_id IS NULL OR tenant_id <> ?)",
-            accountId,
-            tenantId) > 0) {
-      return true;
-    }
-    for (String table : List.of(
-        "store_levels",
-        "product_attributes",
-        "product_attribute_values",
-        "category_template_versions",
-        "crafts",
-        "slab_varieties",
-        "slab_origins",
-        "slab_textures",
-        "slab_colors",
-        "slab_color_categories",
-        "slab_grades",
-        "suppliers")) {
-      if (count("SELECT COUNT(*) FROM " + table + " WHERE created_by_account_id = ?", accountId) > 0) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private void deleteTenantProductCategories(Long tenantId) {
@@ -487,12 +432,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     }
   }
 
-  private void deleteSessionsForAccounts(List<Long> accountIds) {
-    for (Long accountId : accountIds) {
-      jdbcTemplate.update("DELETE FROM auth_sessions WHERE account_id = ?", accountId);
-    }
-  }
-
   private void deleteTenantStoreCategories(Long tenantId) {
     int deletedCount;
     do {
@@ -506,12 +445,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
           """,
           tenantId);
     } while (deletedCount > 0);
-  }
-
-  private void deleteAccounts(List<Long> accountIds) {
-    for (Long accountId : accountIds) {
-      jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
-    }
   }
 
   private int count(String sql, Object... args) {

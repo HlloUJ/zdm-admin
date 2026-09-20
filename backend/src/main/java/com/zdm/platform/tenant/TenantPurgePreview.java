@@ -10,6 +10,7 @@ public record TenantPurgePreview(
     int roleCount,
     int accountDeleteCount,
     int accountRetainCount,
+    int phoneReleaseCount,
     List<String> blockers) {
   public TenantPurgePreview {
     blockers = List.copyOf(blockers);

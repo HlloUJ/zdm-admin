@@ -31,6 +31,7 @@ export interface TenantPurgePreview {
   roleCount: number;
   accountDeleteCount: number;
   accountRetainCount: number;
+  phoneReleaseCount: number;
   blockers: string[];
 }
 
@@ -41,6 +42,7 @@ export interface TenantPurgeResult {
   roleDeleteCount: number;
   accountDeleteCount: number;
   accountRetainCount: number;
+  phoneReleaseCount: number;
 }
 
 export function listTenants() {
