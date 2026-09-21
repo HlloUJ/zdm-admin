@@ -159,10 +159,22 @@ for (const [status, scope] of [
       await expect(specCell.locator('.product-code')).toHaveText('SKU ID：81');
       await expect(fullscreen.getByRole('button', { name: '跟随配置', exact: true })).toBeDisabled();
       const box = await fullscreen.boundingBox();
-      const viewport = await page.evaluate(() => ({
-        width: document.documentElement.clientWidth,
-        height: document.documentElement.clientHeight,
-      }));
+      const viewport = await page.evaluate(() => {
+        // The root reserves a stable gutter even when headless Chrome hides its scrollbar.
+        const probe = document.createElement('div');
+        Object.assign(probe.style, {
+          position: 'fixed',
+          width: '100px',
+          height: '100px',
+          overflowY: 'scroll',
+          scrollbarGutter: getComputedStyle(document.documentElement).scrollbarGutter,
+          visibility: 'hidden',
+        });
+        document.body.append(probe);
+        const gutter = probe.offsetWidth - probe.clientWidth;
+        probe.remove();
+        return { width: window.innerWidth - gutter, height: window.innerHeight };
+      });
       expect(box?.width).toBe(viewport.width);
       expect(box?.height).toBe(viewport.height);
       await page.screenshot({ path: testInfo.outputPath('finished-detail-fullscreen.png') });
