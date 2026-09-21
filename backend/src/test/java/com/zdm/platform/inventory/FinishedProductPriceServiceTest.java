@@ -22,7 +22,7 @@ class FinishedProductPriceServiceTest {
 
     FinishedProductPrice requested = new FinishedProductPrice();
     requested.setStoreLevelId(7L);
-    requested.setVariantKey("SKU-A");
+    requested.setSkuId(101L);
     requested.setPriceCoefficient(new BigDecimal("0.50"));
     requested.setCostPrice(new BigDecimal("100.00"));
     requested.setPrice(new BigDecimal("50.00"));
@@ -46,12 +46,12 @@ class FinishedProductPriceServiceTest {
     FinishedProductPrice existing = new FinishedProductPrice();
     existing.setStoreLevelId(7L);
     existing.setStoreLevelName("已删除的历史级别");
-    existing.setVariantKey("SKU-A");
+    existing.setSkuId(101L);
     when(mapper.selectList(any())).thenReturn(List.of(existing));
 
     FinishedProductPrice requested = new FinishedProductPrice();
     requested.setStoreLevelId(7L);
-    requested.setVariantKey("SKU-A");
+    requested.setSkuId(101L);
     requested.setPriceCoefficient(new BigDecimal("1.20"));
     requested.setCostPrice(new BigDecimal("100.00"));
     requested.setPrice(new BigDecimal("120.00"));
@@ -73,7 +73,7 @@ class FinishedProductPriceServiceTest {
         new StoreLevelPricingDirectory.Level(8L, "手工级别", 2)));
     FinishedProductPrice requested = new FinishedProductPrice();
     requested.setStoreLevelId(7L);
-    requested.setVariantKey("SKU-A");
+    requested.setSkuId(101L);
     assertThatThrownBy(() -> new FinishedProductPriceService(mapper, directory, Mockito.mock(FinishedMarkupConfigurationMapper.class))
         .replacePrices(10L, List.of(requested)))
         .isInstanceOf(IllegalArgumentException.class)

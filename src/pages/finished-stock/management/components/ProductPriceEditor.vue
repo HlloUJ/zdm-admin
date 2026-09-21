@@ -62,7 +62,6 @@ import { AdminDialog, adminFeedback } from '@/components/foundation';
 import {
   updateFinishedProduct,
   type FinishedProductPayload,
-  type FinishedProductVariant,
   type FinishedProductRecord,
 } from '@/services/finishedProducts';
 import PriceSourceToggle from './PriceSourceToggle.vue';
@@ -84,24 +83,12 @@ type PriceRow = {
   priceSource?: 'auto' | 'manual';
   sourceConfigurationId?: number;
 };
-type VariantEditor = { key: string; label: string; specValues: Record<string, string>; rows: PriceRow[] };
+type VariantEditor = { key: number; label: string; specValues: Record<string, string>; rows: PriceRow[] };
 const readonly = computed(() => ['soldOut', 'recycle'].includes(props.product.status));
 const submitted = ref(false);
 const saving = ref(false);
 const confirmVisible = ref(false);
-const variants: (Pick<FinishedProductVariant, 'variantKey' | 'variantLabel'> & Partial<FinishedProductVariant>)[] =
-  props.product.variants.length
-    ? props.product.variants
-    : Array.from(
-        new Set([
-          ...(props.product.guidePrices ?? []).map((price) => price.variantKey),
-          ...(props.product.markupPrices ?? []).map((price) => price.variantKey),
-        ]),
-      ).map((key) => ({
-        variantKey: key,
-        variantLabel: props.product.guidePrices?.find((price) => price.variantKey === key)?.variantLabel || key,
-      }));
-if (!variants.length) variants.push({ variantKey: props.product.sku, variantLabel: props.product.name });
+const variants = props.product.variants;
 const levels = [...props.levels];
 for (const price of props.product.markupPrices ?? []) {
   if (!levels.some((level) => level.id === price.storeLevelId))
@@ -109,11 +96,11 @@ for (const price of props.product.markupPrices ?? []) {
 }
 const editors = ref<VariantEditor[]>(
   variants.map((variant) => {
-    const guide = props.product.guidePrices?.find((price) => price.variantKey === variant.variantKey);
-    const prices = props.product.markupPrices?.filter((price) => price.variantKey === variant.variantKey) ?? [];
+    const guide = props.product.guidePrices?.find((price) => price.skuId === variant.id);
+    const prices = props.product.markupPrices?.filter((price) => price.skuId === variant.id) ?? [];
     return {
-      key: variant.variantKey,
-      label: variant.variantLabel || variant.variantKey,
+      key: variant.id!,
+      label: variant.variantLabel || String(variant.id),
       specValues: variant.salesAttributes ?? {},
       rows: [
         {
@@ -234,7 +221,7 @@ const save = async (closeAfterSave = true) => {
       ...props.product,
       guidePrice: Number(editors.value[0].rows[1].price),
       guidePrices: editors.value.map((variant) => ({
-        variantKey: variant.key,
+        skuId: variant.key,
         variantLabel: variant.label,
         costPrice: Number(variant.rows[0].price),
         priceCoefficient: Number(variant.rows[1].coefficient),
@@ -248,7 +235,7 @@ const save = async (closeAfterSave = true) => {
             priceSource: row.priceSource,
             sourceConfigurationId: row.sourceConfigurationId,
             storeLevelName: row.label,
-            variantKey: variant.key,
+            skuId: variant.key,
             variantLabel: variant.label,
             costPrice: Number(variant.rows[0].price),
             priceCoefficient: Number(row.coefficient),

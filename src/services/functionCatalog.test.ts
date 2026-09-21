@@ -303,17 +303,19 @@ describe('finished stock catalog contract', () => {
         [
           ['查看', 'admin.finished-stock-management.warehouse.view'],
           ['批量上架', 'admin.finished-stock-management.warehouse.batch-shelf'],
+          ['详情', 'admin.finished-stock-management.warehouse.detail'],
           ['价格', 'admin.finished-stock-management.warehouse.price'],
           ['上架', 'admin.finished-stock-management.warehouse.shelf'],
           ['删除', 'admin.finished-stock-management.warehouse.delete'],
         ],
       ],
       [
-        '出售中',
+        '已上架',
         'admin.finished-stock-management.selling',
         [
           ['查看', 'admin.finished-stock-management.selling.view'],
           ['批量下架', 'admin.finished-stock-management.selling.batch-off-shelf'],
+          ['详情', 'admin.finished-stock-management.selling.detail'],
           ['价格', 'admin.finished-stock-management.selling.price'],
           ['下架', 'admin.finished-stock-management.selling.off-shelf'],
         ],
@@ -334,6 +336,7 @@ describe('finished stock catalog contract', () => {
         'admin.finished-stock-management.sold-out',
         [
           ['查看', 'admin.finished-stock-management.sold-out.view'],
+          ['详情', 'admin.finished-stock-management.sold-out.detail'],
           ['价格', 'admin.finished-stock-management.sold-out.price'],
         ],
       ],
@@ -345,19 +348,20 @@ describe('finished stock catalog contract', () => {
           ['批量放回到仓库', 'admin.finished-stock-management.recycle.batch-restore'],
           ['批量彻底删除', 'admin.finished-stock-management.recycle.batch-purge'],
           ['清空回收站', 'admin.finished-stock-management.recycle.clear'],
+          ['详情', 'admin.finished-stock-management.recycle.detail'],
           ['价格', 'admin.finished-stock-management.recycle.price'],
           ['放回仓库', 'admin.finished-stock-management.recycle.restore'],
           ['彻底删除', 'admin.finished-stock-management.recycle.purge'],
         ],
       ],
     ]);
-    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(23);
+    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(27);
     expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);
     const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>
       value.startsWith('admin.finished-stock-management.'),
     );
-    expect(values).toHaveLength(24);
-    expect(new Set(values).size).toBe(24);
+    expect(values).toHaveLength(28);
+    expect(new Set(values).size).toBe(28);
     expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(
       false,
     );

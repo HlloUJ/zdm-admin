@@ -63,10 +63,10 @@ describe('creation snapshot layout', () => {
     expect(wrapper.findAll('h3').map((node) => node.text())).toEqual(['图文描述', '基础信息', '销售信息']);
     const table = wrapper.findComponent({ name: 'TTable' });
     const vm = wrapper.findComponent(FinishedSalesLogTable).vm as unknown as {
-      rows: { merchantCode: string; guide?: { price: number }; level_1?: { price: number } }[];
+      rows: { skuId: string; guide?: { price: number }; level_1?: { price: number } }[];
       columns: { title: string }[];
     };
-    expect(vm.rows.map((row) => row.merchantCode)).toEqual(['red', 'blue']);
+    expect(vm.rows.map((row) => row.skuId)).toEqual(['red', 'blue']);
     expect(vm.rows[0].guide?.price).toBe(20);
     expect(vm.rows[0].level_1?.price).toBe(11);
     expect(vm.columns.map((col) => col.title)).toEqual(['颜色', '成本价', '指导价', '一级合伙人', '数量', '表面处理']);

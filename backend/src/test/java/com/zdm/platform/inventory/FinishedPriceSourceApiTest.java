@@ -52,11 +52,13 @@ class FinishedPriceSourceApiTest {
         VALUES (99101, '来源测试级别', 99101, 2, 'enabled', false, 1)
         """);
     for (String key : List.of("A", "B")) {
+      long skuId = key.equals("A") ? 99111L : 99112L;
+      jdbc.update("INSERT INTO finished_product_variants (id,finished_product_id,variant_label,stock,cost_price) VALUES (?,99101,?,1,10)", skuId, key);
       jdbc.update("""
           INSERT INTO finished_product_guide_prices
-            (finished_product_id, variant_key, variant_label, price_coefficient, cost_price, price)
+            (finished_product_id, sku_id, variant_label, price_coefficient, cost_price, price)
           VALUES (99101, ?, ?, 3, 10, 30)
-          """, key, key);
+          """, skuId, key);
     }
     authenticateDirectService();
     assertThat(sync.backfillMissingPrices(configurations.selectById(99101L))).isEqualTo(2);
@@ -104,8 +106,8 @@ class FinishedPriceSourceApiTest {
         VALUES (99202,'上架日志商品','internal-shelf-test',99202,99202,'详情',99202,99202,2,'warehouse','warehouse',TRUE,1)
         """);
     jdbc.update("""
-        INSERT INTO finished_product_variants (finished_product_id,variant_key,variant_label,stock,cost_price)
-        VALUES (99202,'internal-variant','规格A',2,10)
+        INSERT INTO finished_product_variants (finished_product_id,variant_label,stock,cost_price)
+        VALUES (99202,'规格A',2,10)
         """);
     var identity = new com.zdm.platform.security.CurrentIdentity(1L,1L,1L,null,"supply-chain",null,null,
         "供应链人员","all",List.of("SUPER_ADMIN"),List.of("all"));
@@ -137,8 +139,114 @@ class FinishedPriceSourceApiTest {
     assertThat(logs.detail(firstId).getBeforeStatus()).isNull();
     assertThat(logs.detail(firstId).getAfterStatus()).isEqualTo("warehouse");
     assertThat(logs.detail(firstId).getOperationSummary()).isEqualTo(FinishedOperationLogService.SOURCE_SHELF_SUMMARY);
-    assertThat(logs.listPage("上架日志商品","SOURCE_SYNC",null,null,null,1,20).total()).isEqualTo(2);
+    assertThat(logs.listPage("上架日志商品","SOURCE_SYNC",null,null,null,1,20).total()).isZero();
+    assertThat(logs.listPage("上架日志商品",null,null,null,null,1,20).total()).isEqualTo(3);
+    assertThat(logs.listPage("上架日志商品","SOURCE_OFF_SHELF",null,null,null,1,20).records())
+        .singleElement().satisfies(log -> assertThat(log.getOperationSummary()).isEqualTo("供应链已下架该商品"));
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='supply-chain' AND operation_type='RESTORE'",Long.class)).isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT operation_type FROM finished_operation_logs WHERE id=?",String.class,firstId)).isEqualTo("SOURCE_SYNC");
+    org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity,null,List.of()));
+    long expectedOperationsLogs = 3;
+    for (String target : List.of("offShelf", "recycle", "warehouse", "selling", "offShelf", "recycle", "purged")) {
+      lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,99202L,target,"调整",null);
+      if (List.of("offShelf", "selling", "purged").contains(target)) { expectedOperationsLogs++; }
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='admin'",Long.class))
+          .as("运营日志数量：%s", target).isEqualTo(expectedOperationsLogs);
+      assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=99202",String.class)).isEqualTo("selling");
+      assertThat(jdbc.queryForObject("SELECT price FROM finished_product_guide_prices WHERE finished_product_id=99202",BigDecimal.class)).isEqualByComparingTo("123");
+    }
+    assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='supply-chain' ORDER BY id",String.class))
+        .containsExactly("SHELF", "OFF_SHELF", "RESTORE", "SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE", "RESTORE", "SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE", "PURGE");
+    assertThat(jdbc.queryForObject("SELECT operation_type FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='admin' ORDER BY id DESC LIMIT 1",String.class)).isEqualTo("SOURCE_DELETE");
+  }
+
+  @Test
+  void legacySupplyEventsHaveSpecificTypesAndInternalEventsAreExcludedBeforePagination() {
+    for (String target : List.of("selling", "offShelf", "recycle", "purged", "warehouse")) {
+      jdbc.update("""
+          INSERT INTO finished_operation_logs
+            (product_id,product_name,business_client_code,operation_type,operation_summary,operator_name,operated_at,change_details)
+          VALUES (99302,'旧供应链日志','admin','SOURCE_SYNC','旧笼统文案','测试人员',NOW(),JSON_OBJECT('来源状态',JSON_OBJECT('before','offShelf','after',?)))
+          """, target);
+    }
+    authenticateDirectService();
+    var page = logs.listPage("旧供应链日志",null,null,null,null,1,2);
+    assertThat(page.total()).isEqualTo(3);
+    assertThat(page.records()).hasSize(2).allMatch(log -> !"SOURCE_SYNC".equals(log.getOperationType()));
+    assertThat(logs.listPage("旧供应链日志","SOURCE_SHELF",null,null,null,1,20).total()).isEqualTo(1);
+    var offShelf = logs.listPage("旧供应链日志","SOURCE_OFF_SHELF",null,null,null,1,20).records().getFirst();
+    assertThat(logs.detail(offShelf.getId()).getOperationType()).isEqualTo("SOURCE_OFF_SHELF");
+    assertThat(logs.detail(offShelf.getId()).getOperationSummary()).isEqualTo("供应链已下架该商品");
+    var deleted = logs.listPage("旧供应链日志","SOURCE_DELETE",null,null,null,1,20);
+    assertThat(deleted.total()).isEqualTo(1);
+    assertThat(logs.detail(deleted.records().getFirst().getId()).getOperationSummary()).isEqualTo("供应链已删除该商品");
+    for (Long hidden : jdbc.queryForList("SELECT id FROM finished_operation_logs WHERE product_id=99302 AND JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')) IN ('warehouse','recycle')",Long.class)) {
+      org.assertj.core.api.Assertions.assertThatThrownBy(() -> logs.detail(hidden)).isInstanceOf(IllegalArgumentException.class);
+    }
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99302 AND operation_type='SOURCE_SYNC'",Long.class)).isEqualTo(5);
+  }
+
+  @Test
+  void hidesOldSourceRecycleLogsWithoutHidingManualOrSupplyChainDeletionLogs() {
+    for (String target : List.of("recycle", "purged")) {
+      jdbc.update("""
+          INSERT INTO finished_operation_logs
+            (product_id,product_name,business_client_code,operation_type,operation_summary,operator_name,operated_at,change_details)
+          VALUES (99303,'删除日志边界','admin','SOURCE_DELETE','供应链已删除该商品','测试人员',NOW(),JSON_OBJECT('来源状态',JSON_OBJECT('before','offShelf','after',?)))
+          """, target);
+    }
+    for (String client : List.of("admin", "supply-chain")) {
+      jdbc.update("""
+          INSERT INTO finished_operation_logs
+            (product_id,product_name,business_client_code,operation_type,operation_summary,operator_name,operated_at,change_details)
+          VALUES (99303,'删除日志边界',?,'DELETE_TO_RECYCLE','删除至回收站','测试人员',NOW(),'{}')
+          """, client);
+    }
+    authenticateDirectService();
+    assertThat(logs.listPage("删除日志边界",null,null,null,null,1,1).total()).isEqualTo(2);
+    assertThat(logs.listPage("删除日志边界",null,null,null,null,2,1).records()).hasSize(1);
+    var deleted = logs.listPage("删除日志边界","SOURCE_DELETE",null,null,null,1,20);
+    assertThat(deleted.total()).isEqualTo(1);
+    assertThat(logs.detail(deleted.records().getFirst().getId()).getChangeDetails()).contains("purged");
+    assertThat(logs.listPage("删除日志边界","DELETE_TO_RECYCLE",null,null,null,1,20).total()).isEqualTo(1);
+    Long hidden = jdbc.queryForObject("SELECT MIN(id) FROM finished_operation_logs WHERE product_id=99303",Long.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> logs.detail(hidden)).isInstanceOf(IllegalArgumentException.class);
+    var identity = new com.zdm.platform.security.CurrentIdentity(1L,1L,1L,null,"supply-chain",null,null,
+        "供应链人员","all",List.of("SUPER_ADMIN"),List.of("all"));
+    org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity,null,List.of()));
+    var source = logs.listPage("删除日志边界",null,null,null,null,1,20);
+    assertThat(source.total()).isEqualTo(1);
+    assertThat(logs.detail(source.records().getFirst().getId()).getOperationType()).isEqualTo("DELETE_TO_RECYCLE");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99303",Long.class)).isEqualTo(4);
+    // The shared lifecycle service must retain the existing slab logging rules.
+    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,source_status,status,operations_deleted) VALUES (99303,'大板日志边界','slab-log-boundary','offShelf','selling',FALSE)");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB,99303L,"recycle");
+    assertThat(jdbc.queryForObject("SELECT operation_type FROM slab_operation_logs WHERE slab_id=99303 AND business_client_code='admin'",String.class)).isEqualTo("SOURCE_SYNC");
+  }
+
+  @Test
+  void legacyOperationsPurgeKeepsActualPreviousStateAndDisplaysPermanentDeletion() {
+    List<String> states = List.of("warehouse", "selling", "offShelf", "soldOut", "recycle");
+    for (String previous : states) {
+      jdbc.update("""
+          INSERT INTO finished_operation_logs
+            (product_id,product_name,business_client_code,operation_type,operation_summary,operator_name,operated_at,before_status,after_status,change_details)
+          VALUES (99304,'彻底删除状态日志','admin','PURGE','彻底删除运营商品','测试人员',NOW(),?,NULL,'{}')
+          """, previous);
+    }
+    authenticateDirectService();
+    var page = logs.listPage("彻底删除状态日志","PURGE",null,null,null,1,20);
+    assertThat(page.total()).isEqualTo(5);
+    assertThat(page.records()).extracting(FinishedOperationLog::getBeforeStatus).containsExactlyInAnyOrderElementsOf(states);
+    for (FinishedOperationLog row : page.records()) {
+      assertThat(row.getAfterStatus()).isEqualTo("purged");
+      FinishedOperationLog detail = logs.detail(row.getId());
+      assertThat(detail.getBeforeStatus()).isEqualTo(row.getBeforeStatus());
+      assertThat(detail.getAfterStatus()).isEqualTo("purged");
+    }
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99304 AND after_status IS NULL",Long.class)).isEqualTo(5);
   }
 
   private void updateCoefficient(int value) throws Exception {
@@ -153,7 +261,7 @@ class FinishedPriceSourceApiTest {
   }
   private void assertPrice(String key, String value, String source) {
     FinishedProductPrice row = prices.listPrices(99101L).stream()
-        .filter(price -> key.equals(price.getVariantKey())).findFirst().orElseThrow();
+        .filter(price -> key.equals(price.getVariantLabel())).findFirst().orElseThrow();
     assertThat(row.getPrice()).isEqualByComparingTo(value);
     assertThat(row.getPriceSource()).isEqualTo(source);
   }

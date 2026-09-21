@@ -30,6 +30,9 @@ const props = defineProps<{
   highlightChanges?: boolean;
   priceOnly?: boolean;
 }>();
+type LoggedVariant = Partial<FinishedProductVariant> & { skuId?: number; variantKey?: string };
+const variantIdentity = (row: { skuId?: number; id?: number; variantKey?: string }) =>
+  row.skuId ?? row.variantKey ?? row.id;
 const isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');
 function list<T>(field: string): T[] {
   return Array.isArray(props.snapshot[field]) ? (props.snapshot[field] as T[]) : [];
@@ -39,13 +42,17 @@ function otherList<T>(field: string): T[] {
 }
 const attributes = computed(() => list<FinishedProductAttributeEntry>('商品属性'));
 const variants = computed(() => {
-  if (Array.isArray(props.snapshot['销售规格'])) return list<FinishedProductVariant>('销售规格');
+  if (Array.isArray(props.snapshot['销售规格'])) return list<LoggedVariant>('销售规格');
   const source = [...list<FinishedProductGuidePrice>('指导价'), ...list<FinishedProductPrice>('层级价格')];
   return [
     ...new Map(
       source.map((price) => [
-        price.variantKey,
-        { variantKey: price.variantKey, variantLabel: price.variantLabel } as FinishedProductVariant,
+        variantIdentity(price),
+        {
+          skuId: price.skuId,
+          variantKey: (price as { variantKey?: string }).variantKey,
+          variantLabel: price.variantLabel,
+        } as LoggedVariant,
       ]),
     ).values(),
   ];
@@ -66,11 +73,21 @@ const levels = computed(() => [
 const extraFields = computed(() =>
   [
     ...new Set(
-      [...variants.value, ...otherList<FinishedProductVariant>('销售规格')].flatMap((row) =>
+      [...variants.value, ...otherList<LoggedVariant>('销售规格')].flatMap((row) =>
         Object.keys(row.salesAttributes || {}),
       ),
     ),
-  ].filter((key) => !dimensions.value.some((d) => d.key === key)),
+  ]
+    .filter((key) => !dimensions.value.some((d) => d.key === key))
+    .sort((a, b) => {
+      const order = (props.snapshot['字段顺序'] as { sales?: string[] } | undefined)?.sales;
+      if (!order) return 0;
+      const rank = (key: string) => {
+        const index = order.indexOf(key);
+        return index < 0 ? order.length : index;
+      };
+      return rank(a) - rank(b);
+    }),
 );
 const attributeName = (key: string) =>
   (props.snapshot['销售属性名称'] as Record<string, string> | undefined)?.[key] ||
@@ -92,19 +109,22 @@ const priceCell = (coefficient?: number, price?: number, source?: string) =>
 const rows = computed(() =>
   orderLayeredRows(
     variants.value.map((variant, index) => {
-      const guide = guidePrices.value.find((price) => price.variantKey === variant.variantKey);
+      const guide = guidePrices.value.find((price) => variantIdentity(price) === variantIdentity(variant));
       return {
         ...variant.salesAttributes,
         rowKey: index,
         specText: variant.variantLabel,
+        recordedSkuId: variant.skuId ?? variant.id,
         cost: comparableCell(props.snapshot, variant, 'cost'),
         guide,
         quantity: variant.stock,
-        merchantCode: variant.variantKey,
+        skuId: variantIdentity(variant),
         ...Object.fromEntries(
           levels.value.map(([id]) => [
             `level_${id}`,
-            prices.value.find((price) => price.variantKey === variant.variantKey && price.storeLevelId === id),
+            prices.value.find(
+              (price) => variantIdentity(price) === variantIdentity(variant) && price.storeLevelId === id,
+            ),
           ]),
         ),
       };
@@ -115,7 +135,21 @@ const rows = computed(() =>
 const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...(dimensions.value.length
     ? dimensions.value.map((d) => ({ colKey: d.key, title: d.name, minWidth: 130, fixed: 'left' as const }))
-    : [{ colKey: 'specText', title: '商品规格', minWidth: 180, fixed: 'left' as const }]),
+    : [
+        {
+          colKey: 'specText',
+          title: '商品规格',
+          minWidth: 270,
+          fixed: 'left' as const,
+          cell: (_h: unknown, { row }: { row: TableRowData }) =>
+            isSupplyChain.value
+              ? h('div', [
+                  h('div', text(row.specText)),
+                  h('div', { class: 'historical-sku-id' }, `SKU ID：${text(row.recordedSkuId)}`),
+                ])
+              : row.specText,
+        },
+      ]),
   { colKey: 'cost', title: '成本价', minWidth: 100, cell: (_h, { row }) => money(row.cost) },
   {
     colKey: 'guide',
@@ -142,21 +176,20 @@ const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
     : []),
   ...extraFields.value.map((key) => ({ colKey: key, title: attributeName(key), minWidth: 130 })),
 ]);
-function comparableCell(snapshot: Record<string, unknown>, variant: FinishedProductVariant, key: string): unknown {
+function comparableCell(snapshot: Record<string, unknown>, variant: LoggedVariant, key: string): unknown {
   const guides = (snapshot['指导价'] || []) as FinishedProductGuidePrice[];
   const partners = (snapshot['层级价格'] || []) as FinishedProductPrice[];
-  const guide = guides.find((item) => item.variantKey === variant.variantKey);
+  const guide = guides.find((item) => variantIdentity(item) === variantIdentity(variant));
   if (key === 'specText') return variant.variantLabel;
-  if (key === 'merchantCode') return variant.variantKey;
   if (key === 'quantity') return variant.stock;
   if (key === 'cost') {
     if (isSupplyChain.value) return variant.costPrice;
-    return guide?.costPrice ?? partners.find((item) => item.variantKey === variant.variantKey)?.costPrice;
+    return guide?.costPrice ?? partners.find((item) => variantIdentity(item) === variantIdentity(variant))?.costPrice;
   }
   if (key === 'guide') return [guide?.priceCoefficient, guide?.price];
   if (key.startsWith('level_')) {
     const price = partners.find(
-      (item) => item.variantKey === variant.variantKey && String(item.storeLevelId) === key.slice(6),
+      (item) => variantIdentity(item) === variantIdentity(variant) && String(item.storeLevelId) === key.slice(6),
     );
     return [price?.priceCoefficient, price?.price, price?.priceSource];
   }
@@ -164,12 +197,12 @@ function comparableCell(snapshot: Record<string, unknown>, variant: FinishedProd
 }
 function changedCell(row: TableRowData, key: string): boolean {
   if (!props.highlightChanges) return false;
-  const variant = variants.value.find((item) => item.variantKey === row.merchantCode);
+  const variant = variants.value.find((item) => variantIdentity(item) === row.skuId);
   if (!variant) return false;
-  const candidates = otherList<FinishedProductVariant>('销售规格');
+  const candidates = otherList<LoggedVariant>('销售规格');
   const sameLabel = candidates.filter((item) => item.variantLabel === variant.variantLabel);
   const previous =
-    candidates.find((item) => item.variantKey === variant.variantKey) ||
+    candidates.find((item) => variantIdentity(item) === variantIdentity(variant)) ||
     (sameLabel.length === 1 ? sameLabel[0] : undefined);
   if (!previous) return true;
   return (
@@ -202,6 +235,12 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol<TableR
    including when the table starts below the dialog's visible area. */
 .sales-log-table :deep(.t-table__content) {
   contain: paint;
+}
+
+.sales-log-table :deep(.historical-sku-id) {
+  margin-top: var(--td-comp-margin-xs);
+  color: var(--td-text-color-secondary);
+  font-size: var(--td-font-size-body-small);
 }
 
 .sales-log-table :deep(.sales-value-changed) {

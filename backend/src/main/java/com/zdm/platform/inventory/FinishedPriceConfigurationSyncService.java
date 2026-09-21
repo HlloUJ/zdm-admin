@@ -31,9 +31,9 @@ public class FinishedPriceConfigurationSyncService {
     }
     return jdbc.update("""
         INSERT INTO finished_product_prices
-          (finished_product_id, variant_key, variant_label, store_level_id, store_level_name,
+          (finished_product_id, sku_id, variant_label, store_level_id, store_level_name,
            price_coefficient, cost_price, price, price_source, source_configuration_id)
-        SELECT guide.finished_product_id, guide.variant_key, guide.variant_label,
+        SELECT guide.finished_product_id, guide.sku_id, guide.variant_label,
                configuration.store_level_id, level.name, configuration.price_coefficient,
                guide.cost_price, ROUND(guide.cost_price * configuration.price_coefficient, 2),
                'auto', configuration.id
@@ -41,7 +41,7 @@ public class FinishedPriceConfigurationSyncService {
         INNER JOIN finished_markup_configurations configuration ON configuration.id = ?
         INNER JOIN store_levels level ON level.id = configuration.store_level_id
         LEFT JOIN finished_product_prices price ON price.finished_product_id = guide.finished_product_id
-          AND price.variant_key = guide.variant_key AND price.store_level_id = configuration.store_level_id
+          AND price.sku_id = guide.sku_id AND price.store_level_id = configuration.store_level_id
         WHERE price.id IS NULL
         """, configuration.getId());
   }

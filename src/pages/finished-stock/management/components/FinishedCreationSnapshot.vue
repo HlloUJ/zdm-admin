@@ -3,8 +3,8 @@
     <AdminSectionCard>
       <h3 class="creation-section-title">图文描述</h3>
       <t-space direction="vertical" size="large" class="creation-snapshot">
-        <div v-for="group in mediaGroups" :key="group.label">
-          <div class="creation-media-grid">
+        <div class="creation-media-grid">
+          <template v-for="group in mediaGroups" :key="group.label">
             <div v-for="(asset, index) in group.items" :key="asset.field" class="creation-media-card">
               <div class="creation-media-title">
                 {{ group.items.length > 1 ? `${group.label}${index + 1}` : group.label }}
@@ -34,8 +34,8 @@
                 }}
               </div>
             </div>
-          </div>
-          <span v-if="!group.items.length">未上传</span>
+            <span v-if="!group.items.length">{{ group.label }}：未上传</span>
+          </template>
         </div>
         <div>
           <h4 class="creation-rich-text-title">宝贝详情</h4>
@@ -71,8 +71,10 @@
         <FinishedSalesLogTable :snapshot="snapshot" :other="{}" />
       </SalesLogFullscreen>
       <t-descriptions bordered :column="3" class="creation-sales-summary">
-        <t-descriptions-item label="总库存">{{ text(snapshot['总库存']) }}</t-descriptions-item>
-        <t-descriptions-item label="上架">{{
+        <t-descriptions-item label="总库存" :span="isSupplyChain ? 1 : 3">{{
+          text(snapshot['总库存'])
+        }}</t-descriptions-item>
+        <t-descriptions-item v-if="isSupplyChain" label="上架">{{
           snapshot['状态'] === 'selling'
             ? '立即上架'
             : snapshot['状态'] === 'warehouse'
@@ -85,6 +87,7 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue';
+import { getLoginUser } from '@/services/auth';
 import SalesLogFullscreen from './SalesLogFullscreen.vue';
 import FinishedSalesLogTable from './FinishedSalesLogTable.vue';
 import HistoricalRichText from './HistoricalRichText.vue';
@@ -108,6 +111,7 @@ const props = defineProps<{
   richText: string;
   categoryHint?: string;
 }>();
+const isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');
 const emit = defineEmits<{ preview: [resource: Resource] }>();
 const mediaGroups = computed(() => [
   {
@@ -121,7 +125,19 @@ const mediaGroups = computed(() => [
 function list<T>(field: string): T[] {
   return Array.isArray(props.snapshot[field]) ? (props.snapshot[field] as T[]) : [];
 }
-const attributes = computed(() => list<FinishedProductAttributeEntry>('商品属性'));
+const attributes = computed(() => {
+  const order = (props.snapshot['字段顺序'] as { product?: string[] } | undefined)?.product;
+  return list<FinishedProductAttributeEntry>('商品属性')
+    .slice()
+    .sort((a, b) => {
+      if (!order) return 0;
+      const rank = (id: number) => {
+        const index = order.indexOf(String(id));
+        return index < 0 ? order.length : index;
+      };
+      return rank(a.attributeId) - rank(b.attributeId);
+    });
+});
 const text = (value: unknown) => (value == null || value === '' ? '未填写' : String(value));
 </script>
 <style scoped>
@@ -169,7 +185,7 @@ const text = (value: unknown) => (value == null || value === '' ? '未填写' : 
 }
 .creation-media-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: var(--td-comp-margin-m);
 }
 .creation-media-card {

@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 public class FinishedProductPrice {
   private Long id;
   private Long finishedProductId;
-  private String variantKey;
+  private Long skuId;
   private String variantLabel;
   @NotNull private Long storeLevelId;
   private String storeLevelName;
@@ -29,8 +29,8 @@ public class FinishedProductPrice {
   public void setId(Long id) { this.id = id; }
   public Long getFinishedProductId() { return finishedProductId; }
   public void setFinishedProductId(Long value) { this.finishedProductId = value; }
-  public String getVariantKey() { return variantKey; }
-  public void setVariantKey(String value) { this.variantKey = value; }
+  public Long getSkuId() { return skuId; }
+  public void setSkuId(Long value) { this.skuId = value; }
   public String getVariantLabel() { return variantLabel; }
   public void setVariantLabel(String value) { this.variantLabel = value; }
   public Long getStoreLevelId() { return storeLevelId; }

@@ -12,9 +12,9 @@ class FinishedVariantLogTest {
 
   private Map<String, Object> snapshot() throws Exception {
     Map<String, Object> result = new LinkedHashMap<>();
-    result.put("销售规格", json.readTree("[{\"variantKey\":\"a\",\"variantLabel\":\"规格1\",\"stock\":1},{\"variantKey\":\"b\",\"variantLabel\":\"规格2\",\"stock\":2}]"));
-    result.put("指导价", json.readTree("[{\"variantKey\":\"a\",\"costPrice\":10,\"price\":20},{\"variantKey\":\"b\",\"costPrice\":30,\"price\":40}]"));
-    result.put("层级价格", json.readTree("[{\"variantKey\":\"a\",\"storeLevelId\":1,\"price\":15},{\"variantKey\":\"b\",\"storeLevelId\":1,\"price\":35}]"));
+    result.put("销售规格", json.readTree("[{\"skuId\":\"a\",\"variantLabel\":\"规格1\",\"stock\":1},{\"skuId\":\"b\",\"variantLabel\":\"规格2\",\"stock\":2}]"));
+    result.put("指导价", json.readTree("[{\"skuId\":\"a\",\"costPrice\":10,\"price\":20},{\"skuId\":\"b\",\"costPrice\":30,\"price\":40}]"));
+    result.put("层级价格", json.readTree("[{\"skuId\":\"a\",\"storeLevelId\":1,\"price\":15},{\"skuId\":\"b\",\"storeLevelId\":1,\"price\":35}]"));
     return result;
   }
 
@@ -27,7 +27,7 @@ class FinishedVariantLogTest {
     var data = json.valueToTree(changes);
     for (String field : new String[]{"销售规格", "指导价", "层级价格"}) {
       assertThat(data.path(field).path("before").size()).isEqualTo(1);
-      assertThat(data.path(field).path("after").get(0).path("variantKey").asText()).isEqualTo("a");
+      assertThat(data.path(field).path("after").get(0).path("skuId").asText()).isEqualTo("a");
     }
     assertThat(data.path("指导价").path("before").get(0).path("costPrice").asInt()).isEqualTo(10);
   }
@@ -39,22 +39,22 @@ class FinishedVariantLogTest {
     service.retainChangedVariants(before, after, changes);
     var data = json.valueToTree(changes);
     assertThat(data.path("销售规格").path("before").size()).isEqualTo(1);
-    assertThat(data.path("销售规格").path("before").get(0).path("variantKey").asText()).isEqualTo("b");
+    assertThat(data.path("销售规格").path("before").get(0).path("skuId").asText()).isEqualTo("b");
     assertThat(data.path("指导价").path("after").get(0).path("price").asInt()).isEqualTo(40);
   }
 
   @Test void merchantCodeChangeKeepsBothSidesWithoutIncludingOtherVariant() throws Exception {
     var before = snapshot(); var after = snapshot();
     for (String field : new String[]{"销售规格", "指导价", "层级价格"}) {
-      ((com.fasterxml.jackson.databind.node.ObjectNode) ((com.fasterxml.jackson.databind.JsonNode) after.get(field)).get(0)).put("variantKey", "new-code");
+      ((com.fasterxml.jackson.databind.node.ObjectNode) ((com.fasterxml.jackson.databind.JsonNode) after.get(field)).get(0)).put("skuId", "new-code");
     }
     Map<String, Object> changes = new LinkedHashMap<>(); changes.put("销售规格", Map.of());
     service.retainChangedVariants(before, after, changes);
     var data = json.valueToTree(changes);
     assertThat(data.path("销售规格").path("before").size()).isEqualTo(1);
     assertThat(data.path("销售规格").path("after").size()).isEqualTo(1);
-    assertThat(data.path("销售规格").path("before").get(0).path("variantKey").asText()).isEqualTo("a");
-    assertThat(data.path("销售规格").path("after").get(0).path("variantKey").asText()).isEqualTo("new-code");
+    assertThat(data.path("销售规格").path("before").get(0).path("skuId").asText()).isEqualTo("a");
+    assertThat(data.path("销售规格").path("after").get(0).path("skuId").asText()).isEqualTo("new-code");
   }
   @Test void recordsAllVariantsOnlyWhenAllChanged() throws Exception {
     var before = snapshot(); var after = snapshot();
