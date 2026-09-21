@@ -17,7 +17,12 @@
           @resize="measureSalesScroll"
         >
           <h4>{{ row.label }}</h4>
-          <FinishedAttributeChanges v-if="row.field === '商品属性'" :before="row.before" :after="row.after" />
+          <FinishedAttributeChanges
+            v-if="row.field === '商品属性'"
+            :before="row.before"
+            :after="row.after"
+            :order="attributeOrder"
+          />
           <div
             v-else
             class="change-pair"
@@ -87,6 +92,7 @@
                   highlight-changes
                   price-only
                 />
+                <span v-else-if="row.field === '来源状态' && row[side] === 'selling'">已上架</span>
                 <FinishedLogValue
                   v-else
                   :value="row[side]"
@@ -176,13 +182,17 @@ function syncSalesScroll(event: Event) {
   });
 }
 const sides = ['before', 'after'] as const;
+const attributeOrder = computed(() => {
+  const order = props.changes['字段顺序']?.after as { product?: string[] } | undefined;
+  return order?.product;
+});
 function attributeNames(side: 'before' | 'after') {
   const value = props.changes['销售属性名称']?.[side];
   return value && typeof value === 'object' ? (value as Record<string, string>) : {};
 }
 function salesSnapshot(side: 'before' | 'after'): Record<string, unknown> {
   return Object.fromEntries(
-    ['销售规格', '规格维度', '指导价', '层级价格', '销售属性名称']
+    ['销售规格', '规格维度', '指导价', '层级价格', '销售属性名称', '字段顺序']
       .filter((field) => props.changes[field])
       .map((field) => [field, props.changes[field][side]]),
   );
@@ -229,6 +239,7 @@ const groups = computed(() => {
     ...sales,
     '媒体',
     '宝贝详情',
+    '字段顺序',
     '销售属性名称',
     '规格维度',
     '指导价',

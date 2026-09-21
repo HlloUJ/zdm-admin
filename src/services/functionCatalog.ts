@@ -666,17 +666,19 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.warehouse.view' },
                     { label: '批量上架', value: 'admin.finished-stock-management.warehouse.batch-shelf' },
+                    { label: '详情', value: 'admin.finished-stock-management.warehouse.detail' },
                     { label: '价格', value: 'admin.finished-stock-management.warehouse.price' },
                     { label: '上架', value: 'admin.finished-stock-management.warehouse.shelf' },
                     { label: '删除', value: 'admin.finished-stock-management.warehouse.delete' },
                   ],
                 },
                 {
-                  label: '出售中',
+                  label: '已上架',
                   value: 'admin.finished-stock-management.selling',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.selling.view' },
                     { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },
+                    { label: '详情', value: 'admin.finished-stock-management.selling.detail' },
                     { label: '价格', value: 'admin.finished-stock-management.selling.price' },
                     { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },
                   ],
@@ -697,6 +699,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.finished-stock-management.sold-out',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.sold-out.view' },
+                    { label: '详情', value: 'admin.finished-stock-management.sold-out.detail' },
                     { label: '价格', value: 'admin.finished-stock-management.sold-out.price' },
                   ],
                 },
@@ -708,6 +711,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                     { label: '批量放回到仓库', value: 'admin.finished-stock-management.recycle.batch-restore' },
                     { label: '批量彻底删除', value: 'admin.finished-stock-management.recycle.batch-purge' },
                     { label: '清空回收站', value: 'admin.finished-stock-management.recycle.clear' },
+                    { label: '详情', value: 'admin.finished-stock-management.recycle.detail' },
                     { label: '价格', value: 'admin.finished-stock-management.recycle.price' },
                     { label: '放回仓库', value: 'admin.finished-stock-management.recycle.restore' },
                     { label: '彻底删除', value: 'admin.finished-stock-management.recycle.purge' },

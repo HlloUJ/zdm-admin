@@ -527,7 +527,7 @@ test('does not add empty-cell padding to the finished stock horizontal scroll wi
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [] } }));
   await page.goto('/finished-stock-management');
-  for (const tab of ['仓库中', '出售中', '已下架', '已售完', '回收站']) {
+  for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
     await page.locator('.status-tabs').getByText(tab, { exact: true }).click();
     const table = page.locator('.finished-stock-table');
     await expect(table.getByText('暂无数据')).toBeVisible();

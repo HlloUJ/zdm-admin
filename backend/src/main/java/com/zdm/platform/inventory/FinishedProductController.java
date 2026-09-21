@@ -44,6 +44,23 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     this.storeLevelDirectory = storeLevelDirectory;
   }
 
+  @GetMapping("/{id}")
+  public ApiResponse<FinishedProduct> detail(@PathVariable Long id) {
+    if (!"admin".equals(permissionGuard.identity().clientCode())) {
+      throw new org.springframework.security.access.AccessDeniedException("无权访问当前功能");
+    }
+    permissionGuard.requireView(PERMISSION_PREFIX);
+    permissionGuard.requireAnyPermission(permission("warehouse", "detail"), permission("selling", "detail"),
+        permission("off-shelf", "detail"), permission("sold-out", "detail"), permission("recycle", "detail"));
+    permissionGuard.requireDataPermission();
+    FinishedProduct product = service.visibleDetail(id);
+    if (product == null) { throw new IllegalArgumentException("成品现货不存在或不可访问"); }
+    String status = scope(product.getStatus());
+    permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".view", permission(status, "view"));
+    permissionGuard.requirePermission(permission(status, "detail"));
+    return ApiResponse.ok(service.withDetails(product));
+  }
+
   @GetMapping("/operation-logs")
   public ApiResponse<FinishedOperationLogPage> operationLogs(
       @RequestParam(required = false) String keyword,

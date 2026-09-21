@@ -63,7 +63,7 @@
   <AdminDialog
     v-model:visible="detailVisible"
     header="操作详情"
-    width="min(1040px, 94vw)"
+    width="min(1240px, 94vw)"
     :cancel-btn="null"
     confirm-btn="关闭"
     @confirm="detailVisible = false"
@@ -92,7 +92,7 @@
         <FinishedSalesLogTable :snapshot="priceLogSnapshot(changes['入仓价格'].after)" :other="{}" price-only />
       </SalesLogFullscreen>
       <FinishedCreationSnapshot
-        v-if="detail.operationType === 'CREATE'"
+        v-if="fullSnapshot"
         :snapshot="creationSnapshot"
         :category-hint="changes['商品分类']?.hint"
         :media="allMediaRows"
@@ -229,6 +229,11 @@ const changes = computed<Record<string, { before: unknown; after: unknown; hint?
     return {};
   }
 });
+const fullSnapshot = computed(
+  () =>
+    detail.value?.operationType === 'CREATE' ||
+    (detail.value?.operationType === 'SOURCE_SHELF' && !!changes.value['商品ID'] && !!changes.value['销售规格']),
+);
 const initialWarehousePrice = computed(
   () =>
     getLoginUser().clientCode === 'admin' &&
@@ -258,7 +263,7 @@ const allMediaRows = computed(() =>
     const values = changes.value['媒体']?.[side as 'before' | 'after'];
     return (Array.isArray(values) ? (values as Media[]) : []).map((media) => ({
       ...media,
-      title: `${detail.value?.operationType === 'CREATE' ? '' : side === 'before' ? '修改前 · ' : '修改后 · '}${media.field === 'video' ? '商品视频' : media.field.startsWith('detail') ? '详情媒体' : '商品主图'}`,
+      title: `${fullSnapshot.value ? '' : side === 'before' ? '修改前 · ' : '修改后 · '}${media.field === 'video' ? '商品视频' : media.field.startsWith('detail') ? '详情媒体' : '商品主图'}`,
     }));
   }),
 );

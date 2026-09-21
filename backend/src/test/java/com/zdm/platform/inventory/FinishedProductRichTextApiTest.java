@@ -88,8 +88,7 @@ class FinishedProductRichTextApiTest {
     ObjectNode payload = (ObjectNode) json.readTree("""
         {"categoryId":99001,"supplierId":99001,"name":"富文本验收","sku":"rich-test",
          "status":"warehouse","attributes":[],
-         "variants":[{"variantKey":"one","variantLabel":"规格","displayMode":"single","salesAttributes":{"attribute_99001":"胡桃木","attribute_99002":"大号"},"stock":5,"costPrice":1}],
-         "guidePrices":[{"variantKey":"one","priceCoefficient":1,"costPrice":1,"price":1}]}
+         "variants":[{"variantLabel":"规格","displayMode":"single","salesAttributes":{"attribute_99001":"胡桃木","attribute_99002":"大号"},"stock":5,"costPrice":1}]}
         """);
     payload.put("mainImageMediaId", images.getFirst().path("id").asLong());
     payload.set("mainImageMediaIds", json.valueToTree(images.subList(0, 5).stream().map(i -> i.path("id").asLong()).toList()));
@@ -108,6 +107,7 @@ class FinishedProductRichTextApiTest {
     JsonNode created = data(mvc.perform(post("/api/admin/finished-products").header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     long id = created.path("id").asLong();
+    payload.set("variants", created.path("variants").deepCopy());
     assertThat(id).isPositive();
     Long createLogId = jdbc.queryForObject("SELECT id FROM finished_operation_logs WHERE product_id=? AND operation_type='CREATE'", Long.class, id);
     JsonNode createLog = data(mvc.perform(get("/api/admin/finished-products/operation-logs/{id}", createLogId).header("Authorization", token)));
@@ -140,10 +140,12 @@ class FinishedProductRichTextApiTest {
     payload.set("markupPrices",json.readTree("[]"));
 
     assertThat(created.path("sku").isNull()).isTrue();
+    payload.withArray("variants").forEach(row -> ((ObjectNode)row).remove("id"));
     JsonNode second = data(mvc.perform(post("/api/admin/finished-products").header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     assertThat(second.path("sku").isNull()).isTrue();
     long secondId = second.path("id").asLong();
+    payload.set("variants", second.path("variants").deepCopy());
     payload.put("sku", "temporary-code");
     data(mvc.perform(put("/api/admin/finished-products/{id}", secondId).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
@@ -173,6 +175,7 @@ class FinishedProductRichTextApiTest {
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     data(mvc.perform(delete("/api/admin/finished-products/{id}", secondId).header("Authorization", token)));
     payload.put("status", "warehouse");
+    payload.set("variants", created.path("variants").deepCopy());
     assertThat(created.path("createdByAccountId").asLong()).isEqualTo(1L);
     assertThat(created.path("createdByName").asText()).isNotBlank().isNotEqualTo("伪造创建人");
     assertThat(LocalDateTime.parse(created.path("createdAt").asText()))
@@ -250,17 +253,18 @@ class FinishedProductRichTextApiTest {
       for (String color : List.of("白", "黑")) {
         index++;
         ObjectNode variant = payload.withArray("variants").addObject();
-        variant.put("variantKey", "sku-" + index).put("variantLabel", size + color)
+        variant.put("variantLabel", size + color)
             .put("displayMode", "layered").put("stock", index);
         variant.putObject("salesAttributes").put("attribute_2", size).put("attribute_1", color)
             .put("attribute_3", "非组合属性");
-        payload.withArray("guidePrices").addObject().put("variantKey", "sku-" + index)
+        payload.withArray("guidePrices").addObject().put("skuId", index)
             .put("priceCoefficient", 2).put("costPrice", index).put("price", index * 2);
       }
     }
     JsonNode created = data(mvc.perform(post("/api/admin/finished-products").header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     long id = created.path("id").asLong();
+    payload.set("variants", created.path("variants").deepCopy());
     assertThat(created.path("specDimensions")).isEqualTo(payload.path("specDimensions"));
     JsonNode reloaded = null;
     for (JsonNode item : data(mvc.perform(get("/api/admin/finished-products").header("Authorization", token)))) {
@@ -272,7 +276,7 @@ class FinishedProductRichTextApiTest {
     for (int i = 0; i < 4; i++) {
       assertThat(reloaded.path("variants").get(i).path("salesAttributes"))
           .isEqualTo(payload.path("variants").get(i).path("salesAttributes"));
-      assertThat(reloaded.path("variants").get(i).path("variantKey").asText()).isEqualTo("sku-" + (i + 1));
+      assertThat(reloaded.path("variants").get(i).path("id").asLong()).isPositive();
     }
     JsonNode updated = data(mvc.perform(put("/api/admin/finished-products/{id}", id).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));

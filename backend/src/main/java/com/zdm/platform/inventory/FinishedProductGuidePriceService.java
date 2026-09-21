@@ -19,7 +19,7 @@ public class FinishedProductGuidePriceService {
   public List<FinishedProductGuidePrice> listPrices(Long productId) {
     return mapper.selectList(Wrappers.<FinishedProductGuidePrice>lambdaQuery()
         .eq(FinishedProductGuidePrice::getFinishedProductId, productId)
-        .orderByAsc(FinishedProductGuidePrice::getVariantKey));
+        .orderByAsc(FinishedProductGuidePrice::getSkuId));
   }
 
   @Transactional
@@ -30,7 +30,7 @@ public class FinishedProductGuidePriceService {
     List<FinishedProductGuidePrice> normalized = requestedPrices.stream()
         .map(price -> normalize(productId, price))
         .toList();
-    long distinctVariants = normalized.stream().map(FinishedProductGuidePrice::getVariantKey).distinct().count();
+    long distinctVariants = normalized.stream().map(FinishedProductGuidePrice::getSkuId).distinct().count();
     if (distinctVariants != normalized.size()) {
       throw new IllegalArgumentException("同一成品规格只能填写一条指导价");
     }
@@ -40,8 +40,8 @@ public class FinishedProductGuidePriceService {
   }
 
   private FinishedProductGuidePrice normalize(Long productId, FinishedProductGuidePrice price) {
-    if (!StringUtils.hasText(price.getVariantKey())) {
-      throw new IllegalArgumentException("成品规格编码不能为空");
+    if (price.getSkuId() == null || price.getSkuId() <= 0) {
+      throw new IllegalArgumentException("SKU ID 不能为空");
     }
     BigDecimal coefficient = price.getPriceCoefficient();
     BigDecimal cost = price.getCostPrice();
@@ -57,7 +57,7 @@ public class FinishedProductGuidePriceService {
     }
     FinishedProductGuidePrice normalized = new FinishedProductGuidePrice();
     normalized.setFinishedProductId(productId);
-    normalized.setVariantKey(price.getVariantKey().trim());
+    normalized.setSkuId(price.getSkuId());
     normalized.setVariantLabel(StringUtils.hasText(price.getVariantLabel()) ? price.getVariantLabel().trim() : null);
     normalized.setPriceCoefficient(coefficient.setScale(4, RoundingMode.HALF_UP));
     normalized.setCostPrice(cost.setScale(2, RoundingMode.HALF_UP));

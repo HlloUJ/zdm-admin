@@ -28,11 +28,13 @@ public class ProductLifecycleService {
       this.logKey=logKey; this.logName=logName; this.logCode=logCode; this.code=code; this.config=config;
     }
   }
+  private final FinishedProductArrivalLogService arrivalLogs;
   private final JdbcTemplate jdbc;
   private final CurrentIdentityProvider identities;
   private final ObjectMapper json;
   private final org.mybatis.spring.SqlSessionTemplate sqlSession;
-  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession) {
+  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs) {
+    this.arrivalLogs=arrivalLogs;
     this.sqlSession=sqlSession;
     this.jdbc=jdbc; this.identities=identities; this.json=json;
   }
@@ -96,18 +98,28 @@ public class ProductLifecycleService {
     if(reason!=null) { sourceChanges.put("下架原因",Map.of("before","","after",reason)); }
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
     record(kind,row,"supply-chain",type,label,source,target,sourceChanges);
-    if(!deleted(row) || recreate) {
+    if ((!deleted(row) || recreate) && (kind != Kind.FINISHED || List.of("selling", "offShelf", "purged").contains(target))) {
       String result=publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : "来源重新上架，解除遮罩并保留运营状态") :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
       Map<String,Object> changes=new LinkedHashMap<>();
       changes.put("来源状态",Map.of("before",source,"after",target));
-      if(recreate) { changes.put("入仓价格",Map.of("before",List.of(),"after",priceSnapshot(kind,id))); }
+      if(recreate && kind == Kind.SLAB) { changes.put("入仓价格",Map.of("before",List.of(),"after",priceSnapshot(kind,id))); }
       String operationsType = "SOURCE_SYNC";
-      if (kind == Kind.FINISHED && publish) {
-        operationsType = "SOURCE_SHELF";
-        if (recreate) { result = FinishedOperationLogService.SOURCE_SHELF_SUMMARY; }
+      if (kind == Kind.FINISHED) {
+        operationsType = switch (target) {
+          case "selling" -> "SOURCE_SHELF";
+          case "offShelf" -> "SOURCE_OFF_SHELF";
+          default -> "SOURCE_DELETE";
+        };
+        if ("offShelf".equals(target)) { result = "供应链已下架该商品"; }
+        if ("purged".equals(target)) { result = "供应链已删除该商品"; }
       }
-      record(kind,row,"admin",operationsType,result,kind == Kind.FINISHED && recreate ? null : (String)row.get("status"),recreate?"warehouse":(String)row.get("status"),changes);
+      if (kind == Kind.FINISHED && recreate) {
+        sqlSession.clearCache();
+        arrivalLogs.record(id, source);
+      } else {
+        record(kind,row,"admin",operationsType,result,(String)row.get("status"),recreate?"warehouse":(String)row.get("status"),changes);
+      }
     }
     sqlSession.clearCache();
     return "purged".equals(target) && deleted(row);
@@ -128,7 +140,7 @@ public class ProductLifecycleService {
     if (!"recycle".equals(row.get("status")) && !unavailable((String)row.get("source_status"))) {
       throw new IllegalArgumentException("只有回收站或来源已删除的商品可以彻底删除");
     }
-    record(kind,row,"admin","PURGE","彻底删除运营商品",(String)row.get("status"),null,Map.of());
+    record(kind,row,"admin","PURGE","彻底删除运营商品",(String)row.get("status"),kind == Kind.FINISHED ? "purged" : null,Map.of());
     jdbc.update("UPDATE "+kind.table+" SET operations_deleted=TRUE,guide_price=NULL WHERE id=?",id);
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
     if (kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
@@ -158,7 +170,7 @@ public class ProductLifecycleService {
         throw new IllegalArgumentException("请先在运营管理平台完善价格系数："+level.get("name"));
       }
     }
-    var variants=kind==Kind.FINISHED ? jdbc.queryForList("SELECT variant_key,variant_label,cost_price FROM finished_product_variants WHERE finished_product_id=? ORDER BY id",id):List.of(row);
+    var variants=kind==Kind.FINISHED ? jdbc.queryForList("SELECT id AS sku_id,variant_label,cost_price FROM finished_product_variants WHERE finished_product_id=? ORDER BY id",id):List.of(row);
     if(variants.isEmpty()) { throw new IllegalArgumentException("请完善商品规格与成本价"); }
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
     if(kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
@@ -166,7 +178,7 @@ public class ProductLifecycleService {
       BigDecimal cost=(BigDecimal)variant.get("cost_price");
       if(cost==null || cost.signum()<0) { throw new IllegalArgumentException("请完善商品成本价"); }
       if(kind==Kind.FINISHED) {
-        jdbc.update("INSERT INTO finished_product_guide_prices (finished_product_id,variant_key,variant_label,price_coefficient,cost_price,price) VALUES (?,?,?,?,?,?)",id,variant.get("variant_key"),variant.get("variant_label"),guide,cost,amount(cost,guide));
+        jdbc.update("INSERT INTO finished_product_guide_prices (finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES (?,?,?,?,?,?)",id,variant.get("sku_id"),variant.get("variant_label"),guide,cost,amount(cost,guide));
       }
       for(var level:levels) {
         var price=new LinkedHashMap<String,Object>();
@@ -174,7 +186,7 @@ public class ProductLifecycleService {
         price.put("price_coefficient",level.get("price_coefficient")); price.put("cost_price",cost);
         price.put("price",amount(cost,(BigDecimal)level.get("price_coefficient")));
         price.put("price_source","auto"); price.put("source_configuration_id",level.get("configuration_id"));
-        if(kind==Kind.FINISHED) { price.put("store_level_name",level.get("name")); price.put("variant_key",variant.get("variant_key")); price.put("variant_label",variant.get("variant_label")); }
+        if(kind==Kind.FINISHED) { price.put("store_level_name",level.get("name")); price.put("sku_id",variant.get("sku_id")); price.put("variant_label",variant.get("variant_label")); }
         new SimpleJdbcInsert(jdbc).withTableName(kind.prices).usingColumns(price.keySet().toArray(String[]::new)).execute(price);
       }
     }

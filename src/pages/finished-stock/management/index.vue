@@ -131,104 +131,127 @@
               </div>
             </template>
             <template #table>
-              <t-table
-                :key="activeTab"
-                class="finished-stock-table"
-                :row-class-name="({ row }: { row: StockItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
-                row-key="id"
-                :data="pageData"
-                :columns="columns"
-                :loading="loading"
-                hover
-                table-layout="fixed"
-              >
-                <template #selectTitle>
-                  <t-checkbox
-                    :checked="pageAllSelected"
-                    :indeterminate="pagePartiallySelected"
-                    @change="toggleCurrentPage"
-                  />
-                </template>
-                <template #select="{ row }">
-                  <t-checkbox
-                    :disabled="sourceBlocked(row)"
-                    :checked="selectedKeySet.has(row.id)"
-                    @change="(checked: boolean) => toggleRow(row.id, checked)"
-                  />
-                </template>
-                <template #image="{ row }">
-                  <button
-                    class="product-image preview-trigger"
-                    type="button"
-                    title="点击查看大图"
-                    :disabled="sourceBlocked(row)"
-                    @click="openImagePreview(row)"
-                  >
-                    <img v-if="row.image" :src="row.image" :alt="row.name" />
-                    <t-icon v-else name="image-off" />
-                  </button>
-                </template>
-                <template #product="{ row }">
-                  <div class="product-meta">
-                    <div class="product-name">{{ row.name }}</div>
-                    <t-tag v-if="sourceBlocked(row)" theme="default" variant="light">{{
-                      ['recycle', 'purged'].includes(row.sourceStatus || '')
-                        ? '该商品已被供应链删除'
-                        : '该商品已被供应链下架'
-                    }}</t-tag>
-                    <div class="product-code">ID：{{ row.id }}</div>
-                  </div>
-                </template>
-                <template #supplier="{ row }">
-                  <div class="tenant-cell">
-                    <span>{{ row.supplier }}</span>
-                    <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->
-                    <span class="store-text">平台仓</span>
-                  </div>
-                </template>
-                <template #offShelfAt="{ row }">{{
-                  row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
-                }}</template>
-                <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-                <template #offShelfReason="{ row }">
-                  <div class="off-shelf-reason-cell">
-                    <span>{{ row.offShelfReason || '—' }}</span>
-                    <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
-                      <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
-                    </t-tooltip>
-                  </div>
-                </template>
-                <template #operation="{ row }">
-                  <t-link
-                    v-if="sourceBlocked(row) && hasFinishedAction('purge', 'recycle')"
-                    class="source-purge"
-                    theme="danger"
-                    @click="handleRowAction('purge', row)"
-                    >彻底删除</t-link
-                  >
-                  <div v-else-if="!sourceBlocked(row)" class="table-actions">
-                    <t-link
-                      v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
+              <SourceUnavailableOverlay :rows="pageData.filter(sourceBlocked)">
+                <t-table
+                  :key="activeTab"
+                  class="finished-stock-table"
+                  :row-class-name="({ row }: { row: StockItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
+                  :row-attributes="
+                    ({ row }: { row: StockItem }) =>
+                      sourceBlocked(row) ? { 'data-source-id': row.id, inert: true } : {}
+                  "
+                  row-key="id"
+                  :data="pageData"
+                  :columns="columns"
+                  :loading="loading"
+                  hover
+                  table-layout="fixed"
+                >
+                  <template #selectTitle>
+                    <t-checkbox
+                      :checked="pageAllSelected"
+                      :indeterminate="pagePartiallySelected"
+                      @change="toggleCurrentPage"
+                    />
+                  </template>
+                  <template #select="{ row }">
+                    <t-checkbox
+                      :checked="selectedKeySet.has(row.id)"
+                      @change="(checked: boolean) => toggleRow(row.id, checked)"
+                    />
+                  </template>
+                  <template #image="{ row }">
+                    <button
+                      class="product-image preview-trigger"
+                      type="button"
+                      title="点击查看大图"
+                      @click="openImagePreview(row)"
+                    >
+                      <img v-if="row.image" :src="row.image" :alt="row.name" />
+                      <t-icon v-else name="image-off" />
+                    </button>
+                  </template>
+                  <template #product="{ row }">
+                    <div class="product-meta">
+                      <div class="product-name">{{ row.name }}</div>
+                      <div class="product-code">ID：{{ row.id }}</div>
+                    </div>
+                  </template>
+                  <template #supplier="{ row }">
+                    <div class="tenant-cell">
+                      <span>{{ row.supplier }}</span>
+                      <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->
+                      <span class="store-text">平台仓</span>
+                    </div>
+                  </template>
+                  <template #offShelfAt="{ row }">{{
+                    row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
+                  }}</template>
+                  <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+                  <template #offShelfReason="{ row }">
+                    <div class="off-shelf-reason-cell">
+                      <span>{{ row.offShelfReason || '—' }}</span>
+                      <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
+                        <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
+                      </t-tooltip>
+                    </div>
+                  </template>
+                  <template #operation="{ row }">
+                    <div class="table-actions">
+                      <t-link
+                        v-if="!isSupplyChain && activeTab !== 'offShelf' && hasFinishedAction('detail')"
+                        theme="primary"
+                        hover="color"
+                        @click="handleRowAction('detail', row)"
+                        >详情</t-link
+                      >
+                      <t-link
+                        v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
+                        theme="primary"
+                        hover="color"
+                        @click="openPriceDrawer('view', row)"
+                        >价格</t-link
+                      >
+                      <t-link
+                        v-for="action in rowActions()"
+                        :key="action.action"
+                        :theme="action.theme"
+                        hover="color"
+                        @click="handleRowAction(action.action, row)"
+                      >
+                        {{ action.label }}
+                      </t-link>
+                    </div>
+                  </template>
+                  <template #empty>
+                    <div class="table-empty">暂无数据</div>
+                  </template>
+                </t-table>
+                <template #overlay="{ row }">
+                  <t-space align="center" size="small">
+                    <t-icon name="info-circle" />
+                    <span>{{ row.sourceStatus === 'purged' ? '该商品已被供应链删除' : '该商品已被供应链下架' }}</span>
+                  </t-space>
+                  <t-space size="small">
+                    <t-button
+                      v-if="hasFinishedAction('detail')"
+                      size="small"
                       theme="primary"
-                      hover="color"
-                      @click="openPriceDrawer('view', row)"
-                      >价格</t-link
+                      @click="handleRowAction('detail', row)"
                     >
-                    <t-link
-                      v-for="action in rowActions()"
-                      :key="action.action"
-                      :theme="action.theme"
-                      hover="color"
-                      @click="handleRowAction(action.action, row)"
+                      详情
+                    </t-button>
+                    <t-button
+                      v-if="hasFinishedAction('purge', 'recycle')"
+                      size="small"
+                      theme="danger"
+                      variant="base"
+                      @click="handleRowAction('purge', row)"
+                      >彻底删除</t-button
                     >
-                      {{ action.label }}
-                    </t-link>
-                  </div>
+                  </t-space>
                 </template>
-                <template #empty>
-                  <div class="table-empty">暂无数据</div>
-                </template>
-              </t-table>
+              </SourceUnavailableOverlay>
             </template>
             <template #pagination>
               <AdminPagination
@@ -977,7 +1000,8 @@
     <t-drawer
       v-model:visible="detailDialogVisible"
       header="商品详情"
-      size="960px"
+      :close-btn="!isSupplyChain"
+      size="min(1240px, 100vw)"
       placement="right"
       :footer="false"
       @close="closeDetailDialog"
@@ -986,6 +1010,7 @@
         v-if="detailProduct"
         :product="detailProduct"
         :attribute-names="detailAttributeNames"
+        :operations="!isSupplyChain"
         @preview="openProductMediaPreview"
       />
     </t-drawer>
@@ -1065,6 +1090,7 @@ import {
   type FinishedProductPriceLevelOption,
   deleteFinishedProduct,
   listFinishedProducts,
+  getFinishedProductDetail,
   listFinishedProductFormOptions,
   releaseTemporaryFinishedProductMedia,
   updateFinishedProduct,
@@ -1087,6 +1113,7 @@ import { type SupplierRecord } from '@/services/suppliers';
 import { sortByOffShelfAtDesc } from './offShelfSorting';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import ProductDetail from './components/ProductDetail.vue';
+import SourceUnavailableOverlay from './components/SourceUnavailableOverlay.vue';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
@@ -1189,6 +1216,7 @@ interface ProductForm {
 
 interface SpecRow extends TableRowData {
   id: number;
+  skuId?: number;
   mode: SpecMode;
   specText: string;
   specImage: boolean;
@@ -1211,7 +1239,6 @@ interface SpecRow extends TableRowData {
   level3Coefficient: string;
   level3: string;
   quantity: number | null;
-  merchantCode: string;
   markupPrices: Record<
     number,
     { coefficient: string; price: string; priceSource?: 'auto' | 'manual'; sourceConfigurationId?: number }
@@ -1226,7 +1253,6 @@ interface PriceRow extends TableRowData {
   length: string;
   color: string;
   size: string;
-  merchantCode: string;
   stock: number;
   costCoefficient: string;
   cost: string;
@@ -1251,7 +1277,6 @@ interface BatchFillForm {
   level3Coefficient: string;
   level3: string;
   quantity: number | null;
-  merchantCode: string;
 }
 
 interface SingleSpecItem {
@@ -1283,7 +1308,7 @@ interface CategoryCascaderOption {
 
 const tabs: TabConfig[] = [
   { value: 'warehouse', label: '仓库中' },
-  { value: 'selling', label: getLoginUser().clientCode === 'supply-chain' ? '已上架' : '出售中' },
+  { value: 'selling', label: '已上架' },
   { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
@@ -1661,7 +1686,6 @@ const createEmptyBatchFillForm = (): BatchFillForm => ({
   level3Coefficient: '',
   level3: '',
   quantity: null,
-  merchantCode: '',
 });
 
 const batchFillForm = reactive<BatchFillForm>(createEmptyBatchFillForm());
@@ -2313,7 +2337,7 @@ const handleBatchAction = (action: BatchAction) => {
 };
 
 const handleRowAction = (action: RowAction, row: StockItem) => {
-  if (sourceBlocked(row) && action !== 'purge') return;
+  if (sourceBlocked(row) && !['purge', 'detail'].includes(action)) return;
   if (action === 'detail') {
     void openProductDetail(row);
     return;
@@ -2486,14 +2510,13 @@ const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
   quantity: null,
   markupPrices: createMarkupEditors(),
   ...partial,
-  merchantCode: partial.merchantCode || crypto.randomUUID(),
 });
 
 const createEditSpecRows = (row: StockItem): SpecRow[] => {
   if (row.variants.length) {
     return row.variants.map((variant, index) => {
-      const markupPrices = row.markupPrices?.filter((price) => price.variantKey === variant.variantKey) ?? [];
-      const guidePrice = row.guidePrices?.find((price) => price.variantKey === variant.variantKey);
+      const markupPrices = row.markupPrices?.filter((price) => price.skuId === variant.id) ?? [];
+      const guidePrice = row.guidePrices?.find((price) => price.skuId === variant.id);
       return createBaseSpecRow({
         id: row.id * 100 + index + 1,
         mode: variant.displayMode,
@@ -2508,7 +2531,7 @@ const createEditSpecRows = (row: StockItem): SpecRow[] => {
         guideCoefficient: guidePrice == null ? '' : String(Number(guidePrice.priceCoefficient)),
         guide: guidePrice == null ? '' : String(guidePrice.price),
         quantity: variant.stock,
-        merchantCode: variant.variantKey,
+        skuId: variant.id,
         markupPrices: createMarkupEditors(markupPrices),
       });
     });
@@ -3321,7 +3344,6 @@ const buildLayeredSpecRows = () => {
       size: combination.size?.value || '',
       sizeImage: Boolean(getSpecGroupByField('size')?.withImage && combination.size?.imageUploaded),
       quantity: null,
-      merchantCode: '',
     }),
   );
 };
@@ -3335,7 +3357,6 @@ const specToPriceRow = (row: SpecRow): PriceRow => ({
   length: row.length,
   color: row.color,
   size: row.size,
-  merchantCode: row.merchantCode,
   stock: row.quantity ?? 0,
   costCoefficient: row.costCoefficient,
   cost: row.cost,
@@ -3480,7 +3501,6 @@ const savePriceDrawer = () => {
             level3Coefficient: batchFillForm.level3Coefficient || row.level3Coefficient,
             level3: batchFillForm.level3 || row.level3,
             quantity: batchFillForm.quantity ?? row.quantity,
-            merchantCode: batchFillForm.merchantCode || row.merchantCode,
           }
         : row;
     });
@@ -3512,7 +3532,6 @@ const validateProductForm = () => {
     (row) =>
       isValidSpecPriceNumber(row.cost) &&
       (isSupplyChain.value || (isValidSpecPriceNumber(row.guideCoefficient) && isValidSpecPriceNumber(row.guide))) &&
-      Boolean(row.merchantCode.trim()) &&
       productPriceLevels.value.every((configuration) => {
         const editor = row.markupPrices[configuration.id];
         return isValidSpecPriceNumber(editor?.coefficient) && isValidSpecPriceNumber(editor?.price);
@@ -3573,7 +3592,7 @@ const specVariantLabel = (row: SpecRow) =>
     .map((key) => String(row[key] ?? '').trim())
     .filter(Boolean)
     .join(' / ') ||
-  row.merchantCode;
+  '未命名规格';
 
 const buildProductPayloadFromForm = (): FinishedProductPayload => {
   const stock = totalStock.value || Number(productForm.totalStock || 0);
@@ -3590,6 +3609,10 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
     detail: productForm.detail.trim(),
     totalStock: stock,
     guidePrice: guidePrice > 0 ? guidePrice : undefined,
+    attributeDisplayOrder: {
+      product: attributeFields.value.map((field) => String(field.attributeId)),
+      sales: salesAttributeFields.value.map((field) => field.key),
+    },
     attributes: attributeFields.value
       .map((field) => ({
         attributeId: field.attributeId,
@@ -3599,7 +3622,7 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
       .filter((attribute) => attribute.value),
     specDimensions: confirmedSpecMode.value === 'layered' ? confirmedSpecDimensions.value : [],
     variants: specRows.value.map((row) => ({
-      variantKey: row.merchantCode.trim(),
+      id: row.skuId,
       variantLabel: specVariantLabel(row),
       displayMode: row.mode,
       salesAttributes: Object.fromEntries(
@@ -3612,28 +3635,6 @@ const buildProductPayloadFromForm = (): FinishedProductPayload => {
       costPrice: Number(row.cost),
       stock: Number(row.quantity || 0),
     })),
-    guidePrices: specRows.value.map((row) => ({
-      priceCoefficient: Number(Number(row.guideCoefficient).toFixed(4)),
-      costPrice: Number(row.cost),
-      price: Number(row.guide),
-      variantKey: row.merchantCode.trim(),
-      variantLabel: specVariantLabel(row),
-    })),
-    markupPrices: specRows.value.flatMap((row) =>
-      productPriceLevels.value.map((configuration) => {
-        const editor = row.markupPrices[configuration.id];
-        return {
-          storeLevelId: configuration.id,
-          priceSource: editor.priceSource,
-          sourceConfigurationId: editor.sourceConfigurationId,
-          priceCoefficient: Number(Number(editor.coefficient).toFixed(4)),
-          costPrice: Number(row.cost),
-          price: Number(editor.price),
-          variantKey: row.merchantCode.trim(),
-          variantLabel: specVariantLabel(row),
-        };
-      }),
-    ),
     offShelfReason: editingProduct.value?.offShelfReason,
     offShelfDetail: editingProduct.value?.offShelfDetail,
     status,
@@ -3751,13 +3752,18 @@ const detailAttributeNames = computed(() =>
 );
 const openProductDetail = async (row: StockItem) => {
   try {
-    const products = await listFinishedProducts();
-    const latest = products.find((product) => product.id === row.id);
+    const latest = isSupplyChain.value
+      ? (await listFinishedProducts()).find((product) => product.id === row.id)
+      : await getFinishedProductDetail(row.id);
     if (!latest) {
       adminFeedback.error('商品不存在，请刷新列表');
       return;
     }
     detailProduct.value = toStockItem(latest);
+    if (!isSupplyChain.value) {
+      detailProduct.value.createdAt = formatDateTime(latest.createdAt);
+      detailProduct.value.offShelfAt = latest.offShelfAt ? formatDateTime(latest.offShelfAt) : undefined;
+    }
     detailDialogVisible.value = true;
   } catch {
     adminFeedback.error('商品详情加载失败，请重试');
@@ -3822,8 +3828,11 @@ const handleConfirm = async () => {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
     } else if (type === 'batchShelf') {
-      await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'selling')));
-      selectedKeys.value = [];
+      // Publishing rebuilds prices; finish each transaction before starting the next product.
+      for (const id of [...selectedKeys.value]) {
+        await updateProductStatus(id, 'selling');
+        selectedKeys.value = selectedKeys.value.filter((selectedId) => selectedId !== id);
+      }
     } else if (type === 'batchRestore') {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
       selectedKeys.value = [];
@@ -3857,19 +3866,6 @@ const handleConfirm = async () => {
 </script>
 
 <style scoped>
-/* Deleted sources remain visible in their original operations tab. */
-:deep(tr.source-unavailable > td) {
-  background: var(--td-bg-color-component-disabled);
-}
-:deep(tr.source-unavailable > td > *) {
-  opacity: 0.55;
-  pointer-events: none;
-}
-:deep(tr.source-unavailable .source-purge) {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .main-image-upload-grid :deep(.admin-media-upload > strong) {
   font: var(--td-font-body-small);
   font-weight: 400;

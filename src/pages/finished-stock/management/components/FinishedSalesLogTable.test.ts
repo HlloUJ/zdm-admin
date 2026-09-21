@@ -63,7 +63,7 @@ it('marks only changed cells and matches specifications when merchant code chang
     },
   });
   const vm = wrapper.vm as unknown as { rows: any[]; changedCell: (row: any, key: string) => boolean };
-  expect(vm.changedCell(vm.rows[0], 'merchantCode')).toBe(true);
+  expect(vm.changedCell(vm.rows[0], 'specText')).toBe(false);
   expect(vm.changedCell(vm.rows[0], 'quantity')).toBe(true);
   expect(vm.changedCell(vm.rows[0], 'cost')).toBe(false);
   expect(vm.changedCell(vm.rows[0], 'guide')).toBe(false);
@@ -111,4 +111,18 @@ it('compares before and after costs directly from the supply-chain variant snaps
   expect(vm.rows[0].cost).toBe(1200);
   expect(vm.changedCell(vm.rows[0], 'cost')).toBe(true);
   expect(vm.changedCell(vm.rows[0], 'quantity')).toBe(false);
+});
+
+it('uses stored sales field order instead of JSON object key order', async () => {
+  loginUser.clientCode = 'supply-chain';
+  const snapshot = {
+    销售规格: [{ skuId: 1, variantLabel: '规格', salesAttributes: { attribute_2: '白', attribute_12: '木' } }],
+    销售属性名称: { attribute_2: '颜色', attribute_12: '材质' },
+    字段顺序: { sales: ['attribute_12', 'attribute_2'] },
+  };
+  const wrapper = mount(FinishedSalesLogTable, { shallow: true, props: { snapshot, other: {} } });
+  const vm = wrapper.vm as unknown as { columns: { title: string }[] };
+  expect(vm.columns.slice(-2).map((col) => col.title)).toEqual(['材质', '颜色']);
+  await wrapper.setProps({ snapshot: { ...snapshot, 字段顺序: undefined } });
+  expect(vm.columns.slice(-2).map((col) => col.title)).toEqual(['颜色', '材质']);
 });

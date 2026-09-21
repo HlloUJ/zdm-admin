@@ -13,7 +13,10 @@ export function priceLogSnapshot(value: unknown): Record<string, unknown> {
   return {
     销售规格: [
       ...new Map(
-        rows.map((row) => [row.variantKey, { variantKey: row.variantKey, variantLabel: row.variantLabel }]),
+        rows.map((row) => [
+          row.skuId ?? row.variantKey,
+          { skuId: row.skuId, variantKey: row.variantKey, variantLabel: row.variantLabel },
+        ]),
       ).values(),
     ],
     指导价: rows.filter((row) => row.storeLevelId == null),

@@ -35,21 +35,26 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
   }
 
   public Map<String, Object> snapshot(FinishedProduct product) {
+    return snapshot(product, "supply-chain".equals(identities.require().clientCode()));
+  }
+
+  Map<String, Object> snapshot(FinishedProduct product, boolean supplyChain) {
     Map<String, Object> values = new LinkedHashMap<>();
     values.put("商品名称", product.getName());
     values.put("商品ID", product.getId());
     values.put("商品分类", categoryPath(product.getCategoryId()));
     values.put("商品属性", cleanRows(product.getAttributes()));
+    if (product.getAttributeDisplayOrder() != null) { values.put("字段顺序", product.getAttributeDisplayOrder()); }
     values.put("商家编码", product.getSku());
     values.put("供应商", name("suppliers", product.getSupplierId()));
     values.put("总库存", product.getTotalStock());
-    values.put("状态", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceStatus() : product.getStatus());
+    values.put("状态", supplyChain ? product.getSourceStatus() : product.getStatus());
     values.put("发布类型", product.getPublisherType());
     values.put("创建人", product.getCreatedByName());
     values.put("创建时间", product.getCreatedAt());
-    values.put("下架原因", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfReason() : product.getOffShelfReason());
-    values.put("详细说明", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
-    values.put("下架时间", "supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfAt() : product.getOffShelfAt());
+    values.put("下架原因", supplyChain ? product.getSourceOffShelfReason() : product.getOffShelfReason());
+    values.put("详细说明", supplyChain ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
+    values.put("下架时间", supplyChain ? product.getSourceOffShelfAt() : product.getOffShelfAt());
     values.put("规格维度", product.getSpecDimensions());
     values.put("销售规格", cleanRows(product.getVariants()));
     values.put("销售属性名称", salesAttributeNames(json.valueToTree(product.getVariants())));
@@ -62,7 +67,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       media.add(Map.of("field", row.getString(1), "mediaId", row.getLong(2)));
     }, product.getId());
     values.put("媒体", media);
-    if ("supply-chain".equals(identities.require().clientCode())) {
+    if (supplyChain) {
       values.remove("指导价"); values.remove("层级价格");
     }
     return values;
@@ -128,6 +133,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     if (result.isArray()) {
       result.forEach(row -> {
         if (row instanceof ObjectNode object) {
+          if (object.has("stock") && object.has("id")) { object.set("skuId", object.get("id")); }
           object.remove(List.of("id", "finishedProductId", "createdAt", "updatedAt"));
         }
       });
@@ -150,11 +156,17 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         changes.put(key, change);
       }
     });
+    if (before != null && after != null) { changes.remove("字段顺序"); }
+    if (before != null && after != null) { retainChangedAttributes(before, after, changes); }
     if (changes.isEmpty()) { return; }
     String previousStatus = before == null ? null : (String) before.get("状态");
     String nextStatus = after == null ? null : (String) after.get("状态");
     String type = operationType(before, after, previousStatus, nextStatus, changes);
     if (before != null && after != null) { retainChangedVariants(before, after, changes); }
+    if (before != null && after != null && after.get("字段顺序") != null
+        && List.of("商品属性", "销售规格", "指导价", "层级价格", "规格维度").stream().anyMatch(changes::containsKey)) {
+      changes.put("字段顺序", Map.of("before", after.get("字段顺序"), "after", after.get("字段顺序")));
+    }
     Map<String, String> labels = Map.of("CREATE", "创建商品", "UPDATE", "编辑商品",
         "PRICE_UPDATE", "修改价格", "SHELF", "上架商品", "OFF_SHELF", "下架商品",
         "RESTORE", "放回仓库", "DELETE_TO_RECYCLE", "删除至回收站", "PURGE", "彻底删除商品", "SOLD_OUT", "商品售罄");
@@ -188,6 +200,79 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     history.retain("FINISHED_PRODUCT_LOG", log.getId(), references);
   }
 
+  @Transactional
+  public void recordArrival(FinishedProduct product, String sourceStatus) {
+    Map<String, Object> snapshot = snapshot(product, false);
+    Map<String, Object> changes = new LinkedHashMap<>();
+    snapshot.forEach((key, value) -> {
+      Map<String, Object> change = new LinkedHashMap<>();
+      change.put("before", null);
+      change.put("after", value);
+      if ("商品分类".equals(key)) { change.put("pathRecorded", true); }
+      changes.put(key, change);
+    });
+    changes.put("来源状态", Map.of("before", sourceStatus, "after", product.getSourceStatus()));
+    var identity = identities.require();
+    FinishedOperationLog log = new FinishedOperationLog();
+    log.setProductCreatedByAccountId(product.getCreatedByAccountId());
+    log.setBusinessClientCode("admin");
+    log.setOperatorClientCode(identity.clientCode());
+    log.setOperatorIdentityId(identity.identityId());
+    log.setProductId(product.getId());
+    log.setProductName(product.getName());
+    log.setMerchantCode(product.getSku());
+    log.setPublisherType(product.getPublisherType());
+    log.setOperationType("SOURCE_SHELF");
+    log.setOperationSummary(SOURCE_SHELF_SUMMARY);
+    log.setAfterStatus(product.getStatus());
+    log.setOperationSource("SUPPLY_CHAIN");
+    log.setOperatorName(identity.displayName());
+    log.setOperatorAccountId(identity.accountId());
+    log.setOperatedAt(LocalDateTime.now());
+    log.setCreatedAt(log.getOperatedAt());
+    try { log.setChangeDetails(json.writeValueAsString(changes)); }
+    catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品入仓日志保存失败", error); }
+    save(log);
+    Map<String, Long> references = new LinkedHashMap<>();
+    retainMedia(snapshot, "after", references);
+    history.retain("FINISHED_PRODUCT_LOG", log.getId(), references);
+  }
+
+  // Store only changed attribute identities, retaining historical names and values.
+  void retainChangedAttributes(Map<String, Object> before, Map<String, Object> after,
+      Map<String, Object> changes) {
+    if (!changes.containsKey("商品属性")) { return; }
+    Map<String, JsonNode> oldRows = attributeRows(before.get("商品属性"));
+    Map<String, JsonNode> newRows = attributeRows(after.get("商品属性"));
+    var keys = new java.util.LinkedHashSet<>(oldRows.keySet());
+    keys.addAll(newRows.keySet());
+    var previous = json.createArrayNode();
+    var next = json.createArrayNode();
+    Map<String, String> changeTypes = new LinkedHashMap<>();
+    for (String key : keys) {
+      JsonNode old = oldRows.get(key);
+      JsonNode current = newRows.get(key);
+      if (Objects.equals(old, current)) { continue; }
+      if (old != null) { previous.add(old); }
+      if (current != null) { next.add(current); }
+      changeTypes.put(key, old == null ? "ADD" : current == null ? "REMOVE" : "MODIFY");
+    }
+    if (changeTypes.isEmpty()) {
+      changes.remove("商品属性");
+    } else {
+      changes.put("商品属性", Map.of("before", previous, "after", next, "changeTypes", changeTypes));
+    }
+  }
+
+  private Map<String, JsonNode> attributeRows(Object value) {
+    Map<String, JsonNode> result = new LinkedHashMap<>();
+    JsonNode rows = json.valueToTree(value);
+    if (rows != null && rows.isArray()) {
+      rows.forEach(row -> result.put(row.path("attributeId").asText(), row));
+    }
+    return result;
+  }
+
   // Keep complete historical data only for variants whose data or prices changed.
   void retainChangedVariants(Map<String, Object> before, Map<String, Object> after,
       Map<String, Object> changes) {
@@ -208,7 +293,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         JsonNode rows = json.valueToTree(snapshot.get(field));
         if (rows != null && rows.isArray()) {
           rows.forEach(row -> {
-            if (changed.contains(row.path("variantKey").asText())) { selected.add(row); }
+            if (changed.contains(row.path("skuId").asText())) { selected.add(row); }
           });
         }
         sides.put(side, selected);
@@ -229,7 +314,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       JsonNode rows = json.valueToTree(snapshot.get(field));
       if (rows == null || !rows.isArray()) { continue; }
       rows.forEach(row -> {
-        String key = row.path("variantKey").asText();
+        String key = row.path("skuId").asText();
         String entry = field.equals("层级价格") ? field + ":" + row.path("storeLevelId").asText() : field;
         bundles.computeIfAbsent(key, ignored -> new LinkedHashMap<>()).put(entry, row);
       });
@@ -276,13 +361,14 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       conditions.add("(product_name LIKE ? OR merchant_code LIKE ? OR CAST(product_id AS CHAR) LIKE ?)");
       for (int i = 0; i < 3; i++) { args.add("%" + keyword.trim() + "%"); }
     }
-    String legacyShelf = "(operation_type='SOURCE_SYNC' AND business_client_code='admin'"
-        + " AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')='selling')";
-    if ("SOURCE_SHELF".equals(type)) {
-      conditions.add("(operation_type='SOURCE_SHELF' OR " + legacyShelf + ")");
-    } else if (type != null && !type.isBlank()) {
-      conditions.add("operation_type=?"); args.add(type);
-      if ("SOURCE_SYNC".equals(type)) { conditions.add("NOT " + legacyShelf); }
+    String sourceTarget = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')";
+    String visibleType = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' AND "
+        + sourceTarget + "='recycle' THEN 'SOURCE_INTERNAL' WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
+        + sourceTarget + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
+        + " WHEN 'purged' THEN 'SOURCE_DELETE' ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
+    conditions.add("(" + visibleType + ")<>'SOURCE_INTERNAL'");
+    if (type != null && !type.isBlank()) {
+      conditions.add("(" + visibleType + ")=?"); args.add(type);
     }
     if (operator != null && !operator.isBlank()) { conditions.add("operator_name LIKE ?"); args.add("%" + operator.trim() + "%"); }
     if (start != null) { conditions.add("operated_at>=?"); args.add(start.atStartOfDay()); }
@@ -293,7 +379,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     args.add((page - 1) * size);
     List<FinishedOperationLog> records = jdbc.query("SELECT * FROM finished_operation_logs" + where
         + " ORDER BY operated_at DESC,id DESC LIMIT ? OFFSET ?", BeanPropertyRowMapper.newInstance(FinishedOperationLog.class), args.toArray());
-    records.forEach(this::normalizeSupplyShelf);
+    records.forEach(this::normalizeOperation);
     return new FinishedOperationLogPage(records, count == null ? 0 : count, page, size);
   }
 
@@ -303,6 +389,12 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     com.zdm.platform.security.DataScope.requireAccess(identities.require(), log.getProductCreatedByAccountId());
     try {
       ObjectNode changes = (ObjectNode) json.readTree(log.getChangeDetails());
+      String sourceTarget = changes.path("来源状态").path("after").asText();
+      if ("admin".equals(log.getBusinessClientCode())
+          && ("SOURCE_SYNC".equals(log.getOperationType()) && !List.of("selling", "offShelf", "purged").contains(sourceTarget)
+              || "SOURCE_DELETE".equals(log.getOperationType()) && "recycle".equals(sourceTarget))) {
+        throw new IllegalArgumentException("操作日志不存在");
+      }
       resolveLegacyCategory(changes, log.getProductId());
       if (!changes.has("销售属性名称") && changes.has("销售规格")) {
         ObjectNode names = changes.putObject("销售属性名称");
@@ -330,17 +422,31 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       }
       log.setChangeDetails(json.writeValueAsString(changes));
     } catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("操作日志读取失败", error); }
-    normalizeSupplyShelf(log);
+    normalizeOperation(log);
     return log;
   }
 
-  private void normalizeSupplyShelf(FinishedOperationLog log) {
-    if (!"admin".equals(log.getBusinessClientCode()) || !("SOURCE_SYNC".equals(log.getOperationType()) || "SOURCE_SHELF".equals(log.getOperationType()))) { return; }
+  private void normalizeOperation(FinishedOperationLog log) {
+    if ("admin".equals(log.getBusinessClientCode()) && "PURGE".equals(log.getOperationType())
+        && (log.getAfterStatus() == null || log.getAfterStatus().isBlank())) {
+      log.setAfterStatus("purged");
+    }
+    if (!"admin".equals(log.getBusinessClientCode()) || !List.of("SOURCE_SYNC", "SOURCE_SHELF", "SOURCE_OFF_SHELF", "SOURCE_DELETE").contains(log.getOperationType())) { return; }
     try {
       JsonNode changes = json.readTree(log.getChangeDetails());
-      if (changes == null || !"selling".equals(changes.path("来源状态").path("after").asText())) { return; }
-      log.setOperationType("SOURCE_SHELF");
-      if (changes.has("入仓价格")) {
+      if (changes == null) { return; }
+      String target = changes.path("来源状态").path("after").asText();
+      if ("SOURCE_SYNC".equals(log.getOperationType())) {
+        log.setOperationType(switch (target) {
+          case "selling" -> "SOURCE_SHELF";
+          case "offShelf" -> "SOURCE_OFF_SHELF";
+          case "purged" -> "SOURCE_DELETE";
+          default -> "SOURCE_INTERNAL";
+        });
+      }
+      if ("SOURCE_OFF_SHELF".equals(log.getOperationType())) { log.setOperationSummary("供应链已下架该商品"); }
+      if ("SOURCE_DELETE".equals(log.getOperationType())) { log.setOperationSummary("供应链已删除该商品"); }
+      if ("SOURCE_SHELF".equals(log.getOperationType()) && (changes.has("入仓价格") || changes.has("销售规格") && changes.has("商品ID"))) {
         log.setOperationSummary(SOURCE_SHELF_SUMMARY);
         log.setBeforeStatus(null);
         log.setAfterStatus("warehouse");

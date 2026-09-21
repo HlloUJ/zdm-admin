@@ -23,6 +23,16 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
   }
 
 
+  @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+  private java.util.Map<String, List<String>> attributeDisplayOrder;
+
+  public java.util.Map<String, List<String>> getAttributeDisplayOrder() {
+    return attributeDisplayOrder == null ? null : new java.util.LinkedHashMap<>(attributeDisplayOrder);
+  }
+  public void setAttributeDisplayOrder(java.util.Map<String, List<String>> value) {
+    attributeDisplayOrder = value == null ? null : new java.util.LinkedHashMap<>(value);
+  }
+
   private String sourceOffShelfReason;
   private String sourceOffShelfDetail;
   private java.time.LocalDateTime sourceOffShelfAt;

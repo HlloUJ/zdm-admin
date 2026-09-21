@@ -31,7 +31,7 @@ public class FinishedProductPriceService {
   public List<FinishedProductPrice> listPrices(Long productId) {
     List<FinishedProductPrice> prices = mapper.selectList(Wrappers.<FinishedProductPrice>lambdaQuery()
         .eq(FinishedProductPrice::getFinishedProductId, productId)
-        .orderByAsc(FinishedProductPrice::getVariantKey)
+        .orderByAsc(FinishedProductPrice::getSkuId)
         .orderByAsc(FinishedProductPrice::getId));
     return prices;
   }
@@ -49,22 +49,22 @@ public class FinishedProductPriceService {
     if (requestedPrices == null || requestedPrices.isEmpty()) {
       throw new IllegalArgumentException("请完善全部成品现货价格");
     }
-    Map<String, List<FinishedProductPrice>> byVariant = requestedPrices.stream().collect(Collectors.groupingBy(
-        item -> normalizedVariantKey(item.getVariantKey()), LinkedHashMap::new, Collectors.toList()));
+    Map<Long, List<FinishedProductPrice>> byVariant = requestedPrices.stream().collect(Collectors.groupingBy(
+        item -> normalizedSkuId(item.getSkuId()), LinkedHashMap::new, Collectors.toList()));
     Map<Long, FinishedMarkupConfiguration> configurations = configurationMapper.selectList(
         Wrappers.<FinishedMarkupConfiguration>lambdaQuery()).stream()
         .collect(Collectors.toMap(FinishedMarkupConfiguration::getStoreLevelId, Function.identity()));
     List<FinishedProductPrice> normalized = new ArrayList<>();
-    byVariant.forEach((variantKey, prices) -> {
+    byVariant.forEach((skuId, prices) -> {
       Set<Long> actualIds = prices.stream().map(FinishedProductPrice::getStoreLevelId)
           .collect(Collectors.toSet());
       if (!actualIds.equals(expectedIds) || actualIds.size() != prices.size()) {
         throw new IllegalArgumentException("每个成品规格都必须填写全部启用的价格层级");
       }
       prices.forEach(price -> {
-        FinishedProductPrice result = normalize(productId, variantKey, price, levelNames);
+        FinishedProductPrice result = normalize(productId, skuId, price, levelNames);
         FinishedProductPrice existing = existingPrices.stream().filter(item ->
-            variantKey.equals(item.getVariantKey()) && price.getStoreLevelId().equals(item.getStoreLevelId()))
+            skuId.equals(item.getSkuId()) && price.getStoreLevelId().equals(item.getStoreLevelId()))
             .findFirst().orElse(null);
         applySource(result, price, existing, configurations.get(price.getStoreLevelId()));
         normalized.add(result);
@@ -75,7 +75,7 @@ public class FinishedProductPriceService {
     normalized.forEach(mapper::insert);
   }
 
-  private FinishedProductPrice normalize(Long productId, String variantKey, FinishedProductPrice price,
+  private FinishedProductPrice normalize(Long productId, Long skuId, FinishedProductPrice price,
       Map<Long, String> levelNames) {
     if (price.getStoreLevelId() == null || !levelNames.containsKey(price.getStoreLevelId())) {
       throw new IllegalArgumentException("成品现货价格层级不存在或已停用");
@@ -97,7 +97,7 @@ public class FinishedProductPriceService {
     }
     FinishedProductPrice normalized = new FinishedProductPrice();
     normalized.setFinishedProductId(productId);
-    normalized.setVariantKey(variantKey);
+    normalized.setSkuId(skuId);
     normalized.setVariantLabel(StringUtils.hasText(price.getVariantLabel()) ? price.getVariantLabel().trim() : null);
     normalized.setStoreLevelId(price.getStoreLevelId());
     normalized.setStoreLevelName(levelNames.get(price.getStoreLevelId()));
@@ -127,10 +127,10 @@ public class FinishedProductPriceService {
     result.setSourceConfigurationId(auto ? configuration.getId() : null);
   }
 
-  private String normalizedVariantKey(String value) {
-    if (!StringUtils.hasText(value)) {
-      throw new IllegalArgumentException("成品规格编码不能为空");
+  private Long normalizedSkuId(Long value) {
+    if (value == null || value <= 0) {
+      throw new IllegalArgumentException("SKU ID 不能为空");
     }
-    return value.trim();
+    return value;
   }
 }
