@@ -6,6 +6,33 @@ import FinishedSalesLogTable from './FinishedSalesLogTable.vue';
 config.global.stubs.SalesLogFullscreen = { template: '<div><slot /></div>' };
 
 describe('edit log layout', () => {
+  it.each([
+    ['warehouse', 'selling', '仓库中', '已上架'],
+    ['selling', 'offShelf', '已上架', '已下架'],
+  ])(
+    'renders source status %s → %s with consistent source and operations labels',
+    (before, after, beforeLabel, afterLabel) => {
+      const wrapper = mount(FinishedEditChanges, {
+        shallow: true,
+        props: {
+          changes: {
+            来源状态: { before, after },
+            状态: { before: 'warehouse', after: 'selling' },
+          },
+          media: [],
+          beforeHtml: '',
+          afterHtml: '',
+        },
+        global: { stubs: { FinishedLogValue: false, 't-tag': true, 't-icon': true, 't-table': true } },
+      });
+      const fields = wrapper.findAll('.change-field');
+      const source = fields.find((field) => field.find('h4').text() === '来源状态')!;
+      const operations = fields.find((field) => field.find('h4').text() === '上架状态')!;
+      expect(source.find('.change-side--before').text()).toBe(`修改前${beforeLabel}`);
+      expect(source.find('.change-side--after').text()).toBe(`修改后${afterLabel}`);
+      expect(operations.find('.change-side--after').text()).toBe('修改后已上架');
+    },
+  );
   it('orders changes by edit sections, pairs changed media, and gives wide data full width', () => {
     const media = { field: 'mainImage', mediaId: 1, resource: { available: true, mediaType: 'image', url: '/old' } };
     const next = { ...media, mediaId: 2, resource: { ...media.resource, url: '/new' } };

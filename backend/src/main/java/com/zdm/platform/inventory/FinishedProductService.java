@@ -104,6 +104,20 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
         .toList();
   }
 
+  public FinishedProduct visibleDetail(Long id) {
+    FinishedProduct product = lambdaQuery()
+        .eq(FinishedProduct::getId, id)
+        .eq(FinishedProduct::getOperationsDeleted, false)
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()),
+            FinishedProduct::getCreatedByAccountId, identityProvider.require().accountId())
+        .one();
+    return product;
+  }
+
+  public FinishedProduct withDetails(FinishedProduct product) {
+    return attachDetails(product);
+  }
+
   @Transactional
   public FinishedProduct createWithDetails(FinishedProduct product) {
     lifecycle.requireSupplyChain();
@@ -130,8 +144,8 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       throw new IllegalArgumentException("商品编码已存在", exception);
     }
     replaceDetails(product);
-    if(publishNow) { lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,product.getId(),"selling"); }
     syncMediaReferences(product);
+    if(publishNow) { lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,product.getId(),"selling"); }
     FinishedProduct created = attachDetails(getById(product.getId()));
     operationLogs.record(created, null, operationLogs.snapshot(created));
     return created;
@@ -155,6 +169,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (product.getSpecDimensions() == null) {
       product.setSpecDimensions(existing.getSpecDimensions());
     }
+    if (product.getAttributeDisplayOrder() == null) { product.setAttributeDisplayOrder(existing.getAttributeDisplayOrder()); }
     String requestedStatus=product.getStatus();
     product.setStatus(existing.getStatus());
     product.setSourceStatus(existing.getSourceStatus());
@@ -199,10 +214,10 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     lifecycle.requireOperational(existing.getSourceStatus(), existing.getOperationsDeleted());
     Map<String,Object> before = operationLogs.snapshot(existing);
     if (priceOnly) {
-      Map<String,java.math.BigDecimal> costs = sourceCosts(existing);
+      Map<Long,java.math.BigDecimal> costs = sourceCosts(existing);
       if (request.getGuidePrices() == null || request.getMarkupPrices() == null) { throw new IllegalArgumentException("请完善价格"); }
-      request.getGuidePrices().forEach(price -> requireSourceCost(costs.get(price.getVariantKey()), price.getCostPrice()));
-      request.getMarkupPrices().forEach(price -> requireSourceCost(costs.get(price.getVariantKey()), price.getCostPrice()));
+      request.getGuidePrices().forEach(price -> requireSourceCost(costs.get(price.getSkuId()), price.getCostPrice()));
+      request.getMarkupPrices().forEach(price -> requireSourceCost(costs.get(price.getSkuId()), price.getCostPrice()));
       existing.setGuidePrices(request.getGuidePrices());
       existing.setMarkupPrices(request.getMarkupPrices());
       validatePrices(existing);
@@ -214,16 +229,22 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       existing.setOffShelfReason("offShelf".equals(request.getStatus()) ? request.getOffShelfReason() : null);
       existing.setOffShelfDetail("offShelf".equals(request.getStatus()) ? request.getOffShelfDetail() : null);
       if ("offShelf".equals(request.getStatus())) { existing.setOffShelfAt(LocalDateTime.now()); }
-      updateById(existing);
+      // attachDetails renders source content for responses; never persist it during an operation-only update.
+      lambdaUpdate().eq(FinishedProduct::getId, id)
+          .set(FinishedProduct::getStatus, existing.getStatus())
+          .set(existing.getOffShelfReason() != null, FinishedProduct::getOffShelfReason, existing.getOffShelfReason())
+          .set(FinishedProduct::getOffShelfDetail, existing.getOffShelfDetail())
+          .set(existing.getOffShelfAt() != null, FinishedProduct::getOffShelfAt, existing.getOffShelfAt())
+          .update();
     }
     FinishedProduct updated = attachDetails(getById(id));
     operationLogs.record(updated, before, operationLogs.snapshot(updated));
     return updated;
   }
 
-  private Map<String,java.math.BigDecimal> sourceCosts(FinishedProduct product) {
-    Map<String,java.math.BigDecimal> costs = new LinkedHashMap<>();
-    if (product.getVariants() != null) { product.getVariants().forEach(v -> costs.put(v.getVariantKey(), v.getCostPrice()==null?null:v.getCostPrice().setScale(2,java.math.RoundingMode.HALF_UP))); }
+  private Map<Long,java.math.BigDecimal> sourceCosts(FinishedProduct product) {
+    Map<Long,java.math.BigDecimal> costs = new LinkedHashMap<>();
+    if (product.getVariants() != null) { product.getVariants().forEach(v -> costs.put(v.getId(), v.getCostPrice()==null?null:v.getCostPrice().setScale(2,java.math.RoundingMode.HALF_UP))); }
     return costs;
   }
   private void requireSourceCost(java.math.BigDecimal cost, java.math.BigDecimal requested) {
@@ -258,6 +279,18 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   }
 
   private void validateAndNormalize(FinishedProduct product) {
+    if (product.getAttributeDisplayOrder() == null) {
+      var sales = new LinkedHashSet<String>();
+      if (product.getVariants() != null) {
+        product.getVariants().forEach(variant -> {
+          if (variant.getSalesAttributes() != null) { sales.addAll(variant.getSalesAttributes().keySet()); }
+        });
+      }
+      product.setAttributeDisplayOrder(Map.of(
+          "product", product.getAttributes() == null ? List.of() : product.getAttributes().stream().map(entry -> String.valueOf(entry.getAttributeId())).toList(),
+          "sales", List.copyOf(sales)));
+    }
+
     if (!StringUtils.hasText(product.getName())) {
       throw new IllegalArgumentException("请输入商品名称");
     }
@@ -364,21 +397,19 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (variants.isEmpty()) {
       throw new IllegalArgumentException("请至少配置一条商品规格");
     }
-    Set<String> keys = new LinkedHashSet<>();
+    Set<Long> ids = new LinkedHashSet<>();
     int totalStock = 0;
     for (FinishedProductVariant variant : variants) {
-      String key = variant.getVariantKey() == null ? "" : variant.getVariantKey().trim();
       String label = variant.getVariantLabel() == null ? "" : variant.getVariantLabel().trim();
-      if (key.isEmpty() || label.isEmpty()) {
-        throw new IllegalArgumentException("请完善规格名称和商家编码");
+      if (label.isEmpty()) {
+        throw new IllegalArgumentException("请完善规格名称");
       }
-      if (!keys.add(key)) {
-        throw new IllegalArgumentException("规格商家编码不能重复");
+      if (variant.getId() != null && !ids.add(variant.getId())) {
+        throw new IllegalArgumentException("SKU ID 不能重复");
       }
       if (lifecycle.isSupplyChain() && (variant.getCostPrice() != null && variant.getCostPrice().signum() < 0)) {
         throw new IllegalArgumentException("请完善每个规格的成本价");
       }
-      variant.setVariantKey(key);
       variant.setVariantLabel(label);
       variant.setDisplayMode("layered".equals(variant.getDisplayMode()) ? "layered" : "single");
       int stock = variant.getStock() == null ? 0 : variant.getStock();
@@ -389,30 +420,63 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   }
 
   private void validatePrices(FinishedProduct product) {
-    Set<String> variantKeys = product.getVariants().stream()
-        .map(FinishedProductVariant::getVariantKey)
+    Set<Long> skuIds = product.getVariants().stream()
+        .map(FinishedProductVariant::getId)
         .collect(java.util.stream.Collectors.toSet());
     if (product.getGuidePrices() == null || product.getGuidePrices().isEmpty()) {
       throw new IllegalArgumentException("请配置每条规格的指导价");
     }
     boolean hasUnknownGuideVariant = product.getGuidePrices().stream()
-        .anyMatch(price -> !variantKeys.contains(price.getVariantKey()));
+        .anyMatch(price -> !skuIds.contains(price.getSkuId()));
     boolean hasUnknownMarkupVariant = product.getMarkupPrices() != null && product.getMarkupPrices().stream()
-        .anyMatch(price -> !variantKeys.contains(price.getVariantKey()));
+        .anyMatch(price -> !skuIds.contains(price.getSkuId()));
     if (hasUnknownGuideVariant || hasUnknownMarkupVariant) {
       throw new IllegalArgumentException("价格规格与商品规格不一致");
+    }
+    if (product.getGuidePrices().size() != skuIds.size()
+        || !product.getGuidePrices().stream().map(FinishedProductGuidePrice::getSkuId)
+            .collect(java.util.stream.Collectors.toSet()).equals(skuIds)) {
+      throw new IllegalArgumentException("请配置每条规格且不重复的指导价");
+    }
+    if (product.getMarkupPrices() != null && !product.getMarkupPrices().isEmpty()
+        && !product.getMarkupPrices().stream().map(FinishedProductPrice::getSkuId)
+            .collect(java.util.stream.Collectors.toSet()).equals(skuIds)) {
+      throw new IllegalArgumentException("请配置每条规格的层级价格");
     }
     product.setGuidePrice(product.getGuidePrices().getFirst().getPrice());
   }
 
   private void replaceDetails(FinishedProduct product) {
     Long productId = product.getId();
-    variantMapper.delete(Wrappers.lambdaQuery(FinishedProductVariant.class)
-        .eq(FinishedProductVariant::getFinishedProductId, productId));
+    Map<Long, FinishedProductVariant> existing = variantMapper.selectList(
+        Wrappers.lambdaQuery(FinishedProductVariant.class)
+            .eq(FinishedProductVariant::getFinishedProductId, productId)).stream()
+        .collect(java.util.stream.Collectors.toMap(FinishedProductVariant::getId, java.util.function.Function.identity()));
+    Set<Long> retained = new LinkedHashSet<>();
+    // Validate every supplied ID before applying any SKU changes.
+    for (FinishedProductVariant variant : product.getVariants()) {
+      if (variant.getId() != null && !existing.containsKey(variant.getId())) {
+        throw new IllegalArgumentException("SKU 不属于当前商品");
+      }
+    }
     product.getVariants().forEach(variant -> {
-      variant.setId(null);
       variant.setFinishedProductId(productId);
-      variantMapper.insert(variant);
+      if (variant.getId() == null) {
+        variantMapper.insert(variant);
+      } else {
+        variant.setCreatedAt(existing.get(variant.getId()).getCreatedAt());
+        variant.setStatus(existing.get(variant.getId()).getStatus());
+        variantMapper.updateById(variant);
+      }
+      retained.add(variant.getId());
+    });
+    existing.keySet().stream().filter(id -> !retained.contains(id)).forEach(variantMapper::deleteById);
+    // Labels are snapshots in price rows; keep them aligned when a SKU is renamed.
+    product.getVariants().forEach(variant -> {
+      jdbcTemplate.update("UPDATE finished_product_guide_prices SET variant_label=? WHERE finished_product_id=? AND sku_id=?",
+          variant.getVariantLabel(), productId, variant.getId());
+      jdbcTemplate.update("UPDATE finished_product_prices SET variant_label=? WHERE finished_product_id=? AND sku_id=?",
+          variant.getVariantLabel(), productId, variant.getId());
     });
 
     attributeEntryMapper.delete(Wrappers.lambdaQuery(FinishedProductAttributeEntry.class)

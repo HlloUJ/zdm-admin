@@ -23,14 +23,14 @@ export interface FinishedProductPrice {
   priceCoefficient: number;
   costPrice: number;
   price: number;
-  variantKey: string;
+  skuId: number;
   variantLabel?: string;
 }
 export interface FinishedProductGuidePrice {
   priceCoefficient: number;
   costPrice: number;
   price: number;
-  variantKey: string;
+  skuId: number;
   variantLabel?: string;
 }
 
@@ -50,7 +50,6 @@ export interface FinishedSpecDimension {
 export interface FinishedProductVariant {
   costPrice?: number;
   id?: number;
-  variantKey: string;
   variantLabel: string;
   displayMode: 'single' | 'layered';
   salesAttributes?: Record<string, string>;
@@ -89,6 +88,7 @@ export interface FinishedProductRecord {
   attributes?: FinishedProductAttributeEntry[];
   variants?: FinishedProductVariant[];
   specDimensions?: FinishedSpecDimension[];
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
   offShelfReason?: string;
   offShelfAt?: string;
   offShelfDetail?: string;
@@ -116,6 +116,7 @@ export interface FinishedProductPayload {
   attributes: FinishedProductAttributeEntry[];
   variants: FinishedProductVariant[];
   specDimensions?: FinishedSpecDimension[];
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
   offShelfReason?: string;
   offShelfAt?: string;
   offShelfDetail?: string;
@@ -181,3 +182,6 @@ export async function listFinishedProductTemplateAttributes(): Promise<FinishedP
     template.content.map((attribute) => ({ ...attribute, categoryId: template.categoryId })),
   );
 }
+
+export const getFinishedProductDetail = (id: number) =>
+  request<FinishedProductRecord>(`/admin/finished-products/${id}`);

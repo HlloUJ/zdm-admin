@@ -11,18 +11,16 @@ import jakarta.validation.constraints.NotBlank;
 
 @TableName(value = "finished_product_variants", autoResultMap = true)
 public class FinishedProductVariant extends BaseEntity {
+  @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
   private java.math.BigDecimal costPrice;
   public java.math.BigDecimal getCostPrice() { return costPrice; }
   public void setCostPrice(java.math.BigDecimal value) { costPrice = value; }
   private Long finishedProductId;
 
   @NotBlank
-  private String variantKey;
-
-  @NotBlank
   private String variantLabel;
 
-  @TableField(typeHandler = JacksonTypeHandler.class)
+  @TableField(typeHandler = JacksonTypeHandler.class, updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
   private Map<String, String> salesAttributes;
 
   public Map<String, String> getSalesAttributes() {
@@ -33,9 +31,13 @@ public class FinishedProductVariant extends BaseEntity {
   }
 
   private String displayMode;
+  @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
   private String material;
+  @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
   private String lengthValue;
+  @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
   private String color;
+  @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
   private String sizeValue;
 
   @Min(0)
@@ -43,8 +45,6 @@ public class FinishedProductVariant extends BaseEntity {
 
   public Long getFinishedProductId() { return finishedProductId; }
   public void setFinishedProductId(Long finishedProductId) { this.finishedProductId = finishedProductId; }
-  public String getVariantKey() { return variantKey; }
-  public void setVariantKey(String variantKey) { this.variantKey = variantKey; }
   public String getVariantLabel() { return variantLabel; }
   public void setVariantLabel(String variantLabel) { this.variantLabel = variantLabel; }
   public String getDisplayMode() { return displayMode; }

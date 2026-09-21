@@ -47,12 +47,13 @@ export const finishedLogTypes: Record<string, string> = {
   PURGE: '彻底删除商品',
   SOLD_OUT: '商品售罄',
   SOURCE_SHELF: '供应链上架',
-  SOURCE_SYNC: '供应链联动',
+  SOURCE_OFF_SHELF: '供应链下架',
+  SOURCE_DELETE: '供应链删除',
   RESTORE_WAREHOUSE: '放回仓库',
 };
 export const finishedLogStates: Record<string, string> = {
   warehouse: '仓库中',
-  selling: '出售中',
+  selling: '已上架',
   offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',

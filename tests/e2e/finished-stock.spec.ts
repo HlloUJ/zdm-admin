@@ -652,20 +652,20 @@ test('edits prices in a specification table and preserves product details on sav
     totalStock: 5,
     attributes: [{ attributeId: 1, attributeName: '商品属性', value: '保留属性' }],
     variants: ['A', 'B'].map((key, index) => ({
-      variantKey: key,
+      id: index + 801,
       variantLabel: `规格${key}`,
       displayMode: 'single',
       stock: index + 2,
     })),
-    guidePrices: ['A', 'B'].map((key) => ({
-      variantKey: key,
+    guidePrices: ['A', 'B'].map((key, index) => ({
+      skuId: index + 801,
       variantLabel: `规格${key}`,
       costPrice: 10,
       priceCoefficient: 2,
       price: 20,
     })),
-    markupPrices: ['A', 'B'].map((key) => ({
-      variantKey: key,
+    markupPrices: ['A', 'B'].map((key, index) => ({
+      skuId: index + 801,
       variantLabel: `规格${key}`,
       storeLevelId: 1,
       storeLevelName: '一级价格',
@@ -861,6 +861,75 @@ for (const client of ['admin', 'supply-chain']) {
     await expect(page.locator('.form-shell')).not.toContainText('商家编码');
   });
 }
+
+test('shows complete warehouse arrival snapshot with creation log layout', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page, 'admin');
+  const snapshot = {
+    商品ID: 91,
+    商品名称: '入仓历史商品',
+    商品分类: '成品现货 / 餐桌',
+    供应商: '入仓时供应商',
+    宝贝详情: '<p>入仓时的宝贝详情</p>',
+    总库存: 5,
+    状态: 'warehouse',
+    商品属性: [{ attributeId: 8, attributeName: '材质', value: '石材' }],
+    销售规格: [{ skuId: 811, variantLabel: '入仓规格', stock: 5, costPrice: 10, displayMode: 'single' }],
+    指导价: [{ skuId: 811, variantLabel: '入仓规格', priceCoefficient: 2, costPrice: 10, price: 20 }],
+    层级价格: [
+      {
+        skuId: 811,
+        variantLabel: '入仓规格',
+        storeLevelId: 7,
+        storeLevelName: '城市合伙人',
+        priceCoefficient: 3,
+        costPrice: 10,
+        price: 30,
+        priceSource: 'auto',
+      },
+    ],
+    媒体: [
+      {
+        field: 'mainImage',
+        mediaId: 1,
+        resource: {
+          available: true,
+          mediaType: 'image',
+          url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+        },
+      },
+    ],
+  };
+  const record = {
+    id: 601,
+    productId: 91,
+    productName: '入仓历史商品',
+    operationType: 'SOURCE_SHELF',
+    operationSource: 'SUPPLY_CHAIN',
+    operationSummary: '供应链已上架，商品进入运营管理平台仓库',
+    afterStatus: 'warehouse',
+    operatorName: '供应链人员',
+    changeDetails: JSON.stringify(
+      Object.fromEntries(Object.entries(snapshot).map(([key, after]) => [key, { before: null, after }])),
+    ),
+  };
+  await page.route('**/api/admin/finished-products/operation-logs?*', (route) =>
+    route.fulfill({ json: { code: 0, data: { records: [record], total: 1 } } }),
+  );
+  await page.route('**/api/admin/finished-products/operation-logs/601', (route) =>
+    route.fulfill({ json: { code: 0, data: record } }),
+  );
+  await page.goto('/finished-stock-management');
+  await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  await page.getByRole('row').filter({ hasText: '入仓历史商品' }).getByText('详情', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
+  await expect(dialog.locator('.creation-section-title')).toHaveText(['图文描述', '基础信息', '销售信息']);
+  for (const text of ['入仓时供应商', '入仓时的宝贝详情', '入仓规格', '城市合伙人'])
+    await expect(dialog).toContainText(text);
+  for (const text of ['修改前', '修改后', '入仓价格']) await expect(dialog).not.toContainText(text);
+  await dialog.getByRole('button', { name: '查看商品主图', exact: true }).click();
+  await expect(page.locator('.t-dialog:visible').filter({ hasText: '历史媒体' })).toBeVisible();
+});
 
 test('shows initial warehouse prices without comparison and stacks later prices with fullscreen', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));

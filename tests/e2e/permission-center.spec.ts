@@ -1032,11 +1032,11 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
-    ['查看', '批量上架', '价格', '上架', '删除'],
-    ['查看', '批量下架', '价格', '下架'],
+    ['查看', '批量上架', '详情', '价格', '上架', '删除'],
+    ['查看', '批量下架', '详情', '价格', '下架'],
     ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],
-    ['查看', '价格'],
-    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '价格', '放回仓库', '彻底删除'],
+    ['查看', '详情', '价格'],
+    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '价格', '放回仓库', '彻底删除'],
   ];
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);

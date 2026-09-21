@@ -18,7 +18,7 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue';
-const props = defineProps<{ before: unknown; after: unknown }>();
+const props = defineProps<{ before: unknown; after: unknown; order?: string[] }>();
 type Attribute = { attributeId?: number; attributeName?: string; value?: unknown };
 function values(value: unknown) {
   const counts = new Map<string, number>();
@@ -38,17 +38,31 @@ const rows = computed(() => {
   const after = values(props.after);
   const previous = new Map(before.map((item) => [item.key, item]));
   const next = new Map(after.map((item) => [item.key, item]));
-  return [...new Set([...before, ...after].map((item) => item.key))].map((key) => {
-    const old = previous.get(key);
-    const current = next.get(key);
-    return {
-      key,
-      name: current?.attributeName || old?.attributeName || '历史属性',
-      before: old ? text(old.value) : '未设置',
-      after: current ? text(current.value) : '已移除',
-      changed: !old || !current || JSON.stringify(old.value) !== JSON.stringify(current.value),
-    };
-  });
+  return [...new Set([...before, ...after].map((item) => item.key))]
+    .map((key) => {
+      const old = previous.get(key);
+      const current = next.get(key);
+      return {
+        key,
+        name: current?.attributeName || old?.attributeName || '历史属性',
+        before: old ? text(old.value) : '未设置',
+        after: current ? text(current.value) : '已移除',
+        changed:
+          !old ||
+          !current ||
+          old.attributeName !== current.attributeName ||
+          JSON.stringify(old.value) !== JSON.stringify(current.value),
+      };
+    })
+    .filter((row) => row.changed)
+    .sort((a, b) => {
+      if (!props.order) return 0;
+      const rank = (key: string) => {
+        const index = props.order!.indexOf(key.split(':')[1]!);
+        return index < 0 ? props.order!.length : index;
+      };
+      return rank(a.key) - rank(b.key);
+    });
 });
 </script>
 <style scoped>

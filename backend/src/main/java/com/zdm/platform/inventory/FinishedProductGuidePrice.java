@@ -3,7 +3,6 @@ package com.zdm.platform.inventory;
 import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
@@ -11,7 +10,7 @@ import java.math.BigDecimal;
 public class FinishedProductGuidePrice {
   private Long id;
   private Long finishedProductId;
-  @NotBlank private String variantKey;
+  @NotNull private Long skuId;
   private String variantLabel;
   @NotNull @DecimalMin("0.0000") @Digits(integer = 3, fraction = 4) private BigDecimal priceCoefficient;
   @NotNull @DecimalMin("0.00") private BigDecimal costPrice;
@@ -21,8 +20,8 @@ public class FinishedProductGuidePrice {
   public void setId(Long value) { this.id = value; }
   public Long getFinishedProductId() { return finishedProductId; }
   public void setFinishedProductId(Long value) { this.finishedProductId = value; }
-  public String getVariantKey() { return variantKey; }
-  public void setVariantKey(String value) { this.variantKey = value; }
+  public Long getSkuId() { return skuId; }
+  public void setSkuId(Long value) { this.skuId = value; }
   public String getVariantLabel() { return variantLabel; }
   public void setVariantLabel(String value) { this.variantLabel = value; }
   public BigDecimal getPriceCoefficient() { return priceCoefficient; }
