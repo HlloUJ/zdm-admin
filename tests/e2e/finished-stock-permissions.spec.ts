@@ -86,7 +86,7 @@ for (const [status, scope] of [
   ['soldOut', 'sold-out'],
   ['recycle', 'recycle'],
 ]) {
-  test(`operations ${status} opens read-only complete details and preserves list`, async ({ page }) => {
+  test(`operations ${status} opens read-only complete details and preserves list`, async ({ page }, testInfo) => {
     await setup(page, [prefix + scope + '.view', prefix + scope + '.detail']);
     const product = {
       id: 71,
@@ -159,9 +159,13 @@ for (const [status, scope] of [
       await expect(specCell.locator('.product-code')).toHaveText('SKU ID：81');
       await expect(fullscreen.getByRole('button', { name: '跟随配置', exact: true })).toBeDisabled();
       const box = await fullscreen.boundingBox();
-      expect(box?.width).toBe(page.viewportSize()!.width);
-      expect(box?.height).toBe(page.viewportSize()!.height);
-      await page.screenshot({ path: '/private/tmp/finished-detail-fullscreen.png' });
+      const viewport = await page.evaluate(() => ({
+        width: document.documentElement.clientWidth,
+        height: document.documentElement.clientHeight,
+      }));
+      expect(box?.width).toBe(viewport.width);
+      expect(box?.height).toBe(viewport.height);
+      await page.screenshot({ path: testInfo.outputPath('finished-detail-fullscreen.png') });
       await fullscreen.getByRole('button', { name: '还原', exact: true }).click();
       await expect(page.locator('.sales-fullscreen-panel.is-fullscreen')).toHaveCount(0);
       await expect(drawer).toBeVisible();
@@ -169,7 +173,7 @@ for (const [status, scope] of [
       await page.keyboard.press('Escape');
       await expect(page.locator('.sales-fullscreen-panel.is-fullscreen')).toHaveCount(0);
       await expect(drawer).toBeVisible();
-      await page.screenshot({ path: '/private/tmp/finished-detail-cell.png' });
+      await page.screenshot({ path: testInfo.outputPath('finished-detail-cell.png') });
     }
     await drawer.locator('.t-drawer__close-btn').click();
     await expect(main.getByText('详情验收商品', { exact: true })).toBeVisible();
@@ -222,7 +226,7 @@ test('operations role catalog exposes detail permission for all five finished st
 for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
   test(`source availability ${sourceStatus} keeps operations blocked and distinguishes permanent deletion`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await setup(page, [prefix + 'selling.view', prefix + 'selling.detail', prefix + 'recycle.purge']);
     const product = {
       id: 72,
@@ -257,7 +261,10 @@ for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
     await expect(drawer.getByText('保留商品资料', { exact: true })).toBeVisible();
     await expect(drawer.locator('input,textarea')).toHaveCount(0);
     if (sourceStatus === 'recycle')
-      await page.screenshot({ path: '/private/tmp/finished-source-recycle-detail.png', animations: 'disabled' });
+      await page.screenshot({
+        path: testInfo.outputPath('finished-source-recycle-detail.png'),
+        animations: 'disabled',
+      });
   });
 }
 
