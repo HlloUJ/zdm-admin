@@ -1,15 +1,41 @@
 package com.zdm.platform.inventory;
 
+import com.zdm.platform.common.StoreLevelPriceSynchronizer;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class SlabPriceConfigurationSyncService {
+public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchronizer {
   private final JdbcTemplate jdbcTemplate;
 
   public SlabPriceConfigurationSyncService(JdbcTemplate jdbcTemplate) {
     this.jdbcTemplate = jdbcTemplate;
+  }
+
+  @Override
+  @Transactional
+  public void syncEnabledStoreLevel(Long levelId) {
+    var configurations = jdbcTemplate.query("""
+        SELECT configuration.id, configuration.price_coefficient
+        FROM slab_markup_configurations configuration
+        INNER JOIN store_levels level ON level.id = configuration.store_level_id
+        WHERE level.id = ? AND level.status = 'enabled'
+          AND configuration.status = 'enabled' AND configuration.legacy_seeded = FALSE
+          AND configuration.price_coefficient >= 0
+        FOR UPDATE
+        """, (result, row) -> {
+          var configuration = new SlabMarkupConfiguration();
+          configuration.setId(result.getLong("id"));
+          configuration.setPriceCoefficient(result.getBigDecimal("price_coefficient"));
+          configuration.setStatus("enabled");
+          return configuration;
+        }, levelId);
+    for (var configuration : configurations) {
+      refreshAutoPrices(configuration);
+      backfillMissingPrices(configuration);
+    }
   }
 
   public long countAutoReferences(Long configurationId) {
@@ -47,6 +73,7 @@ public class SlabPriceConfigurationSyncService {
         LEFT JOIN slab_prices price
           ON price.slab_id = inventory.id AND price.store_level_id = configuration.store_level_id
         WHERE inventory.cost_price IS NOT NULL AND price.id IS NULL
+          AND level.status = 'enabled' AND configuration.status = 'enabled'
         """,
         configuration.getId());
   }
@@ -66,6 +93,7 @@ public class SlabPriceConfigurationSyncService {
             price.price = ROUND(inventory.cost_price * ?, 2)
         WHERE price.source_configuration_id = ?
           AND price.price_source = 'auto'
+          AND level.status = 'enabled'
           AND inventory.cost_price IS NOT NULL
         """,
         configuration.getPriceCoefficient(),

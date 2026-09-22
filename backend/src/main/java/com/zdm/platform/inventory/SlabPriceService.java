@@ -65,7 +65,6 @@ public class SlabPriceService {
         .stream()
         .collect(Collectors.toMap(SlabMarkupConfiguration::getStoreLevelId, configuration -> configuration));
     Map<Long, String> levelNames = new LinkedHashMap<>();
-    existingPrices.forEach(price -> levelNames.put(price.getStoreLevelId(), price.getStoreLevelName()));
     storeLevelDirectory.listEnabledLevels().forEach(level -> levelNames.putIfAbsent(level.id(), level.name()));
     Set<Long> expectedIds = levelNames.keySet();
     if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {

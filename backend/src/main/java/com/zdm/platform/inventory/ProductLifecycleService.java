@@ -162,7 +162,7 @@ public class ProductLifecycleService {
     if (!"recycle".equals(row.get("status")) && !unavailable((String)row.get("source_status"))) {
       throw new IllegalArgumentException("只有回收站或来源已删除的商品可以彻底删除");
     }
-    record(kind,row,"admin","PURGE",kind==Kind.FINISHED ? "彻底删除运营商品" : null,(String)row.get("status"),kind == Kind.FINISHED ? "purged" : null,Map.of());
+    record(kind,row,"admin","PURGE",kind==Kind.FINISHED ? "彻底删除运营商品" : null,(String)row.get("status"),"purged",Map.of());
     jdbc.update("UPDATE "+kind.table+" SET operations_deleted=TRUE,guide_price=NULL WHERE id=?",id);
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
     if (kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
@@ -186,10 +186,14 @@ public class ProductLifecycleService {
     var guideRows=jdbc.queryForList("SELECT price_coefficient FROM "+kind.config+"_guide_price_settings WHERE id=1");
     if(guideRows.isEmpty()) { throw new IllegalArgumentException("请先在运营管理平台配置指导价系数"); }
     BigDecimal guide=(BigDecimal)guideRows.getFirst().get("price_coefficient");
-    var levels=jdbc.queryForList("SELECT l.id,l.name,c.id AS configuration_id,c.price_coefficient,c.status AS configuration_status FROM store_levels l LEFT JOIN "+kind.config+"_markup_configurations c ON c.store_level_id=l.id WHERE l.status='enabled' OR l.id IN (SELECT store_level_id FROM "+kind.prices+" WHERE "+kind.priceKey+"=?) ORDER BY l.id",id);
+    var levels=jdbc.queryForList("SELECT l.id,l.name,c.id AS configuration_id,c.price_coefficient,c.status AS configuration_status FROM store_levels l LEFT JOIN "+kind.config+"_markup_configurations c ON c.store_level_id=l.id WHERE l.status='enabled' OR (? AND l.id IN (SELECT store_level_id FROM "+kind.prices+" WHERE "+kind.priceKey+"=?)) ORDER BY l.id",kind==Kind.FINISHED,id);
     var variants=kind==Kind.FINISHED ? jdbc.queryForList("SELECT id AS sku_id,variant_label,cost_price FROM finished_product_variants WHERE finished_product_id=? ORDER BY id",id):List.of(row);
     if(variants.isEmpty()) { throw new IllegalArgumentException("请完善商品规格与成本价"); }
-    jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
+    if (kind == Kind.SLAB) {
+      jdbc.update("DELETE FROM slab_prices WHERE slab_id=? AND store_level_id IN (SELECT id FROM store_levels WHERE status='enabled')", id);
+    } else {
+      jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
+    }
     if(kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
     for(var variant:variants) {
       BigDecimal cost=(BigDecimal)variant.get("cost_price");

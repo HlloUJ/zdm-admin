@@ -2378,17 +2378,19 @@ const salesPriceRows = computed(() => {
     priceCoefficient?: number;
     priceSource?: 'auto' | 'manual';
     sourceConfigurationId?: number;
-  }[] = savedPrices.map((price) => ({
-    id: price.storeLevelId,
-    label:
-      publishOptions.storeLevels.find((level) => level.id === price.storeLevelId)?.label ||
-      markupConfigurations.value.find((item) => item.storeLevelId === price.storeLevelId)?.name ||
-      price.storeLevelName ||
-      `门店级别${price.storeLevelId}`,
-    priceCoefficient: Number(price.priceCoefficient),
-    priceSource: price.priceSource ?? 'manual',
-    sourceConfigurationId: price.sourceConfigurationId,
-  }));
+  }[] = savedPrices
+    .filter((price) => publishOptions.storeLevels.some((level) => level.id === price.storeLevelId))
+    .map((price) => ({
+      id: price.storeLevelId,
+      label:
+        publishOptions.storeLevels.find((level) => level.id === price.storeLevelId)?.label ||
+        markupConfigurations.value.find((item) => item.storeLevelId === price.storeLevelId)?.name ||
+        price.storeLevelName ||
+        `门店级别${price.storeLevelId}`,
+      priceCoefficient: Number(price.priceCoefficient),
+      priceSource: price.priceSource ?? 'manual',
+      sourceConfigurationId: price.sourceConfigurationId,
+    }));
   const savedIds = new Set(rows.map((item) => item.id));
   publishOptions.storeLevels.forEach((level) => {
     if (savedIds.has(level.id)) return;
@@ -2976,8 +2978,10 @@ const handleBatchPriceChange = (index: number, _value?: unknown, context?: Sales
   if (String(row.ratio ?? '').trim()) clearPriceDrawerFieldError(`rows.${index}.ratio`);
 };
 
-const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
-  const snapshots = row.markupPrices ?? [];
+const buildPriceRows = (row: SlabItem, mode: 'detail' | 'edit' = 'detail'): DrawerPriceRow[] => {
+  const snapshots = (row.markupPrices ?? []).filter((price) =>
+    publishOptions.storeLevels.some((level) => level.id === price.storeLevelId),
+  );
   const cost = toNumber(row.price.cost);
   const guidePrice = row.price.guide;
   const guideRatio =
@@ -3001,13 +3005,14 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
   const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.storeLevelId));
   publishOptions.storeLevels.forEach((level) => {
     if (snapshotIds.has(level.id)) return;
-    const configuration = markupConfigurations.value.find((item) => item.storeLevelId === level.id);
+    const configuration = activeConfigurationForLevel(level.id);
     const ratio = configuration == null ? '' : formatRatio(Number(configuration.priceCoefficient));
     configuredRows.push({
       configurationId: level.id,
       label: level.label,
       ratio,
-      price: cost && ratio ? formatPrice(cost * toNumber(ratio)) : '',
+      // Match the finished-stock editor: only saved prices populate the price field.
+      price: mode === 'detail' && cost && ratio ? formatPrice(cost * toNumber(ratio)) : '',
       priceSource: configuration == null ? 'manual' : 'auto',
       sourceConfigurationId: configuration?.id,
     });
@@ -3024,7 +3029,7 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
 };
 
 const fillPriceRows = (row: SlabItem) => {
-  batchPriceRows.splice(0, batchPriceRows.length, ...buildPriceRows(row));
+  batchPriceRows.splice(0, batchPriceRows.length, ...buildPriceRows(row, 'edit'));
 };
 
 const openTableImage = (row: SlabItem) => {

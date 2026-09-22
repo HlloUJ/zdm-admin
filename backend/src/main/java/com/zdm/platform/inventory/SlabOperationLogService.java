@@ -82,6 +82,9 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
           SlabOperationLog record = BeanPropertyRowMapper.newInstance(SlabOperationLog.class).mapRow(rs, rowNum);
           if (record == null) { throw new IllegalStateException("大板操作日志映射失败"); }
           record.setOperationType(rs.getString("visible_operation_type"));
+          if ("PURGE".equals(record.getOperationType()) && record.getAfterStatus() == null) {
+            record.setAfterStatus("purged");
+          }
           return record;
         },
         pageParameters.toArray());
