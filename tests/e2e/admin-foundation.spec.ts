@@ -102,7 +102,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   expect(searchBox?.y).toBe(supplierBox?.y);
   expect(searchBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
 
-  for (const tabLabel of ['仓库中 1', '出售中', '已下架', '已售完', '回收站 2']) {
+  for (const tabLabel of ['仓库中 1', '已上架', '已下架', '已售完', '回收站 2']) {
     await page.getByText(tabLabel, { exact: true }).click();
     await expect(keywordInput).toBeVisible();
   }
@@ -460,7 +460,7 @@ test('resets category browsing and keeps the four-level filter popup stable', as
 test('keeps slab filters inside the card across status tabs', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.goto('/slab-management');
-  for (const tab of ['已下架', '仓库中', '出售中', '已售完', '回收站']) {
+  for (const tab of ['已下架', '仓库中', '已上架', '已售完', '回收站']) {
     await page
       .locator('.status-tabs')
       .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))

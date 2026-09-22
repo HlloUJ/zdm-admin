@@ -220,10 +220,10 @@ class FinishedPriceSourceApiTest {
     assertThat(source.total()).isEqualTo(1);
     assertThat(logs.detail(source.records().getFirst().getId()).getOperationType()).isEqualTo("DELETE_TO_RECYCLE");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99303",Long.class)).isEqualTo(4);
-    // The shared lifecycle service must retain the existing slab logging rules.
+    // Slab source recycle remains recorded internally, like the finished-stock visibility rule.
     jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,source_status,status,operations_deleted) VALUES (99303,'大板日志边界','slab-log-boundary','offShelf','selling',FALSE)");
     lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB,99303L,"recycle");
-    assertThat(jdbc.queryForObject("SELECT operation_type FROM slab_operation_logs WHERE slab_id=99303 AND business_client_code='admin'",String.class)).isEqualTo("SOURCE_SYNC");
+    assertThat(jdbc.queryForObject("SELECT operation_type FROM slab_operation_logs WHERE slab_id=99303 AND business_client_code='admin'",String.class)).isEqualTo("SOURCE_INTERNAL");
   }
 
   @Test

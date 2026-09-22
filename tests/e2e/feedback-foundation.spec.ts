@@ -45,7 +45,7 @@ async function selectProductOption(
 }
 
 async function submitSlabProduct(page: Page) {
-  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
+  const productDialog = page.locator('.slab-publish-page');
   for (const [index, name] of ['main-image.svg', 'scan-image.svg', 'design-image.svg'].entries()) {
     await productDialog
       .locator('input[type="file"]')
@@ -57,7 +57,7 @@ async function submitSlabProduct(page: Page) {
       });
   }
 
-  await productDialog.getByText('基础信息', { exact: true }).click();
+  await productDialog.getByRole('link', { name: '基础信息', exact: true }).click();
   await selectProductOption(page, productDialog, '品种', '潘多拉');
   await selectProductOption(page, productDialog, '产地', '巴西');
   await selectProductOption(page, productDialog, '纹理', '细纹');
@@ -73,7 +73,7 @@ async function submitSlabProduct(page: Page) {
     await productDialog.locator(`.t-form-item__${field}`).getByRole('textbox').fill(value);
   }
 
-  await productDialog.getByText('销售信息', { exact: true }).click();
+  await productDialog.getByRole('link', { name: '销售信息', exact: true }).click();
   await selectProductOption(page, productDialog, '供应商', '装点猫大板供应商');
   await productDialog.locator('.t-form__item').filter({ hasText: '库存' }).getByRole('textbox').fill('1');
   await productDialog
@@ -81,11 +81,7 @@ async function submitSlabProduct(page: Page) {
     .filter({ hasText: '大板编号' })
     .getByRole('textbox')
     .fill('SLAB-PUBLISH-E2E');
-  const costInput = productDialog
-    .locator('.price-editor__row')
-    .filter({ hasText: '成本价' })
-    .getByRole('textbox')
-    .last();
+  const costInput = productDialog.locator('.t-form-item__cost').getByRole('textbox').last();
   await costInput.fill('100');
   await costInput.press('Tab');
   const partnerRows = productDialog.locator('.price-editor__row').filter({ hasNotText: /成本价|指导价/ });
@@ -297,6 +293,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
       publisherType: '接口获取',
       operationType: 'DELETE_TO_RECYCLE',
       operationSummary: '删除至回收站',
+
       standardReason: '',
       detailReason: '',
       operationSource: 'MANUAL',
@@ -310,7 +307,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
       slabName: `历史操作大板 ${index + 1}`,
       publisherType: '平台发布',
       operationType: index === 0 ? 'PRICE_UPDATE' : 'DELETE_TO_RECYCLE',
-      operationSummary: index === 0 ? '修改价格' : '删除至回收站',
+
       standardReason: '资料调整',
       detailReason: '',
       operationSource: 'MANUAL',
@@ -424,7 +421,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   const priceOperationRow = logDrawer.getByRole('row', { name: /历史操作大板 1/ });
   await priceOperationRow.getByText('详情', { exact: true }).click();
   const detailDialog = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
-  await expect(detailDialog.locator('.operation-log-diff-item')).toHaveCount(12);
+  await expect(detailDialog.locator('.operation-log-diff-item')).toHaveCount(13);
   await expect(detailDialog.locator('.operation-log-diff-item__field')).toHaveText([
     '1:1主图',
     '扫描图',
@@ -436,6 +433,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
     '纹理',
     '色系',
     '等级',
+    '面积',
     '供应商',
     '价格层级',
   ]);
@@ -452,7 +450,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '供应商' })).toContainText(
     '新供应商',
   );
-  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '面积' })).toHaveCount(0);
+  await expect(detailDialog.locator('.operation-log-diff-item').filter({ hasText: '面积' })).toContainText('5.94');
   await expect(detailDialog.locator('.operation-log-media-preview--image')).toHaveCount(3);
   await expect(detailDialog.locator('.operation-log-media-preview--video')).toHaveCount(1);
   await expect(detailDialog.getByText('媒体文件已清理', { exact: true })).toHaveCount(0);
@@ -733,6 +731,32 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
     });
   });
 
+  await page.route('**/api/admin/slabs/61', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          id: 61,
+          supplierId: 1,
+          varietyId: 1,
+          name: '批量下架大板 61',
+          serialNo: 'SLAB-E2E-061',
+          warehouse: '云浮仓',
+          publisherType: '平台发布',
+          lengthMm: 3200,
+          widthMm: 1800,
+          thicknessMm: 18,
+          areaSquareMeter: 5.76,
+          costPrice: 6800,
+          guidePrice: 9800,
+          status: slabStatus,
+          offShelfRecords,
+          createdAt: '2026-07-27T09:00:00',
+        },
+      },
+    }),
+  );
+
   let statusPayload: unknown;
   await page.route('**/api/admin/slabs/batch-status', async (route) => {
     statusPayload = route.request().postDataJSON();
@@ -753,7 +777,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   });
 
   await page.goto('/slab-management');
-  await page.getByText('出售中 1', { exact: true }).click();
+  await page.getByText('已上架 1', { exact: true }).click();
   const row = page.getByRole('row', { name: /批量下架大板 61/ });
   await row.locator('.t-checkbox').click();
   await page.getByRole('button', { name: '批量下架', exact: true }).click();
@@ -761,8 +785,9 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '批量下架' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('下架原因', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('请选择下架原因', { exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(page.getByText('请选择下架原因', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible();
   expect(statusPayload).toBeUndefined();
 
   await dialog.getByRole('textbox').first().click();
@@ -861,9 +886,11 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(detailDrawer).toBeVisible();
   await expect(detailDrawer).toContainText('批量下架大板 61');
   await expect(detailDrawer).toContainText('SLAB-E2E-061');
-  await expect(detailDrawer).toContainText('3200 x 1800 x 18mm');
-  await expect(detailDrawer).toContainText('云浮仓');
-  await expect(detailDrawer.getByText('图片', { exact: true })).toBeVisible();
+  await expect(detailDrawer).toContainText('长（mm）3200');
+  await expect(detailDrawer).toContainText('宽（mm）1800');
+  await expect(detailDrawer).toContainText('高（mm）18');
+  await expect(detailDrawer).not.toContainText('云浮仓');
+  await expect(detailDrawer.getByText('图文描述', { exact: true })).toBeVisible();
   await expect(detailDrawer.getByText('销售信息', { exact: true })).toBeVisible();
   await expect(detailDrawer.getByText('成本价', { exact: true })).toBeVisible();
   await expect(detailDrawer.getByText('指导价', { exact: true })).toBeVisible();
@@ -907,8 +934,14 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
   const preview = page.locator('.admin-media-upload__preview[alt="1:1主图"]');
   await expect(preview).toBeVisible();
   await expect(preview).toHaveAttribute('src', previewDataUrl);
-  await preview.click();
+  let unexpectedChoosers = 0;
+  page.on('filechooser', () => unexpectedChoosers++);
+  await page
+    .locator('.slab-publish-page .admin-media-upload')
+    .first()
+    .click({ position: { x: 8, y: 80 } });
   await expect(page.locator('.upload-large-preview[alt="1:1主图"]')).toBeVisible();
+  expect(unexpectedChoosers).toBe(0);
 });
 
 for (const scenario of [
@@ -936,6 +969,7 @@ for (const scenario of [
             ],
             grades: [{ id: 1, label: 'A+', status: 'enabled' }],
             suppliers: [{ id: 1, label: '装点猫大板供应商', status: 'enabled' }],
+            storeLevels: [{ id: 99, label: '未配置加价的门店级别', status: 'enabled' }],
           },
         }),
       });
@@ -964,6 +998,13 @@ for (const scenario of [
       }
       const payload = route.request().postDataJSON() as Record<string, unknown>;
       submittedStatus = String(payload.status);
+      expect(payload).not.toHaveProperty('markupPrices');
+      expect(payload).not.toHaveProperty('guidePrice');
+      expect(payload).not.toHaveProperty('guidePriceCoefficient');
+      expect(payload.costPrice).toBeGreaterThan(0);
+      expect(payload.areaSquareMeter).toBe(
+        Number(((Number(payload.lengthMm) * Number(payload.widthMm)) / 1_000_000).toFixed(2)),
+      );
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -978,6 +1019,11 @@ for (const scenario of [
     await page.goto('/supply-chain/slab-management');
     await page.getByText(scenario.tab, { exact: true }).click();
     await page.getByRole('button', { name: '发布商品', exact: true }).click();
+    await expect(page.getByRole('radio', { name: '暂不上架', exact: true })).toBeChecked();
+    if (scenario.expectedStatus === 'selling') {
+      await page.getByRole('link', { name: '销售信息', exact: true }).click();
+      await page.locator('.slab-publish-page .t-radio').filter({ hasText: '立刻上架' }).click();
+    }
     const createRequest = page.waitForRequest(
       (request) => request.method() === 'POST' && request.url().endsWith('/api/admin/slabs'),
     );
@@ -999,8 +1045,8 @@ test('leaves SKU blank for supply chain staff when publishing a product', async 
   await setMockBusinessClient(page, 'supply-chain');
   await page.goto('/supply-chain/slab-management');
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
-  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
-  await productDialog.getByText('销售信息', { exact: true }).click();
+  const productDialog = page.locator('.slab-publish-page');
+  await productDialog.getByRole('link', { name: '销售信息', exact: true }).click();
   await expect(productDialog.locator('.t-form__item').filter({ hasText: '大板编号' }).getByRole('textbox')).toHaveValue(
     '',
   );
@@ -1016,18 +1062,15 @@ test('limits supply chain publishing to cost without requiring operations markup
   await setMockBusinessClient(page, 'supply-chain');
   await page.goto('/supply-chain/slab-management');
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
-  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
-  await productDialog.getByText('销售信息', { exact: true }).click();
+  const productDialog = page.locator('.slab-publish-page');
+  await productDialog.getByRole('link', { name: '销售信息', exact: true }).click();
 
-  const costInput = productDialog
-    .locator('.price-editor__row')
-    .filter({ hasText: '成本价' })
-    .getByRole('textbox')
-    .last();
+  const costInput = productDialog.locator('.t-form-item__cost').getByRole('textbox').last();
   await costInput.fill('100');
   await costInput.press('Tab');
   await expect(costInput).toHaveValue('100.00');
-  await expect(productDialog.locator('.price-editor__row')).toHaveCount(1);
+  await expect(productDialog.locator('.t-form-item__cost').getByRole('textbox')).toHaveCount(1);
+  await expect(productDialog.locator('.price-editor')).toHaveCount(0);
   await expect(productDialog.locator('.price-editor__row').filter({ hasText: '指导价' })).toHaveCount(0);
   await expect(productDialog.locator('.price-editor__row').filter({ hasText: '1级' })).toHaveCount(0);
 });
@@ -1036,9 +1079,9 @@ test('filters slab varieties and origins by search text when publishing a produc
   await setMockBusinessClient(page, 'supply-chain');
   await page.goto('/supply-chain/slab-management');
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
-  await page.getByText('基础信息', { exact: true }).click();
+  await page.getByRole('link', { name: '基础信息', exact: true }).click();
 
-  const productDialog = page.locator('.t-dialog:visible').filter({ hasText: '发布商品' });
+  const productDialog = page.locator('.slab-publish-page');
   const varietyInput = productDialog.locator('.t-form__item').filter({ hasText: '品种' }).getByRole('textbox');
   await varietyInput.fill('潘多');
   const varietyDropdown = page.locator('.t-select__dropdown:visible');

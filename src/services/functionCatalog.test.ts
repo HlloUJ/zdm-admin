@@ -416,3 +416,24 @@ describe('category sorting permissions', () => {
     expect(values).toContain('admin.tenant.store-category-management.move-down');
   });
 });
+
+describe('slab operations details', () => {
+  it('registers a detail per operations tab without expanding supply chain or terminal grants', () => {
+    const page = fullFunctionCatalog
+      .flatMap((module) => module.menus)
+      .flatMap((menu) => menu.pages)
+      .find((item) => item.value === 'admin.slab-management')!;
+    expect(page.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已下架', '已售完', '回收站']);
+    for (const tab of page.tabs) {
+      expect(tab.actions.filter((action) => action.value.endsWith('.detail'))).toEqual([
+        { label: '详情', value: `${tab.value}.detail` },
+      ]);
+      expect(tab.actions.some((action) => ['查询', '重置'].includes(action.label))).toBe(false);
+    }
+    for (const terminal of Object.values(terminalFunctionTrees)) {
+      expect(
+        getFunctionCatalogPermissionValues(terminal).filter((value) => value.startsWith('admin.slab-management.')),
+      ).toEqual([]);
+    }
+  });
+});
