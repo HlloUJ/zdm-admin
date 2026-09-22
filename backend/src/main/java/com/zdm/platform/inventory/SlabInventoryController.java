@@ -83,6 +83,20 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()));
   }
 
+  @GetMapping("/{id}")
+  public ApiResponse<SlabInventory> detail(@PathVariable Long id) {
+    permissionGuard.requireView(prefix());
+    permissionGuard.requireAnyPermission(permission("warehouse", "detail"), permission("selling", "detail"),
+        permission("off-shelf", "detail"), permission("sold-out", "detail"), permission("recycle", "detail"));
+    permissionGuard.requireDataPermission();
+    SlabInventory item = service.visibleDetail(id);
+    if (item == null) { throw new IllegalArgumentException("大板不存在或不可访问"); }
+    String scope = statusScope(isSupplyChain() ? item.getSourceStatus() : item.getStatus());
+    permissionGuard.requireAnyPermission(prefix() + ".view", permission(scope, "view"));
+    permissionGuard.requirePermission(permission(scope, "detail"));
+    return ApiResponse.ok(item);
+  }
+
   @GetMapping("/operation-logs")
   public ApiResponse<SlabOperationLogPage> listOperationLogs(
       @RequestParam(required = false) String keyword,
@@ -118,6 +132,44 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     permissionGuard.requirePermission(permission(scope,isSupplyChain()?"edit":"price"));
     if(isSupplyChain() && !Objects.equals(existing.getSourceStatus(),inventory.getStatus())) { requireStatusTransition(existing.getSourceStatus(),inventory.getStatus()); }
     return ApiResponse.ok(service.updateWithPrices(id, inventory));
+  }
+
+  public record ActionCheckRequest(List<Long> ids, String action) {
+    public ActionCheckRequest {
+      ids = ids == null ? null : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(ids));
+    }
+  }
+
+  @PostMapping("/action-check")
+  public ApiResponse<Boolean> checkAction(@RequestBody ActionCheckRequest request) {
+    if ("clearRecycle".equals(request.action())) {
+      permissionGuard.requirePermission(permission("recycle", "clear"));
+      service.checkClearRecycle();
+      return ApiResponse.ok(true);
+    }
+    if (request.ids() == null || request.ids().isEmpty() || request.ids().contains(null)) {
+      throw new IllegalArgumentException("请选择大板");
+    }
+    String action = request.action();
+    if (action == null || !List.of("shelf", "offShelf", "restore", "delete", "purge").contains(action)) {
+      throw new IllegalArgumentException("不支持的操作");
+    }
+    for (Long id : request.ids().stream().distinct().toList()) {
+      SlabInventory item = service.getById(id);
+      if (item == null) { throw new IllegalArgumentException("大板不存在或已被删除"); }
+      com.zdm.platform.security.DataScope.requireAccess(permissionGuard.identity(), item.getCreatedByAccountId());
+      String state = isSupplyChain() ? item.getSourceStatus() : item.getStatus();
+      switch (action) {
+        case "shelf" -> requireStatusTransition(state, "selling");
+        case "offShelf" -> requireStatusTransition(state, "offShelf");
+        case "restore" -> requireStatusTransition(state, "warehouse");
+        case "delete" -> permissionGuard.requireAnyPermission(prefix() + ".delete", permission(statusScope(state), "delete"));
+        case "purge" -> permissionGuard.requireAnyPermission(prefix() + ".delete", permission("recycle", "purge"), permission("recycle", "batch-purge"), permission("recycle", "clear"));
+        default -> throw new IllegalArgumentException("不支持的操作");
+      }
+    }
+    service.checkAction(request.ids(), action);
+    return ApiResponse.ok(true);
   }
 
   @PutMapping("/batch-status")

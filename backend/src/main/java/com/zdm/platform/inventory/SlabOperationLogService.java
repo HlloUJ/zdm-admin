@@ -20,6 +20,10 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper, SlabOperationLog> {
+  private static final String VISIBLE_TYPE = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
+      + "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')"
+      + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
+      + " WHEN 'purged' THEN 'SOURCE_DELETE' ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
   private static final String EXTERNAL_API_SOURCE = "EXTERNAL_API";
   private static final Map<String, String> REFERENCE_TABLES = Map.of(
       "供应商ID", "suppliers",
@@ -72,15 +76,116 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     pageParameters.add(pageSize);
     pageParameters.add((page - 1) * pageSize);
     List<SlabOperationLog> records = jdbcTemplate.query(
-        "SELECT * FROM slab_operation_logs" + where
+        "SELECT *, (" + VISIBLE_TYPE + ") AS visible_operation_type FROM slab_operation_logs" + where
             + " ORDER BY operated_at DESC, id DESC LIMIT ? OFFSET ?",
-        BeanPropertyRowMapper.newInstance(SlabOperationLog.class),
+        (rs, rowNum) -> {
+          SlabOperationLog record = BeanPropertyRowMapper.newInstance(SlabOperationLog.class).mapRow(rs, rowNum);
+          if (record == null) { throw new IllegalStateException("大板操作日志映射失败"); }
+          record.setOperationType(rs.getString("visible_operation_type"));
+          return record;
+        },
         pageParameters.toArray());
     Map<String, Map<Long, String>> referenceCaches = new HashMap<>();
     Map<Long, MediaAsset> mediaCache = new HashMap<>();
+    records.forEach(record -> {
+      if (List.of("UPDATE", "PRICE_UPDATE").contains(record.getOperationType()) && record.getChangeDetails() != null) {
+        try {
+          Map<String, Object> changes = objectMapper.readValue(record.getChangeDetails(), new TypeReference<LinkedHashMap<String, Object>>() {});
+          record.setChangeDetails(serializeChanges(SlabLogChanges.retainChanged(changes)));
+        } catch (JsonProcessingException error) { throw new IllegalStateException("操作日志读取失败", error); }
+      }
+    });
+    records.forEach(record -> {
+      if (List.of("SOURCE_OFF_SHELF", "SOURCE_DELETE").contains(record.getOperationType())) {
+        try {
+          Map<String, Object> changes = objectMapper.readValue(record.getChangeDetails() == null ? "{}" : record.getChangeDetails(), new TypeReference<LinkedHashMap<String, Object>>() {});
+          changes.keySet().retainAll(java.util.Set.of("来源状态"));
+          record.setChangeDetails(serializeChanges(changes));
+          record.setStandardReason(null);
+          record.setDetailReason(null);
+        } catch (JsonProcessingException error) { throw new IllegalStateException("操作日志读取失败", error); }
+      }
+    });
+    records.forEach(this::restoreLegacyArrival);
+    records.forEach(record -> {
+      if (List.of("SOURCE_SHELF", "SOURCE_OFF_SHELF", "SOURCE_DELETE").contains(record.getOperationType())) {
+        record.setOperationSummary(operationSummary(record.getOperationType(), record.getBeforeStatus(), Map.of()));
+      }
+    });
     records.forEach(record -> record.setChangeDetails(
         resolveChangeDetails(record.getChangeDetails(), referenceCaches, mediaCache)));
     return new SlabOperationLogPage(records, total == null ? 0 : total, page, pageSize);
+  }
+
+  public Map<String, Object> arrivalSnapshot(Long id) {
+    Map<String, Object> row = jdbcTemplate.queryForMap("SELECT * FROM slab_inventory WHERE id=?", id);
+    Map<String, Object> values = new LinkedHashMap<>();
+    String[][] fields = {
+      {"大板名称","name"},{"大板编号","serial_no"},{"供应商ID","supplier_id"},
+      {"品种ID","variety_id"},{"产地ID","origin_id"},{"纹理ID","texture_id"},{"色系ID","color_id"},{"等级ID","grade_id"},
+      {"长度","length_mm"},{"宽度","width_mm"},{"高度","thickness_mm"},{"面积","area_square_meter"},{"误差","tolerance_mm"},
+      {"1:1主图","main_image_media_id"},{"扫描图","scan_image_media_id"},{"设计图","design_image_media_id"},
+      {"商品视频","video_media_id"},{"视频封面","video_cover_media_id"},{"库存","stock"},{"仓库","warehouse"},
+      {"成本价","cost_price"},{"指导价","guide_price"},{"指导价系数","guide_price_coefficient"},
+      {"状态","status"},{"发布类型","publisher_type"},{"大板ID","id"},{"创建人","created_by_name"},{"创建时间","created_at"}
+    };
+    for (String[] field : fields) { values.put(field[0], row.get(field[1])); }
+    for (int i=1;i<=4;i++) {
+      values.put("扣角"+i+"长",row.get("corner"+i+"_length_mm"));
+      values.put("扣角"+i+"宽",row.get("corner"+i+"_width_mm"));
+    }
+    List<Map<String,Object>> prices = jdbcTemplate.queryForList("SELECT * FROM slab_prices WHERE slab_id=? ORDER BY store_level_id",id);
+    applyArrivalPrices(values, prices);
+    return creationSnapshot(values);
+  }
+
+  private void applyArrivalPrices(Map<String,Object> values, List<Map<String,Object>> prices) {
+    List<Map<String,Object>> tiers = new ArrayList<>();
+    for (Map<String,Object> price : prices) {
+      if (price.get("store_level_id") == null) {
+        for (String[] field : new String[][]{{"成本价","cost_price"},{"指导价","guide_price"},{"指导价系数","guide_price_coefficient"}}) {
+          if (price.containsKey(field[1])) { values.put(field[0],price.get(field[1])); }
+        }
+        continue;
+      }
+      Map<String,Object> tier = new LinkedHashMap<>();
+      tier.put("storeLevelId",price.get("store_level_id"));
+      tier.put("storeLevelName",price.get("store_level_name"));
+      tier.put("priceCoefficient",price.get("price_coefficient"));
+      tier.put("price",price.get("price"));
+      tiers.add(tier);
+      values.put(price.get("store_level_name")+"价格来源", "auto".equals(price.get("price_source")) ? "跟随配置" : "手工价格");
+    }
+    values.put("价格层级",tiers);
+  }
+
+  private void restoreLegacyArrival(SlabOperationLog log) {
+    if (!"SOURCE_SHELF".equals(log.getOperationType()) || log.getChangeDetails() == null) { return; }
+    try {
+      Map<String, Map<String,Object>> changes = objectMapper.readValue(log.getChangeDetails(), new TypeReference<LinkedHashMap<String,Map<String,Object>>>() {});
+      if (!changes.containsKey("入仓价格")) { return; }
+      Map<String,Object> values = new LinkedHashMap<>();
+      List<String> history = jdbcTemplate.queryForList("SELECT change_details FROM slab_operation_logs WHERE slab_id=? AND business_client_code='supply-chain' AND (operated_at<? OR (operated_at=? AND id<?)) ORDER BY operated_at,id",String.class,log.getSlabId(),log.getOperatedAt(),log.getOperatedAt(),log.getId());
+      for (String snapshot : history) {
+        if (snapshot == null) { continue; }
+        Map<String,Map<String,Object>> details=objectMapper.readValue(snapshot,new TypeReference<LinkedHashMap<String,Map<String,Object>>>() {});
+        details.forEach((field,change)-> {
+          String key=REFERENCE_TABLES.containsKey(field)?field.replace("ID",""):field;
+          Object value=change.get("after");
+          if(REFERENCE_TABLES.containsKey(field)) { value=resolveReferenceName(field,value,new HashMap<>()); }
+          values.put(key,value);
+        });
+      }
+      var prices=objectMapper.convertValue(changes.get("入仓价格").get("after"),new TypeReference<List<Map<String,Object>>>() {});
+      applyArrivalPrices(values,prices);
+      values.put("大板名称",log.getSlabName());
+      values.put("大板编号",log.getSlabSerialNo());
+      values.put("状态","warehouse");
+      values.remove("来源状态");
+      log.setChangeDetails(serializeChanges(creationSnapshot(values)));
+      log.setBeforeStatus(null);
+      log.setAfterStatus("warehouse");
+    } catch (JsonProcessingException error) { throw new IllegalStateException("大板入仓日志读取失败",error); }
   }
 
   private String resolveChangeDetails(
@@ -173,13 +278,11 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
   public void record(
       SlabInventory slab,
       String operationType,
-      String operationSummary,
       String beforeStatus,
       String afterStatus,
       String standardReason,
       String detailReason,
       String operationSource,
-      String batchNo,
       Map<String, ?> changes) {
     boolean externalOperation = EXTERNAL_API_SOURCE.equals(operationSource);
     CurrentIdentity identity = identityProvider.require();
@@ -194,7 +297,6 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     log.setSlabName(slab.getName());
     log.setPublisherType(slab.getPublisherType());
     log.setOperationType(operationType);
-    log.setOperationSummary(operationSummary);
     log.setBeforeStatus(beforeStatus);
     log.setAfterStatus(afterStatus);
     log.setStandardReason(standardReason);
@@ -203,14 +305,44 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     if (identity != null && "supply-chain".equals(identity.clientCode())) {
       visibleChanges.keySet().removeIf(key -> key.contains("指导价") || key.contains("价格") || key.endsWith("来源配置ID") || key.contains("加价"));
     }
+    if (List.of("UPDATE", "PRICE_UPDATE").contains(operationType)) {
+      Map<String, Object> changed = SlabLogChanges.retainChanged(visibleChanges);
+      visibleChanges.clear();
+      visibleChanges.putAll(changed);
+      if (visibleChanges.isEmpty()) { return; }
+    }
+    log.setOperationSummary(operationSummary(operationType, beforeStatus, visibleChanges));
     log.setChangeDetails(serializeChanges(visibleChanges));
     log.setOperationSource(operationSource);
-    log.setBatchNo(batchNo);
     log.setOperatorName(externalOperation ? "外部系统" : identity.displayName());
     log.setOperatorAccountId(externalOperation ? null : identity.accountId());
     log.setOperatedAt(now);
     log.setCreatedAt(now);
     save(log);
+    retainSnapshot(log.getId(), changes);
+  }
+
+  public static String operationSummary(String type, String beforeStatus, Map<String, ?> changes) {
+    return switch (type) {
+      case "CREATE" -> "创建大板";
+      case "SHELF" -> "上架大板";
+      case "OFF_SHELF" -> "下架大板";
+      case "RESTORE_WAREHOUSE" -> "放回仓库";
+      case "RESTORE_RECYCLE" -> "放回仓库";
+      case "DELETE_TO_RECYCLE" -> "删除至回收站";
+      case "PHYSICAL_DELETE" -> "物理删除大板";
+      case "PURGE" -> "彻底删除大板";
+      case "SOURCE_OFF_SHELF" -> "供应链已下架该商品";
+      case "SOURCE_DELETE" -> "供应链已删除该商品";
+      case "SOURCE_INTERNAL" -> "供应链状态变更";
+      case "UPDATE" -> "编辑大板（修改" + changes.size() + "项）";
+      case "PRICE_UPDATE" -> changes.containsKey("价格联动") ? "供应链成本变更，按当前系数重算售价" : "修改价格";
+      case "SOURCE_SHELF" -> beforeStatus == null ? "供应链已上架，商品进入运营管理平台仓库" : "来源重新上架，解除遮罩并保留运营状态";
+      default -> "修改大板状态";
+    };
+  }
+
+  public void retainSnapshot(Long logId, Map<String, ?> changes) {
     Map<String, Long> historicalMedia = new LinkedHashMap<>();
     changes.forEach((field, value) -> {
       if (!MEDIA_TYPES.containsKey(field) || !(value instanceof Map<?, ?> change)) {
@@ -223,7 +355,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
         }
       }
     });
-    historyService.retain("SLAB_LOG", log.getId(), historicalMedia);
+    historyService.retain("SLAB_LOG", logId, historicalMedia);
   }
 
   private String buildWhereClause(
@@ -234,6 +366,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       LocalDate endDate,
       List<Object> parameters) {
     List<String> conditions = new ArrayList<>();
+    conditions.add("(" + VISIBLE_TYPE + ") <> 'SOURCE_INTERNAL'");
     conditions.add("business_client_code=?");
     parameters.add(identityProvider.require().clientCode());
     if (!com.zdm.platform.security.DataScope.isAll(identityProvider.require())) {
@@ -248,7 +381,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       parameters.add(normalizedKeyword);
     }
     if (operationType != null && !operationType.isBlank()) {
-      conditions.add("operation_type = ?");
+      conditions.add("(" + VISIBLE_TYPE + ") = ?");
       parameters.add(operationType.trim());
     }
     if (operatorName != null && !operatorName.isBlank()) {

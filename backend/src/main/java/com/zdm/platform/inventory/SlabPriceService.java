@@ -47,7 +47,9 @@ public class SlabPriceService {
   }
 
   public void requireCompletePrices(Long slabId) {
-    if (listPrices(slabId).isEmpty()) {
+    List<SlabPrice> prices = listPrices(slabId);
+    Set<Long> pricedLevels = prices.stream().map(SlabPrice::getStoreLevelId).collect(Collectors.toSet());
+    if (prices.isEmpty() || storeLevelDirectory.listEnabledLevels().stream().anyMatch(level -> !pricedLevels.contains(level.id()))) {
       throw new IllegalArgumentException("请完善全部大板价格");
     }
   }

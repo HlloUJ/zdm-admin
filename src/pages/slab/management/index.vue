@@ -6,7 +6,7 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
+        <header v-show="!isProductFormPage" class="page-header">
           <div>
             <t-breadcrumb>
               <t-breadcrumb-item>大板管理</t-breadcrumb-item>
@@ -19,7 +19,7 @@
           </div>
         </header>
 
-        <AdminListLayout class="slab-list-layout">
+        <AdminListLayout v-show="!isProductFormPage" class="slab-list-layout">
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showSlabTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
@@ -129,6 +129,7 @@
                     :key="button.action"
                     :theme="button.theme"
                     :class="button.className"
+                    :disabled="saving"
                     @click="handleBatchAction(button.action)"
                   >
                     <template #icon>
@@ -142,116 +143,141 @@
             </div>
           </template>
           <template #table>
-            <t-table
-              :row-class-name="({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
-              row-key="id"
-              :data="pageData"
-              :columns="columns"
-              :loading="loading"
-              hover
-              table-layout="fixed"
-            >
-              <template #selectTitle>
-                <t-checkbox
-                  :checked="pageAllSelected"
-                  :indeterminate="pagePartiallySelected"
-                  @change="toggleCurrentPage"
-                />
-              </template>
-              <template #select="{ row }">
-                <t-checkbox
-                  :disabled="sourceBlocked(row)"
-                  :checked="selectedKeySet.has(row.id)"
-                  @change="(checked: boolean) => toggleRow(row.id, checked)"
-                />
-              </template>
-              <template #image="{ row }">
-                <div class="slab-image">
-                  <img
-                    v-if="row.image"
-                    :src="row.image"
-                    :alt="row.name"
-                    role="button"
-                    :tabindex="sourceBlocked(row) ? -1 : 0"
-                    @click="!sourceBlocked(row) && openTableImage(row)"
-                    @keydown.enter="!sourceBlocked(row) && openTableImage(row)"
-                  />
-                  <span v-else class="slab-image-placeholder">暂无主图</span>
-                </div>
-              </template>
-              <template #slab="{ row }">
-                <div class="slab-meta">
-                  <div class="slab-name">{{ row.name }}</div>
-                  <t-tag v-if="sourceBlocked(row)" variant="light">{{
-                    ['recycle', 'purged'].includes(row.sourceStatus || '')
-                      ? '该商品已被供应链删除'
-                      : '该商品已被供应链下架'
-                  }}</t-tag>
-                  <div class="slab-code">ID：{{ row.id }}</div>
-                  <div class="slab-code">大板编号：{{ row.code }}</div>
-                </div>
-              </template>
-              <template #tenant="{ row }">
-                <div class="tenant-cell">
-                  <span>{{ row.tenant }}</span>
-                  <span class="store-text">{{ row.store }}</span>
-                </div>
-              </template>
-              <template #offShelfReason="{ row }">
-                <div class="off-shelf-reason-cell">
-                  <span class="off-shelf-reason-primary">{{ latestOffShelfRecord(row)?.standardReason || '-' }}</span>
-                  <div class="off-shelf-reason-detail-row">
-                    <t-tooltip
-                      class="off-shelf-detail-tooltip"
-                      :content="latestOffShelfRecord(row)?.detailReason || '-'"
-                      placement="bottom-left"
-                    >
-                      <span class="off-shelf-reason-secondary">{{
-                        latestOffShelfRecord(row)?.detailReason || '-'
-                      }}</span>
-                    </t-tooltip>
-                    <t-tooltip content="查看历史下架原因">
-                      <t-button
-                        class="off-shelf-history-trigger"
-                        variant="text"
-                        shape="square"
-                        size="small"
-                        aria-label="查看历史下架原因"
-                        @click="openOffShelfHistory(row)"
-                      >
-                        <template #icon><t-icon name="browse" /></template>
-                      </t-button>
-                    </t-tooltip>
-                  </div>
-                </div>
-              </template>
-              <template #offShelvedByName="{ row }">
-                {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}
-              </template>
-              <template #offShelvedAt="{ row }">
-                {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
-              </template>
-              <template #operation="{ row }">
-                <t-link
-                  v-if="sourceBlocked(row) && hasSlabAction('recycle', 'purge')"
-                  class="source-purge"
-                  theme="danger"
-                  @click="handleRowAction('purge', row)"
-                  >彻底删除</t-link
+            <SourceUnavailableOverlay :rows="pageData.filter(sourceBlocked)">
+              <SlabRowWarnings :rows="pageData" :errors="shelfErrors" @close="(id) => delete shelfErrors[id]">
+                <t-table
+                  :row-attributes="
+                    ({ row }: { row: SlabItem }) =>
+                      sourceBlocked(row)
+                        ? { 'data-source-id': row.id, inert: true }
+                        : shelfErrors[row.id]
+                          ? { 'data-shelf-error-id': row.id }
+                          : {}
+                  "
+                  :row-class-name="({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
+                  row-key="id"
+                  :data="pageData"
+                  :columns="columns"
+                  :loading="loading"
+                  hover
+                  table-layout="fixed"
                 >
-                <div class="table-actions">
-                  <t-link
-                    v-for="action in sourceBlocked(row) ? [] : rowActions()"
-                    :key="action.action"
-                    :theme="action.theme"
-                    hover="color"
-                    @click="handleRowAction(action.action, row)"
+                  <template #selectTitle>
+                    <t-checkbox
+                      :checked="pageAllSelected"
+                      :indeterminate="pagePartiallySelected"
+                      @change="toggleCurrentPage"
+                    />
+                  </template>
+                  <template #select="{ row }">
+                    <t-checkbox
+                      :disabled="sourceBlocked(row)"
+                      :checked="selectedKeySet.has(row.id)"
+                      @change="(checked: boolean) => toggleRow(row.id, checked)"
+                    />
+                  </template>
+                  <template #image="{ row }">
+                    <div class="slab-image">
+                      <img
+                        v-if="row.image"
+                        :src="row.image"
+                        :alt="row.name"
+                        role="button"
+                        :tabindex="sourceBlocked(row) ? -1 : 0"
+                        @click="!sourceBlocked(row) && openTableImage(row)"
+                        @keydown.enter="!sourceBlocked(row) && openTableImage(row)"
+                      />
+                      <span v-else class="slab-image-placeholder">暂无主图</span>
+                    </div>
+                  </template>
+                  <template #slab="{ row }">
+                    <div class="slab-meta">
+                      <div class="slab-name">{{ row.name }}</div>
+                      <div class="slab-code">ID：{{ row.id }}</div>
+                      <div class="slab-code">大板编号：{{ row.code }}</div>
+                    </div>
+                  </template>
+                  <template #tenant="{ row }">
+                    <div class="tenant-cell">
+                      <span>{{ row.tenant }}</span>
+                      <span class="store-text">{{ row.store }}</span>
+                    </div>
+                  </template>
+                  <template #offShelfReason="{ row }">
+                    <div class="off-shelf-reason-cell">
+                      <span class="off-shelf-reason-primary">{{
+                        latestOffShelfRecord(row)?.standardReason || '-'
+                      }}</span>
+                      <div class="off-shelf-reason-detail-row">
+                        <t-tooltip
+                          class="off-shelf-detail-tooltip"
+                          :content="latestOffShelfRecord(row)?.detailReason || '-'"
+                          placement="bottom-left"
+                        >
+                          <span class="off-shelf-reason-secondary">{{
+                            latestOffShelfRecord(row)?.detailReason || '-'
+                          }}</span>
+                        </t-tooltip>
+                        <t-tooltip content="查看历史下架原因">
+                          <t-button
+                            class="off-shelf-history-trigger"
+                            variant="text"
+                            shape="square"
+                            size="small"
+                            aria-label="查看历史下架原因"
+                            @click="openOffShelfHistory(row)"
+                          >
+                            <template #icon><t-icon name="browse" /></template>
+                          </t-button>
+                        </t-tooltip>
+                      </div>
+                    </div>
+                  </template>
+                  <template #offShelvedByName="{ row }">
+                    {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}
+                  </template>
+                  <template #offShelvedAt="{ row }">
+                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
+                  </template>
+                  <template #operation="{ row }">
+                    <div class="table-actions">
+                      <t-link
+                        v-for="action in rowActions()"
+                        :key="action.action"
+                        :theme="action.theme"
+                        hover="color"
+                        @click="handleRowAction(action.action, row)"
+                      >
+                        {{ action.label }}
+                      </t-link>
+                    </div>
+                  </template>
+                </t-table>
+              </SlabRowWarnings>
+              <template #overlay="{ row }">
+                <t-space align="center" size="small">
+                  <t-icon name="info-circle" />
+                  <span>{{ row.sourceStatus === 'purged' ? '该商品已被供应链删除' : '该商品已被供应链下架' }}</span>
+                </t-space>
+                <t-space size="small">
+                  <t-button
+                    v-if="hasSlabAction(activeTab, 'detail')"
+                    size="small"
+                    theme="primary"
+                    @click="handleRowAction('detail', row)"
+                    >详情</t-button
                   >
-                    {{ action.label }}
-                  </t-link>
-                </div>
+                  <t-button
+                    v-if="hasSlabAction('recycle', 'purge')"
+                    size="small"
+                    theme="danger"
+                    variant="base"
+                    @click="handleRowAction('purge', row)"
+                    >彻底删除</t-button
+                  >
+                </t-space>
               </template>
-            </t-table>
+            </SourceUnavailableOverlay>
           </template>
           <template #pagination>
             <AdminPagination
@@ -262,246 +288,208 @@
             />
           </template>
         </AdminListLayout>
-      </main>
-    </div>
-
-    <t-dialog
-      v-model:visible="productDialogVisible"
-      :header="productDialogTitle"
-      width="940px"
-      placement="center"
-      :confirm-btn="productMode === 'view' ? null : '提交商品信息'"
-      cancel-btn="取消"
-      @confirm="handleProductSubmit"
-      @cancel="closeProductDialog"
-      @close="closeProductDialog"
-    >
-      <t-tabs v-model="productTab" class="product-tabs">
-        <t-tab-panel value="images" label="图片">
-          <div class="upload-grid">
-            <AdminMediaUpload
-              v-for="item in uploadItems"
-              :key="item.key"
-              v-model="uploadPreviews[item.key]"
-              :title="item.title"
-              :label="item.label"
-              :required="item.required"
-              :accept="item.accept"
-              :disabled="productMode === 'view'"
-              :error-message="uploadErrors[item.key] ? `请上传${item.title}` : ''"
-              :upload="(file) => uploadSlabMedia(item, file)"
-              @uploaded="uploadErrors[item.key] = false"
-              @removed="releasePendingUpload"
-              @preview="openUploadPreview(item)"
-            />
-          </div>
-        </t-tab-panel>
-        <t-tab-panel value="base" label="基础信息">
-          <t-form ref="productFormRef" :data="productForm" :rules="productRules" label-width="92px" colon>
-            <div class="dialog-form-grid">
-              <t-form-item label="品种" name="variety">
-                <t-select
-                  v-model="productForm.variety"
-                  :disabled="productMode === 'view'"
-                  filterable
-                  placeholder="请选择"
-                  @change="clearProductFieldError('variety')"
-                >
-                  <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
-                </t-select>
-              </t-form-item>
-              <t-form-item label="产地" name="origin">
-                <t-select
-                  v-model="productForm.origin"
-                  :disabled="productMode === 'view'"
-                  filterable
-                  placeholder="请选择"
-                  @change="clearProductFieldError('origin')"
-                >
-                  <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
-                </t-select>
-              </t-form-item>
-              <t-form-item label="纹理" name="textureId">
-                <t-select
-                  v-model="productForm.textureId"
-                  :disabled="productMode === 'view'"
-                  filterable
-                  placeholder="请选择"
-                  @change="clearProductFieldError('textureId')"
-                >
-                  <t-option
-                    v-for="item in publishOptions.textures"
-                    :key="item.id"
-                    :label="item.label"
-                    :value="item.id"
-                    :disabled="item.status === 'disabled'"
+        <SlabProductFormLayout
+          ref="productLayoutRef"
+          v-model:visible="productDialogVisible"
+          v-model:active-section="productTab"
+          :mode="productMode"
+          :title="productDialogTitle"
+          :loading="saving"
+          @confirm="handleProductSubmit"
+          @close="closeProductDialog"
+        >
+          <template #images>
+            <div class="upload-grid" :class="{ 'publish-upload-grid': isProductFormPage }">
+              <AdminMediaUpload
+                v-for="item in uploadItems"
+                :key="item.key"
+                v-model="uploadPreviews[item.key]"
+                :title="item.title"
+                :label="isProductFormPage ? '点击上传' : item.label"
+                :required="item.required"
+                :accept="item.accept"
+                :disabled="productMode === 'view'"
+                :error-message="uploadErrors[item.key] ? `请上传${item.title}` : ''"
+                :upload="(file) => uploadSlabMedia(item, file)"
+                @uploaded="uploadErrors[item.key] = false"
+                @removed="releasePendingUpload"
+                @click.capture="handleUploadBoxClick(item, $event)"
+                @preview="openUploadPreview(item)"
+              />
+            </div>
+          </template>
+          <template #base>
+            <t-form
+              ref="productFormRef"
+              :data="productForm"
+              :rules="productRules"
+              :label-width="isProductFormPage ? '116px' : '92px'"
+              colon
+            >
+              <div class="dialog-form-grid" :class="{ 'publish-base-grid': isProductFormPage }">
+                <t-form-item label="品种" name="variety">
+                  <t-select
+                    v-model="productForm.variety"
+                    :disabled="productMode === 'view'"
+                    filterable
+                    placeholder="请选择"
+                    @change="clearProductFieldError('variety')"
+                  >
+                    <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
+                  </t-select>
+                </t-form-item>
+                <t-form-item label="产地" name="origin">
+                  <t-select
+                    v-model="productForm.origin"
+                    :disabled="productMode === 'view'"
+                    filterable
+                    placeholder="请选择"
+                    @change="clearProductFieldError('origin')"
+                  >
+                    <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
+                  </t-select>
+                </t-form-item>
+                <t-form-item label="纹理" name="textureId">
+                  <t-select
+                    v-model="productForm.textureId"
+                    :disabled="productMode === 'view'"
+                    filterable
+                    placeholder="请选择"
+                    @change="clearProductFieldError('textureId')"
+                  >
+                    <t-option
+                      v-for="item in publishOptions.textures"
+                      :key="item.id"
+                      :label="item.label"
+                      :value="item.id"
+                      :disabled="item.status === 'disabled'"
+                    />
+                  </t-select>
+                </t-form-item>
+                <t-form-item label="色系" name="colorId">
+                  <t-cascader
+                    v-model="productForm.colorId"
+                    :disabled="productMode === 'view'"
+                    :options="colorCascaderOptions"
+                    :show-all-levels="false"
+                    :check-strictly="false"
+                    filterable
+                    placeholder="请选择"
+                    trigger="hover"
+                    value-mode="onlyLeaf"
+                    value-type="single"
+                    @change="clearProductFieldError('colorId')"
                   />
-                </t-select>
-              </t-form-item>
-              <t-form-item label="色系" name="colorId">
-                <t-cascader
-                  v-model="productForm.colorId"
-                  :disabled="productMode === 'view'"
-                  :options="colorCascaderOptions"
-                  :show-all-levels="false"
-                  :check-strictly="false"
-                  filterable
-                  placeholder="请选择"
-                  trigger="hover"
-                  value-mode="onlyLeaf"
-                  value-type="single"
-                  @change="clearProductFieldError('colorId')"
-                />
-              </t-form-item>
-              <t-form-item label="等级" name="gradeId">
-                <t-select
-                  v-model="productForm.gradeId"
-                  :disabled="productMode === 'view'"
-                  filterable
-                  placeholder="请选择"
-                  @change="clearProductFieldError('gradeId')"
-                >
-                  <t-option
-                    v-for="item in publishOptions.grades"
-                    :key="item.id"
-                    :label="formatGradeOption(item)"
-                    :value="item.id"
-                    :disabled="item.status === 'disabled'"
-                  />
-                </t-select>
-              </t-form-item>
-            </div>
-            <div class="section-title">尺寸</div>
-            <div class="dimension-grid">
-              <t-form-item label="长" name="length" required-mark>
-                <t-input-number
-                  v-model="productForm.length"
-                  class="measurement-input"
-                  large-number
-                  :disabled="productMode === 'view'"
-                  :decimal-places="2"
-                  theme="normal"
-                  placeholder="请输入"
-                  @blur="handleMeasurementBlur('length')"
-                  @change="handleMeasurementChange('length')"
-                />
-              </t-form-item>
-              <t-form-item label="宽" name="width" required-mark>
-                <t-input-number
-                  v-model="productForm.width"
-                  class="measurement-input"
-                  large-number
-                  :disabled="productMode === 'view'"
-                  :decimal-places="2"
-                  theme="normal"
-                  placeholder="请输入"
-                  @blur="handleMeasurementBlur('width')"
-                  @change="handleMeasurementChange('width')"
-                />
-              </t-form-item>
-              <t-form-item label="高" name="height" required-mark>
-                <t-input-number
-                  v-model="productForm.height"
-                  class="measurement-input"
-                  large-number
-                  :disabled="productMode === 'view'"
-                  :decimal-places="2"
-                  theme="normal"
-                  placeholder="请输入"
-                  @blur="handleMeasurementBlur('height')"
-                  @change="handleMeasurementChange('height')"
-                />
-              </t-form-item>
-              <t-form-item label="土误差" name="tolerance">
-                <t-input-number
-                  v-model="productForm.tolerance"
-                  class="measurement-input"
-                  large-number
-                  :disabled="productMode === 'view'"
-                  :decimal-places="2"
-                  theme="normal"
-                  placeholder="请输入"
-                  @blur="handleMeasurementBlur('tolerance')"
-                  @change="handleMeasurementChange('tolerance')"
-                />
-              </t-form-item>
-            </div>
-            <div class="section-title">扣角（mm）</div>
-            <div class="corner-grid">
-              <t-form-item v-for="item in cornerFields" :key="item.key" :label="item.label" :name="item.key">
-                <t-input-number
-                  v-model="productForm[item.key]"
-                  class="measurement-input"
-                  large-number
-                  :disabled="productMode === 'view'"
-                  :decimal-places="2"
-                  theme="normal"
-                  placeholder="请输入"
-                  @blur="handleMeasurementBlur(item.key)"
-                  @change="handleMeasurementChange(item.key)"
-                />
-              </t-form-item>
-            </div>
-          </t-form>
-        </t-tab-panel>
-        <t-tab-panel value="sales" label="销售信息">
-          <t-form ref="salesFormRef" :data="productForm" :rules="salesRules" label-width="96px" colon>
-            <t-form-item v-if="isSupplyChain && productMode !== 'view'" label="上架" required-mark>
-              <t-radio-group v-model="publishTargetStatus">
-                <t-radio value="warehouse" :disabled="editingSourceStatus === 'selling'">放到仓库中</t-radio>
-                <t-radio value="selling" :disabled="!canPublishToShelf">上架</t-radio>
-              </t-radio-group>
-            </t-form-item>
-            <div class="dialog-form-grid">
-              <t-form-item label="供应商" name="supplier" required-mark>
-                <t-select
-                  v-model="productForm.supplier"
-                  :disabled="productMode === 'view'"
-                  filterable
-                  placeholder="请选择"
-                  @change="clearSalesFieldError('supplier')"
-                >
-                  <t-option
-                    v-for="item in publishSupplierOptions"
-                    :key="item.id"
-                    :label="item.label"
-                    :value="item.label"
-                  />
-                </t-select>
-              </t-form-item>
-              <t-form-item label="库存" name="stock" required-mark>
-                <t-input-number
-                  v-model="productForm.stock"
-                  large-number
-                  :disabled="productMode === 'view'"
-                  :decimal-places="0"
-                  :input-props="stockInputProps"
-                  theme="normal"
-                  placeholder="请输入"
-                  @change="handleStockChange"
-                  @keydown="handleStockKeydown"
-                />
-              </t-form-item>
-              <t-form-item label="大板编号" name="sku">
-                <t-input
-                  v-model="productForm.sku"
-                  :disabled="productMode === 'view'"
-                  placeholder="请输入"
-                  @change="clearSalesFieldError('sku')"
-                />
-              </t-form-item>
-            </div>
-            <div class="section-title">价格设置</div>
-            <div :key="productPriceSession" class="price-editor">
-              <div class="price-editor__head">
-                <span>价格层级</span>
-                <span><span class="price-required-star">*</span>价格系数</span>
-                <span><span class="price-required-star">*</span>价格</span>
-                <span />
+                </t-form-item>
+                <t-form-item label="等级" name="gradeId">
+                  <t-select
+                    v-model="productForm.gradeId"
+                    :disabled="productMode === 'view'"
+                    filterable
+                    placeholder="请选择"
+                    @change="clearProductFieldError('gradeId')"
+                  >
+                    <t-option
+                      v-for="item in publishOptions.grades"
+                      :key="item.id"
+                      :label="formatGradeOption(item)"
+                      :value="item.id"
+                      :disabled="item.status === 'disabled'"
+                    />
+                  </t-select>
+                </t-form-item>
               </div>
-              <div class="price-editor__row">
-                <span>成本价（基准）</span>
-                <t-input class="price-input" model-value="1.00" disabled />
+              <div class="section-title">尺寸（mm）</div>
+              <div class="dimension-grid">
+                <t-form-item label="长" name="length" required-mark>
+                  <t-input-number
+                    v-model="productForm.length"
+                    class="measurement-input"
+                    large-number
+                    :disabled="productMode === 'view'"
+                    :decimal-places="2"
+                    theme="normal"
+                    placeholder="请输入"
+                    @blur="handleMeasurementBlur('length')"
+                    @change="handleMeasurementChange('length')"
+                  />
+                </t-form-item>
+                <t-form-item label="宽" name="width" required-mark>
+                  <t-input-number
+                    v-model="productForm.width"
+                    class="measurement-input"
+                    large-number
+                    :disabled="productMode === 'view'"
+                    :decimal-places="2"
+                    theme="normal"
+                    placeholder="请输入"
+                    @blur="handleMeasurementBlur('width')"
+                    @change="handleMeasurementChange('width')"
+                  />
+                </t-form-item>
+                <t-form-item label="高" name="height" required-mark>
+                  <t-input-number
+                    v-model="productForm.height"
+                    class="measurement-input"
+                    large-number
+                    :disabled="productMode === 'view'"
+                    :decimal-places="2"
+                    theme="normal"
+                    placeholder="请输入"
+                    @blur="handleMeasurementBlur('height')"
+                    @change="handleMeasurementChange('height')"
+                  />
+                </t-form-item>
+                <t-form-item v-if="isProductFormPage" label="面积" name="area">
+                  <t-input
+                    :model-value="productAreaSquareMeter == null ? '' : productAreaSquareMeter.toFixed(2)"
+                    disabled
+                    placeholder=""
+                    suffix="㎡"
+                  />
+                </t-form-item>
+                <t-form-item :label="isProductFormPage ? '±误差' : '土误差'" name="tolerance">
+                  <t-input-number
+                    v-model="productForm.tolerance"
+                    class="measurement-input"
+                    large-number
+                    :disabled="productMode === 'view'"
+                    :decimal-places="2"
+                    theme="normal"
+                    placeholder="请输入"
+                    @blur="handleMeasurementBlur('tolerance')"
+                    @change="handleMeasurementChange('tolerance')"
+                  />
+                </t-form-item>
+              </div>
+              <div class="section-title">扣角（mm）</div>
+              <div class="corner-grid">
+                <t-form-item v-for="item in cornerFields" :key="item.key" :label="item.label" :name="item.key">
+                  <t-input-number
+                    v-model="productForm[item.key]"
+                    class="measurement-input"
+                    large-number
+                    :disabled="productMode === 'view'"
+                    :decimal-places="2"
+                    theme="normal"
+                    placeholder="请输入"
+                    @blur="handleMeasurementBlur(item.key)"
+                    @change="handleMeasurementChange(item.key)"
+                  />
+                </t-form-item>
+              </div>
+            </t-form>
+          </template>
+          <template #sales>
+            <t-form
+              ref="salesFormRef"
+              :class="{ 'publish-sales-form': isProductFormPage }"
+              :data="productForm"
+              :rules="salesRules"
+              :label-width="isProductFormPage ? '116px' : '96px'"
+              colon
+            >
+              <t-form-item v-if="isSupplyChain" label="成本价" name="cost" required-mark>
                 <SpecPriceInput
                   v-model="productForm.cost"
                   label="成本价"
@@ -510,72 +498,140 @@
                   :disabled="productMode === 'view'"
                   @change="handleCostChange"
                 />
-                <span />
+              </t-form-item>
+              <div :class="isProductFormPage ? undefined : 'dialog-form-grid'">
+                <t-form-item label="供应商" name="supplier" required-mark>
+                  <t-select
+                    v-model="productForm.supplier"
+                    :disabled="productMode === 'view'"
+                    filterable
+                    placeholder="请选择"
+                    @change="clearSalesFieldError('supplier')"
+                  >
+                    <t-option
+                      v-for="item in publishSupplierOptions"
+                      :key="item.id"
+                      :label="item.label"
+                      :value="item.label"
+                    />
+                  </t-select>
+                </t-form-item>
+                <t-form-item label="库存" name="stock" required-mark>
+                  <t-input-number
+                    v-model="productForm.stock"
+                    large-number
+                    :disabled="productMode === 'view'"
+                    :decimal-places="0"
+                    :input-props="stockInputProps"
+                    theme="normal"
+                    placeholder="请输入"
+                    @change="handleStockChange"
+                    @keydown="handleStockKeydown"
+                  />
+                </t-form-item>
+                <t-form-item label="大板编号" name="sku">
+                  <t-input
+                    v-model="productForm.sku"
+                    :disabled="productMode === 'view'"
+                    placeholder="请输入"
+                    @change="clearSalesFieldError('sku')"
+                  />
+                </t-form-item>
               </div>
-              <div v-if="!isSupplyChain" class="price-editor__row">
-                <span>指导价</span>
-                <SpecPriceInput
-                  v-model="productForm.guideRatio"
-                  label="系数"
-                  placeholder="系数"
-                  :submitted="productPriceSubmitted"
-                  :disabled="productMode === 'view'"
-                  @change="handleGuideRatioChange"
-                />
-                <SpecPriceInput
-                  v-model="productForm.guidePrice"
-                  label="价格"
-                  placeholder="价格"
-                  :submitted="productPriceSubmitted"
-                  :disabled="productMode === 'view'"
-                  @change="handleGuidePriceChange"
-                />
-                <span />
+              <t-form-item v-if="isProductFormPage && isSupplyChain" label="上架" required-mark>
+                <t-radio-group v-model="publishTargetStatus">
+                  <t-radio value="selling" :disabled="!canPublishToShelf">立刻上架</t-radio>
+                  <t-radio value="warehouse" :disabled="productMode === 'edit' && editingSourceStatus === 'selling'"
+                    >暂不上架</t-radio
+                  >
+                </t-radio-group>
+              </t-form-item>
+              <div v-if="!isSupplyChain" class="section-title">价格设置</div>
+              <div v-if="!isSupplyChain" :key="productPriceSession" class="price-editor">
+                <div class="price-editor__head">
+                  <span>价格层级</span>
+                  <span><span class="price-required-star">*</span>价格系数</span>
+                  <span><span class="price-required-star">*</span>价格</span>
+                  <span />
+                </div>
+                <div class="price-editor__row">
+                  <span>成本价（基准）</span>
+                  <span>—</span>
+                  <SpecPriceInput
+                    v-model="productForm.cost"
+                    label="成本价"
+                    placeholder="请输入"
+                    :submitted="productPriceSubmitted"
+                    :disabled="productMode === 'view'"
+                    @change="handleCostChange"
+                  />
+                  <span />
+                </div>
+                <div v-if="!isSupplyChain" class="price-editor__row">
+                  <span>指导价</span>
+                  <SpecPriceInput
+                    v-model="productForm.guideRatio"
+                    label="系数"
+                    placeholder="系数"
+                    :submitted="productPriceSubmitted"
+                    :disabled="productMode === 'view'"
+                    @change="handleGuideRatioChange"
+                  />
+                  <SpecPriceInput
+                    v-model="productForm.guidePrice"
+                    label="价格"
+                    placeholder="价格"
+                    :submitted="productPriceSubmitted"
+                    :disabled="productMode === 'view'"
+                    @change="handleGuidePriceChange"
+                  />
+                  <span />
+                </div>
+                <div v-for="item in isSupplyChain ? [] : partnerPriceRows" :key="item.id" class="price-editor__row">
+                  <span>{{ item.label }}</span>
+                  <SpecPriceInput
+                    v-model="productForm.markupPrices[item.id].ratio"
+                    label="系数"
+                    placeholder="系数"
+                    :submitted="productPriceSubmitted"
+                    :disabled="productMode === 'view'"
+                    @change="handlePartnerRatioChange(item.id)"
+                    @commit="markProductPriceManual(item.id)"
+                  />
+                  <SpecPriceInput
+                    v-model="productForm.markupPrices[item.id].price"
+                    label="价格"
+                    placeholder="价格"
+                    :submitted="productPriceSubmitted"
+                    :disabled="productMode === 'view'"
+                    @change="handlePartnerPriceChange(item.id)"
+                    @commit="markProductPriceManual(item.id)"
+                  />
+                  <PriceSourceToggle
+                    :source="productForm.markupPrices[item.id]?.priceSource"
+                    :available="hasActivePriceConfiguration(item.id)"
+                    :readonly="productMode === 'view' || saving"
+                    @toggle="toggleProductPriceSource(item.id)"
+                  />
+                </div>
               </div>
-              <div v-for="item in isSupplyChain ? [] : partnerPriceRows" :key="item.id" class="price-editor__row">
-                <span>{{ item.label }}</span>
-                <SpecPriceInput
-                  v-model="productForm.markupPrices[item.id].ratio"
-                  label="系数"
-                  placeholder="系数"
-                  :submitted="productPriceSubmitted"
-                  :disabled="productMode === 'view'"
-                  @change="handlePartnerRatioChange(item.id)"
-                  @commit="markProductPriceManual(item.id)"
-                />
-                <SpecPriceInput
-                  v-model="productForm.markupPrices[item.id].price"
-                  label="价格"
-                  placeholder="价格"
-                  :submitted="productPriceSubmitted"
-                  :disabled="productMode === 'view'"
-                  @change="handlePartnerPriceChange(item.id)"
-                  @commit="markProductPriceManual(item.id)"
-                />
-                <PriceSourceToggle
-                  :source="productForm.markupPrices[item.id]?.priceSource"
-                  :available="hasActivePriceConfiguration(item.id)"
-                  :readonly="productMode === 'view' || saving"
-                  @toggle="toggleProductPriceSource(item.id)"
-                />
-              </div>
-            </div>
-          </t-form>
-        </t-tab-panel>
-      </t-tabs>
-    </t-dialog>
+            </t-form>
+          </template>
+        </SlabProductFormLayout>
+      </main>
+    </div>
 
     <t-drawer
       v-model:visible="detailDrawerVisible"
       header="大板详情"
       placement="right"
-      size="760px"
+      size="min(1240px, 100vw)"
       :footer="false"
       @close="closeDetailDrawer"
     >
-      <div v-if="detailDrawerRow" class="slab-detail-drawer">
-        <section class="slab-detail-section">
-          <h3>图片</h3>
+      <t-space v-if="detailDrawerRow" direction="vertical" size="large" class="slab-detail-drawer">
+        <AdminSectionCard class="slab-detail-section">
+          <h3 class="slab-detail-section-title">图文描述</h3>
           <div class="slab-detail-media-grid">
             <button
               v-for="media in detailMediaItems"
@@ -592,56 +648,72 @@
               <span class="slab-detail-media-label">{{ media.label }}</span>
             </button>
           </div>
-        </section>
+        </AdminSectionCard>
 
-        <section class="slab-detail-section">
-          <h3>基础信息</h3>
-          <t-descriptions bordered :column="2">
+        <AdminSectionCard class="slab-detail-section">
+          <h3 class="slab-detail-section-title">基础信息</h3>
+          <t-descriptions bordered :column="3">
             <t-descriptions-item label="大板名称" :span="2">{{ detailDrawerRow.name }}</t-descriptions-item>
             <t-descriptions-item label="ID">{{ detailDrawerRow.id }}</t-descriptions-item>
-            <t-descriptions-item label="大板编号">{{ detailDrawerRow.code }}</t-descriptions-item>
             <t-descriptions-item label="品种">{{ detailDrawerRow.variety }}</t-descriptions-item>
             <t-descriptions-item label="产地">{{ detailDrawerRow.origin }}</t-descriptions-item>
             <t-descriptions-item label="纹理">{{ detailDrawerRow.texture }}</t-descriptions-item>
             <t-descriptions-item label="色系">{{ detailDrawerRow.color }}</t-descriptions-item>
             <t-descriptions-item label="等级">{{ detailDrawerRow.grade }}</t-descriptions-item>
-            <t-descriptions-item label="尺寸">{{ detailDrawerRow.size }}</t-descriptions-item>
-            <t-descriptions-item label="误差">{{ formatMillimeter(detailDrawerRow.toleranceMm) }}</t-descriptions-item>
-            <t-descriptions-item label="面积">{{ formatArea(detailDrawerRow.areaSquareMeter) }}</t-descriptions-item>
-            <t-descriptions-item label="扣角1">{{ formatCorner(detailDrawerRow, 1) }}</t-descriptions-item>
-            <t-descriptions-item label="扣角2">{{ formatCorner(detailDrawerRow, 2) }}</t-descriptions-item>
-            <t-descriptions-item label="扣角3">{{ formatCorner(detailDrawerRow, 3) }}</t-descriptions-item>
-            <t-descriptions-item label="扣角4">{{ formatCorner(detailDrawerRow, 4) }}</t-descriptions-item>
+            <t-descriptions-item label="长（mm）">{{ detailDrawerRow.lengthMm ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="宽（mm）">{{ detailDrawerRow.widthMm ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="高（mm）">{{ detailDrawerRow.thicknessMm ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="面积（㎡）">{{ detailDrawerRow.areaSquareMeter ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="±误差（mm）">{{ detailDrawerRow.toleranceMm ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="扣角1长（mm）">{{
+              detailDrawerRow.corner1LengthMm ?? '-'
+            }}</t-descriptions-item>
+            <t-descriptions-item label="扣角1宽（mm）">{{ detailDrawerRow.corner1WidthMm ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="扣角2长（mm）">{{
+              detailDrawerRow.corner2LengthMm ?? '-'
+            }}</t-descriptions-item>
+            <t-descriptions-item label="扣角2宽（mm）">{{ detailDrawerRow.corner2WidthMm ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="扣角3长（mm）">{{
+              detailDrawerRow.corner3LengthMm ?? '-'
+            }}</t-descriptions-item>
+            <t-descriptions-item label="扣角3宽（mm）">{{ detailDrawerRow.corner3WidthMm ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="扣角4长（mm）">{{
+              detailDrawerRow.corner4LengthMm ?? '-'
+            }}</t-descriptions-item>
+            <t-descriptions-item label="扣角4宽（mm）">{{ detailDrawerRow.corner4WidthMm ?? '-' }}</t-descriptions-item>
           </t-descriptions>
-        </section>
+        </AdminSectionCard>
 
-        <section class="slab-detail-section">
-          <h3>销售信息</h3>
-          <t-descriptions bordered :column="2">
+        <AdminSectionCard class="slab-detail-section">
+          <h3 class="slab-detail-section-title">销售信息</h3>
+          <t-descriptions bordered :column="3">
+            <t-descriptions-item label="成本价">{{
+              detailPriceRows.find((row) => row.label === '成本价')?.price ?? '-'
+            }}</t-descriptions-item>
             <t-descriptions-item label="供应商">{{ detailDrawerRow.tenant }}</t-descriptions-item>
-            <t-descriptions-item label="仓库">{{ detailDrawerRow.store }}</t-descriptions-item>
-            <t-descriptions-item label="发布方式">{{ detailDrawerRow.publisherType }}</t-descriptions-item>
-            <t-descriptions-item label="创建人">{{ detailDrawerRow.createdByName }}</t-descriptions-item>
-            <t-descriptions-item label="创建时间" :span="2">{{ detailDrawerRow.createdAt }}</t-descriptions-item>
+            <t-descriptions-item label="库存">{{ detailDrawerRow.stock ?? '-' }}</t-descriptions-item>
+            <t-descriptions-item label="大板编号" :span="3">{{ detailDrawerRow.code }}</t-descriptions-item>
           </t-descriptions>
-          <div class="price-table detail-price-table">
-            <div class="price-table__head">
-              <span>价格层级</span>
-              <span>价格系数</span>
-              <span>价格</span>
-            </div>
-            <div
-              v-for="row in detailPriceRows"
-              :key="`${row.configurationId ?? row.label}-${row.label}`"
-              class="price-table__row"
-            >
-              <span>{{ row.label }}</span>
-              <span>{{ row.ratio || '-' }}</span>
-              <span>{{ row.price || '-' }}</span>
-            </div>
-          </div>
-        </section>
-      </div>
+          <t-table
+            class="detail-price-table"
+            row-key="label"
+            :data="detailPriceRows.filter((row) => row.label !== '成本价')"
+            :columns="[
+              { colKey: 'label', title: '价格层级' },
+              { colKey: 'ratio', title: '价格系数' },
+              { colKey: 'price', title: '价格' },
+            ]"
+            bordered
+          >
+            <template #price="{ row }">
+              <t-space align="center" size="small">
+                <span>{{ row.price }}</span>
+                <PriceSourceToggle v-if="row.priceSource" :source="row.priceSource" :available="false" readonly />
+              </t-space>
+            </template>
+          </t-table>
+        </AdminSectionCard>
+      </t-space>
     </t-drawer>
 
     <t-drawer
@@ -658,7 +730,12 @@
               <t-input v-model="operationLogFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
             </t-form-item>
             <t-form-item label="操作类型">
-              <t-select v-model="operationLogFilter.operationType" clearable placeholder="请选择">
+              <t-select
+                v-model="operationLogFilter.operationType"
+                :popup-props="{ overlayInnerStyle: { width: '120px' } }"
+                clearable
+                placeholder="请选择"
+              >
                 <t-option v-for="item in operationTypeOptions" :key="item.value" v-bind="item" />
               </t-select>
             </t-form-item>
@@ -687,51 +764,44 @@
             </div>
           </div>
         </t-form>
-        <t-table
-          row-key="id"
-          :data="operationLogs"
-          :columns="operationLogColumns"
-          :loading="operationLogLoading"
-          table-layout="fixed"
-          hover
-        >
-          <template #slab="{ row }">
-            <div class="slab-meta">
-              <div class="slab-name">{{ row.slabName }}</div>
-              <div class="slab-code">ID：{{ row.slabId }}</div>
-              <div class="slab-code">大板编号：{{ row.slabSerialNo }}</div>
-            </div>
-          </template>
-          <template #operationType="{ row }">{{ operationTypeLabel(row.operationType) }}</template>
-          <template #summary="{ row }">
-            <div class="operation-log-summary">
-              <span>{{ row.operationSummary || '-' }}</span>
-              <span v-if="row.standardReason || row.detailReason" class="slab-code">
-                {{ [row.standardReason, row.detailReason].filter(Boolean).join('：') }}
-              </span>
-            </div>
-          </template>
-          <template #operatedAt="{ row }">{{ formatDateTime(row.operatedAt) }}</template>
-          <template #operation="{ row }">
-            <t-link theme="primary" hover="color" @click="openOperationLogDetail(row)">详情</t-link>
-          </template>
-        </t-table>
-        <t-empty v-if="!operationLogLoading && !operationLogs.length" description="暂无操作日志" />
-        <AdminPagination
-          v-if="operationLogTotal"
-          v-model:current="operationLogPagination.current"
-          v-model:page-size="operationLogPagination.pageSize"
-          :total="operationLogTotal"
-          :page-size-options="pageSizeOptions"
-          @change="loadOperationLogs"
-        />
+        <div>
+          <t-table
+            row-key="id"
+            :data="operationLogs"
+            :columns="operationLogColumns"
+            :loading="operationLogLoading"
+            hover
+          >
+            <template #slab="{ row }">
+              <div class="slab-meta">
+                <div class="slab-name">{{ row.slabName }}</div>
+                <div class="slab-code">ID：{{ row.slabId }}</div>
+                <div class="slab-code">大板编号：{{ row.slabSerialNo }}</div>
+              </div>
+            </template>
+            <template #operationType="{ row }">{{ operationTypeLabel(row.operationType) }}</template>
+            <template #operatedAt="{ row }">{{ formatDateTime(row.operatedAt) }}</template>
+            <template #operation="{ row }">
+              <t-link theme="primary" hover="color" @click="openOperationLogDetail(row)">详情</t-link>
+            </template>
+          </t-table>
+          <t-empty v-if="!operationLogLoading && !operationLogs.length" description="暂无操作日志" />
+          <AdminPagination
+            v-if="operationLogTotal"
+            v-model:current="operationLogPagination.current"
+            v-model:page-size="operationLogPagination.pageSize"
+            :total="operationLogTotal"
+            :page-size-options="pageSizeOptions"
+            @change="loadOperationLogs"
+          />
+        </div>
       </div>
     </t-drawer>
 
     <AdminDialog
       v-model:visible="operationLogDetailVisible"
       header="操作详情"
-      width="min(1040px, calc(100vw - 48px))"
+      width="min(1240px, 94vw)"
       dialog-class-name="operation-log-detail-dialog"
       :cancel-btn="null"
       confirm-btn="关闭"
@@ -739,10 +809,8 @@
     >
       <template v-if="operationLogDetail">
         <div class="operation-log-detail">
-          <div class="operation-log-detail__section-title">操作信息</div>
-          <t-descriptions bordered :column="3">
+          <t-descriptions title="操作信息" bordered :column="3">
             <t-descriptions-item label="大板名称">{{ operationLogDetail.slabName }}</t-descriptions-item>
-            <t-descriptions-item label="大板编号">{{ operationLogDetail.slabSerialNo }}</t-descriptions-item>
             <t-descriptions-item label="操作类型">
               {{ operationTypeLabel(operationLogDetail.operationType) }}
             </t-descriptions-item>
@@ -750,11 +818,11 @@
             <t-descriptions-item label="操作时间">{{
               formatDateTime(operationLogDetail.operatedAt)
             }}</t-descriptions-item>
-            <t-descriptions-item label="操作来源">{{
+            <t-descriptions-item label="操作来源" :span="2">{{
               operationSourceLabel(operationLogDetail.operationSource)
             }}</t-descriptions-item>
             <t-descriptions-item label="操作内容" :span="2">
-              {{ operationLogDetail.operationSummary || '未填写' }}
+              {{ operationLogDetail.operationSummary }}
             </t-descriptions-item>
             <t-descriptions-item label="状态变化">
               {{ formatStatusChange(operationLogDetail) }}
@@ -762,66 +830,89 @@
           </t-descriptions>
 
           <template v-if="operationLogIsCreate && operationLogChangeRows.length">
-            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">图片</div>
-            <t-row :gutter="[16, 16]">
-              <t-col v-for="row in creationLogImages" :key="row.field" :span="4">
-                <div class="operation-log-media-card">
-                  <div class="operation-log-media-card__title">{{ row.field }}</div>
-                  <button
-                    class="operation-log-media-card__preview"
-                    type="button"
-                    :disabled="!row.afterMedia?.available"
-                    :aria-label="`查看${row.field}`"
-                    @click="row.afterMedia && openOperationLogMediaPreview(row.afterMedia, row.field)"
-                  >
-                    <img
-                      v-if="row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'image'"
-                      :src="row.afterMedia.url"
-                      :alt="row.field"
-                    />
-                    <video
-                      v-else-if="
-                        row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'video'
-                      "
-                      :src="row.afterMedia.url"
-                      preload="metadata"
-                      muted
-                      playsinline
-                    />
-                    <span v-else>{{ mediaAfterFallback(row.afterMedia) }}</span>
-                  </button>
-                  <div class="operation-log-media-card__hint">
-                    {{
-                      row.afterMedia?.available
-                        ? row.afterMedia.message ||
-                          (row.afterMedia.mediaType === 'video' ? '点击播放视频' : '点击查看大图')
-                        : '暂无可预览内容'
-                    }}
-                  </div>
+            <t-space direction="vertical" size="large" class="slab-creation-sections">
+              <AdminSectionCard>
+                <h3 class="slab-creation-title">图文描述</h3>
+                <div class="slab-creation-media-grid">
+                  <template v-for="row in creationLogImages" :key="row.field">
+                    <div class="operation-log-media-card">
+                      <div class="operation-log-media-card__title">{{ row.field }}</div>
+                      <button
+                        class="operation-log-media-card__preview"
+                        type="button"
+                        :disabled="!row.afterMedia?.available"
+                        :aria-label="`查看${row.field}`"
+                        @click="row.afterMedia && openOperationLogMediaPreview(row.afterMedia, row.field)"
+                      >
+                        <img
+                          v-if="row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'image'"
+                          :src="row.afterMedia.url"
+                          :alt="row.field"
+                        />
+                        <video
+                          v-else-if="
+                            row.afterMedia?.available && row.afterMedia.url && row.afterMedia.mediaType === 'video'
+                          "
+                          :src="row.afterMedia.url"
+                          preload="metadata"
+                          muted
+                          playsinline
+                        />
+                        <span v-else>{{ mediaAfterFallback(row.afterMedia) }}</span>
+                      </button>
+                      <div class="operation-log-media-card__hint">
+                        {{
+                          row.afterMedia?.available
+                            ? row.afterMedia.message ||
+                              (row.afterMedia.mediaType === 'video' ? '点击播放视频' : '点击查看大图')
+                            : '暂无可预览内容'
+                        }}
+                      </div>
+                    </div>
+                  </template>
                 </div>
-              </t-col>
-            </t-row>
-            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">基础信息</div>
-            <t-descriptions bordered :column="3" layout="horizontal">
-              <t-descriptions-item v-for="row in creationLogBase" :key="row.field" :label="row.field">
-                {{ row.after }}
-              </t-descriptions-item>
-            </t-descriptions>
-            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">销售信息</div>
-            <t-descriptions bordered :column="3" layout="horizontal">
-              <t-descriptions-item v-for="row in creationLogSales" :key="row.field" :label="row.field">
-                {{ row.after }}
-              </t-descriptions-item>
-            </t-descriptions>
-            <t-table
-              class="operation-log-detail__prices"
-              row-key="label"
-              :data="creationLogPrices"
-              :columns="creationLogPriceColumns"
-              bordered
-            />
+              </AdminSectionCard>
+              <AdminSectionCard>
+                <h3 class="slab-creation-title">基础信息</h3>
+                <t-descriptions bordered :column="3" layout="horizontal">
+                  <t-descriptions-item label="大板名称" :span="3">
+                    {{ operationLogDetail.slabName }}
+                  </t-descriptions-item>
+                  <t-descriptions-item v-for="row in creationLogBase" :key="row.field" :label="row.field">
+                    {{ row.after }}
+                  </t-descriptions-item>
+                </t-descriptions>
+              </AdminSectionCard>
+              <AdminSectionCard>
+                <h3 class="slab-creation-title">销售信息</h3>
+                <t-descriptions bordered :column="3" layout="horizontal">
+                  <t-descriptions-item v-for="row in creationLogSales" :key="row.field" :label="row.field">
+                    {{ row.after }}
+                  </t-descriptions-item>
+                </t-descriptions>
+                <t-table
+                  v-if="!isSupplyChain"
+                  class="operation-log-detail__prices"
+                  row-key="label"
+                  :data="creationLogPrices"
+                  :columns="creationLogPriceColumns"
+                  bordered
+                >
+                  <template #price="{ row }">
+                    <t-space align="center" size="small">
+                      <span>{{ row.price }}</span>
+                      <PriceSourceToggle v-if="row.priceSource" :source="row.priceSource" :available="false" readonly />
+                    </t-space>
+                  </template>
+                </t-table>
+              </AdminSectionCard>
+            </t-space>
           </template>
-          <template v-else-if="operationLogChangeRows.length">
+          <template
+            v-else-if="
+              operationLogChangeRows.length && !(isSupplyChain && operationLogDetail.operationType === 'OFF_SHELF')
+            "
+          >
             <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">
               {{ operationLogIsCreate ? '创建时信息' : '变更对比' }}
               <t-tag theme="primary" variant="light">{{ operationLogChangeRows.length }} 项</t-tag>
@@ -873,12 +964,28 @@
                     <div class="operation-log-price-diff__tier">{{ tier.label }}</div>
                     <div class="operation-log-diff-value operation-log-diff-value--before">
                       <span>价格系数：{{ tier.beforeCoefficient }}</span>
-                      <span>价格：{{ tier.beforePrice }}</span>
+                      <t-space align="center" size="small">
+                        <span>价格：{{ tier.beforePrice }}</span>
+                        <PriceSourceToggle
+                          v-if="tier.beforeSource"
+                          :source="tier.beforeSource"
+                          :available="false"
+                          readonly
+                        />
+                      </t-space>
                     </div>
                     <t-icon name="arrow-right" class="operation-log-diff-arrow" />
                     <div class="operation-log-diff-value operation-log-diff-value--after">
                       <span>价格系数：{{ tier.afterCoefficient }}</span>
-                      <span>价格：{{ tier.afterPrice }}</span>
+                      <t-space align="center" size="small">
+                        <span>价格：{{ tier.afterPrice }}</span>
+                        <PriceSourceToggle
+                          v-if="tier.afterSource"
+                          :source="tier.afterSource"
+                          :available="false"
+                          readonly
+                        />
+                      </t-space>
                     </div>
                   </template>
                 </div>
@@ -900,14 +1007,16 @@
           </template>
 
           <template
-            v-if="operationLogDetail.standardReason || operationLogDetail.detailReason || operationLogDetail.batchNo"
+            v-if="
+              !['SOURCE_OFF_SHELF', 'SOURCE_DELETE'].includes(operationLogDetail.operationType) &&
+              (operationLogDetail.standardReason || operationLogDetail.detailReason)
+            "
           >
             <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">操作说明</div>
             <t-descriptions bordered :column="2">
-              <t-descriptions-item label="原因">{{
+              <t-descriptions-item label="原因" :span="2">{{
                 operationLogDetail.standardReason || '未填写'
               }}</t-descriptions-item>
-              <t-descriptions-item label="批次号">{{ operationLogDetail.batchNo || '未填写' }}</t-descriptions-item>
               <t-descriptions-item label="详细说明" :span="2">
                 <span class="operation-log-detail__long-text">{{ operationLogDetail.detailReason || '未填写' }}</span>
               </t-descriptions-item>
@@ -946,14 +1055,15 @@
               class="price-table__row"
             >
               <span>{{ row.label }}</span>
-              <t-input v-if="index === 0" class="price-input" model-value="1.00" disabled />
+              <span v-if="index === 0">—</span>
               <SpecPriceInput
                 v-else
-                v-model="row.ratio"
+                :model-value="row.ratio ?? ''"
                 label="系数"
                 placeholder="系数"
                 :submitted="drawerPriceSubmitted"
                 :disabled="priceDrawerReadonly || index === 0"
+                @update:model-value="row.ratio = $event"
                 @change="handleBatchRatioChange(index)"
                 @commit="markDrawerPriceManual(row)"
               />
@@ -1079,12 +1189,15 @@
 </template>
 
 <script setup lang="ts">
+import SlabProductFormLayout from './components/SlabProductFormLayout.vue';
 import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
 import SpecPriceInput from '@/pages/finished-stock/management/components/SpecPriceInput.vue';
 
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import SlabRowWarnings from './components/SlabRowWarnings.vue';
+import SourceUnavailableOverlay from '@/pages/finished-stock/management/components/SourceUnavailableOverlay.vue';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   adminFeedback,
@@ -1093,6 +1206,7 @@ import {
   AdminMediaUpload,
   AdminListLayout,
   AdminPagination,
+  AdminSectionCard,
   type AdminMediaValue,
 } from '@/components/foundation';
 import {
@@ -1111,12 +1225,14 @@ import {
   getSlabPublishOptions,
   listSlabOperationLogs,
   listSlabs,
+  getSlabDetail,
   removeSlab,
   releaseTemporarySlabMedia,
   resolveSlabPublishTargetStatus,
   uploadSlabImage,
   updateSlab,
   updateSlabStatuses,
+  checkSlabAction,
   type SlabPayload,
   type SlabOperationLogRecord,
   type SlabOperationType,
@@ -1184,6 +1300,8 @@ interface OperationLogPriceTierRow {
   beforePrice: string;
   afterCoefficient: string;
   afterPrice: string;
+  beforeSource?: 'auto' | 'manual';
+  afterSource?: 'auto' | 'manual';
 }
 
 interface OperationLogMediaValue {
@@ -1207,7 +1325,7 @@ interface PriceGroup {
 interface DrawerPriceRow {
   configurationId?: number;
   label: string;
-  ratio: string;
+  ratio?: string;
   price: string;
   priceSource?: 'auto' | 'manual';
   sourceConfigurationId?: number;
@@ -1224,6 +1342,7 @@ interface SlabItem {
   sourceUnavailable?: boolean;
   sourceStatus?: string;
   stock?: number;
+  sourceOffShelfRecords?: SlabOffShelfRecord[];
   id: number;
   supplierId?: number;
   varietyId?: number;
@@ -1323,7 +1442,7 @@ type CornerFieldKey =
 type MeasurementField = 'length' | 'width' | 'height' | 'tolerance' | CornerFieldKey;
 const tabs: { value: SlabTab; label: string }[] = [
   { value: 'warehouse', label: '仓库中' },
-  { value: 'selling', label: getLoginUser().clientCode === 'supply-chain' ? '已上架' : '出售中' },
+  { value: 'selling', label: '已上架' },
   { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
@@ -1412,6 +1531,12 @@ const drawerPriceSubmitted = ref(false);
 const productPriceSession = ref(0);
 const drawerPriceSession = ref(0);
 const productMode = ref<ProductMode>('create');
+const isProductFormPage = computed(() => productDialogVisible.value && productMode.value !== 'view');
+const productLayoutRef = ref<InstanceType<typeof SlabProductFormLayout>>();
+const focusProductSection = (key: string) => {
+  productTab.value = key;
+  void productLayoutRef.value?.scrollToSection(key);
+};
 const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');
 const productTab = ref('images');
 const editingRowId = ref<number | null>(null);
@@ -1485,16 +1610,22 @@ const operationTypeOptions: { label: string; value: SlabOperationType }[] = [
   { label: '物理删除', value: 'PHYSICAL_DELETE' },
   { label: '彻底删除', value: 'PURGE' },
   { label: '状态变更', value: 'STATUS_UPDATE' },
-  ...(!isSupplyChain.value ? [{ label: '供应链联动', value: 'SOURCE_SYNC' as const }] : []),
+  ...(!isSupplyChain.value
+    ? [
+        { label: '供应链上架', value: 'SOURCE_SHELF' as const },
+        { label: '供应链下架', value: 'SOURCE_OFF_SHELF' as const },
+        { label: '供应链删除', value: 'SOURCE_DELETE' as const },
+      ]
+    : []),
 ];
 const operationTypeLabel = (type: SlabOperationType) =>
   operationTypeOptions.find((item) => item.value === type)?.label || type;
 const operationLogColumns: PrimaryTableCol<SlabOperationLogRecord>[] = [
   { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
-  { colKey: 'operationType', title: '操作类型', width: 110 },
-  { colKey: 'summary', title: '操作内容', minWidth: 220 },
-  { colKey: 'operatorName', title: '操作人', width: 110 },
-  { colKey: 'operatedAt', title: '操作时间', width: 170 },
+  { colKey: 'operationType', title: '操作类型', width: 140 },
+  { colKey: 'operationSummary', title: '操作内容', minWidth: 180 },
+  { colKey: 'operatorName', title: '操作人', width: 120 },
+  { colKey: 'operatedAt', title: '操作时间', width: 180 },
   { colKey: 'operation', title: '操作', width: 76, fixed: 'right' },
 ];
 const formatPriceTierChanges = (value: unknown): string | null => {
@@ -1528,7 +1659,7 @@ const formatPriceTierChanges = (value: unknown): string | null => {
 };
 const formatOperationValue = (value: unknown, field?: string): string => {
   if (value == null || value === '') return '未填写';
-  if (field === '状态') return operationStatusLabels[value as SlabStatus] || String(value);
+  if (field === '状态' || field === '来源状态') return operationStatusLabels[value as SlabStatus] || String(value);
   if (field === '价格层级') return formatPriceTierChanges(value) || '未填写';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
@@ -1544,12 +1675,14 @@ const normalizePriceTierChanges = (value: unknown) => {
       priceCoefficient?: number;
       markupRate?: number;
       price?: number;
+      priceSource?: 'auto' | 'manual';
     };
     const levelId = price.storeLevelId ?? price.configurationId;
     const key = String(levelId ?? 'unknown');
     return [
       {
         key,
+        source: price.priceSource,
         label:
           price.storeLevelName ||
           markupConfigurations.value.find((configuration) => configuration.storeLevelId === levelId)?.name ||
@@ -1579,6 +1712,8 @@ const buildPriceTierComparison = (before: unknown, after: unknown): OperationLog
       beforePrice: beforeTier?.price || '未填写',
       afterCoefficient: afterTier?.coefficient || '未填写',
       afterPrice: afterTier?.price || '未填写',
+      beforeSource: beforeTier?.source,
+      afterSource: afterTier?.source,
     };
   });
 };
@@ -1612,6 +1747,7 @@ const operationLogFieldOrder = [
   '长度',
   '宽度',
   '高度',
+  '面积',
   '误差',
   '扣角1长',
   '扣角1宽',
@@ -1621,11 +1757,13 @@ const operationLogFieldOrder = [
   '扣角3宽',
   '扣角4长',
   '扣角4宽',
+  '成本价',
   '供应商ID',
   '供应商',
   '库存',
   '大板编号',
-  '成本价',
+  '上架',
+  '状态',
   '指导价系数',
   '指导价',
   '价格层级',
@@ -1650,21 +1788,61 @@ const normalizeOperationLogMedia = (value: unknown, field: string): OperationLog
 };
 const mediaAfterFallback = (media?: OperationLogMediaValue) =>
   media?.message || (media ? '历史媒体已不可用' : '未填写');
-const operationLogIsCreate = computed(() => operationLogDetail.value?.operationType === 'CREATE');
+const operationLogIsCreate = computed(() => {
+  const log = operationLogDetail.value;
+  return log?.operationType === 'CREATE' || (log?.operationType === 'SOURCE_SHELF' && !log.beforeStatus);
+});
 const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {
   const details = operationLogDetail.value?.changeDetails;
   if (!details) return [];
   try {
     const parsed = JSON.parse(details) as Record<string, { before?: unknown; after?: unknown }>;
+    const sourceValue = (value: unknown): 'auto' | 'manual' | undefined =>
+      value === '跟随配置' || value === 'auto'
+        ? 'auto'
+        : value === '手工价格' || value === 'manual'
+          ? 'manual'
+          : undefined;
+    const tierChange = parsed['价格层级'];
+    const comparedTiers = buildPriceTierComparison(tierChange?.before, tierChange?.after);
+    if (!operationLogIsCreate.value) {
+      for (const [field, change] of Object.entries(parsed)) {
+        if (!field.endsWith('价格来源')) continue;
+        const label = field.slice(0, -4);
+        let tier = comparedTiers.find((item) => item.label === label);
+        if (!tier) {
+          tier = {
+            key: label,
+            label,
+            beforeCoefficient: '未填写',
+            afterCoefficient: '未填写',
+            beforePrice: '未填写',
+            afterPrice: '未填写',
+          };
+          comparedTiers.push(tier);
+        }
+        tier.beforeSource = sourceValue(change.before);
+        tier.afterSource = sourceValue(change.after);
+      }
+      if (!tierChange && comparedTiers.length) parsed['价格层级'] = {};
+    }
     return Object.entries(parsed)
-      .filter(([field]) => operationLogIsCreate.value || !['面积', '视频封面'].includes(field))
+      .filter(([field]) => operationLogIsCreate.value || (field !== '视频封面' && !field.endsWith('价格来源')))
       .sort(
         ([leftField], [rightField]) =>
           (operationLogFieldOrderIndex.get(leftField) ?? Number.MAX_SAFE_INTEGER) -
           (operationLogFieldOrderIndex.get(rightField) ?? Number.MAX_SAFE_INTEGER),
       )
       .map(([field, change]) => {
-        const priceTiers = field === '价格层级' ? buildPriceTierComparison(change.before, change.after) : undefined;
+        const allPriceTiers = field === '价格层级' ? comparedTiers : undefined;
+        const priceTiers = operationLogIsCreate.value
+          ? allPriceTiers
+          : allPriceTiers?.filter(
+              (tier) =>
+                tier.beforePrice !== tier.afterPrice ||
+                tier.beforeCoefficient !== tier.afterCoefficient ||
+                tier.beforeSource !== tier.afterSource,
+            );
         const mediaType = operationLogMediaTypes[field];
         return {
           field: operationLogReferenceLabels[field] || field,
@@ -1675,49 +1853,116 @@ const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {
           beforeMedia: mediaType ? normalizeOperationLogMedia(change.before, field) : undefined,
           afterMedia: mediaType ? normalizeOperationLogMedia(change.after, field) : undefined,
         };
-      });
+      })
+      .filter((row) => operationLogIsCreate.value || row.priceTiers === undefined || row.priceTiers.length > 0);
   } catch {
     return [];
   }
 });
 const creationLogImages = computed(() => operationLogChangeRows.value.filter((row) => row.mediaType));
 const creationLogSalesFields = new Set(['库存', '供应商', '大板编号', '仓库', '发布类型', '状态']);
-const creationLogMetadataFields = new Set(['大板ID', '创建人', '创建账号ID', '创建时间']);
+const creationLogMetadataFields = new Set(['来源状态', '大板ID', '创建人', '创建账号ID', '创建时间']);
 const creationLogPriceFields = new Set(['成本价', '指导价', '指导价系数', '价格层级']);
-const creationLogBase = computed(() =>
-  operationLogChangeRows.value.filter(
-    (row) =>
-      !row.mediaType &&
-      !creationLogSalesFields.has(row.field) &&
-      !creationLogMetadataFields.has(row.field) &&
-      !creationLogPriceFields.has(row.field) &&
-      !row.field.endsWith('价格来源') &&
-      !row.field.endsWith('来源配置ID'),
-  ),
-);
-const creationLogSales = computed(() =>
-  operationLogChangeRows.value.filter((row) => creationLogSalesFields.has(row.field)),
-);
-const creationLogPriceColumns = [
-  { colKey: 'label', title: '价格层级' },
-  { colKey: 'coefficient', title: '价格系数' },
-  { colKey: 'price', title: '价格' },
-  { colKey: 'source', title: '价格来源' },
+const creationLogBaseFieldOrder = [
+  '品种',
+  '产地',
+  '纹理',
+  '色系',
+  '等级',
+  '长度',
+  '宽度',
+  '高度',
+  '面积',
+  '误差',
+  '扣角1长',
+  '扣角1宽',
+  '扣角2长',
+  '扣角2宽',
+  '扣角3长',
+  '扣角3宽',
+  '扣角4长',
+  '扣角4宽',
 ];
+const creationLogBase = computed(() =>
+  operationLogChangeRows.value
+    .filter(
+      (row) =>
+        row.field !== '大板名称' &&
+        !row.mediaType &&
+        !creationLogSalesFields.has(row.field) &&
+        !creationLogMetadataFields.has(row.field) &&
+        !creationLogPriceFields.has(row.field) &&
+        !row.field.endsWith('价格来源') &&
+        !row.field.endsWith('来源配置ID'),
+    )
+    .sort((a, b) => {
+      const rank = (field: string) => {
+        const index = creationLogBaseFieldOrder.indexOf(field);
+        return index < 0 ? creationLogBaseFieldOrder.length : index;
+      };
+      return rank(a.field) - rank(b.field);
+    })
+    .map((row) => ({
+      ...row,
+      field:
+        row.field === '面积'
+          ? '面积（㎡）'
+          : ['长度', '宽度', '高度', '误差'].includes(row.field) || /^扣角[1-4][长宽]$/.test(row.field)
+            ? `${row.field === '误差' ? '±误差' : row.field}（mm）`
+            : row.field,
+    })),
+);
+const creationLogSales = computed(() => {
+  const rows = operationLogChangeRows.value;
+  const value = (field: string) => rows.find((row) => row.field === field)?.after ?? '未填写';
+  if (!isSupplyChain.value)
+    return ['成本价', '供应商', '库存', '大板编号'].map((field) => ({ field, after: value(field) }));
+  return [
+    { field: '成本价', after: value('成本价') },
+    { field: '供应商', after: value('供应商') },
+    { field: '库存', after: value('库存') },
+    { field: '大板编号', after: value('大板编号') },
+    {
+      field: '上架',
+      after:
+        operationLogDetail.value?.afterStatus === 'selling'
+          ? '立刻上架'
+          : operationLogDetail.value?.afterStatus === 'warehouse'
+            ? '暂不上架'
+            : value('状态'),
+    },
+  ];
+});
+const creationLogPriceColumns = computed(() =>
+  isSupplyChain.value
+    ? [
+        { colKey: 'label', title: '价格层级' },
+        { colKey: 'price', title: '价格' },
+      ]
+    : [
+        { colKey: 'label', title: '价格层级' },
+        { colKey: 'coefficient', title: '价格系数' },
+        { colKey: 'price', title: '价格' },
+      ],
+);
 const creationLogPrices = computed(() => {
   if (!operationLogIsCreate.value) return [];
   const rows = operationLogChangeRows.value;
   const value = (field: string) => rows.find((row) => row.field === field)?.after ?? '未填写';
   const tiers = rows.find((row) => row.field === '价格层级')?.priceTiers ?? [];
-  if (isSupplyChain.value) return [{ label: '成本价', coefficient: '1.00', price: value('成本价'), source: '—' }];
+  if (isSupplyChain.value) return [{ label: '成本价', price: value('成本价') }];
   return [
-    { label: '成本价', coefficient: '1.00', price: value('成本价'), source: '—' },
-    { label: '指导价', coefficient: value('指导价系数'), price: value('指导价'), source: '—' },
+    { label: '指导价', coefficient: value('指导价系数'), price: value('指导价') },
     ...tiers.map((tier) => ({
       label: tier.label,
       coefficient: tier.afterCoefficient,
       price: tier.afterPrice,
-      source: value(`${tier.label}价格来源`),
+      priceSource:
+        value(`${tier.label}价格来源`) === '跟随配置'
+          ? ('auto' as const)
+          : value(`${tier.label}价格来源`) === '手工价格'
+            ? ('manual' as const)
+            : undefined,
     })),
   ];
 });
@@ -1726,11 +1971,11 @@ const operationSourceLabel = (source: SlabOperationLogRecord['operationSource'])
     MANUAL: isSupplyChain.value ? '供应链协同系统' : '运营管理平台',
     EXTERNAL_API: '外部接口',
     SYSTEM: '系统任务',
-    SUPPLY_CHAIN: '供应链联动',
+    SUPPLY_CHAIN: '供应链协同系统',
   })[source] || source;
 const operationStatusLabels: Record<string, string> = {
   warehouse: '仓库中',
-  selling: isSupplyChain.value ? '已上架' : '出售中',
+  selling: '已上架',
   offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',
@@ -1882,14 +2127,13 @@ const latestOffShelfRecord = (row: SlabItem) =>
     return timeDifference > 0 || (timeDifference === 0 && current.id > latest.id) ? current : latest;
   }, undefined);
 
-const formatMillimeter = (value?: number) => (value == null ? '-' : `${value}mm`);
-const formatArea = (value?: number) => (value == null ? '-' : `${value}㎡`);
-const formatCorner = (row: SlabItem, index: 1 | 2 | 3 | 4) => {
-  const length = row[`corner${index}LengthMm`];
-  const width = row[`corner${index}WidthMm`];
-  if (length == null && width == null) return '-';
-  return `${length ?? '-'} × ${width ?? '-'}mm`;
-};
+const productAreaSquareMeter = computed(() => {
+  if (!isValidMeasurement(productForm.length, true) || !isValidMeasurement(productForm.width, true)) return undefined;
+  const length = Number(productForm.length);
+  const width = Number(productForm.width);
+  if (!(length > 0 && width > 0)) return undefined;
+  return Number(((length * width) / 1_000_000).toFixed(2));
+});
 
 const toSlabItem = (record: SlabRecord): SlabItem => {
   if (isSupplyChain.value) record = { ...record, status: record.sourceStatus as SlabRecord['status'] };
@@ -1900,6 +2144,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     sourceUnavailable: record.sourceUnavailable,
     sourceStatus: record.sourceStatus,
     stock: record.stock,
+    sourceOffShelfRecords: record.sourceOffShelfRecords,
     supplierId: record.supplierId,
     varietyId: record.varietyId,
     originId: record.originId,
@@ -2018,6 +2263,8 @@ const loadSlabs = async () => {
     markupConfigurations.value = markupResult;
     guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
     tableData.value = records.map(toSlabItem);
+    const selectableIds = new Set(tableData.value.filter((row) => !sourceBlocked(row)).map((row) => row.id));
+    selectedKeys.value = selectedKeys.value.filter((id) => selectableIds.has(id));
   } catch (error) {
     tableData.value = [];
     adminFeedback.actionError({ action: '加载大板数据', error, fallback: '请稍后重试' });
@@ -2076,7 +2323,13 @@ const reasonForm = reactive({
   detail: '',
 });
 const reasonFormRules = computed<Record<string, FormRule[]>>(() => ({
-  reason: [{ required: true, message: reasonState.type === 'deleteExternal' ? '请选择删除原因' : '请选择下架原因' }],
+  reason: [
+    {
+      required: true,
+      trigger: 'submit',
+      message: reasonState.type === 'deleteExternal' ? '请选择删除原因' : '请选择下架原因',
+    },
+  ],
   detail: [],
 }));
 
@@ -2417,6 +2670,7 @@ const pageData = computed(() => {
   return filteredData.value.slice(start, start + currentPagination.value.pageSize);
 });
 
+const shelfErrors = reactive<Record<number, string>>({});
 const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
 const batchButtons = computed(() => {
@@ -2474,7 +2728,11 @@ const rowActions = (): {
       restore: 'restore',
       purge: 'purge',
     };
-    return actions.filter((action) => hasSlabAction(activeTab.value, actionPermissions[action.action]!));
+    const candidates =
+      !isSupplyChain.value && !actions.some((action) => action.action === 'detail')
+        ? [{ label: '详情', action: 'detail' as const, theme: 'primary' as const }, ...actions]
+        : actions;
+    return candidates.filter((action) => hasSlabAction(activeTab.value, actionPermissions[action.action]!));
   };
   if (activeTab.value === 'warehouse') {
     return filterActions([
@@ -2530,6 +2788,7 @@ const ensureCurrentPage = () => {
 };
 
 const toggleRow = (id: number, checked: boolean) => {
+  if (tableData.value.some((row) => row.id === id && sourceBlocked(row))) return;
   if (checked) {
     selectedKeys.value = Array.from(new Set([...selectedKeys.value, id]));
   } else {
@@ -2648,7 +2907,7 @@ const restoreProductAutoPrice = (storeLevelId: number) => {
 const calculateBatchPrice = (row: DrawerPriceRow) => {
   const costValue = batchPriceRows[0]?.price ?? '';
   const cost = toNumber(costValue);
-  const ratio = toNumber(row.ratio);
+  const ratio = toNumber(row.ratio ?? '');
   if (!isValidSalesNumber(costValue, 0) || !isValidSalesNumber(row.ratio, 0)) return;
   row.price = formatPrice(cost * ratio);
 };
@@ -2754,7 +3013,7 @@ const buildPriceRows = (row: SlabItem): DrawerPriceRow[] => {
     });
   });
   return [
-    { label: '成本价', ratio: '1.00', price: row.price.cost },
+    { label: '成本价', price: row.price.cost },
     {
       label: '指导价',
       ratio: guideRatio,
@@ -2792,10 +3051,15 @@ const openOperationLogMediaPreview = (media: OperationLogMediaValue, title: stri
   uploadPreviewDialogVisible.value = true;
 };
 
-const openDetailDrawer = (row: SlabItem) => {
-  detailDrawerRow.value = row;
-  detailPriceRows.value = buildPriceRows(row);
-  detailDrawerVisible.value = true;
+const openDetailDrawer = async (row: SlabItem) => {
+  try {
+    const latest = toSlabItem(await getSlabDetail(row.id));
+    detailDrawerRow.value = latest;
+    detailPriceRows.value = buildPriceRows(latest);
+    detailDrawerVisible.value = true;
+  } catch (error) {
+    adminFeedback.error(error instanceof Error ? error.message : '大板详情加载失败，请重试');
+  }
 };
 
 const closeDetailDrawer = () => {
@@ -2871,7 +3135,8 @@ const openProductDialog = (mode: ProductMode, row?: SlabItem) => {
     void Promise.allSettled(staleMediaIds.map((mediaId) => releaseTemporarySlabMedia(mediaId)));
   }
   productMode.value = mode;
-  publishTargetStatus.value = resolveSlabPublishTargetStatus(row?.status || activeTab.value);
+  publishTargetStatus.value =
+    mode === 'create' ? 'warehouse' : resolveSlabPublishTargetStatus(row?.status || activeTab.value);
   productTab.value = mode === 'view' ? 'sales' : 'images';
   editingRowId.value = row?.id ?? null;
   resetProductForm();
@@ -3036,7 +3301,7 @@ const handleProductSubmit = async () => {
     uploadErrors[item.key] = missingRequiredUploads.some((missingItem) => missingItem.key === item.key);
   });
   if (missingRequiredUploads.length > 0) {
-    productTab.value = 'images';
+    focusProductSection('images');
     adminFeedback.warning('请上传必填图片');
     return;
   }
@@ -3056,14 +3321,14 @@ const handleProductSubmit = async () => {
     cornerFields.some((item) => !isValidMeasurement(productForm[item.key], false)) ||
     invalidMeasurementFields.size > 0;
   if (hasInvalidBaseInformation) {
-    productTab.value = 'base';
+    focusProductSection('base');
     await nextTick();
     await productFormRef.value?.validate({ trigger: 'all', showErrorMessage: true });
     adminFeedback.warning('请完善基础信息');
     return;
   }
   if (!isSupplyChain.value && productMode.value === 'create' && guidePriceSettingCoefficient.value == null) {
-    productTab.value = 'sales';
+    focusProductSection('sales');
     adminFeedback.warning('请先配置大板指导价默认价格系数');
     return;
   }
@@ -3085,7 +3350,7 @@ const handleProductSubmit = async () => {
     hasInvalidSalesPrice ||
     hasInvalidGuidePrice;
   if (hasInvalidSalesInformation) {
-    productTab.value = 'sales';
+    focusProductSection('sales');
     await nextTick();
     await salesFormRef.value?.validate({ trigger: 'all', showErrorMessage: true });
     adminFeedback.warning(
@@ -3134,19 +3399,21 @@ const handleProductSubmit = async () => {
     corner3WidthMm: productForm.corner3Width ? toNumber(productForm.corner3Width) : undefined,
     corner4LengthMm: productForm.corner4Length ? toNumber(productForm.corner4Length) : undefined,
     corner4WidthMm: productForm.corner4Width ? toNumber(productForm.corner4Width) : undefined,
-    areaSquareMeter: lengthMm && widthMm ? Number(((lengthMm * widthMm) / 1_000_000).toFixed(2)) : undefined,
+    areaSquareMeter: productAreaSquareMeter.value,
     costPrice: toNumber(productForm.cost),
-    guidePrice: toNumber(productForm.guidePrice),
-    guidePriceCoefficient: Number(toNumber(productForm.guideRatio).toFixed(4)),
-    markupPrices: salesPriceRows.value.map((item) => ({
-      storeLevelId: item.id,
-      priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
-      costPrice: toNumber(productForm.cost),
-      price: toNumber(productForm.markupPrices[item.id].price),
-      priceSource: productForm.markupPrices[item.id].priceSource,
-      sourceConfigurationId: productForm.markupPrices[item.id].sourceConfigurationId,
-      variantKey: '',
-    })),
+    guidePrice: isSupplyChain.value ? undefined : toNumber(productForm.guidePrice),
+    guidePriceCoefficient: isSupplyChain.value ? undefined : Number(toNumber(productForm.guideRatio).toFixed(4)),
+    markupPrices: isSupplyChain.value
+      ? undefined
+      : salesPriceRows.value.map((item) => ({
+          storeLevelId: item.id,
+          priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
+          costPrice: toNumber(productForm.cost),
+          price: toNumber(productForm.markupPrices[item.id].price),
+          priceSource: productForm.markupPrices[item.id].priceSource,
+          sourceConfigurationId: productForm.markupPrices[item.id].sourceConfigurationId,
+          variantKey: '',
+        })),
     status: isSupplyChain.value ? publishTargetStatus.value : editingItem?.status || publishTargetStatus.value,
   };
 
@@ -3219,6 +3486,15 @@ const openUploadPreview = (item: (typeof uploadItems)[number]) => {
   uploadPreviewDialogVisible.value = true;
 };
 
+const handleUploadBoxClick = (item: (typeof uploadItems)[number], event: MouseEvent) => {
+  const preview = uploadPreviews[item.key];
+  if (!preview?.videoUrl && !preview?.url) return;
+  if (event.target instanceof Element && event.target.closest('.admin-media-upload__delete')) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openUploadPreview(item);
+};
+
 const releasePendingUpload = (removed: AdminMediaValue) => {
   const removedPendingMediaIds = [removed.mediaId, removed.videoMediaId, removed.coverMediaId].filter(
     (mediaId): mediaId is number => Boolean(mediaId && pendingUploadedMediaIds.has(mediaId)),
@@ -3287,7 +3563,29 @@ const canStartShelf = (rows: SlabItem[]) => {
   return false;
 };
 
+const checkingAction = ref(false);
+const canStartAction = async (
+  ids: number[],
+  action: 'shelf' | 'offShelf' | 'restore' | 'delete' | 'purge' | 'clearRecycle',
+) => {
+  if (checkingAction.value) return false;
+  checkingAction.value = true;
+  try {
+    await checkSlabAction(ids, action);
+    return true;
+  } catch (error) {
+    await loadSlabs();
+    if (tableData.value.some((row) => ids.includes(row.id) && sourceBlocked(row))) return false;
+    const message = error instanceof Error ? error.message : '当前商品无法执行此操作';
+    adminFeedback.warning(action === 'shelf' && message === '请完善全部大板价格' ? `${message}后再上架` : message);
+    return false;
+  } finally {
+    checkingAction.value = false;
+  }
+};
+
 const handleBatchAction = async (action: BatchAction) => {
+  if (saving.value) return;
   if (action === 'publish') {
     openProductDialog('create');
     return;
@@ -3297,8 +3595,6 @@ const handleBatchAction = async (action: BatchAction) => {
       adminFeedback.warning('请先选择大板');
       return;
     }
-    const selectedKeySet = new Set(selectedKeys.value);
-    if (!canStartShelf(tableData.value.filter((item) => selectedKeySet.has(item.id)))) return;
     openConfirm('batchShelf', null, '是否批量上架所选大板？');
     return;
   }
@@ -3307,6 +3603,7 @@ const handleBatchAction = async (action: BatchAction) => {
       adminFeedback.warning('请先选择大板');
       return;
     }
+    if (!(await canStartAction([...selectedKeys.value], 'offShelf'))) return;
     openReasonDialog('offShelf', null, true);
     return;
   }
@@ -3315,6 +3612,7 @@ const handleBatchAction = async (action: BatchAction) => {
       adminFeedback.warning('请先选择大板');
       return;
     }
+    if (!(await canStartAction([...selectedKeys.value], 'restore'))) return;
     openConfirm('batchRestore', null, '是否批量放回到仓库？');
     return;
   }
@@ -3323,15 +3621,32 @@ const handleBatchAction = async (action: BatchAction) => {
       adminFeedback.warning('请先选择大板');
       return;
     }
+    if (!(await canStartAction([...selectedKeys.value], 'purge'))) return;
     openConfirm('batchPurge', null, '彻底删除后无法恢复，是否批量彻底删除所选大板？');
     return;
   }
+  if (!(await canStartAction([], 'clearRecycle'))) return;
   openConfirm('clearRecycle', null, '清空后所有回收站大板将无法恢复，是否清空回收站？');
 };
 
-const handleRowAction = (action: RowAction, row: SlabItem) => {
-  if (sourceBlocked(row) && action !== 'purge') return;
-  if (action === 'detail') openDetailDrawer(row);
+const handleRowAction = async (action: RowAction, row: SlabItem) => {
+  if (!isSupplyChain.value && !sourceBlocked(row)) {
+    await loadSlabs();
+    const latest = tableData.value.find((item) => item.id === row.id);
+    if (!latest || sourceBlocked(latest)) return;
+    row = latest;
+  }
+  if (sourceBlocked(row) && !['purge', 'detail'].includes(action)) return;
+  if (['shelf', 'offShelf', 'restore', 'delete', 'purge'].includes(action)) {
+    if (
+      !(await canStartAction(
+        [row.id],
+        action as 'shelf' | 'offShelf' | 'restore' | 'delete' | 'purge' | 'clearRecycle',
+      ))
+    )
+      return;
+  }
+  if (action === 'detail') void openDetailDrawer(row);
   if (action === 'price') openPriceDrawer(row);
   if (action === 'edit') openProductDialog('edit', row);
   if (action === 'shelf' && canStartShelf([row])) openConfirm('shelf', row, `是否上架大板“${row.name}”？`);
@@ -3400,6 +3715,7 @@ const closeConfirmDialog = () => {
 };
 
 const handleConfirmSubmit = async () => {
+  if (saving.value) return;
   const type = confirmState.type;
   const row = confirmState.row;
   const selectedCount = selectedKeys.value.length;
@@ -3419,7 +3735,7 @@ const handleConfirmSubmit = async () => {
         .filter((item): item is DrawerPriceRow & { configurationId: number } => item.configurationId != null)
         .map((item) => ({
           storeLevelId: item.configurationId,
-          priceCoefficient: Number(toNumber(item.ratio).toFixed(4)),
+          priceCoefficient: Number(toNumber(item.ratio ?? '').toFixed(4)),
           costPrice,
           price: toNumber(item.price),
           priceSource: item.priceSource,
@@ -3452,7 +3768,39 @@ const handleConfirmSubmit = async () => {
       await updateSelectedSlabStatuses('warehouse');
     }
     if (type === 'batchShelf') {
-      await updateSelectedSlabStatuses('selling');
+      const ids = [...selectedKeys.value];
+      const failed = new Map<number, string>();
+      let succeeded = 0;
+      for (const id of ids) {
+        delete shelfErrors[id];
+        try {
+          await updateSlabStatus(id, 'selling');
+          succeeded++;
+        } catch (error) {
+          failed.set(id, error instanceof Error ? error.message : '上架失败，请重试');
+        }
+      }
+      await loadSlabs();
+      for (const [id, message] of failed) {
+        const latest = tableData.value.find((item) => item.id === id);
+        if (latest?.status === 'selling') {
+          succeeded++;
+          failed.delete(id);
+        } else if (latest && !sourceBlocked(latest)) {
+          shelfErrors[id] = message;
+        }
+      }
+      selectedKeys.value = ids.filter(
+        (id) =>
+          failed.has(id) &&
+          tableData.value.some((item) => item.id === id && !sourceBlocked(item) && item.status === 'warehouse'),
+      );
+      ensureCurrentPage();
+      closeConfirmDialog();
+      const message = `已上架 ${succeeded} 个大板，未上架 ${failed.size} 个大板`;
+      if (failed.size) adminFeedback.warning(message);
+      else adminFeedback.success(message);
+      return;
     }
     if (type === 'purge' && row) {
       await deleteSlab(row.id);
@@ -3477,9 +3825,7 @@ const handleConfirmSubmit = async () => {
     else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });
     else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });
     else if (type === 'savePrice' && row) adminFeedback.success('价格保存成功');
-    else if (type === 'batchShelf') {
-      adminFeedback.actionSuccess({ action: '批量上架', target: `${selectedCount} 个大板` });
-    } else if (type === 'batchRestore') {
+    else if (type === 'batchRestore') {
       adminFeedback.actionSuccess({ action: '批量放回到仓库', target: `${selectedCount} 个大板` });
     } else if (type === 'purge' && row) {
       adminFeedback.actionSuccess({ action: '彻底删除', target: row.name });
@@ -3489,7 +3835,7 @@ const handleConfirmSubmit = async () => {
       adminFeedback.actionSuccess({ action: '清空回收站', target: `${recycleIds.length} 个大板` });
     }
   } catch (error) {
-    if (type === 'batchPurge' || type === 'clearRecycle') await loadSlabs();
+    await loadSlabs();
     const isBatchAction = type === 'batchShelf' || type === 'batchRestore' || type === 'batchPurge';
     adminFeedback.actionError({
       action: confirmAction.value,
@@ -3509,6 +3855,7 @@ const openReasonDialog = (type: 'deleteExternal' | 'offShelf', row: SlabItem | n
   reasonForm.reason = '';
   reasonForm.detail = '';
   reasonDialogVisible.value = true;
+  nextTick(() => reasonFormRef.value?.clearValidate());
 };
 
 const closeReasonDialog = () => {
@@ -3550,6 +3897,7 @@ const handleReasonSubmit = async () => {
       closeReasonDialog();
       adminFeedback.actionSuccess({ action: '批量下架', target: `${selectedCount} 个大板` });
     } catch (error) {
+      await loadSlabs();
       adminFeedback.actionError({
         action: '批量下架',
         error,
@@ -3571,6 +3919,7 @@ const handleReasonSubmit = async () => {
       closeReasonDialog();
       adminFeedback.actionSuccess({ action: '下架', target: targetName });
     } catch (error) {
+      await loadSlabs();
       adminFeedback.actionError({
         action: '下架',
         error,
@@ -3595,6 +3944,7 @@ const handleReasonSubmit = async () => {
       closeReasonDialog();
       adminFeedback.actionSuccess({ action: '删除', target: row.name });
     } catch (error) {
+      await loadSlabs();
       adminFeedback.actionError({ action: '删除', error, fallback: '请稍后重试', target: row.name });
     } finally {
       saving.value = false;
@@ -3628,17 +3978,6 @@ const saveBatchPrice = async () => {
 
 <style scoped>
 /* Deleted sources remain visible in their original operations tab. */
-:deep(tr.source-unavailable > td) {
-  background: var(--td-bg-color-component-disabled);
-}
-:deep(tr.source-unavailable > td > *) {
-  opacity: 0.55;
-  pointer-events: none;
-}
-:deep(tr.source-unavailable .source-purge) {
-  opacity: 1;
-  pointer-events: auto;
-}
 
 .admin-layout {
   min-height: 100vh;
@@ -3760,10 +4099,11 @@ const saveBatchPrice = async () => {
 }
 
 .operation-log-date-filter {
-  width: 335px;
+  width: 332px;
 }
 
 .operation-log-date-picker {
+  flex-shrink: 0;
   width: 260px;
 }
 
@@ -3771,14 +4111,6 @@ const saveBatchPrice = async () => {
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
-}
-
-.operation-log-summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--td-comp-margin-xs);
-  white-space: normal;
-  word-break: break-word;
 }
 
 .operation-log-detail__section-title {
@@ -3792,6 +4124,36 @@ const saveBatchPrice = async () => {
 
 .operation-log-detail__section-title--spaced {
   margin-top: var(--td-comp-margin-xl);
+}
+
+.slab-creation-sections {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: var(--td-comp-margin-l);
+}
+.slab-creation-sections :deep(.zdm-admin-section-card) {
+  border: 1px solid var(--td-component-border);
+  box-shadow: none;
+}
+.slab-creation-title {
+  color: var(--td-text-color-primary);
+  font: var(--td-font-title-medium);
+  margin: calc(-1 * var(--zdm-admin-card-padding));
+  margin-bottom: var(--zdm-admin-card-padding);
+  padding: var(--td-comp-paddingTB-m) var(--zdm-admin-card-padding);
+  border-bottom: 1px solid var(--td-component-border);
+  border-radius: var(--zdm-admin-card-radius) var(--zdm-admin-card-radius) 0 0;
+  background: var(--td-bg-color-secondarycontainer);
+}
+.slab-creation-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--td-comp-margin-m);
+}
+.slab-creation-sections .operation-log-media-card__title {
+  color: var(--td-text-color-primary);
+  font: var(--td-font-body-medium);
+  font-weight: 500;
 }
 
 .operation-log-detail__prices {
@@ -4180,41 +4542,50 @@ const saveBatchPrice = async () => {
 }
 
 .slab-detail-drawer {
-  display: grid;
-  gap: var(--td-comp-margin-xl);
-}
-
-.slab-detail-section {
-  display: grid;
-  gap: var(--td-comp-margin-m);
+  width: 100%;
 }
 
 .slab-detail-section h3 {
-  margin: 0;
+  margin: 0 0 var(--td-comp-margin-xxl);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  text-align: left;
+}
+
+.slab-detail-section {
+  border: 1px solid var(--td-component-border);
+  box-shadow: none;
+}
+
+.slab-detail-section .slab-detail-section-title {
   color: var(--td-text-color-primary);
-  font: var(--td-font-title-small);
+  font: var(--td-font-title-medium);
+  margin: calc(-1 * var(--zdm-admin-card-padding));
+  margin-bottom: var(--zdm-admin-card-padding);
+  padding: var(--td-comp-paddingTB-m) var(--zdm-admin-card-padding);
+  border-bottom: 1px solid var(--td-component-border);
+  border-radius: var(--zdm-admin-card-radius) var(--zdm-admin-card-radius) 0 0;
+  background: var(--td-bg-color-secondarycontainer);
 }
 
 .slab-detail-media-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: var(--td-comp-margin-m);
 }
 
 .slab-detail-media {
-  display: grid;
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-  color: inherit;
-  text-align: left;
-  background: var(--td-bg-color-container);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--td-comp-margin-s);
+  padding: var(--td-comp-paddingTB-m);
   border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-medium);
-}
-
-.slab-detail-media:not(:disabled) {
-  cursor: zoom-in;
+  border-radius: var(--td-radius-default);
+  background: var(--td-bg-color-container);
+  color: var(--td-text-color-primary);
+  cursor: pointer;
 }
 
 .slab-detail-media:disabled {
@@ -4224,29 +4595,13 @@ const saveBatchPrice = async () => {
 .slab-detail-media img,
 .slab-detail-media-placeholder {
   width: 100%;
-  height: 104px;
-}
-
-.slab-detail-media img {
-  object-fit: cover;
+  height: 80px;
+  object-fit: contain;
 }
 
 .slab-detail-media-placeholder {
   display: grid;
   place-items: center;
-  color: var(--td-text-color-placeholder);
-  background: var(--td-bg-color-secondarycontainer);
-  font: var(--td-font-body-small);
-}
-
-.slab-detail-media-label {
-  padding: var(--td-comp-paddingTB-xs) var(--td-comp-paddingLR-s);
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-small);
-}
-
-.product-tabs {
-  min-height: 460px;
 }
 
 .upload-grid {
@@ -4254,6 +4609,25 @@ const saveBatchPrice = async () => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--td-comp-margin-l);
   padding-top: var(--td-comp-paddingTB-l);
+}
+
+/* 与成品现货发布页使用相同列宽，上传框高度由基座组件提供。 */
+.upload-grid.publish-upload-grid {
+  grid-template-columns: repeat(auto-fit, 180px);
+  font: var(--td-font-body-medium);
+}
+
+.publish-upload-grid :deep(.admin-media-upload > strong) {
+  font: var(--td-font-body-small);
+  font-weight: 400;
+  color: var(--td-text-color-placeholder);
+}
+
+.publish-sales-form :deep(.t-input-number),
+.publish-sales-form :deep(.t-select__wrap),
+.publish-sales-form :deep(.t-input__wrap) {
+  width: 320px;
+  max-width: 100%;
 }
 
 .upload-large-preview {
@@ -4276,6 +4650,10 @@ const saveBatchPrice = async () => {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
   padding-top: var(--td-comp-paddingTB-l);
+}
+
+.publish-base-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .dimension-grid,
@@ -4325,7 +4703,11 @@ const saveBatchPrice = async () => {
 }
 
 .detail-price-table {
-  margin-top: 0;
+  margin-top: var(--zdm-admin-section-gap);
+}
+
+.detail-price-table :deep(thead th) {
+  background: var(--td-bg-color-secondarycontainer);
 }
 
 .price-table__head,
@@ -4386,6 +4768,7 @@ const saveBatchPrice = async () => {
 
 @media (max-width: 1100px) {
   .upload-grid,
+  .publish-base-grid,
   .dimension-grid,
   .corner-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

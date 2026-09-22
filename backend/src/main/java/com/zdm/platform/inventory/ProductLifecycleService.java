@@ -29,11 +29,13 @@ public class ProductLifecycleService {
     }
   }
   private final FinishedProductArrivalLogService arrivalLogs;
+  private final SlabOperationLogService slabLogs;
   private final JdbcTemplate jdbc;
   private final CurrentIdentityProvider identities;
   private final ObjectMapper json;
   private final org.mybatis.spring.SqlSessionTemplate sqlSession;
-  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs) {
+  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs, SlabOperationLogService slabLogs) {
+    this.slabLogs=slabLogs;
     this.arrivalLogs=arrivalLogs;
     this.sqlSession=sqlSession;
     this.jdbc=jdbc; this.identities=identities; this.json=json;
@@ -60,6 +62,26 @@ public class ProductLifecycleService {
     return Boolean.TRUE.equals(value) || value instanceof Number n && n.intValue()!=0;
   }
   @Transactional
+  public void checkSourceTransition(Kind kind, Long id, String target) {
+    requireSupplyChain();
+    var row = lock(kind, id);
+    validateSourceTransition(kind, id, row, target);
+  }
+
+  private void validateSourceTransition(Kind kind, Long id, Map<String,Object> row, String target) {
+    String source = (String) row.get("source_status");
+    boolean allowed = switch (source) {
+      case "warehouse" -> List.of("selling", "recycle").contains(target);
+      case "selling" -> "offShelf".equals(target);
+      case "offShelf" -> List.of("warehouse", "recycle").contains(target);
+      case "recycle" -> List.of("warehouse", "purged").contains(target);
+      default -> false;
+    };
+    if (!allowed) { throw new IllegalArgumentException("当前供应链状态不允许此操作"); }
+    if ("selling".equals(target)) { validateSourceReady(kind, id, row); }
+  }
+
+  @Transactional
   public boolean sourceTransition(Kind kind, Long id, String target) {
     return sourceTransition(kind,id,target,null,null);
   }
@@ -68,18 +90,10 @@ public class ProductLifecycleService {
     requireSupplyChain();
     var row=lock(kind,id);
     String source=(String)row.get("source_status");
-    boolean allowed=switch(source) {
-      case "warehouse" -> List.of("selling","recycle").contains(target);
-      case "selling" -> "offShelf".equals(target);
-      case "offShelf" -> List.of("warehouse","recycle").contains(target);
-      case "recycle" -> List.of("warehouse","purged").contains(target);
-      default -> false;
-    };
-    if(!allowed) { throw new IllegalArgumentException("当前供应链状态不允许此操作"); }
+    validateSourceTransition(kind, id, row, target);
     if("offShelf".equals(target) && (reason==null || reason.isBlank())) { throw new IllegalArgumentException("请选择下架原因"); }
     if(reason!=null && reason.length()>80 || detail!=null && detail.length()>500) { throw new IllegalArgumentException("下架说明超出长度限制"); }
     boolean publish="selling".equals(target);
-    if(publish) { validateSourceReady(kind,id,row); }
     boolean recreate=publish && deleted(row);
     jdbc.update("UPDATE "+kind.table+" SET source_status=? WHERE id=?",target,id);
     if("offShelf".equals(target)) {
@@ -93,18 +107,26 @@ public class ProductLifecycleService {
       reprice(kind,id,false);
     }
     String type=switch(target) { case "selling" -> "SHELF"; case "offShelf" -> "OFF_SHELF"; case "warehouse" -> kind == Kind.FINISHED ? "RESTORE" : "RESTORE_WAREHOUSE"; case "purged" -> "PURGE"; default -> "DELETE_TO_RECYCLE"; };
-    String label=switch(target) { case "selling" -> "上架商品"; case "offShelf" -> "下架商品"; case "warehouse" -> "放回仓库"; case "purged" -> "彻底删除商品"; default -> "删除至回收站"; };
+    String label=kind==Kind.FINISHED ? switch(target) { case "selling" -> "上架商品"; case "offShelf" -> "下架商品"; case "warehouse" -> "放回仓库"; case "purged" -> "彻底删除商品"; default -> "删除至回收站"; } : null;
     Map<String,Object> sourceChanges=new LinkedHashMap<>();
     if(reason!=null) { sourceChanges.put("下架原因",Map.of("before","","after",reason)); }
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
     record(kind,row,"supply-chain",type,label,source,target,sourceChanges);
     if ((!deleted(row) || recreate) && (kind != Kind.FINISHED || List.of("selling", "offShelf", "purged").contains(target))) {
-      String result=publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : "来源重新上架，解除遮罩并保留运营状态") :
+      String result=kind!=Kind.FINISHED ? null : publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : "来源重新上架，解除遮罩并保留运营状态") :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
       Map<String,Object> changes=new LinkedHashMap<>();
       changes.put("来源状态",Map.of("before",source,"after",target));
-      if(recreate && kind == Kind.SLAB) { changes.put("入仓价格",Map.of("before",List.of(),"after",priceSnapshot(kind,id))); }
-      String operationsType = "SOURCE_SYNC";
+      if(recreate && kind == Kind.SLAB) { changes.putAll(slabLogs.arrivalSnapshot(id)); }
+      if (kind == Kind.SLAB && !List.of("offShelf", "purged").contains(target)) {
+        changes.putAll(sourceChanges);
+      }
+      String operationsType = switch (target) {
+        case "selling" -> "SOURCE_SHELF";
+        case "offShelf" -> "SOURCE_OFF_SHELF";
+        case "purged" -> "SOURCE_DELETE";
+        default -> "SOURCE_INTERNAL";
+      };
       if (kind == Kind.FINISHED) {
         operationsType = switch (target) {
           case "selling" -> "SOURCE_SHELF";
@@ -118,7 +140,7 @@ public class ProductLifecycleService {
         sqlSession.clearCache();
         arrivalLogs.record(id, source);
       } else {
-        record(kind,row,"admin",operationsType,result,(String)row.get("status"),recreate?"warehouse":(String)row.get("status"),changes);
+        record(kind,row,"admin",operationsType,result,recreate && kind == Kind.SLAB ? null : (String)row.get("status"),recreate?"warehouse":(String)row.get("status"),changes);
       }
     }
     sqlSession.clearCache();
@@ -140,7 +162,7 @@ public class ProductLifecycleService {
     if (!"recycle".equals(row.get("status")) && !unavailable((String)row.get("source_status"))) {
       throw new IllegalArgumentException("只有回收站或来源已删除的商品可以彻底删除");
     }
-    record(kind,row,"admin","PURGE","彻底删除运营商品",(String)row.get("status"),kind == Kind.FINISHED ? "purged" : null,Map.of());
+    record(kind,row,"admin","PURGE",kind==Kind.FINISHED ? "彻底删除运营商品" : null,(String)row.get("status"),kind == Kind.FINISHED ? "purged" : null,Map.of());
     jdbc.update("UPDATE "+kind.table+" SET operations_deleted=TRUE,guide_price=NULL WHERE id=?",id);
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
     if (kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
@@ -166,7 +188,7 @@ public class ProductLifecycleService {
     BigDecimal guide=(BigDecimal)guideRows.getFirst().get("price_coefficient");
     var levels=jdbc.queryForList("SELECT l.id,l.name,c.id AS configuration_id,c.price_coefficient,c.status AS configuration_status FROM store_levels l LEFT JOIN "+kind.config+"_markup_configurations c ON c.store_level_id=l.id WHERE l.status='enabled' OR l.id IN (SELECT store_level_id FROM "+kind.prices+" WHERE "+kind.priceKey+"=?) ORDER BY l.id",id);
     for(var level:levels) {
-      if(level.get("price_coefficient")==null || !"enabled".equals(level.get("configuration_status"))) {
+      if(kind==Kind.FINISHED && (level.get("price_coefficient")==null || !"enabled".equals(level.get("configuration_status")))) {
         throw new IllegalArgumentException("请先在运营管理平台完善价格系数："+level.get("name"));
       }
     }
@@ -181,11 +203,16 @@ public class ProductLifecycleService {
         jdbc.update("INSERT INTO finished_product_guide_prices (finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES (?,?,?,?,?,?)",id,variant.get("sku_id"),variant.get("variant_label"),guide,cost,amount(cost,guide));
       }
       for(var level:levels) {
+        boolean configured = level.get("price_coefficient") != null && "enabled".equals(level.get("configuration_status"));
+        var previous = before.stream().filter(value -> java.util.Objects.equals(value.get("store_level_id"), level.get("id"))).findFirst().orElse(Map.of());
+        BigDecimal coefficient = (BigDecimal)(configured ? level.get("price_coefficient") : previous.get("price_coefficient"));
+        // Missing slab configuration leaves this tier for manual entry in operations.
+        if (coefficient == null) { continue; }
         var price=new LinkedHashMap<String,Object>();
         price.put(kind.priceKey,id); price.put("store_level_id",level.get("id")); price.put("store_level_name",level.get("name"));
-        price.put("price_coefficient",level.get("price_coefficient")); price.put("cost_price",cost);
-        price.put("price",amount(cost,(BigDecimal)level.get("price_coefficient")));
-        price.put("price_source","auto"); price.put("source_configuration_id",level.get("configuration_id"));
+        price.put("price_coefficient",coefficient); price.put("cost_price",cost);
+        price.put("price",amount(cost,coefficient));
+        price.put("price_source",configured ? "auto" : "manual"); price.put("source_configuration_id",configured ? level.get("configuration_id") : null);
         if(kind==Kind.FINISHED) { price.put("store_level_name",level.get("name")); price.put("sku_id",variant.get("sku_id")); price.put("variant_label",variant.get("variant_label")); }
         new SimpleJdbcInsert(jdbc).withTableName(kind.prices).usingColumns(price.keySet().toArray(String[]::new)).execute(price);
       }
@@ -193,7 +220,7 @@ public class ProductLifecycleService {
     BigDecimal cost=(BigDecimal)variants.getFirst().get("cost_price");
     jdbc.update("UPDATE "+kind.table+" SET guide_price=?"+(kind==Kind.SLAB?",guide_price_coefficient=?":"")+" WHERE id=?",kind==Kind.SLAB?new Object[]{amount(cost,guide),guide,id}:new Object[]{amount(cost,guide),id});
     sqlSession.clearCache();
-    if(logImpact) { record(kind,row,"admin","PRICE_UPDATE","供应链成本变更，按当前系数重算售价",(String)row.get("status"),(String)row.get("status"),Map.of("价格联动",Map.of("before",before,"after",priceSnapshot(kind,id)))); }
+    if(logImpact) { record(kind,row,"admin","PRICE_UPDATE",kind==Kind.FINISHED ? "供应链成本变更，按当前系数重算售价" : null,(String)row.get("status"),(String)row.get("status"),Map.of("价格联动",Map.of("before",before,"after",priceSnapshot(kind,id)))); }
   }
   private BigDecimal amount(BigDecimal cost,BigDecimal coefficient) { return cost.multiply(coefficient).setScale(2,RoundingMode.HALF_UP); }
   private void record(Kind kind,Map<String,Object> row,String business,String type,String summary,String before,String after,Map<String,?> changes) {
@@ -205,9 +232,12 @@ public class ProductLifecycleService {
     for (var entry : Map.of("下架原因","standard_reason","详细说明","detail_reason").entrySet()) {
       if (changes.get(entry.getKey()) instanceof Map<?,?> change) { log.put(entry.getValue(),change.get("after")); }
     }
-    log.put("operation_type",type);log.put("operation_summary",summary);log.put("before_status",before);log.put("after_status",after);
+    log.put("operation_type",type);
+    log.put("operation_summary",kind==Kind.FINISHED ? summary : SlabOperationLogService.operationSummary(type, before, changes));
+    log.put("before_status",before);log.put("after_status",after);
     log.put("operation_source",business.equals(actor.clientCode())?"MANUAL":"SUPPLY_CHAIN");log.put("operated_at",java.time.LocalDateTime.now());
     try { log.put("change_details",json.writeValueAsString(changes)); } catch(JsonProcessingException error) { throw new IllegalStateException("日志序列化失败",error); }
-    new SimpleJdbcInsert(jdbc).withTableName(kind.logs).usingColumns(log.keySet().toArray(String[]::new)).execute(log);
+    Number logId = new SimpleJdbcInsert(jdbc).withTableName(kind.logs).usingColumns(log.keySet().toArray(String[]::new)).usingGeneratedKeyColumns("id").executeAndReturnKey(log);
+    if(kind==Kind.SLAB) { slabLogs.retainSnapshot(logId.longValue(), changes); }
   }
 }

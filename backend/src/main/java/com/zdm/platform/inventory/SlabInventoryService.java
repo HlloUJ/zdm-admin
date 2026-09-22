@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -81,6 +80,19 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     this.identityProvider = identityProvider;
   }
 
+  public SlabInventory visibleDetail(Long id) {
+    var identity = identityProvider.require();
+    SlabInventory item = baseMapper.selectVisibleDetail(id, lifecycle.isSupplyChain(),
+        com.zdm.platform.security.DataScope.isAll(identity), identity.accountId());
+    if (item == null) { return null; }
+    attachPrices(item);
+    item.setOffShelfRecords(offShelfRecordService.listBySlabIds(List.of(id)));
+    if (!lifecycle.isSupplyChain()) {
+      item.setSourceOffShelfRecords(offShelfRecordService.listSourceBySlabId(id));
+    }
+    return item;
+  }
+
   public List<SlabInventory> listWithPrices() {
     List<SlabInventory> inventory = com.zdm.platform.security.DataScope.filter(identityProvider.require(), baseMapper.selectListWithDetails()).stream()
         .filter(item -> lifecycle.isSupplyChain() ? !"purged".equals(item.getSourceStatus()) : !Boolean.TRUE.equals(item.getOperationsDeleted())).toList();
@@ -128,13 +140,11 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     operationLogService.record(
         created,
         "CREATE",
-        "创建大板",
         null,
         created.getSourceStatus(),
         null,
         null,
         API_PUBLISHER.equals(created.getPublisherType()) ? "EXTERNAL_API" : "MANUAL",
-        null,
         creationDetails(created));
     return created;
   }
@@ -181,13 +191,11 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       operationLogService.record(
           updated,
           priceOnly ? "PRICE_UPDATE" : "UPDATE",
-          priceOnly ? "修改价格" : "编辑大板（修改" + changes.size() + "项）",
           existing.getSourceStatus(),
           updated.getSourceStatus(),
           null,
           null,
           "MANUAL",
-          null,
           changes);
     }
     if(!requestedStatus.equals(existing.getSourceStatus())) {
@@ -237,7 +245,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     priceService.replacePrices(existing.getId(),requested.getMarkupPrices());
     updated=attachPrices(getById(existing.getId()));
     var changes=collectChanges(existing,before,updated);
-    if(!changes.isEmpty()) { operationLogService.record(updated,"PRICE_UPDATE","修改价格",existing.getStatus(),updated.getStatus(),null,null,"MANUAL",null,changes); }
+    if(!changes.isEmpty()) { operationLogService.record(updated,"PRICE_UPDATE",existing.getStatus(),updated.getStatus(),null,null,"MANUAL",changes); }
     return updated;
   }
 
@@ -245,7 +253,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   public boolean deleteFromManagement(Long id, String reason, String detail) {
     lifecycle.lock(ProductLifecycleService.Kind.SLAB,id);
     if(lifecycle.isSupplyChain()) {
-      lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB,id,"recycle");
+      lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB,id,"recycle",normalizeOptionalText(reason),normalizeOptionalText(detail));
       return true;
     }
     SlabInventory inventory = requireDeletable(id);
@@ -253,9 +261,9 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     String normalizedReason = normalizeOptionalText(reason);
     String normalizedDetail = normalizeOptionalText(detail);
     operationLogService.record(
-        inventory, "DELETE_TO_RECYCLE", "删除至回收站",
+        inventory, "DELETE_TO_RECYCLE",
         inventory.getStatus(), "recycle", normalizedReason, normalizedDetail,
-        "MANUAL", null, Map.of());
+        "MANUAL", Map.of());
     inventory.setStatus("recycle");
     return updateById(inventory);
   }
@@ -280,7 +288,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         || inventory.stream().anyMatch(item -> lifecycle.isSupplyChain() ? !"recycle".equals(item.getSourceStatus()) : (Boolean.TRUE.equals(item.getOperationsDeleted()) || (!"recycle".equals(item.getStatus()) && !item.isSourceUnavailable())))) {
       throw new IllegalArgumentException("只有回收站中的大板可以彻底删除");
     }
-    purgeRecycleItems(inventory, "批量彻底删除大板");
+    purgeRecycleItems(inventory);
     return true;
   }
 
@@ -295,11 +303,11 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if (inventory.isEmpty()) {
       return 0;
     }
-    purgeRecycleItems(inventory, "清空回收站");
+    purgeRecycleItems(inventory);
     return inventory.size();
   }
 
-  private void purgeRecycleItems(List<SlabInventory> inventory, String operationSummary) {
+  private void purgeRecycleItems(List<SlabInventory> inventory) {
     inventory.forEach(item -> removeById(item.getId()));
   }
 
@@ -312,6 +320,50 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       throw new IllegalArgumentException("只有仓库中或已下架的大板可以删除");
     }
     return inventory;
+  }
+
+  @Transactional
+  public void checkClearRecycle() {
+    List<SlabInventory> items = lambdaQuery()
+        .eq(lifecycle.isSupplyChain(), SlabInventory::getSourceStatus, "recycle")
+        .eq(!lifecycle.isSupplyChain(), SlabInventory::getStatus, "recycle")
+        .eq(!lifecycle.isSupplyChain(), SlabInventory::getOperationsDeleted, false)
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), SlabInventory::getCreatedByAccountId, identityProvider.require().accountId())
+        .list();
+    if (items.isEmpty()) { throw new IllegalArgumentException("回收站暂无大板"); }
+    checkAction(items.stream().map(SlabInventory::getId).toList(), "purge");
+  }
+
+  @Transactional
+  public void checkAction(List<Long> ids, String action) {
+    if (ids == null || ids.isEmpty()) { throw new IllegalArgumentException("请选择大板"); }
+    for (Long id : ids.stream().distinct().sorted().toList()) {
+      lifecycle.lock(ProductLifecycleService.Kind.SLAB, id);
+      SlabInventory item = getById(id);
+      String state = lifecycle.isSupplyChain() ? item.getSourceStatus() : item.getStatus();
+      if ("purge".equals(action)) {
+        if (lifecycle.isSupplyChain() ? !"recycle".equals(state)
+            : Boolean.TRUE.equals(item.getOperationsDeleted()) || (!"recycle".equals(state) && !item.isSourceUnavailable())) {
+          throw new IllegalArgumentException("只有回收站或来源已删除的大板可以彻底删除");
+        }
+        continue;
+      }
+      if (!lifecycle.isSupplyChain()) { lifecycle.requireOperational(item.getSourceStatus(), item.getOperationsDeleted()); }
+      String target = switch (action) {
+        case "shelf" -> "selling";
+        case "offShelf" -> "offShelf";
+        case "restore" -> "warehouse";
+        case "delete" -> "recycle";
+        default -> throw new IllegalArgumentException("不支持的操作");
+      };
+      if (lifecycle.isSupplyChain()) {
+        lifecycle.checkSourceTransition(ProductLifecycleService.Kind.SLAB, id, target);
+      } else if ("delete".equals(action)) {
+        requireDeletable(id);
+      } else {
+        validateStatusTransition(item, target);
+      }
+    }
   }
 
   @Transactional
@@ -353,17 +405,14 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         .in(SlabInventory::getId, normalizedIds)
         .set(SlabInventory::getStatus, status)
         .update();
-    String batchNo = normalizedIds.size() > 1 ? UUID.randomUUID().toString() : null;
     inventory.forEach(item -> operationLogService.record(
         item,
         statusOperationType(item.getStatus(), status),
-        statusOperationSummary(item.getStatus(), status),
         item.getStatus(),
         status,
         normalizedReason,
         normalizedDetail,
         "MANUAL",
-        batchNo,
         Map.of()));
     if ("offShelf".equals(status)) {
       CurrentIdentity identity = identityProvider.require();
@@ -403,16 +452,6 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       return "RESTORE_RECYCLE";
     }
     return "STATUS_UPDATE";
-  }
-
-  private String statusOperationSummary(String beforeStatus, String afterStatus) {
-    return switch (statusOperationType(beforeStatus, afterStatus)) {
-      case "SHELF" -> "上架大板";
-      case "OFF_SHELF" -> "下架大板";
-      case "RESTORE_WAREHOUSE" -> "放回仓库";
-      case "RESTORE_RECYCLE" -> "放回仓库";
-      default -> "修改大板状态";
-    };
   }
 
   private Map<String, Object> creationDetails(SlabInventory created) {
@@ -480,6 +519,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     addChange(changes, "长度", before.getLengthMm(), after.getLengthMm());
     addChange(changes, "宽度", before.getWidthMm(), after.getWidthMm());
     addChange(changes, "高度", before.getThicknessMm(), after.getThicknessMm());
+    addChange(changes, "面积", before.getAreaSquareMeter(), after.getAreaSquareMeter());
     addChange(changes, "误差", before.getToleranceMm(), after.getToleranceMm());
     addChange(changes, "扣角1长", before.getCorner1LengthMm(), after.getCorner1LengthMm());
     addChange(changes, "扣角1宽", before.getCorner1WidthMm(), after.getCorner1WidthMm());
@@ -527,6 +567,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
           value.put("priceCoefficient", price.getPriceCoefficient());
           value.put("costPrice", price.getCostPrice());
           value.put("price", price.getPrice());
+          value.put("priceSource", price.getPriceSource());
           return value;
         })
         .toList();
@@ -597,7 +638,11 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   }
 
   private void validateReadyForShelf(SlabInventory inventory) {
-    validateReferences(inventory);
+    validateMeasurements(inventory);
+    // Loaded under the business lock and data scope check: these are existing references,
+    // not newly selected uploads owned by the current operating client.
+    validateMedia(inventory, inventory);
+    validateSelectableReferences(inventory, null);
     if (inventory.getSupplierId() == null
         || inventory.getVarietyId() == null
         || inventory.getOriginId() == null
