@@ -70,11 +70,11 @@
   >
     <t-space v-if="detail" direction="vertical" size="large" style="width: 100%">
       <t-descriptions title="操作信息" bordered :column="3">
-        <t-descriptions-item label="商品名称">{{ detail.productName }}</t-descriptions-item>
+        <t-descriptions-item label="商品名称" :span="3">{{ detail.productName }}</t-descriptions-item>
         <t-descriptions-item label="操作类型">{{ finishedLogTypes[detail.operationType] }}</t-descriptions-item>
         <t-descriptions-item label="操作人">{{ detail.operatorName }}</t-descriptions-item>
         <t-descriptions-item label="操作时间">{{ time(detail.operatedAt) }}</t-descriptions-item>
-        <t-descriptions-item label="操作来源" :span="2">{{
+        <t-descriptions-item label="操作来源">{{
           detail.operationSource === 'MANUAL'
             ? getLoginUser().clientCode === 'supply-chain'
               ? '供应链协同系统'
@@ -83,7 +83,7 @@
               ? '供应链协同系统'
               : detail.operationSource
         }}</t-descriptions-item>
-        <t-descriptions-item label="操作内容" :span="2">{{ detail.operationSummary }}</t-descriptions-item>
+        <t-descriptions-item label="操作内容">{{ detail.operationSummary }}</t-descriptions-item>
         <t-descriptions-item label="状态变化"
           >{{ state(detail.beforeStatus) }} → {{ state(detail.afterStatus) }}</t-descriptions-item
         >
@@ -107,9 +107,8 @@
         :after-html="richText('after')"
         @preview="preview = $event"
       />
-      <t-descriptions v-if="detail.operationType === 'OFF_SHELF'" title="操作说明" bordered :column="2">
+      <t-descriptions v-if="detail.operationType === 'OFF_SHELF'" title="操作说明" bordered :column="3">
         <t-descriptions-item label="原因">{{ detail.standardReason || '未填写' }}</t-descriptions-item>
-        <t-descriptions-item label="批次号">{{ detail.batchNo || '未填写' }}</t-descriptions-item>
         <t-descriptions-item label="详细说明" :span="2">
           <span class="operation-reason-text">{{ detail.detailReason || '未填写' }}</span>
         </t-descriptions-item>

@@ -10,7 +10,6 @@ export interface FinishedOperationLog {
   afterStatus?: string;
   standardReason?: string;
   detailReason?: string;
-  batchNo?: string;
   operatorName: string;
   operatedAt: string;
   operationSource: string;

@@ -187,11 +187,6 @@ public class ProductLifecycleService {
     if(guideRows.isEmpty()) { throw new IllegalArgumentException("请先在运营管理平台配置指导价系数"); }
     BigDecimal guide=(BigDecimal)guideRows.getFirst().get("price_coefficient");
     var levels=jdbc.queryForList("SELECT l.id,l.name,c.id AS configuration_id,c.price_coefficient,c.status AS configuration_status FROM store_levels l LEFT JOIN "+kind.config+"_markup_configurations c ON c.store_level_id=l.id WHERE l.status='enabled' OR l.id IN (SELECT store_level_id FROM "+kind.prices+" WHERE "+kind.priceKey+"=?) ORDER BY l.id",id);
-    for(var level:levels) {
-      if(kind==Kind.FINISHED && (level.get("price_coefficient")==null || !"enabled".equals(level.get("configuration_status")))) {
-        throw new IllegalArgumentException("请先在运营管理平台完善价格系数："+level.get("name"));
-      }
-    }
     var variants=kind==Kind.FINISHED ? jdbc.queryForList("SELECT id AS sku_id,variant_label,cost_price FROM finished_product_variants WHERE finished_product_id=? ORDER BY id",id):List.of(row);
     if(variants.isEmpty()) { throw new IllegalArgumentException("请完善商品规格与成本价"); }
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
@@ -204,9 +199,12 @@ public class ProductLifecycleService {
       }
       for(var level:levels) {
         boolean configured = level.get("price_coefficient") != null && "enabled".equals(level.get("configuration_status"));
-        var previous = before.stream().filter(value -> java.util.Objects.equals(value.get("store_level_id"), level.get("id"))).findFirst().orElse(Map.of());
+        var previous = before.stream()
+            .filter(value -> java.util.Objects.equals(value.get("store_level_id"), level.get("id")))
+            .filter(value -> kind != Kind.FINISHED || java.util.Objects.equals(value.get("sku_id"), variant.get("sku_id")))
+            .findFirst().orElse(Map.of());
         BigDecimal coefficient = (BigDecimal)(configured ? level.get("price_coefficient") : previous.get("price_coefficient"));
-        // Missing slab configuration leaves this tier for manual entry in operations.
+        // Missing configuration leaves this tier for manual entry in operations.
         if (coefficient == null) { continue; }
         var price=new LinkedHashMap<String,Object>();
         price.put(kind.priceKey,id); price.put("store_level_id",level.get("id")); price.put("store_level_name",level.get("name"));
