@@ -3,6 +3,7 @@ package com.zdm.platform.store;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.common.StoreLevelPricingDirectory;
+import com.zdm.platform.common.StoreLevelPriceSynchronizer;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.HashSet;
@@ -27,14 +28,17 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
   private final StoreMapper storeMapper;
   private final CurrentIdentityProvider identityProvider;
   private final JdbcTemplate jdbcTemplate;
+  private final StoreLevelPriceSynchronizer finishedPriceSync;
 
   public StoreLevelService(
       StoreMapper storeMapper,
       CurrentIdentityProvider identityProvider,
-      JdbcTemplate jdbcTemplate) {
+      JdbcTemplate jdbcTemplate,
+      StoreLevelPriceSynchronizer finishedPriceSync) {
     this.storeMapper = storeMapper;
     this.identityProvider = identityProvider;
     this.jdbcTemplate = jdbcTemplate;
+    this.finishedPriceSync = finishedPriceSync;
   }
 
   public List<StoreLevel> listEnabled() {
@@ -94,6 +98,9 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     }
     existing.setStatus(status);
     updateById(existing);
+    if ("enabled".equals(status)) {
+      finishedPriceSync.syncEnabledStoreLevel(id);
+    }
     return getById(id);
   }
 

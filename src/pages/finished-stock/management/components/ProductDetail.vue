@@ -1,8 +1,8 @@
 <template>
   <t-space direction="vertical" size="large" class="product-detail">
     <t-alert v-if="operations && product.sourceUnavailable" theme="warning" :message="sourceMessage" />
-    <AdminSectionCard>
-      <h3 class="product-detail__section-title">图文描述</h3>
+    <AdminSectionCard :class="{ 'product-detail__bordered-card': operations }">
+      <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations }">图文描述</h3>
       <div class="product-detail__media">
         <button v-for="(url, index) in images" :key="url" type="button" @click="emit('preview', { url }, 'image')">
           <img :src="url" :alt="`商品主图${index + 1}`" />
@@ -24,8 +24,8 @@
       />
       <t-empty v-else description="暂无图文描述" />
     </AdminSectionCard>
-    <AdminSectionCard :class="{ 'product-detail__basic-card': operations }">
-      <h3 class="product-detail__section-title" :class="{ 'product-detail__basic-title': operations }">基础信息</h3>
+    <AdminSectionCard :class="{ 'product-detail__bordered-card': operations }">
+      <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations }">基础信息</h3>
       <template v-if="operations">
         <t-descriptions bordered :column="3" class="product-detail__basic-table">
           <t-descriptions-item label="商品名称" :span="3">{{ product.name }}</t-descriptions-item>
@@ -58,11 +58,19 @@
         <t-descriptions-item label="供应商" :span="2">{{ product.supplier || '未填写' }}</t-descriptions-item>
       </t-descriptions>
     </AdminSectionCard>
-    <AdminSectionCard>
-      <h3 class="product-detail__section-title">销售信息</h3>
+    <AdminSectionCard :class="{ 'product-detail__bordered-card': operations }">
+      <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations }">销售信息</h3>
       <h4 v-if="!operations">销售规格与价格</h4>
       <component :is="operations ? SalesLogFullscreen : 'div'" :title="operations ? '销售规格与价格' : undefined">
-        <t-table row-key="key" :data="rows" :columns="columns" :table-layout="operations ? 'auto' : 'fixed'" bordered>
+        <t-table
+          :class="{ 'product-detail__layered-table': layeredDimensions.length }"
+          row-key="key"
+          :data="rows"
+          :columns="columns"
+          :rowspan-and-colspan="span"
+          :table-layout="operations ? 'auto' : 'fixed'"
+          bordered
+        >
           <template v-if="operations" #label="{ row }">
             <div class="product-meta">
               <div>{{ row.label }}</div>
@@ -99,7 +107,8 @@ import PriceSourceToggle from './PriceSourceToggle.vue';
 import SalesLogFullscreen from './SalesLogFullscreen.vue';
 import HistoricalRichText from './HistoricalRichText.vue';
 import DOMPurify from 'dompurify';
-import type { PrimaryTableCol } from 'tdesign-vue-next';
+import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
+import { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';
 import type {
   FinishedProductAttributeEntry,
   FinishedProductVariant,
@@ -157,6 +166,9 @@ const sourceMessage = computed(() =>
     : '该商品当前在供应链端未上架，暂不可进行运营操作。',
 );
 const dimensions = computed(() => props.product.specDimensions ?? []);
+const layeredDimensions = computed(() =>
+  props.operations && props.product.variants[0]?.displayMode === 'layered' ? dimensions.value : [],
+);
 const extraFields = computed(() =>
   [...new Set(props.product.variants.flatMap((row) => Object.keys(row.salesAttributes ?? {})))].filter(
     (key) => !dimensions.value.some((dimension) => dimension.key === key),
@@ -194,6 +206,13 @@ const columns = computed<PrimaryTableCol[]>(() => {
     })),
   ];
   const specColumn = { colKey: 'label', title: '商品规格', minWidth: props.operations ? 270 : 180 };
+  if (layeredDimensions.value.length) {
+    return [
+      ...dimensionColumns.map((column) => ({ ...column, minWidth: 130, fixed: 'left' as const })),
+      ...priceColumns,
+      ...attributeColumns,
+    ];
+  }
   return props.operations
     ? [specColumn, ...priceColumns, ...dimensionColumns, ...attributeColumns]
     : [
@@ -203,8 +222,8 @@ const columns = computed<PrimaryTableCol[]>(() => {
         ...priceColumns,
       ];
 });
-const rows = computed(() =>
-  props.product.variants.map((variant, index) => {
+const rows = computed(() => {
+  const mappedRows = props.product.variants.map((variant, index) => {
     const guide = props.product.guidePrices?.find((price) => price.skuId === variant.id);
     const prices = props.product.markupPrices?.filter((price) => price.skuId === variant.id) ?? [];
     return {
@@ -234,11 +253,23 @@ const rows = computed(() =>
         }),
       ),
     };
-  }),
-);
+  });
+  return orderLayeredRows(mappedRows, layeredDimensions.value);
+});
+const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
+  layeredCellSpan(
+    rows.value.map((row) =>
+      layeredDimensions.value.map((dimension) => String((row as TableRowData)[dimension.key] ?? '')),
+    ),
+    rowIndex,
+    layeredDimensions.value.findIndex((dimension) => dimension.key === col.colKey),
+  );
 </script>
 
 <style scoped>
+.product-detail__layered-table :deep(.t-table__content) {
+  contain: paint;
+}
 .product-detail {
   width: 100%;
 }
@@ -249,11 +280,11 @@ const rows = computed(() =>
   line-height: 24px;
   text-align: left;
 }
-.product-detail__basic-card {
+.product-detail__bordered-card {
   border: 1px solid var(--td-component-border);
   box-shadow: none;
 }
-.product-detail__basic-title {
+.product-detail__card-title {
   color: var(--td-text-color-primary);
   font: var(--td-font-title-medium);
   margin: calc(-1 * var(--zdm-admin-card-padding));

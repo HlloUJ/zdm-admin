@@ -30,7 +30,6 @@ public class FinishedOperationLog {
   private String detailReason;
   private String changeDetails;
   private String operationSource;
-  private String batchNo;
   private String operatorName;
   private Long operatorAccountId;
   private LocalDateTime operatedAt;
@@ -62,8 +61,6 @@ public class FinishedOperationLog {
   public void setChangeDetails(String changeDetails) { this.changeDetails = changeDetails; }
   public String getOperationSource() { return operationSource; }
   public void setOperationSource(String operationSource) { this.operationSource = operationSource; }
-  public String getBatchNo() { return batchNo; }
-  public void setBatchNo(String batchNo) { this.batchNo = batchNo; }
   public String getOperatorName() { return operatorName; }
   public void setOperatorName(String operatorName) { this.operatorName = operatorName; }
   public Long getOperatorAccountId() { return operatorAccountId; }

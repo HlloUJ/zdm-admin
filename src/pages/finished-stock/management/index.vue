@@ -5,7 +5,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
 
-      <main class="page">
+      <main class="page" :class="{ 'page--form': formPageVisible }">
         <div v-if="formPageVisible" ref="formAnchorSlot" :style="{ height: `${formAnchorHeight}px` }">
           <AdminSectionCard class="form-anchor-card" :style="formAnchorStyle">
             <nav ref="formAnchorNav" class="form-anchor-nav" aria-label="商品信息分区导航">
@@ -132,101 +132,107 @@
             </template>
             <template #table>
               <SourceUnavailableOverlay :rows="pageData.filter(sourceBlocked)">
-                <t-table
-                  :key="activeTab"
-                  class="finished-stock-table"
-                  :row-class-name="({ row }: { row: StockItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
-                  :row-attributes="
-                    ({ row }: { row: StockItem }) =>
-                      sourceBlocked(row) ? { 'data-source-id': row.id, inert: true } : {}
-                  "
-                  row-key="id"
-                  :data="pageData"
-                  :columns="columns"
-                  :loading="loading"
-                  hover
-                  table-layout="fixed"
-                >
-                  <template #selectTitle>
-                    <t-checkbox
-                      :checked="pageAllSelected"
-                      :indeterminate="pagePartiallySelected"
-                      @change="toggleCurrentPage"
-                    />
-                  </template>
-                  <template #select="{ row }">
-                    <t-checkbox
-                      :checked="selectedKeySet.has(row.id)"
-                      @change="(checked: boolean) => toggleRow(row.id, checked)"
-                    />
-                  </template>
-                  <template #image="{ row }">
-                    <button
-                      class="product-image preview-trigger"
-                      type="button"
-                      title="点击查看大图"
-                      @click="openImagePreview(row)"
-                    >
-                      <img v-if="row.image" :src="row.image" :alt="row.name" />
-                      <t-icon v-else name="image-off" />
-                    </button>
-                  </template>
-                  <template #product="{ row }">
-                    <div class="product-meta">
-                      <div class="product-name">{{ row.name }}</div>
-                      <div class="product-code">ID：{{ row.id }}</div>
-                    </div>
-                  </template>
-                  <template #supplier="{ row }">
-                    <div class="tenant-cell">
-                      <span>{{ row.supplier }}</span>
-                      <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->
-                      <span class="store-text">平台仓</span>
-                    </div>
-                  </template>
-                  <template #offShelfAt="{ row }">{{
-                    row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
-                  }}</template>
-                  <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-                  <template #offShelfReason="{ row }">
-                    <div class="off-shelf-reason-cell">
-                      <span>{{ row.offShelfReason || '—' }}</span>
-                      <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
-                        <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
-                      </t-tooltip>
-                    </div>
-                  </template>
-                  <template #operation="{ row }">
-                    <div class="table-actions">
-                      <t-link
-                        v-if="!isSupplyChain && activeTab !== 'offShelf' && hasFinishedAction('detail')"
-                        theme="primary"
-                        hover="color"
-                        @click="handleRowAction('detail', row)"
-                        >详情</t-link
+                <FinishedRowWarnings :rows="pageData" :errors="shelfErrors" @close="(id) => delete shelfErrors[id]">
+                  <t-table
+                    :key="activeTab"
+                    class="finished-stock-table"
+                    :row-class-name="({ row }: { row: StockItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')"
+                    :row-attributes="
+                      ({ row }: { row: StockItem }) =>
+                        sourceBlocked(row)
+                          ? { 'data-source-id': row.id, inert: true }
+                          : shelfErrors[row.id]
+                            ? { 'data-shelf-error-id': row.id }
+                            : {}
+                    "
+                    row-key="id"
+                    :data="pageData"
+                    :columns="columns"
+                    :loading="loading"
+                    hover
+                    table-layout="fixed"
+                  >
+                    <template #selectTitle>
+                      <t-checkbox
+                        :checked="pageAllSelected"
+                        :indeterminate="pagePartiallySelected"
+                        @change="toggleCurrentPage"
+                      />
+                    </template>
+                    <template #select="{ row }">
+                      <t-checkbox
+                        :checked="selectedKeySet.has(row.id)"
+                        @change="(checked: boolean) => toggleRow(row.id, checked)"
+                      />
+                    </template>
+                    <template #image="{ row }">
+                      <button
+                        class="product-image preview-trigger"
+                        type="button"
+                        title="点击查看大图"
+                        @click="openImagePreview(row)"
                       >
-                      <t-link
-                        v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
-                        theme="primary"
-                        hover="color"
-                        @click="openPriceDrawer('view', row)"
-                        >价格</t-link
-                      >
-                      <t-link
-                        v-for="action in rowActions()"
-                        :key="action.action"
-                        :theme="action.theme"
-                        hover="color"
-                        @click="handleRowAction(action.action, row)"
-                      >
-                        {{ action.label }}
-                      </t-link>
-                    </div>
-                  </template>
-                  <template #empty>
-                    <div class="table-empty">暂无数据</div>
-                  </template>
-                </t-table>
+                        <img v-if="row.image" :src="row.image" :alt="row.name" />
+                        <t-icon v-else name="image-off" />
+                      </button>
+                    </template>
+                    <template #product="{ row }">
+                      <div class="product-meta">
+                        <div class="product-name">{{ row.name }}</div>
+                        <div class="product-code">ID：{{ row.id }}</div>
+                      </div>
+                    </template>
+                    <template #supplier="{ row }">
+                      <div class="tenant-cell">
+                        <span>{{ row.supplier }}</span>
+                        <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->
+                        <span class="store-text">平台仓</span>
+                      </div>
+                    </template>
+                    <template #offShelfAt="{ row }">{{
+                      row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
+                    }}</template>
+                    <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+                    <template #offShelfReason="{ row }">
+                      <div class="off-shelf-reason-cell">
+                        <span>{{ row.offShelfReason || '—' }}</span>
+                        <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
+                          <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
+                        </t-tooltip>
+                      </div>
+                    </template>
+                    <template #operation="{ row }">
+                      <div class="table-actions">
+                        <t-link
+                          v-if="!isSupplyChain && activeTab !== 'offShelf' && hasFinishedAction('detail')"
+                          theme="primary"
+                          hover="color"
+                          @click="handleRowAction('detail', row)"
+                          >详情</t-link
+                        >
+                        <t-link
+                          v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
+                          theme="primary"
+                          hover="color"
+                          @click="openPriceDrawer('view', row)"
+                          >价格</t-link
+                        >
+                        <t-link
+                          v-for="action in rowActions()"
+                          :key="action.action"
+                          :theme="action.theme"
+                          hover="color"
+                          @click="handleRowAction(action.action, row)"
+                        >
+                          {{ action.label }}
+                        </t-link>
+                      </div>
+                    </template>
+                    <template #empty>
+                      <div class="table-empty">暂无数据</div>
+                    </template>
+                  </t-table>
+                </FinishedRowWarnings>
                 <template #overlay="{ row }">
                   <t-space align="center" size="small">
                     <t-icon name="info-circle" />
@@ -667,12 +673,7 @@
           <t-radio value="layered">分层展示：选择标准属性构建规格</t-radio>
         </t-radio-group>
 
-        <t-alert v-if="specConversionNotice" theme="info" :message="specConversionNotice" />
-        <t-alert
-          v-if="unmatchedSpecNames.length && specMode === 'layered'"
-          theme="warning"
-          :message="`以下单层规格尚未匹配，请按原文配置属性值后再确认，或点击重置恢复：${unmatchedSpecNames.join('、')}`"
-        />
+        <t-alert v-if="specDraftError" theme="error" :message="specDraftError" />
         <div v-if="specMode === 'single'" class="single-spec-editor">
           <div class="spec-section-title">商品规格</div>
           <div class="single-spec-list">
@@ -762,10 +763,11 @@
                 </span>
                 <t-select
                   v-if="salesAttributeByKey(group.field)?.type === 'select'"
-                  v-model="value.value"
+                  :value="value.value"
                   :status="specDraftFieldStatus(value.value, value.id)"
                   clearable
                   placeholder="请选择属性值"
+                  @change="value.value = String($event ?? '')"
                 >
                   <t-option
                     v-for="item in salesAttributeByKey(group.field)?.options"
@@ -809,15 +811,14 @@
 
     <AdminDialog
       v-model:visible="specModeConfirmVisible"
-      header="切换展示模式可能导致当前数据被清空"
+      header="切换展示模式"
       confirm-btn="确认切换"
       cancel-btn="取消"
       @confirm="confirmSpecModeChange"
       @cancel="specModeConfirmVisible = false"
       @close="specModeConfirmVisible = false"
     >
-      您正在从【单层展示】切换至【分层展示】。本次操作将可能导致已填写的单层数据被清空，切换后需按分层结构重新配置。
-      点击抽屉下方「重置」按钮可还原至单层数据
+      {{ specModeConfirmMessage }}
     </AdminDialog>
 
     <t-drawer
@@ -1053,7 +1054,7 @@
 </template>
 
 <script setup lang="ts">
-import { matchSpecText, matchSpecAttributeSubset, specIdentity } from './specModeConversion';
+import { materializeLayeredSpec, rebuildLayeredSpecs, specIdentity } from './specModeConversion';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -1086,6 +1087,7 @@ import {
 } from '@/services/finishedMarkupConfigurations';
 import {
   createFinishedProduct,
+  checkFinishedProductShelf,
   listFinishedProductPriceLevelOptions,
   type FinishedProductPriceLevelOption,
   deleteFinishedProduct,
@@ -1114,6 +1116,7 @@ import { sortByOffShelfAtDesc } from './offShelfSorting';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import ProductDetail from './components/ProductDetail.vue';
 import SourceUnavailableOverlay from './components/SourceUnavailableOverlay.vue';
+import FinishedRowWarnings from './components/FinishedRowWarnings.vue';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
@@ -1215,6 +1218,8 @@ interface ProductForm {
 }
 
 interface SpecRow extends TableRowData {
+  _specOriginFields?: LayeredSpecField[];
+  _specValueIds?: Partial<Record<LayeredSpecField, number>>;
   id: number;
   skuId?: number;
   mode: SpecMode;
@@ -1284,6 +1289,12 @@ interface SingleSpecItem {
   id: number;
   text: string;
   imageUploaded: boolean;
+}
+
+interface LayeredSpecDraft extends TableRowData {
+  id: number;
+  sourceRow: SpecRow;
+  valueIds: Partial<Record<LayeredSpecField, number>>;
 }
 
 interface SpecValue {
@@ -1416,7 +1427,7 @@ const productMediaUploading = ref(0);
 const specDialogVisible = ref(false);
 const validatedSpecDraftIds = ref(new Set<number>());
 const specDraftFieldStatus = (value: string, id: number) =>
-  validatedSpecDraftIds.value.has(id) && !value.trim() ? 'error' : undefined;
+  validatedSpecDraftIds.value.has(id) && !value?.trim() ? 'error' : undefined;
 const productPriceEditorRef = ref<InstanceType<typeof ProductPriceEditor>>();
 const priceDrawerVisible = ref(false);
 const reasonDialogVisible = ref(false);
@@ -1545,6 +1556,8 @@ const refreshPriceConfigurations = () => {
 };
 const guidePriceSettingCoefficient = ref<number>();
 const dataItems = ref<StockItem[]>([]);
+const shelfErrors = reactive<Record<number, string>>({});
+const checkingShelf = ref(false);
 
 const categoryCascaderOptions = computed<CategoryCascaderOption[]>(() => {
   const enabled = productCategories.value.filter(
@@ -2336,7 +2349,7 @@ const handleBatchAction = (action: BatchAction) => {
   openConfirm('clearRecycle', null, '是否清空回收站？');
 };
 
-const handleRowAction = (action: RowAction, row: StockItem) => {
+const handleRowAction = async (action: RowAction, row: StockItem) => {
   if (sourceBlocked(row) && !['purge', 'detail'].includes(action)) return;
   if (action === 'detail') {
     void openProductDetail(row);
@@ -2347,6 +2360,23 @@ const handleRowAction = (action: RowAction, row: StockItem) => {
     return;
   }
   if (action === 'shelf') {
+    if (!isSupplyChain.value) {
+      if (checkingShelf.value) return;
+      checkingShelf.value = true;
+      try {
+        await checkFinishedProductShelf(row.id);
+        delete shelfErrors[row.id];
+      } catch (error) {
+        await loadInventoryData();
+        const latest = dataItems.value.find((item) => item.id === row.id);
+        if (latest && !sourceBlocked(latest)) {
+          adminFeedback.warning(error instanceof Error ? error.message : '当前商品无法上架');
+        }
+        return;
+      } finally {
+        checkingShelf.value = false;
+      }
+    }
     openConfirm('shelf', row, `是否上架商品“${row.name}”？`);
     return;
   }
@@ -2375,7 +2405,7 @@ const hasProductFormContent = () => {
     Boolean(videoMedia.value) ||
     specRows.value.length > 0 ||
     singleSpecs.value.some((item) => item.text.trim() || item.imageUploaded) ||
-    specGroups.some((group) => group.selected || group.values.some((item) => item.value.trim()))
+    specGroups.some((group) => group.selected || group.values.some((item) => (item.value ?? '').trim()))
   );
 };
 
@@ -2843,28 +2873,16 @@ const openSpecDialog = async (preserveCurrent = false) => {
     return;
   }
   clearSpecDraft();
-  specConversionNotice.value = '';
-  unmatchedSpecNames.value = [];
   if (preserveCurrent && specRows.value.length) hydrateSpecDialogFromRows();
   if (specMode.value === 'single') {
     singleSpecs.value.forEach((item, index) => {
       item.sourceRow = cloneSpecDraft(specRows.value[index]);
     });
+  } else {
+    useLinkedLayeredDrafts.value = true;
+    layeredSpecDrafts.value = specRows.value.map((row) => createLinkedSpecDraft(row));
+    linkedSpecStructure.value = currentSpecStructure();
   }
-  specSourceRows = cloneSpecDraft(specRows.value).map((row) => ({
-    ...row,
-    _specDraftIdentity: JSON.stringify(
-      specGroups
-        .filter((group) => group.selected)
-        .map((group) => [
-          group.field,
-          group.values.find(
-            (entry) => normalizeLayeredValue(group.field, entry.value) === String(row[group.field] || ''),
-          )?.id,
-        ])
-        .sort(),
-    ),
-  }));
   specOpeningDraft = captureSpecDraft();
   specDialogVisible.value = true;
 };
@@ -2874,34 +2892,55 @@ const closeSpecDialog = () => {
   specDialogVisible.value = false;
 };
 
-let specSourceRows: SpecRow[] = [];
-const specConversionNotice = ref('');
-const unmatchedSpecNames = ref<string[]>([]);
+const layeredSpecDrafts = ref<LayeredSpecDraft[]>([]);
+const useLinkedLayeredDrafts = ref(false);
+const linkedSpecStructure = ref('');
+const currentSpecStructure = () =>
+  JSON.stringify(
+    specGroups
+      .filter((group) => group.selected)
+      .map((group) => [group.field, group.values.map((value) => value.id).sort((a, b) => a - b)])
+      .sort(([left], [right]) => String(left).localeCompare(String(right))),
+  );
+const specDraftError = ref('');
 const cloneSpecDraft = <T,>(value: T): T => (value == null ? value : JSON.parse(JSON.stringify(value)));
-const captureSpecDraft = () => cloneSpecDraft({ mode: specMode.value, singles: singleSpecs.value, groups: specGroups });
+const captureSpecDraft = () =>
+  cloneSpecDraft({
+    mode: specMode.value,
+    singles: singleSpecs.value,
+    groups: specGroups,
+    layered: layeredSpecDrafts.value,
+    useLinkedRows: useLinkedLayeredDrafts.value,
+    linkedStructure: linkedSpecStructure.value,
+  });
 let specOpeningDraft: ReturnType<typeof captureSpecDraft> | undefined;
-const knownConversionGroups = () => {
-  const selected = selectedSpecGroups.value;
-  const candidates = selected.length
-    ? selected
-    : specGroups.filter(
-        (group) => salesAttributeFields.value.find((field) => field.key === group.field)?.options.length,
-      );
-  return candidates.slice(0, MAX_SPEC_GROUPS).map((group) => ({
-    field: group.field,
-    values: [
-      ...new Set(
-        [
-          ...group.values.map((item) => normalizeLayeredValue(group.field, item.value)),
-          ...(salesAttributeFields.value.find((field) => field.key === group.field)?.options || []),
-        ].filter(Boolean),
-      ),
-    ],
-  }));
+const createLinkedSpecDraft = (source: SpecRow): LayeredSpecDraft => {
+  const row = cloneSpecDraft(source);
+  const valueIds: LayeredSpecDraft['valueIds'] = {};
+  specGroups.forEach((group) => {
+    const value = String(row[group.field] ?? '');
+    const match =
+      group.values.find((item) => item.id === row._specValueIds?.[group.field]) ||
+      (value.trim()
+        ? group.values.find((item) => normalizeLayeredValue(group.field, item.value) === value)
+        : undefined);
+    if (match) valueIds[group.field] = match.id;
+  });
+  return {
+    id: row.id,
+    sourceRow: row,
+    valueIds,
+  };
 };
+
 const specModeConfirmVisible = ref(false);
+const pendingSpecMode = ref<SpecMode>('single');
+const specModeConfirmMessage =
+  '您正在从【单层展示】切换至【分层展示】。本次切换将清空已填写的规格数据，请按分层结构重新配置。点击下方「重置」可恢复本次打开时的配置。';
 const requestSpecModeChange = (value: unknown) => {
-  if (specMode.value === 'single' && value === 'layered') {
+  if ((value !== 'single' && value !== 'layered') || value === specMode.value) return;
+  if (value === 'layered' && singleSpecs.value.some((item) => item.text.trim())) {
+    pendingSpecMode.value = value;
     specModeConfirmVisible.value = true;
     return;
   }
@@ -2909,102 +2948,22 @@ const requestSpecModeChange = (value: unknown) => {
 };
 const confirmSpecModeChange = () => {
   specModeConfirmVisible.value = false;
-  if (specDialogVisible.value && specMode.value === 'single') handleSpecModeChange('layered');
+  if (specDialogVisible.value) handleSpecModeChange(pendingSpecMode.value);
 };
-const handleSpecModeChange = (value: unknown) => {
-  if ((value !== 'single' && value !== 'layered') || value === specMode.value) return;
-  validatedSpecDraftIds.value = new Set();
-  if (value === 'single') {
-    const fields = selectedSpecGroups.value.map((group) => group.field);
-    const currentRows = buildLayeredSpecRows();
-    if (
-      !fields.length ||
-      !currentRows.length ||
-      selectedSpecGroups.value.some((group) => group.values.some((item) => !item.value.trim()))
-    ) {
-      adminFeedback.warning('请先填写完整的分层属性值，再转换为单层展示');
-      return;
-    }
-    const unmatchedDrafts = singleSpecs.value.filter((item) => unmatchedSpecNames.value.includes(item.text));
-    singleSpecs.value = currentRows.map((row) => {
-      const sources = [
-        ...specSourceRows,
-        ...singleSpecs.value.flatMap((item) => (item.sourceRow ? [item.sourceRow] : [])),
-      ];
-      const previous =
-        sources.find((source) => source._specDraftIdentity && source._specDraftIdentity === row._specDraftIdentity) ||
-        sources.find((source) => specIdentity(source, fields) === specIdentity(row, fields));
-      return {
-        ...createSingleSpecItem(
-          fields.map((field) => String(row[field] || '')).join(' '),
-          Boolean(row.materialImage || row.lengthImage || row.colorImage || row.sizeImage),
-        ),
-        sourceRow: {
-          ...cloneSpecDraft(previous || row),
-          ...Object.fromEntries(fields.map((field) => [field, row[field]])),
-          _specDraftIdentity: row._specDraftIdentity,
-          _specOriginFields: fields,
-        },
-      };
-    });
-    singleSpecs.value.push(...unmatchedDrafts);
-    unmatchedSpecNames.value = [];
-    specConversionNotice.value =
-      '已将原属性值文本自动拼接预填，您可根据实际情况自行修改。原规格关联的价格和库存将保留。';
-  } else {
-    unmatchedSpecNames.value = [];
-    const candidates = knownConversionGroups();
-    const matched: Record<string, string>[] = [];
-    singleSpecs.value
-      .filter((item) => item.text.trim())
-      .forEach((item) => {
-        const originalFields = item.sourceRow?._specOriginFields;
-        const rowAttributes = Object.fromEntries(
-          specGroups.map((group) => [group.field, String(item.sourceRow?.[group.field] || '')]),
-        );
-        const values =
-          Array.isArray(originalFields) && originalFields.length
-            ? Object.fromEntries(originalFields.map((field: string) => [field, String(item.sourceRow![field] || '')]))
-            : matchSpecAttributeSubset(item.text, rowAttributes, MAX_SPEC_GROUPS) ||
-              matchSpecText(item.text, candidates);
-        if (!values) {
-          unmatchedSpecNames.value.push(item.text);
-          return;
-        }
-        matched.push(values);
-        if (item.sourceRow) Object.assign(item.sourceRow, values, { _specOriginFields: Object.keys(values) });
-      });
-    if (matched.length)
-      specGroups.forEach((group) => {
-        const values = [...new Set(matched.map((item) => item[group.field]).filter(Boolean))];
-        group.selected = values.length > 0;
-        if (values.length)
-          group.values = values.map((value) => {
-            const existing = group.values.find((item) => normalizeLayeredValue(group.field, item.value) === value);
-            return existing || createSpecValue(group.field === 'length' ? value.replace(/mm$/, '') : value);
-          });
-      });
-    singleSpecs.value.forEach((item) => {
-      if (!item.sourceRow || unmatchedSpecNames.value.includes(item.text)) return;
-      item.sourceRow._specDraftIdentity = JSON.stringify(
-        selectedSpecGroups.value
-          .map((group) => [
-            group.field,
-            group.values.find(
-              (entry) => normalizeLayeredValue(group.field, entry.value) === String(item.sourceRow![group.field] || ''),
-            )?.id,
-          ])
-          .sort(),
-      );
-    });
-    specConversionNotice.value =
-      '已尽量保留并回填可明确对应的属性值；无法匹配的规格需补充配置。单层名称修改不会自动覆盖原属性结构，可点击重置恢复本次打开时的数据。';
-  }
+const handleSpecModeChange = (value: SpecMode) => {
+  if (value === specMode.value) return;
+  clearSpecDraft(false);
   specMode.value = value;
 };
 
+const materializeSpecDraft = (draft: LayeredSpecDraft): SpecRow =>
+  materializeLayeredSpec(draft.sourceRow, draft.valueIds, selectedSpecGroups.value);
 const clearSpecDraft = (resetMode = true) => {
   validatedSpecDraftIds.value = new Set();
+  specDraftError.value = '';
+  layeredSpecDrafts.value = [];
+  useLinkedLayeredDrafts.value = false;
+  linkedSpecStructure.value = '';
   if (resetMode) {
     specMode.value = 'single';
   }
@@ -3079,8 +3038,8 @@ const isDuplicateSingleSpec = (current: SingleSpecItem) => {
 
 const isDuplicateSpecValue = (group: SpecGroup, current: SpecValue) => {
   if (salesAttributeByKey(group.field)?.type === 'select') return false;
-  const value = current.value.trim();
-  return value !== '' && group.values.some((item) => item.id !== current.id && item.value.trim() === value);
+  const value = (current.value ?? '').trim();
+  return value !== '' && group.values.some((item) => item.id !== current.id && (item.value ?? '').trim() === value);
 };
 
 const isSpecOptionSelected = (group: SpecGroup, currentId: number, option: string) =>
@@ -3104,7 +3063,10 @@ const removeSpecValue = (name: string, index: number) => {
     adminFeedback.warning('至少需要输入一个属性值');
     return;
   }
-  group?.values.splice(index, 1);
+  const [removed] = group.values.splice(index, 1);
+  layeredSpecDrafts.value.forEach((draft) => {
+    if (draft.valueIds[group.field] === removed?.id) delete draft.valueIds[group.field];
+  });
 };
 
 const MAX_SPEC_GROUPS = 3;
@@ -3113,8 +3075,17 @@ const isSpecGroupDisabled = (group: SpecGroup) => !group.selected && selectedSpe
 const toggleSpecGroup = (group: SpecGroup) => {
   if (isSpecGroupDisabled(group)) return;
   group.selected = !group.selected;
-  group.withImage = false;
-  group.values = [createSpecValue()];
+  if (!group.selected) {
+    group.withImage = false;
+    group.values = [createSpecValue()];
+    layeredSpecDrafts.value.forEach((draft) => {
+      delete draft.valueIds[group.field];
+      draft.sourceRow[group.field] = '';
+      draft.sourceRow[`${group.field}Image`] = false;
+      if (draft.sourceRow._specValueIds) delete draft.sourceRow._specValueIds[group.field];
+    });
+    return;
+  }
 };
 
 const resetSpecDialog = () => {
@@ -3127,8 +3098,10 @@ const resetSpecDialog = () => {
   singleSpecs.value = saved.singles;
   specGroups.splice(0, specGroups.length, ...saved.groups);
   validatedSpecDraftIds.value = new Set();
-  unmatchedSpecNames.value = [];
-  specConversionNotice.value = '';
+  layeredSpecDrafts.value = saved.layered;
+  useLinkedLayeredDrafts.value = saved.useLinkedRows;
+  linkedSpecStructure.value = saved.linkedStructure;
+  specDraftError.value = '';
 };
 
 const hydrateSpecDialogFromRows = () => {
@@ -3136,7 +3109,6 @@ const hydrateSpecDialogFromRows = () => {
   if (confirmedSpecMode.value === 'single') {
     singleSpecs.value = specRows.value.map((row) => createSingleSpecItem(row.specText, row.specImage));
     if (!singleSpecs.value.length) singleSpecs.value = [createSingleSpecItem()];
-    confirmedImageField.value = null;
     return;
   }
   const dimensionOrder = confirmedLayeredFields.value;
@@ -3163,188 +3135,116 @@ const hydrateSpecDialogFromRows = () => {
     if (dimension) group.values.sort((a, b) => dimension.values.indexOf(a.value) - dimension.values.indexOf(b.value));
     if (!group.values.length) group.values = [createSpecValue()];
   });
-  confirmedLayeredFields.value = specGroups.filter((group) => group.selected).map((group) => group.field);
-  confirmedImageField.value = specGroups.find((group) => group.selected && group.withImage)?.field || null;
 };
 
 const confirmCreateSpec = () => {
+  specDraftError.value = '';
   validatedSpecDraftIds.value = new Set(
     specMode.value === 'single'
       ? singleSpecs.value.map((item) => item.id)
       : selectedSpecGroups.value.flatMap((group) => group.values.map((item) => item.id)),
   );
   if (specMode.value === 'layered' && selectedSpecGroups.value.length > MAX_SPEC_GROUPS) {
-    adminFeedback.error('最多选择 3 个销售属性');
+    specDraftError.value = '最多选择 3 个销售属性';
+    return;
+  }
+  if (specMode.value === 'layered' && !selectedSpecGroups.value.length) {
+    specDraftError.value = '请选择销售属性并填写规格属性值';
     return;
   }
   const hasEmptyValue =
     specMode.value === 'single'
       ? singleSpecs.value.some((item) => !item.text.trim())
-      : selectedSpecGroups.value.some((group) => group.values.some((item) => !item.value.trim()));
+      : selectedSpecGroups.value.some((group) => group.values.some((item) => !(item.value ?? '').trim()));
   if (hasEmptyValue) {
-    adminFeedback.error(
-      specMode.value === 'single' ? '商品规格不能为空，请填写后再确认创建' : '请填写所有规格属性值后再确认创建',
-    );
+    specDraftError.value =
+      specMode.value === 'single' ? '商品规格不能为空，请填写后再确认创建' : '请填写所有规格属性值后再确认创建';
     return;
   }
   if (specMode.value === 'single' && singleSpecs.value.some(isDuplicateSingleSpec)) {
-    adminFeedback.error('商品规格名称不能重复，请修改后再确认创建');
+    specDraftError.value = '商品规格名称不能重复，请修改后再确认创建';
     return;
   }
   if (
     specMode.value === 'layered' &&
     selectedSpecGroups.value.some((group) => group.values.some((value) => isDuplicateSpecValue(group, value)))
   ) {
-    adminFeedback.error('同一属性的值不能重复，请修改后再确认创建');
+    specDraftError.value = '同一属性的值不能重复，请修改后再确认创建';
     return;
   }
   const rows =
     specMode.value === 'single'
-      ? singleSpecs.value
-          .map((item) => ({ ...item, text: item.text.trim() }))
-          .filter((item) => item.text)
-          .map((item) =>
-            createBaseSpecRow({
-              ...cloneSpecDraft(item.sourceRow || {}),
-              mode: 'single',
-              specText: item.text,
-              specImage: item.imageUploaded,
-            }),
-          )
+      ? singleSpecs.value.map((item) =>
+          createBaseSpecRow({
+            ...cloneSpecDraft(item.sourceRow || {}),
+            mode: 'single',
+            specText: item.text.trim(),
+            specImage: item.imageUploaded,
+          }),
+        )
       : buildLayeredSpecRows();
   if (!rows.length) {
-    adminFeedback.warning('请至少配置一条商品规格');
+    specDraftError.value = '请至少配置一条商品规格';
     return;
   }
   const fields = selectedSpecGroups.value.map((group) => group.field);
-  if (specMode.value === 'layered') {
-    const sources = [
-      ...singleSpecs.value.flatMap((item) => (item.sourceRow ? [item.sourceRow] : [])),
-      ...specSourceRows,
-    ];
-    const matchedKeys = new Set<string>();
-    const unmatched: string[] = [];
-    singleSpecs.value
-      .filter((item) => item.text.trim())
-      .forEach((item) => {
-        const original = item.sourceRow;
-        const identityRow = original?._specDraftIdentity
-          ? rows.find((row) => row._specDraftIdentity === original._specDraftIdentity)
-          : undefined;
-        const values = identityRow
-          ? Object.fromEntries(fields.map((field) => [field, String(identityRow[field])]))
-          : original && fields.every((field) => String(original[field] || '').trim())
-            ? Object.fromEntries(fields.map((field) => [field, String(original[field])]))
-            : matchSpecText(
-                item.text,
-                selectedSpecGroups.value.map((group) => ({
-                  field: group.field,
-                  values: group.values.map((entry) => normalizeLayeredValue(group.field, entry.value)),
-                })),
-              );
-        if (!values || !rows.some((row) => specIdentity(row, fields) === specIdentity(values, fields))) {
-          unmatched.push(item.text);
-          return;
-        }
-        const matchKey = specIdentity(values, fields);
-        if (matchedKeys.has(matchKey)) {
-          unmatched.push(item.text);
-          return;
-        }
-        matchedKeys.add(matchKey);
-        if (original) sources.push({ ...original, ...values });
-      });
-    if (unmatched.length) {
-      unmatchedSpecNames.value = unmatched;
-      adminFeedback.warning('仍有单层规格无法对应，请补充属性值或重置；原数据未被覆盖');
-      return;
-    }
-    const used = new Set<number>();
-    rows.forEach((row, index) => {
-      const previous =
-        sources.find(
-          (source) =>
-            !used.has(source.id) && source._specDraftIdentity && source._specDraftIdentity === row._specDraftIdentity,
-        ) ||
-        sources.find((source) => !used.has(source.id) && specIdentity(source, fields) === specIdentity(row, fields));
-      if (previous) {
-        used.add(previous.id);
-        rows[index] = {
-          ...cloneSpecDraft(previous),
-          mode: row.mode,
-          specText: row.specText,
-          ...Object.fromEntries(fields.map((field) => [field, row[field]])),
-          materialImage: row.materialImage,
-          lengthImage: row.lengthImage,
-          colorImage: row.colorImage,
-          sizeImage: row.sizeImage,
-        };
-      }
-    });
+  if (specMode.value === 'layered' && rows.some((row) => fields.some((field) => !String(row[field] || '').trim()))) {
+    specDraftError.value = '请补充每条规格的属性值后再确认创建';
+    return;
+  }
+  if (specMode.value === 'layered' && new Set(rows.map((row) => specIdentity(row, fields))).size !== rows.length) {
+    specDraftError.value = '规格组合不能重复，请修改后再确认创建';
+    return;
   }
   confirmedSpecDimensions.value =
     specMode.value === 'layered'
       ? selectedSpecGroups.value.map((group) => ({
           key: group.field,
           name: group.name,
-          values: group.values.map((item) => normalizeLayeredValue(group.field, item.value.trim())),
+          values: group.values.map((item) => normalizeLayeredValue(group.field, item.value)),
         }))
       : [];
   confirmedSpecMode.value = specMode.value;
-  confirmedLayeredFields.value =
-    specMode.value === 'layered' ? selectedSpecGroups.value.map((group) => group.field) : [];
+  confirmedLayeredFields.value = specMode.value === 'layered' ? fields : [];
   confirmedImageField.value = specMode.value === 'layered' ? selectedImageGroup.value?.field || null : null;
-  specRows.value = rows;
-  priceRows.value = rows.map(specToPriceRow);
+  specRows.value = specMode.value === 'layered' ? orderLayeredRows(rows, confirmedSpecDimensions.value) : rows;
+  priceRows.value = specRows.value.map(specToPriceRow);
   closeSpecDialog();
   adminFeedback.success('规格表格已生成');
 };
 
-const normalizeLayeredValue = (field: LayeredSpecField, value: string) =>
-  field === 'length' && value && !value.endsWith('mm') ? `${value}mm` : value;
-
-const getSpecGroupByField = (field: LayeredSpecField) => specGroups.find((group) => group.field === field);
+const normalizeLayeredValue = (field: LayeredSpecField, value: string | null | undefined) => {
+  const text = (value ?? '').trim();
+  return field === 'length' && text && !text.endsWith('mm') ? `${text}mm` : text;
+};
 
 const buildLayeredSpecRows = () => {
-  const normalizedGroups = selectedSpecGroups.value.map((group) => ({
+  const groups = selectedSpecGroups.value;
+  const fields = groups.map((group) => group.field);
+  if (useLinkedLayeredDrafts.value) {
+    const rows = layeredSpecDrafts.value.map(materializeSpecDraft);
+    const bindingsComplete = layeredSpecDrafts.value.every((draft) =>
+      groups.every((group) => group.values.some((value) => value.id === draft.valueIds[group.field])),
+    );
+    // An unchanged sparse set stays sparse; edited dimensions are regenerated below.
+    if (
+      linkedSpecStructure.value === currentSpecStructure() &&
+      bindingsComplete &&
+      new Set(rows.map((row) => specIdentity(row, fields))).size === rows.length
+    )
+      return rows;
+  }
+  const normalizedGroups = groups.map((group) => ({
     ...group,
     values: group.values
-      .map((item) => ({ ...item, value: normalizeLayeredValue(group.field, item.value.trim()) }))
+      .map((item) => ({ ...item, value: normalizeLayeredValue(group.field, item.value) }))
       .filter((item) => item.value),
   }));
-  if (!normalizedGroups.length) return [];
-  if (normalizedGroups.some((group) => group.values.length === 0)) return [];
-
-  const combinations = normalizedGroups.reduce<Partial<Record<LayeredSpecField, SpecValue>>[]>(
-    (acc, group) =>
-      acc.flatMap((combination) =>
-        group.values.map((value) => ({
-          ...combination,
-          [group.field]: value,
-        })),
-      ),
-    [{}],
-  );
-
-  return combinations.map((combination) =>
-    createBaseSpecRow({
-      mode: 'layered',
-      _specDraftIdentity: JSON.stringify(
-        Object.entries(combination)
-          .map(([field, value]) => [field, value?.id])
-          .sort(),
-      ),
-      ...Object.fromEntries(Object.entries(combination).map(([key, item]) => [key, item?.value ?? ''])),
-      material: combination.material?.value || '',
-      materialImage: Boolean(getSpecGroupByField('material')?.withImage && combination.material?.imageUploaded),
-      length: combination.length?.value || '',
-      lengthImage: Boolean(getSpecGroupByField('length')?.withImage && combination.length?.imageUploaded),
-      color: combination.color?.value || '',
-      colorImage: Boolean(getSpecGroupByField('color')?.withImage && combination.color?.imageUploaded),
-      size: combination.size?.value || '',
-      sizeImage: Boolean(getSpecGroupByField('size')?.withImage && combination.size?.imageUploaded),
-      quantity: null,
-    }),
+  return rebuildLayeredSpecs(
+    normalizedGroups,
+    layeredSpecDrafts.value,
+    () => createBaseSpecRow({ mode: 'layered', quantity: null }),
+    salesAttributeFields.value.map((field) => field.key),
   );
 };
 
@@ -3828,10 +3728,49 @@ const handleConfirm = async () => {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
     } else if (type === 'batchShelf') {
-      // Publishing rebuilds prices; finish each transaction before starting the next product.
-      for (const id of [...selectedKeys.value]) {
-        await updateProductStatus(id, 'selling');
-        selectedKeys.value = selectedKeys.value.filter((selectedId) => selectedId !== id);
+      if (isSupplyChain.value) {
+        // Publishing rebuilds prices; finish each transaction before starting the next product.
+        for (const id of [...selectedKeys.value]) {
+          await updateProductStatus(id, 'selling');
+          selectedKeys.value = selectedKeys.value.filter((selectedId) => selectedId !== id);
+        }
+      } else {
+        const ids = [...selectedKeys.value];
+        const failed = new Map<number, string>();
+        let succeeded = 0;
+        for (const id of ids) {
+          delete shelfErrors[id];
+          try {
+            await updateProductStatus(id, 'selling');
+            succeeded++;
+          } catch (error) {
+            failed.set(id, error instanceof Error ? error.message : '上架失败，请重试');
+          }
+        }
+        await loadInventoryData();
+        for (const [id, message] of failed) {
+          const latest = dataItems.value.find((item) => item.id === id);
+          if (latest?.status === 'selling') {
+            succeeded++;
+            failed.delete(id);
+          } else if (latest && !sourceBlocked(latest)) {
+            shelfErrors[id] = message;
+          }
+        }
+        selectedKeys.value = ids.filter(
+          (id) =>
+            failed.has(id) &&
+            dataItems.value.some((item) => item.id === id && !sourceBlocked(item) && item.status === 'warehouse'),
+        );
+        currentPagination.value.current = Math.min(
+          currentPagination.value.current,
+          Math.max(1, Math.ceil(filteredData.value.length / currentPagination.value.pageSize)),
+        );
+        closeConfirmDialog();
+        const message = `已上架 ${succeeded} 个商品，未上架 ${failed.size} 个商品`;
+        if (failed.size) adminFeedback.warning(message);
+        else adminFeedback.success(message);
+        return;
       }
     } else if (type === 'batchRestore') {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
@@ -3858,7 +3797,13 @@ const handleConfirm = async () => {
       adminFeedback.success('操作已完成');
     }
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+    if (type === 'shelf' && !isSupplyChain.value) {
+      closeConfirmDialog();
+      await loadInventoryData();
+      adminFeedback.warning(error instanceof Error ? error.message : '当前商品无法上架');
+    } else {
+      adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+    }
   } finally {
     saving.value = false;
   }
@@ -3965,6 +3910,11 @@ const handleConfirm = async () => {
   min-width: 0;
   flex: 1;
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
+}
+
+/* Keep the sticky submit bar flush with the viewport at the end of the form. */
+.admin-layout > .admin-shell > .page.page--form {
+  padding-bottom: 0 !important;
 }
 
 .page-header {

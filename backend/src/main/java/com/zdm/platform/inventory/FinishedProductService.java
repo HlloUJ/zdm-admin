@@ -207,6 +207,52 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   }
 
   @Transactional
+  public void checkOperationsShelf(Long id) {
+    if (lifecycle.isSupplyChain()) { throw new org.springframework.security.access.AccessDeniedException("此操作属于运营管理平台"); }
+    lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
+    FinishedProduct product = attachDetails(getById(id));
+    lifecycle.requireOperational(product.getSourceStatus(), product.getOperationsDeleted());
+    validateOperationsShelf(product);
+  }
+
+  private void validateOperationsShelf(FinishedProduct product) {
+    if (!"warehouse".equals(product.getStatus())) { throw new IllegalArgumentException("当前成品现货状态不允许上架"); }
+    if (product.getMainImageMediaId() == null || product.getVideoMediaId() == null) {
+      throw new IllegalArgumentException("请完善商品图片或视频后再上架");
+    }
+    // These IDs come from the locked persisted product, not from an upload request.
+    List<Long> imageIds = product.getMainImageMediaIds() == null || product.getMainImageMediaIds().isEmpty()
+        ? List.of(product.getMainImageMediaId()) : product.getMainImageMediaIds();
+    for (Long imageId : imageIds) {
+      if (!"image".equals(mediaAssetService.requireReferencedAvailableForUpdate(imageId).getMediaType())) {
+        throw new IllegalArgumentException("请完善商品图片后再上架");
+      }
+    }
+    if (!"video".equals(mediaAssetService.requireReferencedAvailableForUpdate(product.getVideoMediaId()).getMediaType())) {
+      throw new IllegalArgumentException("请完善商品视频后再上架");
+    }
+    if (product.getCategoryId() == null || product.getSupplierId() == null
+        || !StringUtils.hasText(product.getName()) || !StringUtils.hasText(product.getDetail())) {
+      throw new IllegalArgumentException("请完善商品基础信息后再上架");
+    }
+    if (product.getTotalStock() == null || product.getTotalStock() <= 0
+        || product.getVariants() == null || product.getVariants().isEmpty()) {
+      throw new IllegalArgumentException("请完善商品规格与库存后再上架");
+    }
+    for (FinishedProductVariant variant : product.getVariants()) {
+      if (variant.getCostPrice() == null || variant.getCostPrice().signum() < 0) {
+        throw new IllegalArgumentException("请完善商品成本价后再上架");
+      }
+      var guides = product.getGuidePrices().stream().filter(price -> variant.getId().equals(price.getSkuId())).toList();
+      if (guides.size() != 1 || guides.getFirst().getPriceCoefficient() == null || guides.getFirst().getPriceCoefficient().signum() < 0
+          || guides.getFirst().getPrice() == null || guides.getFirst().getPrice().signum() < 0) {
+        throw new IllegalArgumentException("请完善每条规格的指导价后再上架");
+      }
+    }
+    priceService.requireCompletePrices(product.getId(), product.getVariants());
+  }
+
+  @Transactional
   public FinishedProduct updateOperationWithDetails(Long id, FinishedProduct request, boolean priceOnly) {
     lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
     FinishedProduct existing = attachDetails(getById(id));
@@ -225,6 +271,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       guidePriceService.replacePrices(id, existing.getGuidePrices());
       lambdaUpdate().eq(FinishedProduct::getId,id).set(FinishedProduct::getGuidePrice,existing.getGuidePrice()).update();
     } else {
+      if ("selling".equals(request.getStatus())) { validateOperationsShelf(existing); }
       existing.setStatus(request.getStatus());
       existing.setOffShelfReason("offShelf".equals(request.getStatus()) ? request.getOffShelfReason() : null);
       existing.setOffShelfDetail("offShelf".equals(request.getStatus()) ? request.getOffShelfDetail() : null);
