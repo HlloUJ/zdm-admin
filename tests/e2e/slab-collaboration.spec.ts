@@ -354,3 +354,44 @@ test('批量上架部分成功，失败横幅可关闭并在页面刷新后清�
   await expect(page.getByRole('main').getByText('大板99602', { exact: true })).toBeVisible();
   await expect(warning).toHaveCount(0);
 });
+
+test('彻底删除操作日志显示删除终态，与成品现货一致', async ({ page }) => {
+  await setup(page, 'warehouse');
+  await page.addInitScript(() => {
+    const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    user.permissions.push('admin.slab-management.operation-log.view');
+    localStorage.setItem('zdm-admin-user', JSON.stringify(user));
+  });
+  await page.route('**/api/admin/slabs/operation-logs?**', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          records: [
+            {
+              id: 991,
+              slabId: 99601,
+              slabName: '已删除大板',
+              slabSerialNo: 'SLAB-COLLAB',
+              operationType: 'PURGE',
+              operationSummary: '彻底删除大板',
+              beforeStatus: 'warehouse',
+              afterStatus: 'purged',
+              operationSource: 'MANUAL',
+              operatorName: '大板验收',
+              operatedAt: '2026-09-22T09:46:00',
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 10,
+        },
+      },
+    }),
+  );
+  await page.reload();
+  await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  const logRow = page.locator('.t-drawer--open tbody tr').filter({ hasText: '已删除大板' });
+  await logRow.getByText('详情', { exact: true }).click();
+  await expect(page.locator('.t-dialog:visible')).toContainText('仓库中 → 已彻底删除');
+});

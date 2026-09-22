@@ -9,11 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.zdm.platform.security.CurrentIdentity;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,6 +48,8 @@ class SlabCollaborationApiTest {
   @Autowired private SlabInventoryService slabs;
   @Autowired private SlabOperationLogService logs;
   @Autowired private SlabPriceService prices;
+  @Autowired private SlabMarkupConfigurationService priceConfigurations;
+  @Autowired private com.zdm.platform.store.StoreLevelService storeLevels;
   @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
 
   private void identity(String client, String scope, String... permissions) {
@@ -57,15 +61,21 @@ class SlabCollaborationApiTest {
   private void fixture(String status, String source, boolean deleted, long creator) {
     jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99601,'协同大板','SLAB-COLLAB',?,?,?,?,2,10)", status, source, deleted, creator);
   }
-  @Test void missingPartnerConfigurationAllowsInitialPricingAndManualCompletion() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void missingOrDisabledPartnerConfigurationAllowsInitialPricingAndManualCompletion(boolean disabledConfiguration) {
     jdbc.update("UPDATE store_levels SET status='disabled'");
     jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99609,'未配置合伙人',1)");
+    if (disabledConfiguration) {
+      jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99609,99609,'未配置合伙人',1.4,1,'disabled',false)");
+    }
     jdbc.update("INSERT INTO slab_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
     fixture("warehouse", "selling", false, 1L);
     identity("supply-chain", "all", "all");
     lifecycle.reprice(ProductLifecycleService.Kind.SLAB,99601L,false);
     assertThat(slabs.getById(99601L).getOperationsDeleted()).isFalse();
     assertThat(slabs.getById(99601L).getStatus()).isEqualTo("warehouse");
+    assertThat(prices.listPrices(99601L)).isEmpty();
     assertThatThrownBy(() -> prices.requireCompletePrices(99601L)).hasMessageContaining("请完善全部大板价格");
     identity("admin", "all", "all");
     var price = new SlabPrice();
@@ -82,6 +92,107 @@ class SlabCollaborationApiTest {
     lifecycle.reprice(ProductLifecycleService.Kind.SLAB,99601L,false);
     assertThat(prices.listPrices(99601L).getFirst().getPriceCoefficient()).isEqualByComparingTo("1.5");
     assertThat(prices.listPrices(99601L).getFirst().getPrice()).isEqualByComparingTo("30");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"warehouse", "selling", "offShelf", "recycle"})
+  void operationsPurgeRecordsTerminalStatusAndReadsLegacyLogs(String beforeStatus) {
+    fixture(beforeStatus, "offShelf", false, 1L);
+    identity("admin", "all", "all");
+    slabs.removeById(99601L);
+    assertThat(jdbc.queryForObject("SELECT after_status FROM slab_operation_logs WHERE slab_id=99601 AND operation_type='PURGE'", String.class))
+        .isEqualTo("purged");
+    var recorded = logs.listPage("SLAB-COLLAB", "PURGE", null, null, null, 1, 10).records().getFirst();
+    assertThat(recorded.getBeforeStatus()).isEqualTo(beforeStatus);
+    assertThat(recorded.getAfterStatus()).isEqualTo("purged");
+    jdbc.update("UPDATE slab_operation_logs SET after_status=NULL WHERE slab_id=99601 AND operation_type='PURGE'");
+    var legacy = logs.listPage("SLAB-COLLAB", "PURGE", null, null, null, 1, 10).records().getFirst();
+    assertThat(legacy.getBeforeStatus()).isEqualTo(beforeStatus);
+    assertThat(legacy.getAfterStatus()).isEqualTo("purged");
+    assertThat(jdbc.queryForObject("SELECT after_status FROM slab_operation_logs WHERE slab_id=99601 AND operation_type='PURGE'", String.class)).isNull();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"enabled,enabled,true", "disabled,enabled,false", "enabled,disabled,false", "disabled,disabled,false"})
+  void enablingConfigurationBackfillsOnlyEnabledStoreLevels(String levelStatus, String configurationStatus, boolean shouldBackfill) {
+    fixture("warehouse", "selling", false, 1L);
+    identity("admin", "all", "all");
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99609,'四级合伙人回归',1,?)", levelStatus);
+    jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99609,99609,'四级合伙人回归',1.4,1,'disabled',false)");
+    priceConfigurations.updateStatus(99609L, configurationStatus);
+    assertThat(prices.listPrices(99601L)).hasSize(shouldBackfill ? 1 : 0);
+    if (shouldBackfill) {
+      assertThat(prices.listPrices(99601L).getFirst().getPrice()).isEqualByComparingTo("14");
+      assertThat(prices.listPrices(99601L).getFirst().getPriceSource()).isEqualTo("auto");
+    }
+    // Existing manual prices are retained when toggling the configuration again.
+    jdbc.update("DELETE FROM slab_prices WHERE slab_id=99601");
+    jdbc.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source) VALUES (99601,99609,'四级合伙人回归',1.6,10,16,'manual')");
+    sqlSession.clearCache();
+    priceConfigurations.updateStatus(99609L, configurationStatus);
+    sqlSession.clearCache();
+    assertThat(prices.listPrices(99601L)).hasSize(1);
+    assertThat(prices.listPrices(99601L).getFirst().getPrice()).isEqualByComparingTo("16");
+    assertThat(prices.listPrices(99601L).getFirst().getPriceSource()).isEqualTo("manual");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"enabled,false,10,true", "enabled,false,0,true", "disabled,false,10,false", "enabled,true,10,false", "missing,false,10,false"})
+  void enablingStoreLevelPersistsSlabPricesOnlyForActiveConfiguration(
+      String configurationStatus, boolean legacySeeded, int cost, boolean shouldBackfill) {
+    fixture("warehouse", "selling", false, 1L);
+    identity("admin", "all", "all");
+    jdbc.update("UPDATE slab_inventory SET cost_price=? WHERE id=99601", cost);
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99609,'四级合伙人回归',1,'disabled')");
+    if (!"missing".equals(configurationStatus)) {
+      jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99609,99609,'四级合伙人回归',1.4,1,?,?)", configurationStatus, legacySeeded);
+    }
+    storeLevels.updateStatus(99609L, "enabled");
+    storeLevels.updateStatus(99609L, "enabled");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", Integer.class))
+        .isEqualTo(shouldBackfill ? 1 : 0);
+    if (shouldBackfill) {
+      assertThat(jdbc.queryForObject("SELECT price FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", BigDecimal.class))
+          .isEqualByComparingTo(BigDecimal.valueOf(cost).multiply(new BigDecimal("1.4")));
+      assertThat(jdbc.queryForObject("SELECT price_source FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", String.class)).isEqualTo("auto");
+      assertThat(jdbc.queryForObject("SELECT source_configuration_id FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", Long.class)).isEqualTo(99609L);
+    }
+    jdbc.update("DELETE FROM slab_prices WHERE slab_id=99601");
+    jdbc.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source) VALUES (99601,99609,'四级合伙人回归',1.6,10,16,'manual')");
+    storeLevels.updateStatus(99609L, "disabled");
+    storeLevels.updateStatus(99609L, "enabled");
+    assertThat(jdbc.queryForObject("SELECT price FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", BigDecimal.class)).isEqualByComparingTo("16");
+    assertThat(jdbc.queryForObject("SELECT price_source FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", String.class)).isEqualTo("manual");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void sourcePublishDoesNotCalculateDisabledLevelEvenWithEnabledConfiguration(boolean historicalPrice) {
+    jdbc.update("UPDATE store_levels SET status='disabled'");
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99609,'停用四级',1,'disabled')");
+    jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99609,99609,'停用四级',1.4,1,'enabled',false)");
+    fixture("warehouse", "warehouse", true, 1L);
+    jdbc.update("INSERT INTO slab_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id) VALUES (99609,'上架测试供应商','platform',0)");
+    jdbc.update("INSERT INTO slab_color_categories (id,name) VALUES (99609,'上架测试色系')");
+    jdbc.update("INSERT INTO slab_colors (id,category_id,name) VALUES (99609,99609,'上架测试颜色')");
+    jdbc.update("INSERT INTO slab_grades (id,code,name) VALUES (99609,'TEST','上架测试等级')");
+    for (long mediaId : List.of(99701L, 99702L, 99703L)) {
+      jdbc.update("INSERT INTO media_assets (id,public_id,storage_key,media_type,mime_type,owner_client_code,status) VALUES (?,UUID(),?,'image','image/png','supply-chain','active')", mediaId, "disabled-level-" + mediaId);
+    }
+    jdbc.update("UPDATE slab_inventory SET supplier_id=(SELECT MIN(id) FROM suppliers),variety_id=(SELECT MIN(id) FROM slab_varieties),origin_id=(SELECT MIN(id) FROM slab_origins),texture_id=(SELECT MIN(id) FROM slab_textures),color_id=(SELECT MIN(id) FROM slab_colors),grade_id=(SELECT MIN(id) FROM slab_grades),length_mm=2000,width_mm=1800,thickness_mm=20,main_image_media_id=99701,scan_image_media_id=99702,design_image_media_id=99703 WHERE id=99601");
+    if (historicalPrice) {
+      jdbc.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source,source_configuration_id) VALUES (99601,99609,'停用四级',1.2,10,12,'auto',99609)");
+    }
+    identity("supply-chain", "all", "all");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "selling");
+    assertThat(prices.listPrices(99601L)).hasSize(historicalPrice ? 1 : 0);
+    if (historicalPrice) {
+      assertThat(prices.listPrices(99601L).getFirst().getPrice()).isEqualByComparingTo("12");
+    }
+    identity("admin", "all", "all");
+    prices.replacePrices(99601L, List.of());
+    assertThat(prices.listPrices(99601L)).hasSize(historicalPrice ? 1 : 0);
   }
 
   @Test void batchOperationsKeepIndividualLogsWithoutBatchNumber() throws Exception {
