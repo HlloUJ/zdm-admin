@@ -49,13 +49,13 @@ class SlabPriceServiceTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("必须填写全部展示的门店级别价格");
 
-    service.replacePrices(10L, List.of(historical, price(7L, "0.80", "100.00", "80.00")));
+    service.replacePrices(10L, List.of(price(7L, "0.80", "100.00", "80.00")));
 
     ArgumentCaptor<SlabPrice> captor = ArgumentCaptor.forClass(SlabPrice.class);
-    verify(mapper, Mockito.times(2)).insert(captor.capture());
+    verify(mapper).insert(captor.capture());
     assertThat(captor.getAllValues())
         .extracting(SlabPrice::getStoreLevelName)
-        .containsExactly("已停用历史级别", "当前门店级别");
+        .containsExactly("当前门店级别");
   }
 
   @Test

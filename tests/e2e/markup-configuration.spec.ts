@@ -305,7 +305,7 @@ test('价格配置无排序和停启权限时隐藏对应操作', async ({ page 
   await expect(page.getByRole('row').filter({ hasText: '城市中心店' })).toHaveCount(0);
 });
 
-test('已发布大板始终展示自己的价格而不读取当前价格配置', async ({ page }) => {
+test('大板隐藏停用级别历史价格，启用级别缺失价格不预计算', async ({ page }) => {
   await seedLogin(page, ['all'], ['SUPER_ADMIN']);
   await installAdminApiMocks(page);
   await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
@@ -314,7 +314,7 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
       body: JSON.stringify({
         code: 0,
         message: 'ok',
-        data: [{ id: 8, storeLevelId: 1, name: '当前发布模板', priceCoefficient: 1.2 }],
+        data: [{ id: 8, storeLevelId: 1, name: '当前发布模板', priceCoefficient: 1.2, status: 'enabled' }],
       }),
     });
   });
@@ -356,20 +356,19 @@ test('已发布大板始终展示自己的价格而不读取当前价格配置',
   const row = page.getByRole('row', { name: /独立价格大板/ });
   await row.getByText('价格', { exact: true }).click();
   const drawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
-  await expect(drawer.getByText('历史门店级别', { exact: false })).toBeVisible();
+  await expect(drawer.getByText('历史门店级别', { exact: false })).toHaveCount(0);
   await expect(drawer.getByText('当前发布模板', { exact: true })).toHaveCount(0);
-  await expect(drawer.locator('input[value="175.00"]')).toBeVisible();
+  await expect(drawer.locator('input[value="175.00"]')).toHaveCount(0);
 
   await page.reload();
   await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
   await row.getByText('价格', { exact: true }).click();
   await expect(drawer).toBeVisible();
   const historicalRow = drawer.locator('.price-table__row').filter({ hasText: '历史门店级别' });
-  await expect(historicalRow.getByRole('textbox').first()).toHaveValue('1.75');
-  await expect(historicalRow.getByRole('textbox').last()).toHaveValue('175.00');
+  await expect(historicalRow).toHaveCount(0);
   const configuredCurrentLevel = drawer.locator('.price-table__row').filter({ hasText: '1级' });
   await expect(configuredCurrentLevel.getByRole('textbox').first()).toHaveValue('1.20');
-  await expect(configuredCurrentLevel.getByRole('textbox').last()).toHaveValue('120.00');
+  await expect(configuredCurrentLevel.getByRole('textbox').last()).toHaveValue('');
   const unconfiguredCurrentLevel = drawer.locator('.price-table__row').filter({ hasText: '2级' });
   await expect(unconfiguredCurrentLevel.getByRole('textbox').first()).toHaveValue('');
   await expect(unconfiguredCurrentLevel.getByRole('textbox').last()).toHaveValue('');

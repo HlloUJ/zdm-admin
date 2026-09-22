@@ -28,17 +28,17 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
   private final StoreMapper storeMapper;
   private final CurrentIdentityProvider identityProvider;
   private final JdbcTemplate jdbcTemplate;
-  private final StoreLevelPriceSynchronizer finishedPriceSync;
+  private final List<StoreLevelPriceSynchronizer> priceSynchronizers;
 
   public StoreLevelService(
       StoreMapper storeMapper,
       CurrentIdentityProvider identityProvider,
       JdbcTemplate jdbcTemplate,
-      StoreLevelPriceSynchronizer finishedPriceSync) {
+      List<StoreLevelPriceSynchronizer> priceSynchronizers) {
     this.storeMapper = storeMapper;
     this.identityProvider = identityProvider;
     this.jdbcTemplate = jdbcTemplate;
-    this.finishedPriceSync = finishedPriceSync;
+    this.priceSynchronizers = priceSynchronizers;
   }
 
   public List<StoreLevel> listEnabled() {
@@ -99,7 +99,7 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     existing.setStatus(status);
     updateById(existing);
     if ("enabled".equals(status)) {
-      finishedPriceSync.syncEnabledStoreLevel(id);
+      priceSynchronizers.forEach(synchronizer -> synchronizer.syncEnabledStoreLevel(id));
     }
     return getById(id);
   }
