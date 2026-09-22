@@ -392,3 +392,66 @@ for (const [client, retryFailure] of [
     for (const product of products) await expect(main.getByText(product.name, { exact: true })).toBeVisible();
   });
 }
+
+test('operations incomplete shelf warns before confirmation without updating products', async ({ page }) => {
+  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.shelf']);
+  const product = {
+    id: 991,
+    name: '价格待补齐商品',
+    status: 'warehouse',
+    sourceStatus: 'selling',
+    totalStock: 1,
+    variants: [],
+    attributes: [],
+  };
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  let updates = 0;
+  await page.route('**/api/admin/finished-products/991', (route) => {
+    updates++;
+    return route.fulfill({ json: { code: 0, data: product } });
+  });
+  await page.route('**/api/admin/finished-products/991/shelf-check', (route) =>
+    route.fulfill({ status: 400, json: { code: 400, message: '请完善全部成品现货价格后再上架' } }),
+  );
+  await page.goto('/finished-stock-management');
+  await page.locator('tbody tr').filter({ hasText: product.name }).getByText('上架', { exact: true }).click();
+  await expect(page.getByText('请完善全部成品现货价格后再上架', { exact: true })).toBeVisible();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  expect(updates).toBe(0);
+});
+
+test('operations batch shelf continues after failure and retains the failed row with its warning', async ({ page }) => {
+  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.batch-shelf']);
+  const products = [991, 992, 993].map((id) => ({
+    id,
+    name: `批量验收商品${id}`,
+    status: 'warehouse',
+    sourceStatus: 'selling',
+    totalStock: 1,
+    variants: [],
+    attributes: [],
+  }));
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: products } }));
+  const updates: number[] = [];
+  await page.route(/\/api\/admin\/finished-products\/99[123]$/, (route) => {
+    const id = Number(route.request().url().split('/').pop());
+    updates.push(id);
+    if (id === 992)
+      return route.fulfill({ status: 400, json: { code: 400, message: '请完善全部成品现货价格后再上架' } });
+    const product = products.find((item) => item.id === id)!;
+    product.status = 'selling';
+    return route.fulfill({ json: { code: 0, data: product } });
+  });
+  await page.goto('/finished-stock-management');
+  await expect(page.locator('tbody tr')).toHaveCount(3);
+  await page.locator('thead .t-checkbox').click();
+  await page.getByRole('button', { name: '批量上架', exact: true }).click();
+  await page.locator('.t-dialog:visible').getByRole('button', { name: /^确认/ }).click();
+  await expect(page.getByText('已上架 2 个商品，未上架 1 个商品', { exact: true })).toBeVisible();
+  expect(updates).toEqual([993, 992, 991]);
+  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.locator('tbody tr')).toContainText('批量验收商品992');
+  await expect(page.locator('tbody tr').getByRole('checkbox')).toBeChecked();
+  await expect(page.locator('.finished-row-warning')).toContainText('请完善全部成品现货价格后再上架');
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+});

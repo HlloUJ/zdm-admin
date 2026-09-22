@@ -357,6 +357,68 @@ class FinishedProductPermissionApiTest {
     assertThat(jdbc.queryForObject("SELECT change_details FROM finished_operation_logs WHERE product_id=? ORDER BY id LIMIT 1", String.class, id)).isEqualTo(originalLog);
   }
 
+  @Test
+  void operationsShelfChecksAllTierPricesBeforeConfirmAndAgainAtSubmission() throws Exception {
+    long id = sourceFixture("平台发布", "selling").path("id").asLong();
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99551,'运营补齐价格级别',1)");
+    identity("all", "warehouse.view", "warehouse.shelf");
+    mvc.perform(post("/api/admin/finished-products/{id}/shelf-check", id))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("请完善全部成品现货价格后再上架"));
+    mvc.perform(put("/api/admin/finished-products/{id}", id).contentType("application/json").content("{\"name\":\"跨端商品\",\"status\":\"selling\"}"))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("请完善全部成品现货价格后再上架"));
+    assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=?",String.class,id)).isEqualTo("warehouse");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=? AND business_client_code='admin' AND operation_type='SHELF'",Long.class,id)).isZero();
+    jdbc.update("""
+        INSERT INTO finished_product_prices
+          (finished_product_id,sku_id,variant_label,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source)
+        SELECT finished_product_id,id,variant_label,99551,'运营补齐价格级别',1.5,cost_price,cost_price*1.5,'manual'
+        FROM finished_product_variants WHERE finished_product_id=?
+        """,id);
+    sqlSession.clearCache();
+    data(mvc.perform(post("/api/admin/finished-products/{id}/shelf-check", id)));
+    assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=?",String.class,id)).isEqualTo("warehouse");
+    data(mvc.perform(put("/api/admin/finished-products/{id}", id).contentType("application/json").content("{\"name\":\"跨端商品\",\"status\":\"selling\"}")));
+    assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=?",String.class,id)).isEqualTo("selling");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"guide", "cost", "stock", "image", "category"})
+  void operationsShelfRejectsIncompleteProductInformation(String missing) throws Exception {
+    long id = sourceFixture("平台发布", "selling").path("id").asLong();
+    switch (missing) {
+      case "guide" -> jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id);
+      case "cost" -> jdbc.update("UPDATE finished_product_variants SET cost_price=NULL WHERE finished_product_id=?",id);
+      case "stock" -> jdbc.update("UPDATE finished_products SET total_stock=0 WHERE id=?",id);
+      case "image" -> {
+        jdbc.update("UPDATE finished_products SET main_image_media_id=NULL WHERE id=?",id);
+        jdbc.update("DELETE FROM media_references WHERE business_domain='FINISHED_PRODUCT' AND business_id=? AND field_key LIKE 'mainImage%'",id);
+      }
+      case "category" -> jdbc.update("UPDATE finished_products SET category_id=NULL WHERE id=?",id);
+      default -> throw new AssertionError(missing);
+    }
+    sqlSession.clearCache();
+    identity("all", "warehouse.view", "warehouse.batch-shelf");
+    byte[] checkResponse = mvc.perform(post("/api/admin/finished-products/{id}/shelf-check",id))
+        .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsByteArray();
+    String expectedMessage = json.readTree(checkResponse).path("message").asText();
+    mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content("{\"name\":\"跨端商品\",\"status\":\"selling\"}"))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value(expectedMessage));
+    assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=?",String.class,id)).isEqualTo("warehouse");
+  }
+
+  @Test
+  void operationsShelfCheckPreservesFunctionDataAndClientBoundaries() throws Exception {
+    long id = sourceFixture("平台发布", "selling").path("id").asLong();
+    identity("all", "warehouse.view");
+    mvc.perform(post("/api/admin/finished-products/{id}/shelf-check",id)).andExpect(status().isForbidden());
+    jdbc.update("UPDATE finished_products SET created_by_account_id=2 WHERE id=?",id);
+    sqlSession.clearCache();
+    identity("self", "warehouse.view", "warehouse.shelf");
+    mvc.perform(post("/api/admin/finished-products/{id}/shelf-check",id)).andExpect(status().isForbidden());
+    identityFor("supply-chain", "all", "warehouse.shelf");
+    mvc.perform(post("/api/admin/finished-products/{id}/shelf-check",id)).andExpect(status().isForbidden());
+  }
+
   private ObjectNode sourceFixture(String publisher,String status) throws Exception {
     jdbc.update("INSERT INTO product_categories (id,name,scope,created_by_account_id) VALUES (99010,'跨端测试分类','finished',1)");
     jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id,created_by_account_id) VALUES (99010,'跨端测试供应商','platform',0,1)");

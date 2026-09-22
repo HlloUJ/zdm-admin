@@ -185,3 +185,6 @@ export async function listFinishedProductTemplateAttributes(): Promise<FinishedP
 
 export const getFinishedProductDetail = (id: number) =>
   request<FinishedProductRecord>(`/admin/finished-products/${id}`);
+
+export const checkFinishedProductShelf = (id: number) =>
+  request<boolean>(`/admin/finished-products/${id}/shelf-check`, { method: 'POST' });
