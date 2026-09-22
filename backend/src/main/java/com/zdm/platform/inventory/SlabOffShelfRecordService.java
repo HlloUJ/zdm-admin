@@ -10,6 +10,13 @@ public class SlabOffShelfRecordService
 
   private final com.zdm.platform.security.CurrentIdentityProvider identities;
   public SlabOffShelfRecordService(com.zdm.platform.security.CurrentIdentityProvider identities) { this.identities=identities; }
+  public List<SlabOffShelfRecord> listSourceBySlabId(Long id) {
+    return lambdaQuery().eq(SlabOffShelfRecord::getBusinessClientCode, "supply-chain")
+        .eq(SlabOffShelfRecord::getSlabId, id)
+        .orderByDesc(SlabOffShelfRecord::getOffShelvedAt)
+        .orderByDesc(SlabOffShelfRecord::getId).list();
+  }
+
   public List<SlabOffShelfRecord> listBySlabIds(List<Long> slabIds) {
     if (slabIds.isEmpty()) {
       return List.of();

@@ -190,16 +190,18 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                 value: 'admin.slab-management.warehouse',
                 actions: [
                   { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
+                  { label: '详情', value: 'admin.slab-management.warehouse.detail' },
                   { label: '价格', value: 'admin.slab-management.warehouse.price' },
                   { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
                   { label: '删除', value: 'admin.slab-management.warehouse.delete' },
                 ],
               },
               {
-                label: '出售中',
+                label: '已上架',
                 value: 'admin.slab-management.selling',
                 actions: [
                   { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
+                  { label: '详情', value: 'admin.slab-management.selling.detail' },
                   { label: '价格', value: 'admin.slab-management.selling.price' },
                   { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
                 ],
@@ -217,7 +219,10 @@ const verifiedFunctionCatalog: FunctionModule[] = [
               {
                 label: '已售完',
                 value: 'admin.slab-management.sold-out',
-                actions: [{ label: '价格', value: 'admin.slab-management.sold-out.price' }],
+                actions: [
+                  { label: '详情', value: 'admin.slab-management.sold-out.detail' },
+                  { label: '价格', value: 'admin.slab-management.sold-out.price' },
+                ],
               },
               {
                 label: '回收站',
@@ -226,6 +231,7 @@ const verifiedFunctionCatalog: FunctionModule[] = [
                   { label: '批量放回到仓库', value: 'admin.slab-management.recycle.batch-restore' },
                   { label: '批量彻底删除', value: 'admin.slab-management.recycle.batch-purge' },
                   { label: '清空回收站', value: 'admin.slab-management.recycle.clear' },
+                  { label: '详情', value: 'admin.slab-management.recycle.detail' },
                   { label: '价格', value: 'admin.slab-management.recycle.price' },
                   { label: '放回仓库', value: 'admin.slab-management.recycle.restore' },
                   { label: '彻底删除', value: 'admin.slab-management.recycle.purge' },

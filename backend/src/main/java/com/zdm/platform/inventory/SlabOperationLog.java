@@ -30,7 +30,6 @@ public class SlabOperationLog {
   private String detailReason;
   private String changeDetails;
   private String operationSource;
-  private String batchNo;
   private String operatorName;
   private Long operatorAccountId;
   private LocalDateTime operatedAt;
@@ -49,7 +48,7 @@ public class SlabOperationLog {
   public String getOperationType() { return operationType; }
   public void setOperationType(String operationType) { this.operationType = operationType; }
   public String getOperationSummary() { return operationSummary; }
-  public void setOperationSummary(String operationSummary) { this.operationSummary = operationSummary; }
+  public void setOperationSummary(String value) { operationSummary = value; }
   public String getBeforeStatus() { return beforeStatus; }
   public void setBeforeStatus(String beforeStatus) { this.beforeStatus = beforeStatus; }
   public String getAfterStatus() { return afterStatus; }
@@ -62,8 +61,6 @@ public class SlabOperationLog {
   public void setChangeDetails(String changeDetails) { this.changeDetails = changeDetails; }
   public String getOperationSource() { return operationSource; }
   public void setOperationSource(String operationSource) { this.operationSource = operationSource; }
-  public String getBatchNo() { return batchNo; }
-  public void setBatchNo(String batchNo) { this.batchNo = batchNo; }
   public String getOperatorName() { return operatorName; }
   public void setOperatorName(String operatorName) { this.operatorName = operatorName; }
   public Long getOperatorAccountId() { return operatorAccountId; }

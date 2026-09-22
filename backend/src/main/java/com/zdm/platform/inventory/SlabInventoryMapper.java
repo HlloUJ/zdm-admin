@@ -17,4 +17,16 @@ public interface SlabInventoryMapper extends BaseMapper<SlabInventory> {
       """)
   List<SlabInventory> selectListWithDetails();
 
+  @Select("""
+      SELECT si.*, variety.name AS variety_name, origin.name AS origin_name, supplier.name AS supplier_name
+      FROM slab_inventory si
+      LEFT JOIN slab_varieties variety ON variety.id = si.variety_id
+      LEFT JOIN slab_origins origin ON origin.id = si.origin_id
+      LEFT JOIN suppliers supplier ON supplier.id = si.supplier_id
+      WHERE si.id = #{id}
+        AND ((#{supplyChain} = TRUE AND si.source_status != 'purged')
+          OR (#{supplyChain} = FALSE AND si.operations_deleted = FALSE))
+        AND (#{allData} = TRUE OR si.created_by_account_id = #{accountId})
+      """)
+  SlabInventory selectVisibleDetail(Long id, boolean supplyChain, boolean allData, Long accountId);
 }

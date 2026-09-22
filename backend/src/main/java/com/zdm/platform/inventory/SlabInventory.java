@@ -89,6 +89,9 @@ public class SlabInventory extends BaseEntity implements com.zdm.platform.securi
   private BigDecimal guidePriceCoefficient;
 
   @TableField(exist = false)
+  private List<SlabOffShelfRecord> sourceOffShelfRecords;
+
+  @TableField(exist = false)
   private List<SlabOffShelfRecord> offShelfRecords;
 
   @Valid
@@ -421,6 +424,14 @@ public class SlabInventory extends BaseEntity implements com.zdm.platform.securi
 
   public void setGuidePriceCoefficient(BigDecimal guidePriceCoefficient) {
     this.guidePriceCoefficient = guidePriceCoefficient;
+  }
+
+  public List<SlabOffShelfRecord> getSourceOffShelfRecords() {
+    return sourceOffShelfRecords == null ? List.of() : List.copyOf(sourceOffShelfRecords);
+  }
+
+  public void setSourceOffShelfRecords(List<SlabOffShelfRecord> records) {
+    sourceOffShelfRecords = records == null ? List.of() : List.copyOf(records);
   }
 
   public List<SlabOffShelfRecord> getOffShelfRecords() {

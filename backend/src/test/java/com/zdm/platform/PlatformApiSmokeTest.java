@@ -113,6 +113,7 @@ class PlatformApiSmokeTest {
     for (Long levelId : jdbcTemplate.queryForList("SELECT id FROM store_levels WHERE status = 'enabled'", Long.class)) {
       prices.addObject().put("storeLevelId", levelId).put("priceCoefficient", 1).put("costPrice", 1).put("price", 1);
     }
+    pricePayload.put("areaSquareMeter", 6);
     payload = mapper.writeValueAsString(pricePayload);
     java.util.ArrayList<Long> ids = new java.util.ArrayList<>();
     try {
@@ -135,7 +136,7 @@ class PlatformApiSmokeTest {
         assertThat(details.has("视频封面")).isTrue();
         assertThat(details.has("供应商")).isTrue();
         assertThat(details.has("扣角4宽")).isTrue();
-        assertThat(details.has("面积")).isTrue();
+        assertThat(details.path("面积").path("after").decimalValue()).isEqualByComparingTo("6");
         assertThat(details.has("创建时间")).isTrue();
         assertThat(details.has("价格层级")).isFalse();
         assertThat(jdbcTemplate.queryForObject("SELECT serial_no FROM slab_inventory WHERE id = ?", String.class, id)).isNull();
@@ -153,6 +154,7 @@ class PlatformApiSmokeTest {
       }
       var stockBody = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload);
       stockBody.put("stock", 9);
+      stockBody.put("areaSquareMeter", 5.4);
       mockMvc.perform(put("/api/admin/slabs/{id}", id)
               .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json").content(mapper.writeValueAsBytes(stockBody)))
@@ -160,6 +162,8 @@ class PlatformApiSmokeTest {
       assertThat(jdbcTemplate.queryForObject("SELECT stock FROM slab_inventory WHERE id=?", Integer.class, id)).isEqualTo(9);
       var stockChanges = mapper.readTree(jdbcTemplate.queryForObject(
           "SELECT change_details FROM slab_operation_logs WHERE slab_id=? AND operation_type='UPDATE' ORDER BY id DESC LIMIT 1", String.class, id));
+      assertThat(stockChanges.path("面积").path("before").decimalValue()).isEqualByComparingTo("6");
+      assertThat(stockChanges.path("面积").path("after").decimalValue()).isEqualByComparingTo("5.4");
       assertThat(stockChanges.path("库存").path("before").asInt()).isEqualTo(1);
       assertThat(stockChanges.path("库存").path("after").asInt()).isEqualTo(9);
       Long logCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=?", Long.class, id);
@@ -219,8 +223,16 @@ class PlatformApiSmokeTest {
             "SELECT change_details FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'PRICE_UPDATE' ORDER BY id DESC LIMIT 1",
             String.class, id);
         var changes = mapper.readTree(details);
-        assertThat(changes.size()).isEqualTo(1);
-        var change = changes.elements().next();
+        assertThat(changes.size()).isEqualTo(2);
+        var tiers = changes.path("价格层级");
+        assertThat(tiers.path("before").size()).isEqualTo(1);
+        assertThat(tiers.path("after").size()).isEqualTo(1);
+        assertThat(tiers.path("before").get(0).path("price").decimalValue())
+            .isEqualByComparingTo(tiers.path("after").get(0).path("price").decimalValue());
+        assertThat(tiers.path("after").get(0).path("priceCoefficient").decimalValue())
+            .isEqualByComparingTo(target.path("priceCoefficient").decimalValue());
+        assertThat(tiers.path("after").get(0).path("priceSource").asText()).isEqualTo(source);
+        var change = changes.path(tiers.path("after").get(0).path("storeLevelName").asText() + "价格来源");
         assertThat(change.path("before").asText()).isEqualTo("manual".equals(source) ? "跟随配置" : "手工价格");
         assertThat(change.path("after").asText()).isEqualTo("manual".equals(source) ? "手工价格" : "跟随配置");
       }
@@ -5695,31 +5707,27 @@ class PlatformApiSmokeTest {
           """
           INSERT INTO slab_operation_logs
             (business_client_code,slab_id, slab_serial_no, slab_name, publisher_type, operation_type,
-             operation_summary, change_details, operation_source, operator_name, operated_at)
-          VALUES ('supply-chain',?, ?, '大板发布选项测试', '平台发布', 'UPDATE', '编辑大板', ?,
+             change_details, operation_source, operator_name, operated_at)
+          VALUES ('supply-chain',?, ?, '大板发布选项测试', '平台发布', 'UPDATE', ?,
                   'MANUAL', '超级管理员', NOW())
           """,
           slabId,
           serialNo,
           """
           {
-            "供应商ID":{"before":%d,"after":%d},
-            "品种ID":{"before":1,"after":1},
-            "产地ID":{"before":1,"after":1},
-            "纹理ID":{"before":%d,"after":%d},
-            "色系ID":{"before":%d,"after":%d},
-            "等级ID":{"before":%d,"after":%d},
+            "供应商ID":{"before":null,"after":%d},
+            "品种ID":{"before":null,"after":1},
+            "产地ID":{"before":null,"after":1},
+            "纹理ID":{"before":null,"after":%d},
+            "色系ID":{"before":null,"after":%d},
+            "等级ID":{"before":null,"after":%d},
             "1:1主图":{"before":null,"after":%d},
             "商品视频":{"before":null,"after":%d}
           }
           """.formatted(
               supplierId,
-              supplierId,
-              textureId,
               textureId,
               colorId,
-              colorId,
-              gradeId,
               gradeId,
               mainImageMediaId,
               videoMediaId));
@@ -6133,7 +6141,7 @@ class PlatformApiSmokeTest {
           secondSlabId)).isZero();
       List<Map<String, Object>> clearLogs = jdbcTemplate.queryForList(
           """
-          SELECT slab_id, slab_name, slab_serial_no, operation_type, operation_summary, batch_no
+          SELECT slab_id, slab_name, slab_serial_no, operation_type, operation_summary
           FROM slab_operation_logs
           WHERE slab_id IN (?, ?)
           ORDER BY slab_id
@@ -6148,8 +6156,7 @@ class PlatformApiSmokeTest {
       assertThat(clearLogs).extracting(row -> row.get("operation_type"))
           .containsOnly("PURGE");
       assertThat(clearLogs).extracting(row -> row.get("operation_summary"))
-          .containsOnly("彻底删除运营商品");
-      assertThat(clearLogs.get(0).get("batch_no")).isEqualTo(clearLogs.get(1).get("batch_no"));
+          .containsOnly("彻底删除大板");
     } finally {
       jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id IN (?, ?)", firstSlabId, secondSlabId);
       jdbcTemplate.update("DELETE FROM slab_inventory WHERE id IN (?, ?)", firstSlabId, secondSlabId);

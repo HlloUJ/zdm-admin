@@ -31,6 +31,7 @@ export interface SlabRecord {
   sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
   operationsDeleted?: boolean;
+  sourceOffShelfRecords?: SlabOffShelfRecord[];
   stock?: number;
   id: number;
   supplierId?: number;
@@ -151,7 +152,9 @@ export type SlabOperationType =
   | 'PHYSICAL_DELETE'
   | 'PURGE'
   | 'STATUS_UPDATE'
-  | 'SOURCE_SYNC';
+  | 'SOURCE_SHELF'
+  | 'SOURCE_OFF_SHELF'
+  | 'SOURCE_DELETE';
 
 export interface SlabOperationChange {
   before?: unknown;
@@ -172,7 +175,6 @@ export interface SlabOperationLogRecord {
   detailReason?: string;
   changeDetails?: string;
   operationSource: 'MANUAL' | 'EXTERNAL_API' | 'SYSTEM' | 'SUPPLY_CHAIN';
-  batchNo?: string;
   operatorName: string;
   operatorAccountId?: number;
   operatedAt: string;
@@ -197,6 +199,10 @@ export interface SlabOperationLogQuery {
 
 export function resolveSlabPublishTargetStatus(activeStatus: SlabStatus): SlabPublishTargetStatus {
   return activeStatus === 'selling' ? 'selling' : 'warehouse';
+}
+
+export function getSlabDetail(id: number) {
+  return request<SlabRecord>(`/admin/slabs/${id}`);
 }
 
 export function listSlabs() {
@@ -226,6 +232,16 @@ export function updateSlab(id: number, payload: SlabPayload) {
   return request<SlabRecord>(`/admin/slabs/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export function checkSlabAction(
+  ids: number[],
+  action: 'shelf' | 'offShelf' | 'restore' | 'delete' | 'purge' | 'clearRecycle',
+) {
+  return request<boolean>('/admin/slabs/action-check', {
+    method: 'POST',
+    body: JSON.stringify({ ids, action }),
   });
 }
 
