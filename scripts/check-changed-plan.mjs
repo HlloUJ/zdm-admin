@@ -1,5 +1,9 @@
 import path from 'node:path';
 
+import { createBackendTestPlan } from './backend-test-plan.mjs';
+import { createScriptTestPlan } from './script-test-plan.mjs';
+import { createBrowserTestPlan } from './affected-test-inputs.mjs';
+
 const SCRIPT_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.vue'];
 const TYPECHECK_EXTENSIONS = ['.ts', '.tsx', '.vue'];
 
@@ -20,20 +24,32 @@ export function normalizeFiles(root, files) {
   ].sort();
 }
 
-export function createValidationPlan(files, fileExists = () => true) {
+export function createValidationPlan(files, fileExists = () => true, { root } = {}) {
   const existingFiles = files.filter(fileExists);
   const dependencyFiles = files.filter((file) => file === 'package.json' || file === 'package-lock.json');
-  const backendFiles = files.filter((file) => file.startsWith('backend/'));
-  const e2eFiles = existingFiles.filter((file) => file.startsWith('tests/e2e/') && file.endsWith('.spec.ts'));
+  const backendPlan = createBackendTestPlan(files, fileExists, { root });
+  const backendTask = {
+    name: 'backend tests',
+    reason: backendPlan.reason,
+    args: [
+      'run',
+      'backend:test',
+      ...(backendPlan.mode === 'targeted' ? ['--', `-Dtest=${backendPlan.tests.join(',')}`] : []),
+    ],
+  };
+  const browserPlan = createBrowserTestPlan(files, root, fileExists);
+  const e2eFiles = browserPlan.tests;
 
   if (dependencyFiles.length > 0) {
     return {
       tasks: [
         { name: 'frontend quality', args: ['run', 'quality'] },
         { name: 'frontend build', args: ['run', 'build:app'] },
-        ...(backendFiles.length > 0 ? [{ name: 'backend tests', args: ['run', 'backend:test'] }] : []),
+        ...(backendPlan.mode !== 'none' ? [backendTask] : []),
       ],
       e2eFiles,
+      browserPlan,
+      backendPlan,
     };
   }
 
@@ -49,12 +65,27 @@ export function createValidationPlan(files, fileExists = () => true) {
   );
   const unitTestFiles = existingFiles.filter(
     (file) =>
-      !file.startsWith('tests/e2e/') && (file.includes('/__tests__/') || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)),
+      !file.startsWith('scripts/') &&
+      !file.startsWith('tests/e2e/') &&
+      (file.includes('/__tests__/') || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)),
   );
   const relatedSourceFiles = existingFiles.filter(
     (file) => file.startsWith('src/') && !file.includes('/__tests__/') && hasExtension(file, TYPECHECK_EXTENSIONS),
   );
   const tasks = [];
+  if (files.some((file) => file.startsWith('src/')))
+    tasks.push({ name: 'source guards', args: ['run', 'test:source-guards'] });
+  if (files.some((file) => file.startsWith('scripts/') && hasExtension(file, SCRIPT_EXTENSIONS))) {
+    const scriptPlan = createScriptTestPlan(files, root);
+    tasks.push({
+      name: 'script tests',
+      reason: scriptPlan.reason,
+      args:
+        scriptPlan.mode === 'targeted'
+          ? ['run', 'test:scripts:files', '--', ...scriptPlan.tests]
+          : ['run', 'test:scripts'],
+    });
+  }
 
   if (typecheckNeeded) tasks.push({ name: 'typecheck', args: ['run', 'typecheck:cached'] });
   if (lintFiles.length > 0) {
@@ -65,12 +96,11 @@ export function createValidationPlan(files, fileExists = () => true) {
   }
   if (unitTestFiles.length > 0) {
     tasks.push({ name: 'unit tests', args: ['run', 'test:unit', '--', ...unitTestFiles] });
-  } else if (relatedSourceFiles.length > 0) {
+  }
+  if (relatedSourceFiles.length > 0) {
     tasks.push({ name: 'related unit tests', args: ['run', 'test:related', '--', ...relatedSourceFiles] });
   }
-  if (backendFiles.length > 0) {
-    tasks.push({ name: 'backend tests', args: ['run', 'backend:test'] });
-  }
+  if (backendPlan.mode !== 'none') tasks.push(backendTask);
 
-  return { tasks, e2eFiles };
+  return { tasks, e2eFiles, browserPlan, backendPlan };
 }

@@ -66,6 +66,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     root: workspaceRoot,
+    cacheDir: resolve(workspaceRoot, '.task-runtime/cache/vite'),
     plugins: [
       vue(),
       ...(taskPreview

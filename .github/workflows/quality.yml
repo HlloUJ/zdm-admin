@@ -9,11 +9,38 @@ on:
 
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CI_EVIDENCE_DIR: ${{ github.workspace }}/coverage/ci-evidence
 
 jobs:
-  frontend:
-    name: Frontend quality
+  scope:
+    name: Validation scope
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.scope.outputs.frontend }}
+      backend: ${{ steps.scope.outputs.backend }}
+      engineering: ${{ steps.scope.outputs.engineering }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: scope
+        run: node scripts/ci-quality-evidence.mjs scope
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-validation-scope
+          path: coverage/ci-evidence/scope.json
+          if-no-files-found: error
+          retention-days: 14
+
+  formatting:
+    name: Repository formatting
+    needs: scope
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,23 +48,245 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run quality
-      - run: npm run build:app
-      - run: npx playwright install --with-deps chrome
-      - run: npm run test:e2e:ci
+      - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run formatting -- npm run format:check
+      - if: always()
+        run: node scripts/ci-quality-evidence.mjs finish
         env:
-          PLAYWRIGHT_CHANNEL: chrome
+          JOB_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-formatting
+          path: coverage/ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
 
-  backend:
-    name: Backend quality
+  engineering:
+    name: Engineering tests
+    needs: scope
+    if: ${{ needs.scope.outputs.engineering == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run engineering-tests -- npm run test:engineering
+      - if: always()
+        run: node scripts/ci-quality-evidence.mjs finish
+        env:
+          JOB_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-engineering
+          path: coverage/ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  frontend_static:
+    name: Frontend static checks
+    needs: scope
+    if: ${{ needs.scope.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run frontend-quality -- npm run quality:checks
+      - run: node scripts/ci-quality-evidence.mjs run frontend-build -- npm run build:app
+      - run: node scripts/ci-quality-evidence.mjs run frontend-test-list -- npx playwright test --list --reporter=json
+        env:
+          PLAYWRIGHT_CHANNEL: chrome
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/all-tests.json
+      - if: always()
+        run: node scripts/ci-quality-evidence.mjs finish
+        env:
+          JOB_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-frontend-static
+          path: coverage/ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  frontend_e2e_1:
+    name: Frontend E2E 1/2
+    needs: scope
+    if: ${{ needs.scope.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run chrome-install -- npx playwright install --with-deps chrome
+      - run: node scripts/ci-quality-evidence.mjs run e2e-1 -- npm run test:e2e:ci -- --shard=1/2 --workers=1 --reporter=list,json
+        env:
+          PLAYWRIGHT_CHANNEL: chrome
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
+      - if: always()
+        run: node scripts/ci-quality-evidence.mjs finish
+        env:
+          JOB_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-frontend-e2e-1
+          path: coverage/ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ci-frontend-e2e-1-failures
+          path: test-results/
+          retention-days: 14
+
+  frontend_e2e_2:
+    name: Frontend E2E 2/2
+    needs: scope
+    if: ${{ needs.scope.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run chrome-install -- npx playwright install --with-deps chrome
+      - run: node scripts/ci-quality-evidence.mjs run e2e-2 -- npm run test:e2e:ci -- --shard=2/2 --workers=1 --reporter=list,json
+        env:
+          PLAYWRIGHT_CHANNEL: chrome
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
+      - if: always()
+        run: node scripts/ci-quality-evidence.mjs finish
+        env:
+          JOB_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-frontend-e2e-2
+          path: coverage/ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ci-frontend-e2e-2-failures
+          path: test-results/
+          retention-days: 14
+
+  frontend:
+    name: Frontend quality
+    if: always()
+    needs: [scope, formatting, engineering, frontend_static, frontend_e2e_1, frontend_e2e_2]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-validation-scope
+          path: coverage/downloaded-ci-evidence/ci-validation-scope
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.scope.outputs.frontend == 'true' }}
+        with:
+          pattern: ci-frontend-*
+          path: coverage/downloaded-ci-evidence
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.scope.outputs.engineering == 'true' }}
+        with:
+          name: ci-engineering
+          path: coverage/downloaded-ci-evidence/ci-engineering
+      - run: node scripts/ci-quality-evidence.mjs aggregate-frontend coverage/downloaded-ci-evidence
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-frontend-aggregate
+          path: coverage/ci-evidence/
+          retention-days: 14
+
+  backend_full:
+    name: Backend full checks
+    needs: scope
+    if: ${{ needs.scope.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: maven
       - working-directory: backend
-        run: mvn -B test checkstyle:check spotbugs:check jacoco:report
+        run: node ../scripts/ci-quality-evidence.mjs run backend-quality -- mvn -B test checkstyle:check spotbugs:check jacoco:report
+      - if: always()
+        run: node scripts/ci-quality-evidence.mjs finish
+        env:
+          JOB_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-backend-full
+          path: coverage/ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-backend-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: error
+          retention-days: 14
+
+  backend:
+    name: Backend quality
+    if: always()
+    needs: [scope, formatting, engineering, backend_full]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-validation-scope
+          path: coverage/downloaded-ci-evidence/ci-validation-scope
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.scope.outputs.backend == 'true' }}
+        with:
+          name: ci-backend-full
+          path: coverage/downloaded-ci-evidence/ci-backend-full
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.scope.outputs.engineering == 'true' }}
+        with:
+          name: ci-engineering
+          path: coverage/downloaded-ci-evidence/ci-engineering
+      - run: node scripts/ci-quality-evidence.mjs aggregate-backend coverage/downloaded-ci-evidence
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-backend-aggregate
+          path: coverage/ci-evidence/
+          retention-days: 14

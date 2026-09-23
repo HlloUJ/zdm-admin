@@ -10,6 +10,8 @@ export default tseslint.config(
       'node_modules/**',
       'backend/**',
       'coverage/**',
+      '.task-verification/**',
+      '.task-runtime/**',
       'playwright-report/**',
       'test-results/**',
     ],

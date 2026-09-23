@@ -10,3 +10,5 @@ backend/target
 backend/data
 backups
 .env
+.task-verification/
+.task-runtime/
