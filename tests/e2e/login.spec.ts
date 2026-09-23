@@ -70,6 +70,65 @@ test('logs out and clears the local account session', async ({ page }) => {
   expect(await page.evaluate(() => window.localStorage.getItem('zdm-admin-user'))).toBeNull();
 });
 
+test('built-in super admin switches to the supply-chain system with full scoped access', async ({ page }) => {
+  await installAdminApiMocks(page);
+  const contexts = [
+    { identityId: 1, identityType: 'platform_admin', clientCode: 'admin', tenantId: null, storeId: null },
+    { identityId: 2, identityType: 'platform_admin', clientCode: 'supply-chain', tenantId: null, storeId: null },
+  ];
+  await page.route('**/api/admin/auth/contexts', (route) => route.fulfill({ json: { code: 0, data: contexts } }));
+  await page.route('**/api/admin/auth/switch-identity', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          token: 'supply-chain-super-admin-token',
+          user: {
+            id: 1,
+            identityId: 2,
+            identityType: 'platform_admin',
+            clientCode: 'supply-chain',
+            name: '超级管理员',
+            phone: '15926626945',
+            roles: ['SUPER_ADMIN'],
+            permissions: ['all'],
+            dataPermission: 'all',
+          },
+        },
+      },
+    }),
+  );
+  await page.addInitScript(() => {
+    if (!window.localStorage.getItem('zdm-admin-token')) {
+      window.localStorage.setItem('zdm-admin-token', 'admin-super-admin-token');
+      window.localStorage.setItem(
+        'zdm-admin-user',
+        JSON.stringify({
+          id: 1,
+          identityId: 1,
+          identityType: 'platform_admin',
+          clientCode: 'admin',
+          name: '超级管理员',
+          phone: '15926626945',
+          roles: ['SUPER_ADMIN'],
+          permissions: ['all'],
+          dataPermission: 'all',
+        }),
+      );
+    }
+  });
+
+  await page.goto('/dashboard');
+  await page.locator('.brand-context-select').click();
+  await Promise.all([page.waitForEvent('load'), page.getByText('供应链协同系统', { exact: true }).click()]);
+  await expect(page.locator('.brand-context-label')).toHaveText('供应链协同系统');
+  await page.locator('.side-nav').getByText('商品管理', { exact: true }).click();
+  await expect(page.locator('.side-nav [data-menu-path="/supply-chain/finished-stock-management"]')).toBeVisible();
+  await expect(page.locator('.side-nav [data-menu-path="/supply-chain/slab-management"]')).toBeVisible();
+  await expect(page.locator('.side-nav [data-menu-path="/finished-stock-management"]')).toHaveCount(0);
+  await expect(page.locator('.side-nav [data-menu-path="/tenant-management"]')).toHaveCount(0);
+});
+
 for (const storeCount of [1, 2]) {
   test(`shows only stores in the brand switcher with ${storeCount} stores`, async ({ page }) => {
     await installAdminApiMocks(page);
