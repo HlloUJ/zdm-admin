@@ -21,6 +21,13 @@ import { fileURLToPath } from 'node:url';
 
 import { branchKind, DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from './git-workflow-core.mjs';
 import { classifyChangedFiles } from './verification-impact.mjs';
+import {
+  assertIntegrationRuntimeReady,
+  integrationBackendSnapshot,
+  integrationProofMatches,
+  readIntegrationProof,
+  writeIntegrationProof,
+} from './integration-handoff-state.mjs';
 import { compatibleTaskDependencies, validateTaskDependencies } from './task-dependencies.mjs';
 import {
   createLatestChangeQueue,
@@ -99,6 +106,10 @@ export function parseTaskPreviewArgs(args) {
     }
     if (value === '--handoff') {
       result.handoff = true;
+      continue;
+    }
+    if (value === '--force-integration-backend') {
+      result.forceIntegrationBackend = true;
       continue;
     }
     if (value === '--port' || value === '--backend-port') {
@@ -666,7 +677,7 @@ function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
 function previewServiceRequest(method, requestPath, timeoutMs = 30_000) {
   return new Promise((resolve) => {
     if (!existsSync(PREVIEW_SERVICE_SOCKET)) {
-      resolve({ statusCode: 0, body: '' });
+      resolve({ statusCode: 0, body: '', absent: true });
       return;
     }
     const request = http.request(
@@ -709,18 +720,35 @@ export function previewServiceOwnsWorktree(status, root) {
   );
 }
 
-async function stopSupervisedPreview(root) {
-  const currentResponse = await previewServiceRequest('GET', '/status');
+export async function stopSupervisedPreview(root, { request = previewServiceRequest } = {}) {
+  const stopped = (status) =>
+    status?.type === 'zdm-task-preview-service' &&
+    status.worktree === null &&
+    status.childPid === null &&
+    status.phase === 'integration-fallback' &&
+    status.mode === 'integration-fallback';
+  const currentResponse = await request('GET', '/status');
+  // A missing supervisor socket preserves foreground-preview handoff. An unreachable
+  // installed supervisor is unknown state, never proof that its child has stopped.
+  if (currentResponse.absent) return false;
   const currentStatus = currentResponse.statusCode === 200 ? parseJson(currentResponse.body) : null;
+  if (
+    currentStatus?.type !== 'zdm-task-preview-service' ||
+    !(
+      currentStatus.worktree === null ||
+      (typeof currentStatus.worktree === 'string' && path.isAbsolute(currentStatus.worktree))
+    ) ||
+    (currentStatus.worktree === null && !stopped(currentStatus))
+  )
+    throw new Error(`无法确认任务预览守护服务的进程归属和停止状态：${root}`);
   if (!previewServiceOwnsWorktree(currentStatus, root)) return false;
 
-  const stopResponse = await previewServiceRequest('POST', '/stop');
-  if (stopResponse.statusCode >= 200 && stopResponse.statusCode < 300) return true;
-  const finalResponse = await previewServiceRequest('GET', '/status');
+  const stopResponse = await request('POST', '/stop');
+  if (stopResponse.statusCode >= 200 && stopResponse.statusCode < 300 && stopped(parseJson(stopResponse.body)))
+    return true;
+  const finalResponse = await request('GET', '/status');
   const finalStatus = finalResponse.statusCode === 200 ? parseJson(finalResponse.body) : null;
-  if (previewServiceOwnsWorktree(finalStatus, root)) {
-    throw new Error(`任务预览守护服务未能释放旧任务：${root}`);
-  }
+  if (!stopped(finalStatus)) throw new Error(`任务预览守护服务未能证明旧任务进程已停止：${root}`);
   return true;
 }
 
@@ -897,10 +925,22 @@ function stopIntegrationBackend(integrationRoot) {
   run('docker', [...context.args, 'stop', 'backend'], context);
 }
 
-export async function startIntegrationBackend(integrationRoot, { execute = run, waitForHealth = waitForHttp } = {}) {
-  execute(process.execPath, [path.join(launcherRoot, 'scripts', 'ensure-backend.mjs'), '--worktree', integrationRoot], {
-    cwd: integrationRoot,
-  });
+export async function startIntegrationBackend(
+  integrationRoot,
+  { execute = run, waitForHealth = waitForHttp, forceRecreate = false } = {},
+) {
+  execute(
+    process.execPath,
+    [
+      path.join(launcherRoot, 'scripts', 'ensure-backend.mjs'),
+      '--worktree',
+      integrationRoot,
+      ...(forceRecreate ? ['--force-recreate'] : []),
+    ],
+    {
+      cwd: integrationRoot,
+    },
+  );
   await waitForHealth(`${SHARED_API_TARGET}/actuator/health`);
 }
 
@@ -1112,42 +1152,70 @@ export async function ensureTaskBackend(
   return { action };
 }
 
-async function ensureSharedBackend(worktrees) {
+export async function ensureSharedBackend(
+  worktrees,
+  { health = requestStatus, restore = startIntegrationBackend } = {},
+) {
   const healthUrl = `${SHARED_API_TARGET}/actuator/health`;
-  if ((await requestStatus(healthUrl)) === 200) return;
+  if ((await health(healthUrl)) === 200) return;
   const integrationWorktree = integrationWorktreeFor(worktrees);
-  run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'backend:ensure'], {
-    cwd: integrationWorktree.path,
-  });
-  await waitForHttp(healthUrl);
+  await restore(integrationWorktree.path);
 }
 
-async function handoffDatabaseTask({ root, branch, project, integrationRoot, context }) {
-  const lock = readDatabaseLock(integrationRoot);
+export async function handoffDatabaseTask(
+  { root, branch, project, integrationRoot, context, forceIntegrationBackend = false },
+  {
+    readLock = readDatabaseLock,
+    captureGit = gitCapture,
+    contains = (taskHead, integrationHead) =>
+      spawnSync('git', ['merge-base', '--is-ancestor', taskHead, integrationHead], { cwd: integrationRoot }).status ===
+      0,
+    stopSupervised = stopSupervisedPreview,
+    currentPreview = currentManagedPreview,
+    stopPreview = stopManagedPreview,
+    stopBackend = () => composeRun(context, ['stop', 'backend']),
+    restoreBackend = startIntegrationBackend,
+    snapshot = integrationBackendSnapshot,
+    readReceipt = readIntegrationProof,
+    writeReceipt = writeIntegrationProof,
+    releaseLock = () => unlinkSync(databaseRuntimePaths(integrationRoot).lockFile),
+  } = {},
+) {
+  const lock = readLock(integrationRoot);
   if (lock && lock.project !== project) throw new Error(databaseLockError(lock, { project, branch }));
-  const taskHead = gitCapture(root, ['rev-parse', 'HEAD']);
-  const integrationHead = gitCapture(integrationRoot, ['rev-parse', 'HEAD']);
-  const contained = spawnSync('git', ['merge-base', '--is-ancestor', taskHead, integrationHead], {
-    cwd: integrationRoot,
-  }).status;
-  if (contained !== 0) {
+  const taskHead = captureGit(root, ['rev-parse', 'HEAD']);
+  const integrationHead = captureGit(integrationRoot, ['rev-parse', 'HEAD']);
+  if (!contains(taskHead, integrationHead)) {
     throw new Error('任务提交尚未包含在 codex/integration-current，不能执行任务交接');
   }
 
-  const supervisedPreviewStopped = await stopSupervisedPreview(root);
-  const managedPreview = supervisedPreviewStopped ? null : await currentManagedPreview();
+  const before = snapshot(integrationRoot);
+  if (!before.worktreeClean) throw new Error('集成 Worktree 存在未提交改动，不能执行运行交接');
+  const recreate = forceIntegrationBackend || !integrationProofMatches(readReceipt(integrationRoot), before);
+  writeReceipt(integrationRoot, { version: 1, status: 'pending', integrationHead, taskHead });
+  const supervisedPreviewStopped = await stopSupervised(root);
+  const managedPreview = supervisedPreviewStopped ? null : await currentPreview();
   if (managedPreview && path.resolve(managedPreview.workspaceRoot) === path.resolve(root)) {
-    await stopManagedPreview();
+    await stopPreview();
   }
   if (supervisedPreviewStopped || managedPreview) {
     console.log(`旧任务预览已停止：${branch}`);
   }
-  composeRun(context, ['stop', 'backend']);
+  stopBackend();
   // backend:ensure owns database readiness before restoring the integration backend.
-  await startIntegrationBackend(integrationRoot);
+  await restoreBackend(integrationRoot, { forceRecreate: recreate });
+  const after = snapshot(integrationRoot);
+  assertIntegrationRuntimeReady(before, after, { recreate });
+  // This receipt proves the runtime, not delivery completion. Persist it before releasing the safety lock.
+  writeReceipt(integrationRoot, {
+    version: 1,
+    status: 'passed',
+    taskHead,
+    ...after,
+    action: recreate ? 'recreated' : 'reused',
+  });
   if (lock) {
-    const { lockFile } = databaseRuntimePaths(integrationRoot);
-    unlinkSync(lockFile);
+    releaseLock();
     console.log(`共享数据库锁已释放：${branch}`);
     console.log(`安全备份继续保留：${lock.backupFile}`);
   } else {
@@ -1315,6 +1383,8 @@ export async function main(args = process.argv.slice(2)) {
   if (options.pause && (options.stop || options.handoff || options.temporary || options.apiTarget || options.check))
     throw new Error('--pause 只能用于暂停当前任务');
   if (options.stop && options.handoff) throw new Error('--stop 不能与 --handoff 同时使用');
+  if (options.forceIntegrationBackend && !options.handoff)
+    throw new Error('--force-integration-backend 只能用于 --handoff');
   if (
     options.check &&
     (options.backendPort ||
@@ -1395,7 +1465,14 @@ export async function main(args = process.argv.slice(2)) {
     ensureDocker(root);
     const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
     const context = composeContext({ root, project, backendPort });
-    await handoffDatabaseTask({ root, branch, project, integrationRoot, context });
+    await handoffDatabaseTask({
+      root,
+      branch,
+      project,
+      integrationRoot,
+      context,
+      forceIntegrationBackend: options.forceIntegrationBackend,
+    });
     return;
   }
   if (options.stop) {

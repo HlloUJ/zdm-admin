@@ -7,12 +7,15 @@ import test from 'node:test';
 
 import viteConfig from '../vite.config.js';
 import { runtimeDigest, taskBackendContainerIdentity } from './task-runtime-state.mjs';
+import { PreviewSupervisor } from './task-preview-service.mjs';
 
 const syncIntegrationSource = readFileSync(new URL('./sync-integration.mjs', import.meta.url), 'utf8');
 const taskPreviewSource = readFileSync(new URL('./dev-task.mjs', import.meta.url), 'utf8');
 
 import {
   snapshotAppliedMigrations,
+  stopSupervisedPreview,
+  handoffDatabaseTask,
   ensureTaskBackend,
   runtimeWatchFile,
   createBackendWatchers,
@@ -83,7 +86,8 @@ test('parses task preview mode, ports, target worktree, and stop options', () =>
 });
 
 test('makes integration sync invoke the mandatory task handoff', () => {
-  assert.match(syncIntegrationSource, /dev:task:handoff/);
+  assert.match(syncIntegrationSource, /new URL\('\.\/dev-task\.mjs', import\.meta\.url\)/);
+  assert.match(syncIntegrationSource, /'--handoff'/);
   assert.match(syncIntegrationSource, /任务交接：completed/);
 });
 
@@ -91,8 +95,8 @@ test('makes task handoff stop the old managed preview before its backend', () =>
   const handoffStart = taskPreviewSource.indexOf('async function handoffDatabaseTask');
   const handoffEnd = taskPreviewSource.indexOf('function targetViteConfig', handoffStart);
   const handoffSource = taskPreviewSource.slice(handoffStart, handoffEnd);
-  const previewStop = handoffSource.indexOf('await stopSupervisedPreview(root);');
-  const backendStop = handoffSource.indexOf("composeRun(context, ['stop', 'backend']);", previewStop);
+  const previewStop = handoffSource.indexOf('await stopSupervised(root);');
+  const backendStop = handoffSource.indexOf('stopBackend();', previewStop);
   assert.ok(handoffStart >= 0);
   assert.ok(handoffEnd > handoffStart);
   assert.ok(previewStop >= 0);
@@ -104,6 +108,154 @@ test('scopes preview supervisor shutdown to the handed-off worktree', () => {
   assert.equal(previewServiceOwnsWorktree(status, '/tmp/task-a'), true);
   assert.equal(previewServiceOwnsWorktree(status, '/tmp/task-b'), false);
   assert.equal(previewServiceOwnsWorktree({ type: 'other', worktree: '/tmp/task-a' }, '/tmp/task-a'), false);
+});
+
+const supervisorStatus = (fields = {}) => ({
+  type: 'zdm-task-preview-service',
+  worktree: null,
+  childPid: null,
+  phase: 'integration-fallback',
+  mode: 'integration-fallback',
+  ...fields,
+});
+const supervisorResponse = (status, statusCode = 200) => ({ statusCode, body: JSON.stringify(status) });
+const activeSupervisorStatus = () =>
+  supervisorStatus({ worktree: '/task', childPid: 123, phase: 'running', mode: 'task' });
+
+test('supervised stop requires proof of child exit after a failed or incomplete stop response', async () => {
+  for (const finalResponse of [
+    supervisorResponse(supervisorStatus({ childPid: 123, phase: 'running' })),
+    supervisorResponse(activeSupervisorStatus()),
+    supervisorResponse(supervisorStatus({ childPid: undefined })),
+    supervisorResponse({ type: 'other', worktree: null, childPid: null }),
+    { statusCode: 0, body: '' },
+    { statusCode: 200, body: 'invalid' },
+  ]) {
+    for (const stopCode of [200, 500]) {
+      const responses = [supervisorResponse(activeSupervisorStatus()), supervisorResponse({}, stopCode), finalResponse];
+      const calls = [];
+      await assert.rejects(
+        stopSupervisedPreview('/task', {
+          request: async (...args) => {
+            calls.push(args);
+            return responses.shift();
+          },
+        }),
+        /未能证明旧任务进程已停止/,
+      );
+      assert.deepEqual(calls, [
+        ['GET', '/status'],
+        ['POST', '/stop'],
+        ['GET', '/status'],
+      ]);
+    }
+  }
+});
+
+test('supervised stop accepts confirmed exit and never stops another task or an absent supervisor', async () => {
+  for (const acknowledged of [true, false]) {
+    const responses = [
+      supervisorResponse(activeSupervisorStatus()),
+      acknowledged ? supervisorResponse(supervisorStatus()) : supervisorResponse({}, 500),
+      ...(!acknowledged ? [supervisorResponse(supervisorStatus())] : []),
+    ];
+    assert.equal(await stopSupervisedPreview('/task', { request: async () => responses.shift() }), true);
+    assert.equal(responses.length, 0);
+  }
+  for (const response of [
+    supervisorResponse(supervisorStatus()),
+    supervisorResponse(activeSupervisorStatus()),
+    { statusCode: 0, body: '', absent: true },
+  ]) {
+    let requests = 0;
+    assert.equal(
+      await stopSupervisedPreview('/other', {
+        request: async () => {
+          requests++;
+          return response;
+        },
+      }),
+      false,
+    );
+    assert.equal(requests, 1);
+  }
+});
+
+test('supervised stop blocks unknown initial state and a retry with a live unowned child', async () => {
+  for (const response of [
+    { statusCode: 0, body: '' },
+    { statusCode: 200, body: 'invalid' },
+    supervisorResponse(supervisorStatus({ childPid: 123, phase: 'running' })),
+  ]) {
+    let requests = 0;
+    await assert.rejects(
+      stopSupervisedPreview('/task', {
+        request: async () => {
+          requests++;
+          return response;
+        },
+      }),
+      /无法确认/,
+    );
+    assert.equal(requests, 1);
+  }
+});
+
+test('an actual supervisor stop failure blocks handoff and its retry before backend restore or lock release', async () => {
+  const gateway = {
+    mode: 'task',
+    status() {
+      return { mode: this.mode, upstream: 'mock', listening: true };
+    },
+    useIntegration() {
+      this.mode = 'integration-fallback';
+    },
+  };
+  const supervisor = new PreviewSupervisor(
+    { logFile: '/unused' },
+    { selectedWorktree: '/task', taskArgs: [] },
+    gateway,
+    {
+      writeConfig() {},
+      stopChild: async () => {
+        throw new Error('injected child stop failure');
+      },
+    },
+  );
+  supervisor.child = { pid: 123, exitCode: null };
+  supervisor.currentWorktree = '/task';
+  supervisor.phase = 'running';
+  const request = async (method) => {
+    if (method === 'GET') return supervisorResponse(supervisor.status());
+    try {
+      return supervisorResponse(await supervisor.stop());
+    } catch (error) {
+      return supervisorResponse({ error: error.message }, 500);
+    }
+  };
+  const events = [];
+  const runHandoff = () =>
+    handoffDatabaseTask(
+      { root: '/task', branch: 'codex/task', project: 'task', integrationRoot: '/integration', context: {} },
+      {
+        readLock: () => ({ project: 'task', branch: 'codex/task', backupFile: '/retained/backup.sql' }),
+        captureGit: () => 'merged',
+        contains: () => true,
+        snapshot: () => ({ worktreeClean: true }),
+        readReceipt: () => null,
+        writeReceipt: (_, proof) => events.push(proof.status),
+        stopSupervised: (root) => stopSupervisedPreview(root, { request }),
+        currentPreview: async () => events.push('fallback-preview'),
+        stopBackend: () => events.push('stop-backend'),
+        restoreBackend: async () => events.push('restore-backend'),
+        releaseLock: () => events.push('release-lock'),
+      },
+    );
+  await assert.rejects(runHandoff(), /未能证明旧任务进程已停止/);
+  assert.equal(supervisor.status().worktree, null);
+  assert.equal(supervisor.status().childPid, 123);
+  await assert.rejects(runHandoff(), /无法确认/);
+  assert.deepEqual(events, ['pending', 'pending']);
 });
 
 test('uses one fixed current-task port and reserves dynamic ports for temporary previews', async () => {

@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const EVIDENCE_VERSION = 2;
+export const EVIDENCE_VERSION = 3;
 const contentCache = new Map();
 export const digest = (value) => createHash('sha256').update(value).digest('hex');
 const jsonDigest = (value) => digest(JSON.stringify(value));
@@ -18,7 +19,8 @@ function capture(root, command, args, env = process.env) {
     maxBuffer: 32 * 1024 * 1024,
   });
   if (result.status !== 0) throw new Error(`${command} ${args[0]} identity unavailable`);
-  return result.stdout.trim();
+  // Git's NUL-delimited paths may begin with whitespace; trim only scalar/text output.
+  return command === 'git' && args.includes('-z') ? result.stdout : result.stdout.trim();
 }
 
 function fileDigest(file) {
@@ -302,11 +304,30 @@ function dockerEnvironment(root, env, files, run = capture) {
   };
 }
 
+export function requiresFailureHistory({ args = [], kind = 'node', reuse } = {}) {
+  return (
+    !['runtime', 'orchestration'].includes(kind) &&
+    (reuse !== false ||
+      kind === 'browser' ||
+      args.some(
+        (arg) =>
+          /^(?:test:(?:unit|related|scripts(?::files)?|engineering|source-guards|e2e(?::ci|:chrome)?)|backend:(?:test|quality)|quality(?::checks)?|check:(?:ui|full)|verify(?::local|:delivery)?)$/.test(
+            arg,
+          ) || /(?:^|[/\\])run-(?:frontend|script|playwright)-tests\.mjs$/.test(arg),
+      ))
+  );
+}
+
 export function captureIdentity(task, { captureCommand = capture } = {}) {
   const { root, command, args = [], kind = 'node', env = process.env } = task;
   const backendScope = kind === 'backend' ? backendInputScope(task) : null;
   const source = backendScope?.source ?? captureSource(root);
-  const eligible = task.reuse !== false && !['browser', 'runtime'].includes(kind);
+  const eligible = task.reuse !== false && !['browser', 'runtime', 'orchestration'].includes(kind);
+  const failureHistoryRequired = requiresFailureHistory(task);
+  const testEntry = failureHistoryRequired && !eligible;
+  // Test input proof protects failure history independently of whether successful runs may be cached.
+  // Cheap non-test checks still avoid dependency scans.
+  const proveInputs = eligible || testEntry;
   const environment = {
     node: process.version,
     executable: fileDigest(process.execPath),
@@ -325,8 +346,13 @@ export function captureIdentity(task, { captureCommand = capture } = {}) {
     ),
   };
   let reusable = eligible;
-  let reason = eligible ? null : 'Always execute this check; skip expensive cache probes';
-  if (eligible) {
+  let inputProofComplete = proveInputs;
+  let reason = eligible
+    ? null
+    : testEntry
+      ? 'Always execute this test; retain dependency input proof'
+      : 'Always execute this check; skip expensive cache probes';
+  if (proveInputs) {
     if (kind !== 'backend') environment.dependencies = hashPaths(root, ['node_modules'], { dependency: true });
     const executable = command.includes(path.sep)
       ? path.resolve(root, command)
@@ -352,13 +378,14 @@ export function captureIdentity(task, { captureCommand = capture } = {}) {
       reason = 'Custom runtime options require fresh execution';
     }
   }
-  if (kind === 'backend' && eligible) {
+  if (kind === 'backend' && proveInputs) {
     try {
       if (!backendScope)
         throw new Error('Backend command graph is not mapped; use full source scope and fresh execution');
       environment.docker = dockerEnvironment(root, env, backendScope.scope.files, captureCommand);
     } catch (error) {
       reusable = false;
+      inputProofComplete = false;
       reason = error.message;
     }
   }
@@ -377,7 +404,15 @@ export function captureIdentity(task, { captureCommand = capture } = {}) {
     artifacts: artifactPaths(task),
     environment,
   };
-  return { identity, fingerprint: jsonDigest(identity), source, reusable, reason };
+  return {
+    identity,
+    fingerprint: jsonDigest(identity),
+    source,
+    reusable,
+    reason,
+    inputProofComplete,
+    failureHistoryRequired,
+  };
 }
 
 function artifactPaths(task) {
@@ -396,6 +431,31 @@ export function captureArtifacts(task) {
   return paths.length && paths.every((file) => existsSync(path.join(task.root, file)))
     ? hashPaths(task.root, paths)
     : null;
+}
+
+export function verificationAttempts(directory) {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory)
+    .filter((name) => name.endsWith('.started.json'))
+    .map((name) => {
+      const started = JSON.parse(readFileSync(path.join(directory, name), 'utf8'));
+      assert.equal(name, `${started.attemptId}.started.json`, 'Invalid verification attempt identity');
+      assert.ok(started.fingerprint && started.startedAt, 'Incomplete verification attempt identity');
+      const completedFile = path.join(directory, `${started.attemptId}.json`);
+      if (!existsSync(completedFile))
+        return { ...started, status: 'interrupted', exitCode: 1, reason: 'Attempt has no immutable completion record' };
+      const completed = JSON.parse(readFileSync(completedFile, 'utf8'));
+      for (const key of ['attemptId', 'fingerprint', 'startedAt'])
+        assert.equal(completed[key], started[key], 'Verification attempt completion belongs to different inputs');
+      assert.ok(
+        Number.isInteger(completed.exitCode) && completed.completedAt,
+        'Incomplete verification attempt result',
+      );
+      return completed;
+    })
+    .sort(
+      (left, right) => left.startedAt.localeCompare(right.startedAt) || left.attemptId.localeCompare(right.attemptId),
+    );
 }
 
 export function canReuse(record, snapshot, artifacts, root) {

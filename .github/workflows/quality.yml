@@ -99,7 +99,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
-      - run: node scripts/ci-quality-evidence.mjs run frontend-quality -- npm run quality:checks
+      - run: node scripts/ci-quality-evidence.mjs run frontend-quality -- npm run quality:static
+      - run: node scripts/ci-quality-evidence.mjs run frontend-unit -- npm run test:unit
+      - run: node scripts/ci-quality-evidence.mjs run frontend-source-guards -- npm run test:source-guards
       - run: node scripts/ci-quality-evidence.mjs run frontend-build -- npm run build:app
       - run: node scripts/ci-quality-evidence.mjs run frontend-test-list -- npx playwright test --list --reporter=json
         env:

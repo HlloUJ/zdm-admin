@@ -15,6 +15,8 @@ const RUNTIME_FILES = new Set([
   'scripts/ensure-backend.mjs',
   'scripts/run-integration.mjs',
   'scripts/sync-integration.mjs',
+  'scripts/delivery-launcher.mjs',
+  'scripts/integration-handoff-state.mjs',
   'scripts/task-preview-service.mjs',
   'scripts/macos/launchd-dev.mjs',
   'scripts/macos/启动装点猫.command',

@@ -15,7 +15,36 @@ import {
   verifyScope,
   domainApplicable,
   verifyEngineeringEvidence,
+  requireFirstAttempt,
+  verifyFrontendUnitEvidence,
 } from './ci-quality-evidence.mjs';
+
+function frontendResult(kind) {
+  const file = kind === 'unit' ? 'unit-module-id' : 'scripts/feedback-foundation.test.mjs';
+  return {
+    schemaVersion: 1,
+    kind,
+    runId: kind,
+    complete: true,
+    files: [file],
+    completedFiles: [file],
+    collectedTests: ['one'],
+    suites: [],
+    errors: [],
+    tests: [
+      {
+        id: 'one',
+        file,
+        name: 'test',
+        status: 'passed',
+        retryCount: 0,
+        repeatCount: 0,
+        flaky: false,
+        expectedFailure: false,
+      },
+    ],
+  };
+}
 
 const report = (ids, executed = false) => ({
   suites: [
@@ -44,7 +73,23 @@ function fixture() {
         status: 'success',
         workflowRunId: 'run',
         attempt: '1',
-        phases: phases[index].map((name) => ({ name, exitCode: 0 })),
+        phases: [
+          ...(index === 0
+            ? [
+                { name: 'frontend-unit', runId: 'unit', command: ['npm', 'run', 'test:unit'], exitCode: 0 },
+                {
+                  name: 'frontend-source-guards',
+                  runId: 'source-guards',
+                  command: ['npm', 'run', 'test:source-guards'],
+                  exitCode: 0,
+                },
+              ]
+            : []),
+          ...phases[index].map((name) => ({ name, exitCode: 0 })),
+        ],
+        ...(index === 0
+          ? { frontendResults: { unit: frontendResult('unit'), 'source-guards': frontendResult('source-guards') } }
+          : {}),
       },
       report: value,
     })),
@@ -67,6 +112,79 @@ test('PR source head, base and checked merge candidate remain separate', () => {
 test('all successful jobs and an exact disjoint shard union pass', () => {
   const { needs, groups } = fixture();
   assert.equal(verifyFrontendEvidence(needs, groups).testCount, 2);
+});
+
+test('workflow reruns are blocked even when every attempt identifier agrees', () => {
+  const { needs, groups } = fixture();
+  for (const group of groups) group.metadata.attempt = '2';
+  assert.throws(() => verifyFrontendEvidence(needs, groups), /Workflow reruns/);
+  const { scope, identity } = scopeFixture();
+  scope.identity.attempt = '2';
+  assert.throws(() => verifyScope(scope, { ...identity, attempt: '2' }), /Workflow reruns/);
+  for (const attempt of ['2', undefined, null, 1, '0'])
+    assert.throws(() => requireFirstAttempt({ workflowRunId: 'run', attempt }), /Workflow reruns/);
+  requireFirstAttempt({ workflowRunId: 'run', attempt: '1' });
+  requireFirstAttempt({ workflowRunId: null });
+});
+
+test('the scope CLI rejects workflow reruns before emitting any permissive scope', (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'zdm-ci-rerun-scope-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const result = spawnSync(process.execPath, ['scripts/ci-quality-evidence.mjs', 'scope'], {
+    env: { ...process.env, CI_EVIDENCE_DIR: directory, GITHUB_RUN_ID: 'fixture-run', GITHUB_RUN_ATTEMPT: '2' },
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stderr, /Workflow reruns cannot grant success/);
+  assert.throws(() => readFileSync(path.join(directory, 'scope.json')), /ENOENT/);
+});
+
+test('a successful command with no frontend report cannot create successful phase evidence', (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'zdm-ci-missing-frontend-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/ci-quality-evidence.mjs', 'run', 'frontend-unit', '--', process.execPath, '-e', 'process.exit(0)'],
+    { env: { ...process.env, CI_EVIDENCE_DIR: directory }, encoding: 'utf8' },
+  );
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  const metadata = JSON.parse(readFileSync(path.join(directory, 'metadata.json')));
+  assert.equal(metadata.phases[0].exitCode, 1);
+  assert.ok(metadata.phases[0].runId);
+  assert.match(metadata.phases[0].error, /ENOENT/);
+});
+
+test('frontend quality requires fresh complete unit and source guard evidence with exact commands', () => {
+  const { groups } = fixture();
+  const metadata = groups[0].metadata;
+  verifyFrontendUnitEvidence(metadata);
+  for (const mutate of [
+    (value) => {
+      delete value.frontendResults;
+    },
+    (value) => {
+      value.frontendResults.unit.runId = 'stale';
+    },
+    (value) => {
+      value.phases[0].command.push('--skip');
+    },
+    (value) => {
+      value.phases.push(value.phases[0]);
+    },
+    (value) => {
+      value.frontendResults['source-guards'].files = ['wrong.test.mjs'];
+    },
+    (value) => {
+      value.frontendResults.unit.tests[0].retryCount = 1;
+    },
+    (value) => {
+      value.frontendResults.unit.tests[0].status = 'skipped';
+    },
+  ]) {
+    const broken = structuredClone(metadata);
+    mutate(broken);
+    assert.throws(() => verifyFrontendUnitEvidence(broken));
+  }
 });
 
 test('any failed, cancelled, skipped or absent job fails the required aggregate', () => {
