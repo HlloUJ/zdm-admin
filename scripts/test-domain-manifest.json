@@ -23,7 +23,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "fae39752d3ea45d1a5dc67dd82881c7b860bfbc45e57af0d2f7c23cf06112848",
+      "digest": "a89d8c5c8b554583fe700875978dc56af9f168f29a40159eb519c3b5fd980e9e",
       "imports": [],
       "dynamicImports": 0
     },
@@ -38,12 +38,12 @@
       "dynamicImports": 2
     },
     "scripts/backend-runtime.mjs": {
-      "digest": "38938aee24215061f8192e19b558ccf033b9e8f2031a64072be8986d3bce0387",
-      "imports": ["scripts/dev-task.mjs", "scripts/git-workflow-core.mjs"],
+      "digest": "56288f7f97dd12efebbe8a609ce8ac753983444d6f0ac08a37ba6f25dc7048ab",
+      "imports": ["scripts/dev-task.mjs", "scripts/git-workflow-core.mjs", "scripts/integration-handoff-state.mjs"],
       "dynamicImports": 0
     },
     "scripts/backend-runtime.test.mjs": {
-      "digest": "1e73dcd77cff48d69aa49af82c5d61bd0d042c802fbf039cea21cfa6753d9aba",
+      "digest": "6d7360dab9a4815858c8624909b6326bfd4af2390b08fd19e060419662387201",
       "imports": ["scripts/backend-runtime.mjs", "scripts/dev-task.mjs", "scripts/ensure-backend.mjs"],
       "dynamicImports": 0
     },
@@ -97,9 +97,10 @@
       "dynamicImports": 0
     },
     "scripts/ci-quality-evidence.mjs": {
-      "digest": "bfd93d609217558fffb1b00d96e0d6be5a18967b9f059e0d302185177fd40a32",
+      "digest": "7c92e477a4030b3e54dc232dd7281cec2b96066bf5265c001afd0c31bd8bf325",
       "imports": [
         "scripts/backend-test-evidence.mjs",
+        "scripts/frontend-test-evidence.mjs",
         "scripts/run-script-tests.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/verification-impact.mjs"
@@ -107,9 +108,10 @@
       "dynamicImports": 0
     },
     "scripts/ci-quality-evidence.test.mjs": {
-      "digest": "5171a7ec9277d4c5fb6dccd822ef24835ac315d18a1cdebd69a332501e4c50e4",
+      "digest": "197f934759d23b6126e465b50a2ce083bb9dfc0dab9ba7f13ec8da00499e96cd",
       "imports": [
         "scripts/ci-quality-evidence.mjs",
+        "scripts/feedback-foundation.test.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/task-batch.mjs",
         "scripts/verification-impact.mjs"
@@ -127,10 +129,11 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "40efbf8ddb906cb9530e084efbbcfa0d9f5de96d44e28801bc0017bf03c04282",
+      "digest": "178770280ac5c6cbe295a82437417cb3f66031d2727cc4c5de8230ddf36e88c9",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
         "scripts/task-dependencies.mjs",
         "scripts/task-runtime-state.mjs",
         "scripts/verification-impact.mjs"
@@ -138,7 +141,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.test.mjs": {
-      "digest": "2c7bd973b80895afab1428a4b8d1771cb2300210855208246290a4d6b82d58e9",
+      "digest": "60e102c42e0d807f3e3ea27edb97a7207ca14d31f94749b753b930c2366d93fb",
       "imports": [
         "scripts/backend-test-plan.mjs",
         "scripts/dev-task.mjs",
@@ -150,7 +153,7 @@
       "dynamicImports": 0
     },
     "scripts/ensure-backend.mjs": {
-      "digest": "eb4a33005192a28c4ee2b930af779ecfd4c06cb9ed0793b6d9300cdbce2e9758",
+      "digest": "ae854fe788487dc280ac3c5ec45237ccbe669a79ebc0c2f588642d0a4b674aaa",
       "imports": ["scripts/backend-runtime.mjs"],
       "dynamicImports": 0
     },
@@ -159,19 +162,45 @@
       "imports": [],
       "dynamicImports": 0
     },
-    "scripts/git-workflow-core.mjs": {
-      "digest": "a2e82dc2d0fdbcc30cb439621abd0443c590f076b95a6b40bfda6e5deee1d207",
+    "scripts/frontend-test-evidence.mjs": {
+      "digest": "846f31c0a65beb644bc1a8f513949124bb19588a326f35494c4b8b162210f4f3",
       "imports": [],
       "dynamicImports": 0
     },
+    "scripts/frontend-test-evidence.test.mjs": {
+      "digest": "6eb58dd65cebe13c85f2dd1cce37103388fcff4433227a6974ac8753d1dac1e7",
+      "imports": [
+        "scripts/feedback-foundation.test.mjs",
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/run-frontend-tests.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/git-workflow-core.mjs": {
+      "digest": "6fe79185795ad849ef59d51e0d1d5a14ed24874140811276586258dec067cfe6",
+      "imports": ["scripts/verification-impact.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/git-workflow-core.test.mjs": {
-      "digest": "8e19a24715bcd6a42e2acc7626c223e7a479b06465b2860f0b88b65df489f396",
-      "imports": ["scripts/backend-runtime.mjs", "scripts/git-workflow-core.mjs"],
+      "digest": "436e4518cee26c292f127e90f126b8b7e341aa67ee0c2cbe1357acbdeb94c2c6",
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/backend-test-evidence.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/git-workflow-state.mjs": {
       "digest": "47dd3bc4764d43c5ae94c04709e1099706be30595bf984eceef70083fe6acc51",
       "imports": ["scripts/git-workflow-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/integration-handoff-state.mjs": {
+      "digest": "cf7252b1ae1e1cfcc3b4cf48a1df200d382ac2f0214b42fdd0e031c7dd3d1012",
+      "imports": ["scripts/task-runtime-state.mjs", "scripts/verification-impact.mjs"],
       "dynamicImports": 0
     },
     "scripts/macos/com.zdm.admin.dev.plist": {
@@ -194,6 +223,11 @@
       "imports": [],
       "dynamicImports": 0
     },
+    "scripts/node-source-evidence-reporter.mjs": {
+      "digest": "beaba30a3ab3254c4ed184e63e4ba09ed219a01a3371d7fa4c36a988393cb569",
+      "imports": [],
+      "dynamicImports": 0
+    },
     "scripts/restore-db.sh": {
       "digest": "26b769fb9d6a38022aa9aae951d00fd9d823beb4bfe93d345d76cd15a8a85db2",
       "imports": [],
@@ -202,6 +236,16 @@
     "scripts/rollback-code.sh": {
       "digest": "25993423753c5453b9c1ebfe58bbfa5990a20898e8a2aef850c9a7ebf0a5426a",
       "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/run-frontend-tests.mjs": {
+      "digest": "0fd054ce56c09a303c34722fcf6be3eaba486f8c0aa0b51303a610864e00c9e3",
+      "imports": [
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/node-source-evidence-reporter.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/vitest-evidence-reporter.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/run-integration.mjs": {
@@ -250,9 +294,19 @@
       "dynamicImports": 0
     },
     "scripts/sync-integration.mjs": {
-      "digest": "d3aa3b76bbc6c886641e392aced97ef90793a444fa96f20cc2360976815125d5",
-      "imports": ["scripts/git-workflow-core.mjs"],
+      "digest": "df80a45702b7ad2353d0180170f079683e42b6f2e1898be39ad155b4d9297c47",
+      "imports": ["scripts/dev-task.mjs", "scripts/git-workflow-core.mjs", "scripts/integration-handoff-state.mjs"],
       "dynamicImports": 0
+    },
+    "scripts/sync-integration.test.mjs": {
+      "digest": "43931f15522ced4b1a2b5a55972ce94e696c3608c67e3fa492e5353228c9179b",
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 2
     },
     "scripts/task-batch.mjs": {
       "digest": "fe62c1b6f965c4695a954f00161678b8ca6a087a05783cb464b8c46043b3256d",
@@ -309,12 +363,13 @@
       "dynamicImports": 1
     },
     "scripts/verification-impact.mjs": {
-      "digest": "dcb17afc65f57a21c403b4c850ca11f3d790a53cb8f65287ca41d916ca2345b8",
+      "digest": "6ef91a742397868be003c53f4bf4469b90673201d3b7afeee5789ee5ca1b24c9",
       "imports": [
         "scripts/backend-runtime.mjs",
         "scripts/dev-all.mjs",
         "scripts/dev-task.mjs",
         "scripts/ensure-backend.mjs",
+        "scripts/integration-handoff-state.mjs",
         "scripts/macos/launchd-dev.mjs",
         "scripts/run-integration.mjs",
         "scripts/sync-integration.mjs",
@@ -372,6 +427,11 @@
         "scripts/verification-impact.mjs",
         "scripts/verification-runner.mjs"
       ],
+      "dynamicImports": 0
+    },
+    "scripts/vitest-evidence-reporter.mjs": {
+      "digest": "785f55e2668c5cdafa9b51a658ad411560003934646baa590ecf4bbb5961de91",
+      "imports": [],
       "dynamicImports": 0
     },
     "vite.config.js": {

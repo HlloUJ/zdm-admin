@@ -60,7 +60,7 @@ npm run test:e2e:chrome
 npm run integration:dev
 ```
 
-该命令始终从 `codex/integration-current` 固定 Worktree 启动已经正式交付的组合版本，不在其中直接开发。集成前端固定使用 `5173`，集成后端使用 `8080`。
+该命令始终从 `codex/integration-current` 固定 Worktree 启动已正式汇入的任务组合，其中可能包含尚未完成主线交付的任务，不在其中直接开发。集成前端固定使用 `5173`，集成后端使用 `8080`。
 
 查看服务状态和手机可访问的局域网地址：
 
@@ -139,6 +139,8 @@ npm run dev
 
 ## 常用验收命令
 
+验证范围按 [项目规则](../AGENTS.md#验证与工具) 选择；以下是可单独调用的检查入口，不要求每次全部执行。
+
 ```bash
 npm run quality
 npm run build:app
@@ -153,7 +155,7 @@ npm run verify:delivery -- --list
 npm run verify:delivery
 ```
 
-需要本地完整回归或 CI 基础设施不可用时：
+按项目规则需要本地完整回归、验证器排障，或 CI 缺失、不可靠、覆盖不明时：
 
 ```bash
 npm run verify:local
@@ -185,7 +187,7 @@ npm run backend:quality
 - 普通集成后端代码调整可使用 `backend:restart`；任务中的后端或 Flyway 变化统一从任务 Worktree 运行 `dev:task`，不得绕过数据库备份与任务代码路由。
 - `backend:ensure` 会校验后端容器实际挂载的 Worktree；目录不匹配时可能重建后端，按集成启动流程调用，不作为 Mock E2E 的隐式前置步骤。
 - 日常后端改动使用 `backend:test`。
-- 发布、合并或高风险回归使用 `backend:quality`。
+- 本地需要完整后端质量验证时使用 `backend:quality`，适用于高风险回归或补足 CI 缺失、不可靠、覆盖不明的后端门禁。普通正式交付按 [项目规则](../AGENTS.md#验证与工具) 执行受影响本地检查，由可靠 CI 承担最终候选的完整适用后端门禁。
 - 本机已安装 JDK 21、Maven 时，可显式使用 `backend:test:local` 或 `backend:quality:local`。
 - Agent 和项目脚本不得直接调用本机 `mvn`，统一通过上述 npm 命令执行。
 
