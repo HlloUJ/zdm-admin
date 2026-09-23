@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import { ensureIntegrationDatabase, mergeMigrationCatalog, verifyPausedCatalog } from './dev-task.mjs';
@@ -20,6 +20,10 @@ export function resolveRuntimeMigrations(currentFiles, pausedRecords, history) {
     if (!available.has(script)) throw new Error(`已执行迁移缺少可信原始文件：${script}`);
   }
   return catalog;
+}
+
+export function runtimeMigrationDirectory(digest, temporaryRoot = tmpdir()) {
+  return path.join(realpathSync(temporaryRoot), 'zdm-backend-migrations', digest);
 }
 
 function runtimeComposeArgs(root) {
@@ -73,7 +77,7 @@ function runtimeComposeArgs(root) {
     });
   const catalog = resolveRuntimeMigrations(files, records, history);
   const digest = createHash('sha256').update(JSON.stringify(catalog)).digest('hex');
-  const directory = path.join(tmpdir(), 'zdm-backend-migrations', digest);
+  const directory = runtimeMigrationDirectory(digest);
   mkdirSync(directory, { recursive: true });
   if (lstatSync(directory).isSymbolicLink()) throw new Error('迁移运行目录不能是符号链接');
   for (const name of [...catalog.map((entry) => entry.name), 'compose.json']) {

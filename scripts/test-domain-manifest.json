@@ -38,12 +38,12 @@
       "dynamicImports": 2
     },
     "scripts/backend-runtime.mjs": {
-      "digest": "56288f7f97dd12efebbe8a609ce8ac753983444d6f0ac08a37ba6f25dc7048ab",
+      "digest": "f74af9e9d5a54c8717d7b779754da9827642ca930bc595d566b913350c7293e2",
       "imports": ["scripts/dev-task.mjs", "scripts/git-workflow-core.mjs", "scripts/integration-handoff-state.mjs"],
       "dynamicImports": 0
     },
     "scripts/backend-runtime.test.mjs": {
-      "digest": "ba71d8d28f67ef42320711a3813a67f862ab652920eed6003a130633fe473483",
+      "digest": "c67534152b95a8a3bad918512fec98edb48accb855b54f3e5e3adb9b12642009",
       "imports": ["scripts/backend-runtime.mjs", "scripts/dev-task.mjs", "scripts/ensure-backend.mjs"],
       "dynamicImports": 0
     },
