@@ -3,7 +3,7 @@
   "sourceGuards": ["scripts/feedback-foundation.test.mjs"],
   "files": {
     ".codex/zdm-project-workflow.yaml": {
-      "digest": "27b9b5119c34623722c9ecdb9a54419c504b81bb52f3d370bb2707da9f2c77e4",
+      "digest": "ce1c485a89de43094295216d5938dea0469ead1432063697df4870823c0be455",
       "imports": [],
       "dynamicImports": 0
     },
@@ -73,17 +73,22 @@
       "dynamicImports": 0
     },
     "scripts/check-changed-plan.mjs": {
-      "digest": "14e69d72952b306316981ad04d54430d712af8501e3bd71926a5b3281d7380d4",
-      "imports": ["scripts/affected-test-inputs.mjs", "scripts/backend-test-plan.mjs", "scripts/script-test-plan.mjs"],
+      "digest": "5a6cacc2e44bf6fdb6172dfd7919d24275775a59652aa7d676c465fc41e3f6df",
+      "imports": [
+        "scripts/affected-test-inputs.mjs",
+        "scripts/backend-test-plan.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/verification-impact.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/check-changed-plan.test.mjs": {
-      "digest": "a4d2bb59d2367e7363f684b2947ad8d637f86479e8d0860f5f3bddd96548df51",
+      "digest": "d4021c26361dfcb1fdc3f59a284d5426a8dcd9b6f5e6e78bb9457dee9f24bdba",
       "imports": ["scripts/check-changed-plan.mjs", "scripts/verification-impact.test.mjs"],
       "dynamicImports": 0
     },
     "scripts/check-changed.mjs": {
-      "digest": "4ab5cae4e3bda4ac6d1899fce72313300aa33efeb19555e85957dfa02e9ae699",
+      "digest": "3eb40bab4bbdcf9a5bf51d11c34fd844aad71197f242bcc322dae72cfa676030",
       "imports": [
         "scripts/check-changed-plan.mjs",
         "scripts/verification-evidence.mjs",
@@ -92,7 +97,7 @@
       "dynamicImports": 0
     },
     "scripts/check-changed.test.mjs": {
-      "digest": "54c551b95efc3cd3cc5e8c48c75246920c2a0f29885b3ffb4a9eae2eef4b23f2",
+      "digest": "f8ce3b8948c20a56026e6e24eddbb537a5497d0a587d21620678ab4bc789318b",
       "imports": ["scripts/check-changed-plan.mjs", "scripts/check-changed.mjs", "scripts/verification-evidence.mjs"],
       "dynamicImports": 0
     },
@@ -158,7 +163,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "eae8ed9842529b8b66ceaca3eea75f1ef84e6812ae6eb949da1203ef7cdcfa3f",
+      "digest": "cc29108f0f2e47b302c4e42acf57602cc58cd03395d37ed7269c042fcc7bb1ef",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -170,12 +175,13 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.test.mjs": {
-      "digest": "60e102c42e0d807f3e3ea27edb97a7207ca14d31f94749b753b930c2366d93fb",
+      "digest": "031d064fa9655a009a1505e674955b5c985ec1eac8b672c8ebce813f3cb96914",
       "imports": [
         "scripts/backend-test-plan.mjs",
         "scripts/dev-task.mjs",
         "scripts/dev-task.test.mjs",
         "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
         "scripts/task-runtime-state.mjs",
         "vite.config.js"
       ],
@@ -233,7 +239,7 @@
       "dynamicImports": 0
     },
     "scripts/local-test-entrypoints.test.mjs": {
-      "digest": "33219ebf44ee53ae4311ad65f935d4912d7b93c1469649a84fceb157a39506b4",
+      "digest": "0bdac63113f1c2d9257891755297834a864c465e8a9f9b9f4163ff30ae75b942",
       "imports": [
         "scripts/frontend-test-evidence.mjs",
         "scripts/playwright-test-evidence.mjs",
@@ -420,7 +426,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.mjs": {
-      "digest": "ebc9a49bb999869619dea16d82ed51753beafefac81a19a803424edca6ce79c2",
+      "digest": "cce1f77fb5b02f61e198ed1bd137bbb94470d7d840dc14109e5857c67f14ea0d",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/verification-evidence.mjs",
@@ -429,14 +435,14 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "161f9a24023ccb73ab6b324178c9ef2be0a268ab3fb3c5fadced8f9af10a845e",
+      "digest": "9b6b25ef616a2c59db20d31c18d0f539f8fd923f7c1f424bce6db9a6ea86fc44",
       "imports": [
         "scripts/run-frontend-tests.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-runner.mjs",
         "scripts/verify.mjs"
       ],
-      "dynamicImports": 2
+      "dynamicImports": 8
     },
     "scripts/verification-impact.mjs": {
       "digest": "787e397a606865050eb98a28f61f143f4313e28a99e313cfbd835694b4eb2537",
@@ -482,7 +488,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "4f644cae32d6cf26f134106e657029fadd5bb33353f22dc0b50a12b278b95f16",
+      "digest": "3cf953e2fc7556d1c16e291d93441797f529d1a525489669cb537a6b4b03fd6a",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -500,7 +506,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "f359e3293e2d3efccc14f639d6c1f72b8a3a90c7f1a5c32ea2f5edf7fb340508",
+      "digest": "b47e0849d16d21eef5b0392b90bda220921f7dcda38d40ae8e5d9be5fbabca66",
       "imports": [
         "scripts/check-changed-plan.mjs",
         "scripts/script-test-plan.mjs",
