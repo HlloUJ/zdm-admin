@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { ensureBackend, resolveRuntimeMigrations } from './backend-runtime.mjs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { ensureBackend, resolveRuntimeMigrations, runtimeMigrationDirectory } from './backend-runtime.mjs';
 import { ensureIntegrationDatabase, ensureSharedBackend, startIntegrationBackend } from './dev-task.mjs';
 const first = { name: 'V1__base.sql', content: 'SELECT 1;' };
 const pending = { name: 'V2__paused.sql', content: 'SELECT 2;' };
@@ -141,6 +144,31 @@ test('restores a different workspace or migration mount by recreating, without u
       'backend-healthy',
     ]);
   }
+});
+
+test('a temporary-root symlink keeps an existing canonical migration mount without recreating the backend', async (t) => {
+  const fixture = mkdtempSync(path.join(tmpdir(), 'zdm-runtime-path-'));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const physical = path.join(fixture, 'physical');
+  const alias = path.join(fixture, 'alias');
+  mkdirSync(physical);
+  symlinkSync(physical, alias, 'dir');
+  const directory = runtimeMigrationDirectory('catalog-digest', alias);
+  assert.equal(directory, path.join(realpathSync(physical), 'zdm-backend-migrations', 'catalog-digest'));
+  assert.equal(runtimeMigrationDirectory('catalog-digest', physical), directory);
+  const commands = [];
+  await ensureBackend('/fixture/integration', {
+    ensureDatabase: async () => {},
+    inspect: (_, __, args) => {
+      if (args[0] === 'compose') return 'backend\nmysql';
+      if (args[2].includes('/workspace')) return '/fixture/integration';
+      return process.platform === 'darwin' ? `/host_mnt${directory}` : directory;
+    },
+    resolveRuntime: () => ({ args: ['compose', '-f', 'runtime.json'], directory }),
+    execute: (_, __, args) => commands.push(args),
+    waitForHealth: async () => {},
+  });
+  assert.deepEqual(commands, [['compose', '-f', 'runtime.json', 'start', 'backend']]);
 });
 
 test('integration recovery uses the launcher backend entrypoint even for an older target Worktree', async () => {
