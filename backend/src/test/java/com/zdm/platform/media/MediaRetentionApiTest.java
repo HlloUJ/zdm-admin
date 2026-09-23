@@ -1,10 +1,12 @@
 package com.zdm.platform.media;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import com.zdm.platform.support.SpringContainerTestSupport;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -80,6 +82,14 @@ class MediaRetentionApiTest extends SpringContainerTestSupport {
     assertThat(previewId).isNotNull();
     assertThat(retention.count(previewId, "PREVIEW")).isEqualTo(2);
     references.removeBusiness("TEST_PRODUCT", id, "替换图片");
+    // removeBusiness dispatches a real after-commit worker. Let that transaction finish
+    // before changing the fixture's retention deadline and deletion switch.
+    await().alias("realtime cleanup transaction completed")
+        .pollInterval(Duration.ofMillis(20)).atMost(Duration.ofSeconds(10))
+        .until(() -> jdbc.queryForObject("""
+            SELECT COUNT(*) FROM media_cleanup_tasks
+            WHERE media_id=? AND status IN ('pending','processing','failed')
+            """, Long.class, id) == 0L);
     assertThat(retention.evaluate(assets.getById(id)).eligible()).isFalse();
     jdbc.update("UPDATE media_assets SET unreferenced_since=DATE_SUB(NOW(),INTERVAL 182 DAY) WHERE id=?", id);
     runCleanup(id);
