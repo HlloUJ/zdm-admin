@@ -46,9 +46,10 @@ public class FinishedPriceConfigurationSyncService implements StoreLevelPriceSyn
     }
     return jdbc.update("""
         UPDATE finished_product_prices price
+        INNER JOIN store_levels level ON level.id = price.store_level_id
         SET price.price_coefficient = ?, price.price = ROUND(price.cost_price * ?, 2)
         WHERE price.source_configuration_id = ? AND price.price_source = 'auto'
-          AND price.cost_price >= 0
+          AND level.status = 'enabled' AND price.cost_price >= 0
         """, configuration.getPriceCoefficient(), configuration.getPriceCoefficient(), configuration.getId());
   }
 
@@ -70,6 +71,8 @@ public class FinishedPriceConfigurationSyncService implements StoreLevelPriceSyn
         LEFT JOIN finished_product_prices price ON price.finished_product_id = guide.finished_product_id
           AND price.sku_id = guide.sku_id AND price.store_level_id = configuration.store_level_id
         WHERE price.id IS NULL AND guide.cost_price >= 0
+          AND level.status = 'enabled' AND configuration.status = 'enabled'
+          AND configuration.legacy_seeded = FALSE
         """, configuration.getId());
   }
 }

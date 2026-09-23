@@ -142,7 +142,12 @@ interface DetailProduct {
   guidePrices?: FinishedProductGuidePrice[];
   specDimensions?: FinishedSpecDimension[];
 }
-const props = defineProps<{ product: DetailProduct; attributeNames: Record<string, string>; operations?: boolean }>();
+const props = defineProps<{
+  product: DetailProduct;
+  attributeNames: Record<string, string>;
+  operations?: boolean;
+  enabledLevelIds?: number[];
+}>();
 const emit = defineEmits<{ preview: [media: { url: string }, type: 'image' | 'video'] }>();
 const images = computed(() =>
   props.product.mainImageUrls?.length ? props.product.mainImageUrls : props.product.image ? [props.product.image] : [],
@@ -176,10 +181,9 @@ const extraFields = computed(() =>
 );
 const levels = computed(() => [
   ...new Map(
-    (props.product.markupPrices ?? []).map((price) => [
-      price.storeLevelId,
-      price.storeLevelName || `${price.storeLevelId}级价格`,
-    ]),
+    (props.product.markupPrices ?? [])
+      .filter((price) => !props.operations || props.enabledLevelIds?.includes(price.storeLevelId))
+      .map((price) => [price.storeLevelId, price.storeLevelName || `${price.storeLevelId}级价格`]),
   ).entries(),
 ]);
 const columns = computed<PrimaryTableCol[]>(() => {

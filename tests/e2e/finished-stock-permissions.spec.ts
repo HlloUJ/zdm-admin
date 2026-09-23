@@ -88,6 +88,9 @@ for (const [status, scope] of [
 ]) {
   test(`operations ${status} opens read-only complete details and preserves list`, async ({ page }, testInfo) => {
     await setup(page, [prefix + scope + '.view', prefix + scope + '.detail']);
+    await page.route('**/api/admin/finished-products/price-level-options', (route) =>
+      route.fulfill({ json: { code: 0, message: 'ok', data: [{ id: 1, name: '1级合伙人' }] } }),
+    );
     const product = {
       id: 71,
       name: '详情验收商品',
