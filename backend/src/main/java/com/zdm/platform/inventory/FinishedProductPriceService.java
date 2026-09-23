@@ -40,10 +40,10 @@ public class FinishedProductPriceService {
     List<FinishedProductPrice> prices = listPrices(productId);
     Set<Long> expectedLevels = storeLevelDirectory.listEnabledLevels().stream()
         .map(StoreLevelPricingDirectory.Level::id).collect(Collectors.toSet());
-    prices.forEach(price -> expectedLevels.add(price.getStoreLevelId()));
     for (FinishedProductVariant variant : variants) {
       List<FinishedProductPrice> skuPrices = prices.stream()
-          .filter(price -> variant.getId().equals(price.getSkuId())).toList();
+          .filter(price -> variant.getId().equals(price.getSkuId())
+              && expectedLevels.contains(price.getStoreLevelId())).toList();
       Set<Long> actualLevels = skuPrices.stream().map(FinishedProductPrice::getStoreLevelId).collect(Collectors.toSet());
       if (!actualLevels.equals(expectedLevels) || skuPrices.size() != expectedLevels.size()
           || skuPrices.stream().anyMatch(price -> price.getPriceCoefficient() == null || price.getPriceCoefficient().signum() < 0
@@ -58,8 +58,12 @@ public class FinishedProductPriceService {
   public void replacePrices(Long productId, List<FinishedProductPrice> requestedPrices) {
     List<FinishedProductPrice> existingPrices = listPrices(productId);
     Map<Long, String> levelNames = new LinkedHashMap<>();
-    existingPrices.forEach(price -> levelNames.putIfAbsent(price.getStoreLevelId(), price.getStoreLevelName()));
-    storeLevelDirectory.listEnabledLevels().forEach(level -> levelNames.putIfAbsent(level.id(), level.name()));
+    storeLevelDirectory.listEnabledLevels().forEach(level -> levelNames.put(level.id(), level.name()));
+    existingPrices.forEach(price -> {
+      if (levelNames.containsKey(price.getStoreLevelId())) {
+        levelNames.put(price.getStoreLevelId(), price.getStoreLevelName());
+      }
+    });
     Set<Long> expectedIds = levelNames.keySet();
     if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
       return;
@@ -89,7 +93,8 @@ public class FinishedProductPriceService {
       });
     });
     mapper.delete(Wrappers.<FinishedProductPrice>lambdaQuery()
-        .eq(FinishedProductPrice::getFinishedProductId, productId));
+        .eq(FinishedProductPrice::getFinishedProductId, productId)
+        .in(FinishedProductPrice::getStoreLevelId, expectedIds));
     normalized.forEach(mapper::insert);
   }
 

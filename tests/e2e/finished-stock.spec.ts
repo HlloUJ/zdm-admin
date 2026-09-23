@@ -1166,22 +1166,28 @@ for (const coefficient of [1.8, 0, undefined]) {
       }[];
     }[] = [];
     await page.route('**/api/admin/finished-products/91', (route) => {
+      if (route.request().method() === 'GET') return route.fulfill({ json: { code: 0, data: product } });
       const payload = route.request().postDataJSON();
       saves.push(payload);
       return route.fulfill({ json: { code: 0, data: { ...product, ...payload } } });
     });
     await page.goto('/finished-stock-management');
+    await page.getByRole('row').filter({ hasText: product.name }).getByText('详情', { exact: true }).click();
+    await expect(page.locator('.product-detail')).toBeVisible();
+    await expect(page.locator('.product-detail thead')).not.toContainText('4级合伙人');
+    await page.locator('.t-drawer:visible .t-drawer__close-btn').click();
     await page.getByText('价格', { exact: true }).click();
     const editor = page.locator('.product-price-editor');
     const firstLevel = editor.locator('tbody tr').nth(0).locator('td').nth(3);
     const missingLevel = editor.locator('tbody tr').nth(1).locator('td').nth(3);
     const zeroCostLevel = editor.locator('tbody tr').nth(2).locator('td').nth(3);
-    await expect(firstLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
-    await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+    await expect(editor.locator('thead')).not.toContainText('4级合伙人');
     await page.locator('.price-editor-footer').getByRole('button', { name: '取消', exact: true }).click();
     await expect(editor).not.toBeVisible();
     levelEnabled = true;
     await page.getByText('价格', { exact: true }).click();
+    await expect(editor.locator('thead')).toContainText('4级合伙人');
+    await expect(firstLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
     // Configuration alone must not invent a price absent from the server response.
     await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
     await page.locator('.price-editor-footer').getByRole('button', { name: '取消', exact: true }).click();

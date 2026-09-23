@@ -1012,6 +1012,7 @@
         :product="detailProduct"
         :attribute-names="detailAttributeNames"
         :operations="!isSupplyChain"
+        :enabled-level-ids="enabledPriceLevels.map((level) => level.id)"
         @preview="openProductMediaPreview"
       />
     </t-drawer>
@@ -1497,8 +1498,7 @@ const productSuppliers = ref<SupplierRecord[]>([]);
 const markupConfigurations = ref<FinishedMarkupConfigurationRecord[]>([]);
 const enabledPriceLevels = ref<FinishedProductPriceLevelOption[]>([]);
 const productPriceLevels = computed(() => {
-  const saved = editingProduct.value?.markupPrices ?? [];
-  const levels = [...enabledPriceLevels.value]
+  return [...enabledPriceLevels.value]
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id - b.id)
     .map((level) => {
       const configuration = markupConfigurations.value.find(
@@ -1511,16 +1511,6 @@ const productPriceLevels = computed(() => {
         priceCoefficient: configuration == null ? undefined : Number(configuration.priceCoefficient),
       };
     });
-  for (const price of saved) {
-    if (!levels.some((level) => level.id === price.storeLevelId))
-      levels.push({
-        id: price.storeLevelId,
-        configurationId: undefined,
-        name: price.storeLevelName || `门店级别${price.storeLevelId}`,
-        priceCoefficient: Number(price.priceCoefficient),
-      });
-  }
-  return levels;
 });
 let priceConfigurationRefresh: Promise<void> | undefined;
 const refreshPriceConfigurations = () => {
@@ -3652,13 +3642,17 @@ const detailAttributeNames = computed(() =>
 );
 const openProductDetail = async (row: StockItem) => {
   try {
-    const latest = isSupplyChain.value
-      ? (await listFinishedProducts()).find((product) => product.id === row.id)
-      : await getFinishedProductDetail(row.id);
+    const [latest, levels] = await Promise.all([
+      isSupplyChain.value
+        ? listFinishedProducts().then((products) => products.find((product) => product.id === row.id))
+        : getFinishedProductDetail(row.id),
+      isSupplyChain.value ? Promise.resolve(null) : listFinishedProductPriceLevelOptions(),
+    ]);
     if (!latest) {
       adminFeedback.error('商品不存在，请刷新列表');
       return;
     }
+    if (levels) enabledPriceLevels.value = levels;
     detailProduct.value = toStockItem(latest);
     if (!isSupplyChain.value) {
       detailProduct.value.createdAt = formatDateTime(latest.createdAt);
