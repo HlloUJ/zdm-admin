@@ -1,4 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  integrationBackendSnapshot,
+  integrationProofMatches,
+  readIntegrationProof,
+} from './integration-handoff-state.mjs';
 
 import {
   branchKind,
@@ -9,13 +16,9 @@ import {
   parseWorktreePorcelain,
 } from './git-workflow-core.mjs';
 
-const rawArgs = process.argv.slice(2);
-const taskIndex = rawArgs.indexOf('--task');
-const requestedTask = taskIndex >= 0 ? rawArgs[taskIndex + 1] : '';
-
-function capture(commandArgs, { cwd, allowFailure = false, command = 'git' } = {}) {
+function capture(commandArgs, { cwd, allowFailure = false, command = 'git', trim = true } = {}) {
   const result = spawnSync(command, commandArgs, { cwd, encoding: 'utf8' });
-  if (result.status === 0) return result.stdout.trim();
+  if (result.status === 0) return trim ? result.stdout.trim() : result.stdout;
   if (allowFailure) return '';
   throw new Error(result.stderr.trim() || `${command} ${commandArgs.join(' ')} failed`);
 }
@@ -33,7 +36,7 @@ function aheadBehind(localRef, remoteRef, cwd) {
   return parseAheadBehind(capture(['rev-list', '--left-right', '--count', `${localRef}...${remoteRef}`], { cwd }));
 }
 
-try {
+export function syncIntegration(requestedTask = '', { executeHandoff = execFileSync } = {}) {
   const root = capture(['rev-parse', '--show-toplevel']);
   const taskBranch = requestedTask || capture(['branch', '--show-current'], { cwd: root });
   if (branchKind(taskBranch) !== 'task') throw new Error(`只能同步 codex/* 任务分支，当前为：${taskBranch}`);
@@ -85,50 +88,67 @@ try {
   if (finalState?.ahead !== 0 || finalState?.behind !== 0) throw new Error('集成分支推送后仍与远程不一致');
   const changedFiles = alreadyIntegrated
     ? []
-    : capture(['diff', '--name-only', `${integrationHeadBefore}..${integrationLocalRef}`], { cwd: root })
-        .split(/\r?\n/)
+    : capture(['diff', '--name-only', '-z', `${integrationHeadBefore}..${integrationLocalRef}`], {
+        cwd: root,
+        trim: false,
+      })
+        .split('\0')
         .filter(Boolean);
-  let backendReload = 'not-needed';
-  if (needsBackendReload(changedFiles)) {
-    const mountedWorkspace = capture(
-      [
-        'inspect',
-        '--format',
-        '{{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Source}}{{end}}{{end}}',
-        'zdm-platform-backend',
-      ],
-      { cwd: integrationWorktree.path, allowFailure: true, command: 'docker' },
-    );
-    const running = capture(['inspect', '--format', '{{.State.Running}}', 'zdm-platform-backend'], {
-      cwd: integrationWorktree.path,
-      allowFailure: true,
-      command: 'docker',
-    });
-    if (mountedWorkspace === integrationWorktree.path && running === 'true') {
-      const reload = spawnSync('docker', ['compose', 'restart', 'backend'], {
-        cwd: integrationWorktree.path,
-        stdio: 'inherit',
-      });
-      backendReload = reload.status === 0 ? 'restarted' : 'failed';
-    } else {
-      backendReload = 'deferred-until-integration-dev';
-    }
-  }
+  const integrationHead = capture(['rev-parse', integrationLocalRef], { cwd: root });
+  const taskHead = capture(['rev-parse', taskLocalRef], { cwd: root });
+  const before = integrationBackendSnapshot(integrationWorktree.path);
+  const recreate = needsBackendReload(changedFiles);
+  const assertStable = (state, expectedContainer) => {
+    if (
+      state.sourceIdentity !== before.sourceIdentity ||
+      state.configurationIdentity !== before.configurationIdentity ||
+      state.containerIdentity !== expectedContainer ||
+      capture(['rev-parse', 'HEAD'], { cwd: integrationWorktree.path }) !== integrationHead ||
+      capture(['status', '--porcelain'], { cwd: integrationWorktree.path }) !== ''
+    )
+      throw new Error('集成运行输入或容器身份在交接期间变化，不能登记交接成功');
+  };
 
-  execFileSync(
-    process.platform === 'win32' ? 'npm.cmd' : 'npm',
-    ['run', 'dev:task:handoff', '--', '--worktree', taskWorktree.path],
+  executeHandoff(
+    process.execPath,
+    [
+      fileURLToPath(new URL('./dev-task.mjs', import.meta.url)),
+      '--handoff',
+      '--worktree',
+      taskWorktree.path,
+      ...(recreate ? ['--force-integration-backend'] : []),
+    ],
     { cwd: integrationWorktree.path, stdio: 'inherit' },
   );
+
+  const after = integrationBackendSnapshot(integrationWorktree.path);
+  const receipt = readIntegrationProof(integrationWorktree.path);
+  if (
+    !integrationProofMatches(receipt, after) ||
+    receipt.integrationHead !== integrationHead ||
+    receipt.taskHead !== taskHead
+  )
+    throw new Error('集成运行环境不匹配交接成功证明，不能报告交付完成');
+  assertStable(after, receipt.containerIdentity);
+  if (!after.containerIdentity || (recreate && after.containerIdentity === before.containerIdentity))
+    throw new Error('集成后端没有有效的新运行身份，不能登记交接成功');
 
   console.log(
     alreadyIntegrated
       ? `${taskBranch} 已存在于 ${DEFAULT_INTEGRATION_BRANCH}，本地与远程一致。`
       : `${taskBranch} 已合入并推送 ${DEFAULT_INTEGRATION_BRANCH}。`,
   );
-  console.log(`完整集成后端：${backendReload}`);
+  console.log(`完整集成后端：${receipt.action === 'recreated' ? 'recreated-and-verified' : 'verified-reuse'}`);
   console.log(`任务交接：completed（${taskWorktree.path}）`);
-} catch (error) {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    const rawArgs = process.argv.slice(2);
+    const taskIndex = rawArgs.indexOf('--task');
+    syncIntegration(taskIndex >= 0 ? rawArgs[taskIndex + 1] : '');
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  }
 }

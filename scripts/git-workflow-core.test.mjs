@@ -10,6 +10,7 @@ import {
   parseWorktreePorcelain,
 } from './git-workflow-core.mjs';
 import { normalizeDockerMountPath } from './backend-runtime.mjs';
+import { classifyChangedFiles } from './verification-impact.mjs';
 
 test('classifies task, integration, and main branches', () => {
   assert.equal(branchKind('codex/fix-product-category'), 'task');
@@ -64,6 +65,28 @@ test('detects changes that require an integration backend reload', () => {
   assert.equal(needsBackendReload(['src/pages/product/category/index.vue']), false);
   assert.equal(needsBackendReload(['backend/src/main/java/example/Service.java']), true);
   assert.equal(needsBackendReload(['docker-compose.yml']), true);
+  for (const file of [
+    'backend/src/test/java/example/ServiceTest.java',
+    'backend/src/test/resources/application.yml',
+    'package.json',
+    'package-lock.json',
+    'scripts/backend-test-evidence.mjs',
+  ])
+    assert.equal(needsBackendReload([file]), false, file);
+  for (const file of [
+    'backend/pom.xml',
+    'pom.xml',
+    '.env.local',
+    '.mvn/jvm.config',
+    'backend/src/main/resources/db/migration/V9__test.sql',
+    'scripts/sync-integration.mjs',
+    'scripts/task-runtime-state.mjs',
+    'docker-compose.task.yml',
+  ])
+    assert.equal(needsBackendReload([file]), true, file);
+  const unknown = ['unknown-runtime.bin'];
+  assert.equal(needsBackendReload(unknown), classifyChangedFiles(unknown).runtime);
+  assert.equal(classifyChangedFiles(unknown).full, true, 'Unknown impact still requires full quality checks');
 });
 
 test('normalizes Docker Desktop bind mount paths before comparing worktrees', () => {

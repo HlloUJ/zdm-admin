@@ -83,7 +83,8 @@ test('parses task preview mode, ports, target worktree, and stop options', () =>
 });
 
 test('makes integration sync invoke the mandatory task handoff', () => {
-  assert.match(syncIntegrationSource, /dev:task:handoff/);
+  assert.match(syncIntegrationSource, /new URL\('\.\/dev-task\.mjs', import\.meta\.url\)/);
+  assert.match(syncIntegrationSource, /'--handoff'/);
   assert.match(syncIntegrationSource, /任务交接：completed/);
 });
 
@@ -91,8 +92,8 @@ test('makes task handoff stop the old managed preview before its backend', () =>
   const handoffStart = taskPreviewSource.indexOf('async function handoffDatabaseTask');
   const handoffEnd = taskPreviewSource.indexOf('function targetViteConfig', handoffStart);
   const handoffSource = taskPreviewSource.slice(handoffStart, handoffEnd);
-  const previewStop = handoffSource.indexOf('await stopSupervisedPreview(root);');
-  const backendStop = handoffSource.indexOf("composeRun(context, ['stop', 'backend']);", previewStop);
+  const previewStop = handoffSource.indexOf('await stopSupervised(root);');
+  const backendStop = handoffSource.indexOf('stopBackend();', previewStop);
   assert.ok(handoffStart >= 0);
   assert.ok(handoffEnd > handoffStart);
   assert.ok(previewStop >= 0);

@@ -160,3 +160,48 @@ test('integration recovery uses the launcher backend entrypoint even for an olde
   });
   assert.deepEqual(events, ['same-launcher-entrypoint', 'integration-api-healthy']);
 });
+
+test('explicit recovery recreates even matching mounts after database and migration protection', async () => {
+  const events = [];
+  await ensureBackend('/tmp/integration', {
+    forceRecreate: true,
+    ensureDatabase: async () => events.push('database-ready'),
+    inspect: (_, __, args) =>
+      args[0] === 'compose'
+        ? 'backend\nmysql'
+        : args[2].includes('/workspace')
+          ? '/tmp/integration'
+          : '/tmp/current-migrations',
+    resolveRuntime: () => {
+      events.push('migrations-verified');
+      return { args: ['compose', '-f', 'protected-runtime.json'], directory: '/tmp/current-migrations' };
+    },
+    execute: (_, command, args) => {
+      assert.equal(command, 'docker');
+      events.push(args);
+    },
+    waitForHealth: async () => events.push('backend-healthy'),
+  });
+  assert.deepEqual(events, [
+    'database-ready',
+    'migrations-verified',
+    ['compose', '-f', 'protected-runtime.json', 'up', '-d', '--no-deps', '--force-recreate', 'backend'],
+    'backend-healthy',
+  ]);
+});
+
+test('runtime launch failure blocks backend health and propagates to the caller', async () => {
+  await assert.rejects(
+    ensureBackend('/tmp/integration', {
+      forceRecreate: true,
+      ensureDatabase: async () => undefined,
+      inspect: () => '',
+      resolveRuntime: () => ({ args: ['compose', '-f', 'protected-runtime.json'], directory: '/tmp/migrations' }),
+      execute: () => {
+        throw new Error('injected compose startup failure');
+      },
+      waitForHealth: () => assert.fail('health must not turn launch failure into success'),
+    }),
+    /injected compose startup failure/,
+  );
+});

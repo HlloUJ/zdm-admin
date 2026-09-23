@@ -72,8 +72,6 @@ export function integrationPromotionErrors({
 }
 
 export function needsBackendReload(files) {
-  return files.some(
-    (file) =>
-      file === 'docker-compose.yml' || file === 'pom.xml' || file === 'package.json' || file.startsWith('backend/'),
-  );
+  return classifyChangedFiles(files).runtime;
 }
+import { classifyChangedFiles } from './verification-impact.mjs';
