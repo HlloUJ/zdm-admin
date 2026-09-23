@@ -98,7 +98,7 @@ verification:
   full: npm run verify:local
   integration: npm run integration:verify
   evidence:
-    version: 2
+    version: 3
     directory: .task-verification
     force: npm run verify:local -- --force
 
