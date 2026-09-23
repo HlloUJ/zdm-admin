@@ -18,7 +18,8 @@ function capture(root, command, args, env = process.env) {
     maxBuffer: 32 * 1024 * 1024,
   });
   if (result.status !== 0) throw new Error(`${command} ${args[0]} identity unavailable`);
-  return result.stdout.trim();
+  // Git's NUL-delimited paths may begin with whitespace; trim only scalar/text output.
+  return command === 'git' && args.includes('-z') ? result.stdout : result.stdout.trim();
 }
 
 function fileDigest(file) {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -52,6 +52,70 @@ test('matching evidence reuses success, but force and CI always execute', async 
   assert.equal((await runVerificationTask(step, silent)).reused, true);
   assert.equal((await runVerificationTask(step, { ...silent, force: true })).reused, false);
   assert.equal((await runVerificationTask({ ...step, env: { ...step.env, CI: 'true' } }, silent)).reused, false);
+});
+
+test('real empty related discovery remains not-applicable in verification records and summaries', async (t) => {
+  const { root, git } = fixture(t);
+  writeFileSync(path.join(root, '.gitignore'), readFileSync(path.join(root, '.gitignore'), 'utf8') + 'node_modules\n');
+  symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), path.join(root, 'node_modules'), 'dir');
+  writeFileSync(
+    path.join(root, 'vitest.config.mjs'),
+    "export default {test:{environment:'node',include:['*.test.mjs'],maxWorkers:1}};",
+  );
+  writeFileSync(path.join(root, 'unrelated.test.mjs'), "import {test} from 'vitest'; test('unrelated',()=>{});");
+  git('add', '.');
+  git('commit', '-m', 'related fixture', '--no-verify');
+  const runner = fileURLToPath(new URL('./run-frontend-tests.mjs', import.meta.url));
+  const code = `const {spawnSync}=require('node:child_process'); process.exitCode=spawnSync(process.execPath, [${JSON.stringify(runner)}, 'related', 'source.js'], {stdio:'inherit',env:process.env}).status;`;
+  const step = task(root, code);
+  step.args.push('test:related');
+  const messages = [];
+  const result = await runVerificationTask(step, {
+    report: (message) => messages.push(message),
+    captureIdentity: () => ({
+      identity: { source: 'fixture' },
+      source: { mutationStamp: 'stable' },
+      fingerprint: 'fixture',
+      reusable: false,
+    }),
+    captureArtifacts: () => [],
+  });
+  assert.equal(result.exitCode, 0, messages.join('\n'));
+  assert.equal(result.status, 'not-applicable');
+  assert.equal(record(result).status, 'not-applicable');
+  assert.equal(record(result).tests.status, 'not-applicable');
+  assert.equal(record(result).tests.tests, 0);
+  assert.ok(messages.some((message) => message.startsWith('[not-applicable]')));
+  assert.equal(
+    messages.some((message) => message.startsWith('[passed]')),
+    false,
+  );
+});
+
+test('a related command that omits actual discovery evidence cannot pass the outer executor', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root);
+  step.args.push('test:related');
+  const result = await runVerificationTask(step, silent);
+  assert.equal(result.exitCode, 1);
+  assert.equal(record(result).status, 'failed');
+});
+
+test('the first NUL-delimited Git path retains leading spaces and newlines in candidate evidence', (t) => {
+  for (const name of [' leading.js', '\nleading.js']) {
+    const { root, git } = fixture(t);
+    writeFileSync(path.join(root, name), 'export const value = 1;\n');
+    git('add', '--', name);
+    git('commit', '-m', 'whitespace filename fixture', '--no-verify');
+    const files = spawnSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' });
+    assert.equal(files.status, 0, files.stderr);
+    assert.equal(files.stdout.split('\0')[0], name, 'The regression requires the whitespace path to be first');
+    const before = captureSource(root);
+    writeFileSync(path.join(root, name), 'export const value = 2;\n');
+    const after = captureSource(root);
+    assert.notEqual(after.digest, before.digest, 'Changing the first whitespace path must invalidate evidence');
+    assert.notEqual(after.mutationStamp, before.mutationStamp);
+  }
 });
 
 test('source content, deletion, untracked files, lockfile, installed dependency, and ignored env invalidate', async (t) => {

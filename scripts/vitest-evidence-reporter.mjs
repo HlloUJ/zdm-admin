@@ -1,11 +1,44 @@
-import { writeFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { statSync, writeFileSync } from 'node:fs';
 
 export default class EvidenceReporter {
   files = [];
   collected = [];
 
-  onTestRunStart(specifications) {
+  onInit(context) {
+    this.context = context;
+  }
+
+  async onTestRunStart(specifications) {
     this.files = specifications.map((specification) => specification.taskId);
+    if (process.env.FRONTEND_TEST_KIND === 'related') {
+      const sources = this.context.config.related;
+      assert.ok(Array.isArray(sources) && sources.length > 0, 'Related testing requires explicit source files');
+      for (const source of sources) {
+        const relative = path.relative(this.context.config.root, source);
+        assert.ok(
+          relative && !relative.startsWith('../') && !path.isAbsolute(relative),
+          'Related source is outside the project',
+        );
+        assert.ok(statSync(source).isFile(), `Related source is not a file: ${source}`);
+      }
+      // Use the same resolver that selected this run, including project and dependency configuration.
+      const universe = await this.context.globTestSpecifications([]);
+      const relevant = await this.context.getRelevantTestSpecifications([]);
+      assert.deepEqual(
+        relevant.map((item) => item.taskId).sort(),
+        [...this.files].sort(),
+        'Related selection changed during discovery',
+      );
+      this.selection = {
+        resolver: 'vitest-dependency-graph',
+        complete: true,
+        sources,
+        universe: universe.map((item) => item.taskId),
+        selected: this.files,
+      };
+    }
   }
 
   onTestModuleCollected(module) {
@@ -37,10 +70,11 @@ export default class EvidenceReporter {
       JSON.stringify(
         {
           schemaVersion: 1,
-          kind: 'unit',
+          kind: process.env.FRONTEND_TEST_KIND ?? 'unit',
           runId: process.env.FRONTEND_TEST_RUN_ID,
           complete: reason === 'passed',
           files: this.files,
+          selection: this.selection,
           completedFiles: modules.map((module) => module.id),
           collectedTests: this.collected,
           tests,

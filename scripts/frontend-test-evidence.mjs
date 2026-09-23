@@ -6,6 +6,27 @@ export function validateFrontendTestReport(report, { kind, runId } = {}) {
   assert.ok(runId && report.runId === runId, 'Frontend execution report is stale');
   assert.equal(report.complete, true, 'Frontend report is incomplete');
   assert.equal(report.errors.length, 0, 'Frontend report contains unhandled errors');
+  if (kind === 'related' && report.files.length === 0) {
+    const selection = report.selection;
+    assert.equal(selection?.resolver, 'vitest-dependency-graph', 'Missing related dependency discovery');
+    assert.equal(selection.complete, true, 'Related dependency discovery is incomplete');
+    assert.ok(
+      selection.sources?.length > 0 &&
+        selection.sources.every((source) => typeof source === 'string' && source.length > 0),
+      'Missing related source inventory',
+    );
+    assert.ok(selection.universe?.length > 0, 'An empty project cannot prove related tests inapplicable');
+    assert.equal(new Set(selection.universe).size, selection.universe.length, 'Duplicate available test files');
+    for (const list of [selection.selected, report.completedFiles, report.collectedTests, report.tests, report.suites])
+      assert.deepEqual(list, [], 'Empty related selection contains unexpected execution');
+    return {
+      status: 'not-applicable',
+      reason: 'No tests selected by completed Vitest dependency discovery',
+      tests: 0,
+      files: 0,
+      suites: 0,
+    };
+  }
   assert.ok(report.files.length > 0, 'Frontend file inventory is empty');
   assert.equal(new Set(report.files).size, report.files.length, 'Duplicate frontend files');
   assert.deepEqual([...report.completedFiles].sort(), [...report.files].sort(), 'Incomplete frontend file execution');
@@ -33,5 +54,5 @@ export function validateFrontendTestReport(report, { kind, runId } = {}) {
     assert.equal(test.flaky, false, `Flaky test: ${test.name}`);
     assert.equal(test.expectedFailure, false, `Expected failure cannot pass: ${test.name}`);
   }
-  return { tests: report.tests.length, files: report.files.length, suites: report.suites.length };
+  return { status: 'passed', tests: report.tests.length, files: report.files.length, suites: report.suites.length };
 }

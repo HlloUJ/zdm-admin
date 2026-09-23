@@ -12,6 +12,7 @@ import {
   EVIDENCE_VERSION,
 } from './verification-evidence.mjs';
 import { backendReportState, validateBackendReports } from './backend-test-evidence.mjs';
+import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
 
 function save(file, record) {
   const temporary = `${file}.${randomUUID()}.tmp`;
@@ -106,13 +107,18 @@ export async function runVerificationTask(task, options = {}) {
     });
     const commandStarted = performance.now();
     const previousReports = task.kind === 'backend' && args.includes('backend:test') ? backendReportState(root) : {};
+    const relatedRunId = args.includes('test:related') ? randomUUID() : null;
+    const relatedResult = relatedRunId ? path.join(directory, `related-${relatedRunId}.json`) : null;
+    const childEnv = relatedRunId
+      ? { ...env, FRONTEND_TEST_RUN_ID: relatedRunId, FRONTEND_TEST_RESULT_PATH: relatedResult }
+      : env;
     let tail = '';
     const append = (chunk) => {
       stream.write(chunk);
       tail = `${tail}${chunk}`.slice(-6000);
     };
     const exitCode = await new Promise((resolve) => {
-      const child = spawn(command, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(command, args, { cwd: root, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
       child.stdout.on('data', append);
       child.stderr.on('data', append);
       child.on('error', (error) => append(`${error.message}\n`));
@@ -124,6 +130,17 @@ export async function runVerificationTask(task, options = {}) {
     const afterProbeStarted = performance.now();
     let reportResult = null;
     let reportError = null;
+    if (exitCode === 0 && relatedRunId) {
+      try {
+        const result = JSON.parse(readFileSync(relatedResult, 'utf8'));
+        reportResult = {
+          ...validateFrontendTestReport(result, { kind: 'related', runId: relatedRunId }),
+          selection: result.selection,
+        };
+      } catch (error) {
+        reportError = error.message;
+      }
+    }
     if (exitCode === 0 && task.kind === 'backend' && args.includes('backend:test')) {
       try {
         reportResult = validateBackendReports(root, {
@@ -147,9 +164,17 @@ export async function runVerificationTask(task, options = {}) {
       before.source.mutationStamp === after.source.mutationStamp;
     const unchanged = before.fingerprint === after.fingerprint;
     const finalCode = sourceUnchanged && !reportError ? exitCode : 1;
+    const notApplicable = finalCode === 0 && reportResult?.status === 'not-applicable';
     record = {
       ...record,
-      status: finalCode !== 0 ? 'failed' : unchanged && before.reusable && after.reusable ? 'passed' : 'not-reusable',
+      status:
+        finalCode !== 0
+          ? 'failed'
+          : notApplicable
+            ? 'not-applicable'
+            : unchanged && before.reusable && after.reusable
+              ? 'passed'
+              : 'not-reusable',
       completedAt: new Date().toISOString(),
       exitCode: finalCode,
       commandExitCode: exitCode,
@@ -162,6 +187,7 @@ export async function runVerificationTask(task, options = {}) {
       afterFingerprint: after.fingerprint,
       reason:
         reportError ??
+        (notApplicable ? reportResult.reason : null) ??
         (!sourceUnchanged
           ? 'Source or baseline changed during validation'
           : !unchanged
@@ -170,10 +196,10 @@ export async function runVerificationTask(task, options = {}) {
     };
     save(file, record);
     report(
-      `[${finalCode === 0 ? 'passed' : 'failed'}] ${name} ${(record.elapsedMs / 1000).toFixed(1)}s (command ${(commandMs / 1000).toFixed(1)}s, evidence ${(probeMs / 1000).toFixed(1)}s); log: ${log}${record.reason ? `; ${record.reason}` : ''}`,
+      `[${finalCode === 0 ? (notApplicable ? 'not-applicable' : 'passed') : 'failed'}] ${name} ${(record.elapsedMs / 1000).toFixed(1)}s (command ${(commandMs / 1000).toFixed(1)}s, evidence ${(probeMs / 1000).toFixed(1)}s); log: ${log}${record.reason ? `; ${record.reason}` : ''}`,
     );
     if (finalCode !== 0 && tail) report(tail);
-    return { exitCode: finalCode, reused: false, evidence: file, reason: record.reason };
+    return { exitCode: finalCode, reused: false, evidence: file, reason: record.reason, status: record.status };
   } catch (error) {
     // Never allow a previous success to survive a failed identity capture or interrupted attempt.
     save(file, {
