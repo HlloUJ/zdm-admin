@@ -40,7 +40,8 @@ public interface AuthAccountMapper {
         AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)
         AND (ai.tenant_id IS NULL OR t.status = 'enabled')
         AND (ai.store_id IS NULL OR s.status = 'enabled')
-      ORDER BY CASE ai.identity_type
+      ORDER BY CASE WHEN ai.client_code = 'admin' AND ai.identity_type = 'platform_admin' THEN -1 ELSE 0 END,
+        CASE ai.identity_type
         WHEN 'platform_admin' THEN 0
         WHEN 'store_admin' THEN 1
         WHEN 'tenant_admin' THEN 2
@@ -165,7 +166,8 @@ public interface AuthAccountMapper {
         AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)
         AND (ai.tenant_id IS NULL OR t.status = 'enabled')
         AND (ai.store_id IS NULL OR s.status = 'enabled')
-      ORDER BY CASE ai.identity_type
+      ORDER BY CASE WHEN ai.client_code = 'admin' AND ai.identity_type = 'platform_admin' THEN -1 ELSE 0 END,
+        CASE ai.identity_type
         WHEN 'platform_admin' THEN 0
         WHEN 'store_admin' THEN 1
         WHEN 'tenant_admin' THEN 2

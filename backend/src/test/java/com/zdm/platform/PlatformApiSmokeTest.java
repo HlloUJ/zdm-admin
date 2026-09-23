@@ -3721,6 +3721,74 @@ class PlatformApiSmokeTest {
   }
 
   @Test
+  void builtInSuperAdminSwitchesToSupplyChainWithoutRoleOrTerminalAllocation() throws Exception {
+    Long supplyIdentityId = jdbcTemplate.queryForObject(
+        "SELECT id FROM account_identities WHERE account_id = 1 AND client_code = 'supply-chain' "
+            + "AND identity_type = 'platform_admin' AND status = 'enabled'",
+        Long.class);
+    assertThat(supplyIdentityId).isNotNull();
+    assertThat(authAccounts.findAdminRoleCodes(1L, supplyIdentityId)).isEmpty();
+
+    String terminalPermissions = jdbcTemplate.queryForObject(
+        "SELECT function_permissions FROM terminal_function_policies WHERE terminal = 'supply-chain'",
+        String.class);
+    jdbcTemplate.update(
+        "UPDATE terminal_function_policies SET function_permissions = '' WHERE terminal = 'supply-chain'");
+    try {
+      MvcResult loginResult = mockMvc.perform(post("/api/admin/auth/login")
+              .contentType("application/json")
+              .content("""
+                  {"phone":"15926626945","verifyCode":"888888"}
+                  """))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.user.clientCode").value("admin"))
+          .andReturn();
+      String adminToken = com.jayway.jsonpath.JsonPath.read(
+          loginResult.getResponse().getContentAsString(), "$.data.token");
+
+      mockMvc.perform(get("/api/admin/auth/contexts")
+              .header("Authorization", "Bearer " + adminToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[?(@.identityId == %d)].clientCode".formatted(supplyIdentityId))
+              .value(hasItem("supply-chain")));
+
+      MvcResult switchResult = mockMvc.perform(post("/api/admin/auth/switch-identity")
+              .header("Authorization", "Bearer " + adminToken)
+              .contentType("application/json")
+              .content("""
+                  {"identityId":%d}
+                  """.formatted(supplyIdentityId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.user.clientCode").value("supply-chain"))
+          .andExpect(jsonPath("$.data.user.identityType").value("platform_admin"))
+          .andExpect(jsonPath("$.data.user.roles[0]").value("SUPER_ADMIN"))
+          .andExpect(jsonPath("$.data.user.permissions[0]").value("all"))
+          .andExpect(jsonPath("$.data.user.dataPermission").value("all"))
+          .andExpect(jsonPath("$.data.user.tenantId").doesNotExist())
+          .andExpect(jsonPath("$.data.user.storeId").doesNotExist())
+          .andReturn();
+      String supplyToken = com.jayway.jsonpath.JsonPath.read(
+          switchResult.getResponse().getContentAsString(), "$.data.token");
+      assertThat(com.zdm.platform.security.DataScope.isAll(sessionTokens.authenticate(supplyToken)))
+          .isTrue();
+
+      mockMvc.perform(get("/api/admin/slabs")
+              .header("Authorization", "Bearer " + supplyToken))
+          .andExpect(status().isOk());
+      mockMvc.perform(get("/api/admin/tenants")
+              .header("Authorization", "Bearer " + supplyToken))
+          .andExpect(status().isForbidden());
+      mockMvc.perform(get("/api/admin/slabs")
+              .header("Authorization", "Bearer " + adminToken))
+          .andExpect(status().isUnauthorized());
+    } finally {
+      jdbcTemplate.update(
+          "UPDATE terminal_function_policies SET function_permissions = ? WHERE terminal = 'supply-chain'",
+          terminalPermissions);
+    }
+  }
+
+  @Test
   void ordinaryRoleWithoutPermissionCannotAccessTenantApi() throws Exception {
     long accountId = 9010L;
     long employeeId = 9010L;
