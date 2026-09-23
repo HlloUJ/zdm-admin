@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
@@ -9,11 +9,14 @@ import {
   dockerDesktopLaunchCommand,
   INTEGRATION_PREVIEW_URL,
   launchAgentPlist,
+  main,
   MANAGED_TASK_PREVIEW_PORT,
   normalizedPath,
   parseServiceArgs,
   PreviewGateway,
+  PreviewSupervisor,
   previewCommand,
+  readServiceStatus,
   restartDelay,
   SERVICE_LABEL,
   servicePaths,
@@ -242,4 +245,197 @@ test('creates a login-persistent launchd definition with escaped paths', () => {
   assert.match(plist, /\/opt\/node&amp;runtime/);
   assert.match(plist, /integration&lt;current&gt;/);
   assert.match(plist, /task preview\/service\.mjs/);
+});
+
+function supervisorFixture({ unhealthy = false, blocked = false } = {}) {
+  const events = [];
+  const root = '/repo/task';
+  const gateway = {
+    mode: 'task',
+    status() {
+      return { mode: this.mode, upstream: 'http://127.0.0.1:5176', listening: true };
+    },
+    useIntegration() {
+      this.mode = 'integration-fallback';
+    },
+    useTask() {
+      this.mode = 'task';
+    },
+  };
+  const config = {
+    selectedWorktree: root,
+    taskArgs: ['--mode', 'full'],
+    nodePath: process.execPath,
+    launcherPath: '/repo/scripts/dev-task.mjs',
+  };
+  const supervisor = new PreviewSupervisor({ logFile: '/tmp/preview.log' }, config, gateway, {
+    resolveTaskWorktree: (worktree) => ({ root: worktree, branch: 'codex/task' }),
+    writeConfig: () => events.push('save'),
+    checkSelectedPreview: async () => {
+      events.push('check');
+      if (unhealthy) throw new Error('API health unavailable');
+    },
+    ensureDockerReady: async () => events.push('docker-ready'),
+    stopChild: async (child) => {
+      events.push('stop');
+      child.exitCode = 0;
+    },
+    spawn: (command, args) => {
+      assert.equal(command, process.execPath);
+      assert.deepEqual(args, [config.launcherPath, '--worktree', root, '--port', '5176', '--mode', 'full']);
+      events.push('launch-protected-task');
+      return Object.assign(new EventEmitter(), { pid: 123, exitCode: null });
+    },
+    waitForPreview: async () => {
+      events.push('ready');
+      if (blocked) throw new Error('共享数据库正由另一任务执行结构任务');
+      return { branch: 'codex/task' };
+    },
+  });
+  supervisor.child = Object.assign(new EventEmitter(), { pid: 122, exitCode: null });
+  supervisor.currentWorktree = root;
+  supervisor.currentTaskArgs = [...config.taskArgs];
+  supervisor.phase = 'running';
+  return { supervisor, root, config, events, gateway };
+}
+
+test('same-worktree healthy switch validates the actual preview without restarting', async () => {
+  const f = supervisorFixture();
+  const child = f.supervisor.child;
+  const result = await f.supervisor.switch(f.root, f.config.taskArgs);
+  assert.equal(result.phase, 'running');
+  assert.equal(f.supervisor.child, child);
+  assert.deepEqual(f.events, ['save', 'check']);
+});
+
+test('same-worktree failed preview check reaches protected recovery instead of the running fast path', async () => {
+  const f = supervisorFixture({ unhealthy: true });
+  const result = await f.supervisor.switch(f.root, f.config.taskArgs);
+  assert.equal(result.phase, 'running');
+  assert.deepEqual(f.events, ['save', 'check', 'docker-ready', 'stop', 'launch-protected-task', 'ready', 'ready']);
+});
+
+test('a child that exits during the asynchronous check is recovered instead of reporting stale reuse', async () => {
+  const f = supervisorFixture();
+  f.supervisor.dependencies.checkSelectedPreview = async () => {
+    f.events.push('check');
+    f.supervisor.child = null;
+    f.supervisor.phase = 'error';
+    f.gateway.useIntegration();
+  };
+  const result = await f.supervisor.switch(f.root, f.config.taskArgs);
+  assert.equal(result.phase, 'running');
+  assert.ok(f.events.includes('launch-protected-task'));
+});
+
+test('recovery propagates launcher protection failure and preserves the selected task', async () => {
+  const f = supervisorFixture({ unhealthy: true, blocked: true });
+  try {
+    await assert.rejects(f.supervisor.switch(f.root, f.config.taskArgs), /共享数据库/);
+    assert.equal(f.supervisor.config.selectedWorktree, f.root);
+    assert.equal(f.supervisor.child, null);
+    assert.equal(f.gateway.mode, 'integration-fallback');
+    assert.equal(f.events.filter((event) => event === 'launch-protected-task').length, 1);
+  } finally {
+    f.supervisor.clearRestart();
+  }
+});
+
+test('switch refuses another selected task before saving or stopping resources', async () => {
+  const f = supervisorFixture();
+  await assert.rejects(f.supervisor.switch('/repo/other', []), /请先交接/);
+  assert.deepEqual(f.events, []);
+  assert.equal(f.supervisor.config.selectedWorktree, f.root);
+});
+
+test('a live child with inconsistent selection is not reassigned before ownership is resolved', async () => {
+  const f = supervisorFixture();
+  f.supervisor.config.selectedWorktree = null;
+  await assert.rejects(f.supervisor.switch('/repo/other', []), /进程归属/);
+  assert.deepEqual(f.events, []);
+  assert.equal(f.supervisor.config.selectedWorktree, null);
+});
+
+function offlineStatusDependencies(config) {
+  return {
+    request: async () => {
+      throw new Error('connect ECONNREFUSED');
+    },
+    read: () => config,
+    exists: () => true,
+  };
+}
+
+test('CLI status returns offline ownership without ensuring or starting a service', async () => {
+  const paths = servicePaths('/tmp/status-fixture');
+  const output = [];
+  await main(['status', '--json'], {
+    servicePaths: () => paths,
+    readServiceStatus: (target) =>
+      readServiceStatus(
+        target,
+        offlineStatusDependencies({
+          launcherPath: '/repo/scripts/dev-task.mjs',
+          nodePath: process.execPath,
+          selectedWorktree: '/repo/task',
+        }),
+      ),
+    ensureService: () => assert.fail('status must not kickstart launchd'),
+    requestJson: () => assert.fail('status must not mutate service state'),
+    log: (value) => output.push(JSON.parse(value)),
+  });
+  assert.equal(output[0].phase, 'offline');
+  assert.equal(output[0].selectionKnown, true);
+  assert.equal(output[0].worktree, '/repo/task');
+  assert.equal(output[0].servicePid, null);
+  assert.equal(output[0].url, null);
+});
+
+test('offline status with corrupt ownership remains unknown rather than claiming an empty task', async () => {
+  const status = await readServiceStatus(servicePaths('/tmp/status-fixture'), {
+    ...offlineStatusDependencies(null),
+    read: () => {
+      throw new Error('corrupt config');
+    },
+  });
+  assert.equal(status.phase, 'offline');
+  assert.equal(status.selectionKnown, false);
+});
+
+test('explicit same-task switch can restore offline service and rechecks ownership before switching', async () => {
+  for (const restoredWorktree of ['/repo/task', '/repo/other']) {
+    const actions = [];
+    const promise = main(['switch', '--worktree', '/repo/task'], {
+      resolveTaskWorktree: (root) => ({ root }),
+      readServiceStatus: async () => ({ phase: 'offline', selectionKnown: true, worktree: '/repo/task' }),
+      ensureService: async () => {
+        actions.push('ensure');
+        return { phase: 'running', worktree: restoredWorktree };
+      },
+      requestJson: async (request) => {
+        assert.equal(request.requestPath, '/switch');
+        actions.push('switch');
+        return { phase: 'running' };
+      },
+      printStatus: () => {},
+    });
+    if (restoredWorktree === '/repo/task') {
+      await promise;
+      assert.deepEqual(actions, ['ensure', 'switch']);
+    } else {
+      await assert.rejects(promise, /请先交接/);
+      assert.deepEqual(actions, ['ensure']);
+    }
+  }
+});
+
+test('offline stop and unknown-owner switch do not kickstart or mutate service state', async () => {
+  const dependencies = {
+    resolveTaskWorktree: (root) => ({ root }),
+    readServiceStatus: async () => ({ phase: 'offline', selectionKnown: false, worktree: null }),
+    ensureService: () => assert.fail('must not start a service'),
+    requestJson: () => assert.fail('must not mutate service state'),
+  };
+  await assert.rejects(main(['stop'], dependencies), /服务离线/);
+  await assert.rejects(main(['switch', '--worktree', '/repo/task'], dependencies), /任务归属未知/);
 });

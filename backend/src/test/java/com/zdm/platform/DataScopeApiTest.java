@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import com.zdm.platform.support.SpringContainerTestSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zdm.platform.security.CurrentIdentity;
 import java.util.List;
@@ -34,7 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc(addFilters = false)
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
-class DataScopeApiTest {
+class DataScopeApiTest extends SpringContainerTestSupport {
   @Container
   private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
       .withDatabaseName("zdm_scope_test").withUsername("test").withPassword("test");

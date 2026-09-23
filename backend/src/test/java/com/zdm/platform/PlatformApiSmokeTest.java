@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.zdm.platform.support.SpringContainerTestSupport;
 import com.zdm.platform.inventory.SlabPrice;
 import com.zdm.platform.inventory.SlabPriceService;
 import com.zdm.platform.security.CurrentIdentity;
@@ -44,7 +45,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
-class PlatformApiSmokeTest {
+class PlatformApiSmokeTest extends SpringContainerTestSupport {
   private static final Path MEDIA_ROOT = Path.of(
       System.getProperty("java.io.tmpdir"), "zdm-media-smoke-" + UUID.randomUUID());
 

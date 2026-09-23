@@ -1,15 +1,22 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
 import viteConfig from '../vite.config.js';
+import { runtimeDigest, taskBackendContainerIdentity } from './task-runtime-state.mjs';
 
 const syncIntegrationSource = readFileSync(new URL('./sync-integration.mjs', import.meta.url), 'utf8');
 const taskPreviewSource = readFileSync(new URL('./dev-task.mjs', import.meta.url), 'utf8');
 
 import {
   snapshotAppliedMigrations,
+  ensureTaskBackend,
+  runtimeWatchFile,
+  createBackendWatchers,
+  withRuntimeStartupWatch,
   verifyPausedCatalog,
   backendSensitiveFiles,
   chooseTaskFrontendPort,
@@ -27,6 +34,8 @@ import {
   selectTaskPreviewMode,
   taskPublicOrigin,
   taskPreviewReadinessErrors,
+  taskPreviewCheckExpectations,
+  taskPreviewChangedFiles,
   taskPreviewErrors,
   taskProjectName,
 } from './dev-task.mjs';
@@ -306,6 +315,7 @@ test('roots task preview assets and aliases in the selected worktree', () => {
   try {
     const config = viteConfig({ mode: 'development' });
     assert.equal(config.root, resolve(selectedWorktree));
+    assert.equal(config.cacheDir, resolve(selectedWorktree, '.task-runtime/cache/vite'));
     assert.equal(config.resolve.alias['@'], resolve(selectedWorktree, 'src'));
     assert.equal(
       config.plugins.some((plugin) => plugin.name === 'zdm-task-preview-control'),
@@ -351,4 +361,419 @@ test('pause is an explicit operation and does not imply delivery', () => {
   assert.equal(options.pause, true);
   assert.equal(options.handoff, false);
   assert.equal(options.stop, false);
+});
+
+test('worktree checks reject a stale branch and a frontend preview when the task needs its own backend', () => {
+  const metadata = {
+    workspaceRoot: '/tmp/task',
+    branch: 'codex/task',
+    mode: 'frontend',
+    apiTarget: 'http://127.0.0.1:8080',
+  };
+  const input = { root: '/tmp/task', branch: 'codex/task', files: ['src/page.vue'], metadata };
+  assert.throws(
+    () => taskPreviewCheckExpectations({ ...input, metadata: { ...metadata, branch: 'codex/old' } }),
+    /不是 codex\/task/,
+  );
+  assert.throws(
+    () => taskPreviewCheckExpectations({ ...input, files: ['backend/src/main/java/Service.java'] }),
+    /必须使用 full/,
+  );
+  assert.throws(() => taskPreviewCheckExpectations({ ...input, branch: '' }), /只能预览/);
+});
+
+test('worktree checks preserve explicit full mode and bind it to the registered task backend port', () => {
+  const metadata = {
+    workspaceRoot: '/tmp/task',
+    branch: 'codex/task',
+    mode: 'full',
+    apiTarget: 'http://127.0.0.1:8083',
+  };
+  const input = {
+    root: '/tmp/task',
+    branch: 'codex/task',
+    files: ['src/page.vue'],
+    metadata,
+    registeredBackendPort: 8083,
+  };
+  const expected = taskPreviewCheckExpectations(input);
+  assert.equal(expected.expectedMode, 'full');
+  assert.equal(expected.expectedApiTarget, 'http://127.0.0.1:8083');
+  assert.deepEqual(
+    taskPreviewReadinessErrors({ metadata, ...expected, healthStatus: 200, healthBody: '{"status":"UP"}' }),
+    [],
+  );
+  assert.match(
+    taskPreviewReadinessErrors({
+      metadata: { ...metadata, apiTarget: 'http://127.0.0.1:8080' },
+      ...expected,
+      healthStatus: 200,
+      healthBody: '{"status":"UP"}',
+    }).join('\n'),
+    /不是 http/,
+  );
+  assert.throws(() => taskPreviewCheckExpectations({ ...input, registeredBackendPort: null }), /无法证明/);
+});
+
+test('frontend worktree checks use the shared API or an independently registered explicit API target', () => {
+  const metadata = {
+    workspaceRoot: '/tmp/task',
+    branch: 'codex/task',
+    mode: 'frontend',
+    apiTarget: 'http://127.0.0.1:9000',
+  };
+  const input = { root: '/tmp/task', branch: 'codex/task', files: ['src/page.vue'], metadata };
+  const defaultExpected = taskPreviewCheckExpectations(input);
+  assert.equal(defaultExpected.expectedApiTarget, 'http://127.0.0.1:8080');
+  assert.match(
+    taskPreviewReadinessErrors({ metadata, ...defaultExpected, healthStatus: 200, healthBody: '{"status":"UP"}' }).join(
+      '\n',
+    ),
+    /不是 http/,
+  );
+  const explicitExpected = taskPreviewCheckExpectations({ ...input, registeredApiTarget: metadata.apiTarget });
+  assert.deepEqual(
+    taskPreviewReadinessErrors({ metadata, ...explicitExpected, healthStatus: 200, healthBody: '{"status":"UP"}' }),
+    [],
+  );
+});
+
+test('worktree runtime scope includes committed, staged, unstaged, deleted and untracked changes', (t) => {
+  const root = mkdtempSync(resolve(tmpdir(), 'zdm-runtime-scope-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git('init', '--initial-branch=main');
+  git('config', 'user.email', 'runtime@example.invalid');
+  git('config', 'user.name', 'Runtime fixture');
+  mkdirSync(resolve(root, 'backend'), { recursive: true });
+  for (const file of ['committed.java', 'deleted.java', 'staged.java', 'unstaged.java', 'renamed.java'])
+    writeFileSync(resolve(root, 'backend', file), 'baseline');
+  git('add', '.');
+  git('commit', '-m', 'baseline', '--no-verify');
+  git('checkout', '-b', 'codex/task');
+  writeFileSync(resolve(root, 'backend/committed.java'), 'committed');
+  git('add', '.');
+  git('commit', '-m', 'task change', '--no-verify');
+  writeFileSync(resolve(root, 'backend/staged.java'), 'staged');
+  git('add', '.');
+  writeFileSync(resolve(root, 'backend/unstaged.java'), 'unstaged');
+  rmSync(resolve(root, 'backend/deleted.java'));
+  writeFileSync(resolve(root, 'backend/untracked.java'), 'untracked');
+  git('mv', 'backend/renamed.java', 'backend/rename target.java');
+  writeFileSync(resolve(root, 'backend/ leading\nname.java'), 'untracked special');
+  writeFileSync(resolve(root, ' leading\nroot.java'), 'untracked root special');
+  assert.deepEqual(taskPreviewChangedFiles(root), [
+    ' leading\nroot.java',
+    'backend/ leading\nname.java',
+    'backend/committed.java',
+    'backend/deleted.java',
+    'backend/rename target.java',
+    'backend/renamed.java',
+    'backend/staged.java',
+    'backend/unstaged.java',
+    'backend/untracked.java',
+  ]);
+});
+
+test('startup, check and watch share the same runtime scope; test/tools-only changes stay frontend', () => {
+  for (const file of [
+    'backend/src/test/java/ExampleTest.java',
+    'backend/src/test/resources/application.yml',
+    'scripts/backend-test-plan.mjs',
+    'scripts/dev-task.test.mjs',
+  ]) {
+    assert.equal(selectTaskPreviewMode({ files: [file] }), 'frontend', file);
+    const slash = file.indexOf('/');
+    assert.equal(runtimeWatchFile(file.slice(0, slash), file.slice(slash + 1)), null, file);
+  }
+  for (const file of [
+    'backend/src/main/java/Example.java',
+    'backend/src/main/resources/db/migration/V2__test.sql',
+    'docker-compose.task.yml',
+    'backend/pom.xml',
+    '.codex/zdm-project-workflow.yaml',
+  ]) {
+    assert.equal(selectTaskPreviewMode({ files: [file] }), 'full', file);
+    assert.equal(runtimeWatchFile('', file), file);
+  }
+  assert.ok(runtimeWatchFile('backend/src', null));
+  assert.ok(runtimeWatchFile('', null));
+});
+
+test('watch callbacks keep the actual filename and ignore tests/build output', (t) => {
+  const root = mkdtempSync(resolve(tmpdir(), 'zdm-watch-fixture-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(resolve(root, 'backend/src/test'), { recursive: true });
+  const subscriptions = new Map();
+  const changed = [];
+  const watchers = createBackendWatchers(
+    root,
+    (file) => changed.push(file),
+    (directory, options, callback) => {
+      subscriptions.set(directory, callback);
+      return { close() {} };
+    },
+  );
+  assert.ok(watchers.length);
+  subscriptions.get(resolve(root, 'backend/src'))('change', 'test/java/ExampleTest.java');
+  subscriptions.get(resolve(root, 'backend/src'))('change', 'main/java/Example.java');
+  subscriptions.get(resolve(root, 'backend'))('change', 'target');
+  subscriptions.get(root)('change', 'docker-compose.task.yml');
+  assert.deepEqual(changed, ['backend/src/main/java/Example.java', 'docker-compose.task.yml']);
+});
+
+function backendStartupFixture() {
+  const options = {
+    root: '/task',
+    integrationRoot: '/integration',
+    project: 'zdm-task-test',
+    branch: 'codex/test',
+    context: { env: { ZDM_TASK_BACKEND_PORT: '8084' } },
+  };
+  const container = {
+    Id: 'container-1',
+    State: { Running: true, StartedAt: 'start-1' },
+    Image: 'image-1',
+    Config: {
+      Labels: {
+        'com.docker.compose.project': options.project,
+        'com.docker.compose.service': 'backend',
+        'com.zdm.task.preview': 'true',
+        'com.zdm.task.database': 'integration',
+      },
+    },
+    HostConfig: { PortBindings: { '8080/tcp': [{ HostIp: '127.0.0.1', HostPort: '8084' }] } },
+    Mounts: [
+      { Type: 'bind', Source: '/task', Destination: '/workspace', RW: true },
+      { Type: 'bind', Source: '/migrations', Destination: '/task-migrations', RW: false },
+    ],
+  };
+  const commands = [];
+  const writes = [];
+  const order = [];
+  const record = {
+    version: 1,
+    sourceIdentity: 'source-1',
+    configurationIdentity: runtimeDigest('config-1'),
+    containerIdentity: taskBackendContainerIdentity(container, {
+      ...options,
+      backendPort: 8084,
+      migrationDirectory: '/migrations',
+    }),
+  };
+  const dependencies = {
+    ensureDatabase: async () => order.push('database'),
+    prepareMigrations: () => ({ directory: '/migrations', count: 1 }),
+    readLock: () => null,
+    acquireLock: async () => order.push('lock'),
+    inspect: () => container,
+    configuration: () => 'config-1',
+    snapshot: () => 'source-1',
+    readRecord: () => record,
+    writeRecord: (root, value) => writes.push(value),
+    execute: (context, args) => {
+      commands.push(args);
+      if (args[0] !== 'logs') container.State.StartedAt = 'start-2';
+    },
+    health: async () => {
+      order.push('health');
+      return { statusCode: 200, body: '{"status":"UP"}' };
+    },
+    waitForHealth: async () => {},
+  };
+  return { options, dependencies, container, commands, writes, order };
+}
+
+test('verified healthy backend is reused after the existing migration lock guards', async () => {
+  const fixture = backendStartupFixture();
+  fixture.options.riskFiles = ['migration.sql'];
+  assert.deepEqual(await ensureTaskBackend(fixture.options, fixture.dependencies), { action: 'reuse' });
+  assert.deepEqual(fixture.order, ['database', 'lock', 'health']);
+  assert.deepEqual(fixture.commands, []);
+  assert.deepEqual(fixture.writes, []);
+  fixture.dependencies.readLock = () => ({ project: 'other', branch: 'codex/other', backupFile: '/backup' });
+  await assert.rejects(ensureTaskBackend(fixture.options, fixture.dependencies), /共享数据库正由/);
+  assert.deepEqual(fixture.commands, []);
+});
+
+test('backend startup restarts only known source changes and recreates unknown or changed configuration', async () => {
+  for (const scenario of ['source', 'config', 'unknown', 'migration', 'unhealthy']) {
+    const fixture = backendStartupFixture();
+    if (scenario === 'source' || scenario === 'migration') fixture.dependencies.snapshot = () => 'source-2';
+    if (scenario === 'migration') fixture.options.riskFiles = ['migration.sql'];
+    if (scenario === 'config') fixture.dependencies.configuration = () => 'config-2';
+    if (scenario === 'unknown') fixture.dependencies.readRecord = () => null;
+    if (scenario === 'unhealthy') {
+      let probes = 0;
+      fixture.dependencies.health = async () => ({
+        statusCode: 200,
+        body: ++probes === 1 ? '{"status":"DOWN"}' : '{"status":"UP"}',
+      });
+    }
+    const expected = ['source', 'unhealthy'].includes(scenario) ? 'restart' : 'recreate';
+    assert.equal((await ensureTaskBackend(fixture.options, fixture.dependencies)).action, expected, scenario);
+    assert.equal(fixture.commands[0][0], expected === 'restart' ? 'restart' : 'up');
+    assert.equal(fixture.writes.length, 1);
+  }
+});
+
+test('runtime proof is never written for changing inputs, wrong containers, or a no-op restart', async () => {
+  for (const scenario of ['changing', 'wrong mount', 'unchanged start', 'not UP', 'replaced during start']) {
+    const fixture = backendStartupFixture();
+    fixture.dependencies.readRecord = () => null;
+    if (scenario === 'changing') {
+      let source = 'source-1';
+      fixture.dependencies.snapshot = () => source;
+      fixture.dependencies.waitForHealth = async () => {
+        source = 'source-2';
+      };
+    }
+    if (scenario === 'wrong mount')
+      fixture.dependencies.waitForHealth = async () => (fixture.container.Mounts[0].Source = '/other');
+    if (scenario === 'not UP')
+      fixture.dependencies.health = async () => ({ statusCode: 200, body: '<html>wrong service</html>' });
+    if (scenario === 'replaced during start')
+      fixture.dependencies.waitForHealth = async () => {
+        fixture.container.Id = 'another-container';
+      };
+    if (scenario === 'unchanged start') fixture.dependencies.execute = (context, args) => fixture.commands.push(args);
+    await assert.rejects(ensureTaskBackend(fixture.options, fixture.dependencies), /未登记复用证据/, scenario);
+    assert.deepEqual(fixture.writes, []);
+  }
+});
+
+test('a container change during the health probe cannot pass the backend reuse path', async () => {
+  const fixture = backendStartupFixture();
+  fixture.dependencies.health = async () => {
+    fixture.container.Id = 'replaced';
+    return { statusCode: 200, body: '{"status":"UP"}' };
+  };
+  assert.equal((await ensureTaskBackend(fixture.options, fixture.dependencies)).action, 'recreate');
+  assert.equal(fixture.commands[0][0], 'up');
+});
+
+test('startup listeners capture a frontend-to-full change and drain the final change before activating live updates', async (t) => {
+  const root = mkdtempSync(resolve(tmpdir(), 'zdm-startup-window-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git('init', '--initial-branch=main');
+  git('config', 'user.email', 'fixture@example.invalid');
+  git('config', 'user.name', 'Fixture');
+  mkdirSync(resolve(root, 'backend/src/main/java'), { recursive: true });
+  mkdirSync(resolve(root, 'src'), { recursive: true });
+  writeFileSync(resolve(root, 'backend/src/main/java/Example.java'), 'baseline');
+  writeFileSync(resolve(root, 'src/page.vue'), 'baseline');
+  git('add', '.');
+  git('commit', '-m', 'baseline', '--no-verify');
+  git('checkout', '-b', 'codex/task');
+  writeFileSync(resolve(root, 'src/page.vue'), 'frontend change');
+  const subscriptions = new Map();
+  const updates = [];
+  const forwarded = [];
+  let closed = 0;
+  const watchRuntime = (directory, notify) =>
+    createBackendWatchers(directory, notify, (watched, options, callback) => {
+      subscriptions.set(watched, callback);
+      return { close: () => (closed += 1) };
+    });
+  await withRuntimeStartupWatch(
+    root,
+    async (startup) => {
+      assert.ok(subscriptions.has(resolve(root, 'backend/src')), 'listeners exist before initial classification');
+      assert.equal(selectTaskPreviewMode({ files: taskPreviewChangedFiles(root) }), 'frontend');
+      // Simulate the await between shared-backend readiness and frontend port preparation.
+      await Promise.resolve();
+      writeFileSync(resolve(root, 'backend/src/main/java/Example.java'), 'backend change');
+      subscriptions.get(resolve(root, 'backend/src'))('change', 'main/java/Example.java');
+      subscriptions.get(resolve(root, 'backend/src'))('change', 'main/java/Example.java');
+      assert.deepEqual(updates, [], 'startup does not race its first frontend readiness check');
+      await startup.settle(
+        async (files) => {
+          updates.push({ files, mode: selectTaskPreviewMode({ files: taskPreviewChangedFiles(root) }) });
+          if (updates.length === 1) {
+            await Promise.resolve();
+            writeFileSync(resolve(root, 'docker-compose.task.yml'), 'changed runtime configuration');
+            subscriptions.get(root)('change', 'docker-compose.task.yml');
+          }
+        },
+        (file) => forwarded.push(file),
+      );
+      assert.deepEqual(updates, [
+        { files: ['backend/src/main/java/Example.java'], mode: 'full' },
+        { files: ['docker-compose.task.yml'], mode: 'full' },
+      ]);
+      subscriptions.get(resolve(root, 'backend/src'))('change', 'main/java/Example.java');
+      assert.deepEqual(forwarded, ['backend/src/main/java/Example.java']);
+      startup.close();
+    },
+    watchRuntime,
+  );
+  assert.equal(closed, subscriptions.size);
+});
+
+test('a backend edit after initial healthy reuse is handled before startup finishes', async () => {
+  const fixture = backendStartupFixture();
+  let notify;
+  let source = 'source-1';
+  fixture.dependencies.snapshot = () => source;
+  await withRuntimeStartupWatch(
+    '/task',
+    async (startup) => {
+      assert.deepEqual(await ensureTaskBackend(fixture.options, fixture.dependencies), { action: 'reuse' });
+      // The previously uncovered window: backend has returned, prepareFrontendPort is still awaiting.
+      await Promise.resolve();
+      source = 'source-2';
+      notify('backend/src/main/java/Example.java');
+      const results = [];
+      await startup.settle(
+        async () => results.push(await ensureTaskBackend(fixture.options, fixture.dependencies)),
+        () => {},
+      );
+      assert.deepEqual(results, [{ action: 'restart' }]);
+      assert.equal(fixture.writes.at(-1).sourceIdentity, 'source-2');
+      assert.deepEqual(fixture.commands, [['restart', 'backend']]);
+      startup.close();
+    },
+    (root, callback) => {
+      notify = callback;
+      return [{ close() {} }];
+    },
+  );
+});
+
+test('startup failures and failed convergence close the early listeners without activating queued work', async () => {
+  for (const duringConvergence of [false, true]) {
+    let notify;
+    let closed = 0;
+    let forwarded = 0;
+    await assert.rejects(
+      withRuntimeStartupWatch(
+        '/task',
+        async (startup) => {
+          notify('backend/src/main/java/Example.java');
+          if (!duringConvergence) throw new Error('initial failure');
+          await startup.settle(
+            async () => {
+              throw new Error('convergence failure');
+            },
+            () => (forwarded += 1),
+          );
+        },
+        (root, callback) => {
+          notify = callback;
+          return [{ close: () => (closed += 1) }];
+        },
+      ),
+      /failure/,
+    );
+    notify('after failure');
+    assert.equal(closed, 1);
+    assert.equal(forwarded, 0);
+  }
 });

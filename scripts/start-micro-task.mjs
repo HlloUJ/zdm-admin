@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from './git-workflow-core.mjs';
+import { assertBatchIdAvailable, readActiveBatch, registerBatch, validateActiveBatch } from './task-batch.mjs';
 
 const MAIN_BRANCH = 'main';
 const REMOTE = 'origin';
@@ -11,7 +12,7 @@ const TASK_BRANCH_PREFIX = 'codex/';
 const sourceFile = fileURLToPath(import.meta.url);
 
 export function parseMicroTaskArgs(args) {
-  const options = { slug: '', resume: false, help: false };
+  const options = { slug: '', kind: 'business', resume: false, independent: false, help: false };
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
     if (value === '--help' || value === '-h') {
@@ -22,16 +23,26 @@ export function parseMicroTaskArgs(args) {
       options.resume = true;
       continue;
     }
-    if (value === '--slug') {
-      options.slug = args[index + 1] ?? '';
+    if (value === '--independent') {
+      options.independent = true;
+      continue;
+    }
+    if (value === '--slug' || value === '--kind') {
+      const next = args[index + 1];
+      if (!next || next.startsWith('--')) throw new Error(`${value} 需要参数值`);
+      options[value.slice(2)] = next;
       index += 1;
       continue;
     }
     throw new Error(`未知参数：${value}`);
   }
-  if (!options.help && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(options.slug)) {
+  if (!options.help && options.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(options.slug)) {
     throw new Error('--slug 只能使用小写字母、数字和单个连字符，例如 status-copy');
   }
+  if (!['business', 'infrastructure', 'maintenance'].includes(options.kind))
+    throw new Error('--kind 只能是 business、infrastructure 或 maintenance');
+  if (options.resume && !options.slug && !options.help) throw new Error('--resume 需要 --slug 指定真实任务 Worktree');
+  if (options.resume && options.independent) throw new Error('--resume 与 --independent 不能同时使用');
   return options;
 }
 
@@ -100,10 +111,11 @@ function pathEntryExists(value) {
   }
 }
 
-function gitOperationInProgress(cwd) {
-  return ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'].some((name) =>
-    pathEntryExists(captureGit(cwd, ['rev-parse', '--git-path', name])),
-  );
+export function gitOperationInProgress(cwd) {
+  const markers = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'];
+  const paths = captureGit(cwd, ['rev-parse', ...markers.flatMap((marker) => ['--git-path', marker])]).split('\n');
+  if (paths.length !== markers.length) throw new Error('无法证明 Git 操作状态');
+  return paths.some((file) => pathEntryExists(path.resolve(cwd, file)));
 }
 
 function refsAreSynced(cwd, left, right) {
@@ -118,7 +130,15 @@ function assertSafeDirectory(value, label) {
 function queryPreviewStatus(previewService, cwd) {
   const result = run(process.execPath, [previewService, 'status', '--json'], { cwd });
   try {
-    return JSON.parse(result.stdout);
+    const status = JSON.parse(result.stdout);
+    if (
+      status?.type !== 'zdm-task-preview-service' ||
+      typeof status.phase !== 'string' ||
+      !(status.worktree === null || (typeof status.worktree === 'string' && path.isAbsolute(status.worktree)))
+    ) {
+      throw new Error('状态缺少可核验的任务归属');
+    }
+    return status;
   } catch {
     throw new Error(`无法解析任务预览状态：${result.stdout.trim()}`);
   }
@@ -134,92 +154,175 @@ function findManagedWorktrees(root) {
 }
 
 function printHelp() {
-  console.log(`Usage: npm run task:micro -- --slug <task-slug> [--resume]
+  console.log(`Usage: npm run task:start -- [--slug <task-slug>] [--kind <kind>] [--resume | --independent]
 
-从最新 origin/main 创建微改任务 Worktree，立即将 5175 切换到该任务并校验预览身份。
+默认恢复同类型未交付批次的分支和 Worktree；没有活动批次时从最新 origin/main 创建并登记。
+随后切换 5175 并校验完整累计任务差异所需的预览环境。task:micro 保持兼容。
 
 Options:
-  --slug status-copy   任务标识，对应 codex/status-copy
-  --resume             复用已存在的同名任务 Worktree
+  --slug status-copy   新批次标识；已有批次时新模块名不会创建新分支
+  --kind business     批次类型：business（默认）、infrastructure、maintenance
+  --resume             恢复 --slug 对应的真实任务 Worktree；不得替换另一个活动批次
+  --independent        明确要求独立任务；存在活动批次时停止，不接管其资源
   --help               显示帮助`);
 }
 
-export function main(args = process.argv.slice(2)) {
+export function startTask(options, dependencies = {}) {
+  const system = {
+    cwd: process.cwd(),
+    captureGit,
+    readActiveBatch,
+    validateActiveBatch,
+    assertBatchIdAvailable,
+    registerBatch,
+    findManagedWorktrees,
+    assertSafeDirectory,
+    queryPreviewStatus,
+    gitOperationInProgress,
+    refsAreSynced,
+    gitRefExists,
+    pathEntryExists,
+    run,
+    log: console.log,
+    ...dependencies,
+  };
+  const invocationRoot = system.captureGit(system.cwd, ['rev-parse', '--show-toplevel']);
+  const active = system.readActiveBatch(invocationRoot);
+  let batch = active ? system.validateActiveBatch(invocationRoot, active) : null;
+  let branch;
+  let targetWorktree;
+  let mainWorktree;
+  let integration;
+  let commands;
+  const restored = Boolean(batch);
+
+  if (batch) {
+    if (options.independent) {
+      throw new Error(`当前已有未交付批次 ${batch.id}，本工具不接管；需先安排该批次交接或另行配置独立运行资源。`);
+    }
+    if (batch.kind !== options.kind) {
+      throw new Error(
+        `当前批次 ${batch.id} 类型为 ${batch.kind}，不能混入 ${options.kind}；恢复时请显式使用 --kind ${batch.kind}。`,
+      );
+    }
+    branch = batch.branch;
+    targetWorktree = batch.worktree;
+    if (options.resume) {
+      const { integration: managedIntegration } = system.findManagedWorktrees(invocationRoot);
+      const requestedWorktree = taskWorktreeForSlug(path.dirname(managedIntegration.path), options.slug);
+      if (
+        taskBranchForSlug(options.slug) !== branch ||
+        path.resolve(requestedWorktree) !== path.resolve(targetWorktree)
+      )
+        throw new Error(`--resume 指定的 Worktree 与活动批次 ${batch.id} 不同，不自动替换批次。`);
+    }
+    system.log(
+      `恢复未交付批次：${batch.id}（${branch}）${options.slug && options.slug !== batch.id ? `；请求的 ${options.slug} 将在原批次继续，不新建分支` : ''}`,
+    );
+  } else {
+    if (!options.slug) throw new Error('没有活动批次，新建任务需要 --slug <task-slug>');
+    system.assertBatchIdAvailable(invocationRoot, options.slug);
+    const managed = system.findManagedWorktrees(invocationRoot);
+    mainWorktree = managed.main;
+    integration = managed.integration;
+    const taskParent = path.dirname(integration.path);
+    system.assertSafeDirectory(taskParent, '任务 Worktree 父目录');
+    branch = taskBranchForSlug(options.slug);
+    targetWorktree = taskWorktreeForSlug(taskParent, options.slug);
+    commands = microTaskGitCommands({ branch, targetWorktree });
+    if (path.dirname(targetWorktree) !== taskParent) throw new Error(`任务 Worktree 越界：${targetWorktree}`);
+
+    if (options.resume) {
+      const existing = managed.worktrees.find(
+        (worktree) => worktree.branch === branch && path.resolve(worktree.path) === path.resolve(targetWorktree),
+      );
+      if (!existing) throw new Error(`未找到可恢复的任务 Worktree：${branch}`);
+      system.assertSafeDirectory(targetWorktree, '任务 Worktree');
+    }
+  }
+
+  const previewService = path.join(invocationRoot, 'scripts', 'task-preview-service.mjs');
+  const previewStatus = system.queryPreviewStatus(previewService, invocationRoot);
+  if (
+    previewStatus.phase === 'offline' &&
+    (!previewStatus.selectionKnown ||
+      !(restored || options.resume) ||
+      !previewStatus.worktree ||
+      path.resolve(previewStatus.worktree) !== path.resolve(targetWorktree))
+  ) {
+    throw new Error('预览服务离线，尚不能证明可安全新建或切换；请先核对并显式恢复原任务，不自动建立新批次');
+  }
+  const conflict = previewConflictError({ currentWorktree: previewStatus.worktree, targetWorktree });
+  if (conflict) throw new Error(`${conflict}\n请先验收或交接当前任务，不自动覆盖其预览。`);
+
+  if (!batch) {
+    if (!options.resume) {
+      system.run('git', commands.fetch, { cwd: mainWorktree.path, stdio: 'inherit' });
+      const errors = newTaskSetupErrors({
+        mainClean:
+          system.captureGit(mainWorktree.path, ['status', '--porcelain']) === '' &&
+          !system.gitOperationInProgress(mainWorktree.path),
+        integrationClean:
+          system.captureGit(integration.path, ['status', '--porcelain']) === '' &&
+          !system.gitOperationInProgress(integration.path),
+        integrationSynced: system.refsAreSynced(
+          integration.path,
+          DEFAULT_INTEGRATION_BRANCH,
+          `${REMOTE}/${DEFAULT_INTEGRATION_BRANCH}`,
+        ),
+        localBranchExists: system.gitRefExists(mainWorktree.path, `refs/heads/${branch}`),
+        remoteBranchExists: system.gitRefExists(mainWorktree.path, `refs/remotes/${REMOTE}/${branch}`),
+        targetPathExists: system.pathEntryExists(targetWorktree),
+      });
+      if (errors.length > 0) throw new Error(errors.map((error) => `- ${error}`).join('\n'));
+      system.run('git', commands.fastForwardMain, { cwd: mainWorktree.path, stdio: 'inherit' });
+      system.run('git', commands.addWorktree, { cwd: mainWorktree.path, stdio: 'inherit' });
+    }
+    // Register before switching the preview so a failed startup remains recoverable in this batch.
+    batch = system.registerBatch(targetWorktree, { id: options.slug, kind: options.kind });
+  }
+
+  const checkPreview = () =>
+    system.run(
+      process.execPath,
+      [path.join(invocationRoot, 'scripts', 'dev-task.mjs'), '--check', '--worktree', targetWorktree],
+      { cwd: invocationRoot, stdio: 'inherit' },
+    );
+  let previewReady = false;
+  if (
+    restored &&
+    previewStatus.phase !== 'offline' &&
+    previewStatus.worktree &&
+    path.resolve(previewStatus.worktree) === path.resolve(targetWorktree)
+  ) {
+    try {
+      checkPreview();
+      previewReady = true;
+      system.log('当前批次预览身份和 API 健康检查通过，复用现有运行环境。');
+    } catch (error) {
+      system.log(`当前批次预览检查未通过，将通过正常启动保护流程恢复：${error.message}`);
+    }
+  }
+  if (!previewReady) {
+    system.run(process.execPath, [previewService, 'switch', '--worktree', targetWorktree], {
+      cwd: invocationRoot,
+      stdio: 'inherit',
+    });
+    checkPreview();
+  }
+  system.log(`任务批次已就绪：${batch.id}（${branch}）`);
+  system.log(`Worktree：${targetWorktree}`);
+  system.log('验收入口：http://127.0.0.1:5175/');
+  return { batch, restored };
+}
+
+export function main(args = process.argv.slice(2), dependencies = {}) {
   const options = parseMicroTaskArgs(args);
   if (options.help) {
     printHelp();
     return;
   }
-
-  const invocationRoot = captureGit(process.cwd(), ['rev-parse', '--show-toplevel']);
-  const { worktrees, main: mainWorktree, integration } = findManagedWorktrees(invocationRoot);
-  const taskParent = path.dirname(integration.path);
-  assertSafeDirectory(taskParent, '任务 Worktree 父目录');
-
-  const branch = taskBranchForSlug(options.slug);
-  const targetWorktree = taskWorktreeForSlug(taskParent, options.slug);
-  const commands = microTaskGitCommands({ branch, targetWorktree });
-  if (path.dirname(targetWorktree) !== taskParent) throw new Error(`任务 Worktree 越界：${targetWorktree}`);
-
-  const existingWorktree = worktrees.find(
-    (worktree) => worktree.branch === branch || path.resolve(worktree.path) === path.resolve(targetWorktree),
-  );
-  const previewService = path.join(invocationRoot, 'scripts', 'task-preview-service.mjs');
-  const previewStatus = queryPreviewStatus(previewService, invocationRoot);
-  const conflict = previewConflictError({
-    currentWorktree: previewStatus.worktree,
-    targetWorktree,
-  });
-  if (conflict) throw new Error(`${conflict}\n请先验收或交接当前任务，不自动覆盖其预览。`);
-
-  if (options.resume) {
-    if (
-      !existingWorktree ||
-      existingWorktree.branch !== branch ||
-      path.resolve(existingWorktree.path) !== path.resolve(targetWorktree)
-    ) {
-      throw new Error(`未找到可恢复的任务 Worktree：${branch}`);
-    }
-  } else {
-    run('git', commands.fetch, { cwd: mainWorktree.path, stdio: 'inherit' });
-    const errors = newTaskSetupErrors({
-      mainClean:
-        captureGit(mainWorktree.path, ['status', '--porcelain']) === '' && !gitOperationInProgress(mainWorktree.path),
-      integrationClean:
-        captureGit(integration.path, ['status', '--porcelain']) === '' && !gitOperationInProgress(integration.path),
-      integrationSynced: refsAreSynced(
-        integration.path,
-        DEFAULT_INTEGRATION_BRANCH,
-        `${REMOTE}/${DEFAULT_INTEGRATION_BRANCH}`,
-      ),
-      localBranchExists: gitRefExists(mainWorktree.path, `refs/heads/${branch}`),
-      remoteBranchExists: gitRefExists(mainWorktree.path, `refs/remotes/${REMOTE}/${branch}`),
-      targetPathExists: pathEntryExists(targetWorktree),
-    });
-    if (errors.length > 0) throw new Error(errors.map((error) => `- ${error}`).join('\n'));
-    run('git', commands.fastForwardMain, { cwd: mainWorktree.path, stdio: 'inherit' });
-    run('git', commands.addWorktree, {
-      cwd: mainWorktree.path,
-      stdio: 'inherit',
-    });
-  }
-
-  run(process.execPath, [previewService, 'switch', '--worktree', targetWorktree], {
-    cwd: invocationRoot,
-    stdio: 'inherit',
-  });
-  run(
-    process.execPath,
-    [path.join(invocationRoot, 'scripts', 'dev-task.mjs'), '--check', '--worktree', targetWorktree],
-    {
-      cwd: invocationRoot,
-      stdio: 'inherit',
-    },
-  );
-
-  console.log(`微改任务已就绪：${branch}`);
-  console.log(`Worktree：${targetWorktree}`);
-  console.log('验收入口：http://127.0.0.1:5175/');
+  return startTask(options, dependencies);
 }
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';

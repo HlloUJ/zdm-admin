@@ -12,7 +12,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { spawn, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { homedir } from 'node:os';
 import http from 'node:http';
@@ -533,8 +533,22 @@ export class PreviewGateway {
   }
 }
 
-class PreviewSupervisor {
-  constructor(paths, config, gateway) {
+async function checkSelectedPreview(config, root) {
+  await new Promise((resolve, reject) => {
+    execFile(
+      config.nodePath,
+      [config.launcherPath, '--check', '--worktree', root],
+      { cwd: root, env: { ...process.env, PATH: config.pathValue || process.env.PATH }, timeout: 30_000 },
+      (error, stdout, stderr) => {
+        if (error) reject(new Error(stderr.trim() || stdout.trim() || error.message));
+        else resolve();
+      },
+    );
+  });
+}
+
+export class PreviewSupervisor {
+  constructor(paths, config, gateway, dependencies = {}) {
     this.paths = paths;
     this.config = config;
     this.gateway = gateway;
@@ -548,6 +562,16 @@ class PreviewSupervisor {
     this.restartTimer = null;
     this.intentionalStop = false;
     this.operation = Promise.resolve();
+    this.dependencies = {
+      resolveTaskWorktree,
+      writeConfig,
+      ensureDockerReady,
+      stopChild,
+      spawn,
+      waitForPreview,
+      checkSelectedPreview,
+      ...dependencies,
+    };
   }
 
   status() {
@@ -588,7 +612,7 @@ class PreviewSupervisor {
       taskArgs,
       updatedAt: new Date().toISOString(),
     };
-    writeConfig(this.paths, this.config);
+    this.dependencies.writeConfig(this.paths, this.config);
   }
 
   clearRestart() {
@@ -615,7 +639,7 @@ class PreviewSupervisor {
   async stopOwnedChild() {
     this.intentionalStop = true;
     const child = this.child;
-    await stopChild(child);
+    await this.dependencies.stopChild(child);
     if (this.child === child) this.child = null;
     this.intentionalStop = false;
   }
@@ -627,7 +651,10 @@ class PreviewSupervisor {
       this.transition('integration-fallback');
       return this.status();
     }
-    const resolved = resolveTaskWorktree(worktree);
+    const resolved = this.dependencies.resolveTaskWorktree(worktree);
+    if (this.child && this.currentWorktree !== resolved.root) {
+      throw new Error('当前预览进程归属另一 Worktree，请先明确交接，不自动接管');
+    }
     const taskArgs = this.config.taskArgs ?? [];
     if (
       this.child &&
@@ -636,10 +663,18 @@ class PreviewSupervisor {
       this.phase === 'running' &&
       this.gateway.mode === 'task'
     ) {
-      return this.status();
+      const checkedChild = this.child;
+      try {
+        await this.dependencies.checkSelectedPreview(this.config, resolved.root);
+        if (this.child === checkedChild && this.phase === 'running' && this.gateway.mode === 'task') {
+          return this.status();
+        }
+      } catch (error) {
+        console.log(`当前任务预览检查未通过，按启动保护流程恢复：${error.message}`);
+      }
     }
     this.gateway.useIntegration();
-    await ensureDockerReady(this.config);
+    await this.dependencies.ensureDockerReady(this.config);
     if (this.child) await this.stopOwnedChild();
 
     const command = previewCommand({
@@ -652,7 +687,7 @@ class PreviewSupervisor {
     this.currentTaskArgs = [...taskArgs];
     this.transition('starting');
     console.log(`启动当前任务预览：${resolved.branch} (${resolved.root})`);
-    const child = spawn(command.command, command.args, {
+    const child = this.dependencies.spawn(command.command, command.args, {
       cwd: resolved.root,
       env: {
         ...process.env,
@@ -677,9 +712,9 @@ class PreviewSupervisor {
 
     try {
       const taskUrl = `http://127.0.0.1:${MANAGED_TASK_PREVIEW_PORT}/`;
-      await waitForPreview(resolved.root, child, { baseUrl: taskUrl });
+      await this.dependencies.waitForPreview(resolved.root, child, { baseUrl: taskUrl });
       this.gateway.useTask();
-      const metadata = await waitForPreview(resolved.root, child);
+      const metadata = await this.dependencies.waitForPreview(resolved.root, child);
       this.restartAttempts = 0;
       this.transition('running');
       console.log(`当前任务预览已就绪：${CURRENT_TASK_PREVIEW_URL} (${metadata.branch})`);
@@ -695,7 +730,11 @@ class PreviewSupervisor {
 
   switch(worktree, taskArgs = []) {
     return this.enqueue(async () => {
-      const resolved = resolveTaskWorktree(worktree);
+      const resolved = this.dependencies.resolveTaskWorktree(worktree);
+      assertPreviewSelection(this.status(), resolved.root);
+      if (this.child && this.currentWorktree !== resolved.root) {
+        throw new Error('当前预览进程归属另一 Worktree 或归属未知，请先明确交接');
+      }
       this.clearRestart();
       this.saveSelection(resolved.root, taskArgs);
       return this.launchSelected();
@@ -907,6 +946,59 @@ async function ensureService(paths) {
   }
 }
 
+export async function readServiceStatus(paths, { request = requestJson, read = readJson, exists = existsSync } = {}) {
+  try {
+    const status = await request({ paths, timeoutMs: 1_000 });
+    if (
+      status?.type !== 'zdm-task-preview-service' ||
+      typeof status.phase !== 'string' ||
+      !(status.worktree === null || (typeof status.worktree === 'string' && path.isAbsolute(status.worktree)))
+    ) {
+      throw new Error('预览服务状态格式无效');
+    }
+    return status;
+  } catch (error) {
+    let config;
+    try {
+      config = read(paths.configFile);
+    } catch {
+      // Corrupt or absent ownership cannot authorize starting or switching a task.
+    }
+    const selectionKnown = Boolean(
+      config?.launcherPath &&
+      config?.nodePath &&
+      (config.selectedWorktree === null ||
+        (typeof config.selectedWorktree === 'string' && path.isAbsolute(config.selectedWorktree))),
+    );
+    return {
+      type: 'zdm-task-preview-service',
+      phase: 'offline',
+      selectionKnown,
+      installed: exists(paths.launchAgentFile),
+      worktree: selectionKnown ? config.selectedWorktree : null,
+      servicePid: null,
+      childPid: null,
+      mode: null,
+      upstream: null,
+      url: null,
+      logFile: paths.logFile,
+      lastError: error.message,
+    };
+  }
+}
+
+function assertPreviewSelection(status, target) {
+  if (!(status?.worktree === null || (typeof status?.worktree === 'string' && path.isAbsolute(status.worktree)))) {
+    throw new Error('预览任务归属未知，不自动启动或切换');
+  }
+  if (status.phase === 'offline' && !status.selectionKnown) {
+    throw new Error('预览服务离线且任务归属未知，请先核对安装配置与任务归属，不自动启动或切换');
+  }
+  if (status.worktree && path.resolve(status.worktree) !== path.resolve(target)) {
+    throw new Error(`预览仍归属 ${status.worktree}，请先交接，不自动切换到 ${target}`);
+  }
+}
+
 function resolveLauncher(paths) {
   const config = readJson(paths.configFile);
   if (config?.launcherPath && existsSync(config.launcherPath)) return config.launcherPath;
@@ -931,7 +1023,7 @@ function printHelp() {
 Commands:
   install                 安装或更新 macOS 登录常驻服务，并选择当前任务
   switch                  把 5175 切换到当前任务（默认命令）
-  status                  查看守护服务和当前任务状态
+  status                  只读查看状态；离线时不启动守护服务
   stop                    停止当前任务前后端，5175 回退到集成环境
   logs                    查看服务日志
 
@@ -945,13 +1037,23 @@ Options:
 其余任务参数会原样传递给现有 dev-task.mjs 启动器。`);
 }
 
-export async function main(args = process.argv.slice(2)) {
+export async function main(args = process.argv.slice(2), dependencies = {}) {
+  const system = {
+    servicePaths,
+    readServiceStatus,
+    ensureService,
+    requestJson,
+    resolveTaskWorktree,
+    printStatus,
+    log: console.log,
+    ...dependencies,
+  };
   const options = parseServiceArgs(args);
   if (options.command === 'help') {
     printHelp();
     return;
   }
-  const paths = servicePaths();
+  const paths = system.servicePaths();
   if (options.command === 'run') {
     await runService(paths);
     return;
@@ -965,18 +1067,22 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   if (options.command === 'status') {
-    const status = await ensureService(paths);
-    if (options.json) console.log(JSON.stringify(status));
-    else printStatus(status);
+    const status = await system.readServiceStatus(paths);
+    if (options.json) system.log(JSON.stringify(status));
+    else system.printStatus(status);
     return;
   }
   if (options.command === 'stop') {
-    await ensureService(paths);
-    printStatus(await requestJson({ paths, method: 'POST', requestPath: '/stop', timeoutMs: CONTROL_TIMEOUT_MS }));
+    const current = await system.readServiceStatus(paths);
+    if (current.phase === 'offline')
+      throw new Error('预览服务离线，无法证明任务资源已停止；未启动守护服务，请核对现场');
+    system.printStatus(
+      await system.requestJson({ paths, method: 'POST', requestPath: '/stop', timeoutMs: CONTROL_TIMEOUT_MS }),
+    );
     return;
   }
 
-  const target = resolveTaskWorktree(options.worktree || process.cwd());
+  const target = system.resolveTaskWorktree(options.worktree || process.cwd());
   if (shouldRunForeground(options.taskArgs)) {
     const result = run(process.execPath, [resolveLauncher(paths), '--worktree', target.root, ...options.taskArgs], {
       cwd: target.root,
@@ -985,15 +1091,17 @@ export async function main(args = process.argv.slice(2)) {
     process.exitCode = result.status ?? 1;
     return;
   }
-  await ensureService(paths);
-  const status = await requestJson({
+  const current = await system.readServiceStatus(paths);
+  assertPreviewSelection(current, target.root);
+  if (current.phase === 'offline') assertPreviewSelection(await system.ensureService(paths), target.root);
+  const status = await system.requestJson({
     paths,
     method: 'POST',
     requestPath: '/switch',
     payload: { worktree: target.root, taskArgs: options.taskArgs },
     timeoutMs: CONTROL_TIMEOUT_MS,
   });
-  printStatus(status);
+  system.printStatus(status);
 }
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';

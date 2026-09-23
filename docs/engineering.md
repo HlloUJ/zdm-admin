@@ -27,8 +27,9 @@
 ## Git 与质量
 
 - 保留未提交改动，不在任务中混入无关格式化或重构。
-- 小改动使用增量检查；高风险或跨模块变更使用 `npm run verify:local`。
-- CI 入口为 `.github/workflows/quality.yml`，前后端完整门禁不得依赖文档中的人工提醒。
+- 同仓库串行模块按批次共用分支、Worktree 和预览；模块分别验证并保存本地提交，整批“任务完成”时统一推送与合并。新对话通过 `task:batch status` 恢复目录；模块依赖、局部回滚与清理按 [批次开发规则](project-optimization-baseline.md#批次连续开发) 执行，不默认压缩模块提交。
+- 开发使用增量检查，普通交付使用 `npm run verify:delivery`；高风险需要本地完整回归或 CI 基础设施不可用时使用 `npm run verify:local`。本地通过不能覆盖 CI 真实失败或绕过分支保护。证据失效和强制重验按 [工程效率基线](project-optimization-baseline.md#验证证据与执行) 执行。
+- CI 入口为 `.github/workflows/quality.yml`，最终候选按完整差异选择全部适用门禁；`Frontend quality` 和 `Backend quality` 始终汇总，分类不明时执行全量，不能靠文档提醒或工作流路径跳过。
 
 ## 产品依据
 

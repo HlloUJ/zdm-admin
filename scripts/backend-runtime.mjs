@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
-import { mergeMigrationCatalog, verifyPausedCatalog } from './dev-task.mjs';
+import { ensureIntegrationDatabase, mergeMigrationCatalog, verifyPausedCatalog } from './dev-task.mjs';
 import { parseWorktreePorcelain, DEFAULT_INTEGRATION_BRANCH } from './git-workflow-core.mjs';
 
 export function resolveRuntimeMigrations(currentFiles, pausedRecords, history) {
@@ -163,16 +163,22 @@ export function waitForPort(port, timeoutMs = 120_000) {
   });
 }
 
-export async function ensureBackend(root) {
-  if (!capture(root, 'docker', ['info', '--format', '{{.ServerVersion}}'])) {
-    console.error('Docker is unavailable. Start Docker Desktop and retry.');
-    process.exit(1);
-  }
+export async function ensureBackend(
+  root,
+  {
+    ensureDatabase = ensureIntegrationDatabase,
+    inspect = capture,
+    execute = run,
+    resolveRuntime = runtimeComposeArgs,
+    waitForHealth = waitForBackendHealth,
+  } = {},
+) {
+  await ensureDatabase(root);
 
   const services = new Set(
-    capture(root, 'docker', ['compose', 'ps', '-a', '--services']).split(/\r?\n/).filter(Boolean),
+    inspect(root, 'docker', ['compose', 'ps', '-a', '--services']).split(/\r?\n/).filter(Boolean),
   );
-  const backendWorkspace = capture(root, 'docker', [
+  const backendWorkspace = inspect(root, 'docker', [
     'inspect',
     '--format',
     '{{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Source}}{{end}}{{end}}',
@@ -181,10 +187,8 @@ export async function ensureBackend(root) {
   const backendUsesCurrentWorktree =
     backendWorkspace && path.resolve(normalizeDockerMountPath(backendWorkspace)) === path.resolve(root);
 
-  run(root, 'docker', ['compose', 'up', '-d', 'mysql']);
-  await waitForPort(3306);
-  const runtime = runtimeComposeArgs(root);
-  const existingMigrations = capture(root, 'docker', [
+  const runtime = resolveRuntime(root);
+  const existingMigrations = inspect(root, 'docker', [
     'inspect',
     '--format',
     '{{range .Mounts}}{{if eq .Destination "/opt/zdm-migrations"}}{{.Source}}{{end}}{{end}}',
@@ -195,16 +199,16 @@ export async function ensureBackend(root) {
     backendUsesCurrentWorktree &&
     path.resolve(normalizeDockerMountPath(existingMigrations || '.')) === path.resolve(runtime.directory)
   ) {
-    run(root, 'docker', [...runtime.args, 'start', 'backend']);
+    execute(root, 'docker', [...runtime.args, 'start', 'backend']);
   } else {
-    run(root, 'docker', [...runtime.args, 'up', '-d', '--force-recreate', 'backend']);
+    execute(root, 'docker', [...runtime.args, 'up', '-d', '--force-recreate', 'backend']);
   }
 
   try {
-    await waitForBackendHealth();
+    await waitForHealth();
   } catch (error) {
     console.error(error.message);
-    run(root, 'docker', ['compose', 'logs', '--tail', '80', 'backend']);
+    execute(root, 'docker', ['compose', 'logs', '--tail', '80', 'backend']);
     process.exit(1);
   }
 

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { resolveRuntimeMigrations } from './backend-runtime.mjs';
+import { fileURLToPath } from 'node:url';
+import { ensureBackend, resolveRuntimeMigrations } from './backend-runtime.mjs';
+import { ensureIntegrationDatabase, startIntegrationBackend } from './dev-task.mjs';
 const first = { name: 'V1__base.sql', content: 'SELECT 1;' };
 const pending = { name: 'V2__paused.sql', content: 'SELECT 2;' };
 const record = {
@@ -32,4 +34,129 @@ test('rejects missing, failed, tampered and conflicting migrations', () => {
       ),
     /冲突/,
   );
+});
+
+test('starts MySQL once and waits for container health before backend runtime work', async () => {
+  const root = '/tmp/integration';
+  const events = [];
+  const health = ['starting', 'healthy'];
+  await ensureBackend(root, {
+    ensureDatabase: (directory) =>
+      ensureIntegrationDatabase(directory, {
+        prepare: (cwd) => {
+          assert.equal(cwd, root);
+          events.push('docker-and-volume-protection');
+        },
+        execute: (command, args, context) => {
+          assert.equal(command, 'docker');
+          assert.equal(context.cwd, root);
+          assert.deepEqual(args, [
+            'compose',
+            '--project-directory',
+            root,
+            '--file',
+            `${root}/docker-compose.yml`,
+            'up',
+            '-d',
+            'mysql',
+          ]);
+          events.push('mysql-up');
+        },
+        inspect: (command, args) => {
+          assert.equal(command, 'docker');
+          assert.deepEqual(args, ['inspect', '--format', '{{.State.Health.Status}}', 'zdm-platform-mysql']);
+          return health.shift();
+        },
+        wait: async (isHealthy, options) => {
+          assert.equal(options.timeoutMs, 120_000);
+          assert.equal(isHealthy(), false);
+          assert.equal(isHealthy(), true);
+          events.push('mysql-healthy');
+        },
+      }),
+    inspect: (_, command, args) => {
+      assert.equal(command, 'docker');
+      assert.ok(events.includes('mysql-healthy'));
+      if (args[0] === 'compose') return 'mysql\nbackend';
+      return args[2].includes('/workspace') ? root : '/tmp/runtime-migrations';
+    },
+    resolveRuntime: () => {
+      events.push('verify-migration-catalog');
+      return { args: ['compose', '-f', 'runtime-compose.json'], directory: '/tmp/runtime-migrations' };
+    },
+    execute: (_, command, args) => {
+      assert.equal(command, 'docker');
+      assert.deepEqual(args, ['compose', '-f', 'runtime-compose.json', 'start', 'backend']);
+      events.push('backend-start');
+    },
+    waitForHealth: async () => events.push('backend-healthy'),
+  });
+  assert.deepEqual(events, [
+    'docker-and-volume-protection',
+    'mysql-up',
+    'mysql-healthy',
+    'verify-migration-catalog',
+    'backend-start',
+    'backend-healthy',
+  ]);
+});
+
+test('database health failure blocks migration and backend startup', async () => {
+  const error = new Error('等待集成 MySQL 健康检查超时');
+  let started = 0;
+  await assert.rejects(
+    ensureBackend('/tmp/integration', {
+      ensureDatabase: async () => {
+        throw error;
+      },
+      inspect: () => assert.fail('Runtime inspection must wait for database health'),
+      resolveRuntime: () => assert.fail('Migrations must wait for database health'),
+      execute: () => started++,
+      waitForHealth: () => assert.fail('Backend health cannot precede database readiness'),
+    }),
+    error,
+  );
+  assert.equal(started, 0);
+});
+
+test('restores a different workspace or migration mount by recreating, without unconditional restarts', async () => {
+  for (const mounts of [
+    { workspace: '/tmp/other-task', migrations: '/tmp/current-migrations' },
+    { workspace: '/tmp/integration', migrations: '/tmp/old-migrations' },
+  ]) {
+    const actions = [];
+    await ensureBackend('/tmp/integration', {
+      ensureDatabase: async () => actions.push('database-ready'),
+      inspect: (_, __, args) => {
+        if (args[0] === 'compose') return 'backend\nmysql';
+        return args[2].includes('/workspace') ? mounts.workspace : mounts.migrations;
+      },
+      resolveRuntime: () => ({ args: ['compose', '-f', 'runtime.json'], directory: '/tmp/current-migrations' }),
+      execute: (_, __, args) => actions.push(args),
+      waitForHealth: async () => actions.push('backend-healthy'),
+    });
+    assert.deepEqual(actions, [
+      'database-ready',
+      ['compose', '-f', 'runtime.json', 'up', '-d', '--force-recreate', 'backend'],
+      'backend-healthy',
+    ]);
+  }
+});
+
+test('integration recovery uses the launcher backend entrypoint even for an older target Worktree', async () => {
+  const target = '/tmp/old-integration';
+  const events = [];
+  await startIntegrationBackend(target, {
+    execute: (command, args, context) => {
+      assert.equal(command, process.execPath);
+      assert.deepEqual(args, [fileURLToPath(new URL('./ensure-backend.mjs', import.meta.url)), '--worktree', target]);
+      assert.deepEqual(context, { cwd: target });
+      events.push('same-launcher-entrypoint');
+    },
+    waitForHealth: async (url) => {
+      assert.equal(url, 'http://127.0.0.1:8080/actuator/health');
+      events.push('integration-api-healthy');
+    },
+  });
+  assert.deepEqual(events, ['same-launcher-entrypoint', 'integration-api-healthy']);
 });
