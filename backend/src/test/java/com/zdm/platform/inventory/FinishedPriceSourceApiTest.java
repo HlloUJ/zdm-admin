@@ -329,6 +329,42 @@ class FinishedPriceSourceApiTest {
     assertThat(second.getPrice()).isEqualByComparingTo("75");
   }
 
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void disabledStoreLevelKeepsHistoricalPriceOutsideCurrentPricing() {
+    jdbc.update("UPDATE store_levels SET status='disabled'");
+    jdbc.update("INSERT INTO store_levels (id,name,status,sort_order) VALUES (99405,'已停用四级','disabled',1),(99406,'启用级别','enabled',2)");
+    jdbc.update("INSERT INTO finished_markup_configurations (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order) VALUES (99405,'已停用四级',99405,1.4,'enabled',false,1),(99406,'启用级别',99406,2,'enabled',false,2)");
+    jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,3) ON DUPLICATE KEY UPDATE price_coefficient=3");
+    jdbc.update("INSERT INTO finished_products (id,name,sku,source_status,status,operations_deleted,created_by_account_id) VALUES (99405,'停用级别历史商品','disabled-level-history','selling','warehouse',FALSE,1)");
+    jdbc.update("INSERT INTO finished_product_variants (id,finished_product_id,variant_label,stock,cost_price) VALUES (99451,99405,'规格A',1,20)");
+    jdbc.update("INSERT INTO finished_product_prices (finished_product_id,sku_id,variant_label,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source,source_configuration_id) VALUES (99405,99451,'规格A',99405,'已停用四级',1.2,10,12,'auto',99405)");
+
+    authenticateSupplyChain();
+    lifecycle.reprice(ProductLifecycleService.Kind.FINISHED,99405L,false);
+    assertThat(jdbc.queryForObject("SELECT price FROM finished_product_prices WHERE finished_product_id=99405 AND store_level_id=99405",BigDecimal.class))
+        .isEqualByComparingTo("12");
+    assertThat(jdbc.queryForObject("SELECT price FROM finished_product_prices WHERE finished_product_id=99405 AND store_level_id=99406",BigDecimal.class))
+        .isEqualByComparingTo("40");
+
+    FinishedProductPrice current = prices.listPrices(99405L).stream()
+        .filter(price -> price.getStoreLevelId().equals(99406L)).findFirst().orElseThrow();
+    prices.replacePrices(99405L,List.of(current));
+    var variant = new FinishedProductVariant();
+    variant.setId(99451L);
+    prices.requireCompletePrices(99405L,List.of(variant));
+    assertThat(jdbc.queryForObject("SELECT price FROM finished_product_prices WHERE finished_product_id=99405 AND store_level_id=99405",BigDecimal.class))
+        .isEqualByComparingTo("12");
+
+    jdbc.update("UPDATE finished_markup_configurations SET price_coefficient=1.8 WHERE id=99405");
+    assertThat(sync.refreshAutoPrices(configurations.selectById(99405L))).isZero();
+    jdbc.update("INSERT INTO finished_product_variants (id,finished_product_id,variant_label,stock,cost_price) VALUES (99452,99405,'规格B',1,30)");
+    jdbc.update("INSERT INTO finished_product_guide_prices (finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES (99405,99452,'规格B',3,30,90)");
+    assertThat(sync.backfillMissingPrices(configurations.selectById(99405L))).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_product_prices WHERE finished_product_id=99405 AND store_level_id=99405",Long.class))
+        .isEqualTo(1L);
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"warehouse", "selling", "offShelf"})
   @org.springframework.transaction.annotation.Transactional

@@ -48,6 +48,7 @@ class FinishedProductPriceServiceTest {
     existing.setStoreLevelName("已删除的历史级别");
     existing.setSkuId(101L);
     when(mapper.selectList(any())).thenReturn(List.of(existing));
+    when(directory.listEnabledLevels()).thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "当前门店级别", 1)));
 
     FinishedProductPrice requested = new FinishedProductPrice();
     requested.setStoreLevelId(7L);

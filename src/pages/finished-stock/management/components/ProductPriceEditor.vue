@@ -90,10 +90,6 @@ const saving = ref(false);
 const confirmVisible = ref(false);
 const variants = props.product.variants;
 const levels = [...props.levels];
-for (const price of props.product.markupPrices ?? []) {
-  if (!levels.some((level) => level.id === price.storeLevelId))
-    levels.push({ id: price.storeLevelId, name: price.storeLevelName ?? `门店级别 ${price.storeLevelId}` });
-}
 const editors = ref<VariantEditor[]>(
   variants.map((variant) => {
     const guide = props.product.guidePrices?.find((price) => price.skuId === variant.id);
