@@ -677,7 +677,7 @@ function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
 function previewServiceRequest(method, requestPath, timeoutMs = 30_000) {
   return new Promise((resolve) => {
     if (!existsSync(PREVIEW_SERVICE_SOCKET)) {
-      resolve({ statusCode: 0, body: '' });
+      resolve({ statusCode: 0, body: '', absent: true });
       return;
     }
     const request = http.request(
@@ -720,18 +720,35 @@ export function previewServiceOwnsWorktree(status, root) {
   );
 }
 
-async function stopSupervisedPreview(root) {
-  const currentResponse = await previewServiceRequest('GET', '/status');
+export async function stopSupervisedPreview(root, { request = previewServiceRequest } = {}) {
+  const stopped = (status) =>
+    status?.type === 'zdm-task-preview-service' &&
+    status.worktree === null &&
+    status.childPid === null &&
+    status.phase === 'integration-fallback' &&
+    status.mode === 'integration-fallback';
+  const currentResponse = await request('GET', '/status');
+  // A missing supervisor socket preserves foreground-preview handoff. An unreachable
+  // installed supervisor is unknown state, never proof that its child has stopped.
+  if (currentResponse.absent) return false;
   const currentStatus = currentResponse.statusCode === 200 ? parseJson(currentResponse.body) : null;
+  if (
+    currentStatus?.type !== 'zdm-task-preview-service' ||
+    !(
+      currentStatus.worktree === null ||
+      (typeof currentStatus.worktree === 'string' && path.isAbsolute(currentStatus.worktree))
+    ) ||
+    (currentStatus.worktree === null && !stopped(currentStatus))
+  )
+    throw new Error(`无法确认任务预览守护服务的进程归属和停止状态：${root}`);
   if (!previewServiceOwnsWorktree(currentStatus, root)) return false;
 
-  const stopResponse = await previewServiceRequest('POST', '/stop');
-  if (stopResponse.statusCode >= 200 && stopResponse.statusCode < 300) return true;
-  const finalResponse = await previewServiceRequest('GET', '/status');
+  const stopResponse = await request('POST', '/stop');
+  if (stopResponse.statusCode >= 200 && stopResponse.statusCode < 300 && stopped(parseJson(stopResponse.body)))
+    return true;
+  const finalResponse = await request('GET', '/status');
   const finalStatus = finalResponse.statusCode === 200 ? parseJson(finalResponse.body) : null;
-  if (previewServiceOwnsWorktree(finalStatus, root)) {
-    throw new Error(`任务预览守护服务未能释放旧任务：${root}`);
-  }
+  if (!stopped(finalStatus)) throw new Error(`任务预览守护服务未能证明旧任务进程已停止：${root}`);
   return true;
 }
 
