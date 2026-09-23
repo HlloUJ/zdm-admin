@@ -5,10 +5,11 @@ import { createValidationPlan } from './check-changed-plan.mjs';
 
 const names = (plan) => plan.tasks.map((task) => task.name);
 
-test('deleted TypeScript files still trigger typecheck', () => {
+test('deleted TypeScript inputs trigger typecheck and the full unit suite', () => {
   const plan = createValidationPlan(['src/services/removed.ts'], () => false);
 
-  assert.deepEqual(names(plan), ['source guards', 'typecheck']);
+  assert.deepEqual(names(plan), ['source guards', 'typecheck', 'unit tests']);
+  assert.deepEqual(plan.tasks.at(-1).args, ['run', 'test:unit']);
 });
 
 test('dependency changes trigger full frontend checks', () => {
@@ -65,4 +66,9 @@ test('source and test edits retain both explicit and related test consumers', ()
   const plan = createValidationPlan(['src/example.ts', 'src/example.test.ts']);
   assert.ok(names(plan).includes('unit tests'));
   assert.ok(names(plan).includes('related unit tests'));
+});
+
+test('deleted frontend styles do not broaden the unit-test selection', () => {
+  const plan = createValidationPlan(['src/removed.css'], () => false);
+  assert.deepEqual(names(plan), ['source guards']);
 });

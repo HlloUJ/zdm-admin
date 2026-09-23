@@ -13,13 +13,14 @@ const isFrontendFile = (file) => !file.startsWith('backend/') && !file.startsWit
 export function normalizeFiles(root, files) {
   return [
     ...new Set(
-      files
-        .map((file) => {
-          const absolute = path.isAbsolute(file) ? file : path.resolve(root, file);
-          const relative = path.relative(root, absolute).replaceAll(path.sep, '/');
-          return relative.startsWith('../') ? null : relative;
-        })
-        .filter(Boolean),
+      files.map((file) => {
+        if (typeof file !== 'string' || !file || file.includes('\0')) throw new Error('Invalid changed-file path');
+        const absolute = path.isAbsolute(file) ? file : path.resolve(root, file);
+        const relative = path.relative(root, absolute).replaceAll(path.sep, '/');
+        if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative))
+          throw new Error(`Changed-file path is outside the project or names its root: ${JSON.stringify(file)}`);
+        return relative;
+      }),
     ),
   ].sort();
 }
@@ -69,6 +70,9 @@ export function createValidationPlan(files, fileExists = () => true, { root } = 
       !file.startsWith('tests/e2e/') &&
       (file.includes('/__tests__/') || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)),
   );
+  const removedUnitInput = files.some(
+    (file) => file.startsWith('src/') && hasExtension(file, TYPECHECK_EXTENSIONS) && !fileExists(file),
+  );
   const relatedSourceFiles = existingFiles.filter(
     (file) => file.startsWith('src/') && !file.includes('/__tests__/') && hasExtension(file, TYPECHECK_EXTENSIONS),
   );
@@ -94,11 +98,19 @@ export function createValidationPlan(files, fileExists = () => true, { root } = 
   if (styleFiles.length > 0) {
     tasks.push({ name: 'stylelint', args: ['run', 'stylelint:changed', '--', ...styleFiles] });
   }
-  if (unitTestFiles.length > 0) {
-    tasks.push({ name: 'unit tests', args: ['run', 'test:unit', '--', ...unitTestFiles] });
-  }
-  if (relatedSourceFiles.length > 0) {
-    tasks.push({ name: 'related unit tests', args: ['run', 'test:related', '--', ...relatedSourceFiles] });
+  if (removedUnitInput) {
+    tasks.push({
+      name: 'unit tests',
+      reason: 'Deleted or renamed frontend input cannot prove its former unit-test consumers; run the full unit suite.',
+      args: ['run', 'test:unit'],
+    });
+  } else {
+    if (unitTestFiles.length > 0) {
+      tasks.push({ name: 'unit tests', args: ['run', 'test:unit', '--', ...unitTestFiles] });
+    }
+    if (relatedSourceFiles.length > 0) {
+      tasks.push({ name: 'related unit tests', args: ['run', 'test:related', '--', ...relatedSourceFiles] });
+    }
   }
   if (backendPlan.mode !== 'none') tasks.push(backendTask);
 
