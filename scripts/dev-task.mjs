@@ -20,6 +20,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { branchKind, DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from './git-workflow-core.mjs';
+import { classifyChangedFiles } from './verification-impact.mjs';
+import { compatibleTaskDependencies, validateTaskDependencies } from './task-dependencies.mjs';
+import {
+  createLatestChangeQueue,
+  runtimeDigest,
+  taskBackendAction,
+  taskBackendContainerIdentity,
+  taskBackendSourceIdentity,
+} from './task-runtime-state.mjs';
 
 export const CURRENT_TASK_FRONTEND_PORT = 5175;
 const FRONTEND_PORT_START = 5175;
@@ -144,15 +153,7 @@ export function taskPreviewErrors({ branch }) {
 }
 
 export function backendSensitiveFiles(files) {
-  return files.filter(
-    (file) =>
-      file.startsWith('backend/') ||
-      ['docker-compose.yml', 'docker-compose.task.yml', 'compose.yml', 'compose.yaml', 'pom.xml'].includes(file) ||
-      file.startsWith('scripts/backend-') ||
-      file === 'scripts/ensure-backend.mjs' ||
-      file.startsWith('scripts/restore-db') ||
-      file.startsWith('scripts/backup-db'),
-  );
+  return files.filter((file) => classifyChangedFiles([file]).runtime);
 }
 
 export function databaseRiskFiles(files) {
@@ -267,6 +268,56 @@ export function taskPreviewReadinessErrors({
   return errors;
 }
 
+// Worktree-scoped checks must prove the current branch and the backend required by the complete task diff.
+// The unscoped --check keeps its existing generic health-check semantics.
+export function taskPreviewCheckExpectations({
+  root,
+  branch,
+  files,
+  metadata,
+  registeredBackendPort = null,
+  registeredApiTarget = null,
+}) {
+  const errors = taskPreviewErrors({ branch });
+  if (errors.length) throw new Error(errors.join('\n'));
+  if (!metadata || path.resolve(metadata.workspaceRoot) !== path.resolve(root))
+    throw new Error('当前预览不属于待验证 Worktree');
+  if (metadata.branch !== branch) throw new Error(`当前预览分支为 ${metadata.branch || '(未知)'}，不是 ${branch}`);
+  if (!['frontend', 'full'].includes(metadata.mode)) throw new Error('当前预览模式不可证明，请重新运行 dev:task');
+  const requiredMode = selectTaskPreviewMode({ files });
+  if (requiredMode === 'full' && metadata.mode !== 'full')
+    throw new Error('当前任务包含后端变更，必须使用 full 任务预览');
+  // A frontend task may have been explicitly started in full mode; retain that supported choice.
+  const expectedMode = metadata.mode;
+  let expectedApiTarget = registeredApiTarget ?? SHARED_API_TARGET;
+  if (expectedMode === 'full') {
+    if (
+      !Number.isInteger(registeredBackendPort) ||
+      registeredBackendPort < BACKEND_PORT_START ||
+      registeredBackendPort > BACKEND_PORT_END
+    )
+      throw new Error('无法证明当前任务的已登记后端端口，不能声明运行环境就绪');
+    expectedApiTarget = `http://127.0.0.1:${registeredBackendPort}`;
+  }
+  return { expectedWorkspaceRoot: root, expectedBranch: branch, expectedMode, expectedApiTarget };
+}
+
+export function taskPreviewChangedFiles(root) {
+  const baseRef = refExists('refs/remotes/origin/main', root) ? 'origin/main' : 'main';
+  const queries = [
+    ['diff', '--name-only', '-z', '--no-renames', `${baseRef}...HEAD`],
+    ['diff', '--name-only', '-z', '--no-renames'],
+    ['diff', '--cached', '--name-only', '-z', '--no-renames', 'HEAD'],
+    ['ls-files', '--others', '--exclude-standard', '-z'],
+  ];
+  const files = queries.flatMap((args) => {
+    const value = capture('git', args, { cwd: root, trim: false });
+    if (value && !value.endsWith('\0')) throw new Error('Git 变更路径输出不完整');
+    return value ? value.slice(0, -1).split('\0') : [];
+  });
+  return [...new Set(files)].sort();
+}
+
 export function parseDatabaseLock(value) {
   try {
     const lock = JSON.parse(value);
@@ -285,21 +336,17 @@ export function parseDatabaseLock(value) {
 }
 
 export function selectSharedNodeModules({ root, worktrees }) {
-  const currentLock = path.join(root, 'package-lock.json');
-  if (!existsSync(currentLock)) return null;
-  const lockContent = readFileSync(currentLock, 'utf8');
   for (const worktree of worktrees) {
     if (path.resolve(worktree.path) === path.resolve(root)) continue;
     const modules = path.join(worktree.path, 'node_modules');
-    const lock = path.join(worktree.path, 'package-lock.json');
-    if (existsSync(modules) && existsSync(lock) && readFileSync(lock, 'utf8') === lockContent) return modules;
+    if (compatibleTaskDependencies(root, modules)) return modules;
   }
   return null;
 }
 
-function capture(command, args, { cwd, allowFailure = false, env = process.env } = {}) {
+function capture(command, args, { cwd, allowFailure = false, env = process.env, trim = true } = {}) {
   const result = spawnSync(command, args, { cwd, env, encoding: 'utf8' });
-  if (result.status === 0) return result.stdout.trim();
+  if (result.status === 0) return trim ? result.stdout.trim() : result.stdout;
   if (allowFailure) return '';
   throw new Error(result.stderr.trim() || `${command} ${args.join(' ')} failed`);
 }
@@ -317,24 +364,27 @@ function refExists(ref, cwd) {
   return spawnSync('git', ['show-ref', '--verify', '--quiet', ref], { cwd }).status === 0;
 }
 
-function changedFiles(root) {
-  const baseRef = refExists('refs/remotes/origin/main', root) ? 'origin/main' : 'main';
-  const values = [
-    gitCapture(root, ['diff', '--name-only', `${baseRef}...HEAD`], true),
-    gitCapture(root, ['diff', '--name-only'], true),
-    gitCapture(root, ['diff', '--cached', '--name-only'], true),
-    gitCapture(root, ['ls-files', '--others', '--exclude-standard'], true),
-  ];
-  return [...new Set(values.flatMap((value) => value.split(/\r?\n/)).filter(Boolean))];
-}
-
-function ensureNodeModules(root, worktrees) {
+export function ensureNodeModules(root, worktrees) {
   const localModules = path.join(root, 'node_modules');
-  if (existsSync(localModules)) return;
+  // An existing symlink is not evidence that its target matches this Worktree's lock.
+  try {
+    lstatSync(localModules);
+    try {
+      return validateTaskDependencies(root, localModules);
+    } catch (error) {
+      throw new Error(
+        `当前 node_modules 无法证明与锁文件一致；请在依赖所属目录修复后重试，不会自动修改共享依赖：${error.message}`,
+        { cause: error },
+      );
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
   const sharedModules = selectSharedNodeModules({ root, worktrees });
-  if (!sharedModules) throw new Error('当前 Worktree 缺少可复用且版本一致的 node_modules，请先安装依赖');
+  if (!sharedModules) throw new Error('当前 Worktree 缺少可复用且实际安装版本一致的 node_modules，请先安装依赖');
   symlinkSync(sharedModules, localModules, process.platform === 'win32' ? 'junction' : 'dir');
   console.log(`复用依赖：${sharedModules}`);
+  return validateTaskDependencies(root, localModules);
 }
 
 function integrationWorktreeFor(worktrees) {
@@ -518,7 +568,6 @@ function prepareTaskMigrations({ root, integrationRoot, project }) {
     if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`任务迁移目录不安全：${directory}`);
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isFile()) throw new Error(`任务迁移目录包含非文件项，已停止覆盖：${entry.name}`);
-      unlinkSync(path.join(directory, entry.name));
     }
   } else {
     mkdirSync(directory, { recursive: true });
@@ -527,7 +576,14 @@ function prepareTaskMigrations({ root, integrationRoot, project }) {
     integrationFiles: [...readMigrationCatalog(integrationRoot), ...readPausedMigrations(integrationRoot)],
     taskFiles: readMigrationCatalog(root),
   });
-  for (const entry of catalog) writeFileSync(path.join(directory, entry.name), entry.content, { flag: 'wx' });
+  const names = new Set(catalog.map((entry) => entry.name));
+  for (const name of readdirSync(directory)) {
+    if (!names.has(name)) unlinkSync(path.join(directory, name));
+  }
+  for (const entry of catalog) {
+    const file = path.join(directory, entry.name);
+    if (!existsSync(file) || readFileSync(file, 'utf8') !== entry.content) writeFileSync(file, entry.content);
+  }
   return { directory, count: catalog.length };
 }
 
@@ -784,13 +840,16 @@ function integrationComposeContext(integrationRoot) {
   };
 }
 
-async function ensureIntegrationDatabase(integrationRoot) {
-  ensureDocker(integrationRoot);
+export async function ensureIntegrationDatabase(
+  integrationRoot,
+  { prepare = ensureDocker, execute = run, inspect = capture, wait = waitUntil } = {},
+) {
+  prepare(integrationRoot);
   const context = integrationComposeContext(integrationRoot);
-  run('docker', [...context.args, 'up', '-d', 'mysql'], context);
-  await waitUntil(
+  execute('docker', [...context.args, 'up', '-d', 'mysql'], context);
+  await wait(
     () =>
-      capture('docker', ['inspect', '--format', '{{.State.Health.Status}}', INTEGRATION_MYSQL_CONTAINER], {
+      inspect('docker', ['inspect', '--format', '{{.State.Health.Status}}', INTEGRATION_MYSQL_CONTAINER], {
         cwd: integrationRoot,
       }) === 'healthy',
     { timeoutMs: 120_000, message: '等待集成 MySQL 健康检查超时' },
@@ -838,9 +897,11 @@ function stopIntegrationBackend(integrationRoot) {
   run('docker', [...context.args, 'stop', 'backend'], context);
 }
 
-async function startIntegrationBackend(integrationRoot) {
-  run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'backend:ensure'], { cwd: integrationRoot });
-  await waitForHttp(`${SHARED_API_TARGET}/actuator/health`);
+export async function startIntegrationBackend(integrationRoot, { execute = run, waitForHealth = waitForHttp } = {}) {
+  execute(process.execPath, [path.join(launcherRoot, 'scripts', 'ensure-backend.mjs'), '--worktree', integrationRoot], {
+    cwd: integrationRoot,
+  });
+  await waitForHealth(`${SHARED_API_TARGET}/actuator/health`);
 }
 
 function otherSharedDatabaseTaskBackends(root, project) {
@@ -934,22 +995,111 @@ async function chooseBackendPort({ root, project, requestedPort }) {
   return findAvailablePort({ start: BACKEND_PORT_START, end: BACKEND_PORT_END });
 }
 
-async function ensureTaskBackend({ context, integrationRoot, root, branch, project, riskFiles = [] }) {
-  await ensureIntegrationDatabase(integrationRoot);
-  const migrations = prepareTaskMigrations({ root, integrationRoot, project });
-  const lock = readDatabaseLock(integrationRoot);
+function backendResponseHealthy(response) {
+  try {
+    return response.statusCode === 200 && JSON.parse(response.body).status === 'UP';
+  } catch {
+    return false;
+  }
+}
+
+function inspectTaskBackend(context) {
+  const ids = composeCapture(context, ['ps', '--all', '--quiet', 'backend'], true).split(/\r?\n/).filter(Boolean);
+  if (ids.length !== 1) return null;
+  try {
+    const containers = JSON.parse(capture('docker', ['inspect', ids[0]], { cwd: context.cwd }));
+    return containers.length === 1 ? containers[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+function readBackendRecord(root) {
+  try {
+    return JSON.parse(readFileSync(path.join(root, '.task-runtime/backend-state.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeBackendRecord(root, record) {
+  mkdirSync(path.join(root, '.task-runtime'), { recursive: true });
+  writeFileSync(path.join(root, '.task-runtime/backend-state.json'), `${JSON.stringify(record)}\n`);
+}
+
+export async function ensureTaskBackend(
+  { context, integrationRoot, root, branch, project, riskFiles = [] },
+  {
+    ensureDatabase = ensureIntegrationDatabase,
+    prepareMigrations = prepareTaskMigrations,
+    readLock = readDatabaseLock,
+    acquireLock = acquireDatabaseLock,
+    inspect = inspectTaskBackend,
+    configuration = (value) => composeCapture(value, ['config', '--format', 'json']),
+    snapshot = taskBackendSourceIdentity,
+    readRecord = readBackendRecord,
+    writeRecord = writeBackendRecord,
+    execute = composeRun,
+    health = requestResponse,
+    waitForHealth = waitForHttp,
+  } = {},
+) {
+  await ensureDatabase(integrationRoot);
+  const migrations = prepareMigrations({ root, integrationRoot, project });
+  const lock = readLock(integrationRoot);
   const conflict = databaseLockError(lock, { project, branch });
   if (conflict) throw new Error(`${conflict}\n当前任务备份：${lock.backupFile}`);
   if (riskFiles.length > 0) {
-    await acquireDatabaseLock({ context, integrationRoot, root, branch, project, riskFiles });
+    await acquireLock({ context, integrationRoot, root, branch, project, riskFiles });
   }
-  composeRun(context, ['up', '-d', '--no-deps', '--force-recreate', 'backend']);
+  const expected = {
+    root,
+    project,
+    backendPort: context.env.ZDM_TASK_BACKEND_PORT,
+    migrationDirectory: migrations.directory,
+  };
+  const state = () => ({
+    sourceIdentity: snapshot({ root, migrationDirectory: migrations.directory }),
+    configurationIdentity: runtimeDigest(configuration(context)),
+    containerIdentity: taskBackendContainerIdentity(inspect(context), expected),
+  });
+  let before = state();
+  const record = readRecord(root);
+  let action = taskBackendAction(record, { ...before, risk: riskFiles.length > 0 });
   const healthUrl = `http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}/actuator/health`;
+  if (action === 'reuse') {
+    const response = await health(healthUrl);
+    const after = state();
+    if (backendResponseHealthy(response) && JSON.stringify(before) === JSON.stringify(after)) {
+      console.log(`复用已核验的任务后端：http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}`);
+      return { action: 'reuse' };
+    }
+    before = after;
+    action = taskBackendAction(record, { ...before, risk: riskFiles.length > 0 });
+    if (action === 'reuse') action = 'restart';
+  }
+  execute(
+    context,
+    action === 'restart' ? ['restart', 'backend'] : ['up', '-d', '--no-deps', '--force-recreate', 'backend'],
+  );
   try {
-    await waitForHttp(healthUrl);
+    const launchedIdentity = taskBackendContainerIdentity(inspect(context), expected);
+    if (!launchedIdentity || launchedIdentity === before.containerIdentity)
+      throw new Error('任务后端未产生新的有效启动身份，未登记复用证据');
+    await waitForHealth(healthUrl);
+    if (!backendResponseHealthy(await health(healthUrl))) throw new Error('任务后端未返回 UP 健康状态，未登记复用证据');
+    const after = state();
+    if (after.sourceIdentity !== before.sourceIdentity || after.configurationIdentity !== before.configurationIdentity)
+      throw Object.assign(new Error('后端启动期间运行输入发生变化，未登记复用证据；请在改动稳定后重试'), {
+        code: 'RUNTIME_INPUT_CHANGED',
+      });
+    if (!after.containerIdentity || after.containerIdentity !== launchedIdentity)
+      throw new Error('任务后端容器身份、挂载或端口不匹配，未登记复用证据');
+    writeRecord(root, { version: 1, ...after });
   } catch (error) {
-    composeRun(context, ['logs', '--tail', '80', 'backend']);
-    const activeLock = readDatabaseLock(integrationRoot);
+    if (error.code === 'RUNTIME_INPUT_CHANGED') throw error;
+    execute(context, ['logs', '--tail', '80', 'backend']);
+    const activeLock = readLock(integrationRoot);
     if (activeLock?.project === project) {
       console.error(`数据库保护点保留：${activeLock.backupFile}`);
       console.error('集成后端保持暂停；恢复数据库必须先取得用户明确确认。');
@@ -959,19 +1109,7 @@ async function ensureTaskBackend({ context, integrationRoot, root, branch, proje
   console.log(`任务后端：http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}`);
   console.log('任务数据库：复用集成 MySQL / zdm_admin（手工验收数据持续保留）');
   console.log(`Flyway 迁移目录：集成基线 + 当前任务（${migrations.count} 个）`);
-}
-
-async function restartTaskBackend(context) {
-  console.log('检测到后端源码变化，正在重启任务后端…');
-  composeRun(context, ['restart', 'backend']);
-  const healthUrl = `http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}/actuator/health`;
-  try {
-    await waitForHttp(healthUrl);
-    console.log('任务后端已加载最新代码。');
-  } catch (error) {
-    composeRun(context, ['logs', '--tail', '80', 'backend']);
-    throw error;
-  }
+  return { action };
 }
 
 async function ensureSharedBackend(worktrees) {
@@ -1005,7 +1143,7 @@ async function handoffDatabaseTask({ root, branch, project, integrationRoot, con
     console.log(`旧任务预览已停止：${branch}`);
   }
   composeRun(context, ['stop', 'backend']);
-  await ensureIntegrationDatabase(integrationRoot);
+  // backend:ensure owns database readiness before restoring the integration backend.
   await startIntegrationBackend(integrationRoot);
   if (lock) {
     const { lockFile } = databaseRuntimePaths(integrationRoot);
@@ -1067,24 +1205,79 @@ async function stopChild(child) {
   clearTimeout(forceTimer);
 }
 
-function createBackendWatchers(root, onChange) {
+export function runtimeWatchFile(directory, filename) {
+  // An unnamed event cannot prove a test-only scope; retain the watched directory's conservative scope.
+  const unknown = {
+    '': 'docker-compose.task.yml',
+    scripts: 'scripts/dev-task.mjs',
+    '.codex': '.codex/zdm-project-workflow.yaml',
+    '.mvn': '.mvn/jvm.config',
+  };
+  const file =
+    filename == null
+      ? (unknown[directory] ?? directory)
+      : path.posix.join(directory, String(filename).replaceAll('\\', '/'));
+  return backendSensitiveFiles([file]).length ? file : null;
+}
+
+export function createBackendWatchers(root, onChange, watchDirectory = watch) {
   const watchers = [];
-  const source = path.join(root, 'backend', 'src');
-  if (existsSync(source)) watchers.push(watch(source, { recursive: true }, () => onChange('backend/src')));
-  const backend = path.join(root, 'backend');
-  if (existsSync(backend)) {
+  const add = (directory, recursive = false, filter = () => true) => {
+    const absolute = path.join(root, directory);
+    if (!existsSync(absolute)) return;
     watchers.push(
-      watch(backend, (event, filename) => {
-        if (`${filename}` === 'pom.xml') onChange('backend/pom.xml');
+      watchDirectory(absolute, { recursive }, (event, filename) => {
+        if (!filter(filename)) return;
+        const file = runtimeWatchFile(directory, filename);
+        if (file) onChange(file);
       }),
     );
-  }
-  watchers.push(
-    watch(root, (event, filename) => {
-      if (['docker-compose.yml', 'compose.yml', 'compose.yaml'].includes(`${filename}`)) onChange(`${filename}`);
-    }),
-  );
+  };
+  add('backend/src', true);
+  add('backend/.mvn', true);
+  add('.mvn', true);
+  add('scripts', true);
+  add('.codex', true);
+  add('backend', false, (filename) => filename == null || ['pom.xml', 'src', '.mvn'].includes(String(filename)));
+  add('', false, (filename) => filename == null || !['backend', 'scripts', '.codex'].includes(String(filename)));
   return watchers;
+}
+
+// Install the listeners before classification/startup. Until startup settles, events are
+// buffered instead of racing the first frontend readiness check or being dropped.
+export async function withRuntimeStartupWatch(root, start, watchRuntime = createBackendWatchers) {
+  const pending = new Set();
+  let forward = null;
+  let closed = false;
+  const notify = (file) => {
+    if (closed) return;
+    if (forward) forward(file);
+    else pending.add(file);
+  };
+  const watchers = watchRuntime(root, notify);
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    pending.clear();
+    for (const watcher of watchers) watcher.close();
+  };
+  try {
+    return await start({
+      notify,
+      close,
+      async settle(run, onChange) {
+        while (!closed && pending.size) {
+          const files = [...pending];
+          pending.clear();
+          await run(files);
+        }
+        if (!closed) forward = onChange;
+      },
+    });
+  } catch (error) {
+    close();
+    throw error;
+  }
 }
 
 async function resolveTargetRoot(worktree) {
@@ -1103,7 +1296,7 @@ Options:
   --api http://...          显式使用指定 API，并进入前端模式
   --database-risk           将非 Flyway 的破坏性数据任务纳入备份与写入锁
   --worktree /path          从新版启动器预览尚未包含该脚本的旧任务 Worktree
-  --check                   检查当前任务预览身份及其 API 代理链路
+  --check                   检查当前任务预览身份及其 API 代理链路；指定 --worktree 时只读核对 Git/模式/已登记 Docker 端口
   --handoff                 集成分支包含任务提交后，停止任务预览和后端、恢复集成后端并释放数据库锁
   --pause                   备份并暂停当前锁所属任务，保留已执行迁移供其他任务校验
   --stop                    仅停止当前任务前端和后端；不删除数据库或备份`);
@@ -1138,7 +1331,34 @@ export async function main(args = process.argv.slice(2)) {
   if (options.check) {
     const expectedWorkspaceRoot = options.worktree ? await resolveTargetRoot(options.worktree) : null;
     const port = options.port || CURRENT_TASK_FRONTEND_PORT;
-    const metadata = await requireManagedPreviewReady({ port, expectedWorkspaceRoot });
+    let expectations = { expectedWorkspaceRoot };
+    if (expectedWorkspaceRoot) {
+      const branch = gitCapture(expectedWorkspaceRoot, ['branch', '--show-current']);
+      const files = taskPreviewChangedFiles(expectedWorkspaceRoot);
+      const current = await currentManagedPreview(port);
+      let registeredBackendPort = null;
+      let registeredApiTarget = null;
+      if (current?.mode === 'full') {
+        const project = taskProjectName({ branch, root: expectedWorkspaceRoot });
+        registeredBackendPort = existingTaskBackendPort(
+          composeContext({ root: expectedWorkspaceRoot, project, backendPort: BACKEND_PORT_START }),
+        );
+      } else if (current?.apiTarget && current.apiTarget !== SHARED_API_TARGET) {
+        const response = await previewServiceRequest('GET', '/status');
+        const status = response.statusCode === 200 ? parseJson(response.body) : null;
+        if (previewServiceOwnsWorktree(status, expectedWorkspaceRoot))
+          registeredApiTarget = parseTaskPreviewArgs(status.taskArgs ?? []).apiTarget;
+      }
+      expectations = taskPreviewCheckExpectations({
+        root: expectedWorkspaceRoot,
+        branch,
+        files,
+        metadata: current,
+        registeredBackendPort,
+        registeredApiTarget,
+      });
+    }
+    const metadata = await requireManagedPreviewReady({ port, ...expectations });
     console.log(`任务预览就绪：http://127.0.0.1:${port}/`);
     console.log(`Worktree：${metadata.workspaceRoot}`);
     console.log(`分支：${metadata.branch}`);
@@ -1197,177 +1417,178 @@ export async function main(args = process.argv.slice(2)) {
   }
 
   ensureNodeModules(root, worktrees);
-  const files = changedFiles(root);
-  let mode = selectTaskPreviewMode({ files, requestedMode: options.mode, apiTarget: options.apiTarget });
-  if (options.databaseRisk) mode = 'full';
-  const riskFiles = databaseRiskFiles(files);
-  if (options.databaseRisk) riskFiles.push('--database-risk');
-  const activeDatabaseLock = readDatabaseLock(integrationRoot);
-  const lockConflict = databaseLockError(activeDatabaseLock, { project, branch });
-  if (lockConflict) throw new Error(`${lockConflict}\n当前任务备份：${activeDatabaseLock.backupFile}`);
-  const frontendPort = await chooseTaskFrontendPort({
-    requestedPort: options.port,
-    temporary: options.temporary,
-  });
+  return withRuntimeStartupWatch(root, async (startupWatch) => {
+    const files = taskPreviewChangedFiles(root);
+    let mode = selectTaskPreviewMode({ files, requestedMode: options.mode, apiTarget: options.apiTarget });
+    if (options.databaseRisk) mode = 'full';
+    const riskFiles = databaseRiskFiles(files);
+    if (options.databaseRisk) riskFiles.push('--database-risk');
+    const activeDatabaseLock = readDatabaseLock(integrationRoot);
+    const lockConflict = databaseLockError(activeDatabaseLock, { project, branch });
+    if (lockConflict) throw new Error(`${lockConflict}\n当前任务备份：${activeDatabaseLock.backupFile}`);
+    const frontendPort = await chooseTaskFrontendPort({
+      requestedPort: options.port,
+      temporary: options.temporary,
+    });
 
-  let backendContext = null;
-  let apiTarget = options.apiTarget;
-  if (mode === 'full') {
-    const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
-    backendContext = composeContext({ root, project, backendPort });
-    await ensureTaskBackend({ context: backendContext, integrationRoot, root, branch, project, riskFiles });
-    apiTarget = `http://127.0.0.1:${backendPort}`;
-  } else if (apiTarget) {
-    const apiUrl = new URL(apiTarget);
-    if (
-      ['127.0.0.1', 'localhost'].includes(apiUrl.hostname) &&
-      (await requestStatus(`${apiTarget}/actuator/health`)) !== 200
-    ) {
-      throw new Error(`指定 API 未就绪：${apiTarget}`);
+    let backendContext = null;
+    let apiTarget = options.apiTarget;
+    if (mode === 'full') {
+      const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
+      backendContext = composeContext({ root, project, backendPort });
+      await ensureTaskBackend({ context: backendContext, integrationRoot, root, branch, project, riskFiles });
+      apiTarget = `http://127.0.0.1:${backendPort}`;
+    } else if (apiTarget) {
+      const apiUrl = new URL(apiTarget);
+      if (
+        ['127.0.0.1', 'localhost'].includes(apiUrl.hostname) &&
+        (await requestStatus(`${apiTarget}/actuator/health`)) !== 200
+      ) {
+        throw new Error(`指定 API 未就绪：${apiTarget}`);
+      }
+    } else {
+      await ensureSharedBackend(worktrees);
+      apiTarget = SHARED_API_TARGET;
     }
-  } else {
-    await ensureSharedBackend(worktrees);
-    apiTarget = SHARED_API_TARGET;
-  }
 
-  await prepareFrontendPort({
-    port: frontendPort,
-    allowManagedSwitch: !options.port && !options.temporary,
-  });
-
-  console.log(`任务预览：${branch}`);
-  console.log(`自动模式：${mode === 'full' ? '完整前后端' : '快速前端'}`);
-  if (mode === 'full') {
-    for (const file of backendSensitiveFiles(files)) console.log(`- 后端影响：${file}`);
-  }
-  console.log(
-    `${options.port || options.temporary ? '准备临时页面' : '准备固定页面'}：http://127.0.0.1:${frontendPort}/`,
-  );
-  console.log(`API 代理：${apiTarget}`);
-  console.log('按 Ctrl+C 只停止前端；任务后端继续保留，数据始终位于集成数据库。');
-
-  let frontend = null;
-  let shuttingDown = false;
-  let restartingFrontend = false;
-  let backendTimer = null;
-  let backendJob = Promise.resolve();
-  const attachFrontend = (child) => {
-    child.on('error', (error) => {
-      console.error(error.message);
-      process.exitCode = 1;
+    await prepareFrontendPort({
+      port: frontendPort,
+      allowManagedSwitch: !options.port && !options.temporary,
     });
-    child.on('exit', (code) => {
-      if (shuttingDown || restartingFrontend || child !== frontend) return;
-      closeWatchers();
-      process.exitCode = code ?? 1;
-    });
-    return child;
-  };
-  const watchers = createBackendWatchers(root, (reason) => {
-    clearTimeout(backendTimer);
-    backendTimer = setTimeout(() => {
-      backendJob = backendJob
-        .then(async () => {
-          if (mode === 'frontend') {
-            if (options.apiTarget || options.mode === 'frontend') {
-              console.warn(`检测到 ${reason} 变化，但当前为显式前端模式；重新运行并使用 --mode auto 或 full。`);
-              return;
-            }
-            console.log(`检测到 ${reason} 变化，正在自动升级为完整前后端模式…`);
-            const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
-            backendContext = composeContext({ root, project, backendPort });
-            const currentRiskFiles = databaseRiskFiles(changedFiles(root));
-            if (options.databaseRisk) currentRiskFiles.push('--database-risk');
-            await ensureTaskBackend({
-              context: backendContext,
-              integrationRoot,
-              root,
-              branch,
-              project,
-              riskFiles: currentRiskFiles,
-            });
-            apiTarget = `http://127.0.0.1:${backendPort}`;
-            restartingFrontend = true;
-            await stopChild(frontend);
-            mode = 'full';
-            frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
-            try {
-              await waitForManagedPreviewReady({
-                port: frontendPort,
-                expectedWorkspaceRoot: root,
-                expectedBranch: branch,
-                expectedMode: mode,
-                expectedApiTarget: apiTarget,
-              });
-            } catch (error) {
-              await stopChild(frontend);
-              throw error;
-            } finally {
-              restartingFrontend = false;
-            }
-            console.log(`已切换完整模式，页面地址保持：http://127.0.0.1:${frontendPort}/`);
+
+    console.log(`任务预览：${branch}`);
+    console.log(`自动模式：${mode === 'full' ? '完整前后端' : '快速前端'}`);
+    if (mode === 'full') {
+      for (const file of backendSensitiveFiles(files)) console.log(`- 后端影响：${file}`);
+    }
+    console.log(
+      `${options.port || options.temporary ? '准备临时页面' : '准备固定页面'}：http://127.0.0.1:${frontendPort}/`,
+    );
+    console.log(`API 代理：${apiTarget}`);
+    console.log('按 Ctrl+C 只停止前端；任务后端继续保留，数据始终位于集成数据库。');
+
+    let frontend = null;
+    let shuttingDown = false;
+    let restartingFrontend = false;
+    const attachFrontend = (child) => {
+      child.on('error', (error) => {
+        console.error(error.message);
+        process.exitCode = 1;
+      });
+      child.on('exit', (code) => {
+        if (shuttingDown || restartingFrontend || child !== frontend) return;
+        closeWatchers();
+        process.exitCode = code ?? 1;
+      });
+      return child;
+    };
+    const updateBackend = async (reasons) => {
+      try {
+        const reason = reasons.join(', ');
+        if (mode === 'frontend') {
+          if (options.apiTarget || options.mode === 'frontend') {
+            console.warn(`检测到 ${reason} 变化，但当前为显式前端模式；重新运行并使用 --mode auto 或 full。`);
             return;
           }
-          const currentRiskFiles = databaseRiskFiles(changedFiles(root));
+          console.log(`检测到 ${reason} 变化，正在自动升级为完整前后端模式…`);
+          const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
+          backendContext = composeContext({ root, project, backendPort });
+          const currentRiskFiles = databaseRiskFiles(taskPreviewChangedFiles(root));
           if (options.databaseRisk) currentRiskFiles.push('--database-risk');
-          if (currentRiskFiles.length > 0 || ['docker-compose.yml', 'compose.yml', 'compose.yaml'].includes(reason)) {
-            await ensureTaskBackend({
-              context: backendContext,
-              integrationRoot,
-              root,
-              branch,
-              project,
-              riskFiles: currentRiskFiles,
-            });
-          } else {
-            await restartTaskBackend(backendContext);
-          }
-        })
-        .catch(async (error) => {
-          console.error(error instanceof Error ? error.message : error);
-          closeWatchers();
+          await ensureTaskBackend({
+            context: backendContext,
+            integrationRoot,
+            root,
+            branch,
+            project,
+            riskFiles: currentRiskFiles,
+          });
+          apiTarget = `http://127.0.0.1:${backendPort}`;
+          restartingFrontend = true;
           await stopChild(frontend);
-          process.exitCode = 1;
-          console.error('任务后端未能恢复健康，已关闭当前任务页面入口。');
+          mode = 'full';
+          frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
+          try {
+            await waitForManagedPreviewReady({
+              port: frontendPort,
+              expectedWorkspaceRoot: root,
+              expectedBranch: branch,
+              expectedMode: mode,
+              expectedApiTarget: apiTarget,
+            });
+          } catch (error) {
+            await stopChild(frontend);
+            throw error;
+          } finally {
+            restartingFrontend = false;
+          }
+          console.log(`已切换完整模式，页面地址保持：http://127.0.0.1:${frontendPort}/`);
+          return;
+        }
+        const currentRiskFiles = databaseRiskFiles(taskPreviewChangedFiles(root));
+        if (options.databaseRisk) currentRiskFiles.push('--database-risk');
+        await ensureTaskBackend({
+          context: backendContext,
+          integrationRoot,
+          root,
+          branch,
+          project,
+          riskFiles: currentRiskFiles,
         });
-    }, 700);
-  });
-
-  const closeWatchers = () => {
-    clearTimeout(backendTimer);
-    for (const watcher of watchers) watcher.close();
-  };
-  frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
-  try {
-    await waitForManagedPreviewReady({
-      port: frontendPort,
-      expectedWorkspaceRoot: root,
-      expectedBranch: branch,
-      expectedMode: mode,
-      expectedApiTarget: apiTarget,
+      } catch (error) {
+        if (error.code !== 'RUNTIME_INPUT_CHANGED') throw error;
+        console.log('后端启动期间又有修改，合并到下一次加载。');
+        startupWatch.notify('backend/src');
+      }
+    };
+    const backendQueue = createLatestChangeQueue({
+      run: updateBackend,
+      onError: async (error) => {
+        console.error(error instanceof Error ? error.message : error);
+        closeWatchers();
+        await stopChild(frontend);
+        process.exitCode = 1;
+        console.error('任务后端未能恢复健康，已关闭当前任务页面入口。');
+      },
     });
-  } catch (error) {
-    closeWatchers();
-    await stopChild(frontend);
-    if (mode === 'full') {
-      console.log('任务后端继续保留，便于检查日志；当前页面入口已关闭。');
-    }
-    throw error;
-  }
-  console.log(`预览 API 链路已就绪：http://127.0.0.1:${frontendPort}/ → ${apiTarget}`);
+    const closeWatchers = () => {
+      backendQueue.close();
+      startupWatch.close();
+    };
 
-  const shutdown = async () => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    closeWatchers();
-    await stopChild(frontend);
-    if (mode === 'full') {
-      console.log(`任务后端仍在运行。停止命令：node ${fileURLToPath(import.meta.url)} --worktree "${root}" --stop`);
+    frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
+    try {
+      await waitForManagedPreviewReady({
+        port: frontendPort,
+        expectedWorkspaceRoot: root,
+        expectedBranch: branch,
+        expectedMode: mode,
+        expectedApiTarget: apiTarget,
+      });
+      await startupWatch.settle(updateBackend, (reason) => backendQueue.notify(reason));
+    } catch (error) {
+      closeWatchers();
+      await stopChild(frontend);
+      if (mode === 'full') {
+        console.log('任务后端继续保留，便于检查日志；当前页面入口已关闭。');
+      }
+      throw error;
     }
-    process.exit(0);
-  };
-  process.once('SIGINT', () => void shutdown());
-  process.once('SIGTERM', () => void shutdown());
+    console.log(`预览 API 链路已就绪：http://127.0.0.1:${frontendPort}/ → ${apiTarget}`);
+
+    const shutdown = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      closeWatchers();
+      await stopChild(frontend);
+      if (mode === 'full') {
+        console.log(`任务后端仍在运行。停止命令：node ${fileURLToPath(import.meta.url)} --worktree "${root}" --stop`);
+      }
+      process.exit(0);
+    };
+    process.once('SIGINT', () => void shutdown());
+    process.once('SIGTERM', () => void shutdown());
+  });
 }
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';

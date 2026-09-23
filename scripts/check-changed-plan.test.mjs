@@ -8,7 +8,7 @@ const names = (plan) => plan.tasks.map((task) => task.name);
 test('deleted TypeScript files still trigger typecheck', () => {
   const plan = createValidationPlan(['src/services/removed.ts'], () => false);
 
-  assert.deepEqual(names(plan), ['typecheck']);
+  assert.deepEqual(names(plan), ['source guards', 'typecheck']);
 });
 
 test('dependency changes trigger full frontend checks', () => {
@@ -34,5 +34,35 @@ test('deleted backend files still execute backend tests', () => {
 test('Vue source changes select incremental frontend checks', () => {
   const plan = createValidationPlan(['src/pages/example/index.vue']);
 
-  assert.deepEqual(names(plan), ['typecheck', 'eslint', 'stylelint', 'related unit tests']);
+  assert.deepEqual(names(plan), ['source guards', 'typecheck', 'eslint', 'stylelint', 'related unit tests']);
+});
+
+test('reviewed backend mapping provides an executable Maven selector and explanation', () => {
+  const plan = createValidationPlan(['backend/src/main/java/com/zdm/platform/inventory/SlabLogChanges.java']);
+  assert.equal(plan.backendPlan.mode, 'targeted');
+  assert.equal(plan.tasks[0].reason, plan.backendPlan.reason);
+  assert.deepEqual(plan.tasks[0].args.slice(0, 3), ['run', 'backend:test', '--']);
+  assert.ok(plan.tasks[0].args[3].includes('PlatformApiSmokeTest'));
+});
+
+test('dependency branch retains a backend full-suite explanation', () => {
+  const plan = createValidationPlan([
+    'package.json',
+    'backend/src/main/java/com/zdm/platform/inventory/SlabLogChanges.java',
+  ]);
+  assert.equal(plan.backendPlan.mode, 'full');
+  assert.deepEqual(plan.tasks.at(-1).args, ['run', 'backend:test']);
+  assert.ok(plan.tasks.at(-1).reason);
+});
+
+test('Node script tests use the Node suite instead of being sent to Vitest', () => {
+  const plan = createValidationPlan(['scripts/verification-impact.test.mjs']);
+  assert.ok(plan.tasks.some((entry) => entry.args.includes('test:scripts')));
+  assert.ok(!plan.tasks.some((entry) => entry.args.includes('test:unit')));
+});
+
+test('source and test edits retain both explicit and related test consumers', () => {
+  const plan = createValidationPlan(['src/example.ts', 'src/example.test.ts']);
+  assert.ok(names(plan).includes('unit tests'));
+  assert.ok(names(plan).includes('related unit tests'));
 });

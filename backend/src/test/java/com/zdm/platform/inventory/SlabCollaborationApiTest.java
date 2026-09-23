@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.zdm.platform.support.SpringContainerTestSupport;
 import com.zdm.platform.security.CurrentIdentity;
 import java.math.BigDecimal;
 import java.util.List;
@@ -34,7 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc(addFilters = false)
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
-class SlabCollaborationApiTest {
+class SlabCollaborationApiTest extends SpringContainerTestSupport {
   @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
       .withDatabaseName("slab_collaboration").withUsername("test").withPassword("test");
   @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {

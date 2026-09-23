@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
+import com.zdm.platform.support.SpringContainerTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -37,7 +38,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc(addFilters = false)
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
-class FinishedProductPermissionApiTest {
+class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
   private static final String PREFIX = "admin.finished-stock-management.";
   @Container
   private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")

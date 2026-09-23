@@ -23,6 +23,8 @@
     <springdoc.version>2.6.0</springdoc.version>
     <spotbugs.version>4.8.6.5</spotbugs.version>
     <dependency-check.version>10.0.4</dependency-check.version>
+    <zdm.test.forks>2</zdm.test.forks>
+    <maven.build.timestamp.format>yyyyMMddHHmmssSSS</maven.build.timestamp.format>
   </properties>
 
   <dependencies>
@@ -102,6 +104,17 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <forkCount>${zdm.test.forks}</forkCount>
+          <reuseForks>true</reuseForks>
+          <systemPropertyVariables>
+            <zdm.media.storage-path>${project.build.directory}/test-media/${maven.build.timestamp}/fork-${surefire.forkNumber}</zdm.media.storage-path>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
@@ -134,6 +147,28 @@
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco-runs/${maven.build.timestamp}/fork-${surefire.forkNumber}.exec</destFile>
+              <append>false</append>
+            </configuration>
+          </execution>
+          <execution>
+            <id>merge-fork-coverage</id>
+            <phase>test</phase>
+            <goals>
+              <goal>merge</goal>
+            </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco.exec</destFile>
+              <fileSets>
+                <fileSet>
+                  <directory>${project.build.directory}/jacoco-runs/${maven.build.timestamp}</directory>
+                  <includes>
+                    <include>fork-*.exec</include>
+                  </includes>
+                </fileSet>
+              </fileSets>
+            </configuration>
           </execution>
           <execution>
             <id>report</id>

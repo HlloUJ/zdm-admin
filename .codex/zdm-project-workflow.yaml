@@ -15,6 +15,17 @@ worktrees:
   paths_relative_to: primary_worktree
   task_parent: ../管理后台-worktrees
 
+batch:
+  mode: serial
+  registry: git-common-dir/task-batches
+  preserve_module_commits: true
+  commands:
+    status: npm run task:batch -- status --json
+    start: 'npm run task:start -- --slug "{batch_slug}" --kind "{batch_kind}"'
+    delivery_plan: npm run task:batch -- plan --delivery
+    rollback_plan: 'npm run task:batch -- plan --rollback "{module_id}"'
+    close: npm run task:batch -- close
+
 integration:
   enabled: true
   branch: codex/integration-current
@@ -83,8 +94,13 @@ database:
 
 verification:
   changed: 'npm run check:changed -- {changed_files}'
+  delivery: npm run verify:delivery
   full: npm run verify:local
   integration: npm run integration:verify
+  evidence:
+    version: 2
+    directory: .task-verification
+    force: npm run verify:local -- --force
 
 delivery:
   completion_gate:
