@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertDeliveryLauncherFresh, runDeliveryLauncher } from './delivery-launcher.mjs';
 import {
   integrationBackendSnapshot,
   integrationProofMatches,
@@ -36,12 +37,13 @@ function aheadBehind(localRef, remoteRef, cwd) {
   return parseAheadBehind(capture(['rev-list', '--left-right', '--count', `${localRef}...${remoteRef}`], { cwd }));
 }
 
-export function syncIntegration(requestedTask = '', { executeHandoff = execFileSync } = {}) {
+export function syncIntegration(requestedTask = '', { executeHandoff = execFileSync, launcher = null } = {}) {
   const root = capture(['rev-parse', '--show-toplevel']);
   const taskBranch = requestedTask || capture(['branch', '--show-current'], { cwd: root });
   if (branchKind(taskBranch) !== 'task') throw new Error(`只能同步 codex/* 任务分支，当前为：${taskBranch}`);
 
   run(['fetch', 'origin', '--prune'], root);
+  if (launcher) assertDeliveryLauncherFresh(launcher, root);
   const taskLocalRef = `refs/heads/${taskBranch}`;
   const taskRemoteRef = `refs/remotes/origin/${taskBranch}`;
   const integrationLocalRef = `refs/heads/${DEFAULT_INTEGRATION_BRANCH}`;
@@ -146,7 +148,42 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const rawArgs = process.argv.slice(2);
     const taskIndex = rawArgs.indexOf('--task');
-    syncIntegration(taskIndex >= 0 ? rawArgs[taskIndex + 1] : '');
+    const taskBranch = taskIndex >= 0 ? rawArgs[taskIndex + 1] : capture(['branch', '--show-current']);
+    const headIndex = rawArgs.indexOf('--launcher-head');
+    const kindIndex = rawArgs.indexOf('--launcher-kind');
+    const publishedIndex = rawArgs.indexOf('--published-head');
+    if (headIndex < 0 && kindIndex < 0 && publishedIndex < 0) {
+      if (rawArgs.some((value, index) => index !== taskIndex && index !== taskIndex + 1))
+        throw new Error('不支持的集成同步参数');
+      runDeliveryLauncher({ action: 'sync', taskBranch, reviewedCandidate: null, plan: false });
+    } else {
+      const launcherHead = rawArgs[headIndex + 1];
+      const kind = rawArgs[kindIndex + 1];
+      const publishedHead = rawArgs[publishedIndex + 1];
+      const keys = rawArgs.filter((_, index) => index % 2 === 0);
+      if (
+        rawArgs.length !== 8 ||
+        new Set(keys).size !== 4 ||
+        keys.some((key) => !['--task', '--launcher-head', '--launcher-kind', '--published-head'].includes(key)) ||
+        headIndex < 0 ||
+        kindIndex < 0 ||
+        publishedIndex < 0 ||
+        !/^[a-f0-9]{40}$/.test(launcherHead) ||
+        !/^[a-f0-9]{40}$/.test(publishedHead) ||
+        !['published', 'reviewed-candidate'].includes(kind)
+      )
+        throw new Error('启动器来源参数不完整');
+      syncIntegration(taskBranch, {
+        launcher: {
+          action: 'sync',
+          taskBranch,
+          launcherHead,
+          kind,
+          publishedHead,
+          launcherRoot: fileURLToPath(new URL('..', import.meta.url)),
+        },
+      });
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;

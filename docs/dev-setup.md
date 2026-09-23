@@ -109,6 +109,26 @@ npm run dev:task:handoff
 
 集成数据库可能包含尚未进入 `main` 的迁移。启动器会把集成分支迁移和当前任务迁移合成临时只读目录供任务后端完整校验；同版本不同文件、同文件内容不一致、失败迁移或 checksum 异常都会停止启动，不会通过忽略规则绕过。
 
+### 交付启动器与首次升级
+
+正式交付按 `.codex/zdm-project-workflow.yaml` 的入口执行。日常同步和独立交接由 `scripts/delivery-launcher.mjs` 选择同仓库已发布的 `main` 启动器；不从旧任务目录挑选旧脚本，也不因为集成目录已有未发布改动就改用未发布实现。`main` 必须干净、与 `origin/main` 跟踪引用一致且具备所需启动器协议，缺少能力时明确停止。
+
+从固定集成 Worktree 可先查看入口计划：
+
+```bash
+node scripts/delivery-launcher.mjs sync --task codex/<batch> --plan
+```
+
+计划只读本地 Git，不 fetch、不合并、不推送、不启动服务；输出启动器目录、准确提交、目标任务和 `local-tracking-reference-only` 标记，不把跟踪引用称为已实时核验远程。实际同步复用原有一次 fetch，随后在任何合并前复核所选实现和主线；发生变化必须停止并重新核对。
+
+任务自身修改启动器时，默认入口会阻断使用旧实现完成自升级。只有已审查、通过适用验证且已获正式交付授权的基建候选，才使用适配中的 `delivery.reviewed_launcher_candidate`。其入口在任务 Worktree，必须传入已经审查的完整 40 位提交 SHA；选择器还要求工作区干净、候选与同名远程跟踪分支一致并包含当前主线。该参数记录选择依据，不授予提交、推送或合并权限，也不替代验证。首次发布选择器、已发布版本尚无该文件时同样使用这一明确候选入口，不能先调用旧集成同步脚本。
+
+```bash
+node scripts/delivery-launcher.mjs sync --task codex/<batch> --reviewed-candidate <已审查完整SHA> --plan
+```
+
+核对计划后在已授权交付中去掉 `--plan`；同步、交接、`ensure-backend` 始终沿同一选定启动器执行。普通业务任务不需要候选参数或新增审批。已安装常驻服务仍是脚本副本：交付中核对副本内容与配置路径，源文件变化才按现有安装流程升级；任务健康检查不等于证明正在运行候选启动器。停止旧任务并完成交接后，后续进程从已更新的固定入口加载脚本。
+
 ### 分开启动
 
 ```bash

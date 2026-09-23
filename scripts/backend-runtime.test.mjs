@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { ensureBackend, resolveRuntimeMigrations } from './backend-runtime.mjs';
-import { ensureIntegrationDatabase, startIntegrationBackend } from './dev-task.mjs';
+import { ensureIntegrationDatabase, ensureSharedBackend, startIntegrationBackend } from './dev-task.mjs';
 const first = { name: 'V1__base.sql', content: 'SELECT 1;' };
 const pending = { name: 'V2__paused.sql', content: 'SELECT 2;' };
 const record = {
@@ -204,4 +204,20 @@ test('runtime launch failure blocks backend health and propagates to the caller'
     }),
     /injected compose startup failure/,
   );
+});
+
+test('frontend shared-backend recovery uses the current protected launcher while healthy reuse stays unchanged', async () => {
+  const worktrees = [{ branch: 'codex/integration-current', path: '/old/integration' }];
+  await ensureSharedBackend(worktrees, {
+    health: async () => 200,
+    restore: () => assert.fail('Healthy backend must be reused'),
+  });
+  let recovered = null;
+  await ensureSharedBackend(worktrees, {
+    health: async () => 503,
+    restore: async (root) => {
+      recovered = root;
+    },
+  });
+  assert.equal(recovered, '/old/integration');
 });

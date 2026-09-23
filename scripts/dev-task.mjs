@@ -1135,14 +1135,14 @@ export async function ensureTaskBackend(
   return { action };
 }
 
-async function ensureSharedBackend(worktrees) {
+export async function ensureSharedBackend(
+  worktrees,
+  { health = requestStatus, restore = startIntegrationBackend } = {},
+) {
   const healthUrl = `${SHARED_API_TARGET}/actuator/health`;
-  if ((await requestStatus(healthUrl)) === 200) return;
+  if ((await health(healthUrl)) === 200) return;
   const integrationWorktree = integrationWorktreeFor(worktrees);
-  run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'backend:ensure'], {
-    cwd: integrationWorktree.path,
-  });
-  await waitForHttp(healthUrl);
+  await restore(integrationWorktree.path);
 }
 
 export async function handoffDatabaseTask(

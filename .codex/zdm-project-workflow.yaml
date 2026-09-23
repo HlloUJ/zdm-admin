@@ -61,7 +61,7 @@ preview:
       run: 'npm run dev:task:stop -- --worktree "{task_worktree}"'
     handoff:
       cwd: integration_worktree
-      run: 'npm run dev:task:handoff -- --worktree "{task_worktree}"'
+      run: 'node scripts/delivery-launcher.mjs handoff --task "{task_branch}"'
   urls:
     current_task: http://127.0.0.1:5175
     integration: http://127.0.0.1:5173
@@ -113,4 +113,7 @@ delivery:
     block_completion_on_failure: true
   sync_integration:
     cwd: integration_worktree
-    run: 'npm run git:integration:sync -- --task "{task_branch}"'
+    run: 'node scripts/delivery-launcher.mjs sync --task "{task_branch}"'
+  reviewed_launcher_candidate:
+    cwd: task_worktree
+    run: 'node scripts/delivery-launcher.mjs sync --task "{task_branch}" --reviewed-candidate "{task_head}"'
