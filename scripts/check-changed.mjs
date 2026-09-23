@@ -113,7 +113,7 @@ With file arguments, checks only files from the current task.
           ...task,
           root,
           command: npmCommand,
-          kind: task.args.includes('backend:test') ? 'backend' : 'node',
+          kind: task.kind ?? (task.args.includes('backend:test') ? 'backend' : 'node'),
           reuse: task.args.includes('backend:test'),
           ...(task.args.includes('build:app') ? { artifacts: ['dist'] } : {}),
         },

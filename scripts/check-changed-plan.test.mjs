@@ -12,10 +12,11 @@ test('deleted TypeScript inputs trigger typecheck and the full unit suite', () =
   assert.deepEqual(plan.tasks.at(-1).args, ['run', 'test:unit']);
 });
 
-test('dependency changes trigger full frontend checks', () => {
+test('dependency changes trigger the complete shared-configuration gate', () => {
   const plan = createValidationPlan(['package-lock.json']);
 
-  assert.deepEqual(names(plan), ['frontend quality', 'frontend build']);
+  assert.deepEqual(names(plan), ['shared configuration checks']);
+  assert.deepEqual(plan.tasks[0].args, ['run', 'verify:local']);
 });
 
 test('backend changes execute Docker backend tests', () => {
@@ -46,14 +47,14 @@ test('reviewed backend mapping provides an executable Maven selector and explana
   assert.ok(plan.tasks[0].args[3].includes('PlatformApiSmokeTest'));
 });
 
-test('dependency branch retains a backend full-suite explanation', () => {
+test('dependency changes with backend edits retain backend coverage in the full gate', () => {
   const plan = createValidationPlan([
     'package.json',
     'backend/src/main/java/com/zdm/platform/inventory/SlabLogChanges.java',
   ]);
   assert.equal(plan.backendPlan.mode, 'full');
-  assert.deepEqual(plan.tasks.at(-1).args, ['run', 'backend:test']);
-  assert.ok(plan.tasks.at(-1).reason);
+  assert.deepEqual(plan.tasks[0].args, ['run', 'verify:local']);
+  assert.ok(plan.backendPlan.reason);
 });
 
 test('Node script tests use the Node suite instead of being sent to Vitest', () => {
@@ -62,13 +63,59 @@ test('Node script tests use the Node suite instead of being sent to Vitest', () 
   assert.ok(!plan.tasks.some((entry) => entry.args.includes('test:unit')));
 });
 
-test('source and test edits retain both explicit and related test consumers', () => {
+test('source and test edits select the complete consumer union in one run', () => {
   const plan = createValidationPlan(['src/example.ts', 'src/example.test.ts']);
-  assert.ok(names(plan).includes('unit tests'));
-  assert.ok(names(plan).includes('related unit tests'));
+  assert.ok(!names(plan).includes('unit tests'));
+  assert.deepEqual(plan.tasks.find((entry) => entry.args.includes('test:related')).args, [
+    'run',
+    'test:related',
+    '--',
+    'src/example.ts',
+    'src/example.test.ts',
+  ]);
 });
 
 test('deleted frontend styles do not broaden the unit-test selection', () => {
   const plan = createValidationPlan(['src/removed.css'], () => false);
   assert.deepEqual(names(plan), ['source guards']);
+});
+
+test('a changed unit test runs once rather than again as its own related source', () => {
+  const file = 'src/services/recordSorting.test.ts';
+  const plan = createValidationPlan([file]);
+  assert.equal(plan.tasks.filter((entry) => entry.args.includes('test:unit')).length, 1);
+  assert.equal(
+    plan.tasks.some((entry) => entry.args.includes('test:related')),
+    false,
+  );
+  const mixed = createValidationPlan(['src/services/recordSorting.ts', file]);
+  assert.deepEqual(mixed.tasks.find((entry) => entry.args.includes('test:related')).args, [
+    'run',
+    'test:related',
+    '--',
+    'src/services/recordSorting.ts',
+    file,
+  ]);
+});
+
+test('shared configuration cannot silently produce an empty or partial local plan', () => {
+  for (const file of [
+    'vite.config.js',
+    'vitest.config.ts',
+    'playwright.config.ts',
+    'docker-compose.yml',
+    '.github/workflows/quality.yml',
+    '.codex/zdm-project-workflow.yaml',
+    'unknown-execution-input.conf',
+  ]) {
+    const plan = createValidationPlan([file]);
+    assert.deepEqual(
+      plan.tasks.map((entry) => entry.args),
+      [['run', 'verify:local']],
+      file,
+    );
+    assert.equal(plan.backendPlan.mode, 'full');
+    assert.equal(plan.browserPlan.mode, 'none', 'The full gate owns browser checks without a duplicate follow-up');
+  }
+  assert.deepEqual(createValidationPlan(['docs/readme.md']).tasks, []);
 });

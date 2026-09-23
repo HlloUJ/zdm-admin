@@ -254,3 +254,22 @@ test('candidate mutations and unsuccessful checks cannot report success', async 
     assert.ok(!messages.includes('Changed-file checks passed.'));
   }
 });
+
+test('shared configuration delegates failure evidence to the full verifier domains', async (t) => {
+  const f = fixture(t);
+  f.write('docker-compose.yml', 'services: {}\n');
+  const tasks = [];
+  const code = await main(['docker-compose.yml'], {
+    root: f.root,
+    report: () => {},
+    run: async (task) => {
+      tasks.push(task);
+      return { exitCode: 0 };
+    },
+  });
+  assert.equal(code, 0);
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0].kind, 'orchestration');
+  assert.equal(tasks[0].reuse, false);
+  assert.deepEqual(tasks[0].args, ['run', 'verify:local']);
+});

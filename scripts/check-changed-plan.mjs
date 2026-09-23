@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createBackendTestPlan } from './backend-test-plan.mjs';
 import { createScriptTestPlan } from './script-test-plan.mjs';
 import { createBrowserTestPlan } from './affected-test-inputs.mjs';
+import { classifyChangedFiles } from './verification-impact.mjs';
 
 const SCRIPT_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.vue'];
 const TYPECHECK_EXTENSIONS = ['.ts', '.tsx', '.vue'];
@@ -27,7 +28,6 @@ export function normalizeFiles(root, files) {
 
 export function createValidationPlan(files, fileExists = () => true, { root } = {}) {
   const existingFiles = files.filter(fileExists);
-  const dependencyFiles = files.filter((file) => file === 'package.json' || file === 'package-lock.json');
   const backendPlan = createBackendTestPlan(files, fileExists, { root });
   const backendTask = {
     name: 'backend tests',
@@ -41,16 +41,19 @@ export function createValidationPlan(files, fileExists = () => true, { root } = 
   const browserPlan = createBrowserTestPlan(files, root, fileExists);
   const e2eFiles = browserPlan.tests;
 
-  if (dependencyFiles.length > 0) {
+  // Business sources and script consumers have dedicated affected planners. Shared execution
+  // configuration and otherwise unknown inputs use the same conservative policy as delivery/CI.
+  const unscopedInputs = files.filter(
+    (file) =>
+      !/^(?:src|tests\/e2e|public|backend)\//.test(file) &&
+      !(file.startsWith('scripts/') && hasExtension(file, SCRIPT_EXTENSIONS)),
+  );
+  if (unscopedInputs.some((file) => classifyChangedFiles([file]).full)) {
     return {
-      tasks: [
-        { name: 'frontend quality', args: ['run', 'quality'] },
-        { name: 'frontend build', args: ['run', 'build:app'] },
-        ...(backendPlan.mode !== 'none' ? [backendTask] : []),
-      ],
-      e2eFiles,
-      browserPlan,
-      backendPlan,
+      tasks: [{ name: 'shared configuration checks', args: ['run', 'verify:local'], kind: 'orchestration' }],
+      e2eFiles: [],
+      browserPlan: { mode: 'none', tests: [], reason: 'Browser coverage is included in the full local gate.' },
+      backendPlan: { mode: 'full', files: unscopedInputs, tests: [], reason: 'Shared or unknown execution input.' },
     };
   }
 
@@ -74,7 +77,7 @@ export function createValidationPlan(files, fileExists = () => true, { root } = 
     (file) => file.startsWith('src/') && hasExtension(file, TYPECHECK_EXTENSIONS) && !fileExists(file),
   );
   const relatedSourceFiles = existingFiles.filter(
-    (file) => file.startsWith('src/') && !file.includes('/__tests__/') && hasExtension(file, TYPECHECK_EXTENSIONS),
+    (file) => file.startsWith('src/') && !unitTestFiles.includes(file) && hasExtension(file, TYPECHECK_EXTENSIONS),
   );
   const tasks = [];
   if (files.some((file) => file.startsWith('src/')))
@@ -104,13 +107,15 @@ export function createValidationPlan(files, fileExists = () => true, { root } = 
       reason: 'Deleted or renamed frontend input cannot prove its former unit-test consumers; run the full unit suite.',
       args: ['run', 'test:unit'],
     });
-  } else {
-    if (unitTestFiles.length > 0) {
-      tasks.push({ name: 'unit tests', args: ['run', 'test:unit', '--', ...unitTestFiles] });
-    }
-    if (relatedSourceFiles.length > 0) {
-      tasks.push({ name: 'related unit tests', args: ['run', 'test:related', '--', ...relatedSourceFiles] });
-    }
+  } else if (relatedSourceFiles.length > 0) {
+    // Vitest selects a changed test itself as well as consumers of changed sources.
+    // Query their union once so editing source + its test does not execute that test twice.
+    tasks.push({
+      name: 'related unit tests',
+      args: ['run', 'test:related', '--', ...new Set([...relatedSourceFiles, ...unitTestFiles])],
+    });
+  } else if (unitTestFiles.length > 0) {
+    tasks.push({ name: 'unit tests', args: ['run', 'test:unit', '--', ...unitTestFiles] });
   }
   if (backendPlan.mode !== 'none') tasks.push(backendTask);
 

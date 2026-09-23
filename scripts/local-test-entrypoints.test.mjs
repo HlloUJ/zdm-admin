@@ -176,3 +176,19 @@ test('missing or duplicated selected Playwright cases and incomplete or stale re
     assert.throws(() => validatePlaywrightTestReport(broken, report.runId));
   }
 });
+
+test('related selection unions changed source consumers and explicit changed tests without duplicate execution', (t) => {
+  const f = relatedFixture(t);
+  writeFileSync(path.join(f.root, 'independent.test.mjs'), "import {test} from 'vitest'; test('independent',()=>{});");
+  const result = f.execute('./run-frontend-tests.mjs', [
+    'related',
+    'source.mjs',
+    'example.test.mjs',
+    'independent.test.mjs',
+  ]);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const report = JSON.parse(readFileSync(path.join(f.env.CI_EVIDENCE_DIR, 'related-results.json'), 'utf8'));
+  assert.equal(report.tests.length, 2);
+  assert.equal(new Set(report.tests.map((item) => item.id)).size, 2);
+  assert.equal(report.files.length, 2);
+});
