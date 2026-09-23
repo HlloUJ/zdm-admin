@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { captureIdentity, captureArtifacts, captureSource } from './verification-evidence.mjs';
+import { captureIdentity, captureArtifacts, captureSource, verificationAttempts } from './verification-evidence.mjs';
 import { runVerificationTask } from './verification-runner.mjs';
 import { collectDeliveryChanges, createVerificationPlan, executeVerification } from './verify.mjs';
 
@@ -43,6 +43,12 @@ function record(result) {
   return JSON.parse(readFileSync(result.evidence, 'utf8'));
 }
 
+const failFirstScript = `const fs = require('node:fs'); const file = '.task-verification/fixture-attempt-count';
+const count = fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8')) : 0;
+fs.writeFileSync(file, String(count + 1)); process.exit(count === 0 ? 1 : 0);`;
+const attemptsDirectory = (result) =>
+  path.join(path.dirname(result.evidence), 'attempts', path.basename(result.evidence, '.json'));
+
 test('matching evidence reuses success, but force and CI always execute', async (t) => {
   const { root } = fixture(t);
   const step = task(root);
@@ -52,6 +58,328 @@ test('matching evidence reuses success, but force and CI always execute', async 
   assert.equal((await runVerificationTask(step, silent)).reused, true);
   assert.equal((await runVerificationTask(step, { ...silent, force: true })).reused, false);
   assert.equal((await runVerificationTask({ ...step, env: { ...step.env, CI: 'true' } }, silent)).reused, false);
+});
+
+test('unchanged inputs cannot turn an initial failure into success or reuse, even with force or a same-content commit', async (t) => {
+  const { root, git } = fixture(t);
+  const step = task(root, failFirstScript);
+  const first = await runVerificationTask(step, silent);
+  assert.equal(first.exitCode, 1);
+  const original = record(first);
+  const directory = attemptsDirectory(first);
+  const firstFile = path.join(directory, `${original.attemptId}.json`);
+  const firstBytes = readFileSync(firstFile, 'utf8');
+  git('commit', '--allow-empty', '-m', 'no input repair', '--no-verify');
+  for (const options of [silent, { ...silent, force: true }]) {
+    const result = await runVerificationTask(step, options);
+    const attempt = record(result);
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.reused, false);
+    assert.equal(attempt.commandExitCode, options.force ? 0 : null);
+    assert.equal(attempt.status, options.force ? 'failed' : 'blocked');
+    assert.equal(attempt.executed, !!options.force);
+    assert.equal(attempt.fingerprint, original.fingerprint);
+    assert.equal(attempt.firstFailure.attemptId, original.attemptId);
+    assert.equal(attempt.retryBasis, 'same-inputs');
+    assert.match(attempt.reason, /already failed for these inputs/);
+    assert.equal(
+      readFileSync(path.join(root, '.task-verification/fixture-attempt-count'), 'utf8'),
+      options.force ? '2' : '1',
+    );
+  }
+  // Removing the mutable latest-result index cannot erase immutable failure history.
+  rmSync(first.evidence);
+  const again = await runVerificationTask(step, silent);
+  assert.equal(again.exitCode, 1);
+  assert.equal(record(again).firstFailure.attemptId, original.attemptId);
+  assert.equal(readFileSync(firstFile, 'utf8'), firstBytes);
+  assert.equal(verificationAttempts(directory).length, 2);
+  assert.equal(readFileSync(path.join(root, '.task-verification/fixture-attempt-count'), 'utf8'), '2');
+});
+
+test('a source repair starts a new input candidate and keeps its original failure association', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root, failFirstScript);
+  const first = await runVerificationTask(step, silent);
+  const failed = record(first);
+  assert.equal((await runVerificationTask(step, silent)).exitCode, 1);
+  writeFileSync(path.join(root, 'source.js'), 'export const value = 2;\n');
+  const repaired = await runVerificationTask(step, silent);
+  const passed = record(repaired);
+  assert.equal(repaired.exitCode, 0);
+  assert.equal(passed.status, 'passed');
+  assert.notEqual(passed.fingerprint, failed.fingerprint);
+  assert.equal(passed.firstFailure.attemptId, failed.attemptId);
+  assert.equal(passed.retryBasis, 'inputs-changed');
+  assert.equal((await runVerificationTask(step, silent)).reused, true);
+  assert.equal(verificationAttempts(attemptsDirectory(first)).length, 2);
+});
+
+test('a proven environment repair creates a new input candidate without relaxing retry policy', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root, "process.exit(process.env.FIXTURE_ENVIRONMENT_READY === 'true' ? 0 : 1)");
+  const first = await runVerificationTask(step, silent);
+  const failure = record(first);
+  assert.equal(first.exitCode, 1);
+  const repaired = await runVerificationTask(
+    { ...step, env: { ...step.env, FIXTURE_ENVIRONMENT_READY: 'true' } },
+    silent,
+  );
+  assert.equal(repaired.exitCode, 0);
+  assert.notEqual(record(repaired).fingerprint, failure.fingerprint);
+  assert.equal(record(repaired).firstFailure.attemptId, failure.attemptId);
+  assert.equal(record(repaired).retryBasis, 'inputs-changed');
+});
+
+test('an incomplete immutable attempt blocks by default while explicit diagnostics still cannot pass', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root);
+  const first = await runVerificationTask(step, silent);
+  const unfinished = {
+    ...record(first),
+    attemptId: randomUUID(),
+    status: 'running',
+    exitCode: null,
+    completedAt: null,
+  };
+  writeFileSync(
+    path.join(attemptsDirectory(first), `${unfinished.attemptId}.started.json`),
+    JSON.stringify(unfinished),
+  );
+  const result = await runVerificationTask(step, silent);
+  assert.equal(result.reused, false);
+  assert.equal(result.exitCode, 1);
+  assert.equal(record(result).commandExitCode, null);
+  assert.equal(result.executed, false);
+  assert.equal(record(result).firstFailure.attemptId, unfinished.attemptId);
+  const diagnostic = await runVerificationTask(step, { ...silent, force: true });
+  assert.equal(diagnostic.exitCode, 1);
+  assert.equal(record(diagnostic).commandExitCode, 0);
+  assert.equal(record(diagnostic).firstFailure.attemptId, unfinished.attemptId);
+});
+
+test('runtime health checks recheck recovered service state without reusing automated-test evidence', async (t) => {
+  const { root } = fixture(t);
+  const step = {
+    ...task(root, "process.exit(require('node:fs').existsSync('.task-verification/fixture-service-healthy') ? 0 : 1)"),
+    kind: 'runtime',
+  };
+  const first = await runVerificationTask(step, silent);
+  const failed = record(first);
+  assert.equal(first.exitCode, 1);
+  writeFileSync(path.join(root, '.task-verification/fixture-service-healthy'), 'healthy');
+  const restored = await runVerificationTask(step, silent);
+  const passed = record(restored);
+  assert.equal(restored.exitCode, 0);
+  assert.equal(passed.fingerprint, failed.fingerprint, 'Runtime recovery does not require a source change');
+  assert.equal(passed.status, 'not-reusable');
+  assert.equal(passed.retryBasis, 'runtime-recheck');
+  assert.equal(passed.firstFailure.attemptId, failed.attemptId);
+  assert.equal((await runVerificationTask(step, silent)).reused, false);
+});
+
+test('unavailable identity cannot masquerade as repaired inputs after a known failure', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root, failFirstScript);
+  const first = await runVerificationTask(step, silent);
+  const failure = record(first);
+  const result = await runVerificationTask(step, {
+    ...silent,
+    captureIdentity() {
+      throw new Error('temporary probe failure');
+    },
+  });
+  assert.equal(result.exitCode, 1);
+  assert.equal(record(result).commandExitCode, 0);
+  assert.equal(record(result).firstFailure.attemptId, failure.attemptId);
+  assert.equal(record(result).inputProofComplete, false);
+});
+
+test('a scoped backend failure remains known when its next identity probe falls back to the full candidate', async (t) => {
+  const { root } = fixture(t);
+  const step = { ...task(root, failFirstScript), kind: 'backend' };
+  const source = captureSource(root);
+  const first = await runVerificationTask(step, {
+    ...silent,
+    captureArtifacts: () => null,
+    captureIdentity: () => ({
+      identity: {
+        source: { digest: 'backend-only-inputs', baseline: source.baseline, mergeBase: source.mergeBase },
+        artifacts: [],
+      },
+      source: { ...source, digest: 'backend-only-inputs' },
+      fingerprint: 'scoped-backend-fingerprint',
+      reusable: false,
+      inputProofComplete: true,
+    }),
+  });
+  const failure = record(first);
+  assert.equal(first.exitCode, 1);
+  assert.notEqual(failure.identity.source.digest, failure.candidate.digest);
+  const result = await runVerificationTask(step, {
+    ...silent,
+    captureArtifacts: () => null,
+    captureIdentity() {
+      throw new Error('backend identity probe unavailable');
+    },
+  });
+  assert.equal(result.exitCode, 1);
+  assert.equal(record(result).commandExitCode, 0, 'The command must still execute for diagnosis');
+  assert.deepEqual(record(result).candidate, failure.candidate);
+  assert.equal(record(result).firstFailure.attemptId, failure.attemptId);
+  assert.equal(record(result).inputProofComplete, false);
+});
+
+test('noncached test and browser checks accept a real installed dependency repair without source changes', async (t) => {
+  for (const kind of ['node', 'browser']) {
+    const { root } = fixture(t);
+    const dependency = path.join(root, 'node_modules/fixture-dependency/index.js');
+    mkdirSync(path.dirname(dependency), { recursive: true });
+    writeFileSync(dependency, 'module.exports = false;\n');
+    const step = { ...task(root, "process.exit(require('fixture-dependency') ? 0 : 1)"), kind, reuse: false };
+    if (kind === 'node') step.args.push('test:engineering');
+    const first = await runVerificationTask(step, silent);
+    const failure = record(first);
+    assert.equal(first.exitCode, 1);
+    assert.equal(failure.inputProofComplete, true);
+    assert.ok(failure.identity.environment.dependencies);
+    writeFileSync(dependency, 'module.exports = true;\n');
+    const repaired = await runVerificationTask(step, silent);
+    const passed = record(repaired);
+    assert.equal(repaired.exitCode, 0);
+    assert.deepEqual(passed.candidate, failure.candidate);
+    assert.notEqual(passed.identity.environment.dependencies, failure.identity.environment.dependencies);
+    assert.notEqual(passed.fingerprint, failure.fingerprint);
+    assert.equal(passed.firstFailure.attemptId, failure.attemptId);
+    assert.equal(passed.status, 'not-reusable');
+    assert.equal(passed.retryBasis, 'inputs-changed');
+  }
+});
+
+test('cheap non-test checks rerun after dependency repair without scanning dependencies or claiming reusable test evidence', async (t) => {
+  for (const script of ['typecheck:cached', 'lint:changed', 'build:app']) {
+    const { root } = fixture(t);
+    const dependency = path.join(root, 'node_modules/fixture-tool/index.js');
+    mkdirSync(path.dirname(dependency), { recursive: true });
+    writeFileSync(dependency, 'module.exports = false;\n');
+    const step = { ...task(root, "process.exit(require('fixture-tool') ? 0 : 1)"), reuse: false };
+    step.args.push(script);
+    const first = await runVerificationTask(step, silent);
+    const failed = record(first);
+    assert.equal(first.exitCode, 1);
+    assert.equal(failed.failureHistoryRequired, false);
+    assert.equal(failed.identity.environment.dependencies, undefined);
+    writeFileSync(dependency, 'module.exports = true;\n');
+    const repaired = await runVerificationTask(step, silent);
+    const passed = record(repaired);
+    assert.equal(repaired.exitCode, 0);
+    assert.equal(passed.fingerprint, failed.fingerprint);
+    assert.equal(passed.firstFailure.attemptId, failed.attemptId);
+    assert.equal(passed.status, 'not-reusable');
+    assert.equal(passed.executed, true);
+    assert.equal(passed.retryBasis, 'fresh-check');
+    assert.equal((await runVerificationTask(step, silent)).reused, false);
+  }
+});
+
+test('pure orchestration reruns and delegates strict failure identity to its actual child test gate', async (t) => {
+  const { root } = fixture(t);
+  mkdirSync(path.join(root, '.task-verification'));
+  const state = path.join(root, '.task-verification/fixture-service-state');
+  writeFileSync(state, 'unhealthy');
+  const runner = new URL('./verification-runner.mjs', import.meta.url).href;
+  const code = `(async()=>{
+    const {runVerificationTask}=await import(${JSON.stringify(runner)});
+    const ready=require('node:fs').readFileSync('.task-verification/fixture-service-state','utf8');
+    const result=await runVerificationTask({root:process.cwd(),name:'inner test gate',command:process.execPath,
+      args:['-e',"process.exit(process.env.FIXTURE_SERVICE_READY === 'healthy' ? 0 : 1)"],
+      env:{...process.env,FIXTURE_SERVICE_READY:ready}}, {report(){}});
+    process.exitCode=result.exitCode;
+  })();`;
+  const step = { ...task(root, code), kind: 'orchestration', reuse: false };
+  step.args.push('verify:local');
+  const first = await runVerificationTask(step, silent);
+  const failed = record(first);
+  assert.equal(first.exitCode, 1);
+  assert.equal(failed.failureHistoryRequired, false);
+  assert.equal(failed.identity.environment.dependencies, undefined);
+  writeFileSync(state, 'healthy');
+  const restored = await runVerificationTask(step, silent);
+  const passed = record(restored);
+  assert.equal(restored.exitCode, 0);
+  assert.equal(
+    passed.fingerprint,
+    failed.fingerprint,
+    'External child environment changes do not alter orchestration identity',
+  );
+  assert.equal(passed.status, 'not-reusable');
+  assert.equal(passed.executed, true);
+  assert.equal(passed.retryBasis, 'fresh-check');
+  assert.equal(passed.firstFailure.attemptId, failed.attemptId);
+});
+
+test('real empty related discovery remains not-applicable in verification records and summaries', async (t) => {
+  const { root, git } = fixture(t);
+  writeFileSync(path.join(root, '.gitignore'), readFileSync(path.join(root, '.gitignore'), 'utf8') + 'node_modules\n');
+  symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), path.join(root, 'node_modules'), 'dir');
+  writeFileSync(
+    path.join(root, 'vitest.config.mjs'),
+    "export default {test:{environment:'node',include:['*.test.mjs'],maxWorkers:1}};",
+  );
+  writeFileSync(path.join(root, 'unrelated.test.mjs'), "import {test} from 'vitest'; test('unrelated',()=>{});");
+  git('add', '.');
+  git('commit', '-m', 'related fixture', '--no-verify');
+  const runner = fileURLToPath(new URL('./run-frontend-tests.mjs', import.meta.url));
+  const code = `const {spawnSync}=require('node:child_process'); process.exitCode=spawnSync(process.execPath, [${JSON.stringify(runner)}, 'related', 'source.js'], {stdio:'inherit',env:process.env}).status;`;
+  const step = task(root, code);
+  step.args.push('test:related');
+  const messages = [];
+  const result = await runVerificationTask(step, {
+    report: (message) => messages.push(message),
+    captureIdentity: () => ({
+      identity: { source: 'fixture' },
+      source: { mutationStamp: 'stable' },
+      fingerprint: 'fixture',
+      reusable: false,
+    }),
+    captureArtifacts: () => [],
+  });
+  assert.equal(result.exitCode, 0, messages.join('\n'));
+  assert.equal(result.status, 'not-applicable');
+  assert.equal(record(result).status, 'not-applicable');
+  assert.equal(record(result).tests.status, 'not-applicable');
+  assert.equal(record(result).tests.tests, 0);
+  assert.ok(messages.some((message) => message.startsWith('[not-applicable]')));
+  assert.equal(
+    messages.some((message) => message.startsWith('[passed]')),
+    false,
+  );
+});
+
+test('a related command that omits actual discovery evidence cannot pass the outer executor', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root);
+  step.args.push('test:related');
+  const result = await runVerificationTask(step, silent);
+  assert.equal(result.exitCode, 1);
+  assert.equal(record(result).status, 'failed');
+});
+
+test('the first NUL-delimited Git path retains leading spaces and newlines in candidate evidence', (t) => {
+  for (const name of [' leading.js', '\nleading.js']) {
+    const { root, git } = fixture(t);
+    writeFileSync(path.join(root, name), 'export const value = 1;\n');
+    git('add', '--', name);
+    git('commit', '-m', 'whitespace filename fixture', '--no-verify');
+    const files = spawnSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' });
+    assert.equal(files.status, 0, files.stderr);
+    assert.equal(files.stdout.split('\0')[0], name, 'The regression requires the whitespace path to be first');
+    const before = captureSource(root);
+    writeFileSync(path.join(root, name), 'export const value = 2;\n');
+    const after = captureSource(root);
+    assert.notEqual(after.digest, before.digest, 'Changing the first whitespace path must invalidate evidence');
+    assert.notEqual(after.mutationStamp, before.mutationStamp);
+  }
 });
 
 test('source content, deletion, untracked files, lockfile, installed dependency, and ignored env invalidate', async (t) => {

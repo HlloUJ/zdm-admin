@@ -60,7 +60,7 @@ npm run test:e2e:chrome
 npm run integration:dev
 ```
 
-该命令始终从 `codex/integration-current` 固定 Worktree 启动已经正式交付的组合版本，不在其中直接开发。集成前端固定使用 `5173`，集成后端使用 `8080`。
+该命令始终从 `codex/integration-current` 固定 Worktree 启动已正式汇入的任务组合，其中可能包含尚未完成主线交付的任务，不在其中直接开发。集成前端固定使用 `5173`，集成后端使用 `8080`。
 
 查看服务状态和手机可访问的局域网地址：
 
@@ -99,15 +99,29 @@ npm run dev:task
 - `npm run dev:task:foreground` 仅用于调试启动器；日常验收不使用。
 - `npm run dev:task:stop` 停止当前任务前后端并让 `5175` 回退到集成环境，不删除共享数据库或备份；再次运行 `npm run dev:task` 即可切换到新任务。
 
-Flyway 迁移会自动检查其他共享数据库任务后端、暂停当前任务与集成后端、备份数据库并锁定任务切换；存在其他任务写入者时停止并报告，不会批量停止。非迁移但会批量删除、清空或破坏性导入数据时运行 `npm run dev:task -- --database-risk`。任务正式提交、推送并同步集成分支后运行：
-
-```bash
-npm run dev:task:handoff
-```
-
-该命令只有在集成分支已经包含任务提交且集成后端恢复健康时才释放数据库锁；备份仍保留，等待单独的清理确认。
+Flyway 迁移会自动检查其他共享数据库任务后端、暂停当前任务与集成后端、备份数据库并锁定任务切换；存在其他任务写入者时停止并报告，不会批量停止。非迁移但会批量删除、清空或破坏性导入数据时运行 `npm run dev:task -- --database-risk`。获正式交付授权后，按[项目适配](../.codex/zdm-project-workflow.yaml)和[交付启动器选择](#交付启动器与首次升级)执行集成同步与交接。同步已完成交接时只复核实际版本、健康、路由和锁；存在缺口时沿同一已选兼容启动器完成交接。只有确认集成包含任务提交且运行环境核验通过，才释放所属数据库锁；备份仍保留，等待单独的清理确认。
 
 集成数据库可能包含尚未进入 `main` 的迁移。启动器会把集成分支迁移和当前任务迁移合成临时只读目录供任务后端完整校验；同版本不同文件、同文件内容不一致、失败迁移或 checksum 异常都会停止启动，不会通过忽略规则绕过。
+
+### 交付启动器与首次升级
+
+正式交付按 `.codex/zdm-project-workflow.yaml` 的入口执行。日常同步和独立交接由 `scripts/delivery-launcher.mjs` 选择同仓库已发布的 `main` 启动器；不从旧任务目录挑选旧脚本，也不因为集成目录已有未发布改动就改用未发布实现。`main` 必须干净、与 `origin/main` 跟踪引用一致且具备所需启动器协议，缺少能力时明确停止。
+
+从固定集成 Worktree 可先查看入口计划：
+
+```bash
+node scripts/delivery-launcher.mjs sync --task codex/<batch> --plan
+```
+
+计划只读本地 Git，不 fetch、不合并、不推送、不启动服务；输出启动器目录、准确提交、目标任务和 `local-tracking-reference-only` 标记，不把跟踪引用称为已实时核验远程。实际同步复用原有一次 fetch，随后在任何合并前复核所选实现和主线；发生变化必须停止并重新核对。
+
+任务自身修改启动器时，默认入口会阻断使用旧实现完成自升级。只有已审查、通过适用验证且已获正式交付授权的基建候选，才使用适配中的 `delivery.reviewed_launcher_candidate`。其入口在任务 Worktree，必须传入已经审查的完整 40 位提交 SHA；选择器还要求工作区干净、候选与同名远程跟踪分支一致并包含当前主线。该参数记录选择依据，不授予提交、推送或合并权限，也不替代验证。首次发布选择器、已发布版本尚无该文件时同样使用这一明确候选入口，不能先调用旧集成同步脚本。
+
+```bash
+node scripts/delivery-launcher.mjs sync --task codex/<batch> --reviewed-candidate <已审查完整SHA> --plan
+```
+
+核对计划后在已授权交付中去掉 `--plan`；同步、交接、`ensure-backend` 始终沿同一选定启动器执行。普通业务任务不需要候选参数或新增审批。已安装常驻服务仍是脚本副本：交付中核对副本内容与配置路径，源文件变化才按现有安装流程升级；任务健康检查不等于证明正在运行候选启动器。停止旧任务并完成交接后，后续进程从已更新的固定入口加载脚本。
 
 ### 分开启动
 
@@ -139,6 +153,8 @@ npm run dev
 
 ## 常用验收命令
 
+验证范围按 [项目规则](../AGENTS.md#验证与工具) 选择；以下是可单独调用的检查入口，不要求每次全部执行。
+
 ```bash
 npm run quality
 npm run build:app
@@ -153,7 +169,7 @@ npm run verify:delivery -- --list
 npm run verify:delivery
 ```
 
-需要本地完整回归或 CI 基础设施不可用时：
+按项目规则需要本地完整回归、验证器排障，或 CI 缺失、不可靠、覆盖不明时：
 
 ```bash
 npm run verify:local
@@ -185,7 +201,7 @@ npm run backend:quality
 - 普通集成后端代码调整可使用 `backend:restart`；任务中的后端或 Flyway 变化统一从任务 Worktree 运行 `dev:task`，不得绕过数据库备份与任务代码路由。
 - `backend:ensure` 会校验后端容器实际挂载的 Worktree；目录不匹配时可能重建后端，按集成启动流程调用，不作为 Mock E2E 的隐式前置步骤。
 - 日常后端改动使用 `backend:test`。
-- 发布、合并或高风险回归使用 `backend:quality`。
+- 本地需要完整后端质量验证时使用 `backend:quality`，适用于高风险回归或补足 CI 缺失、不可靠、覆盖不明的后端门禁。普通正式交付按 [项目规则](../AGENTS.md#验证与工具) 执行受影响本地检查，由可靠 CI 承担最终候选的完整适用后端门禁。
 - 本机已安装 JDK 21、Maven 时，可显式使用 `backend:test:local` 或 `backend:quality:local`。
 - Agent 和项目脚本不得直接调用本机 `mvn`，统一通过上述 npm 命令执行。
 

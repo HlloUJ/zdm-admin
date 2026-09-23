@@ -6,8 +6,9 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyChangedFiles } from './verification-impact.mjs';
-import { engineeringDomainProof, scriptTestFiles } from './script-test-plan.mjs';
+import { engineeringDomainProof, scriptTestFiles, SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { backendReportState, validateBackendReports } from './backend-test-evidence.mjs';
+import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const saveJson = (file, value) => {
@@ -28,6 +29,32 @@ export function revisionIdentity(event, candidateSha, treeSha, env = process.env
     runnerOS: env.RUNNER_OS ?? process.platform,
     nodeVersion: process.version,
   };
+}
+
+export function requireFirstAttempt(identity) {
+  if (identity.workflowRunId)
+    assert.equal(
+      identity.attempt,
+      '1',
+      'Workflow reruns cannot grant success; preserve the failed run, fix its cause and validate a new candidate on its first attempt',
+    );
+}
+
+export function verifyFrontendUnitEvidence(metadata) {
+  for (const [kind, name, command] of [
+    ['unit', 'frontend-unit', 'test:unit'],
+    ['source-guards', 'frontend-source-guards', 'test:source-guards'],
+  ]) {
+    const phases = metadata.phases.filter((phase) => phase.name === name);
+    assert.equal(phases.length, 1, `Missing or repeated ${name} phase`);
+    const phase = phases[0];
+    assert.deepEqual(phase.command, ['npm', 'run', command], `Unexpected ${name} command`);
+    assert.equal(phase.exitCode, 0, `${name} did not pass`);
+    const report = metadata.frontendResults?.[kind];
+    validateFrontendTestReport(report, { kind, runId: phase.runId });
+    if (kind === 'source-guards')
+      assert.deepEqual(report.files, SOURCE_GUARD_TESTS, 'Incomplete source guard inventory');
+  }
 }
 
 export function testIdentities(report, executed = false) {
@@ -65,6 +92,7 @@ export function verifyFrontendEvidence(needs, groups) {
   const first = groups[0].metadata;
   for (const [index, group] of groups.entries()) {
     const metadata = group.metadata;
+    requireFirstAttempt(metadata);
     assert.equal(metadata.status, 'success', `Artifact ${index} did not finish successfully`);
     for (const field of ['sourceHeadSha', 'baseSha', 'candidateSha', 'treeSha', 'workflowRunId', 'attempt']) {
       assert.equal(metadata[field], first[field], `Evidence has a different ${field}`);
@@ -82,6 +110,7 @@ export function verifyFrontendEvidence(needs, groups) {
         `Missing phase ${name}`,
       );
   }
+  verifyFrontendUnitEvidence(groups[0].metadata);
   const expected = testIdentities(groups[0].report);
   const actual = groups
     .slice(1)
@@ -153,6 +182,7 @@ export function changeScope(event, identity, git = gitRaw, engineeringProof = en
 }
 
 export function verifyScope(scope, identity) {
+  requireFirstAttempt(identity);
   assert.equal(scope.schemaVersion, 1, 'Unknown classification schema');
   const engineeringProof = engineeringDomainProof(process.cwd());
   assert.deepEqual(scope.engineeringProof, engineeringProof, 'Engineering input proof differs from current candidate');
@@ -236,6 +266,7 @@ function main(args) {
   const directory = process.env.CI_EVIDENCE_DIR ?? 'coverage/ci-evidence';
   if (mode === 'scope') {
     const identity = loadMetadata(directory);
+    requireFirstAttempt(identity);
     const event = process.env.GITHUB_EVENT_PATH ? readJson(process.env.GITHUB_EVENT_PATH) : {};
     const scope = changeScope(event, identity);
     saveJson(path.join(directory, 'scope.json'), scope);
@@ -304,10 +335,13 @@ function main(args) {
   const backendRoot = name === 'backend-quality' ? gitValue(['rev-parse', '--show-toplevel']) : null;
   const previousReports = backendRoot ? backendReportState(backendRoot) : null;
   if (name === 'engineering-tests') metadata.engineeringTests = scriptTestFiles(process.cwd(), 'engineering');
-  const runId = name === 'engineering-tests' ? randomUUID() : null;
+  const frontendKind = { 'frontend-unit': 'unit', 'frontend-source-guards': 'source-guards' }[name];
+  const runId = name === 'engineering-tests' || frontendKind ? randomUUID() : null;
   const result = spawnSync(command, childArgs, {
     stdio: 'inherit',
-    env: runId ? { ...process.env, CI_EVIDENCE_DIR: directory, ENGINEERING_RUN_ID: runId } : process.env,
+    env: runId
+      ? { ...process.env, CI_EVIDENCE_DIR: directory, ENGINEERING_RUN_ID: runId, FRONTEND_TEST_RUN_ID: runId }
+      : process.env,
   });
   let exitCode = result.status ?? 1;
   let reportError = null;
@@ -323,7 +357,7 @@ function main(args) {
       console.error(reportError);
     }
   }
-  if (runId && exitCode === 0) {
+  if (name === 'engineering-tests' && exitCode === 0) {
     try {
       metadata.engineeringResults = readJson(path.join(directory, 'engineering-results.json'));
       assert.equal(metadata.engineeringResults.runId, runId, 'Engineering results are stale');
@@ -333,6 +367,18 @@ function main(args) {
         'Engineering test inventory differs',
       );
       validateNodeTestSummary(metadata.engineeringResults.summary);
+    } catch (error) {
+      exitCode = 1;
+      reportError = error.message;
+      console.error(reportError);
+    }
+  }
+  if (frontendKind && exitCode === 0) {
+    try {
+      const report = readJson(path.join(directory, `${frontendKind}-results.json`));
+      validateFrontendTestReport(report, { kind: frontendKind, runId });
+      metadata.frontendResults ??= {};
+      metadata.frontendResults[frontendKind] = report;
     } catch (error) {
       exitCode = 1;
       reportError = error.message;

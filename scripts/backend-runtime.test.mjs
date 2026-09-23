@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { ensureBackend, resolveRuntimeMigrations } from './backend-runtime.mjs';
-import { ensureIntegrationDatabase, startIntegrationBackend } from './dev-task.mjs';
+import { ensureIntegrationDatabase, ensureSharedBackend, startIntegrationBackend } from './dev-task.mjs';
 const first = { name: 'V1__base.sql', content: 'SELECT 1;' };
 const pending = { name: 'V2__paused.sql', content: 'SELECT 2;' };
 const record = {
@@ -159,4 +159,65 @@ test('integration recovery uses the launcher backend entrypoint even for an olde
     },
   });
   assert.deepEqual(events, ['same-launcher-entrypoint', 'integration-api-healthy']);
+});
+
+test('explicit recovery recreates even matching mounts after database and migration protection', async () => {
+  const events = [];
+  await ensureBackend('/tmp/integration', {
+    forceRecreate: true,
+    ensureDatabase: async () => events.push('database-ready'),
+    inspect: (_, __, args) =>
+      args[0] === 'compose'
+        ? 'backend\nmysql'
+        : args[2].includes('/workspace')
+          ? '/tmp/integration'
+          : '/tmp/current-migrations',
+    resolveRuntime: () => {
+      events.push('migrations-verified');
+      return { args: ['compose', '-f', 'protected-runtime.json'], directory: '/tmp/current-migrations' };
+    },
+    execute: (_, command, args) => {
+      assert.equal(command, 'docker');
+      events.push(args);
+    },
+    waitForHealth: async () => events.push('backend-healthy'),
+  });
+  assert.deepEqual(events, [
+    'database-ready',
+    'migrations-verified',
+    ['compose', '-f', 'protected-runtime.json', 'up', '-d', '--no-deps', '--force-recreate', 'backend'],
+    'backend-healthy',
+  ]);
+});
+
+test('runtime launch failure blocks backend health and propagates to the caller', async () => {
+  await assert.rejects(
+    ensureBackend('/tmp/integration', {
+      forceRecreate: true,
+      ensureDatabase: async () => undefined,
+      inspect: () => '',
+      resolveRuntime: () => ({ args: ['compose', '-f', 'protected-runtime.json'], directory: '/tmp/migrations' }),
+      execute: () => {
+        throw new Error('injected compose startup failure');
+      },
+      waitForHealth: () => assert.fail('health must not turn launch failure into success'),
+    }),
+    /injected compose startup failure/,
+  );
+});
+
+test('frontend shared-backend recovery uses the current protected launcher while healthy reuse stays unchanged', async () => {
+  const worktrees = [{ branch: 'codex/integration-current', path: '/old/integration' }];
+  await ensureSharedBackend(worktrees, {
+    health: async () => 200,
+    restore: () => assert.fail('Healthy backend must be reused'),
+  });
+  let recovered = null;
+  await ensureSharedBackend(worktrees, {
+    health: async () => 503,
+    restore: async (root) => {
+      recovered = root;
+    },
+  });
+  assert.equal(recovered, '/old/integration');
 });

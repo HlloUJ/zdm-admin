@@ -1,3 +1,5 @@
+import { normalizeDockerMountPath } from './integration-handoff-state.mjs';
+export { normalizeDockerMountPath } from './integration-handoff-state.mjs';
 import { spawnSync } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
@@ -130,13 +132,6 @@ function capture(root, command, args) {
   return result.status === 0 ? result.stdout.trim() : '';
 }
 
-export function normalizeDockerMountPath(mountPath) {
-  if (process.platform === 'darwin' && mountPath.startsWith('/host_mnt/')) {
-    return mountPath.slice('/host_mnt'.length);
-  }
-  return mountPath;
-}
-
 export function waitForPort(port, timeoutMs = 120_000) {
   const startedAt = Date.now();
 
@@ -166,6 +161,7 @@ export function waitForPort(port, timeoutMs = 120_000) {
 export async function ensureBackend(
   root,
   {
+    forceRecreate = false,
     ensureDatabase = ensureIntegrationDatabase,
     inspect = capture,
     execute = run,
@@ -195,13 +191,21 @@ export async function ensureBackend(
     'zdm-platform-backend',
   ]);
   if (
+    !forceRecreate &&
     services.has('backend') &&
     backendUsesCurrentWorktree &&
     path.resolve(normalizeDockerMountPath(existingMigrations || '.')) === path.resolve(runtime.directory)
   ) {
     execute(root, 'docker', [...runtime.args, 'start', 'backend']);
   } else {
-    execute(root, 'docker', [...runtime.args, 'up', '-d', '--force-recreate', 'backend']);
+    execute(root, 'docker', [
+      ...runtime.args,
+      'up',
+      '-d',
+      ...(forceRecreate ? ['--no-deps'] : []),
+      '--force-recreate',
+      'backend',
+    ]);
   }
 
   try {

@@ -97,7 +97,7 @@ export function createVerificationPlan({
         root,
         command,
         env,
-        kind: backend ? 'backend' : 'node',
+        kind: entry.kind ?? (backend ? 'backend' : 'node'),
         reuse: backend,
       });
     }
