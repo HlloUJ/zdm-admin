@@ -1,6 +1,7 @@
 package com.zdm.platform.media;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.zdm.platform.support.SpringContainerTestSupport;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
@@ -26,7 +27,7 @@ import com.zdm.platform.security.CurrentIdentity;
 
 @SpringBootTest
 @Testcontainers(disabledWithoutDocker = true)
-class MediaRetentionApiTest {
+class MediaRetentionApiTest extends SpringContainerTestSupport {
   @Container
   static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
       .withDatabaseName("media_retention_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");

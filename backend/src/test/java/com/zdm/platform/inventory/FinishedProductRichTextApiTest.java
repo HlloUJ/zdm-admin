@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.zdm.platform.support.SpringContainerTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -33,7 +34,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
-class FinishedProductRichTextApiTest {
+class FinishedProductRichTextApiTest extends SpringContainerTestSupport {
   @Container
   private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
       .withDatabaseName("zdm_finished_rich_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");

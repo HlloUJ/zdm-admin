@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.zdm.platform.support.SpringContainerTestSupport;
 import com.zdm.platform.security.TokenAuthenticationFilter;
 import java.math.BigDecimal;
 import java.util.List;
@@ -27,7 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
-class FinishedPriceSourceApiTest {
+class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
   @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
       .withDatabaseName("finished_price_source").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private JdbcTemplate jdbc;
