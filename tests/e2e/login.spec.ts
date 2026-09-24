@@ -197,13 +197,17 @@ for (const storeCount of [1, 2]) {
 
     await expect(page.locator('.top-actions .t-select')).toHaveCount(0);
     if (storeCount === 1) {
-      await expect(page.locator('.brand-subtitle')).toHaveText('杭州体验门店 · 城市合伙人');
+      await expect(page.locator('.brand-subtitle')).toContainText('杭州体验门店');
+      await expect(page.locator('.brand-subtitle .t-tag')).toHaveText('合');
       await expect(page.locator('.brand .brand-context-select')).toHaveCount(0);
     } else {
       await expect(page.locator('.brand .brand-context-select')).toBeVisible();
       await page.locator('.brand .brand-context-select').click();
       await expect(page.getByText('华东石材', { exact: true })).toHaveCount(0);
-      await expect(page.getByText('宁波体验门店 · 城市合伙人', { exact: true })).toBeVisible();
+      await expect(page.getByText('宁波体验门店', { exact: true })).toBeVisible();
+      await expect(page.locator('.t-select-option').filter({ hasText: '宁波体验门店' }).locator('.t-tag')).toHaveText(
+        '合',
+      );
     }
   });
 }
@@ -278,14 +282,19 @@ for (const platformIdentityType of ['platform_admin', 'employee']) {
       '测试大板供应商 · 大板供应商',
       '测试成品供应商 · 成品供应商',
       '测试工厂 · 工厂',
-      '测试城市合伙人门店 · 城市合伙人',
+      '测试城市合伙人门店',
     ]) {
       await page.locator('.brand-context-select').click();
       await expect(page.getByText('测试租户', { exact: true })).toHaveCount(0);
       // Switching reloads the document; arm the next load event before clicking.
       // A late waitForLoadState can accept the old document and race context teardown.
       await Promise.all([page.waitForEvent('load'), page.getByText(label, { exact: true }).click()]);
-      await expect(page.locator('.brand-context-label')).toHaveText(label);
+      if (label === '测试城市合伙人门店') {
+        await expect(page.locator('.brand-context-label')).toContainText(label);
+        await expect(page.locator('.brand-context-label .t-tag')).toHaveText('合');
+      } else {
+        await expect(page.locator('.brand-context-label')).toHaveText(label);
+      }
     }
     expect(switchedIds).toEqual([21, 24, 25, 26, 23]);
   });
