@@ -6225,7 +6225,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
       assertThat(clearLogs).extracting(row -> row.get("operation_type"))
           .containsOnly("PURGE");
       assertThat(clearLogs).extracting(row -> row.get("operation_summary"))
-          .containsOnly("彻底删除大板");
+          .containsOnly("彻底删除商品");
     } finally {
       jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id IN (?, ?)", firstSlabId, secondSlabId);
       jdbcTemplate.update("DELETE FROM slab_inventory WHERE id IN (?, ?)", firstSlabId, secondSlabId);

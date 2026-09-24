@@ -65,6 +65,7 @@ export function runScriptTests(mode, args = [], { root = process.cwd(), env = pr
     process.execPath,
     [
       '--test',
+      '--test-concurrency=2',
       '--test-reporter=spec',
       `--test-reporter=${fileURLToPath(new URL('./node-source-evidence-reporter.mjs', import.meta.url))}`,
       '--test-reporter-destination=stdout',

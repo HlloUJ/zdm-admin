@@ -529,9 +529,41 @@ test('worktree checks reject a stale branch and a frontend preview when the task
   );
   assert.throws(
     () => taskPreviewCheckExpectations({ ...input, files: ['backend/src/main/java/Service.java'] }),
-    /必须使用 full/,
+    /必须使用已登记的任务后端/,
   );
   assert.throws(() => taskPreviewCheckExpectations({ ...input, branch: '' }), /只能预览/);
+});
+
+test('worktree checks accept an explicitly registered running task backend even when the preview is frontend mode', () => {
+  const metadata = {
+    workspaceRoot: '/tmp/task',
+    branch: 'codex/task',
+    mode: 'frontend',
+    apiTarget: 'http://127.0.0.1:8083',
+  };
+  const input = {
+    root: '/tmp/task',
+    branch: 'codex/task',
+    files: ['backend/src/main/java/Service.java'],
+    metadata,
+    registeredBackendPort: 8083,
+    registeredApiTarget: metadata.apiTarget,
+  };
+  const expected = taskPreviewCheckExpectations(input);
+  assert.equal(expected.expectedMode, 'frontend');
+  assert.equal(expected.expectedApiTarget, metadata.apiTarget);
+  assert.deepEqual(
+    taskPreviewReadinessErrors({ metadata, ...expected, healthStatus: 200, healthBody: '{"status":"UP"}' }),
+    [],
+  );
+  for (const changes of [
+    { registeredBackendPort: null },
+    { registeredBackendPort: 8084 },
+    { registeredApiTarget: null },
+    { registeredApiTarget: 'http://127.0.0.1:8084' },
+  ]) {
+    assert.throws(() => taskPreviewCheckExpectations({ ...input, ...changes }), /必须使用已登记的任务后端/);
+  }
 });
 
 test('worktree checks preserve explicit full mode and bind it to the registered task backend port', () => {

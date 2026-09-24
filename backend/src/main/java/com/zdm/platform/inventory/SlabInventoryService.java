@@ -451,6 +451,9 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if ("recycle".equals(beforeStatus) && "warehouse".equals(afterStatus)) {
       return "RESTORE_RECYCLE";
     }
+    if ("soldOut".equals(afterStatus)) {
+      return "SOLD_OUT";
+    }
     return "STATUS_UPDATE";
   }
 

@@ -1,6 +1,6 @@
 import type { MessageInfoOptions } from 'tdesign-vue-next';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { SessionExpiredError } from '@/services/http';
+import { SessionExpiredError, SESSION_EXPIRED_MESSAGE } from '@/services/http';
 
 type FeedbackTheme = 'success' | 'error' | 'warning' | 'info';
 type FeedbackInput = string | MessageInfoOptions;
@@ -103,7 +103,8 @@ export function getSafeErrorMessage(error: unknown, fallback = '请稍后重试'
 
 export const adminFeedback = {
   success: (input: FeedbackInput) => showFeedback('success', input),
-  error: (input: FeedbackInput) => showFeedback('error', input),
+  error: (input: FeedbackInput) =>
+    getContent(input) === SESSION_EXPIRED_MESSAGE ? undefined : showFeedback('error', input),
   warning: (input: FeedbackInput) => showFeedback('warning', input),
   info: (input: FeedbackInput) => showFeedback('info', input),
   created: (target: string) => showFeedback('success', buildActionSuccessText('新增', target)),

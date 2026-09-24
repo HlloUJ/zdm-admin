@@ -43,9 +43,14 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
   public java.time.LocalDateTime getSourceOffShelfAt() { return sourceOffShelfAt; }
   public void setSourceOffShelfAt(java.time.LocalDateTime value) { sourceOffShelfAt=value; }
   private String sourceStatus = "warehouse";
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String sourceBlockReason;
   private Boolean operationsDeleted = false;
   public String getSourceStatus() { return sourceStatus; }
   public void setSourceStatus(String value) { sourceStatus = value; }
+  public String getSourceBlockReason() { return sourceBlockReason; }
+  public void setSourceBlockReason(String value) { sourceBlockReason = value; }
+  public String getSourceMessage() { return ProductLifecycleService.sourceBlockMessage(sourceStatus, sourceBlockReason); }
   public Boolean getOperationsDeleted() { return operationsDeleted; }
   public void setOperationsDeleted(Boolean value) { operationsDeleted = value; }
   public boolean isSourceUnavailable() { return ProductLifecycleService.unavailable(sourceStatus); }

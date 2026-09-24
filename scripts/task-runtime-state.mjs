@@ -1,8 +1,18 @@
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 
 export const runtimeDigest = (value) => createHash('sha256').update(value).digest('hex');
+
+function sameHostPath(left, right) {
+  const normalize = (value) => {
+    const hostPath =
+      process.platform === 'darwin' && value.startsWith('/host_mnt/') ? value.slice('/host_mnt'.length) : value;
+    const absolute = path.resolve(hostPath);
+    return existsSync(absolute) ? realpathSync(absolute) : absolute;
+  };
+  return normalize(left) === normalize(right);
+}
 
 export function taskBackendSourceIdentity({ root, migrationDirectory }) {
   const hash = createHash('sha256');
@@ -40,16 +50,13 @@ export function taskBackendContainerIdentity(container, { root, project, backend
     labels['com.zdm.task.preview'] !== 'true' ||
     labels['com.zdm.task.database'] !== 'integration' ||
     !mounts.some(
-      (mount) =>
-        mount.Type === 'bind' &&
-        mount.Destination === '/workspace' &&
-        path.resolve(mount.Source) === path.resolve(root),
+      (mount) => mount.Type === 'bind' && mount.Destination === '/workspace' && sameHostPath(mount.Source, root),
     ) ||
     !mounts.some(
       (mount) =>
         mount.Type === 'bind' &&
         mount.Destination === '/task-migrations' &&
-        path.resolve(mount.Source) === path.resolve(migrationDirectory) &&
+        sameHostPath(mount.Source, migrationDirectory) &&
         mount.RW === false,
     ) ||
     port?.length !== 1 ||

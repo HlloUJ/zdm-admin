@@ -296,19 +296,24 @@ export function taskPreviewCheckExpectations({
   if (metadata.branch !== branch) throw new Error(`当前预览分支为 ${metadata.branch || '(未知)'}，不是 ${branch}`);
   if (!['frontend', 'full'].includes(metadata.mode)) throw new Error('当前预览模式不可证明，请重新运行 dev:task');
   const requiredMode = selectTaskPreviewMode({ files });
-  if (requiredMode === 'full' && metadata.mode !== 'full')
-    throw new Error('当前任务包含后端变更，必须使用 full 任务预览');
+  const taskBackendTarget =
+    Number.isInteger(registeredBackendPort) &&
+    registeredBackendPort >= BACKEND_PORT_START &&
+    registeredBackendPort <= BACKEND_PORT_END
+      ? `http://127.0.0.1:${registeredBackendPort}`
+      : null;
+  if (
+    requiredMode === 'full' &&
+    metadata.mode !== 'full' &&
+    (!taskBackendTarget || metadata.apiTarget !== taskBackendTarget || registeredApiTarget !== taskBackendTarget)
+  )
+    throw new Error('当前任务包含后端变更，必须使用已登记的任务后端');
   // A frontend task may have been explicitly started in full mode; retain that supported choice.
   const expectedMode = metadata.mode;
   let expectedApiTarget = registeredApiTarget ?? SHARED_API_TARGET;
-  if (expectedMode === 'full') {
-    if (
-      !Number.isInteger(registeredBackendPort) ||
-      registeredBackendPort < BACKEND_PORT_START ||
-      registeredBackendPort > BACKEND_PORT_END
-    )
-      throw new Error('无法证明当前任务的已登记后端端口，不能声明运行环境就绪');
-    expectedApiTarget = `http://127.0.0.1:${registeredBackendPort}`;
+  if (expectedMode === 'full' || requiredMode === 'full') {
+    if (!taskBackendTarget) throw new Error('无法证明当前任务的已登记后端端口，不能声明运行环境就绪');
+    expectedApiTarget = taskBackendTarget;
   }
   return { expectedWorkspaceRoot: root, expectedBranch: branch, expectedMode, expectedApiTarget };
 }
@@ -1011,8 +1016,8 @@ async function acquireDatabaseLock({ context, integrationRoot, root, branch, pro
   return lock;
 }
 
-function existingTaskBackendPort(context) {
-  const containerId = composeCapture(context, ['ps', '--all', '--quiet', 'backend'], true);
+function existingTaskBackendPort(context, { runningOnly = false } = {}) {
+  const containerId = composeCapture(context, ['ps', ...(runningOnly ? [] : ['--all']), '--quiet', 'backend'], true);
   if (!containerId) return null;
   const bindings = capture(
     'docker',
@@ -1408,12 +1413,17 @@ export async function main(args = process.argv.slice(2)) {
       const current = await currentManagedPreview(port);
       let registeredBackendPort = null;
       let registeredApiTarget = null;
-      if (current?.mode === 'full') {
+      if (
+        current?.mode === 'full' ||
+        (backendSensitiveFiles(files).length > 0 && current?.apiTarget && current.apiTarget !== SHARED_API_TARGET)
+      ) {
         const project = taskProjectName({ branch, root: expectedWorkspaceRoot });
         registeredBackendPort = existingTaskBackendPort(
           composeContext({ root: expectedWorkspaceRoot, project, backendPort: BACKEND_PORT_START }),
+          { runningOnly: true },
         );
-      } else if (current?.apiTarget && current.apiTarget !== SHARED_API_TARGET) {
+      }
+      if (current?.mode === 'frontend' && current.apiTarget !== SHARED_API_TARGET) {
         const response = await previewServiceRequest('GET', '/status');
         const status = response.statusCode === 200 ? parseJson(response.body) : null;
         if (previewServiceOwnsWorktree(status, expectedWorkspaceRoot))

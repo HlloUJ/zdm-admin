@@ -48,6 +48,16 @@ const router = createRouter({
       component: () => import('@/pages/finished-stock/management/index.vue'),
     },
     {
+      path: '/store/finished-stock-management',
+      name: 'storeFinishedStockManagement',
+      component: () => import('@/pages/finished-stock/store/index.vue'),
+    },
+    {
+      path: '/store/price-configuration',
+      name: 'storeFinishedPriceConfiguration',
+      component: () => import('@/pages/finished-stock/store/price-configuration.vue'),
+    },
+    {
       path: '/finished-stock-craft',
       name: 'finishedStockCraft',
       component: () => import('@/pages/craft/finished-stock/index.vue'),

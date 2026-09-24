@@ -35,21 +35,6 @@ export const listFinishedOperationLogs = (filter: FinishedLogFilter) => {
 };
 export const getFinishedOperationLog = (id: number) =>
   request<FinishedOperationLog>(`/admin/finished-products/operation-logs/${id}`);
-export const finishedLogTypes: Record<string, string> = {
-  CREATE: '创建商品',
-  UPDATE: '编辑商品',
-  PRICE_UPDATE: '修改价格',
-  SHELF: '上架商品',
-  OFF_SHELF: '下架商品',
-  RESTORE: '放回仓库',
-  DELETE_TO_RECYCLE: '删除至回收站',
-  PURGE: '彻底删除商品',
-  SOLD_OUT: '商品售罄',
-  SOURCE_SHELF: '供应链上架',
-  SOURCE_OFF_SHELF: '供应链下架',
-  SOURCE_DELETE: '供应链删除',
-  RESTORE_WAREHOUSE: '放回仓库',
-};
 export const finishedLogStates: Record<string, string> = {
   warehouse: '仓库中',
   selling: '已上架',

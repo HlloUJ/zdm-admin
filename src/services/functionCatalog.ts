@@ -750,6 +750,8 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
 
 const navigationModuleOrder = [
   'admin.tenant',
+  'store.finished-stock-management',
+  'store.price-configuration',
   'admin.product-data-center',
   'admin.supplier-supply-type-management',
   'supply-chain.products',
@@ -897,10 +899,121 @@ const withAdministrationTabs = (modules: FunctionModule[]): FunctionModule[] =>
       }),
     })),
   }));
+
+const storeFinishedStock: FunctionModule = {
+  label: '成品现货管理',
+  value: 'store.finished-stock-management',
+  audiences: ['store'],
+  menus: [
+    {
+      label: '成品现货管理',
+      value: 'store.finished-stock-management.menu',
+      direct: true,
+      pages: [
+        {
+          label: '成品现货管理页',
+          value: 'store.finished-stock-management',
+          actions: [
+            { label: '操作日志', value: 'store.finished-stock-management.operation-log.view' },
+            { label: '上游不可用时彻底删除', value: 'store.finished-stock-management.unavailable.purge' },
+          ],
+          tabs: [
+            {
+              label: '仓库中',
+              value: 'store.finished-stock-management.warehouse',
+              actions: [
+                ['select', '挑选商品'],
+                ['batch-shelf', '批量上架'],
+                ['detail', '详情'],
+                ['price', '价格'],
+                ['shelf', '上架'],
+                ['delete', '删除'],
+              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.warehouse.${code}` })),
+            },
+            {
+              label: '出售中',
+              value: 'store.finished-stock-management.selling',
+              actions: [
+                ['batch-off-shelf', '批量下架'],
+                ['detail', '详情'],
+                ['price', '价格'],
+                ['off-shelf', '下架'],
+              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),
+            },
+            {
+              label: '已下架',
+              value: 'store.finished-stock-management.off-shelf',
+              actions: [
+                ['batch-restore', '批量放回到仓库'],
+                ['detail', '详情'],
+                ['restore', '放回仓库'],
+                ['delete', '删除'],
+              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.off-shelf.${code}` })),
+            },
+            {
+              label: '已售完',
+              value: 'store.finished-stock-management.sold-out',
+              actions: [
+                ['detail', '详情'],
+                ['price', '价格'],
+              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.sold-out.${code}` })),
+            },
+            {
+              label: '回收站',
+              value: 'store.finished-stock-management.recycle',
+              actions: [
+                ['batch-restore', '批量放回到仓库'],
+                ['batch-purge', '批量彻底删除'],
+                ['clear', '清空回收站'],
+                ['detail', '详情'],
+                ['price', '价格'],
+                ['restore', '放回仓库'],
+                ['purge', '彻底删除'],
+              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.recycle.${code}` })),
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const storePriceConfiguration: FunctionModule = {
+  label: '价格配置',
+  value: 'store.price-configuration',
+  audiences: ['store'],
+  menus: [
+    {
+      label: '价格配置',
+      value: 'store.price-configuration.menu',
+      direct: true,
+      pages: [
+        {
+          label: '价格配置页',
+          value: 'store.price-configuration',
+          actions: [
+            ['create', '新增'],
+            ['edit', '编辑'],
+            ['toggle-status', '停用/启用'],
+            ['delete', '删除'],
+          ].map(([code, label]) => ({ label, value: `store.price-configuration.${code}` })),
+          tabs: [],
+        },
+      ],
+    },
+  ],
+};
 export const fullFunctionCatalog = applyConfirmedNavigationStructure(
   orderModulesByNavigation(
     withDefaultViewPermissions(
-      withAdministrationTabs([storeLevelModule, ...verifiedFunctionCatalog, supplyChainProducts, supplyTypeModule]),
+      withAdministrationTabs([
+        storeLevelModule,
+        storeFinishedStock,
+        storePriceConfiguration,
+        ...verifiedFunctionCatalog,
+        supplyChainProducts,
+        supplyTypeModule,
+      ]),
     ),
   ),
 );

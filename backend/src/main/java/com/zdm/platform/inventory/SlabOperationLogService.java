@@ -20,10 +20,14 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper, SlabOperationLog> {
-  private static final String VISIBLE_TYPE = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
+  private static final String VISIBLE_TYPE = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
+      + "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')"
+      + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' ELSE 'SOURCE_PURGE' END "
+      + "WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
       + "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')"
       + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
-      + " WHEN 'purged' THEN 'SOURCE_DELETE' ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
+      + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' WHEN 'purged' THEN 'SOURCE_PURGE'"
+      + " ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
   private static final String EXTERNAL_API_SOURCE = "EXTERNAL_API";
   private static final Map<String, String> REFERENCE_TABLES = Map.of(
       "供应商ID", "suppliers",
@@ -99,7 +103,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       }
     });
     records.forEach(record -> {
-      if (List.of("SOURCE_OFF_SHELF", "SOURCE_DELETE").contains(record.getOperationType())) {
+      if (List.of("SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_PURGE").contains(record.getOperationType())) {
         try {
           Map<String, Object> changes = objectMapper.readValue(record.getChangeDetails() == null ? "{}" : record.getChangeDetails(), new TypeReference<LinkedHashMap<String, Object>>() {});
           changes.keySet().retainAll(java.util.Set.of("来源状态"));
@@ -111,7 +115,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     });
     records.forEach(this::restoreLegacyArrival);
     records.forEach(record -> {
-      if (List.of("SOURCE_SHELF", "SOURCE_OFF_SHELF", "SOURCE_DELETE").contains(record.getOperationType())) {
+      if (List.of("SOURCE_SHELF", "SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_PURGE").contains(record.getOperationType())) {
         record.setOperationSummary(operationSummary(record.getOperationType(), record.getBeforeStatus(), Map.of()));
       }
     });
@@ -327,18 +331,20 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
 
   public static String operationSummary(String type, String beforeStatus, Map<String, ?> changes) {
     return switch (type) {
-      case "CREATE" -> "创建大板";
-      case "SHELF" -> "上架大板";
-      case "OFF_SHELF" -> "下架大板";
+      case "CREATE" -> "发布商品";
+      case "SHELF" -> "上架商品";
+      case "OFF_SHELF" -> "下架商品";
       case "RESTORE_WAREHOUSE" -> "放回仓库";
       case "RESTORE_RECYCLE" -> "放回仓库";
       case "DELETE_TO_RECYCLE" -> "删除至回收站";
       case "PHYSICAL_DELETE" -> "物理删除大板";
-      case "PURGE" -> "彻底删除大板";
+      case "PURGE" -> "彻底删除商品";
+      case "SOLD_OUT" -> "商品售罄";
       case "SOURCE_OFF_SHELF" -> "供应链已下架该商品";
-      case "SOURCE_DELETE" -> "供应链已删除该商品";
+      case "SOURCE_DELETE_TO_RECYCLE" -> "供应链已将该商品删除至回收站";
+      case "SOURCE_PURGE" -> "供应链已彻底删除该商品";
       case "SOURCE_INTERNAL" -> "供应链状态变更";
-      case "UPDATE" -> "编辑大板（修改" + changes.size() + "项）";
+      case "UPDATE" -> "编辑商品";
       case "PRICE_UPDATE" -> changes.containsKey("价格联动") ? "供应链成本变更，按当前系数重算售价" : "修改价格";
       case "SOURCE_SHELF" -> beforeStatus == null ? "供应链已上架，商品进入运营管理平台仓库" : "来源重新上架，解除遮罩并保留运营状态";
       default -> "修改大板状态";
@@ -384,8 +390,12 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       parameters.add(normalizedKeyword);
     }
     if (operationType != null && !operationType.isBlank()) {
-      conditions.add("(" + VISIBLE_TYPE + ") = ?");
-      parameters.add(operationType.trim());
+      if ("RESTORE".equals(operationType.trim())) {
+        conditions.add("(" + VISIBLE_TYPE + ") IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')");
+      } else {
+        conditions.add("(" + VISIBLE_TYPE + ") = ?");
+        parameters.add(operationType.trim());
+      }
     }
     if (operatorName != null && !operatorName.isBlank()) {
       conditions.add("operator_name LIKE ?");

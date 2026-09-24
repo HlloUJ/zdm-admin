@@ -3,6 +3,12 @@ import { installAdminApiMocks } from './admin-api-mocks';
 
 const scope = (state: string) => ({ offShelf: 'off-shelf', soldOut: 'sold-out' })[state] || state;
 const prefix = 'admin.slab-management.';
+const sourceBlockMessage = (source: string) =>
+  source === 'purged'
+    ? '该商品已被供应链彻底删除'
+    : source === 'recycle'
+      ? '该商品已被供应链删除至回收站'
+      : '该商品已被供应链下架';
 async function setup(page: Page, status: string, sourceStatus = 'selling', detail = true) {
   await installAdminApiMocks(page);
   const permissions = [prefix + scope(status) + '.view', prefix + 'recycle.purge'];
@@ -28,6 +34,7 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
     status,
     sourceStatus,
     sourceUnavailable: !['selling', 'soldOut'].includes(sourceStatus),
+    sourceMessage: !['selling', 'soldOut'].includes(sourceStatus) ? sourceBlockMessage(sourceStatus) : null,
     stock: 2,
     costPrice: 10,
     lengthMm: 3000,
@@ -69,7 +76,7 @@ for (const source of ['offShelf', 'recycle', 'purged', 'warehouse']) {
     await setup(page, 'selling', source);
     const main = page.getByRole('main');
     const overlay = main.locator('.source-unavailable-overlay');
-    await expect(overlay).toContainText(source === 'purged' ? '该商品已被供应链删除' : '该商品已被供应链下架');
+    await expect(overlay).toContainText(sourceBlockMessage(source));
     await expect(overlay.getByRole('button')).toHaveText(['详情', '彻底删除']);
     await expect(main.locator('tr[data-source-id="99601"]')).toHaveAttribute('inert', '');
     await expect(main.locator('tr[data-source-id="99601"] input[type="checkbox"]')).toBeDisabled();
@@ -153,6 +160,7 @@ test('操作时来源已下架会刷新遮罩并清除旧选择', async ({ page 
             status: 'selling',
             sourceStatus: 'offShelf',
             sourceUnavailable: true,
+            sourceMessage: sourceBlockMessage('offShelf'),
           },
         ],
       },
@@ -192,6 +200,7 @@ test('操作时来源不可用直接刷新遮罩，不显示 toast 或确认弹�
             status: 'selling',
             sourceStatus: 'offShelf',
             sourceUnavailable: true,
+            sourceMessage: sourceBlockMessage('offShelf'),
           },
         ],
       },
@@ -275,6 +284,7 @@ for (const [status, actions] of Object.entries({
                 status,
                 sourceStatus: 'offShelf',
                 sourceUnavailable: true,
+                sourceMessage: sourceBlockMessage('offShelf'),
               },
             ],
           },
@@ -303,6 +313,7 @@ test('批量上架部分成功，失败横幅可关闭并在页面刷新后清�
     status: 'warehouse',
     sourceStatus: 'selling',
     sourceUnavailable: false,
+    sourceMessage: null as string | null,
   }));
   await page.route('**/api/admin/slabs', (route) => route.fulfill({ json: { code: 0, data: records } }));
   const requests: number[] = [];
@@ -316,6 +327,7 @@ test('批量上架部分成功，失败横幅可关闭并在页面刷新后清�
     if (id === 99603) {
       records[2].sourceStatus = 'offShelf';
       records[2].sourceUnavailable = true;
+      records[2].sourceMessage = sourceBlockMessage('offShelf');
     }
     return route.fulfill({
       status: 400,

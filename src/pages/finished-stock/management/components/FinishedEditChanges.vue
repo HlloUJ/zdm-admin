@@ -48,25 +48,14 @@
                 <div class="change-side-title">
                   {{ side === 'before' ? '修改前' : '修改后' }}
                 </div>
-                <template v-if="row.media">
-                  <button
-                    v-if="row[side]?.resource?.available"
-                    class="change-media"
-                    type="button"
-                    :aria-label="`查看${row.label}${side === 'before' ? '修改前' : '修改后'}`"
-                    @click="emit('preview', row[side].resource)"
-                  >
-                    <video
-                      v-if="row[side].resource.mediaType === 'video'"
-                      :src="row[side].resource.url"
-                      preload="metadata"
-                      muted
-                    />
-                    <img v-else :src="row[side].resource.url" :alt="row.label" />
-                    <span v-if="row[side].resource.mediaType === 'video'">点击播放视频</span>
-                  </button>
-                  <span v-else>{{ row[side] ? row[side].resource?.message || '历史媒体已不可用' : '未上传' }}</span>
-                </template>
+                <ProductLogFieldValue
+                  v-if="row.media"
+                  :label="row.label"
+                  is-media
+                  :media="row[side]?.resource"
+                  :missing="!row[side]"
+                  @preview="emit('preview', $event)"
+                />
                 <div
                   v-else-if="row.field === '宝贝详情'"
                   class="change-rich-scroll"
@@ -93,6 +82,11 @@
                   price-only
                 />
                 <span v-else-if="row.field === '来源状态' && row[side] === 'selling'">已上架</span>
+                <ProductLogFieldValue
+                  v-else-if="typeof row[side] !== 'object' && !['状态', '来源状态', '价格来源'].includes(row.field)"
+                  :label="row.label"
+                  :value="row[side]"
+                />
                 <FinishedLogValue
                   v-else
                   :value="row[side]"
@@ -122,6 +116,7 @@ import { priceLogSnapshot } from '../priceLogSnapshot';
 const isPriceTable = (field: string) => ['销售规格', '价格联动', '入仓价格'].includes(field);
 import SalesLogFullscreen from './SalesLogFullscreen.vue';
 import HistoricalRichText from './HistoricalRichText.vue';
+import ProductLogFieldValue from '@/components/product-logs/ProductLogFieldValue.vue';
 import FinishedLogValue from './FinishedLogValue.vue';
 import FinishedSalesLogTable from './FinishedSalesLogTable.vue';
 import FinishedAttributeChanges from './FinishedAttributeChanges.vue';

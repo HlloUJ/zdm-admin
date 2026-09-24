@@ -15,4 +15,9 @@
     </Or>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
+  <!-- Spring owns this injected JdbcTemplate, as with other inventory services. -->
+  <Match>
+    <Class name="com.zdm.platform.inventory.CityPartnerStoreScope"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
 </FindBugsFilter>

@@ -19,9 +19,14 @@ public class SlabInventory extends BaseEntity implements com.zdm.platform.securi
   private Long gradeId;
 
   private String sourceStatus = "warehouse";
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String sourceBlockReason;
   private Boolean operationsDeleted = false;
   public String getSourceStatus() { return sourceStatus; }
   public void setSourceStatus(String value) { sourceStatus = value; }
+  public String getSourceBlockReason() { return sourceBlockReason; }
+  public void setSourceBlockReason(String value) { sourceBlockReason = value; }
+  public String getSourceMessage() { return ProductLifecycleService.sourceBlockMessage(sourceStatus, sourceBlockReason); }
   public Boolean getOperationsDeleted() { return operationsDeleted; }
   public void setOperationsDeleted(Boolean value) { operationsDeleted = value; }
   public boolean isSourceUnavailable() { return ProductLifecycleService.unavailable(sourceStatus); }
