@@ -28,6 +28,18 @@ export type AdminMenuEntry = AdminMenuItem | AdminMenuGroup;
 export const adminMenuEntries: AdminMenuEntry[] = [
   { label: '工作台', path: '/dashboard', icon: 'dashboard' },
   {
+    label: '成品现货管理',
+    path: '/store/finished-stock-management',
+    icon: 'layers',
+    permissionPrefix: 'store.finished-stock-management',
+  },
+  {
+    label: '价格配置',
+    path: '/store/price-configuration',
+    icon: 'money-circle',
+    permissionPrefix: 'store.price-configuration',
+  },
+  {
     label: '商品管理',
     value: 'supply-chain-products',
     icon: 'layers',

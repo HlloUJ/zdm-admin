@@ -1225,10 +1225,21 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {
     await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
     await expect(moduleList.locator('.permission-module-item > span:first-child')).toHaveText([
+      ...(terminal === '城市合伙人门店管理后台' ? ['成品现货管理', '价格配置'] : []),
       '供应商管理',
       '门店分类管理',
       '权限管理',
     ]);
+    if (terminal === '城市合伙人门店管理后台') {
+      await moduleList.getByText('成品现货管理', { exact: true }).click();
+      await expect(matrix.getByText('一级菜单直达')).toBeVisible();
+      for (const tab of ['仓库中', '出售中', '已下架', '已售完', '回收站']) {
+        await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
+      }
+      await moduleList.getByText('价格配置', { exact: true }).click();
+      await expect(matrix.getByText('一级菜单直达')).toBeVisible();
+      await expect(matrix.getByText('指导价设置')).toHaveCount(0);
+    }
     await moduleList.getByText('供应商管理', { exact: true }).click();
     await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
       '查看',
@@ -1313,7 +1324,7 @@ test('allows platform allocation viewers to inspect without a save action', asyn
     );
   });
   await page.goto('/terminal-function-allocation');
-  await expect(page.getByRole('main').locator('.permission-module-item')).toHaveCount(3);
+  await expect(page.getByRole('main').locator('.permission-module-item')).toHaveCount(5);
   await expect(page.getByRole('main').getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
 });
 

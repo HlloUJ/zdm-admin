@@ -35,6 +35,7 @@ public final class FunctionAudiencePolicy {
           case "internal-management" -> List.of("admin", "supply-chain").contains(audience);
           case "shared" -> !"supply-chain".equals(audience);
           case "admin-only" -> "admin".equals(audience);
+          case "store-only" -> "store".equals(audience);
           case "terminal-only" -> List.of("store", "supplier").contains(audience);
           case "supply-chain-only" -> "supply-chain".equals(audience);
           case "supplier-directory" -> !"admin".equals(audience);

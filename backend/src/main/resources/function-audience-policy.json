@@ -20,6 +20,14 @@
     "scope": "admin-only"
   },
   {
+    "prefix": "store.finished-stock-management",
+    "scope": "store-only"
+  },
+  {
+    "prefix": "store.price-configuration",
+    "scope": "store-only"
+  },
+  {
     "prefix": "admin.slab-management",
     "scope": "admin-only"
   },

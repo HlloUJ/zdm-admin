@@ -84,7 +84,7 @@
                   <table class="permission-matrix__table">
                     <thead>
                       <tr>
-                        <th class="permission-menu-column">二级菜单</th>
+                        <th class="permission-menu-column">菜单</th>
                         <th class="permission-third-menu-column">三级菜单</th>
                         <th class="permission-page-column">页面</th>
                         <th class="permission-tab-column">Tab</th>
@@ -94,8 +94,8 @@
                     <tbody>
                       <tr v-for="row in activeRows" :key="row.key">
                         <td v-if="row.showMenu" class="permission-menu-cell" :rowspan="row.menuRowspan">
+                          <span class="permission-menu-name">{{ row.menuLabel }}</span>
                           <t-tag v-if="row.direct" class="permission-level-tag" variant="light">一级菜单直达</t-tag>
-                          <span v-else class="permission-menu-name">{{ row.menuLabel }}</span>
                         </td>
                         <td v-if="row.showThirdMenu" class="permission-third-menu-cell" :rowspan="row.thirdMenuRowspan">
                           <span v-if="row.thirdMenuLabel" class="permission-third-menu-name">{{

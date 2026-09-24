@@ -12,6 +12,7 @@ export function isFunctionAllowedForAudience(permission: string, audience: strin
       (rule.scope === 'internal-management' && ['admin', 'supply-chain'].includes(audience)) ||
       (rule.scope === 'shared' && audience !== 'supply-chain') ||
       (rule.scope === 'admin-only' && audience === 'admin') ||
+      (rule.scope === 'store-only' && audience === 'store') ||
       (rule.scope === 'terminal-only' && ['store', 'supplier'].includes(audience)) ||
       (rule.scope === 'supply-chain-only' && audience === 'supply-chain') ||
       (rule.scope === 'supplier-directory' && audience !== 'admin')),
