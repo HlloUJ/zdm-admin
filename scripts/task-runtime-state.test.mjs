@@ -64,6 +64,20 @@ test('runtime reuse requires source/configuration and an unchanged correctly sco
   assert.notEqual(taskBackendContainerIdentity(container, expected), containerIdentity);
 });
 
+test('macOS Docker Desktop host mount aliases resolve to the same task paths', (t) => {
+  if (process.platform !== 'darwin') return;
+  const { container, expected } = backendFixture();
+  const root = mkdtempSync(path.join(tmpdir(), 'zdm-runtime-mount-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const migrations = path.join(root, 'migrations');
+  mkdirSync(migrations);
+  expected.root = root;
+  expected.migrationDirectory = migrations;
+  container.Mounts[0].Source = `/host_mnt${root}`;
+  container.Mounts[1].Source = `/host_mnt${migrations}`;
+  assert.ok(taskBackendContainerIdentity(container, expected));
+});
+
 test('backend input identity observes production/config/migrations without reading test code or build output', (t) => {
   const root = mkdtempSync(path.join(tmpdir(), 'zdm-runtime-input-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
