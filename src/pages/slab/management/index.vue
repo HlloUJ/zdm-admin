@@ -257,7 +257,7 @@
               <template #overlay="{ row }">
                 <t-space align="center" size="small">
                   <t-icon name="info-circle" />
-                  <span>{{ row.sourceStatus === 'purged' ? '该商品已被供应链删除' : '该商品已被供应链下架' }}</span>
+                  <span>{{ row.sourceMessage || '上游商品不可用' }}</span>
                 </t-space>
                 <t-space size="small">
                   <t-button
@@ -1089,7 +1089,7 @@ import SlabRowWarnings from './components/SlabRowWarnings.vue';
 import SourceUnavailableOverlay from '@/pages/finished-stock/management/components/SourceUnavailableOverlay.vue';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
 import ProductLogFieldValue from '@/components/product-logs/ProductLogFieldValue.vue';
-import { productOperationTypeOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
+import { productLogFilterOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   adminFeedback,
@@ -1233,6 +1233,7 @@ interface DetailMediaItem {
 interface SlabItem {
   sourceUnavailable?: boolean;
   sourceStatus?: string;
+  sourceMessage?: string;
   stock?: number;
   sourceOffShelfRecords?: SlabOffShelfRecord[];
   id: number;
@@ -1496,20 +1497,7 @@ const offShelfHistoryColumns: PrimaryTableCol<SlabOffShelfRecord>[] = [
   { colKey: 'offShelvedByName', title: '下架人', width: 110 },
   { colKey: 'offShelvedAt', title: '下架时间', width: 170 },
 ];
-const operationTypeOptions = productOperationTypeOptions([
-  'CREATE',
-  'UPDATE',
-  'PRICE_UPDATE',
-  'SHELF',
-  'OFF_SHELF',
-  'RESTORE_WAREHOUSE',
-  'RESTORE_RECYCLE',
-  'DELETE_TO_RECYCLE',
-  'PHYSICAL_DELETE',
-  'PURGE',
-  'STATUS_UPDATE',
-  ...(!isSupplyChain.value ? ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE'] : []),
-]);
+const operationTypeOptions = computed(() => productLogFilterOptions(isSupplyChain.value ? 'supply-chain' : 'admin'));
 const toOperationLogRow = (row: SlabOperationLogRecord): ProductOperationLogRow => ({
   id: row.id,
   subjectName: row.slabName,
@@ -1530,7 +1518,7 @@ const operationLogDetailRow = computed(() => operationLogDetail.value && toOpera
 const operationLogSourceLabel = (row: ProductOperationLogRow) =>
   operationSourceLabel((row.operationSource || 'MANUAL') as SlabOperationLogRecord['operationSource']);
 const operationLogShowReason = (row: ProductOperationLogRow) =>
-  !['SOURCE_OFF_SHELF', 'SOURCE_DELETE'].includes(row.operationType);
+  !['SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'].includes(row.operationType);
 const formatPriceTierChanges = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null;
   return value
@@ -2041,6 +2029,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     id: record.id,
     sourceUnavailable: record.sourceUnavailable,
     sourceStatus: record.sourceStatus,
+    sourceMessage: record.sourceMessage,
     stock: record.stock,
     sourceOffShelfRecords: record.sourceOffShelfRecords,
     supplierId: record.supplierId,

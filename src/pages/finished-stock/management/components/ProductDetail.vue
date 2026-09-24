@@ -127,6 +127,7 @@ interface DetailProduct {
   status: string;
   sourceStatus?: string;
   sourceUnavailable?: boolean;
+  sourceMessage?: string;
   createdByName: string;
   createdAt?: string;
   offShelfReason?: string;
@@ -165,10 +166,8 @@ const descriptionMedia = computed(() => {
 function previewDescription(resource: { url?: string; mediaType: string }) {
   if (resource.url) emit('preview', { url: resource.url }, resource.mediaType === 'video' ? 'video' : 'image');
 }
-const sourceMessage = computed(() =>
-  props.product.sourceStatus === 'purged'
-    ? '该商品已被供应链删除，当前仅可查看资料或按权限彻底删除。'
-    : '该商品当前在供应链端未上架，暂不可进行运营操作。',
+const sourceMessage = computed(
+  () => `${props.product.sourceMessage || '上游商品不可用'}，当前仅可查看资料或按权限彻底删除。`,
 );
 const dimensions = computed(() => props.product.specDimensions ?? []);
 const layeredDimensions = computed(() =>

@@ -350,7 +350,7 @@ import {
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
-import { productOperationTypeOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
+import { productLogFilterOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
 import {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,
@@ -523,22 +523,7 @@ function changeLogPage(page: { current: number; pageSize: number }) {
   Object.assign(logPagination, page);
   void loadLogs();
 }
-const logTypeOptions = productOperationTypeOptions([
-  'SELECT',
-  'SHELF',
-  'OFF_SHELF',
-  'RESTORE',
-  'DELETE_TO_RECYCLE',
-  'PURGE',
-  'PRICE_UPDATE',
-  'SOURCE_SHELF',
-  'SOURCE_OFF_SHELF',
-  'SOURCE_DELETE',
-  'OPERATIONS_SHELF',
-  'OPERATIONS_OFF_SHELF',
-  'OPERATIONS_DELETE_TO_RECYCLE',
-  'OPERATIONS_PURGE',
-]);
+const logTypeOptions = productLogFilterOptions('store');
 const logRows = computed(() => logs.value.map(toLogRow));
 const rowActions: Record<
   string,

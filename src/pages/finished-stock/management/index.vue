@@ -236,7 +236,7 @@
                 <template #overlay="{ row }">
                   <t-space align="center" size="small">
                     <t-icon name="info-circle" />
-                    <span>{{ row.sourceStatus === 'purged' ? '该商品已被供应链删除' : '该商品已被供应链下架' }}</span>
+                    <span>{{ row.sourceMessage || '上游商品不可用' }}</span>
                   </t-space>
                   <t-space size="small">
                     <t-button
@@ -1163,6 +1163,7 @@ interface PaginationState {
 interface StockItem {
   sourceUnavailable?: boolean;
   sourceStatus?: string;
+  sourceMessage?: string;
   id: number;
   createdByName: string;
   offShelfByName?: string;
@@ -1922,6 +1923,7 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     id: record.id,
     sourceUnavailable: record.sourceUnavailable,
     sourceStatus: record.sourceStatus,
+    sourceMessage: record.sourceMessage,
     code: record.sku ?? '',
     createdByName: record.createdByName?.trim() || '-',
     offShelfByName: record.offShelfByName?.trim() || '未记录',

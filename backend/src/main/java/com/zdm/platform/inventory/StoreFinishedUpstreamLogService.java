@@ -24,14 +24,16 @@ public class StoreFinishedUpstreamLogService {
   public void sourceChange(Long productId, String before, String after) {
     String type = switch (after) {
       case "offShelf" -> "SOURCE_OFF_SHELF";
-      case "purged" -> "SOURCE_DELETE";
+      case "recycle" -> "SOURCE_DELETE_TO_RECYCLE";
+      case "purged" -> "SOURCE_PURGE";
       case "selling" -> "SOURCE_SHELF";
       default -> null;
     };
     if (type == null) { return; }
     String summary = switch (type) {
       case "SOURCE_OFF_SHELF" -> "供应链已下架该商品";
-      case "SOURCE_DELETE" -> "供应链已删除该商品";
+      case "SOURCE_DELETE_TO_RECYCLE" -> "供应链已将该商品删除至回收站";
+      case "SOURCE_PURGE" -> "供应链已彻底删除该商品";
       default -> "供应链已重新上架该商品";
     };
     record(productId, type, summary, "来源状态", before, after);
@@ -48,7 +50,7 @@ public class StoreFinishedUpstreamLogService {
     if (storeType == null) { return; }
     String summary = switch (storeType) {
       case "OPERATIONS_OFF_SHELF" -> "运营端已下架该商品";
-      case "OPERATIONS_DELETE_TO_RECYCLE" -> "运营端已将该商品移入回收站";
+      case "OPERATIONS_DELETE_TO_RECYCLE" -> "运营端已将该商品删除至回收站";
       case "OPERATIONS_PURGE" -> "运营端已彻底删除该商品";
       default -> "运营端已重新上架该商品";
     };
@@ -74,6 +76,7 @@ public class StoreFinishedUpstreamLogService {
         FROM store_finished_products listing
         JOIN finished_products product ON product.id = listing.finished_product_id
         WHERE listing.finished_product_id = ?
+          AND listing.selection_generation = product.selection_generation
         """, type, summary, changes, actor.accountId(), actor.displayName(), productId);
   }
 }

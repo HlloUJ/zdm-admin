@@ -66,7 +66,7 @@ import DOMPurify from 'dompurify';
 import { getLoginUser } from '@/services/auth';
 import { AdminDialog, adminFeedback } from '@/components/foundation';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
-import { productOperationTypeOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
+import { productLogFilterOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
 import {
   listFinishedOperationLogs,
   getFinishedOperationLog,
@@ -104,21 +104,9 @@ const detailVisible = ref(false);
 type Resource = { available: boolean; url?: string; mediaType: string; message?: string; previewOnly?: boolean };
 type Media = { field: string; mediaId: number; resource?: Resource };
 const preview = ref<Resource | null>(null);
-const typeOptions = productOperationTypeOptions([
-  'CREATE',
-  'UPDATE',
-  'PRICE_UPDATE',
-  'SHELF',
-  'OFF_SHELF',
-  'RESTORE',
-  'DELETE_TO_RECYCLE',
-  'PURGE',
-  'SOLD_OUT',
-  'SOURCE_SHELF',
-  'SOURCE_OFF_SHELF',
-  'SOURCE_DELETE',
-  'RESTORE_WAREHOUSE',
-]);
+const typeOptions = computed(() =>
+  productLogFilterOptions(getLoginUser().clientCode === 'supply-chain' ? 'supply-chain' : 'admin'),
+);
 const toLogRow = (row: FinishedOperationLog): ProductOperationLogRow => ({
   id: row.id,
   subjectName: row.productName,

@@ -2,7 +2,13 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import FinishedOperationLogs from './FinishedOperationLogs.vue';
 import FinishedLogValue from './FinishedLogValue.vue';
+import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
+import { getLoginUser } from '@/services/auth';
 import { listFinishedOperationLogs, getFinishedOperationLog } from '@/services/finishedOperationLogs';
+vi.mock('@/services/auth', async (original) => ({
+  ...(await original<typeof import('@/services/auth')>()),
+  getLoginUser: vi.fn(() => ({ clientCode: 'admin' })),
+}));
 vi.mock('@/services/finishedOperationLogs', async (original) => ({
   ...(await original<typeof import('@/services/finishedOperationLogs')>()),
   listFinishedOperationLogs: vi.fn().mockResolvedValue({ records: [], total: 0 }),
@@ -51,6 +57,19 @@ vi.mock('@/components/foundation', () => ({
   adminFeedback: { error: vi.fn() },
 }));
 describe('finished operation logs', () => {
+  it('keeps supplier source filters on operations only', () => {
+    const optionValues = (clientCode: 'admin' | 'supply-chain') => {
+      vi.mocked(getLoginUser).mockReturnValue({ clientCode } as ReturnType<typeof getLoginUser>);
+      const wrapper = mount(FinishedOperationLogs, { props: { visible: false }, shallow: true });
+      return (wrapper.findComponent(ProductOperationLogTemplate).props('typeOptions') as { value: string }[]).map(
+        ({ value }) => value,
+      );
+    };
+    const sourceTypes = ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'];
+    const supplyOptions = optionValues('supply-chain');
+    for (const type of sourceTypes) expect(supplyOptions).not.toContain(type);
+    expect(optionValues('admin')).toEqual(expect.arrayContaining(sourceTypes));
+  });
   it('loads on opening and reads persisted details without editable fields', async () => {
     const wrapper = mount(FinishedOperationLogs, {
       props: { visible: false },

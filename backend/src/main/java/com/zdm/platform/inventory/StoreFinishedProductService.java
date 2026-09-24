@@ -71,7 +71,8 @@ public class StoreFinishedProductService {
         WHERE product.status = 'selling' AND product.source_status IN ('selling', 'soldOut')
           AND product.operations_deleted = FALSE AND product.total_stock > 0
           AND NOT EXISTS (SELECT 1 FROM store_finished_products selected
-            WHERE selected.store_id = ? AND selected.finished_product_id = product.id)
+            WHERE selected.store_id = ? AND selected.finished_product_id = product.id
+              AND selected.selection_generation = product.selection_generation)
         ORDER BY product.created_at DESC, product.id DESC
         """, (row, index) -> {
           Long id = row.getLong("id");
@@ -85,8 +86,11 @@ public class StoreFinishedProductService {
   public List<ProductView> list() {
     var store = scopes.require();
     List<Long> ids = jdbc.queryForList("""
-        SELECT id FROM store_finished_products
-        WHERE tenant_id = ? AND store_id = ? ORDER BY created_at DESC, id DESC
+        SELECT listing.id FROM store_finished_products listing
+        JOIN finished_products product ON product.id = listing.finished_product_id
+          AND product.selection_generation = listing.selection_generation
+        WHERE listing.tenant_id = ? AND listing.store_id = ?
+        ORDER BY listing.created_at DESC, listing.id DESC
         """, Long.class, store.tenantId(), store.storeId());
     return ids.stream().map(id -> view(store, listing(store, id, false))).toList();
   }
@@ -126,20 +130,24 @@ public class StoreFinishedProductService {
         throw new IllegalArgumentException("所选商品已不在运营端已上架商品池");
       }
       Long exists = jdbc.queryForObject("""
-          SELECT COUNT(*) FROM store_finished_products WHERE store_id = ? AND finished_product_id = ?
-          """, Long.class, store.storeId(), productId);
+          SELECT COUNT(*) FROM store_finished_products
+          WHERE store_id = ? AND finished_product_id = ? AND selection_generation = ?
+          """, Long.class, store.storeId(), productId, source.get("selection_generation"));
       if (exists != null && exists > 0) {
         throw new IllegalArgumentException("该商品已在本门店成品现货中");
       }
       jdbc.update("""
           INSERT INTO store_finished_products
-            (tenant_id, store_id, finished_product_id, status, selected_by_account_id)
-          VALUES (?, ?, ?, 'warehouse', ?)
-          """, store.tenantId(), store.storeId(), productId, store.accountId());
+            (tenant_id, store_id, finished_product_id, selection_generation,
+             status, selected_by_account_id)
+          VALUES (?, ?, ?, ?, 'warehouse', ?)
+          """, store.tenantId(), store.storeId(), productId,
+          source.get("selection_generation"), store.accountId());
       Long listingId = jdbc.queryForObject("""
-          SELECT id FROM store_finished_products WHERE store_id = ? AND finished_product_id = ?
-          """, Long.class, store.storeId(), productId);
-      log(store, listingId, productId, (String) source.get("name"), "SELECT", "挑选商品进入仓库",
+          SELECT id FROM store_finished_products
+          WHERE store_id = ? AND finished_product_id = ? AND selection_generation = ?
+          """, Long.class, store.storeId(), productId, source.get("selection_generation"));
+      log(store, listingId, productId, (String) source.get("name"), "SELECT", "从运营端已上架商品池挑选商品，放入本店仓库",
           null, "warehouse", Map.of("商品ID", productId));
       selected.add(detail(listingId));
     }
@@ -234,8 +242,10 @@ public class StoreFinishedProductService {
   public void clearRecycle() {
     var store = scopes.require();
     List<Long> ids = jdbc.queryForList("""
-        SELECT id FROM store_finished_products
-        WHERE tenant_id = ? AND store_id = ? AND status = 'recycle'
+        SELECT listing.id FROM store_finished_products listing
+        JOIN finished_products product ON product.id = listing.finished_product_id
+          AND product.selection_generation = listing.selection_generation
+        WHERE listing.tenant_id = ? AND listing.store_id = ? AND listing.status = 'recycle'
         """, Long.class, store.tenantId(), store.storeId());
     purgeBatch(ids);
   }
@@ -420,11 +430,20 @@ public class StoreFinishedProductService {
     boolean unavailable = !isUsable(source);
     String status = (String) listing.get("status");
     String effective = "selling".equals(status) && stock(source) == 0 ? "soldOut" : status;
-    String reason = !List.of("selling", "soldOut").contains(product.getSourceStatus())
-        ? "该商品已被供应链下架或删除"
-        : !List.of("selling", "soldOut").contains(product.getStatus())
-            || Boolean.TRUE.equals(product.getOperationsDeleted())
-            ? "该商品已被运营管理平台下架或删除" : null;
+    List<String> reasons = new ArrayList<>();
+    if (!List.of("selling", "soldOut").contains(product.getSourceStatus())) {
+      reasons.add(product.getSourceMessage());
+    }
+    if (Boolean.TRUE.equals(product.getOperationsDeleted())) {
+      reasons.add("该商品已被运营端彻底删除");
+    } else if ("recycle".equals(product.getStatus())) {
+      reasons.add("该商品已被运营端删除至回收站");
+    } else if ("offShelf".equals(product.getStatus())) {
+      reasons.add("该商品已被运营端下架");
+    } else if ("warehouse".equals(product.getStatus())) {
+      reasons.add("该商品当前未在运营端上架");
+    }
+    String reason = reasons.isEmpty() ? null : String.join("；", reasons);
     String supplierName = jdbc.query("SELECT name FROM suppliers WHERE id = ?",
         (row, index) -> row.getString("name"), product.getSupplierId()).stream().findFirst().orElse(null);
     String categoryName = jdbc.query("SELECT name FROM product_categories WHERE id = ?",
@@ -553,8 +572,10 @@ public class StoreFinishedProductService {
 
   private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
     List<Map<String, Object>> rows = jdbc.queryForList("""
-        SELECT * FROM store_finished_products
-        WHERE id = ? AND tenant_id = ? AND store_id = ?
+        SELECT listing.* FROM store_finished_products listing
+        JOIN finished_products product ON product.id = listing.finished_product_id
+          AND product.selection_generation = listing.selection_generation
+        WHERE listing.id = ? AND listing.tenant_id = ? AND listing.store_id = ?
         """ + (lock ? " FOR UPDATE" : ""), id, store.tenantId(), store.storeId());
     if (rows.isEmpty()) { throw new IllegalArgumentException("本门店商品不存在或不可访问"); }
     return rows.getFirst();

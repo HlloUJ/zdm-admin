@@ -91,6 +91,56 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   }
 
   @Test
+  void republishedPurgedOperationsProductRequiresFreshSelectionAndKeepsHistoricalPrices() {
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99831,'重选测试级别',1)");
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,store_level_id,status) VALUES (99831,1,'重选测试门店','cityPartner',99831,'enabled')");
+    jdbc.update("INSERT INTO roles (id,tenant_id,store_id,client_code,name,code,status) VALUES (99831,1,99831,'admin','重选测试角色','STORE_RESELECT_TEST','enabled')");
+    jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id) VALUES (99831,'重选测试供应商','platform',0)");
+    jdbc.update("INSERT INTO product_categories (id,name,scope) VALUES (99831,'重选测试分类','finished')");
+    jdbc.update("INSERT INTO media_assets (id,public_id,storage_key,media_type,mime_type,owner_client_code) VALUES (99831,UUID(),'reselect-test','image','image/png','supply-chain')");
+    jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    jdbc.update("""
+        INSERT INTO finished_products
+          (id,name,sku,supplier_id,category_id,detail,main_image_media_id,video_media_id,
+           total_stock,status,source_status,operations_deleted)
+        VALUES (99831,'重选测试商品','store-reselect-test',99831,99831,'详情',99831,99831,
+          2,'selling','selling',FALSE)
+        """);
+    jdbc.update("INSERT INTO finished_product_variants (id,finished_product_id,variant_label,stock,cost_price) VALUES (99841,99831,'规格 A',2,10)");
+    jdbc.update("INSERT INTO finished_product_prices (finished_product_id,sku_id,variant_label,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source) VALUES (99831,99841,'规格 A',99831,'重选测试级别',1.5,10,15,'manual')");
+
+    identity(99831L);
+    long historicalId = products.select(List.of(99831L)).getFirst().id();
+    products.saveGuidePrice(historicalId, 99841L, new BigDecimal("25"));
+    jdbc.update("INSERT INTO store_finished_role_price_overrides (listing_id,sku_id,role_id,manual_price,updated_by_account_id) VALUES (?,?,?,?,?)",
+        historicalId, 99841L, 99831L, 12, 1);
+    jdbc.update("UPDATE finished_products SET source_status='offShelf',status='recycle',operations_deleted=TRUE WHERE id=99831");
+
+    upstreamIdentity("supply-chain");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99831L, "warehouse");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99831L, "selling");
+
+    identity(99831L);
+    assertThat(products.list()).isEmpty();
+    assertThat(products.pool()).isEmpty();
+    assertThatThrownBy(() -> products.detail(historicalId)).isInstanceOf(IllegalArgumentException.class);
+    assertThat(jdbc.queryForObject("SELECT manual_price FROM store_finished_guide_prices WHERE listing_id=?", BigDecimal.class, historicalId))
+        .isEqualByComparingTo("25");
+    assertThat(jdbc.queryForObject("SELECT manual_price FROM store_finished_role_price_overrides WHERE listing_id=?", BigDecimal.class, historicalId))
+        .isEqualByComparingTo("12");
+    assertThat(products.logs()).extracting(StoreFinishedProductService.LogEntry::operationType)
+        .contains("SELECT", "SOURCE_SHELF");
+    jdbc.update("UPDATE finished_products SET status='selling' WHERE id=99831");
+    assertThat(products.pool()).extracting(StoreFinishedProductService.PoolProduct::id).containsExactly(99831L);
+    long freshId = products.select(List.of(99831L)).getFirst().id();
+    assertThat(freshId).isNotEqualTo(historicalId);
+    assertThat(jdbc.queryForList("SELECT selection_generation FROM store_finished_products WHERE finished_product_id=99831 ORDER BY id", Long.class))
+        .containsExactly(0L, 1L);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_guide_prices WHERE listing_id=?", Long.class, freshId)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_role_price_overrides WHERE listing_id=?", Long.class, freshId)).isZero();
+  }
+
+  @Test
   void upstreamEventsRemainIndependentAndScopedAfterBothUpstreamSidesDelete() {
     jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99821,'日志门店级别',1)");
     jdbc.update("INSERT INTO stores (id,tenant_id,name,type,store_level_id,status) VALUES (99821,1,'日志门店甲','cityPartner',99821,'enabled'),(99822,1,'日志门店乙','cityPartner',99821,'enabled')");
@@ -113,10 +163,10 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
     identity(99821L);
     var firstPage = products.logPage("", "", "", "", "", 1, 2);
-    assertThat(firstPage.total()).isEqualTo(5);
+    assertThat(firstPage.total()).isEqualTo(6);
     assertThat(firstPage.records()).hasSize(2);
     assertThat(firstPage.records()).extracting(StoreFinishedProductService.LogEntry::operationType)
-        .containsExactly("SOURCE_DELETE", "SOURCE_OFF_SHELF");
+        .containsExactly("SOURCE_PURGE", "SOURCE_DELETE_TO_RECYCLE");
     assertThat(products.logPage("", "", "", "", "", 1, 10).records())
         .extracting(StoreFinishedProductService.LogEntry::operationType)
         .contains("OPERATIONS_OFF_SHELF", "OPERATIONS_DELETE_TO_RECYCLE", "OPERATIONS_PURGE");
@@ -126,16 +176,18 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThatThrownBy(() -> products.logDetail(otherStoreLogId))
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(products.detail(99821L).status()).isEqualTo("selling");
+    assertThat(products.detail(99821L).sourceMessage())
+        .isEqualTo("该商品已被供应链彻底删除；该商品已被运营端彻底删除");
     products.purge(99821L);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_products WHERE id=99821",
         Integer.class)).isEqualTo(1);
 
     identity(99822L);
-    assertThat(products.logPage("", "", "", "", "", 1, 10).total()).isEqualTo(5);
+    assertThat(products.logPage("", "", "", "", "", 1, 10).total()).isEqualTo(6);
     products.purge(99822L);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_products WHERE id=99821",
         Integer.class)).isZero();
-    assertThat(products.logDetail(otherStoreLogId).operationType()).isEqualTo("SOURCE_DELETE");
+    assertThat(products.logDetail(otherStoreLogId).operationType()).isEqualTo("SOURCE_PURGE");
   }
 
   private void upstreamIdentity(String clientCode) {

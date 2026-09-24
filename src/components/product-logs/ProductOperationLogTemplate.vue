@@ -31,7 +31,7 @@
             <t-input
               :value="filter.operatorName"
               clearable
-              placeholder="请输入操作人"
+              placeholder="请输入"
               @change="emit('filter-change', 'operatorName', $event)"
             />
           </t-form-item>
@@ -176,7 +176,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
 <style scoped>
 .operation-log-filters {
   display: grid;
-  grid-template-columns: 234px minmax(150px, 180px) minmax(150px, 180px) 332px auto;
+  grid-template-columns: 234px minmax(150px, 210px) minmax(120px, 150px) 332px auto;
   align-items: center;
   gap: var(--td-comp-margin-m);
 }

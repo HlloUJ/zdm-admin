@@ -48,6 +48,21 @@ public class ProductLifecycleService {
     if (!isSupplyChain()) { throw new AccessDeniedException("来源商品只能由供应链维护"); }
   }
   public static boolean unavailable(String status) { return !"selling".equals(status) && !"soldOut".equals(status); }
+  public static String sourceBlockMessage(String status, String retainedReason) {
+    if (!unavailable(status)) { return null; }
+    String reason = switch (status) {
+      case "offShelf" -> "OFF_SHELF";
+      case "recycle" -> "DELETE_TO_RECYCLE";
+      case "purged" -> "PURGE";
+      default -> retainedReason;
+    };
+    return switch (reason == null ? "" : reason) {
+      case "OFF_SHELF" -> "该商品已被供应链下架";
+      case "DELETE_TO_RECYCLE" -> "该商品已被供应链删除至回收站";
+      case "PURGE" -> "该商品已被供应链彻底删除";
+      default -> "上游商品不可用";
+    };
+  }
   public void requireOperational(String source, Boolean deleted) {
     if (Boolean.TRUE.equals(deleted)) { throw new IllegalArgumentException("运营商品已被彻底删除"); }
     if (unavailable(source)) { throw new IllegalArgumentException("来源商品未上架或已删除，只能彻底删除运营商品"); }
@@ -97,7 +112,17 @@ public class ProductLifecycleService {
     if(reason!=null && reason.length()>80 || detail!=null && detail.length()>500) { throw new IllegalArgumentException("下架说明超出长度限制"); }
     boolean publish="selling".equals(target);
     boolean recreate=publish && deleted(row);
-    jdbc.update("UPDATE "+kind.table+" SET source_status=? WHERE id=?",target,id);
+    String blockReason = switch (target) {
+      case "offShelf" -> "OFF_SHELF";
+      case "recycle" -> "DELETE_TO_RECYCLE";
+      case "purged" -> "PURGE";
+      default -> null;
+    };
+    if ("warehouse".equals(target)) {
+      jdbc.update("UPDATE "+kind.table+" SET source_status=? WHERE id=?",target,id);
+    } else {
+      jdbc.update("UPDATE "+kind.table+" SET source_status=?,source_block_reason=? WHERE id=?",target,blockReason,id);
+    }
     if("offShelf".equals(target)) {
       if(kind==Kind.FINISHED) { jdbc.update("UPDATE finished_products SET source_off_shelf_reason=?,source_off_shelf_detail=?,source_off_shelf_at=NOW() WHERE id=?",reason,detail,id); }
       else { jdbc.update("INSERT INTO slab_off_shelf_records (slab_id,business_client_code,standard_reason,detail_reason,off_shelved_at,off_shelved_by_name,off_shelved_by_account_id) VALUES (?,'supply-chain',?,?,NOW(),?,?)",id,reason,detail,identities.require().displayName(),identities.require().accountId()); }
@@ -115,7 +140,12 @@ public class ProductLifecycleService {
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
     record(kind,row,"supply-chain",type,label,source,target,sourceChanges);
     if (kind == Kind.FINISHED) { storeUpstreamLogs.sourceChange(id, source, target); }
-    if ((!deleted(row) || recreate) && (kind != Kind.FINISHED || List.of("selling", "offShelf", "purged").contains(target))) {
+    if (kind == Kind.FINISHED && recreate) {
+      // Keep old store listings, manual prices and logs as history. The next store selection
+      // receives a new listing ID and its own prices after operations shelves the product.
+      jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1 WHERE id=?", id);
+    }
+    if ((!deleted(row) || recreate) && (kind != Kind.FINISHED || List.of("selling", "offShelf", "recycle", "purged").contains(target))) {
       String result=kind!=Kind.FINISHED ? null : publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : "来源重新上架，解除遮罩并保留运营状态") :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
       Map<String,Object> changes=new LinkedHashMap<>();
@@ -127,17 +157,20 @@ public class ProductLifecycleService {
       String operationsType = switch (target) {
         case "selling" -> "SOURCE_SHELF";
         case "offShelf" -> "SOURCE_OFF_SHELF";
-        case "purged" -> "SOURCE_DELETE";
+        case "recycle" -> "SOURCE_DELETE_TO_RECYCLE";
+        case "purged" -> "SOURCE_PURGE";
         default -> "SOURCE_INTERNAL";
       };
       if (kind == Kind.FINISHED) {
         operationsType = switch (target) {
           case "selling" -> "SOURCE_SHELF";
           case "offShelf" -> "SOURCE_OFF_SHELF";
-          default -> "SOURCE_DELETE";
+          case "recycle" -> "SOURCE_DELETE_TO_RECYCLE";
+          default -> "SOURCE_PURGE";
         };
         if ("offShelf".equals(target)) { result = "供应链已下架该商品"; }
-        if ("purged".equals(target)) { result = "供应链已删除该商品"; }
+        if ("recycle".equals(target)) { result = "供应链已将该商品删除至回收站"; }
+        if ("purged".equals(target)) { result = "供应链已彻底删除该商品"; }
       }
       if (kind == Kind.FINISHED && recreate) {
         sqlSession.clearCache();
