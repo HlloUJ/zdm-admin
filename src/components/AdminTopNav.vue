@@ -9,20 +9,37 @@
           class="brand-context-switcher"
           :class="{ 'is-open': identitySelectorOpen }"
         >
-          <span class="brand-context-label" aria-hidden="true">{{ currentIdentityLabel }}</span>
+          <span class="brand-context-label" :class="{ 'is-city-partner': isCityPartnerStore }" aria-hidden="true">
+            {{ currentIdentityLabel }}
+            <t-tag v-if="isCityPartnerStore" class="city-partner-mark" theme="warning" variant="dark" size="small"
+              >合</t-tag
+            >
+          </span>
           <t-select
             v-model="selectedIdentityId"
             v-model:popup-visible="identitySelectorOpen"
             class="brand-context-select"
             size="small"
             auto-width
-            :options="identityOptions"
             :loading="switchingIdentity"
             aria-label="切换业务身份"
             @change="handleIdentityChange"
-          />
+          >
+            <t-option v-for="option in identityOptions" :key="option.value" :label="option.label" :value="option.value">
+              <span v-if="option.storeType === 'cityPartner'" class="city-partner-option">
+                <span class="city-partner-option-name">{{ option.label }}</span>
+                <t-tag class="city-partner-mark" theme="warning" variant="dark" size="small">合</t-tag>
+              </span>
+              <span v-else>{{ option.label }}</span>
+            </t-option>
+          </t-select>
         </div>
-        <div v-else class="brand-subtitle">{{ currentIdentityLabel }}</div>
+        <div v-else class="brand-subtitle" :class="{ 'is-city-partner': isCityPartnerStore }">
+          {{ currentIdentityLabel }}
+          <t-tag v-if="isCityPartnerStore" class="city-partner-mark" theme="warning" variant="dark" size="small"
+            >合</t-tag
+          >
+        </div>
       </div>
     </div>
 
@@ -59,14 +76,19 @@ const selectedIdentityId = ref<number>();
 const switchingIdentity = ref(false);
 const identitySelectorOpen = ref(false);
 const avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');
-const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string> = {
-  cityPartner: '城市合伙人',
+const storeTypeLabels: Record<Exclude<NonNullable<IdentityContext['storeType']>, 'cityPartner'>, string> = {
   slabSupplier: '大板供应商',
   finishedSupplier: '成品供应商',
   factory: '工厂',
 };
 const formatStoreLabel = (storeName: string, storeType?: IdentityContext['storeType']) =>
-  storeType ? `${storeName} · ${storeTypeLabels[storeType]}` : storeName;
+  storeType && storeType !== 'cityPartner' ? `${storeName} · ${storeTypeLabels[storeType]}` : storeName;
+const isCityPartnerStore = computed(
+  () =>
+    loginUser.value.clientCode !== 'supply-chain' &&
+    Boolean(loginUser.value.storeName) &&
+    loginUser.value.storeType === 'cityPartner',
+);
 const currentIdentityLabel = computed(() => {
   if (loginUser.value.clientCode === 'supply-chain') return '供应链协同系统';
   if (loginUser.value.storeName) return formatStoreLabel(loginUser.value.storeName, loginUser.value.storeType);
@@ -93,7 +115,11 @@ const switchableIdentityContexts = computed(() =>
   ),
 );
 const identityOptions = computed(() =>
-  switchableIdentityContexts.value.map((context) => ({ label: identityLabel(context), value: context.identityId })),
+  switchableIdentityContexts.value.map((context) => ({
+    label: identityLabel(context),
+    value: context.identityId,
+    storeType: context.storeType,
+  })),
 );
 
 const handleIdentityChange = async (value: string | number) => {
@@ -129,6 +155,34 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.city-partner-mark {
+  width: 12px;
+  height: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+}
+
+.city-partner-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.city-partner-option-name {
+  line-height: 12px;
+}
+
+.brand-context-label.is-city-partner,
+.brand-subtitle.is-city-partner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .brand-context-switcher {
   display: grid;
   align-items: center;
