@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,10 +22,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/store-finished-products")
 public class StoreFinishedProductController {
-  public record SelectRequest(@NotEmpty List<@NotNull Long> productIds) {}
+  public record SelectRequest(@NotEmpty List<@NotNull Long> productIds) {
+    public SelectRequest {
+      productIds = productIds == null ? null
+          : Collections.unmodifiableList(new ArrayList<>(productIds));
+    }
+  }
   public record TransitionRequest(@NotNull String target, String reason, String detail) {}
   public record BatchRequest(@NotEmpty List<@NotNull Long> ids, @NotNull String target,
-      String reason, String detail) {}
+      String reason, String detail) {
+    public BatchRequest {
+      ids = ids == null ? null : Collections.unmodifiableList(new ArrayList<>(ids));
+    }
+  }
   public record GuidePriceRequest(@NotNull BigDecimal price) {}
   public record RolePriceRequest(BigDecimal price, boolean followConfiguration) {}
 

@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,14 +27,27 @@ public class StoreFinishedProductService {
   public record SkuPrice(Long skuId, String label, Integer stock, BigDecimal costPrice,
       BigDecimal guidePrice, String guideSource, List<RolePrice> rolePrices,
       String displayMode, Map<String, String> salesAttributes, String material,
-      String lengthValue, String color, String sizeValue) {}
+      String lengthValue, String color, String sizeValue) {
+    public SkuPrice {
+      rolePrices = List.copyOf(rolePrices);
+      salesAttributes = salesAttributes == null ? null
+          : Collections.unmodifiableMap(new LinkedHashMap<>(salesAttributes));
+    }
+  }
   public record ProductView(Long id, Long productId, String name, String merchantCode,
       String status, String effectiveStatus, boolean sourceUnavailable, String sourceMessage,
       Integer totalStock, String imageUrl, List<String> imageUrls, String videoUrl,
       String detail, Long categoryId, String categoryName, Long supplierId, String supplierName,
       List<FinishedProductAttributeEntry> attributes, List<FinishedSpecDimension> specDimensions,
       List<SkuPrice> skus, LocalDateTime createdAt, String offShelfReason,
-      String offShelfDetail, LocalDateTime offShelfAt) {}
+      String offShelfDetail, LocalDateTime offShelfAt) {
+    public ProductView {
+      imageUrls = List.copyOf(imageUrls);
+      attributes = List.copyOf(attributes);
+      specDimensions = specDimensions == null ? null : List.copyOf(specDimensions);
+      skus = List.copyOf(skus);
+    }
+  }
   public record PoolProduct(Long id, String name, String merchantCode, Integer totalStock,
       String imageUrl, Long categoryId, String supplierName) {}
   public record LogEntry(Long id, Long listingId, Long productId, String productName,
