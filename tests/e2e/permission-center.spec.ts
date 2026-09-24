@@ -986,6 +986,8 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('页面');
   await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
+  await roleModuleList.getByText('供应商供货类型管理', { exact: true }).click();
+  await expect(roleMatrix.locator('tbody .permission-menu-cell').first()).toHaveText('一级菜单直达');
   await roleModuleList.getByText('租户与门店', { exact: true }).click();
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(['租户管理', '门店管理', '门店基础数据']);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(['—', '—', '门店级别管理']);
@@ -1220,6 +1222,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   const main = page.getByRole('main');
   const moduleList = main.locator('.permission-module-list');
   const matrix = main.locator('.permission-matrix');
+  await expect(matrix.locator('thead th')).toHaveText(['二级菜单', '三级菜单', '页面', '页面 Tab', '操作权限']);
   await expect(page.locator('.side-nav').getByText('门店分类管理', { exact: true })).toHaveCount(0);
 
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {
@@ -1233,6 +1236,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
     if (terminal === '城市合伙人门店管理后台') {
       await moduleList.getByText('成品现货管理', { exact: true }).click();
       await expect(matrix.getByText('一级菜单直达')).toBeVisible();
+      await expect(matrix.locator('tbody .permission-menu-cell').first()).toHaveText('一级菜单直达');
       for (const tab of ['仓库中', '出售中', '已下架', '已售完', '回收站']) {
         await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
       }
