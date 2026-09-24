@@ -112,7 +112,23 @@ export const saveStoreFinishedRolePrice = (
   });
 export const getCurrentEmployeeMinimumPrice = (id: number, skuId: number) =>
   request<{ price: number; roleId: number }>(`${base}/${id}/skus/${skuId}/minimum-sale-price`);
-export const listStoreFinishedLogs = () => request<StoreFinishedLog[]>(`${base}/operation-logs`);
+export interface StoreFinishedLogFilter {
+  keyword: string;
+  operationType: string;
+  operatorName: string;
+  startDate: string;
+  endDate: string;
+  page: number;
+  pageSize: number;
+}
+export const listStoreFinishedLogs = (filter: StoreFinishedLogFilter) => {
+  const query = new URLSearchParams();
+  Object.entries(filter).forEach(([key, value]) => {
+    if (value !== '') query.set(key, String(value));
+  });
+  return request<{ records: StoreFinishedLog[]; total: number }>(`${base}/operation-logs?${query}`);
+};
+export const getStoreFinishedLog = (id: number) => request<StoreFinishedLog>(`${base}/operation-logs/${id}`);
 
 export interface StorePriceConfiguration {
   id: number;

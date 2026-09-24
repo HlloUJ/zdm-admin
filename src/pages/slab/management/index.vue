@@ -716,119 +716,31 @@
       </t-space>
     </t-drawer>
 
-    <t-drawer
+    <ProductOperationLogTemplate
       v-model:visible="operationLogDrawerVisible"
-      header="操作日志"
-      placement="right"
-      size="min(1240px, 100vw)"
-      :footer="false"
+      v-model:detail-visible="operationLogDetailVisible"
+      :records="operationLogRows"
+      :detail="operationLogDetailRow"
+      :total="operationLogTotal"
+      :loading="operationLogLoading"
+      :filter="operationLogFilter"
+      :pagination="operationLogPagination"
+      :type-options="operationTypeOptions"
+      subject-label="大板"
+      subject-code-label="大板编号"
+      keyword-placeholder="大板名称/ID/大板编号"
+      :status-label="operationLogStatusLabel"
+      :format-time="formatDateTime"
+      :source-label="operationLogSourceLabel"
+      :show-reason="operationLogShowReason"
+      @filter-change="updateOperationLogFilter"
+      @search="handleOperationLogSearch"
+      @reset="handleOperationLogReset"
+      @page-change="changeOperationLogPage"
+      @open-detail="openOperationLogDetailById"
     >
-      <div class="operation-log-drawer">
-        <t-form class="zdm-admin-filter-form" label-width="auto" :data="operationLogFilter" colon>
-          <div class="operation-log-filters">
-            <t-form-item label="大板" class="operation-log-keyword-filter">
-              <t-input v-model="operationLogFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
-            </t-form-item>
-            <t-form-item label="操作类型">
-              <t-select
-                v-model="operationLogFilter.operationType"
-                :popup-props="{ overlayInnerStyle: { width: '120px' } }"
-                clearable
-                placeholder="请选择"
-              >
-                <t-option v-for="item in operationTypeOptions" :key="item.value" v-bind="item" />
-              </t-select>
-            </t-form-item>
-            <t-form-item label="操作人" class="operation-log-operator-filter">
-              <t-input v-model="operationLogFilter.operatorName" clearable placeholder="请输入操作人" />
-            </t-form-item>
-            <t-form-item label="操作时间" class="operation-log-date-filter">
-              <t-date-range-picker
-                v-model="operationLogFilter.dateRange"
-                class="operation-log-date-picker"
-                clearable
-                allow-input
-                value-type="YYYY-MM-DD"
-                :placeholder="['开始日期', '结束日期']"
-              />
-            </t-form-item>
-            <div class="operation-log-filter-actions">
-              <t-button theme="primary" @click="handleOperationLogSearch">
-                <template #icon><t-icon name="search" /></template>
-                查询
-              </t-button>
-              <t-button theme="default" variant="base" @click="handleOperationLogReset">
-                <template #icon><t-icon name="refresh" /></template>
-                重置
-              </t-button>
-            </div>
-          </div>
-        </t-form>
-        <div>
-          <t-table
-            row-key="id"
-            :data="operationLogs"
-            :columns="operationLogColumns"
-            :loading="operationLogLoading"
-            hover
-          >
-            <template #slab="{ row }">
-              <div class="slab-meta">
-                <div class="slab-name">{{ row.slabName }}</div>
-                <div class="slab-code">ID：{{ row.slabId }}</div>
-                <div class="slab-code">大板编号：{{ row.slabSerialNo }}</div>
-              </div>
-            </template>
-            <template #operationType="{ row }">{{ operationTypeLabel(row.operationType) }}</template>
-            <template #operatedAt="{ row }">{{ formatDateTime(row.operatedAt) }}</template>
-            <template #operation="{ row }">
-              <t-link theme="primary" hover="color" @click="openOperationLogDetail(row)">详情</t-link>
-            </template>
-          </t-table>
-          <t-empty v-if="!operationLogLoading && !operationLogs.length" description="暂无操作日志" />
-          <AdminPagination
-            v-if="operationLogTotal"
-            v-model:current="operationLogPagination.current"
-            v-model:page-size="operationLogPagination.pageSize"
-            :total="operationLogTotal"
-            :page-size-options="pageSizeOptions"
-            @change="loadOperationLogs"
-          />
-        </div>
-      </div>
-    </t-drawer>
-
-    <AdminDialog
-      v-model:visible="operationLogDetailVisible"
-      header="操作详情"
-      width="min(1240px, 94vw)"
-      dialog-class-name="operation-log-detail-dialog"
-      :cancel-btn="null"
-      confirm-btn="关闭"
-      @confirm="operationLogDetailVisible = false"
-    >
-      <template v-if="operationLogDetail">
-        <div class="operation-log-detail">
-          <t-descriptions title="操作信息" bordered :column="3">
-            <t-descriptions-item label="大板名称">{{ operationLogDetail.slabName }}</t-descriptions-item>
-            <t-descriptions-item label="操作类型">
-              {{ operationTypeLabel(operationLogDetail.operationType) }}
-            </t-descriptions-item>
-            <t-descriptions-item label="操作人">{{ operationLogDetail.operatorName }}</t-descriptions-item>
-            <t-descriptions-item label="操作时间">{{
-              formatDateTime(operationLogDetail.operatedAt)
-            }}</t-descriptions-item>
-            <t-descriptions-item label="操作来源" :span="2">{{
-              operationSourceLabel(operationLogDetail.operationSource)
-            }}</t-descriptions-item>
-            <t-descriptions-item label="操作内容" :span="2">
-              {{ operationLogDetail.operationSummary }}
-            </t-descriptions-item>
-            <t-descriptions-item label="状态变化">
-              {{ formatStatusChange(operationLogDetail) }}
-            </t-descriptions-item>
-          </t-descriptions>
-
+      <template #detail>
+        <div v-if="operationLogDetail" class="operation-log-detail">
           <template v-if="operationLogIsCreate && operationLogChangeRows.length">
             <t-space direction="vertical" size="large" class="slab-creation-sections">
               <AdminSectionCard>
@@ -931,29 +843,23 @@
                   >
                     <t-space direction="vertical">
                       <span>{{ side.label }}</span>
-                      <img
-                        v-if="side.media?.available && side.media.url && side.media.mediaType === 'image'"
-                        class="operation-log-media-preview operation-log-media-preview--image"
-                        :src="side.media.url"
-                        :alt="`${row.field}${side.label}`"
-                        @click="openOperationLogMediaPreview(side.media, `${row.field} - ${side.label}`)"
+                      <ProductLogFieldValue
+                        :label="`${row.field} - ${side.label}`"
+                        is-media
+                        :media="side.media"
+                        :missing="!side.media"
+                        @preview="
+                          openOperationLogMediaPreview(
+                            { ...$event, mediaType: $event.mediaType === 'video' ? 'video' : 'image' },
+                            `${row.field} - ${side.label}`,
+                          )
+                        "
                       />
-                      <video
-                        v-else-if="side.media?.available && side.media.url && side.media.mediaType === 'video'"
-                        class="operation-log-media-preview operation-log-media-preview--video"
-                        :src="side.media.url"
-                        preload="metadata"
-                        muted
-                        playsinline
-                        @click="openOperationLogMediaPreview(side.media, `${row.field} - ${side.label}`)"
-                      />
-                      <span v-else>{{ mediaAfterFallback(side.media) }}</span>
-                      <span v-if="side.media?.available && side.media.message">{{ side.media.message }}</span>
                     </t-space>
                   </t-col>
                 </t-row>
                 <div v-else-if="operationLogIsCreate" class="operation-log-media-after">
-                  <span>{{ row.after }}</span>
+                  <ProductLogFieldValue :label="row.field" :value="row.after" />
                 </div>
                 <div v-else-if="row.priceTiers?.length" class="operation-log-price-diff">
                   <div class="operation-log-price-diff__header">价格层级</div>
@@ -992,39 +898,22 @@
                 <div v-else class="operation-log-diff-comparison">
                   <div class="operation-log-diff-value operation-log-diff-value--before">
                     <span class="operation-log-diff-value__label">修改前</span>
-                    <span>{{ row.before }}</span>
+                    <ProductLogFieldValue :label="row.field" :value="row.before" />
                   </div>
                   <t-icon name="arrow-right" class="operation-log-diff-arrow" />
                   <div class="operation-log-diff-value operation-log-diff-value--after">
                     <span class="operation-log-diff-value__label">{{
                       operationLogIsCreate ? '创建时' : '修改后'
                     }}</span>
-                    <span>{{ row.after }}</span>
+                    <ProductLogFieldValue :label="row.field" :value="row.after" />
                   </div>
                 </div>
               </div>
             </div>
           </template>
-
-          <template
-            v-if="
-              !['SOURCE_OFF_SHELF', 'SOURCE_DELETE'].includes(operationLogDetail.operationType) &&
-              (operationLogDetail.standardReason || operationLogDetail.detailReason)
-            "
-          >
-            <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">操作说明</div>
-            <t-descriptions bordered :column="2">
-              <t-descriptions-item label="原因" :span="2">{{
-                operationLogDetail.standardReason || '未填写'
-              }}</t-descriptions-item>
-              <t-descriptions-item label="详细说明" :span="2">
-                <span class="operation-log-detail__long-text">{{ operationLogDetail.detailReason || '未填写' }}</span>
-              </t-descriptions-item>
-            </t-descriptions>
-          </template>
         </div>
       </template>
-    </AdminDialog>
+    </ProductOperationLogTemplate>
 
     <t-drawer
       v-model:visible="priceDrawerVisible"
@@ -1198,6 +1087,9 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import SlabRowWarnings from './components/SlabRowWarnings.vue';
 import SourceUnavailableOverlay from '@/pages/finished-stock/management/components/SourceUnavailableOverlay.vue';
+import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
+import ProductLogFieldValue from '@/components/product-logs/ProductLogFieldValue.vue';
+import { productOperationTypeOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   adminFeedback,
@@ -1571,6 +1463,12 @@ const makeOperationLogFilter = (): OperationLogFilterState => ({
 const operationLogFilter = reactive(makeOperationLogFilter());
 const appliedOperationLogFilter = reactive(makeOperationLogFilter());
 const operationLogPagination = reactive({ current: 1, pageSize: 10 });
+const updateOperationLogFilter = (field: string, value: string | string[]) =>
+  Object.assign(operationLogFilter, { [field]: value });
+const changeOperationLogPage = (page: { current: number; pageSize: number }) => {
+  Object.assign(operationLogPagination, page);
+  void loadOperationLogs();
+};
 const detailPriceRows = ref<DrawerPriceRow[]>([]);
 const detailMediaItems = computed<DetailMediaItem[]>(() => {
   const row = detailDrawerRow.value;
@@ -1598,36 +1496,41 @@ const offShelfHistoryColumns: PrimaryTableCol<SlabOffShelfRecord>[] = [
   { colKey: 'offShelvedByName', title: '下架人', width: 110 },
   { colKey: 'offShelvedAt', title: '下架时间', width: 170 },
 ];
-const operationTypeOptions: { label: string; value: SlabOperationType }[] = [
-  { label: '创建大板', value: 'CREATE' },
-  { label: '编辑信息', value: 'UPDATE' },
-  { label: isSupplyChain.value ? '修改成本' : '修改价格', value: 'PRICE_UPDATE' },
-  { label: '上架', value: 'SHELF' },
-  { label: '下架', value: 'OFF_SHELF' },
-  { label: '放回仓库', value: 'RESTORE_WAREHOUSE' },
-  { label: '恢复大板', value: 'RESTORE_RECYCLE' },
-  { label: '移入回收站', value: 'DELETE_TO_RECYCLE' },
-  { label: '物理删除', value: 'PHYSICAL_DELETE' },
-  { label: '彻底删除', value: 'PURGE' },
-  { label: '状态变更', value: 'STATUS_UPDATE' },
-  ...(!isSupplyChain.value
-    ? [
-        { label: '供应链上架', value: 'SOURCE_SHELF' as const },
-        { label: '供应链下架', value: 'SOURCE_OFF_SHELF' as const },
-        { label: '供应链删除', value: 'SOURCE_DELETE' as const },
-      ]
-    : []),
-];
-const operationTypeLabel = (type: SlabOperationType) =>
-  operationTypeOptions.find((item) => item.value === type)?.label || type;
-const operationLogColumns: PrimaryTableCol<SlabOperationLogRecord>[] = [
-  { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
-  { colKey: 'operationType', title: '操作类型', width: 140 },
-  { colKey: 'operationSummary', title: '操作内容', minWidth: 180 },
-  { colKey: 'operatorName', title: '操作人', width: 120 },
-  { colKey: 'operatedAt', title: '操作时间', width: 180 },
-  { colKey: 'operation', title: '操作', width: 76, fixed: 'right' },
-];
+const operationTypeOptions = productOperationTypeOptions([
+  'CREATE',
+  'UPDATE',
+  'PRICE_UPDATE',
+  'SHELF',
+  'OFF_SHELF',
+  'RESTORE_WAREHOUSE',
+  'RESTORE_RECYCLE',
+  'DELETE_TO_RECYCLE',
+  'PHYSICAL_DELETE',
+  'PURGE',
+  'STATUS_UPDATE',
+  ...(!isSupplyChain.value ? ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE'] : []),
+]);
+const toOperationLogRow = (row: SlabOperationLogRecord): ProductOperationLogRow => ({
+  id: row.id,
+  subjectName: row.slabName,
+  subjectId: row.slabId,
+  subjectCode: row.slabSerialNo,
+  operationType: row.operationType,
+  operationSummary: row.operationSummary,
+  operatorName: row.operatorName,
+  operatedAt: row.operatedAt,
+  operationSource: row.operationSource,
+  beforeStatus: row.beforeStatus,
+  afterStatus: row.afterStatus,
+  standardReason: row.standardReason,
+  detailReason: row.detailReason,
+});
+const operationLogRows = computed(() => operationLogs.value.map(toOperationLogRow));
+const operationLogDetailRow = computed(() => operationLogDetail.value && toOperationLogRow(operationLogDetail.value));
+const operationLogSourceLabel = (row: ProductOperationLogRow) =>
+  operationSourceLabel((row.operationSource || 'MANUAL') as SlabOperationLogRecord['operationSource']);
+const operationLogShowReason = (row: ProductOperationLogRow) =>
+  !['SOURCE_OFF_SHELF', 'SOURCE_DELETE'].includes(row.operationType);
 const formatPriceTierChanges = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null;
   return value
@@ -1981,12 +1884,7 @@ const operationStatusLabels: Record<string, string> = {
   recycle: '回收站',
   purged: '已彻底删除',
 };
-const formatStatusChange = (record: SlabOperationLogRecord) => {
-  if (!record.beforeStatus && !record.afterStatus) return '-';
-  return `${record.beforeStatus ? operationStatusLabels[record.beforeStatus] : '-'} → ${
-    record.afterStatus ? operationStatusLabels[record.afterStatus] : '-'
-  }`;
-};
+const operationLogStatusLabel = (value?: string | null) => (value ? operationStatusLabels[value] || value : '—');
 const uploadPreviews = reactive<Partial<Record<UploadItemKey, AdminMediaValue>>>({});
 const pendingUploadedMediaIds = new Set<number>();
 const uploadErrors = reactive<Partial<Record<UploadItemKey, boolean>>>({});
@@ -3702,9 +3600,9 @@ const handleOperationLogReset = async () => {
   await handleOperationLogSearch();
 };
 
-const openOperationLogDetail = (record: SlabOperationLogRecord) => {
-  operationLogDetail.value = record;
-  operationLogDetailVisible.value = true;
+const openOperationLogDetailById = (id: number) => {
+  operationLogDetail.value = operationLogs.value.find((record) => record.id === id) || null;
+  operationLogDetailVisible.value = Boolean(operationLogDetail.value);
 };
 
 const openConfirm = (type: ConfirmType, row: SlabItem | null, content: string) => {
@@ -4082,42 +3980,6 @@ const saveBatchPrice = async () => {
   gap: var(--td-comp-margin-m);
 }
 
-.operation-log-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--td-comp-margin-l);
-}
-
-.operation-log-filters {
-  display: grid;
-  grid-template-columns: 234px minmax(150px, 180px) minmax(150px, 180px) 332px auto;
-  align-items: center;
-  gap: var(--td-comp-margin-m);
-}
-
-.operation-log-filters :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.operation-log-keyword-filter {
-  width: 234px;
-}
-
-.operation-log-date-filter {
-  width: 332px;
-}
-
-.operation-log-date-picker {
-  flex-shrink: 0;
-  width: 260px;
-}
-
-.operation-log-filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
 .operation-log-detail__section-title {
   display: flex;
   align-items: center;
@@ -4285,24 +4147,6 @@ const saveBatchPrice = async () => {
   padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);
   color: var(--td-text-color-secondary);
   font: var(--td-font-body-small);
-}
-
-.operation-log-media-preview {
-  display: block;
-  width: 180px;
-  height: 108px;
-  max-width: 100%;
-  border-radius: var(--td-radius-default);
-  object-fit: cover;
-}
-
-.operation-log-media-preview--image,
-.operation-log-media-preview--video {
-  cursor: pointer;
-}
-
-.operation-log-media-preview--video {
-  background: var(--td-bg-color-secondarycontainer);
 }
 
 .operation-log-media-after {

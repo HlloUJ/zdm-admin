@@ -384,8 +384,12 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       parameters.add(normalizedKeyword);
     }
     if (operationType != null && !operationType.isBlank()) {
-      conditions.add("(" + VISIBLE_TYPE + ") = ?");
-      parameters.add(operationType.trim());
+      if ("RESTORE".equals(operationType.trim())) {
+        conditions.add("(" + VISIBLE_TYPE + ") IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')");
+      } else {
+        conditions.add("(" + VISIBLE_TYPE + ") = ?");
+        parameters.add(operationType.trim());
+      }
     }
     if (operatorName != null && !operatorName.isBlank()) {
       conditions.add("operator_name LIKE ?");

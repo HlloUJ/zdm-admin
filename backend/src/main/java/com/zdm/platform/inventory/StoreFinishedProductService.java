@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -37,6 +39,11 @@ public class StoreFinishedProductService {
   public record LogEntry(Long id, Long listingId, Long productId, String productName,
       String operationType, String operationSummary, String beforeStatus, String afterStatus,
       String changeDetails, String operatorName, LocalDateTime operatedAt) {}
+  public record LogPage(List<LogEntry> records, long total, int page, int pageSize) {
+    public LogPage {
+      records = List.copyOf(records);
+    }
+  }
   public record EffectiveMinimumPrice(BigDecimal price, Long roleId) {}
 
   private final JdbcTemplate jdbc;
@@ -196,7 +203,7 @@ public class StoreFinishedProductService {
     changes.put("状态", Map.of("before", current, "after", target));
     if ("offShelf".equals(target)) {
       changes.put("下架原因", reason);
-      if (detail != null && !detail.isBlank()) changes.put("详细说明", detail);
+      if (detail != null && !detail.isBlank()) { changes.put("详细说明", detail); }
     }
     log(store, id, number(listing.get("finished_product_id")), (String) source.get("name"),
         type, summary, current, target, changes);
@@ -206,7 +213,7 @@ public class StoreFinishedProductService {
   @Transactional
   public List<ProductView> changeStatusBatch(List<Long> ids, String target, String reason, String detail) {
     List<ProductView> changed = new ArrayList<>();
-    for (Long id : ids) changed.add(changeStatus(id, target, reason, detail));
+    for (Long id : ids) { changed.add(changeStatus(id, target, reason, detail)); }
     return changed;
   }
 
@@ -220,7 +227,7 @@ public class StoreFinishedProductService {
 
   @Transactional
   public void purgeBatch(List<Long> ids) {
-    for (Long id : ids) purge(id);
+    for (Long id : ids) { purge(id); }
   }
 
   @Transactional
@@ -245,6 +252,7 @@ public class StoreFinishedProductService {
         current, "purged", Map.of("状态", Map.of("before", current, "after", "purged")));
     jdbc.update("DELETE FROM store_finished_products WHERE id = ? AND tenant_id = ? AND store_id = ?",
         listingId, store.tenantId(), store.storeId());
+    products.releaseFullyPurgedIfUnreferenced(productId);
     return null;
   }
 
@@ -335,9 +343,74 @@ public class StoreFinishedProductService {
         store.tenantId(), store.storeId());
   }
 
+  public LogPage logPage(String keyword, String operationType, String operatorName,
+      String startDate, String endDate, int requestedPage, int requestedSize) {
+    var store = scopes.require();
+    int page = Math.max(1, requestedPage);
+    int size = Math.clamp(requestedSize, 1, 100);
+    StringBuilder conditions = new StringBuilder("tenant_id = ? AND store_id = ?");
+    List<Object> args = new ArrayList<>(List.of(store.tenantId(), store.storeId()));
+    if (keyword != null && !keyword.isBlank()) {
+      conditions.append(" AND (product_name LIKE ? OR CAST(finished_product_id AS CHAR) LIKE ?)");
+      args.add("%" + keyword.trim() + "%");
+      args.add("%" + keyword.trim() + "%");
+    }
+    if (operationType != null && !operationType.isBlank()) {
+      if ("RESTORE".equals(operationType)) {
+        conditions.append(" AND operation_type IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')");
+      } else {
+        conditions.append(" AND operation_type = ?");
+        args.add(operationType);
+      }
+    }
+    if (operatorName != null && !operatorName.isBlank()) {
+      conditions.append(" AND operator_name LIKE ?");
+      args.add("%" + operatorName.trim() + "%");
+    }
+    if (startDate != null && !startDate.isBlank()) {
+      conditions.append(" AND operated_at >= ?");
+      args.add(startDate + " 00:00:00");
+    }
+    if (endDate != null && !endDate.isBlank()) {
+      conditions.append(" AND operated_at < DATE_ADD(?, INTERVAL 1 DAY)");
+      args.add(endDate);
+    }
+    Long count = jdbc.queryForObject(
+        "SELECT COUNT(*) FROM store_finished_operation_logs WHERE " + conditions,
+        Long.class, args.toArray());
+    long total = count == null ? 0L : count;
+    List<Object> pageArgs = new ArrayList<>(args);
+    pageArgs.add(size);
+    pageArgs.add((page - 1) * size);
+    List<LogEntry> records = jdbc.query("""
+        SELECT id, listing_id, finished_product_id, product_name, operation_type,
+          operation_summary, before_status, after_status, change_details,
+          operator_name, operated_at
+        FROM store_finished_operation_logs WHERE
+        """ + conditions + " ORDER BY operated_at DESC, id DESC LIMIT ? OFFSET ?",
+        (row, index) -> logEntry(row), pageArgs.toArray());
+    return new LogPage(records, total, page, size);
+  }
+
   public LogEntry logDetail(Long id) {
-    return logs().stream().filter(log -> log.id().equals(id)).findFirst()
+    var store = scopes.require();
+    return jdbc.query("""
+        SELECT id, listing_id, finished_product_id, product_name, operation_type,
+          operation_summary, before_status, after_status, change_details,
+          operator_name, operated_at
+        FROM store_finished_operation_logs WHERE id = ? AND tenant_id = ? AND store_id = ?
+        """, (row, index) -> logEntry(row), id, store.tenantId(), store.storeId())
+        .stream().findFirst()
         .orElseThrow(() -> new IllegalArgumentException("本门店操作日志不存在"));
+  }
+
+  private static LogEntry logEntry(ResultSet row) throws SQLException {
+    return new LogEntry(row.getLong("id"), row.getObject("listing_id", Long.class),
+        row.getLong("finished_product_id"), row.getString("product_name"),
+        row.getString("operation_type"), row.getString("operation_summary"),
+        row.getString("before_status"), row.getString("after_status"),
+        row.getString("change_details"), row.getString("operator_name"),
+        row.getTimestamp("operated_at").toLocalDateTime());
   }
 
   private ProductView view(CityPartnerStoreScope.Store store, Map<String, Object> listing) {
@@ -408,7 +481,7 @@ public class StoreFinishedProductService {
 
   private FinishedProduct publicProduct(Long productId) {
     FinishedProduct product = productMapper.selectById(productId);
-    if (product == null) throw new IllegalArgumentException("来源商品不存在");
+    if (product == null) { throw new IllegalArgumentException("来源商品不存在"); }
     // Product selection and reads are scoped by CityPartnerStoreScope and the store listing;
     // FinishedProductService.getById checks the platform creator and rejects store self-scope.
     return products.withDetails(product);
@@ -416,7 +489,7 @@ public class StoreFinishedProductService {
 
   private void requireReadyToSell(CityPartnerStoreScope.Store store, Long listingId,
       Map<String, Object> source) {
-    if (stock(source) <= 0) throw new IllegalArgumentException("统一库存已售完，不能上架");
+    if (stock(source) <= 0) { throw new IllegalArgumentException("统一库存已售完，不能上架"); }
     ProductView view = view(store, listing(store, listingId, false));
     List<SkuPrice> sellableSkus = view.skus().stream()
         .filter(sku -> sku.stock() != null && sku.stock() > 0).toList();
@@ -442,14 +515,14 @@ public class StoreFinishedProductService {
         SELECT COUNT(*) FROM finished_product_variants
         WHERE id = ? AND finished_product_id = ?
         """, Long.class, skuId, source.get("id"));
-    if (count == null || count == 0) throw new IllegalArgumentException("商品规格不存在");
+    if (count == null || count == 0) { throw new IllegalArgumentException("商品规格不存在"); }
   }
 
   private BigDecimal guidePrice(Long listingId, Long skuId, Long productId) {
     List<BigDecimal> manual = jdbc.queryForList("""
         SELECT manual_price FROM store_finished_guide_prices WHERE listing_id = ? AND sku_id = ?
         """, BigDecimal.class, listingId, skuId);
-    if (!manual.isEmpty()) return manual.getFirst();
+    if (!manual.isEmpty()) { return manual.getFirst(); }
     List<BigDecimal> source = jdbc.queryForList("""
         SELECT price FROM finished_product_guide_prices WHERE finished_product_id = ? AND sku_id = ?
         """, BigDecimal.class, productId, skuId);
@@ -462,7 +535,7 @@ public class StoreFinishedProductService {
         SELECT manual_price FROM store_finished_role_price_overrides
         WHERE listing_id = ? AND sku_id = ? AND role_id = ?
         """, BigDecimal.class, listingId, skuId, roleId);
-    if (!manual.isEmpty()) return manual.getFirst();
+    if (!manual.isEmpty()) { return manual.getFirst(); }
     List<Map<String, Object>> prices = jdbc.queryForList("""
         SELECT partner.price AS cost_price, config.price_coefficient
         FROM store_finished_role_price_configurations config
@@ -472,7 +545,7 @@ public class StoreFinishedProductService {
         WHERE config.store_id = ? AND config.tenant_id = ? AND config.role_id = ?
           AND config.status = 'enabled'
         """, productId, skuId, store.storeId(), store.tenantId(), roleId);
-    if (prices.isEmpty()) return null;
+    if (prices.isEmpty()) { return null; }
     Map<String, Object> row = prices.getFirst();
     return ((BigDecimal) row.get("cost_price")).multiply((BigDecimal) row.get("price_coefficient"))
         .setScale(2, RoundingMode.HALF_UP);
@@ -483,14 +556,14 @@ public class StoreFinishedProductService {
         SELECT * FROM store_finished_products
         WHERE id = ? AND tenant_id = ? AND store_id = ?
         """ + (lock ? " FOR UPDATE" : ""), id, store.tenantId(), store.storeId());
-    if (rows.isEmpty()) throw new IllegalArgumentException("本门店商品不存在或不可访问");
+    if (rows.isEmpty()) { throw new IllegalArgumentException("本门店商品不存在或不可访问"); }
     return rows.getFirst();
   }
 
   private Map<String, Object> source(Long id, boolean lock) {
     List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM finished_products WHERE id = ?"
         + (lock ? " FOR UPDATE" : ""), id);
-    if (rows.isEmpty()) throw new IllegalArgumentException("来源商品不存在");
+    if (rows.isEmpty()) { throw new IllegalArgumentException("来源商品不存在"); }
     return rows.getFirst();
   }
 

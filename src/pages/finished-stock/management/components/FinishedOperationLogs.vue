@@ -1,93 +1,26 @@
 <template>
-  <t-drawer
-    :visible="visible"
-    header="操作日志"
-    size="min(1240px, 100vw)"
-    :footer="false"
-    @update:visible="emit('update:visible', $event)"
+  <ProductOperationLogTemplate
+    v-model:visible="visibleProxy"
+    v-model:detail-visible="detailVisible"
+    :records="logRows"
+    :detail="detailRow"
+    :total="total"
+    :loading="loading"
+    :filter="filter"
+    :pagination="pagination"
+    :type-options="typeOptions"
+    subject-label="商品"
+    keyword-placeholder="商品名称/ID"
+    :status-label="state"
+    :format-time="time"
+    :source-label="sourceLabel"
+    @filter-change="updateFilter"
+    @search="search"
+    @reset="reset"
+    @page-change="changePage"
+    @open-detail="showDetail"
   >
-    <t-space direction="vertical" size="large" style="width: 100%">
-      <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
-        <div class="operation-log-filters">
-          <t-form-item label="商品" class="operation-log-keyword-filter">
-            <t-input v-model="filter.keyword" clearable placeholder="商品名称/ID" />
-          </t-form-item>
-          <t-form-item label="操作类型">
-            <t-select v-model="filter.operationType" clearable placeholder="请选择">
-              <t-option v-for="item in typeOptions" :key="item.value" v-bind="item" />
-            </t-select>
-          </t-form-item>
-          <t-form-item label="操作人" class="operation-log-operator-filter">
-            <t-input v-model="filter.operatorName" clearable placeholder="请输入操作人" />
-          </t-form-item>
-          <t-form-item label="操作时间" class="operation-log-date-filter">
-            <t-date-range-picker
-              v-model="dateRange"
-              class="operation-log-date-picker"
-              clearable
-              allow-input
-              value-type="YYYY-MM-DD"
-              :placeholder="['开始日期', '结束日期']"
-            />
-          </t-form-item>
-          <div class="operation-log-filter-actions">
-            <t-button theme="primary" @click="search">
-              <template #icon><t-icon name="search" /></template>
-              查询
-            </t-button>
-            <t-button theme="default" variant="base" @click="reset">
-              <template #icon><t-icon name="refresh" /></template>
-              重置
-            </t-button>
-          </div>
-        </div>
-      </t-form>
-      <t-table row-key="id" :data="records" :columns="columns" :loading="loading" hover>
-        <template #productName="{ row }"
-          ><div>{{ row.productName }}</div>
-          <div>ID：{{ row.productId }}</div>
-        </template>
-        <template #operationType="{ row }">{{ finishedLogTypes[row.operationType] || row.operationType }}</template>
-        <template #operatedAt="{ row }">{{ time(row.operatedAt) }}</template>
-        <template #operation="{ row }"><t-link theme="primary" @click="showDetail(row.id)">详情</t-link></template>
-        <template #empty>暂无操作日志</template>
-      </t-table>
-      <AdminPagination
-        v-model:current="filter.page"
-        v-model:page-size="filter.pageSize"
-        :total="total"
-        @change="load"
-      />
-    </t-space>
-  </t-drawer>
-  <AdminDialog
-    v-model:visible="detailVisible"
-    header="操作详情"
-    width="min(1240px, 94vw)"
-    :cancel-btn="null"
-    confirm-btn="关闭"
-    @confirm="detailVisible = false"
-  >
-    <t-space v-if="detail" direction="vertical" size="large" style="width: 100%">
-      <t-descriptions title="操作信息" bordered :column="3">
-        <t-descriptions-item label="商品名称" :span="3">{{ detail.productName }}</t-descriptions-item>
-        <t-descriptions-item label="操作类型">{{ finishedLogTypes[detail.operationType] }}</t-descriptions-item>
-        <t-descriptions-item label="操作人">{{ detail.operatorName }}</t-descriptions-item>
-        <t-descriptions-item label="操作时间">{{ time(detail.operatedAt) }}</t-descriptions-item>
-        <t-descriptions-item label="操作来源">{{
-          detail.operationSource === 'MANUAL'
-            ? getLoginUser().clientCode === 'supply-chain'
-              ? '供应链协同系统'
-              : '运营管理平台'
-            : detail.operationSource === 'SUPPLY_CHAIN'
-              ? '供应链协同系统'
-              : detail.operationSource
-        }}</t-descriptions-item>
-        <t-descriptions-item label="操作内容">{{ detail.operationSummary }}</t-descriptions-item>
-        <t-descriptions-item label="状态变化"
-          >{{ state(detail.beforeStatus) }} → {{ state(detail.afterStatus) }}</t-descriptions-item
-        >
-      </t-descriptions>
+    <template #detail>
       <SalesLogFullscreen v-if="initialWarehousePrice" title="入仓价格">
         <FinishedSalesLogTable :snapshot="priceLogSnapshot(changes['入仓价格'].after)" :other="{}" price-only />
       </SalesLogFullscreen>
@@ -107,14 +40,8 @@
         :after-html="richText('after')"
         @preview="preview = $event"
       />
-      <t-descriptions v-if="detail.operationType === 'OFF_SHELF'" title="操作说明" bordered :column="3">
-        <t-descriptions-item label="原因">{{ detail.standardReason || '未填写' }}</t-descriptions-item>
-        <t-descriptions-item label="详细说明" :span="2">
-          <span class="operation-reason-text">{{ detail.detailReason || '未填写' }}</span>
-        </t-descriptions-item>
-      </t-descriptions>
-    </t-space>
-  </AdminDialog>
+    </template>
+  </ProductOperationLogTemplate>
   <AdminDialog
     :visible="!!preview"
     header="历史媒体"
@@ -137,12 +64,12 @@
 import { computed, reactive, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
 import { getLoginUser } from '@/services/auth';
-import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { AdminDialog, AdminPagination, adminFeedback } from '@/components/foundation';
+import { AdminDialog, adminFeedback } from '@/components/foundation';
+import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
+import { productOperationTypeOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
 import {
   listFinishedOperationLogs,
   getFinishedOperationLog,
-  finishedLogTypes,
   finishedLogStates,
   type FinishedOperationLog,
 } from '@/services/finishedOperationLogs';
@@ -153,16 +80,22 @@ import FinishedEditChanges from './FinishedEditChanges.vue';
 import FinishedCreationSnapshot from './FinishedCreationSnapshot.vue';
 const props = defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ 'update:visible': [value: boolean] }>();
+const visibleProxy = computed({
+  get: () => props.visible,
+  set: (value: boolean) => emit('update:visible', value),
+});
 const filter = reactive({
   keyword: '',
   operationType: '',
   operatorName: '',
-  startDate: '',
-  endDate: '',
-  page: 1,
-  pageSize: 10,
+  dateRange: [] as string[],
 });
-const dateRange = ref<string[]>([]);
+const pagination = reactive({ current: 1, pageSize: 10 });
+const updateFilter = (field: string, value: string | string[]) => Object.assign(filter, { [field]: value });
+function changePage(page: { current: number; pageSize: number }) {
+  Object.assign(pagination, page);
+  void load();
+}
 const records = ref<FinishedOperationLog[]>([]);
 const total = ref(0);
 const loading = ref(false);
@@ -171,21 +104,60 @@ const detailVisible = ref(false);
 type Resource = { available: boolean; url?: string; mediaType: string; message?: string; previewOnly?: boolean };
 type Media = { field: string; mediaId: number; resource?: Resource };
 const preview = ref<Resource | null>(null);
-const typeOptions = Object.entries(finishedLogTypes).map(([value, label]) => ({ value, label }));
-const columns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'productName', title: '商品名称/ID', minWidth: 220 },
-  { colKey: 'operationType', title: '操作类型', width: 140 },
-  { colKey: 'operationSummary', title: '操作内容', minWidth: 180 },
-  { colKey: 'operatorName', title: '操作人', width: 120 },
-  { colKey: 'operatedAt', title: '操作时间', width: 180 },
-  { colKey: 'operation', title: '操作', width: 76, fixed: 'right' },
-];
+const typeOptions = productOperationTypeOptions([
+  'CREATE',
+  'UPDATE',
+  'PRICE_UPDATE',
+  'SHELF',
+  'OFF_SHELF',
+  'RESTORE',
+  'DELETE_TO_RECYCLE',
+  'PURGE',
+  'SOLD_OUT',
+  'SOURCE_SHELF',
+  'SOURCE_OFF_SHELF',
+  'SOURCE_DELETE',
+  'RESTORE_WAREHOUSE',
+]);
+const toLogRow = (row: FinishedOperationLog): ProductOperationLogRow => ({
+  id: row.id,
+  subjectName: row.productName,
+  subjectId: row.productId,
+  subjectCode: row.merchantCode,
+  operationType: row.operationType,
+  operationSummary: row.operationSummary,
+  operatorName: row.operatorName,
+  operatedAt: row.operatedAt,
+  operationSource: row.operationSource,
+  beforeStatus: row.beforeStatus,
+  afterStatus: row.afterStatus,
+  standardReason: row.standardReason,
+  detailReason: row.detailReason,
+});
+const logRows = computed(() => records.value.map(toLogRow));
+const detailRow = computed(() => detail.value && toLogRow(detail.value));
+const sourceLabel = (row: ProductOperationLogRow) =>
+  row.operationSource === 'MANUAL'
+    ? getLoginUser().clientCode === 'supply-chain'
+      ? '供应链协同系统'
+      : '运营管理平台'
+    : row.operationSource === 'SUPPLY_CHAIN'
+      ? '供应链协同系统'
+      : row.operationSource || '—';
 let requestId = 0;
 async function load() {
   const id = ++requestId;
   loading.value = true;
   try {
-    const page = await listFinishedOperationLogs({ ...filter });
+    const page = await listFinishedOperationLogs({
+      keyword: filter.keyword,
+      operationType: filter.operationType,
+      operatorName: filter.operatorName,
+      startDate: filter.dateRange[0] || '',
+      endDate: filter.dateRange[1] || '',
+      page: pagination.current,
+      pageSize: pagination.pageSize,
+    });
     if (id === requestId) {
       records.value = page.records;
       total.value = page.total;
@@ -197,14 +169,12 @@ async function load() {
   }
 }
 function search() {
-  filter.page = 1;
-  filter.startDate = dateRange.value?.[0] || '';
-  filter.endDate = dateRange.value?.[1] || '';
+  pagination.current = 1;
   void load();
 }
 function reset() {
-  Object.assign(filter, { keyword: '', operationType: '', operatorName: '', startDate: '', endDate: '', page: 1 });
-  dateRange.value = [];
+  Object.assign(filter, { keyword: '', operationType: '', operatorName: '', dateRange: [] });
+  pagination.current = 1;
   void load();
 }
 async function showDetail(id: number) {
@@ -276,7 +246,7 @@ function richText(side: 'before' | 'after') {
     { ADD_TAGS: ['video'], ADD_ATTR: ['controls'] },
   );
 }
-const state = (value?: string) =>
+const state = (value?: string | null) =>
   value === 'selling' && getLoginUser().clientCode === 'supply-chain'
     ? '已上架'
     : value
@@ -304,35 +274,6 @@ const time = (value?: string) => {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.operation-log-filters {
-  display: grid;
-  grid-template-columns: 234px minmax(150px, 180px) minmax(150px, 180px) 332px auto;
-  align-items: center;
-  gap: var(--td-comp-margin-m);
-}
-
-.operation-log-filters :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.operation-log-keyword-filter {
-  width: 234px;
-}
-
-.operation-log-date-filter {
-  width: 332px;
-}
-
-.operation-log-date-picker {
-  width: 260px;
-}
-
-.operation-log-filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
 .history-media-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

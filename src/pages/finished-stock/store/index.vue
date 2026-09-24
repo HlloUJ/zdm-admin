@@ -299,85 +299,37 @@
       @update:visible="!$event && (confirm = null)"
     />
 
-    <t-drawer v-model:visible="logsVisible" header="操作日志" size="min(1240px, 100vw)" :footer="false">
-      <t-space direction="vertical" size="large" style="width: 100%">
-        <t-form class="zdm-admin-filter-form" label-width="auto" :data="logFilter" colon>
-          <div class="filter-row">
-            <div class="filter-fields">
-              <t-form-item label="商品"
-                ><t-input v-model="logFilter.keyword" clearable placeholder="商品名称/ID"
-              /></t-form-item>
-              <t-form-item label="操作类型">
-                <t-select v-model="logFilter.operationType" clearable placeholder="请选择">
-                  <t-option v-for="item in logTypeOptions" :key="item.value" v-bind="item" />
-                </t-select>
-              </t-form-item>
-              <t-form-item label="操作人"
-                ><t-input v-model="logFilter.operatorName" clearable placeholder="请输入操作人"
-              /></t-form-item>
-              <t-form-item label="操作时间">
-                <t-date-range-picker
-                  v-model="logDateRange"
-                  clearable
-                  allow-input
-                  value-type="YYYY-MM-DD"
-                  :placeholder="['开始日期', '结束日期']"
-                />
-              </t-form-item>
-            </div>
-            <div class="filter-actions">
-              <t-button theme="primary" @click="logPage = 1"
-                ><template #icon><t-icon name="search" /></template>查询</t-button
-              >
-              <t-button variant="base" @click="resetLogFilter"
-                ><template #icon><t-icon name="refresh" /></template>重置</t-button
-              >
-            </div>
-          </div>
-        </t-form>
-        <t-table row-key="id" :data="logPageRows" :columns="logColumns" hover>
-          <template #productName="{ row }"
-            >{{ row.productName }}
-            <div>ID：{{ row.productId }}</div></template
-          >
-          <template #operationType="{ row }">{{ logTypes[row.operationType] || row.operationType }}</template>
-          <template #operatedAt="{ row }">{{ time(row.operatedAt) }}</template>
-          <template #operation="{ row }"><t-link theme="primary" @click="logDetail = row">详情</t-link></template>
-          <template #empty>暂无操作日志</template>
-        </t-table>
-        <AdminPagination v-model:current="logPage" v-model:page-size="logPageSize" :total="filteredLogs.length" />
-      </t-space>
-    </t-drawer>
-    <AdminDialog
-      :visible="Boolean(logDetail)"
-      header="操作详情"
-      width="min(1240px, 94vw)"
-      :cancel-btn="null"
-      confirm-btn="关闭"
-      @confirm="logDetail = null"
-      @close="logDetail = null"
-      @update:visible="!$event && (logDetail = null)"
+    <ProductOperationLogTemplate
+      v-model:visible="logsVisible"
+      v-model:detail-visible="logDetailVisible"
+      :records="logRows"
+      :detail="logDetailRow"
+      :total="logTotal"
+      :loading="logLoading"
+      :filter="logFilter"
+      :pagination="logPagination"
+      :type-options="logTypeOptions"
+      subject-label="商品"
+      keyword-placeholder="商品名称/ID"
+      :status-label="stateLabel"
+      :format-time="time"
+      :source-label="logSourceLabel"
+      @filter-change="updateLogFilter"
+      @search="searchLogs"
+      @reset="resetLogFilter"
+      @page-change="changeLogPage"
+      @open-detail="openLogDetail"
     >
-      <t-descriptions v-if="logDetail" title="操作信息" bordered :column="3">
-        <t-descriptions-item label="商品名称" :span="3">{{ logDetail.productName }}</t-descriptions-item>
-        <t-descriptions-item label="操作类型">{{
-          logTypes[logDetail.operationType] || logDetail.operationType
-        }}</t-descriptions-item>
-        <t-descriptions-item label="操作人">{{ logDetail.operatorName }}</t-descriptions-item>
-        <t-descriptions-item label="操作内容">{{ logDetail.operationSummary }}</t-descriptions-item>
-        <t-descriptions-item label="操作时间">{{ time(logDetail.operatedAt) }}</t-descriptions-item>
-        <t-descriptions-item label="状态变化" :span="2"
-          >{{ stateLabel(logDetail.beforeStatus) }} → {{ stateLabel(logDetail.afterStatus) }}</t-descriptions-item
-        >
-      </t-descriptions>
-      <FinishedEditChanges
-        v-if="Object.keys(logChanges).length"
-        :changes="logChanges"
-        :media="[]"
-        before-html=""
-        after-html=""
-      />
-    </AdminDialog>
+      <template #detail>
+        <FinishedEditChanges
+          v-if="Object.keys(logChanges).length"
+          :changes="logChanges"
+          :media="[]"
+          before-html=""
+          after-html=""
+        />
+      </template>
+    </ProductOperationLogTemplate>
   </div>
 </template>
 
@@ -397,11 +349,14 @@ import {
 } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
+import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
+import { productOperationTypeOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
 import {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,
   clearStoreFinishedRecycle,
   getStoreFinishedProduct,
+  getStoreFinishedLog,
   listStoreFinishedLogs,
   listStoreFinishedPool,
   listStoreFinishedProducts,
@@ -505,7 +460,38 @@ type ActionKind = 'shelf' | 'delete' | 'restore' | 'purge' | 'batch-shelf' | 'ba
 const confirm = ref<{ kind: ActionKind; label: string; product?: StoreFinishedProduct; ids?: number[] } | null>(null);
 const logsVisible = ref(false);
 const logs = ref<StoreFinishedLog[]>([]);
+const logTotal = ref(0);
+const logLoading = ref(false);
 const logDetail = ref<StoreFinishedLog | null>(null);
+const logDetailVisible = ref(false);
+const toLogRow = (row: StoreFinishedLog): ProductOperationLogRow => ({
+  id: row.id,
+  subjectName: row.productName,
+  subjectId: row.productId,
+  operationType: row.operationType,
+  operationSummary: row.operationSummary,
+  operatorName: row.operatorName,
+  operatedAt: row.operatedAt,
+  beforeStatus:
+    row.operationType.startsWith('SOURCE_') || row.operationType.startsWith('OPERATIONS_') ? null : row.beforeStatus,
+  afterStatus:
+    row.operationType.startsWith('SOURCE_') || row.operationType.startsWith('OPERATIONS_') ? null : row.afterStatus,
+});
+const logDetailRow = computed(() => logDetail.value && toLogRow(logDetail.value));
+const logSourceLabel = (row: ProductOperationLogRow) =>
+  row.operationType.startsWith('SOURCE_')
+    ? '供应链协同系统'
+    : row.operationType.startsWith('OPERATIONS_')
+      ? '运营管理平台'
+      : '合伙人门店';
+async function openLogDetail(id: number) {
+  try {
+    logDetail.value = await getStoreFinishedLog(id);
+    logDetailVisible.value = true;
+  } catch (error) {
+    adminFeedback.error(getSafeErrorMessage(error, '操作详情加载失败'));
+  }
+}
 const logChanges = computed<Record<string, { before: unknown; after: unknown }>>(() => {
   if (!logDetail.value?.changeDetails) return {};
   try {
@@ -519,7 +505,7 @@ const logChanges = computed<Record<string, { before: unknown; after: unknown }>>
             : { before: null, after: value };
         return [
           label,
-          field === '状态'
+          ['状态', '来源状态', '运营状态'].includes(field)
             ? { before: stateLabel(change.before as string), after: stateLabel(change.after as string) }
             : change,
         ];
@@ -529,36 +515,31 @@ const logChanges = computed<Record<string, { before: unknown; after: unknown }>>
     return {};
   }
 });
-const logFilter = reactive({ keyword: '', operationType: '', operatorName: '' });
-const logDateRange = ref<string[]>([]);
-const logPage = ref(1);
-const logPageSize = ref(10);
-const logTypes: Record<string, string> = {
-  SELECT: '挑选商品',
-  SHELF: '上架',
-  OFF_SHELF: '下架',
-  RESTORE: '放回仓库',
-  DELETE_TO_RECYCLE: '删除至回收站',
-  PURGE: '彻底删除',
-  PRICE_UPDATE: '修改价格',
-};
-const logTypeOptions = Object.entries(logTypes).map(([value, label]) => ({ value, label }));
-const filteredLogs = computed(() =>
-  logs.value.filter((log) => {
-    const keyword = logFilter.keyword.trim();
-    const operatedDate = log.operatedAt.slice(0, 10);
-    return (
-      (!keyword || `${log.productName} ${log.productId}`.includes(keyword)) &&
-      (!logFilter.operationType || log.operationType === logFilter.operationType) &&
-      (!logFilter.operatorName.trim() || log.operatorName.includes(logFilter.operatorName.trim())) &&
-      (!logDateRange.value?.[0] || operatedDate >= logDateRange.value[0]) &&
-      (!logDateRange.value?.[1] || operatedDate <= logDateRange.value[1])
-    );
-  }),
-);
-const logPageRows = computed(() =>
-  filteredLogs.value.slice((logPage.value - 1) * logPageSize.value, logPage.value * logPageSize.value),
-);
+const logFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
+const appliedLogFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
+const logPagination = reactive({ current: 1, pageSize: 10 });
+const updateLogFilter = (field: string, value: string | string[]) => Object.assign(logFilter, { [field]: value });
+function changeLogPage(page: { current: number; pageSize: number }) {
+  Object.assign(logPagination, page);
+  void loadLogs();
+}
+const logTypeOptions = productOperationTypeOptions([
+  'SELECT',
+  'SHELF',
+  'OFF_SHELF',
+  'RESTORE',
+  'DELETE_TO_RECYCLE',
+  'PURGE',
+  'PRICE_UPDATE',
+  'SOURCE_SHELF',
+  'SOURCE_OFF_SHELF',
+  'SOURCE_DELETE',
+  'OPERATIONS_SHELF',
+  'OPERATIONS_OFF_SHELF',
+  'OPERATIONS_DELETE_TO_RECYCLE',
+  'OPERATIONS_PURGE',
+]);
+const logRows = computed(() => logs.value.map(toLogRow));
 const rowActions: Record<
   string,
   { kind: ActionKind | 'off-shelf'; label: string; permission: string; theme: 'primary' | 'danger' | 'warning' }[]
@@ -620,21 +601,13 @@ const roleColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'priceSource', title: '价格来源', minWidth: 230 },
   { colKey: 'operation', title: '操作', width: 90 },
 ];
-const logColumns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'productName', title: '商品名称/ID', minWidth: 220 },
-  { colKey: 'operationType', title: '操作类型', width: 140 },
-  { colKey: 'operationSummary', title: '操作内容', minWidth: 180 },
-  { colKey: 'operatorName', title: '操作人', width: 120 },
-  { colKey: 'operatedAt', title: '操作时间', width: 180 },
-  { colKey: 'operation', title: '操作', width: 80 },
-];
 function time(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 16).replaceAll('-', '/') : '—';
 }
 function money(value: number | null | undefined) {
   return value == null ? '—' : Number(value).toFixed(2);
 }
-function stateLabel(value?: string) {
+function stateLabel(value?: string | null) {
   return value ? statusLabels[value] || value : '—';
 }
 async function load() {
@@ -830,18 +803,40 @@ async function runConfirmed() {
   }
 }
 async function openLogs() {
+  Object.assign(logFilter, { keyword: '', operationType: '', operatorName: '', dateRange: [] });
+  Object.assign(appliedLogFilter, logFilter);
+  logPagination.current = 1;
+  logsVisible.value = true;
+  await loadLogs();
+}
+async function loadLogs() {
+  logLoading.value = true;
   try {
-    logs.value = await listStoreFinishedLogs();
-    resetLogFilter();
-    logsVisible.value = true;
+    const result = await listStoreFinishedLogs({
+      keyword: appliedLogFilter.keyword,
+      operationType: appliedLogFilter.operationType,
+      operatorName: appliedLogFilter.operatorName,
+      startDate: appliedLogFilter.dateRange[0] || '',
+      endDate: appliedLogFilter.dateRange[1] || '',
+      page: logPagination.current,
+      pageSize: logPagination.pageSize,
+    });
+    logs.value = result.records;
+    logTotal.value = result.total;
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '操作日志加载失败'));
+  } finally {
+    logLoading.value = false;
   }
 }
+function searchLogs() {
+  Object.assign(appliedLogFilter, logFilter, { dateRange: [...logFilter.dateRange] });
+  logPagination.current = 1;
+  void loadLogs();
+}
 function resetLogFilter() {
-  Object.assign(logFilter, { keyword: '', operationType: '', operatorName: '' });
-  logDateRange.value = [];
-  logPage.value = 1;
+  Object.assign(logFilter, { keyword: '', operationType: '', operatorName: '', dateRange: [] });
+  searchLogs();
 }
 onMounted(load);
 </script>

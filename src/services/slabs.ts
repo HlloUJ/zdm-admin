@@ -148,6 +148,7 @@ export type SlabOperationType =
   | 'OFF_SHELF'
   | 'RESTORE_WAREHOUSE'
   | 'RESTORE_RECYCLE'
+  | 'RESTORE'
   | 'DELETE_TO_RECYCLE'
   | 'PHYSICAL_DELETE'
   | 'PURGE'

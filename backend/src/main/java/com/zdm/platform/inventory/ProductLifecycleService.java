@@ -30,13 +30,15 @@ public class ProductLifecycleService {
   }
   private final FinishedProductArrivalLogService arrivalLogs;
   private final SlabOperationLogService slabLogs;
+  private final StoreFinishedUpstreamLogService storeUpstreamLogs;
   private final JdbcTemplate jdbc;
   private final CurrentIdentityProvider identities;
   private final ObjectMapper json;
   private final org.mybatis.spring.SqlSessionTemplate sqlSession;
-  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs, SlabOperationLogService slabLogs) {
+  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs, SlabOperationLogService slabLogs, StoreFinishedUpstreamLogService storeUpstreamLogs) {
     this.slabLogs=slabLogs;
     this.arrivalLogs=arrivalLogs;
+    this.storeUpstreamLogs=storeUpstreamLogs;
     this.sqlSession=sqlSession;
     this.jdbc=jdbc; this.identities=identities; this.json=json;
   }
@@ -112,6 +114,7 @@ public class ProductLifecycleService {
     if(reason!=null) { sourceChanges.put("下架原因",Map.of("before","","after",reason)); }
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
     record(kind,row,"supply-chain",type,label,source,target,sourceChanges);
+    if (kind == Kind.FINISHED) { storeUpstreamLogs.sourceChange(id, source, target); }
     if ((!deleted(row) || recreate) && (kind != Kind.FINISHED || List.of("selling", "offShelf", "purged").contains(target))) {
       String result=kind!=Kind.FINISHED ? null : publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : "来源重新上架，解除遮罩并保留运营状态") :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
@@ -163,6 +166,9 @@ public class ProductLifecycleService {
       throw new IllegalArgumentException("只有回收站或来源已删除的商品可以彻底删除");
     }
     record(kind,row,"admin","PURGE",kind==Kind.FINISHED ? "彻底删除运营商品" : null,(String)row.get("status"),"purged",Map.of());
+    if (kind == Kind.FINISHED) {
+      storeUpstreamLogs.operationsChange(id, "PURGE", (String) row.get("status"), "purged");
+    }
     jdbc.update("UPDATE "+kind.table+" SET operations_deleted=TRUE,guide_price=NULL WHERE id=?",id);
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
     if (kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }

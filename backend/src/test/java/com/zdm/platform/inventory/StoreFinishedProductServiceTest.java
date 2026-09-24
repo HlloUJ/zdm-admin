@@ -28,6 +28,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private StoreFinishedProductService products;
   @Autowired private StoreFinishedPriceConfigurationService configurations;
+  @Autowired private ProductLifecycleService lifecycle;
+  @Autowired private FinishedProductService finishedProducts;
 
   @DynamicPropertySource
   static void datasource(DynamicPropertyRegistry registry) {
@@ -86,6 +88,61 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     identity(99802L);
     assertThat(products.list()).isEmpty();
     assertThatThrownBy(() -> products.detail(listingId)).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void upstreamEventsRemainIndependentAndScopedAfterBothUpstreamSidesDelete() {
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99821,'日志门店级别',1)");
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,store_level_id,status) VALUES (99821,1,'日志门店甲','cityPartner',99821,'enabled'),(99822,1,'日志门店乙','cityPartner',99821,'enabled')");
+    jdbc.update("INSERT INTO finished_products (id,name,sku,total_stock,status,source_status,operations_deleted) VALUES (99821,'日志成品','store-log-test',1,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO store_finished_products (id,tenant_id,store_id,finished_product_id,status,selected_by_account_id) VALUES (99821,1,99821,99821,'selling',1),(99822,1,99822,99821,'warehouse',1)");
+
+    upstreamIdentity("admin");
+    FinishedProduct offShelf = new FinishedProduct();
+    offShelf.setStatus("offShelf");
+    offShelf.setOffShelfReason("其他");
+    finishedProducts.updateOperationWithDetails(99821L, offShelf, false);
+    FinishedProduct recycle = new FinishedProduct();
+    recycle.setStatus("recycle");
+    finishedProducts.updateOperationWithDetails(99821L, recycle, false);
+    lifecycle.purgeOperations(ProductLifecycleService.Kind.FINISHED, 99821L);
+    upstreamIdentity("supply-chain");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99821L, "offShelf", "其他", null);
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99821L, "recycle");
+    finishedProducts.removeById(99821L);
+
+    identity(99821L);
+    var firstPage = products.logPage("", "", "", "", "", 1, 2);
+    assertThat(firstPage.total()).isEqualTo(5);
+    assertThat(firstPage.records()).hasSize(2);
+    assertThat(firstPage.records()).extracting(StoreFinishedProductService.LogEntry::operationType)
+        .containsExactly("SOURCE_DELETE", "SOURCE_OFF_SHELF");
+    assertThat(products.logPage("", "", "", "", "", 1, 10).records())
+        .extracting(StoreFinishedProductService.LogEntry::operationType)
+        .contains("OPERATIONS_OFF_SHELF", "OPERATIONS_DELETE_TO_RECYCLE", "OPERATIONS_PURGE");
+    Long otherStoreLogId = jdbc.queryForObject(
+        "SELECT id FROM store_finished_operation_logs WHERE store_id=99822 ORDER BY id DESC LIMIT 1",
+        Long.class);
+    assertThatThrownBy(() -> products.logDetail(otherStoreLogId))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(products.detail(99821L).status()).isEqualTo("selling");
+    products.purge(99821L);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_products WHERE id=99821",
+        Integer.class)).isEqualTo(1);
+
+    identity(99822L);
+    assertThat(products.logPage("", "", "", "", "", 1, 10).total()).isEqualTo(5);
+    products.purge(99822L);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_products WHERE id=99821",
+        Integer.class)).isZero();
+    assertThat(products.logDetail(otherStoreLogId).operationType()).isEqualTo("SOURCE_DELETE");
+  }
+
+  private void upstreamIdentity(String clientCode) {
+    CurrentIdentity identity = new CurrentIdentity(1L, 1L, 1L, null, clientCode, 1L, null,
+        "上游测试人员", "all", List.of(), List.of("all"));
+    SecurityContextHolder.getContext().setAuthentication(
+        new UsernamePasswordAuthenticationToken(identity, null, List.of()));
   }
 
   private void identity(Long storeId) {

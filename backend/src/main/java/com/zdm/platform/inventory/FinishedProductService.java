@@ -318,11 +318,22 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     boolean release = lifecycle.isSupplyChain()
         ? lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,productId,"purged")
         : lifecycle.purgeOperations(ProductLifecycleService.Kind.FINISHED,productId);
-    if (release) {
-      super.removeById(id);
-      mediaReferenceService.removeBusiness(MEDIA_DOMAIN,productId,"两端商品均已彻底删除");
-    }
+    if (release) { releaseFullyPurgedIfUnreferenced(productId); }
     return true;
+  }
+
+  /** Keep the source snapshot while any store still needs a read-only listing. */
+  public void releaseFullyPurgedIfUnreferenced(Long productId) {
+    Long remaining = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM store_finished_products WHERE finished_product_id = ?",
+        Long.class, productId);
+    if (remaining != null && remaining == 0 && Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+        SELECT source_status = 'purged' AND operations_deleted = TRUE
+        FROM finished_products WHERE id = ?
+        """, Boolean.class, productId))) {
+      super.removeById(productId);
+      mediaReferenceService.removeBusiness(MEDIA_DOMAIN, productId, "两端商品均已彻底删除且门店已移除");
+    }
   }
 
   private void validateAndNormalize(FinishedProduct product) {

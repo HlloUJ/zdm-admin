@@ -1,7 +1,6 @@
 import { mount, config } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import FinishedEditChanges from './FinishedEditChanges.vue';
-import FinishedLogValue from './FinishedLogValue.vue';
 import FinishedSalesLogTable from './FinishedSalesLogTable.vue';
 config.global.stubs.SalesLogFullscreen = { template: '<div><slot /></div>' };
 
@@ -50,6 +49,7 @@ describe('edit log layout', () => {
         beforeHtml: '',
         afterHtml: '',
       },
+      global: { stubs: { ProductLogFieldValue: false } },
     });
     expect(wrapper.findAll('.change-section-title').map((el) => el.text().replace(/\s+/g, ''))).toEqual([
       '图文描述',
@@ -61,7 +61,7 @@ describe('edit log layout', () => {
     expect(wrapper.text()).not.toContain('点击查看大图');
     expect(wrapper.findAll('.change-side--media')).toHaveLength(2);
     expect(wrapper.findAll('.change-pair--wide')).toHaveLength(1);
-    expect(wrapper.findAllComponents(FinishedLogValue).map((c) => c.props('value'))).toContain('新名称');
+    expect(wrapper.text()).toContain('新名称');
     expect(wrapper.find('input').exists()).toBe(false);
     wrapper.findAll('button')[1].trigger('click');
     expect(wrapper.emitted('preview')?.[0]).toEqual([next.resource]);

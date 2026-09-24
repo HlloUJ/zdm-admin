@@ -171,23 +171,23 @@ test('store price configuration has roles and coefficients without tabs or guide
 test('store operation logs show the same filter, pagination, and detail structure', async ({ page }) => {
   await storeLogin(page);
   await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok([]) }));
-  await page.route('**/api/admin/store-finished-products/operation-logs', (route) =>
-    route.fulfill({
-      json: ok([
-        {
-          id: 1,
-          productId: 91,
-          productName: '门店测试商品',
-          operationType: 'PRICE_UPDATE',
-          operationSummary: '修改本店指导价',
-          operatorName: '门店员工',
-          operatedAt: '2026-09-24T10:00:00',
-          beforeStatus: 'warehouse',
-          afterStatus: 'warehouse',
-          changeDetails: '{"指导价":{"before":150,"after":140}}',
-        },
-      ]),
-    }),
+  const log = {
+    id: 1,
+    productId: 91,
+    productName: '门店测试商品',
+    operationType: 'PRICE_UPDATE',
+    operationSummary: '修改本店指导价',
+    operatorName: '门店员工',
+    operatedAt: '2026-09-24T10:00:00',
+    beforeStatus: 'warehouse',
+    afterStatus: 'warehouse',
+    changeDetails: '{"指导价":{"before":150,"after":140}}',
+  };
+  await page.route('**/api/admin/store-finished-products/operation-logs?**', (route) =>
+    route.fulfill({ json: ok({ records: [log], total: 1 }) }),
+  );
+  await page.route('**/api/admin/store-finished-products/operation-logs/1', (route) =>
+    route.fulfill({ json: ok(log) }),
   );
   await page.goto('/store/finished-stock-management');
   await page.getByRole('main').getByText('操作日志').click();

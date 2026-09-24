@@ -25,13 +25,22 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
   private final ObjectMapper json;
   private final CurrentIdentityProvider identities;
   private final MediaHistoryService history;
+  private final StoreFinishedUpstreamLogService storeUpstreamLogs;
 
+  @org.springframework.beans.factory.annotation.Autowired
   public FinishedOperationLogService(JdbcTemplate jdbc, ObjectMapper json,
-      CurrentIdentityProvider identities, MediaHistoryService history) {
+      CurrentIdentityProvider identities, MediaHistoryService history,
+      StoreFinishedUpstreamLogService storeUpstreamLogs) {
     this.jdbc = jdbc;
     this.json = json;
     this.identities = identities;
     this.history = history;
+    this.storeUpstreamLogs = storeUpstreamLogs;
+  }
+
+  FinishedOperationLogService(JdbcTemplate jdbc, ObjectMapper json,
+      CurrentIdentityProvider identities, MediaHistoryService history) {
+    this(jdbc, json, identities, history, null);
   }
 
   public Map<String, Object> snapshot(FinishedProduct product) {
@@ -194,6 +203,10 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品操作日志保存失败", error); }
     save(log);
+    if ("admin".equals(identity.clientCode()) && storeUpstreamLogs != null
+        && List.of("SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE").contains(type)) {
+      storeUpstreamLogs.operationsChange(product.getId(), type, previousStatus, nextStatus);
+    }
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(before, "before", references);
     retainMedia(after, "after", references);
@@ -368,7 +381,11 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         + " WHEN 'purged' THEN 'SOURCE_DELETE' ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
     conditions.add("(" + visibleType + ")<>'SOURCE_INTERNAL'");
     if (type != null && !type.isBlank()) {
-      conditions.add("(" + visibleType + ")=?"); args.add(type);
+      if ("RESTORE".equals(type)) {
+        conditions.add("(" + visibleType + ") IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')");
+      } else {
+        conditions.add("(" + visibleType + ")=?"); args.add(type);
+      }
     }
     if (operator != null && !operator.isBlank()) { conditions.add("operator_name LIKE ?"); args.add("%" + operator.trim() + "%"); }
     if (start != null) { conditions.add("operated_at>=?"); args.add(start.atStartOfDay()); }

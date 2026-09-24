@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -155,10 +156,18 @@ public class StoreFinishedProductController {
   }
 
   @GetMapping("/operation-logs")
-  public ApiResponse<List<StoreFinishedProductService.LogEntry>> logs() {
+  public ApiResponse<StoreFinishedProductService.LogPage> logs(
+      @RequestParam(defaultValue = "") String keyword,
+      @RequestParam(defaultValue = "") String operationType,
+      @RequestParam(defaultValue = "") String operatorName,
+      @RequestParam(defaultValue = "") String startDate,
+      @RequestParam(defaultValue = "") String endDate,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int pageSize) {
     guard.requirePermission(PREFIX + ".operation-log.view");
     guard.requireDataPermission();
-    return ApiResponse.ok(service.logs());
+    return ApiResponse.ok(service.logPage(keyword, operationType, operatorName,
+        startDate, endDate, page, pageSize));
   }
 
   @GetMapping("/operation-logs/{id}")
