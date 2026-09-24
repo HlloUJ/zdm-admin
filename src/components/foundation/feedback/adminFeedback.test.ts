@@ -41,6 +41,18 @@ describe('adminFeedback', () => {
     expect(messageMocks.warning).toHaveBeenCalledTimes(1);
   });
 
+  it('登录失效时只展示路由统一提示，不重复展示页面错误提示', async () => {
+    const { adminFeedback } = await import('./adminFeedback');
+    const { SESSION_EXPIRED_MESSAGE } = await import('@/services/http');
+
+    adminFeedback.warning(SESSION_EXPIRED_MESSAGE);
+    adminFeedback.error(SESSION_EXPIRED_MESSAGE);
+    adminFeedback.error({ content: SESSION_EXPIRED_MESSAGE });
+
+    expect(messageMocks.warning).toHaveBeenCalledTimes(1);
+    expect(messageMocks.error).not.toHaveBeenCalled();
+  });
+
   it('按动作和对象生成明确的成功文案', async () => {
     const { buildActionSuccessText } = await import('./adminFeedback');
 

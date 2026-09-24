@@ -51,6 +51,8 @@ describe('full function catalog', () => {
   it('keeps platform, supplier and store capabilities in their respective audiences', () => {
     expect(fullFunctionCatalog.map((module) => module.value)).toEqual([
       'admin.tenant',
+      'store.finished-stock-management',
+      'store.price-configuration',
       'admin.product-data-center',
       'admin.supplier-supply-type-management',
       'supply-chain.products',
@@ -58,13 +60,18 @@ describe('full function catalog', () => {
       'admin.tenant.store-category-management',
       'admin.permission-management',
     ]);
-    for (const terminal of ['store', 'supplier'] as const) {
-      expect(terminalFunctionTrees[terminal].map((module) => module.value)).toEqual([
-        'admin.supplier-management',
-        'admin.tenant.store-category-management',
-        'admin.permission-management',
-      ]);
-    }
+    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([
+      'store.finished-stock-management',
+      'store.price-configuration',
+      'admin.supplier-management',
+      'admin.tenant.store-category-management',
+      'admin.permission-management',
+    ]);
+    expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual([
+      'admin.supplier-management',
+      'admin.tenant.store-category-management',
+      'admin.permission-management',
+    ]);
     const operations = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));
     const source = getFunctionCatalogPermissionValues(terminalFunctionTrees['supply-chain']);
     expect(operations).toContain('admin.product-data-center.markup-configuration.slab.guide-price.edit');
@@ -88,6 +95,30 @@ describe('full function catalog', () => {
       expect(operations).not.toContain(`admin.${module}.warehouse.publish`);
       expect(operations).not.toContain(`admin.${module}.selling.edit`);
       expect(normalizeTerminalPermissions('supply-chain', [`admin.${module}.warehouse.price`])).toEqual([]);
+    }
+  });
+
+  it('assigns store finished stock as a direct menu with five tabs and separate role pricing', () => {
+    const stock = terminalFunctionTrees.store.find((module) => module.value === 'store.finished-stock-management')!;
+    expect(stock.menus[0].direct).toBe(true);
+    expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual([
+      '仓库中',
+      '出售中',
+      '已下架',
+      '已售完',
+      '回收站',
+    ]);
+    const storeValues = getFunctionCatalogPermissionValues(terminalFunctionTrees.store);
+    expect(storeValues).toContain('store.finished-stock-management.warehouse.select');
+    expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');
+    expect(storeValues).not.toContain('store.finished-stock-management.selling.delete');
+    const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
+    expect(pricing.menus[0].direct).toBe(true);
+    expect(pricing.menus[0].pages[0].tabs).toEqual([]);
+    expect(storeValues).toContain('store.price-configuration.view');
+    for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {
+      const values = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience(audience));
+      expect(values.some((value) => value.startsWith('store.'))).toBe(false);
     }
   });
 

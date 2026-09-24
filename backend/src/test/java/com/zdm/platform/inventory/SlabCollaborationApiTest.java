@@ -219,7 +219,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     jdbc.update("UPDATE slab_inventory SET length_mm=2000,width_mm=1800,thickness_mm=20,area_square_meter=3.6 WHERE id=99601");
     var snapshot = logs.arrivalSnapshot(99601L);
     logs.record(slabs.getById(99601L), "CREATE", null, "warehouse", null, null, "MANUAL", snapshot);
-    assertThat(jdbc.queryForObject("SELECT operation_summary FROM slab_operation_logs WHERE slab_id=99601 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("创建大板");
+    assertThat(jdbc.queryForObject("SELECT operation_summary FROM slab_operation_logs WHERE slab_id=99601 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("发布商品");
     identity("admin", "all", "all");
     logs.record(slabs.getById(99601L), "SOURCE_SHELF", null, "warehouse", null, null, "SUPPLY_CHAIN", snapshot);
     logs.record(slabs.getById(99601L), "SOURCE_SYNC", "warehouse", "warehouse", null, null, "SUPPLY_CHAIN",
@@ -288,9 +288,9 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isBadRequest());
     identity("admin", "all", "all");
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records())
-        .extracting(SlabOperationLog::getOperationType).containsExactly("SOURCE_DELETE", "SOURCE_OFF_SHELF");
+        .extracting(SlabOperationLog::getOperationType).containsExactly("SOURCE_PURGE", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_OFF_SHELF");
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records())
-        .extracting(SlabOperationLog::getOperationSummary).containsExactly("供应链已删除该商品", "供应链已下架该商品");
+        .extracting(SlabOperationLog::getOperationSummary).containsExactly("供应链已彻底删除该商品", "供应链已将该商品删除至回收站", "供应链已下架该商品");
     for (var log : logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records()) {
       assertThat(log.getStandardReason()).isNull();
       assertThat(log.getDetailReason()).isNull();
@@ -300,10 +300,11 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     jdbc.update("UPDATE slab_operation_logs SET operation_type='SOURCE_SYNC' WHERE slab_id=99601 AND business_client_code='admin'");
     assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_OFF_SHELF", null, null, null, 1, 10).total()).isEqualTo(1);
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records())
-        .extracting(SlabOperationLog::getOperationType).containsExactly("SOURCE_DELETE", "SOURCE_OFF_SHELF");
+        .extracting(SlabOperationLog::getOperationType).containsExactly("SOURCE_PURGE", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_OFF_SHELF");
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isOk())
         .andExpect(jsonPath("$.data.sourceStatus").value("purged"))
         .andExpect(jsonPath("$.data.sourceUnavailable").value(true))
+        .andExpect(jsonPath("$.data.sourceMessage").value("该商品已被供应链彻底删除"))
         .andExpect(jsonPath("$.data.status").value("selling"))
         .andExpect(jsonPath("$.data.sourceOffShelfRecords[0].standardReason").value("库存异常"));
     mvc.perform(put("/api/admin/slabs/batch-status").contentType("application/json")

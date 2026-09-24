@@ -30,6 +30,7 @@ export interface SlabOffShelfRecord {
 export interface SlabRecord {
   sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
+  sourceMessage?: string;
   operationsDeleted?: boolean;
   sourceOffShelfRecords?: SlabOffShelfRecord[];
   stock?: number;
@@ -148,13 +149,16 @@ export type SlabOperationType =
   | 'OFF_SHELF'
   | 'RESTORE_WAREHOUSE'
   | 'RESTORE_RECYCLE'
+  | 'RESTORE'
   | 'DELETE_TO_RECYCLE'
   | 'PHYSICAL_DELETE'
   | 'PURGE'
   | 'STATUS_UPDATE'
   | 'SOURCE_SHELF'
   | 'SOURCE_OFF_SHELF'
-  | 'SOURCE_DELETE';
+  | 'SOURCE_DELETE'
+  | 'SOURCE_DELETE_TO_RECYCLE'
+  | 'SOURCE_PURGE';
 
 export interface SlabOperationChange {
   before?: unknown;

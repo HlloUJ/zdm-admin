@@ -484,7 +484,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   ]);
   expect(operatorBox?.y).toBe(dateFilterBox?.y);
   expect(operatorBox?.y).toBe(searchButtonBox?.y);
-  await logDrawer.getByPlaceholder('请输入操作人').fill('不存在的人员');
+  await logDrawer.getByPlaceholder('请输入', { exact: true }).fill('不存在的人员');
   await logDrawer.getByRole('button', { name: '查询', exact: true }).click();
   await expect(operationLogRow).toHaveCount(0);
   await logDrawer.getByRole('button', { name: '重置', exact: true }).click();

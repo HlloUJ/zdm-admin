@@ -49,8 +49,9 @@ public class EffectivePermissionResolver {
       return List.of();
     }
     String value = authAccountMapper.findTerminalPermissionValue(account.getStoreType());
+    String audience = "cityPartner".equals(account.getStoreType()) ? "store" : "supplier";
     return StringUtils.hasText(value)
-        ? FunctionAudiencePolicy.filter(FunctionPermissionNormalizer.normalize(List.of(value)), "store")
+        ? FunctionAudiencePolicy.filter(FunctionPermissionNormalizer.normalize(List.of(value)), audience)
         : List.of();
   }
 

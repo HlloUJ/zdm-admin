@@ -63,6 +63,7 @@ export interface FinishedProductVariant {
 export interface FinishedProductRecord {
   sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
+  sourceMessage?: string;
   sourceOffShelfReason?: string;
   sourceOffShelfDetail?: string;
   sourceOffShelfAt?: string;

@@ -99,6 +99,7 @@ for (const [status, scope] of [
       supplierId: 2,
       sourceStatus: status === 'selling' ? 'offShelf' : 'selling',
       sourceUnavailable: status === 'selling',
+      sourceMessage: status === 'selling' ? '该商品已被供应链下架' : null,
       publisherType: '平台发布',
       totalStock: 6,
       createdByName: '验收人员',
@@ -249,6 +250,12 @@ for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
       status: 'selling',
       sourceStatus,
       sourceUnavailable: true,
+      sourceMessage:
+        sourceStatus === 'purged'
+          ? '该商品已被供应链彻底删除'
+          : sourceStatus === 'recycle'
+            ? '该商品已被供应链删除至回收站'
+            : '该商品已被供应链下架',
       totalStock: 6,
       detail: '<p>保留商品资料</p>',
       attributes: [],
@@ -264,14 +271,12 @@ for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
     );
     await page.goto('/finished-stock-management');
     const overlay = page.getByRole('main').locator('.source-unavailable-overlay');
-    await expect(overlay).toContainText(sourceStatus === 'purged' ? '该商品已被供应链删除' : '该商品已被供应链下架');
+    await expect(overlay).toContainText(product.sourceMessage);
     await expect(overlay.getByRole('button')).toHaveText(['详情', '彻底删除']);
     await overlay.getByRole('button', { name: '详情', exact: true }).click();
     const drawer = page.locator('.t-drawer:visible');
     await expect(drawer.locator('.t-alert')).toContainText(
-      sourceStatus === 'purged'
-        ? '该商品已被供应链删除，当前仅可查看资料或按权限彻底删除。'
-        : '该商品当前在供应链端未上架，暂不可进行运营操作。',
+      `${product.sourceMessage}，当前仅可查看资料或按权限彻底删除。`,
     );
     await expect(drawer.getByText('保留商品资料', { exact: true })).toBeVisible();
     await expect(drawer.locator('input,textarea')).toHaveCount(0);

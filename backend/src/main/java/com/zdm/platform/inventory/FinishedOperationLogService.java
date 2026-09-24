@@ -25,13 +25,22 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
   private final ObjectMapper json;
   private final CurrentIdentityProvider identities;
   private final MediaHistoryService history;
+  private final StoreFinishedUpstreamLogService storeUpstreamLogs;
 
+  @org.springframework.beans.factory.annotation.Autowired
   public FinishedOperationLogService(JdbcTemplate jdbc, ObjectMapper json,
-      CurrentIdentityProvider identities, MediaHistoryService history) {
+      CurrentIdentityProvider identities, MediaHistoryService history,
+      StoreFinishedUpstreamLogService storeUpstreamLogs) {
     this.jdbc = jdbc;
     this.json = json;
     this.identities = identities;
     this.history = history;
+    this.storeUpstreamLogs = storeUpstreamLogs;
+  }
+
+  FinishedOperationLogService(JdbcTemplate jdbc, ObjectMapper json,
+      CurrentIdentityProvider identities, MediaHistoryService history) {
+    this(jdbc, json, identities, history, null);
   }
 
   public Map<String, Object> snapshot(FinishedProduct product) {
@@ -167,7 +176,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         && List.of("商品属性", "销售规格", "指导价", "层级价格", "规格维度").stream().anyMatch(changes::containsKey)) {
       changes.put("字段顺序", Map.of("before", after.get("字段顺序"), "after", after.get("字段顺序")));
     }
-    Map<String, String> labels = Map.of("CREATE", "创建商品", "UPDATE", "编辑商品",
+    Map<String, String> labels = Map.of("CREATE", "发布商品", "UPDATE", "编辑商品",
         "PRICE_UPDATE", "修改价格", "SHELF", "上架商品", "OFF_SHELF", "下架商品",
         "RESTORE", "放回仓库", "DELETE_TO_RECYCLE", "删除至回收站", "PURGE", "彻底删除商品", "SOLD_OUT", "商品售罄");
     var identity = identities.require();
@@ -194,6 +203,10 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品操作日志保存失败", error); }
     save(log);
+    if ("admin".equals(identity.clientCode()) && storeUpstreamLogs != null
+        && List.of("SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE").contains(type)) {
+      storeUpstreamLogs.operationsChange(product.getId(), type, previousStatus, nextStatus);
+    }
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(before, "before", references);
     retainMedia(after, "after", references);
@@ -362,13 +375,19 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       for (int i = 0; i < 3; i++) { args.add("%" + keyword.trim() + "%"); }
     }
     String sourceTarget = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')";
-    String visibleType = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' AND "
-        + sourceTarget + "='recycle' THEN 'SOURCE_INTERNAL' WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
+    String visibleType = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
+        + sourceTarget + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' ELSE 'SOURCE_PURGE' END "
+        + "WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
         + sourceTarget + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
-        + " WHEN 'purged' THEN 'SOURCE_DELETE' ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
+        + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' WHEN 'purged' THEN 'SOURCE_PURGE'"
+        + " ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
     conditions.add("(" + visibleType + ")<>'SOURCE_INTERNAL'");
     if (type != null && !type.isBlank()) {
-      conditions.add("(" + visibleType + ")=?"); args.add(type);
+      if ("RESTORE".equals(type)) {
+        conditions.add("(" + visibleType + ") IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')");
+      } else {
+        conditions.add("(" + visibleType + ")=?"); args.add(type);
+      }
     }
     if (operator != null && !operator.isBlank()) { conditions.add("operator_name LIKE ?"); args.add("%" + operator.trim() + "%"); }
     if (start != null) { conditions.add("operated_at>=?"); args.add(start.atStartOfDay()); }
@@ -391,8 +410,8 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       ObjectNode changes = (ObjectNode) json.readTree(log.getChangeDetails());
       String sourceTarget = changes.path("来源状态").path("after").asText();
       if ("admin".equals(log.getBusinessClientCode())
-          && ("SOURCE_SYNC".equals(log.getOperationType()) && !List.of("selling", "offShelf", "purged").contains(sourceTarget)
-              || "SOURCE_DELETE".equals(log.getOperationType()) && "recycle".equals(sourceTarget))) {
+          && "SOURCE_SYNC".equals(log.getOperationType())
+          && !List.of("selling", "offShelf", "recycle", "purged").contains(sourceTarget)) {
         throw new IllegalArgumentException("操作日志不存在");
       }
       resolveLegacyCategory(changes, log.getProductId());
@@ -431,7 +450,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         && (log.getAfterStatus() == null || log.getAfterStatus().isBlank())) {
       log.setAfterStatus("purged");
     }
-    if (!"admin".equals(log.getBusinessClientCode()) || !List.of("SOURCE_SYNC", "SOURCE_SHELF", "SOURCE_OFF_SHELF", "SOURCE_DELETE").contains(log.getOperationType())) { return; }
+    if (!"admin".equals(log.getBusinessClientCode()) || !List.of("SOURCE_SYNC", "SOURCE_SHELF", "SOURCE_OFF_SHELF", "SOURCE_DELETE", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_PURGE").contains(log.getOperationType())) { return; }
     try {
       JsonNode changes = json.readTree(log.getChangeDetails());
       if (changes == null) { return; }
@@ -440,12 +459,17 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         log.setOperationType(switch (target) {
           case "selling" -> "SOURCE_SHELF";
           case "offShelf" -> "SOURCE_OFF_SHELF";
-          case "purged" -> "SOURCE_DELETE";
+          case "recycle" -> "SOURCE_DELETE_TO_RECYCLE";
+          case "purged" -> "SOURCE_PURGE";
           default -> "SOURCE_INTERNAL";
         });
       }
+      if ("SOURCE_DELETE".equals(log.getOperationType())) {
+        log.setOperationType("recycle".equals(target) ? "SOURCE_DELETE_TO_RECYCLE" : "SOURCE_PURGE");
+      }
       if ("SOURCE_OFF_SHELF".equals(log.getOperationType())) { log.setOperationSummary("供应链已下架该商品"); }
-      if ("SOURCE_DELETE".equals(log.getOperationType())) { log.setOperationSummary("供应链已删除该商品"); }
+      if ("SOURCE_DELETE_TO_RECYCLE".equals(log.getOperationType())) { log.setOperationSummary("供应链已将该商品删除至回收站"); }
+      if ("SOURCE_PURGE".equals(log.getOperationType())) { log.setOperationSummary("供应链已彻底删除该商品"); }
       if ("SOURCE_SHELF".equals(log.getOperationType()) && (changes.has("入仓价格") || changes.has("销售规格") && changes.has("商品ID"))) {
         log.setOperationSummary(SOURCE_SHELF_SUMMARY);
         log.setBeforeStatus(null);
