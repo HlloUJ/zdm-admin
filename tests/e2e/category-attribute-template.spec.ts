@@ -461,8 +461,18 @@ test('failed display order save restores rows', async ({ page }) => {
     route.fulfill({ status: 400, json: { code: 400, message: '排序保存失败' } }),
   );
   await page.goto('/category-attribute-template');
-  const handles = page.locator('.attribute-table tbody tr td:nth-child(2)');
-  await handles.first().dragTo(handles.nth(1), { targetPosition: { x: 8, y: 13 } });
+  const targetRow = page.locator('.attribute-table tbody tr').nth(1);
+  const targetBox = await targetRow.boundingBox();
+  expect(targetBox).not.toBeNull();
+  await Promise.all([
+    page.waitForRequest((request) => request.url().endsWith('/display-order') && request.method() === 'PUT'),
+    page
+      .locator('.attribute-table .t-icon-move')
+      .first()
+      .dragTo(targetRow, {
+        targetPosition: { x: 8, y: targetBox!.height - 4 },
+      }),
+  ]);
   await expect(page.getByText('调整“字段显示顺序”失败：排序保存失败', { exact: true })).toBeVisible();
   await expect(page.locator('.attribute-table tbody tr').first()).toContainText('颜色');
 });
