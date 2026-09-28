@@ -88,7 +88,7 @@ async function openEditor(page: Page) {
   return { editor, level: editor.locator('.price-table__row').filter({ hasText: '4级合伙人' }) };
 }
 
-test('supply-chain off-shelf price permission edits only slab cost', async ({ page }) => {
+test('supply-chain off-shelf keeps original actions even with a stale price grant', async ({ page }) => {
   await installAdminApiMocks(page);
   await page.addInitScript(() => {
     localStorage.setItem('zdm-admin-token', 'dev-token');
@@ -99,7 +99,13 @@ test('supply-chain off-shelf price permission edits only slab cost', async ({ pa
         clientCode: 'supply-chain',
         name: '大板价格权限测试',
         roles: ['OPERATOR'],
-        permissions: ['supply-chain.slab-management.off-shelf.view', 'supply-chain.slab-management.off-shelf.price'],
+        permissions: [
+          'supply-chain.slab-management.off-shelf.view',
+          'supply-chain.slab-management.off-shelf.detail',
+          'supply-chain.slab-management.off-shelf.restore',
+          'supply-chain.slab-management.off-shelf.delete',
+          'supply-chain.slab-management.off-shelf.price',
+        ],
         dataPermission: 'all',
       }),
     );
@@ -115,7 +121,6 @@ test('supply-chain off-shelf price permission edits only slab cost', async ({ pa
     guidePrice: 200,
     markupPrices: [],
   };
-  const saves: unknown[] = [];
   await page.route('**/api/admin/slabs', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
   await page.route('**/api/admin/slabs/form-options', (route) =>
     route.fulfill({
@@ -133,23 +138,10 @@ test('supply-chain off-shelf price permission edits only slab cost', async ({ pa
       },
     }),
   );
-  await page.route('**/api/admin/slabs/99601/source-cost', (route) => {
-    saves.push(route.request().postDataJSON());
-    return route.fulfill({ json: { code: 0, data: { ...product, costPrice: 120 } } });
-  });
   await page.goto('/supply-chain/slab-management');
   const main = page.getByRole('main');
-  await expect(main.locator('.table-actions .t-link')).toHaveText(['价格']);
-  await main.locator('.table-actions').getByText('价格', { exact: true }).click();
-  const editor = page.locator('.t-drawer--open');
-  await expect(editor.getByPlaceholder('成本价', { exact: true })).toBeVisible();
-  await expect(editor.getByText('指导价', { exact: true })).toHaveCount(0);
-  await expect(editor.getByText('价格系数', { exact: true })).toHaveCount(0);
-  await editor.getByPlaceholder('成本价', { exact: true }).fill('120');
-  await editor.getByRole('button', { name: '保存', exact: true }).click();
-  await page.locator('.t-dialog:visible').getByRole('button', { name: /确认/ }).click();
-  await expect(editor).not.toBeVisible();
-  expect(saves).toEqual([{ costPrice: 120 }]);
+  await expect(main.locator('.table-actions .t-link')).toHaveText(['详情', '放回仓库', '删除']);
+  await expect(page.locator('.t-drawer--open').filter({ hasText: '价格编辑器' })).toHaveCount(0);
 });
 
 for (const status of ['enabled', 'disabled', undefined] as const) {

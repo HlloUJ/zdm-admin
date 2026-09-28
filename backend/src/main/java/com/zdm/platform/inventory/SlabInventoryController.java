@@ -151,7 +151,7 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     permissionGuard.requireData(existing);
     String scope = statusScope(existing.getSourceStatus());
     permissionGuard.requirePermission(permission(scope, "price"));
-    if (!List.of("warehouse", "selling", "off-shelf").contains(scope)) {
+    if (!List.of("warehouse", "selling").contains(scope)) {
       throw new IllegalArgumentException("当前状态不能修改成本价");
     }
     return ApiResponse.ok(service.updateSourceCost(id, request == null ? null : request.costPrice()));

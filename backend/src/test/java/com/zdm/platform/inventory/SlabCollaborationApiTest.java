@@ -62,9 +62,9 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   private void fixture(String status, String source, boolean deleted, long creator) {
     jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99601,'协同大板','SLAB-COLLAB',?,?,?,?,2,10)", status, source, deleted, creator);
   }
-  @Test void sourcePricePermissionOnlyChangesCostIncludingOffShelf() throws Exception {
+  @Test void sourcePricePermissionOnlyChangesWarehouseAndSellingCost() throws Exception {
     fixture("warehouse", "warehouse", true, 1L);
-    for (String[] state : new String[][] {{"warehouse", "warehouse"}, {"selling", "selling"}, {"offShelf", "off-shelf"}}) {
+    for (String[] state : new String[][] {{"warehouse", "warehouse"}, {"selling", "selling"}}) {
       jdbc.update("UPDATE slab_inventory SET source_status=? WHERE id=99601", state[0]);
       sqlSession.clearCache();
       identity("supply-chain", "all", "supply-chain.slab-management." + state[1] + ".edit");
@@ -80,6 +80,14 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
       assertThat(jdbc.queryForObject("SELECT name FROM slab_inventory WHERE id=99601", String.class)).isEqualTo("协同大板");
       assertThat(jdbc.queryForObject("SELECT source_status FROM slab_inventory WHERE id=99601", String.class)).isEqualTo(state[0]);
     }
+    jdbc.update("UPDATE slab_inventory SET source_status='offShelf' WHERE id=99601");
+    sqlSession.clearCache();
+    identity("supply-chain", "all", "supply-chain.slab-management.off-shelf.price");
+    mvc.perform(put("/api/admin/slabs/99601/source-cost").contentType("application/json")
+        .content("{\"costPrice\":22}"))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("SELECT cost_price FROM slab_inventory WHERE id=99601", BigDecimal.class))
+        .isEqualByComparingTo("21");
     jdbc.update("UPDATE slab_inventory SET source_status='soldOut' WHERE id=99601");
     sqlSession.clearCache();
     identity("supply-chain", "all", "supply-chain.slab-management.sold-out.price");

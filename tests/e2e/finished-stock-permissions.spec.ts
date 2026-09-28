@@ -50,10 +50,16 @@ test('one tab hides rail and only grants requested row operation', async ({ page
   await expect(main.getByRole('radio', { name: '立刻上架', exact: true })).toBeDisabled();
   await expect(main.getByRole('radio', { name: '暂不上架', exact: true })).toBeEnabled();
 });
-test('supply-chain off-shelf price permission opens cost-only editor without edit permission', async ({ page }) => {
+test('supply-chain off-shelf keeps original actions even with a stale price grant', async ({ page }) => {
   await setup(
     page,
-    ['supply-chain.finished-stock-management.off-shelf.view', 'supply-chain.finished-stock-management.off-shelf.price'],
+    [
+      'supply-chain.finished-stock-management.off-shelf.view',
+      'supply-chain.finished-stock-management.off-shelf.detail',
+      'supply-chain.finished-stock-management.off-shelf.restore',
+      'supply-chain.finished-stock-management.off-shelf.delete',
+      'supply-chain.finished-stock-management.off-shelf.price',
+    ],
     'supply-chain',
   );
   const product = {
@@ -66,25 +72,11 @@ test('supply-chain off-shelf price permission opens cost-only editor without edi
     guidePrices: [{ skuId: 821, price: 20, priceCoefficient: 2 }],
     markupPrices: [],
   };
-  const saves: unknown[] = [];
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
-  await page.route('**/api/admin/finished-products/72/source-costs', (route) => {
-    saves.push(route.request().postDataJSON());
-    return route.fulfill({
-      json: { code: 0, data: { ...product, variants: [{ ...product.variants[0], costPrice: 15 }] } },
-    });
-  });
   await page.goto('/supply-chain/finished-stock-management');
   const main = page.getByRole('main');
-  await expect(main.locator('.table-actions .t-link')).toHaveText(['价格']);
-  await main.locator('.table-actions').getByText('价格', { exact: true }).click();
-  const editor = page.locator('.product-price-editor');
-  await expect(editor.getByText('指导价', { exact: true })).toHaveCount(0);
-  await editor.getByPlaceholder('价格', { exact: true }).fill('15');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await page.getByRole('button', { name: '确认保存', exact: true }).click();
-  await expect(editor).not.toBeVisible();
-  expect(saves).toEqual([{ variants: [{ skuId: 821, costPrice: 15 }] }]);
+  await expect(main.locator('.table-actions .t-link')).toHaveText(['详情', '放回仓库', '删除']);
+  await expect(page.locator('.product-price-editor')).toHaveCount(0);
 });
 test('multiple tabs exclude unauthorized default and fall back to selling', async ({ page }) => {
   await setup(page, [prefix + 'selling.view', prefix + 'sold-out.view']);

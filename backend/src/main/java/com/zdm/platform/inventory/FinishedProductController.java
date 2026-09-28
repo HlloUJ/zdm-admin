@@ -214,7 +214,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     permissionGuard.requireData(existing);
     String scope = scope(existing.getSourceStatus());
     permissionGuard.requirePermission(permission(scope, "price"));
-    if (!List.of("warehouse", "selling", "off-shelf").contains(scope)) {
+    if (!List.of("warehouse", "selling").contains(scope)) {
       throw new IllegalArgumentException("当前状态不能修改成本价");
     }
     if (request == null || request.variants() == null) {

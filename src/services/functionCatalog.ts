@@ -816,7 +816,6 @@ const supplyChainProducts: FunctionModule = {
               value: `${prefix}.off-shelf`,
               actions: actions('off-shelf', [
                 ['detail', '详情'],
-                ['price', '价格'],
                 ['restore', '放回仓库'],
                 ['batch-restore', '批量放回到仓库'],
                 ['delete', '删除'],

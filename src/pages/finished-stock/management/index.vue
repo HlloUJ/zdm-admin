@@ -2253,7 +2253,7 @@ const managementRowButtons = computed<FinishedStockRowAction[]>(() => [
   ...(!isSupplyChain.value && activeTab.value !== 'offShelf' && hasFinishedAction('detail')
     ? [{ id: 'detail', label: '详情', theme: 'primary' as const }]
     : []),
-  ...((activeTab.value !== 'offShelf' || isSupplyChain.value) && hasFinishedAction('price')
+  ...(activeTab.value !== 'offShelf' && hasFinishedAction('price')
     ? [{ id: 'price', label: '价格', theme: 'primary' as const }]
     : []),
   ...rowActions().map((action) => ({

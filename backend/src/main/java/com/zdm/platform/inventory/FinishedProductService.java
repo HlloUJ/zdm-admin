@@ -211,7 +211,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     lifecycle.requireSupplyChain();
     lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
     FinishedProduct existing = attachDetails(getById(id));
-    if (existing == null || !List.of("warehouse", "selling", "offShelf").contains(existing.getSourceStatus())) {
+    if (existing == null || !List.of("warehouse", "selling").contains(existing.getSourceStatus())) {
       throw new IllegalArgumentException("当前状态不能修改成本价");
     }
     Map<Long, java.math.BigDecimal> current = sourceCosts(existing);

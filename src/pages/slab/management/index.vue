@@ -2652,13 +2652,11 @@ const rowActions = (): {
     ]);
   }
   if (activeTab.value === 'offShelf') {
-    const actions: Parameters<typeof filterActions>[0] = [
+    return filterActions([
       { label: '详情', action: 'detail', theme: 'primary' },
       { label: '放回仓库', action: 'restore', theme: 'primary' },
       { label: '删除', action: 'delete', theme: 'danger' },
-    ];
-    if (isSupplyChain.value) actions.splice(1, 0, { label: '价格', action: 'price', theme: 'primary' });
-    return filterActions(actions);
+    ]);
   }
   if (activeTab.value === 'soldOut') {
     return filterActions([{ label: '价格', action: 'price', theme: 'primary' }]);

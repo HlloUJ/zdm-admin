@@ -214,7 +214,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       throw new IllegalArgumentException("当前状态不能修改成本价");
     }
     SlabInventory existing = attachPrices(current);
-    if (!List.of("warehouse", "selling", "offShelf").contains(existing.getSourceStatus())) {
+    if (!List.of("warehouse", "selling").contains(existing.getSourceStatus())) {
       throw new IllegalArgumentException("当前状态不能修改成本价");
     }
     if (costPrice == null || costPrice.signum() < 0 || costPrice.stripTrailingZeros().scale() > 2) {
