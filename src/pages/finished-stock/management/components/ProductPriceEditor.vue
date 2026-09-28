@@ -20,7 +20,7 @@
               label="系数"
               placeholder="系数"
               :submitted="submitted"
-              :disabled="readonly || index === 0"
+              :disabled="readonly || (!costOnly && index === 0)"
               @change="updateCoefficient(row, row.rows[index], false)"
               @commit="markManual(row.rows[index])"
             />
@@ -29,7 +29,7 @@
               label="价格"
               placeholder="价格"
               :submitted="submitted"
-              :disabled="readonly || index === 0"
+              :disabled="readonly || (!costOnly && index === 0)"
               @change="updatePrice(row, row.rows[index], index)"
               @commit="markManual(row.rows[index])"
             />
@@ -72,6 +72,7 @@ const props = defineProps<{
   productId: number;
   product: FinishedProductPayload;
   levels: { id: number; name: string; priceCoefficient?: number | null; configurationId?: number }[];
+  costOnly?: boolean;
 }>();
 const emit = defineEmits<{ saved: [record: FinishedProductRecord, closeAfterSave: boolean] }>();
 type PriceRow = {
@@ -103,30 +104,34 @@ const editors = ref<VariantEditor[]>(
           key: 'cost',
           label: '成本价',
           coefficient: '1.00',
-          price: String(guide?.costPrice ?? prices[0]?.costPrice ?? ''),
+          price: String(props.costOnly ? (variant.costPrice ?? '') : (guide?.costPrice ?? prices[0]?.costPrice ?? '')),
         },
-        {
-          key: 'guide',
-          label: '指导价',
-          coefficient: String(guide?.priceCoefficient ?? ''),
-          price: String(guide?.price ?? ''),
-        },
-        ...levels.map((level) => {
-          const price = prices.find((entry) => entry.storeLevelId === level.id);
-          return {
-            key: `level-${level.id}`,
-            levelId: level.id,
-            label: level.name,
-            coefficient: String(price?.priceCoefficient ?? level.priceCoefficient ?? ''),
-            price: String(price?.price ?? ''),
-            priceSource: price
-              ? (price.priceSource ?? 'manual')
-              : level.configurationId
-                ? ('auto' as const)
-                : ('manual' as const),
-            sourceConfigurationId: price?.sourceConfigurationId ?? (price ? undefined : level.configurationId),
-          };
-        }),
+        ...(!props.costOnly
+          ? [
+              {
+                key: 'guide',
+                label: '指导价',
+                coefficient: String(guide?.priceCoefficient ?? ''),
+                price: String(guide?.price ?? ''),
+              },
+              ...levels.map((level) => {
+                const price = prices.find((entry) => entry.storeLevelId === level.id);
+                return {
+                  key: `level-${level.id}`,
+                  levelId: level.id,
+                  label: level.name,
+                  coefficient: String(price?.priceCoefficient ?? level.priceCoefficient ?? ''),
+                  price: String(price?.price ?? ''),
+                  priceSource: price
+                    ? (price.priceSource ?? 'manual')
+                    : level.configurationId
+                      ? ('auto' as const)
+                      : ('manual' as const),
+                  sourceConfigurationId: price?.sourceConfigurationId ?? (price ? undefined : level.configurationId),
+                };
+              }),
+            ]
+          : []),
       ],
     };
   }),
@@ -162,7 +167,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...priceFields.value.map((field, index) => ({
     colKey: field.key,
     title: () => h('span', [field.label, h('span', { class: 'required-star' }, '*')]),
-    width: index === 0 ? 110 : index === 1 ? 180 : 196,
+    width: index === 0 ? (props.costOnly ? 160 : 110) : index === 1 ? 180 : 196,
   })),
 ]);
 const activeConfiguration = (row: PriceRow) =>
@@ -213,32 +218,46 @@ const save = async (closeAfterSave = true) => {
   if (saving.value || readonly.value) return;
   saving.value = true;
   try {
-    const payload: FinishedProductPayload = {
-      ...props.product,
-      guidePrice: Number(editors.value[0].rows[1].price),
-      guidePrices: editors.value.map((variant) => ({
-        skuId: variant.key,
-        variantLabel: variant.label,
-        costPrice: Number(variant.rows[0].price),
-        priceCoefficient: Number(variant.rows[1].coefficient),
-        price: Number(variant.rows[1].price),
-      })),
-      markupPrices: editors.value.flatMap((variant) =>
-        variant.rows
-          .filter((row) => row.levelId != null)
-          .map((row) => ({
-            storeLevelId: row.levelId!,
-            priceSource: row.priceSource,
-            sourceConfigurationId: row.sourceConfigurationId,
-            storeLevelName: row.label,
-            skuId: variant.key,
-            variantLabel: variant.label,
-            costPrice: Number(variant.rows[0].price),
-            priceCoefficient: Number(row.coefficient),
-            price: Number(row.price),
-          })),
-      ),
-    };
+    let payload: FinishedProductPayload;
+    if (props.costOnly) {
+      payload = {
+        ...props.product,
+        variants: props.product.variants.map((variant, index) => ({
+          ...variant,
+          costPrice: Number(editors.value[index].rows[0].price),
+        })),
+      };
+      delete payload.guidePrice;
+      delete payload.guidePrices;
+      delete payload.markupPrices;
+    } else {
+      payload = {
+        ...props.product,
+        guidePrice: Number(editors.value[0].rows[1].price),
+        guidePrices: editors.value.map((variant) => ({
+          skuId: variant.key,
+          variantLabel: variant.label,
+          costPrice: Number(variant.rows[0].price),
+          priceCoefficient: Number(variant.rows[1].coefficient),
+          price: Number(variant.rows[1].price),
+        })),
+        markupPrices: editors.value.flatMap((variant) =>
+          variant.rows
+            .filter((row) => row.levelId != null)
+            .map((row) => ({
+              storeLevelId: row.levelId!,
+              priceSource: row.priceSource,
+              sourceConfigurationId: row.sourceConfigurationId,
+              storeLevelName: row.label,
+              skuId: variant.key,
+              variantLabel: variant.label,
+              costPrice: Number(variant.rows[0].price),
+              priceCoefficient: Number(row.coefficient),
+              price: Number(row.price),
+            })),
+        ),
+      };
+    }
     const record = await updateFinishedProduct(props.productId, payload);
     confirmVisible.value = false;
     adminFeedback.success('价格保存成功');

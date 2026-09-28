@@ -777,6 +777,75 @@ test('edits prices in a specification table and preserves product details on sav
   await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toBeDisabled();
 });
 
+test('supply-chain price editor only edits costs in a content-sized drawer', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  const product = {
+    id: 72,
+    name: '供应链成本价商品',
+    sku: 'COST-72',
+    status: 'warehouse',
+    categoryId: 5,
+    mainImageMediaId: 1,
+    videoMediaId: 2,
+    detail: '<p>保留详情</p>',
+    totalStock: 2,
+    attributes: [],
+    variants: [{ id: 821, variantLabel: '规格A', displayMode: 'single', stock: 2, costPrice: 10 }],
+    guidePrice: 20,
+    guidePrices: [{ skuId: 821, variantLabel: '规格A', costPrice: 10, priceCoefficient: 2, price: 20 }],
+    markupPrices: [
+      {
+        skuId: 821,
+        variantLabel: '规格A',
+        storeLevelId: 1,
+        storeLevelName: '一级价格',
+        costPrice: 10,
+        priceCoefficient: 3,
+        price: 30,
+      },
+    ],
+  };
+  let saves = 0;
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/finished-products/price-level-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [{ id: 1, name: '一级价格' }] } }),
+  );
+  await page.route('**/api/admin/finished-products/72', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { code: 0, data: product } });
+      return;
+    }
+    saves += 1;
+    const payload = route.request().postDataJSON();
+    expect(payload.variants[0].costPrice).toBe(15);
+    expect(payload.detail).toBe(product.detail);
+    expect(payload).not.toHaveProperty('guidePrice');
+    expect(payload).not.toHaveProperty('guidePrices');
+    expect(payload).not.toHaveProperty('markupPrices');
+    await route.fulfill({ json: { code: 0, data: { ...product, variants: payload.variants } } });
+  });
+
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.getByText('价格', { exact: true }).click();
+  const editor = page.locator('.product-price-editor');
+  await expect(editor.locator('thead th')).toHaveText(['商品规格', '成本价*']);
+  await expect(editor.getByText('指导价')).toHaveCount(0);
+  await expect(editor.getByText('一级价格')).toHaveCount(0);
+  const drawer = page.locator('.t-drawer--open').filter({ has: editor });
+  await expect
+    .poll(() => drawer.locator('.t-drawer__content-wrapper').evaluate((element) => element.getBoundingClientRect().width))
+    .toBeLessThan(700);
+  const cost = editor.locator('tbody tr').first().getByPlaceholder('价格', { exact: true });
+  await expect(cost).toBeEnabled();
+  await expect(cost).toHaveValue('10.00');
+  await cost.fill('15');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  expect(saves).toBe(1);
+});
+
 test('restores the initial horizontal layout after visiting the off-shelf tab', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));

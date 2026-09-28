@@ -782,7 +782,7 @@
       v-model:visible="priceDrawerVisible"
       :header="priceDrawerMode === 'view' ? '价格编辑器' : '批量填写'"
       placement="right"
-      size="1180px"
+      :size="priceDrawerSize"
       lazy
       destroy-on-close
       :footer="priceDrawerMode === 'view' && !['soldOut', 'recycle'].includes(priceEditorTarget?.status ?? '')"
@@ -922,6 +922,7 @@
         :product-id="priceEditorTarget.id"
         :product="toProductPayload(priceEditorTarget)"
         :levels="productPriceLevels"
+        :cost-only="isSupplyChain"
         @saved="handlePriceEditorSaved"
       />
       <template #footer>
@@ -3259,6 +3260,14 @@ const canViewOperationLogs = computed(() =>
   hasPermission(getLoginUser(), `${productPermissionPrefix.value}.operation-log.view`),
 );
 const priceEditorTarget = ref<StockItem | null>(null);
+const priceDrawerSize = computed(() => {
+  if (priceDrawerMode.value !== 'view' || !isSupplyChain.value) return '1180px';
+  const product = priceEditorTarget.value;
+  const dimensionCount = product?.variants[0]?.displayMode === 'layered' ? (product.specDimensions?.length ?? 0) : 0;
+  const specificationWidth = dimensionCount ? dimensionCount * 100 : 180;
+  return `min(${Math.max(480, specificationWidth + 160 + 96)}px, calc(100vw - 32px))`;
+});
+
 const handlePriceEditorSaved = (record: FinishedProductRecord, closeAfterSave = true) => {
   upsertStockItem(record);
   if (closeAfterSave) closePriceDrawer();
