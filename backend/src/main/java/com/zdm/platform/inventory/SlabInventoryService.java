@@ -205,6 +205,36 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     return updated;
   }
 
+  @Transactional
+  public SlabInventory updateSourceCost(Long id, BigDecimal costPrice) {
+    lifecycle.requireSupplyChain();
+    lifecycle.lock(ProductLifecycleService.Kind.SLAB, id);
+    SlabInventory current = getById(id);
+    if (current == null) {
+      throw new IllegalArgumentException("当前状态不能修改成本价");
+    }
+    SlabInventory existing = attachPrices(current);
+    if (!List.of("warehouse", "selling", "offShelf").contains(existing.getSourceStatus())) {
+      throw new IllegalArgumentException("当前状态不能修改成本价");
+    }
+    if (costPrice == null || costPrice.signum() < 0 || costPrice.stripTrailingZeros().scale() > 2) {
+      throw new IllegalArgumentException("请完善成本价");
+    }
+    if (existing.getCostPrice() != null && existing.getCostPrice().compareTo(costPrice) == 0) {
+      return existing;
+    }
+    List<SlabPrice> beforePrices = priceService.listPrices(id);
+    lambdaUpdate().eq(SlabInventory::getId, id).set(SlabInventory::getCostPrice, costPrice).update();
+    lifecycle.reprice(ProductLifecycleService.Kind.SLAB, id, true);
+    SlabInventory updated = attachPrices(getById(id));
+    Map<String, Object> changes = collectChanges(existing, beforePrices, updated);
+    if (!changes.isEmpty()) {
+      operationLogService.record(updated, "PRICE_UPDATE", existing.getSourceStatus(), updated.getSourceStatus(),
+          null, null, "MANUAL", changes);
+    }
+    return updated;
+  }
+
   public boolean cleanupTemporaryMedia(Long mediaId) {
     mediaAssetService.requireAvailable(mediaId);
     mediaCleanupService.enqueueAfterCommit(List.of(mediaId), "取消未保存的大板媒体");

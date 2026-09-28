@@ -793,6 +793,7 @@ const supplyChainProducts: FunctionModule = {
               value: `${prefix}.warehouse`,
               actions: actions('warehouse', [
                 ['publish', '发布商品'],
+                ['price', '价格'],
                 ['edit', '编辑'],
                 ['shelf', '上架'],
                 ['batch-shelf', '批量上架'],
@@ -804,6 +805,7 @@ const supplyChainProducts: FunctionModule = {
               value: `${prefix}.selling`,
               actions: actions('selling', [
                 ['publish', '发布商品'],
+                ['price', '价格'],
                 ['edit', '编辑'],
                 ['off-shelf', '下架'],
                 ['batch-off-shelf', '批量下架'],
@@ -814,16 +816,18 @@ const supplyChainProducts: FunctionModule = {
               value: `${prefix}.off-shelf`,
               actions: actions('off-shelf', [
                 ['detail', '详情'],
+                ['price', '价格'],
                 ['restore', '放回仓库'],
                 ['batch-restore', '批量放回到仓库'],
                 ['delete', '删除'],
               ]),
             },
-            { label: '已售完', value: `${prefix}.sold-out`, actions: [] },
+            { label: '已售完', value: `${prefix}.sold-out`, actions: actions('sold-out', [['price', '价格']]) },
             {
               label: '回收站',
               value: `${prefix}.recycle`,
               actions: actions('recycle', [
+                ['price', '价格'],
                 ['restore', '放回仓库'],
                 ['purge', '彻底删除'],
                 ['batch-restore', '批量放回到仓库'],

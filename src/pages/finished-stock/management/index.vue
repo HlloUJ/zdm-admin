@@ -2253,7 +2253,7 @@ const managementRowButtons = computed<FinishedStockRowAction[]>(() => [
   ...(!isSupplyChain.value && activeTab.value !== 'offShelf' && hasFinishedAction('detail')
     ? [{ id: 'detail', label: '详情', theme: 'primary' as const }]
     : []),
-  ...(activeTab.value !== 'offShelf' && hasFinishedAction('price')
+  ...((activeTab.value !== 'offShelf' || isSupplyChain.value) && hasFinishedAction('price')
     ? [{ id: 'price', label: '价格', theme: 'primary' as const }]
     : []),
   ...rowActions().map((action) => ({
@@ -3264,8 +3264,8 @@ const priceDrawerSize = computed(() => {
   if (priceDrawerMode.value !== 'view' || !isSupplyChain.value) return '1180px';
   const product = priceEditorTarget.value;
   const dimensionCount = product?.variants[0]?.displayMode === 'layered' ? (product.specDimensions?.length ?? 0) : 0;
-  const specificationWidth = dimensionCount ? dimensionCount * 100 : 180;
-  return `min(${Math.max(480, specificationWidth + 160 + 96)}px, calc(100vw - 32px))`;
+  const tableWidth = Math.max(600, dimensionCount * 100) + 200;
+  return `min(calc(${tableWidth + 2}px + 2 * var(--td-comp-paddingLR-l)), calc(100vw - 32px))`;
 });
 
 const handlePriceEditorSaved = (record: FinishedProductRecord, closeAfterSave = true) => {

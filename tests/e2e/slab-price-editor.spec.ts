@@ -88,6 +88,70 @@ async function openEditor(page: Page) {
   return { editor, level: editor.locator('.price-table__row').filter({ hasText: '4级合伙人' }) };
 }
 
+test('supply-chain off-shelf price permission edits only slab cost', async ({ page }) => {
+  await installAdminApiMocks(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('zdm-admin-token', 'dev-token');
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 2,
+        clientCode: 'supply-chain',
+        name: '大板价格权限测试',
+        roles: ['OPERATOR'],
+        permissions: ['supply-chain.slab-management.off-shelf.view', 'supply-chain.slab-management.off-shelf.price'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+  const product = {
+    id: 99601,
+    name: '供应链已下架大板',
+    serialNo: 'SLAB-COST',
+    status: 'offShelf',
+    sourceStatus: 'offShelf',
+    stock: 1,
+    costPrice: 100,
+    guidePrice: 200,
+    markupPrices: [],
+  };
+  const saves: unknown[] = [];
+  await page.route('**/api/admin/slabs', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/slabs/form-options', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          textures: [],
+          colorCategories: [],
+          grades: [],
+          suppliers: [],
+          varieties: [],
+          origins: [],
+          storeLevels: [],
+        },
+      },
+    }),
+  );
+  await page.route('**/api/admin/slabs/99601/source-cost', (route) => {
+    saves.push(route.request().postDataJSON());
+    return route.fulfill({ json: { code: 0, data: { ...product, costPrice: 120 } } });
+  });
+  await page.goto('/supply-chain/slab-management');
+  const main = page.getByRole('main');
+  await expect(main.locator('.table-actions .t-link')).toHaveText(['价格']);
+  await main.locator('.table-actions').getByText('价格', { exact: true }).click();
+  const editor = page.locator('.t-drawer--open');
+  await expect(editor.getByPlaceholder('成本价', { exact: true })).toBeVisible();
+  await expect(editor.getByText('指导价', { exact: true })).toHaveCount(0);
+  await expect(editor.getByText('价格系数', { exact: true })).toHaveCount(0);
+  await editor.getByPlaceholder('成本价', { exact: true }).fill('120');
+  await editor.getByRole('button', { name: '保存', exact: true }).click();
+  await page.locator('.t-dialog:visible').getByRole('button', { name: /确认/ }).click();
+  await expect(editor).not.toBeVisible();
+  expect(saves).toEqual([{ costPrice: 120 }]);
+});
+
 for (const status of ['enabled', 'disabled', undefined] as const) {
   test(`缺失四级价格与成品现货一致：${status ?? 'unconfigured'} 不在编辑器中预计算`, async ({ page }) => {
     const state = await setup(page, status);

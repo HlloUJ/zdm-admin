@@ -8,7 +8,10 @@ import com.zdm.platform.media.MediaStorageService;
 import com.zdm.platform.media.MediaUploadResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -188,6 +191,43 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     }
     permissionGuard.requirePermission(permission(source, "price"));
     return ApiResponse.ok(service.updateOperationWithDetails(id, product, true));
+  }
+
+  public record SourceCostEntry(Long skuId, BigDecimal costPrice) {}
+  public record SourceCostsRequest(List<SourceCostEntry> variants) {
+    public SourceCostsRequest {
+      variants = variants == null ? null : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(variants));
+    }
+  }
+
+  @PutMapping("/{id}/source-costs")
+  public ApiResponse<FinishedProduct> updateSourceCosts(
+      @PathVariable Long id, @RequestBody SourceCostsRequest request) {
+    if (!isSupplyChain()) {
+      throw new org.springframework.security.access.AccessDeniedException("此操作属于供应链协同系统");
+    }
+    permissionGuard.requireDataPermission();
+    FinishedProduct existing = service.getById(id);
+    if (existing == null || "purged".equals(existing.getSourceStatus())) {
+      throw new IllegalArgumentException("成品现货不存在或已被删除");
+    }
+    permissionGuard.requireData(existing);
+    String scope = scope(existing.getSourceStatus());
+    permissionGuard.requirePermission(permission(scope, "price"));
+    if (!List.of("warehouse", "selling", "off-shelf").contains(scope)) {
+      throw new IllegalArgumentException("当前状态不能修改成本价");
+    }
+    if (request == null || request.variants() == null) {
+      throw new IllegalArgumentException("请完善每个规格的成本价");
+    }
+    Map<Long, BigDecimal> costs = new LinkedHashMap<>();
+    for (SourceCostEntry entry : request.variants()) {
+      if (entry == null || entry.skuId() == null || entry.costPrice() == null
+          || costs.putIfAbsent(entry.skuId(), entry.costPrice()) != null) {
+        throw new IllegalArgumentException("请完善每个规格的成本价");
+      }
+    }
+    return ApiResponse.ok(service.updateSourceCosts(id, costs));
   }
 
   @Override

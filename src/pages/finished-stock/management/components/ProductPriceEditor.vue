@@ -1,12 +1,12 @@
 <template>
-  <div class="product-price-editor">
+  <div class="product-price-editor" :class="{ 'cost-only': costOnly }">
     <t-table
       row-key="key"
       :data="displayEditors"
       :columns="columns"
       :rowspan-and-colspan="specRowspanAndColspan"
-      table-layout="auto"
-      table-content-width="max-content"
+      :table-layout="costOnly ? 'fixed' : 'auto'"
+      :table-content-width="costOnly ? `${costOnlyTableWidth}px` : 'max-content'"
       bordered
       hover
     >
@@ -61,6 +61,7 @@ import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { AdminDialog, adminFeedback } from '@/components/foundation';
 import {
   updateFinishedProduct,
+  updateFinishedProductSourceCosts,
   type FinishedProductPayload,
   type FinishedProductRecord,
 } from '@/services/finishedProducts';
@@ -139,6 +140,7 @@ const editors = ref<VariantEditor[]>(
 const dimensions = computed(() =>
   props.product.variants[0]?.displayMode === 'layered' ? (props.product.specDimensions ?? []) : [],
 );
+const costOnlyTableWidth = computed(() => Math.max(600, dimensions.value.length * 100) + 200);
 const displayEditors = computed(() =>
   orderLayeredRows(
     editors.value.map((editor) => ({ ...editor.specValues, editor })),
@@ -163,11 +165,21 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
         ellipsis: false,
         cell: (_h: unknown, { row }: { row: TableRowData }) => row.specValues[dimension.key] ?? '',
       }))
-    : [{ colKey: 'label', title: '商品规格', minWidth: 180, ellipsis: false }]),
+    : [
+        { colKey: 'label', title: '商品规格', width: props.costOnly ? 600 : undefined, minWidth: 180, ellipsis: false },
+      ]),
   ...priceFields.value.map((field, index) => ({
     colKey: field.key,
-    title: () => h('span', [field.label, h('span', { class: 'required-star' }, '*')]),
-    width: index === 0 ? (props.costOnly ? 160 : 110) : index === 1 ? 180 : 196,
+    title: () =>
+      h('span', [
+        field.label,
+        h(
+          'span',
+          props.costOnly && index === 0 ? { style: { color: 'var(--td-error-color)' } } : { class: 'required-star' },
+          '*',
+        ),
+      ]),
+    width: index === 0 ? (props.costOnly ? 200 : 110) : index === 1 ? 180 : 196,
   })),
 ]);
 const activeConfiguration = (row: PriceRow) =>
@@ -218,20 +230,17 @@ const save = async (closeAfterSave = true) => {
   if (saving.value || readonly.value) return;
   saving.value = true;
   try {
-    let payload: FinishedProductPayload;
+    let record: FinishedProductRecord;
     if (props.costOnly) {
-      payload = {
-        ...props.product,
-        variants: props.product.variants.map((variant, index) => ({
-          ...variant,
+      record = await updateFinishedProductSourceCosts(
+        props.productId,
+        props.product.variants.map((variant, index) => ({
+          skuId: variant.id!,
           costPrice: Number(editors.value[index].rows[0].price),
         })),
-      };
-      delete payload.guidePrice;
-      delete payload.guidePrices;
-      delete payload.markupPrices;
+      );
     } else {
-      payload = {
+      const payload: FinishedProductPayload = {
         ...props.product,
         guidePrice: Number(editors.value[0].rows[1].price),
         guidePrices: editors.value.map((variant) => ({
@@ -257,8 +266,8 @@ const save = async (closeAfterSave = true) => {
             })),
         ),
       };
+      record = await updateFinishedProduct(props.productId, payload);
     }
-    const record = await updateFinishedProduct(props.productId, payload);
     confirmVisible.value = false;
     adminFeedback.success('价格保存成功');
     emit('saved', record, closeAfterSave);
@@ -283,6 +292,10 @@ defineExpose({ confirmSave });
 .product-price-editor :deep(th),
 .product-price-editor :deep(td) {
   white-space: nowrap;
+}
+.product-price-editor.cost-only :deep(td:not(:last-child)) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .price-pair {
   display: grid;

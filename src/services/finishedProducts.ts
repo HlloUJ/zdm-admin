@@ -150,6 +150,13 @@ export function updateFinishedProduct(id: number, payload: FinishedProductPayloa
   });
 }
 
+export function updateFinishedProductSourceCosts(id: number, variants: { skuId: number; costPrice: number }[]) {
+  return request<FinishedProductRecord>(`/admin/finished-products/${id}/source-costs`, {
+    method: 'PUT',
+    body: JSON.stringify({ variants }),
+  });
+}
+
 export function deleteFinishedProduct(id: number) {
   return request<boolean>(`/admin/finished-products/${id}`, {
     method: 'DELETE',

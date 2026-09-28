@@ -780,6 +780,7 @@ test('edits prices in a specification table and preserves product details on sav
 test('supply-chain price editor only edits costs in a content-sized drawer', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
+  const longSpec = '超长商品规格说明'.repeat(20);
   const product = {
     id: 72,
     name: '供应链成本价商品',
@@ -791,7 +792,7 @@ test('supply-chain price editor only edits costs in a content-sized drawer', asy
     detail: '<p>保留详情</p>',
     totalStock: 2,
     attributes: [],
-    variants: [{ id: 821, variantLabel: '规格A', displayMode: 'single', stock: 2, costPrice: 10 }],
+    variants: [{ id: 821, variantLabel: longSpec, displayMode: 'single', stock: 2, costPrice: 10 }],
     guidePrice: 20,
     guidePrices: [{ skuId: 821, variantLabel: '规格A', costPrice: 10, priceCoefficient: 2, price: 20 }],
     markupPrices: [
@@ -811,39 +812,127 @@ test('supply-chain price editor only edits costs in a content-sized drawer', asy
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, data: [{ id: 1, name: '一级价格' }] } }),
   );
-  await page.route('**/api/admin/finished-products/72', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({ json: { code: 0, data: product } });
-      return;
-    }
+  await page.route('**/api/admin/finished-products/72/source-costs', async (route) => {
     saves += 1;
     const payload = route.request().postDataJSON();
-    expect(payload.variants[0].costPrice).toBe(15);
-    expect(payload.detail).toBe(product.detail);
-    expect(payload).not.toHaveProperty('guidePrice');
-    expect(payload).not.toHaveProperty('guidePrices');
-    expect(payload).not.toHaveProperty('markupPrices');
-    await route.fulfill({ json: { code: 0, data: { ...product, variants: payload.variants } } });
+    expect(payload).toEqual({ variants: [{ skuId: 821, costPrice: 15 }] });
+    await route.fulfill({
+      json: { code: 0, data: { ...product, variants: [{ ...product.variants[0], costPrice: 15 }] } },
+    });
   });
 
   await page.goto('/supply-chain/finished-stock-management');
   await page.getByText('价格', { exact: true }).click();
   const editor = page.locator('.product-price-editor');
   await expect(editor.locator('thead th')).toHaveText(['商品规格', '成本价*']);
+  const headers = editor.locator('thead th');
+  await expect
+    .poll(() => headers.evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width)))
+    .toEqual([600, 200]);
+  const specificationCell = editor.locator('tbody tr').first().locator('td').first();
+  await expect(specificationCell).toHaveText(longSpec);
+  await expect(specificationCell).toHaveCSS('white-space', 'normal');
+  expect(await specificationCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await expect(headers.nth(1).getByText('*', { exact: true })).toHaveCSS('color', 'rgb(213, 73, 65)');
   await expect(editor.getByText('指导价')).toHaveCount(0);
   await expect(editor.getByText('一级价格')).toHaveCount(0);
   const drawer = page.locator('.t-drawer--open').filter({ has: editor });
   await expect
-    .poll(() => drawer.locator('.t-drawer__content-wrapper').evaluate((element) => element.getBoundingClientRect().width))
-    .toBeLessThan(700);
+    .poll(() =>
+      drawer.locator('.t-drawer__content-wrapper').evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBe(834);
+  const body = drawer.locator('.t-drawer__body');
+  const margins = await body.evaluate((element) => {
+    const bodyRect = element.getBoundingClientRect();
+    const tableRect = element.querySelector('table')!.getBoundingClientRect();
+    return { left: tableRect.left - bodyRect.left, right: bodyRect.right - tableRect.right };
+  });
+  expect(margins).toEqual({ left: 17, right: 17 });
   const cost = editor.locator('tbody tr').first().getByPlaceholder('价格', { exact: true });
   await expect(cost).toBeEnabled();
   await expect(cost).toHaveValue('10.00');
+  expect(await cost.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(140);
   await cost.fill('15');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await page.getByRole('button', { name: '确认保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);
+});
+
+test('supply-chain layered price editor keeps the cost column at 200px', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  const product = {
+    id: 73,
+    name: '分层规格成本价商品',
+    sku: 'COST-73',
+    status: 'warehouse',
+    categoryId: 5,
+    mainImageMediaId: 1,
+    videoMediaId: 2,
+    detail: '<p>分层规格</p>',
+    totalStock: 2,
+    attributes: [],
+    specDimensions: [
+      { key: 'material', name: '材质', values: ['岩板'] },
+      { key: 'color', name: '颜色', values: ['灰色'] },
+      { key: 'size', name: '尺寸', values: ['小', '大'] },
+    ],
+    variants: [
+      {
+        id: 831,
+        variantLabel: '岩板 / 小',
+        displayMode: 'layered',
+        salesAttributes: { material: '岩板', color: '灰色', size: '小' },
+        stock: 1,
+        costPrice: 10,
+      },
+      {
+        id: 832,
+        variantLabel: '岩板 / 大',
+        displayMode: 'layered',
+        salesAttributes: { material: '岩板', color: '灰色', size: '大' },
+        stock: 1,
+        costPrice: 12,
+      },
+    ],
+  };
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/finished-products/price-level-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [] } }),
+  );
+  await page.route('**/api/admin/finished-products/73', (route) => route.fulfill({ json: { code: 0, data: product } }));
+
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.getByText('价格', { exact: true }).click();
+  const editor = page.locator('.product-price-editor');
+  await expect(editor.locator('thead th')).toHaveText(['材质', '颜色', '尺寸', '成本价*']);
+  await expect
+    .poll(() =>
+      editor
+        .locator('thead th')
+        .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width)),
+    )
+    .toEqual([200, 200, 200, 200]);
+  await expect
+    .poll(() =>
+      editor
+        .locator('thead th')
+        .last()
+        .evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBe(200);
+  await expect
+    .poll(() =>
+      editor
+        .locator('tbody tr')
+        .first()
+        .locator('td')
+        .last()
+        .evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBe(200);
 });
 
 test('restores the initial horizontal layout after visiting the off-shelf tab', async ({ page }) => {

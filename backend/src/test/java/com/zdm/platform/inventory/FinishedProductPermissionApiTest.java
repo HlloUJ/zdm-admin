@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zdm.platform.security.CurrentIdentity;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -448,6 +449,32 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
   private void sourceStatus(long id,String target) throws Exception {
     ObjectNode row=sourceRecord(id);row.put("status",target).put("offShelfReason","库存异常");
     data(mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))));
+  }
+  @Test void sourcePricePermissionOnlyChangesCostsIncludingOffShelf() throws Exception {
+    ObjectNode created = sourceFixture("平台发布", "warehouse");
+    long id = created.path("id").asLong();
+    long skuId = created.path("variants").get(0).path("id").asLong();
+    for (String[] state : new String[][] {{"warehouse", "warehouse"}, {"selling", "selling"}, {"offShelf", "off-shelf"}}) {
+      jdbc.update("UPDATE finished_products SET source_status=? WHERE id=?", state[0], id);
+      sqlSession.clearCache();
+      String payload = "{\"variants\":[{\"skuId\":" + skuId + ",\"costPrice\":21}],\"name\":\"夹带名称\"}";
+      identityFor("supply-chain", "all", state[1] + ".view", state[1] + ".edit");
+      mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id)
+          .contentType("application/json").content(payload)).andExpect(status().isForbidden());
+      identityFor("supply-chain", "all", state[1] + ".view", state[1] + ".price");
+      mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id)
+          .contentType("application/json").content(payload)).andExpect(status().isOk());
+      assertThat(jdbc.queryForObject("SELECT cost_price FROM finished_product_variants WHERE id=?", BigDecimal.class, skuId))
+          .isEqualByComparingTo("21");
+      assertThat(jdbc.queryForObject("SELECT name FROM finished_products WHERE id=?", String.class, id)).isEqualTo("跨端商品");
+      assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?", String.class, id)).isEqualTo(state[0]);
+    }
+    jdbc.update("UPDATE finished_products SET source_status='soldOut' WHERE id=?", id);
+    sqlSession.clearCache();
+    identityFor("supply-chain", "all", "sold-out.view", "sold-out.price");
+    mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id)
+        .contentType("application/json").content("{\"variants\":[{\"skuId\":" + skuId + ",\"costPrice\":22}]}"))
+        .andExpect(status().isBadRequest());
   }
   @Test void publicationGateAndIndependentLifecyclesSurviveDeletionAndRepublication() throws Exception {
     long id=sourceFixture("平台发布","warehouse").path("id").asLong();

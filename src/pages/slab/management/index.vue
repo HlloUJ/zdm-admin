@@ -930,7 +930,18 @@
             保存
           </t-button>
         </div>
-        <t-form ref="priceDrawerFormRef" :data="priceDrawerForm" class="price-drawer-form">
+        <div v-if="isSupplyChain" class="source-cost-editor">
+          <span>成本价<span class="price-required-star">*</span></span>
+          <SpecPriceInput
+            v-if="batchPriceRows[0]"
+            v-model="batchPriceRows[0].price"
+            label="成本价"
+            placeholder="成本价"
+            :submitted="drawerPriceSubmitted"
+            :disabled="priceDrawerReadonly"
+          />
+        </div>
+        <t-form v-else ref="priceDrawerFormRef" :data="priceDrawerForm" class="price-drawer-form">
           <div :key="drawerPriceSession" class="price-table">
             <div class="price-table__head">
               <span>价格层级</span>
@@ -1123,6 +1134,7 @@ import {
   resolveSlabPublishTargetStatus,
   uploadSlabImage,
   updateSlab,
+  updateSlabSourceCost,
   updateSlabStatuses,
   checkSlabAction,
   type SlabPayload,
@@ -2223,6 +2235,7 @@ const reasonFormRules = computed<Record<string, FormRule[]>>(() => ({
 const batchPriceRows = reactive<DrawerPriceRow[]>([]);
 const priceDrawerForm = reactive({ rows: batchPriceRows });
 const priceDrawerSize = computed(() => {
+  if (isSupplyChain.value) return '420px';
   const longestLabelLength = batchPriceRows.reduce((length, row) => Math.max(length, row.label.length), 0);
   return `${Math.max(620, longestLabelLength * 16 + 430)}px`;
 });
@@ -2639,11 +2652,13 @@ const rowActions = (): {
     ]);
   }
   if (activeTab.value === 'offShelf') {
-    return filterActions([
+    const actions: Parameters<typeof filterActions>[0] = [
       { label: '详情', action: 'detail', theme: 'primary' },
       { label: '放回仓库', action: 'restore', theme: 'primary' },
       { label: '删除', action: 'delete', theme: 'danger' },
-    ]);
+    ];
+    if (isSupplyChain.value) actions.splice(1, 0, { label: '价格', action: 'price', theme: 'primary' });
+    return filterActions(actions);
   }
   if (activeTab.value === 'soldOut') {
     return filterActions([{ label: '价格', action: 'price', theme: 'primary' }]);
@@ -3622,39 +3637,44 @@ const handleConfirmSubmit = async () => {
     if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');
     if (type === 'savePrice' && row) {
       const costPrice = toNumber(batchPriceRows[0]?.price ?? '');
-      const nextMarkupPrices: SlabPrice[] = batchPriceRows
-        .slice(1)
-        .filter((item): item is DrawerPriceRow & { configurationId: number } => item.configurationId != null)
-        .map((item) => ({
-          storeLevelId: item.configurationId,
-          priceCoefficient: Number(toNumber(item.ratio ?? '').toFixed(4)),
-          costPrice,
-          price: toNumber(item.price),
-          priceSource: item.priceSource,
-          sourceConfigurationId: item.sourceConfigurationId,
-          variantKey: '',
-        }));
-      const guidePrice = batchPriceRows.find((item) => item.label === '指导价')?.price;
-      const guidePriceCoefficient = batchPriceRows.find((item) => item.label === '指导价')?.ratio;
-      const nextPrice = {
-        cost: String(costPrice),
-        guide: guidePrice == null ? row.price.guide : String(toNumber(guidePrice)),
-        level1: row.price.level1,
-        level2: row.price.level2,
-        level3: row.price.level3,
-      };
-      upsertSlabItem(
-        await updateSlab(
-          row.id,
-          toSlabPayload(row, {
-            price: nextPrice,
-            guidePriceCoefficient:
-              guidePriceCoefficient == null ? row.guidePriceCoefficient : toNumber(guidePriceCoefficient),
-            markupPrices: nextMarkupPrices,
-          }),
-        ),
-      );
-      closePriceDrawer();
+      if (isSupplyChain.value) {
+        upsertSlabItem(await updateSlabSourceCost(row.id, costPrice));
+        closePriceDrawer();
+      } else {
+        const nextMarkupPrices: SlabPrice[] = batchPriceRows
+          .slice(1)
+          .filter((item): item is DrawerPriceRow & { configurationId: number } => item.configurationId != null)
+          .map((item) => ({
+            storeLevelId: item.configurationId,
+            priceCoefficient: Number(toNumber(item.ratio ?? '').toFixed(4)),
+            costPrice,
+            price: toNumber(item.price),
+            priceSource: item.priceSource,
+            sourceConfigurationId: item.sourceConfigurationId,
+            variantKey: '',
+          }));
+        const guidePrice = batchPriceRows.find((item) => item.label === '指导价')?.price;
+        const guidePriceCoefficient = batchPriceRows.find((item) => item.label === '指导价')?.ratio;
+        const nextPrice = {
+          cost: String(costPrice),
+          guide: guidePrice == null ? row.price.guide : String(toNumber(guidePrice)),
+          level1: row.price.level1,
+          level2: row.price.level2,
+          level3: row.price.level3,
+        };
+        upsertSlabItem(
+          await updateSlab(
+            row.id,
+            toSlabPayload(row, {
+              price: nextPrice,
+              guidePriceCoefficient:
+                guidePriceCoefficient == null ? row.guidePriceCoefficient : toNumber(guidePriceCoefficient),
+              markupPrices: nextMarkupPrices,
+            }),
+          ),
+        );
+        closePriceDrawer();
+      }
     }
     if (type === 'batchRestore') {
       await updateSelectedSlabStatuses('warehouse');
@@ -3853,9 +3873,11 @@ const closePriceDrawer = () => {
 const saveBatchPrice = async () => {
   if (priceDrawerReadonly.value || saving.value) return;
   drawerPriceSubmitted.value = true;
-  const hasInvalidPrice = batchPriceRows.some(
-    (row, index) => !isValidSalesNumber(row.price, 0) || (index > 0 && !isValidSalesNumber(row.ratio, 0)),
-  );
+  const hasInvalidPrice = isSupplyChain.value
+    ? !isValidSalesNumber(batchPriceRows[0]?.price ?? '', 0)
+    : batchPriceRows.some(
+        (row, index) => !isValidSalesNumber(row.price, 0) || (index > 0 && !isValidSalesNumber(row.ratio, 0)),
+      );
   if (hasInvalidPrice) {
     await priceDrawerFormRef.value?.validate({ trigger: 'all', showErrorMessage: true });
     adminFeedback.warning('请完善价格信息');

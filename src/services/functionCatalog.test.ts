@@ -90,7 +90,9 @@ describe('full function catalog', () => {
       expect(source).toContain(`supply-chain.${module}.off-shelf.restore`);
       expect(source).not.toContain(`supply-chain.${module}.sold-out.edit`);
       expect(source).not.toContain(`supply-chain.${module}.sold-out.delete`);
-      expect(source).not.toContain(`supply-chain.${module}.warehouse.price`);
+      for (const scope of ['warehouse', 'selling', 'off-shelf', 'sold-out', 'recycle']) {
+        expect(source).toContain(`supply-chain.${module}.${scope}.price`);
+      }
       expect(operations).toContain(`admin.${module}.warehouse.price`);
       expect(operations).not.toContain(`admin.${module}.warehouse.publish`);
       expect(operations).not.toContain(`admin.${module}.selling.edit`);

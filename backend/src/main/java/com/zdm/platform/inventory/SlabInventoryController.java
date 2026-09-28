@@ -7,6 +7,7 @@ import com.zdm.platform.media.MediaStorageService;
 import com.zdm.platform.media.MediaUploadResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -132,6 +133,28 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     permissionGuard.requirePermission(permission(scope,isSupplyChain()?"edit":"price"));
     if(isSupplyChain() && !Objects.equals(existing.getSourceStatus(),inventory.getStatus())) { requireStatusTransition(existing.getSourceStatus(),inventory.getStatus()); }
     return ApiResponse.ok(service.updateWithPrices(id, inventory));
+  }
+
+  public record SourceCostRequest(BigDecimal costPrice) {}
+
+  @PutMapping("/{id}/source-cost")
+  public ApiResponse<SlabInventory> updateSourceCost(
+      @PathVariable Long id, @RequestBody SourceCostRequest request) {
+    if (!isSupplyChain()) {
+      throw new org.springframework.security.access.AccessDeniedException("此操作属于供应链协同系统");
+    }
+    permissionGuard.requireDataPermission();
+    SlabInventory existing = service.getById(id);
+    if (existing == null || "purged".equals(existing.getSourceStatus())) {
+      throw new IllegalArgumentException("大板不存在或已被删除");
+    }
+    permissionGuard.requireData(existing);
+    String scope = statusScope(existing.getSourceStatus());
+    permissionGuard.requirePermission(permission(scope, "price"));
+    if (!List.of("warehouse", "selling", "off-shelf").contains(scope)) {
+      throw new IllegalArgumentException("当前状态不能修改成本价");
+    }
+    return ApiResponse.ok(service.updateSourceCost(id, request == null ? null : request.costPrice()));
   }
 
   public record ActionCheckRequest(List<Long> ids, String action) {
