@@ -143,7 +143,8 @@ const editors = ref<VariantEditor[]>(
 const dimensions = computed(() =>
   props.product.variants[0]?.displayMode === 'layered' ? (props.product.specDimensions ?? []) : [],
 );
-const costOnlyTableWidth = computed(() => Math.max(600, dimensions.value.length * 100) + 200);
+const costOnlySpecificationWidth = computed(() => Math.max(600, dimensions.value.length * 100));
+const costOnlyTableWidth = computed(() => costOnlySpecificationWidth.value + 200);
 const displayEditors = computed(() =>
   orderLayeredRows(
     editors.value.map((editor) => ({ ...editor.specValues, editor })),
@@ -164,6 +165,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
     ? dimensions.value.map((dimension) => ({
         colKey: `spec:${dimension.key}`,
         title: dimension.name,
+        width: props.costOnly ? costOnlySpecificationWidth.value / dimensions.value.length : undefined,
         minWidth: 100,
         ellipsis: false,
         cell: (_h: unknown, { row }: { row: TableRowData }) => row.specValues[dimension.key] ?? '',

@@ -861,6 +861,7 @@ test('supply-chain price editor only edits costs in a content-sized drawer', asy
 });
 
 test('supply-chain layered price editor keeps the cost column at 200px', async ({ page }) => {
+  await page.setViewportSize({ width: 1368, height: 858 });
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
   const product = {
@@ -875,9 +876,9 @@ test('supply-chain layered price editor keeps the cost column at 200px', async (
     totalStock: 2,
     attributes: [],
     specDimensions: [
-      { key: 'material', name: '材质', values: ['岩板'] },
-      { key: 'color', name: '颜色', values: ['灰色'] },
-      { key: 'size', name: '尺寸', values: ['小', '大'] },
+      { key: 'material', name: '销售属性1（共享）', values: ['岩板'] },
+      { key: 'color', name: '销售属性2（共享）', values: ['灰色'] },
+      { key: 'size', name: '销售属性3（共享）', values: ['小', '大'] },
     ],
     variants: [
       {
@@ -907,7 +908,12 @@ test('supply-chain layered price editor keeps the cost column at 200px', async (
   await page.goto('/supply-chain/finished-stock-management');
   await page.getByText('价格', { exact: true }).click();
   const editor = page.locator('.product-price-editor');
-  await expect(editor.locator('thead th')).toHaveText(['材质', '颜色', '尺寸', '成本价*']);
+  await expect(editor.locator('thead th')).toHaveText([
+    '销售属性1（共享）',
+    '销售属性2（共享）',
+    '销售属性3（共享）',
+    '成本价*',
+  ]);
   await expect
     .poll(() =>
       editor
