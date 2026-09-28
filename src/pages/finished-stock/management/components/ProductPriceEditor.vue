@@ -86,7 +86,10 @@ type PriceRow = {
   sourceConfigurationId?: number;
 };
 type VariantEditor = { key: number; label: string; specValues: Record<string, string>; rows: PriceRow[] };
-const readonly = computed(() => ['soldOut', 'recycle'].includes(props.product.status));
+const readonly = computed(
+  () =>
+    ['soldOut', 'recycle'].includes(props.product.status) || (props.costOnly && props.product.status === 'offShelf'),
+);
 const submitted = ref(false);
 const saving = ref(false);
 const confirmVisible = ref(false);

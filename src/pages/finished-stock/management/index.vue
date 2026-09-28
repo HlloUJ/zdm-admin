@@ -785,7 +785,7 @@
       :size="priceDrawerSize"
       lazy
       destroy-on-close
-      :footer="priceDrawerMode === 'view' && !['soldOut', 'recycle'].includes(priceEditorTarget?.status ?? '')"
+      :footer="priceDrawerMode === 'view' && !priceEditorReadonly"
       confirm-btn="保存"
       cancel-btn="取消"
       @confirm="productPriceEditorRef?.confirmSave()"
@@ -1082,7 +1082,7 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'v
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 type PublisherType = '平台发布' | '接口获取';
-type RowAction = 'detail' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
+type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
 type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 type FormSectionKey = 'description' | 'base' | 'sales';
 type SpecMode = 'single' | 'layered';
@@ -1323,6 +1323,7 @@ const finishedActionCodes: Record<string, string> = {
   edit: 'edit',
   delete: 'delete',
   detail: 'detail',
+  price: 'price',
   restore: 'restore',
   purge: 'purge',
 };
@@ -2233,6 +2234,7 @@ const unfilteredRowActions = (): { action: RowAction; label: string; theme: stri
   if (activeTab.value === 'offShelf') {
     return [
       { action: 'detail', label: '详情', theme: 'primary' },
+      ...(isSupplyChain.value ? [{ action: 'price' as const, label: '价格', theme: 'primary' }] : []),
       { action: 'restore', label: '放回仓库', theme: 'primary' },
       { action: 'delete', label: '删除', theme: 'danger' },
     ];
@@ -3260,6 +3262,10 @@ const canViewOperationLogs = computed(() =>
   hasPermission(getLoginUser(), `${productPermissionPrefix.value}.operation-log.view`),
 );
 const priceEditorTarget = ref<StockItem | null>(null);
+const priceEditorReadonly = computed(() => {
+  const status = priceEditorTarget.value?.status;
+  return status === 'soldOut' || status === 'recycle' || (isSupplyChain.value && status === 'offShelf');
+});
 const priceDrawerSize = computed(() => {
   if (priceDrawerMode.value !== 'view' || !isSupplyChain.value) return '1180px';
   const product = priceEditorTarget.value;

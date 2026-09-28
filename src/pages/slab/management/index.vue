@@ -2504,7 +2504,12 @@ const pageAllSelected = computed(
 const pagePartiallySelected = computed(
   () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,
 );
-const priceDrawerReadonly = computed(() => activeTab.value === 'soldOut' || activeTab.value === 'recycle');
+const priceDrawerReadonly = computed(
+  () =>
+    activeTab.value === 'soldOut' ||
+    activeTab.value === 'recycle' ||
+    (isSupplyChain.value && activeTab.value === 'offShelf'),
+);
 const productDialogTitle = computed(() => {
   if (productMode.value === 'create') return '发布商品';
   if (productMode.value === 'edit') return '编辑商品';
@@ -2654,6 +2659,7 @@ const rowActions = (): {
   if (activeTab.value === 'offShelf') {
     return filterActions([
       { label: '详情', action: 'detail', theme: 'primary' },
+      ...(isSupplyChain.value ? [{ label: '价格', action: 'price' as const, theme: 'primary' as const }] : []),
       { label: '放回仓库', action: 'restore', theme: 'primary' },
       { label: '删除', action: 'delete', theme: 'danger' },
     ]);

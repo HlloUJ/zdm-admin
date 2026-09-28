@@ -1281,6 +1281,33 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   await expect(matrix.locator('.module-allocation-count')).toHaveText('已下放 8 / 8');
 });
 
+test('assigns supply-chain off-shelf price rights separately for finished stock and slabs', async ({ page }) => {
+  await page.goto('/terminal-function-allocation');
+  const main = page.getByRole('main');
+  await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
+  await main.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
+  const matrix = main.locator('.permission-matrix');
+  await expect(matrix.getByText('成品现货管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('大板管理页', { exact: true })).toBeVisible();
+  const offShelf = matrix.locator('tbody tr').filter({
+    has: page.locator('.permission-tab-cell').getByText('已下架', { exact: true }),
+  });
+  await expect(offShelf).toHaveCount(2);
+  for (let index = 0; index < 2; index += 1) {
+    const price = offShelf.nth(index).getByRole('checkbox', { name: '价格', exact: true });
+    await expect(price).toBeEnabled();
+    await offShelf.nth(index).getByText('价格', { exact: true }).click();
+  }
+
+  const saved = page.waitForRequest(
+    (request) => request.method() === 'PUT' && request.url().endsWith('/terminal-function-policies/supply-chain'),
+  );
+  await main.getByRole('button', { name: '保存', exact: true }).click();
+  const permissions = (await saved).postDataJSON().functionPermissions.split(',');
+  expect(permissions).toContain('supply-chain.finished-stock-management.off-shelf.price');
+  expect(permissions).toContain('supply-chain.slab-management.off-shelf.price');
+});
+
 for (const storeType of ['cityPartner', 'slabSupplier']) {
   test(`keeps platform functions outside ${storeType} runtime menus and routes`, async ({ page }) => {
     await page.addInitScript((type) => {
