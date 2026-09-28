@@ -4,76 +4,44 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <header class="page-header">
-          <t-breadcrumb><t-breadcrumb-item>成品现货管理</t-breadcrumb-item></t-breadcrumb>
-          <t-link v-if="canGlobal('operation-log.view')" theme="primary" @click="openLogs">操作日志</t-link>
-        </header>
-        <AdminListLayout v-if="tabs.length">
-          <template #toolbar>
-            <div class="list-controls">
-              <t-tabs v-model="activeTab" :list="tabs" @change="resetSelection" />
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
-                <div class="filter-row">
-                  <div class="filter-fields">
-                    <t-form-item label="商品"
-                      ><t-input v-model="filter.keyword" clearable placeholder="商品名称 / ID" @enter="page = 1"
-                    /></t-form-item>
-                    <t-form-item label="商品分类">
-                      <t-select v-model="filter.category" clearable placeholder="请选择">
-                        <t-option v-for="item in categoryOptions" :key="item" :value="item" :label="item" />
-                      </t-select>
-                    </t-form-item>
-                    <t-form-item label="供应商">
-                      <t-select v-model="filter.supplier" clearable placeholder="请选择">
-                        <t-option v-for="item in supplierOptions" :key="item" :value="item" :label="item" />
-                      </t-select>
-                    </t-form-item>
-                  </div>
-                  <div class="filter-actions">
-                    <t-button theme="primary" @click="page = 1"
-                      ><template #icon><t-icon name="search" /></template>查询</t-button
-                    >
-                    <t-button variant="base" @click="resetFilter"
-                      ><template #icon><t-icon name="refresh" /></template>重置</t-button
-                    >
-                  </div>
-                </div>
-              </t-form>
-              <div class="table-toolbar">
-                <t-space>
-                  <t-button
-                    v-if="activeTab === 'warehouse' && can('warehouse', 'select')"
-                    theme="primary"
-                    @click="openPool"
-                    ><template #icon><t-icon name="add" /></template>挑选商品</t-button
-                  >
-                  <t-button v-if="batchAction" theme="default" :disabled="!selected.length" @click="prepareBatch">{{
-                    batchAction.label
-                  }}</t-button>
-                  <t-button
-                    v-if="activeTab === 'recycle' && can('recycle', 'batch-purge')"
-                    theme="danger"
-                    variant="base"
-                    :disabled="!selected.length"
-                    @click="confirm = { kind: 'batch-purge', label: '批量彻底删除', ids: [...selected] }"
-                    >批量彻底删除</t-button
-                  >
-                  <t-button
-                    v-if="activeTab === 'recycle' && can('recycle', 'clear')"
-                    theme="danger"
-                    variant="base"
-                    @click="confirm = { kind: 'clear', label: '清空回收站' }"
-                    >清空回收站</t-button
-                  >
-                </t-space>
-                <span>已选 {{ selected.length }} 项</span>
-              </div>
-            </div>
+        <FinishedStockManagementList
+          :tabs="tabs"
+          :active-tab="activeTab"
+          :filter="filter"
+          :supplier-options="supplierOptions"
+          :toolbar-actions="storeToolbarActions"
+          :selected-count="selected.length"
+          :page="page"
+          :page-size="pageSize"
+          :total="filteredRows.length"
+          empty-description="暂无成品现货管理权限"
+          @tab-change="
+            activeTab = $event as StoreFinishedStatus;
+            resetSelection();
+          "
+          @filter-change="updateStoreListFilter"
+          @search="page = 1"
+          @reset="resetFilter"
+          @toolbar-action="handleStoreToolbarAction"
+          @update:page="page = $event"
+          @update:page-size="pageSize = $event"
+        >
+          <template #breadcrumb>
+            <t-breadcrumb><t-breadcrumb-item>成品现货管理</t-breadcrumb-item></t-breadcrumb>
+          </template>
+          <template #header-action>
+            <t-link v-if="canGlobal('operation-log.view')" theme="primary" @click="openLogs">操作日志</t-link>
+          </template>
+          <template #category-filter>
+            <t-select v-model="filter.category" clearable placeholder="请选择">
+              <t-option v-for="item in categoryOptions" :key="item" :value="item" :label="item" />
+            </t-select>
           </template>
           <template #table>
             <SourceUnavailableOverlay :rows="pageRows.filter((item) => item.sourceUnavailable)">
               <t-table
                 :key="activeTab"
+                class="finished-stock-table"
                 row-key="id"
                 :data="pageRows"
                 :columns="columns"
@@ -113,22 +81,7 @@
                 </template>
                 <template #offShelfAt="{ row }">{{ time(row.offShelfAt) }}</template>
                 <template #operation="{ row }">
-                  <t-space size="small">
-                    <t-link v-if="can(activeScope, 'detail')" theme="primary" @click="openDetail(row)">详情</t-link>
-                    <t-link v-if="can(activeScope, 'price')" theme="primary" @click="openPrice(row)">价格</t-link>
-                    <t-link
-                      v-if="rowAction && can(activeScope, rowAction.permission)"
-                      :theme="rowAction.theme"
-                      @click="prepareAction(rowAction.kind, row)"
-                      >{{ rowAction.label }}</t-link
-                    >
-                    <t-link
-                      v-if="secondRowAction && can(activeScope, secondRowAction.permission)"
-                      :theme="secondRowAction.theme"
-                      @click="prepareAction(secondRowAction.kind, row)"
-                      >{{ secondRowAction.label }}</t-link
-                    >
-                  </t-space>
+                  <FinishedStockRowActions :actions="storeRowButtons" @action="handleStoreRowButton($event, row)" />
                 </template>
                 <template #empty>暂无商品</template>
               </t-table>
@@ -163,11 +116,7 @@
               </template>
             </SourceUnavailableOverlay>
           </template>
-          <template #pagination
-            ><AdminPagination v-model:current="page" v-model:page-size="pageSize" :total="filteredRows.length"
-          /></template>
-        </AdminListLayout>
-        <t-empty v-else description="暂无成品现货管理权限" />
+        </FinishedStockManagementList>
       </main>
     </div>
 
@@ -341,8 +290,6 @@ import AdminTopNav from '@/components/AdminTopNav.vue';
 import {
   AdminConfirmDialog,
   AdminDialog,
-  AdminListLayout,
-  AdminPagination,
   AdminSectionCard,
   adminFeedback,
   getSafeErrorMessage,
@@ -374,6 +321,10 @@ import {
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
 import FinishedEditChanges from '../management/components/FinishedEditChanges.vue';
 import StoreProductDetail from './product-detail.vue';
+import FinishedStockManagementList, {
+  type FinishedStockToolbarAction,
+} from '../shared/FinishedStockManagementList.vue';
+import FinishedStockRowActions, { type FinishedStockRowAction } from '../shared/FinishedStockRowActions.vue';
 
 const user = getLoginUser();
 const prefix = 'store.finished-stock-management';
@@ -556,6 +507,50 @@ const batchAction = computed(() => {
   const action = batchActions[activeTab.value];
   return action && can(activeScope.value, action.permission) ? action : null;
 });
+const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
+  ...(activeTab.value === 'warehouse' && can('warehouse', 'select')
+    ? [{ id: 'select', label: '挑选商品', theme: 'primary' as const, icon: 'add' }]
+    : []),
+  ...(batchAction.value
+    ? [{ id: 'batch', label: batchAction.value.label, theme: 'default' as const, disabled: !selected.value.length }]
+    : []),
+  ...(activeTab.value === 'recycle' && can('recycle', 'batch-purge')
+    ? [
+        {
+          id: 'batch-purge',
+          label: '批量彻底删除',
+          theme: 'danger' as const,
+          variant: 'base' as const,
+          disabled: !selected.value.length,
+        },
+      ]
+    : []),
+  ...(activeTab.value === 'recycle' && can('recycle', 'clear')
+    ? [{ id: 'clear', label: '清空回收站', theme: 'danger' as const, variant: 'base' as const }]
+    : []),
+]);
+const storeRowButtons = computed<FinishedStockRowAction[]>(() => [
+  ...(can(activeScope.value, 'detail') ? [{ id: 'detail', label: '详情', theme: 'primary' as const }] : []),
+  ...(can(activeScope.value, 'price') ? [{ id: 'price', label: '价格', theme: 'primary' as const }] : []),
+  ...[rowAction.value, secondRowAction.value]
+    .filter((action) => action && can(activeScope.value, action.permission))
+    .map((action) => ({ id: action!.kind, label: action!.label, theme: action!.theme })),
+]);
+const updateStoreListFilter = (field: 'keyword' | 'supplier', value: string) => {
+  filter[field] = value;
+};
+const handleStoreToolbarAction = (action: string) => {
+  if (action === 'select') void openPool();
+  else if (action === 'batch') prepareBatch();
+  else if (action === 'batch-purge')
+    confirm.value = { kind: 'batch-purge', label: '批量彻底删除', ids: [...selected.value] };
+  else if (action === 'clear') confirm.value = { kind: 'clear', label: '清空回收站' };
+};
+const handleStoreRowButton = (action: string, row: StoreFinishedProduct) => {
+  if (action === 'detail') void openDetail(row);
+  else if (action === 'price') void openPrice(row);
+  else prepareAction(action as ActionKind, row);
+};
 const baseColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'select', title: '全选', width: 70 },
   { colKey: 'imageUrl', title: '主图', width: 84 },

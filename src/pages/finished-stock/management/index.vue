@@ -24,7 +24,7 @@
             </nav>
           </AdminSectionCard>
         </div>
-        <header class="page-header">
+        <header v-if="formPageVisible || !finishedTabs.length" class="page-header">
           <div>
             <t-breadcrumb>
               <t-breadcrumb-item
@@ -43,92 +43,78 @@
         </header>
 
         <template v-if="!formPageVisible && finishedTabs.length">
-          <AdminListLayout class="finished-list-layout">
-            <template #toolbar>
-              <div class="list-controls">
-                <t-tabs v-if="showFinishedTabRail" v-model="activeTab" class="status-tabs" @change="handleTabChange">
-                  <t-tab-panel v-for="tab in finishedTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
-                </t-tabs>
-
-                <t-form class="zdm-admin-filter-form" label-width="auto" :data="currentFilter" colon>
-                  <div class="filter-row">
-                    <div class="filter-fields">
-                      <t-form-item label="商品">
-                        <t-input
-                          v-model="currentFilter.keyword"
-                          clearable
-                          placeholder="商品名称 / ID"
-                          @enter="handleSearch"
-                        />
-                      </t-form-item>
-                      <t-form-item label="商品分类">
-                        <t-select-input
-                          :value="currentFilter.category"
-                          :value-display="currentFilter.category?.split(' / ').at(-1)"
-                          :popup-visible="categoryFilterVisible"
-                          :popup-props="{
-                            placement: 'bottom-left',
-                            overlayInnerStyle: { width: 'auto' },
-                            popperOptions: { modifiers: [{ name: 'flip', enabled: false }] },
-                          }"
-                          clearable
-                          placeholder="请选择"
-                          @popup-visible-change="categoryFilterVisible = $event"
-                          @clear="currentFilter.category = ''"
-                        >
-                          <template #suffixIcon
-                            ><t-icon :name="categoryFilterVisible ? 'chevron-up' : 'chevron-down'"
-                          /></template>
-                          <template #panel>
-                            <t-cascader-panel
-                              v-if="categoryFilterVisible"
-                              :value="''"
-                              :options="categoryCascaderOptions"
-                              :check-strictly="false"
-                              trigger="hover"
-                              @change="handleCategoryFilterChange"
-                            />
-                          </template>
-                        </t-select-input>
-                      </t-form-item>
-                      <t-form-item label="供应商">
-                        <t-select v-model="currentFilter.supplier" clearable placeholder="请选择">
-                          <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
-                        </t-select>
-                      </t-form-item>
-                    </div>
-
-                    <div class="filter-actions">
-                      <t-button theme="primary" @click="handleSearch">
-                        <template #icon><t-icon name="search" /></template>
-                        查询
-                      </t-button>
-                      <t-button theme="default" variant="base" @click="handleReset">
-                        <template #icon><t-icon name="refresh" /></template>
-                        重置
-                      </t-button>
-                    </div>
-                  </div>
-                </t-form>
-
-                <div v-if="batchButtons.length" class="table-toolbar">
-                  <div class="toolbar-buttons">
-                    <t-button
-                      v-for="button in batchButtons"
-                      :key="button.action"
-                      :theme="button.theme"
-                      :class="button.className"
-                      @click="handleBatchAction(button.action)"
-                    >
-                      <template #icon>
-                        <t-icon :name="button.icon" />
-                      </template>
-                      {{ button.label }}
-                    </t-button>
-                  </div>
-                  <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
-                </div>
-              </div>
+          <FinishedStockManagementList
+            :tabs="finishedTabs.map((tab) => ({ value: tab.value, label: tabLabel(tab) }))"
+            :active-tab="activeTab"
+            :show-tabs="showFinishedTabRail"
+            :filter="currentFilter"
+            :supplier-options="supplierOptions"
+            :toolbar-actions="managementToolbarActions"
+            :show-toolbar="Boolean(batchButtons.length)"
+            :selected-count="selectedKeys.length"
+            :page="currentPagination.current"
+            :page-size="currentPagination.pageSize"
+            :total="paginationTotal"
+            :page-size-options="pageSizeOptions"
+            @tab-change="
+              activeTab = $event as StockStatus;
+              handleTabChange();
+            "
+            @filter-change="updateManagementListFilter"
+            @search="handleSearch"
+            @reset="handleReset"
+            @toolbar-action="handleBatchAction($event as BatchAction)"
+            @update:page="currentPagination.current = $event"
+            @update:page-size="currentPagination.pageSize = $event"
+          >
+            <template #breadcrumb>
+              <t-breadcrumb>
+                <t-breadcrumb-item
+                  content="成品现货管理"
+                  :href="isSupplyChain ? '/supply-chain/finished-stock-management' : '/finished-stock-management'"
+                  :to="{
+                    path: isSupplyChain ? '/supply-chain/finished-stock-management' : '/finished-stock-management',
+                  }"
+                  replace
+                  @click="closeFormPage"
+                />
+                <t-breadcrumb-item v-if="formPageVisible">{{ formPageTitle }}</t-breadcrumb-item>
+              </t-breadcrumb>
+            </template>
+            <template #header-action>
+              <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="operationLogsVisible = true"
+                >操作日志</t-link
+              >
+            </template>
+            <template #category-filter>
+              <t-select-input
+                :value="currentFilter.category"
+                :value-display="currentFilter.category?.split(' / ').at(-1)"
+                :popup-visible="categoryFilterVisible"
+                :popup-props="{
+                  placement: 'bottom-left',
+                  overlayInnerStyle: { width: 'auto' },
+                  popperOptions: { modifiers: [{ name: 'flip', enabled: false }] },
+                }"
+                clearable
+                placeholder="请选择"
+                @popup-visible-change="categoryFilterVisible = $event"
+                @clear="currentFilter.category = ''"
+              >
+                <template #suffixIcon
+                  ><t-icon :name="categoryFilterVisible ? 'chevron-up' : 'chevron-down'"
+                /></template>
+                <template #panel>
+                  <t-cascader-panel
+                    v-if="categoryFilterVisible"
+                    :value="''"
+                    :options="categoryCascaderOptions"
+                    :check-strictly="false"
+                    trigger="hover"
+                    @change="handleCategoryFilterChange"
+                  />
+                </template>
+              </t-select-input>
             </template>
             <template #table>
               <SourceUnavailableOverlay :rows="pageData.filter(sourceBlocked)">
@@ -202,31 +188,10 @@
                       </div>
                     </template>
                     <template #operation="{ row }">
-                      <div class="table-actions">
-                        <t-link
-                          v-if="!isSupplyChain && activeTab !== 'offShelf' && hasFinishedAction('detail')"
-                          theme="primary"
-                          hover="color"
-                          @click="handleRowAction('detail', row)"
-                          >详情</t-link
-                        >
-                        <t-link
-                          v-if="activeTab !== 'offShelf' && hasFinishedAction('price')"
-                          theme="primary"
-                          hover="color"
-                          @click="openPriceDrawer('view', row)"
-                          >价格</t-link
-                        >
-                        <t-link
-                          v-for="action in rowActions()"
-                          :key="action.action"
-                          :theme="action.theme"
-                          hover="color"
-                          @click="handleRowAction(action.action, row)"
-                        >
-                          {{ action.label }}
-                        </t-link>
-                      </div>
+                      <FinishedStockRowActions
+                        :actions="managementRowButtons"
+                        @action="handleManagementRowButton($event, row)"
+                      />
                     </template>
                     <template #empty>
                       <div class="table-empty">暂无数据</div>
@@ -259,15 +224,7 @@
                 </template>
               </SourceUnavailableOverlay>
             </template>
-            <template #pagination>
-              <AdminPagination
-                v-model:current="currentPagination.current"
-                v-model:page-size="currentPagination.pageSize"
-                :total="paginationTotal"
-                :page-size-options="pageSizeOptions"
-              />
-            </template>
-          </AdminListLayout>
+          </FinishedStockManagementList>
         </template>
 
         <template v-else-if="formPageVisible">
@@ -1076,8 +1033,6 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminMediaUpload,
-  AdminListLayout,
-  AdminPagination,
   AdminSectionCard,
   type AdminMediaValue,
 } from '@/components/foundation';
@@ -1118,6 +1073,10 @@ import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import ProductDetail from './components/ProductDetail.vue';
 import SourceUnavailableOverlay from './components/SourceUnavailableOverlay.vue';
 import FinishedRowWarnings from './components/FinishedRowWarnings.vue';
+import FinishedStockManagementList, {
+  type FinishedStockToolbarAction,
+} from '../shared/FinishedStockManagementList.vue';
+import FinishedStockRowActions, { type FinishedStockRowAction } from '../shared/FinishedStockRowActions.vue';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
@@ -2111,6 +2070,16 @@ const batchButtons = computed(() => {
   return map[activeTab.value].filter((button) => hasFinishedAction(finishedActionCodes[button.action]));
 });
 
+const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
+  batchButtons.value.map((button) => ({
+    id: button.action,
+    label: button.label,
+    theme: button.theme as FinishedStockToolbarAction['theme'],
+    icon: button.icon,
+    className: button.className,
+  })),
+);
+
 // Fixed pixel widths; update only when the tab action buttons change.
 const operationWidths = {
   warehouse: 190,
@@ -2279,8 +2248,31 @@ const unfilteredRowActions = (): { action: RowAction; label: string; theme: stri
 const rowActions = () =>
   unfilteredRowActions().filter((action) => hasFinishedAction(finishedActionCodes[action.action]));
 
+const managementRowButtons = computed<FinishedStockRowAction[]>(() => [
+  ...(!isSupplyChain.value && activeTab.value !== 'offShelf' && hasFinishedAction('detail')
+    ? [{ id: 'detail', label: '详情', theme: 'primary' as const }]
+    : []),
+  ...(activeTab.value !== 'offShelf' && hasFinishedAction('price')
+    ? [{ id: 'price', label: '价格', theme: 'primary' as const }]
+    : []),
+  ...rowActions().map((action) => ({
+    id: action.action,
+    label: action.label,
+    theme: action.theme as FinishedStockRowAction['theme'],
+  })),
+]);
+
+const handleManagementRowButton = (action: string, row: StockItem) => {
+  if (action === 'price') openPriceDrawer('view', row);
+  else handleRowAction(action as RowAction, row);
+};
+
 const handleTabChange = () => {
   selectedKeys.value = [];
+};
+
+const updateManagementListFilter = (field: 'keyword' | 'supplier', value: string) => {
+  currentFilter.value[field] = value;
 };
 
 const handleSearch = () => {
@@ -3934,63 +3926,11 @@ const handleConfirm = async () => {
   color: var(--td-brand-color);
 }
 
-.finished-list-layout {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.list-controls {
-  min-width: 0;
-  display: grid;
-  width: 100%;
-  gap: var(--td-comp-margin-l);
-}
-
-.filter-row {
-  justify-content: space-between;
-  gap: var(--td-comp-margin-m);
-}
-
-.filter-fields {
-  display: grid;
-  flex: 1;
-  grid-template-columns: 258px 230px 240px;
-  gap: var(--td-comp-margin-m);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.filter-actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: var(--td-comp-margin-s);
-  align-self: flex-start;
-}
-
-/* The full-width empty state already includes the visible table width. */
-.finished-stock-table :deep(.t-table__empty-row > td) {
-  padding-inline: 0;
-}
-
 .table-empty {
   width: 100%;
   padding: 28px 0;
   color: var(--td-text-color-placeholder);
   text-align: center;
-}
-
-.table-toolbar {
-  justify-content: space-between;
-}
-
-.toolbar-buttons {
-  gap: 8px;
-}
-
-.selection-info {
-  color: #6b7280;
-  font-size: 13px;
 }
 
 .off-shelf-reason-cell {
@@ -4006,17 +3946,6 @@ const handleConfirm = async () => {
   font: var(--td-font-body-small);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.brown-button {
-  color: #fff;
-  background: #8b5e34;
-  border-color: #8b5e34;
-}
-
-.deep-danger-button {
-  background: #8a1f11;
-  border-color: #8a1f11;
 }
 
 .product-image {
@@ -4076,13 +4005,6 @@ const handleConfirm = async () => {
 .store-text {
   color: #6b7280;
   font-size: 12px;
-}
-
-.table-actions {
-  display: flex;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 10px;
 }
 
 .form-shell {
@@ -4731,7 +4653,6 @@ const handleConfirm = async () => {
 
 @media (max-width: 1180px) {
   .product-attributes-grid,
-  .filter-fields,
   .form-grid.three {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
@@ -4747,21 +4668,15 @@ const handleConfirm = async () => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .filter-row,
   .form-title-row {
     display: block;
   }
 
-  .filter-fields,
   .form-grid.two,
   .form-grid.three,
   .category-picker,
   .detail-panel {
     grid-template-columns: 1fr;
-  }
-
-  .filter-actions {
-    margin-top: 12px;
   }
 }
 </style>
