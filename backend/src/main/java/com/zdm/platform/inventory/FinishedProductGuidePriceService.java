@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,6 +22,17 @@ public class FinishedProductGuidePriceService {
     return mapper.selectList(Wrappers.<FinishedProductGuidePrice>lambdaQuery()
         .eq(FinishedProductGuidePrice::getFinishedProductId, productId)
         .orderByAsc(FinishedProductGuidePrice::getSkuId));
+  }
+
+  public Map<Long, List<FinishedProductGuidePrice>> listPricesByProductIds(List<Long> productIds) {
+    if (productIds.isEmpty()) {
+      return Map.of();
+    }
+    return mapper.selectList(Wrappers.<FinishedProductGuidePrice>lambdaQuery()
+        .in(FinishedProductGuidePrice::getFinishedProductId, productIds)
+        .orderByAsc(FinishedProductGuidePrice::getFinishedProductId)
+        .orderByAsc(FinishedProductGuidePrice::getSkuId)).stream()
+        .collect(Collectors.groupingBy(FinishedProductGuidePrice::getFinishedProductId));
   }
 
   @Transactional

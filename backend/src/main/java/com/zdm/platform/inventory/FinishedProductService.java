@@ -39,6 +39,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   private final MediaReferenceService mediaReferenceService;
   private final CurrentIdentityProvider identityProvider;
   private final FinishedProductDetailContent detailContent;
+  private final FinishedProductListDetails listDetails;
   private final FinishedOperationLogService operationLogs;
 
   public FinishedProductService(
@@ -64,6 +65,8 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     this.mediaReferenceService = mediaReferenceService;
     this.identityProvider = identityProvider;
     this.detailContent = new FinishedProductDetailContent(mediaAssetService);
+    this.listDetails = new FinishedProductListDetails(lifecycle, priceService, guidePriceService,
+        variantMapper, attributeEntryMapper, jdbcTemplate, mediaAssetService);
   }
 
   public record AttributeTemplateOption(Long categoryId, Long versionId, Integer versionNo,
@@ -92,16 +95,14 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   }
 
   public List<FinishedProduct> listWithDetails() {
-    return lambdaQuery()
+    List<FinishedProduct> products = lambdaQuery()
         .ne(lifecycle.isSupplyChain(), FinishedProduct::getSourceStatus, "purged")
         .eq(!lifecycle.isSupplyChain(), FinishedProduct::getOperationsDeleted, false)
         .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), FinishedProduct::getCreatedByAccountId, identityProvider.require().accountId())
         .orderByDesc(FinishedProduct::getCreatedAt)
         .orderByDesc(FinishedProduct::getId)
-        .list()
-        .stream()
-        .map(this::attachDetails)
-        .toList();
+        .list();
+    return listDetails.attach(products);
   }
 
   public FinishedProduct visibleDetail(Long id) {
