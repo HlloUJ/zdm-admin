@@ -1077,6 +1077,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import { materializeLayeredSpec, rebuildLayeredSpecs, specIdentity } from './specModeConversion';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -1903,22 +1904,6 @@ const supplierIdByName = (name: string) =>
 const formatPriceRange = (guidePrice?: number) => {
   const value = Number(guidePrice ?? 0);
   return value > 0 ? `￥${value.toFixed(2)}` : '-';
-};
-const formatDateTime = (value?: string) => {
-  if (!value) return '-';
-  const timestamp = new Date(`${value.replace(' ', 'T').replace(/Z$/, '')}Z`);
-  if (Number.isNaN(timestamp.getTime())) return '-';
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(timestamp);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-  return `${part('year')}/${part('month')}/${part('day')} ${part('hour')}:${part('minute')}`;
 };
 const toStockItem = (record: FinishedProductRecord): StockItem => {
   const status = normalizeStatus(record.status);

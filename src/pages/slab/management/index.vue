@@ -1057,6 +1057,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import SlabProductFormLayout from './components/SlabProductFormLayout.vue';
 import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
 import SpecPriceInput from '@/pages/finished-stock/management/components/SpecPriceInput.vue';
@@ -1951,22 +1952,6 @@ const supplierIdByName = (name: string) => publishSupplierOptions.value.find((it
 const formatSize = (record: SlabRecord) => {
   const dimensions = [record.lengthMm, record.widthMm, record.thicknessMm];
   return dimensions.some((item) => item == null) ? '-' : `${dimensions.join(' x ')}mm`;
-};
-const formatDateTime = (value?: string) => {
-  if (!value) return '-';
-  const timestamp = new Date(`${value.replace(' ', 'T').replace(/Z$/, '')}Z`);
-  if (Number.isNaN(timestamp.getTime())) return '-';
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(timestamp);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-  return `${part('year')}/${part('month')}/${part('day')} ${part('hour')}:${part('minute')}`;
 };
 const offShelfTimestamp = (record?: SlabOffShelfRecord) => {
   if (!record?.offShelvedAt) return 0;
