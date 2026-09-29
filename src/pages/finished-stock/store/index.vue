@@ -323,6 +323,11 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { finishedStockActions } from '../shared/finishedStockActions';
 import {
+  parseStoreOperationLogChanges,
+  storeOperationLogSourceLabel as logSourceLabel,
+  toStoreOperationLogRow as toLogRow,
+} from './storeOperationLog';
+import {
   AdminConfirmDialog,
   AdminDialog,
   AdminSectionCard,
@@ -332,7 +337,7 @@ import {
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
-import { productLogFilterOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
+import { productLogFilterOptions } from '@/services/productOperationLog';
 import {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,
@@ -459,26 +464,7 @@ const logTotal = ref(0);
 const logLoading = ref(false);
 const logDetail = ref<StoreFinishedLog | null>(null);
 const logDetailVisible = ref(false);
-const toLogRow = (row: StoreFinishedLog): ProductOperationLogRow => ({
-  id: row.id,
-  subjectName: row.productName,
-  subjectId: row.productId,
-  operationType: row.operationType,
-  operationSummary: row.operationSummary,
-  operatorName: row.operatorName,
-  operatedAt: row.operatedAt,
-  beforeStatus:
-    row.operationType.startsWith('SOURCE_') || row.operationType.startsWith('OPERATIONS_') ? null : row.beforeStatus,
-  afterStatus:
-    row.operationType.startsWith('SOURCE_') || row.operationType.startsWith('OPERATIONS_') ? null : row.afterStatus,
-});
 const logDetailRow = computed(() => logDetail.value && toLogRow(logDetail.value));
-const logSourceLabel = (row: ProductOperationLogRow) =>
-  row.operationType.startsWith('SOURCE_')
-    ? '供应链协同系统'
-    : row.operationType.startsWith('OPERATIONS_')
-      ? '运营管理平台'
-      : '合伙人门店';
 async function openLogDetail(id: number) {
   try {
     logDetail.value = await getStoreFinishedLog(id);
@@ -487,28 +473,7 @@ async function openLogDetail(id: number) {
     adminFeedback.error(getSafeErrorMessage(error, '操作详情加载失败'));
   }
 }
-const logChanges = computed<Record<string, { before: unknown; after: unknown }>>(() => {
-  if (!logDetail.value?.changeDetails) return {};
-  try {
-    const details = JSON.parse(logDetail.value.changeDetails) as Record<string, unknown>;
-    return Object.fromEntries(
-      Object.entries(details).map(([field, value]) => {
-        const change =
-          value && typeof value === 'object' && 'before' in value && 'after' in value
-            ? (value as { before: unknown; after: unknown })
-            : { before: null, after: value };
-        return [
-          field,
-          ['状态', '来源状态', '运营状态'].includes(field)
-            ? { before: stateLabel(change.before as string), after: stateLabel(change.after as string) }
-            : change,
-        ];
-      }),
-    );
-  } catch {
-    return {};
-  }
-});
+const logChanges = computed(() => parseStoreOperationLogChanges(logDetail.value?.changeDetails, stateLabel));
 const logFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
 const appliedLogFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
 const logPagination = reactive({ current: 1, pageSize: 10 });
