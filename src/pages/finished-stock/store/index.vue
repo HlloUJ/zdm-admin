@@ -317,6 +317,7 @@
 </template>
 
 <script setup lang="ts">
+import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';
 import { computed, onMounted, reactive, ref } from 'vue';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -361,21 +362,6 @@ import SourceUnavailableOverlay from '../management/components/SourceUnavailable
 import FinishedEditChanges from '../management/components/FinishedEditChanges.vue';
 import StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
-interface FinishedStockToolbarAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-  variant?: 'base' | 'outline' | 'text';
-  icon?: string;
-  className?: string;
-  disabled?: boolean;
-}
-interface FinishedStockRowAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-}
-
 const user = getLoginUser();
 const prefix = 'store.finished-stock-management';
 const can = (tab: string, action: string) => hasPermission(user, `${prefix}.${tab}.${action}`);

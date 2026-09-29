@@ -1002,6 +1002,34 @@
 </template>
 
 <script setup lang="ts">
+import type {
+  FinishedStockToolbarAction,
+  FinishedStockRowAction,
+  StockStatus,
+  PublisherType,
+  RowAction,
+  BatchAction,
+  FormSectionKey,
+  SpecMode,
+  LayeredSpecField,
+  BatchFilterField,
+  DecimalField,
+  ConfirmType,
+  ProductFormMode,
+  TabConfig,
+  FilterState,
+  PaginationState,
+  StockItem,
+  ProductForm,
+  SpecRow,
+  PriceRow,
+  BatchFillForm,
+  SingleSpecItem,
+  LayeredSpecDraft,
+  SpecValue,
+  SpecGroup,
+  CategoryCascaderOption,
+} from '../shared/finishedStockPageModel';
 import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import { materializeLayeredSpec, rebuildLayeredSpecs, specIdentity } from '../management/specModeConversion';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
@@ -1065,211 +1093,8 @@ import ProductDetail from '../management/components/ProductDetail.vue';
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
-interface FinishedStockToolbarAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-  variant?: 'base' | 'outline' | 'text';
-  icon?: string;
-  className?: string;
-  disabled?: boolean;
-}
-interface FinishedStockRowAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-}
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
-type PublisherType = '平台发布' | '接口获取';
-type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
-type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
-type FormSectionKey = 'description' | 'base' | 'sales';
-type SpecMode = 'single' | 'layered';
-type LayeredSpecField = 'material' | 'length' | 'color' | 'size' | `attribute_${number}`;
-type BatchFilterField = 'specText' | LayeredSpecField;
-type DecimalField =
-  | 'cost'
-  | 'guideCoefficient'
-  | 'guide'
-  | 'level1Coefficient'
-  | 'level1'
-  | 'level2Coefficient'
-  | 'level2'
-  | 'level3Coefficient'
-  | 'level3';
-type ConfirmType =
-  'shelf' | 'delete' | 'restore' | 'purge' | 'batchShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
-type ProductFormMode = 'create' | 'edit';
-interface TabConfig {
-  value: StockStatus;
-  label: string;
-  count?: number;
-}
-interface FilterState {
-  keyword: string;
-  category: string;
-  supplier: string;
-}
-interface PaginationState {
-  current: number;
-  pageSize: number;
-}
-interface StockItem {
-  sourceUnavailable?: boolean;
-  sourceStatus?: string;
-  sourceMessage?: string;
-  id: number;
-  createdByName: string;
-  offShelfByName?: string;
-  createdAt?: string;
-  code: string;
-  image: string;
-  name: string;
-  categoryId?: number;
-  supplierId?: number;
-  category: string;
-  stock: number;
-  supplier: string;
-  publisherType: PublisherType;
-  isExternalSupplier: boolean;
-  guidePrice?: number;
-  priceRange: string;
-  status: StockStatus;
-  offShelfReason?: string;
-  offShelfAt?: string;
-  offShelfDetail?: string;
-  markupPrices?: FinishedProductPrice[];
-  guidePrices?: FinishedProductGuidePrice[];
-  mainImageMediaId?: number;
-  mainImageMediaIds?: number[];
-  mainImageUrls?: string[];
-  videoMediaId?: number;
-  videoUrl?: string;
-  detail: string;
-  attributes: FinishedProductAttributeEntry[];
-  variants: FinishedProductVariant[];
-  specDimensions?: FinishedSpecDimension[];
-}
-interface ProductForm {
-  supplier: string;
-  name: string;
-  brand: string;
-  model: string;
-  style: string;
-  shape: string;
-  material: string;
-  craftTexture: string;
-  layers: string;
-  functionText: string;
-  waterproof: string;
-  loadBearing: string;
-  origin: string;
-  installDesc: string;
-  detail: string;
-  totalStock: number;
-  merchantCode: string;
-  shelfNow: 'now' | 'later';
-  [key: string]: string | number;
-}
-interface SpecRow extends TableRowData {
-  _specOriginFields?: LayeredSpecField[];
-  _specValueIds?: Partial<Record<LayeredSpecField, number>>;
-  id: number;
-  skuId?: number;
-  mode: SpecMode;
-  specText: string;
-  specImage: boolean;
-  material: string;
-  materialImage: boolean;
-  length: string;
-  lengthImage: boolean;
-  color: string;
-  colorImage: boolean;
-  size: string;
-  sizeImage: boolean;
-  costCoefficient: string;
-  cost: string;
-  guideCoefficient: string;
-  guide: string;
-  level1Coefficient: string;
-  level1: string;
-  level2Coefficient: string;
-  level2: string;
-  level3Coefficient: string;
-  level3: string;
-  quantity: number | null;
-  markupPrices: Record<
-    number,
-    {
-      coefficient: string;
-      price: string;
-      priceSource?: 'auto' | 'manual';
-      sourceConfigurationId?: number;
-    }
-  >;
-}
-interface PriceRow extends TableRowData {
-  id: number;
-  mode: SpecMode;
-  specText: string;
-  material: string;
-  length: string;
-  color: string;
-  size: string;
-  stock: number;
-  costCoefficient: string;
-  cost: string;
-  guideCoefficient: string;
-  guide: string;
-  level1Coefficient: string;
-  level1: string;
-  level2Coefficient: string;
-  level2: string;
-  level3Coefficient: string;
-  level3: string;
-}
-interface BatchFillForm {
-  cost: string;
-  guideCoefficient: string;
-  guide: string;
-  level1Coefficient: string;
-  level1: string;
-  level2Coefficient: string;
-  level2: string;
-  level3Coefficient: string;
-  level3: string;
-  quantity: number | null;
-}
-interface SingleSpecItem {
-  sourceRow?: SpecRow;
-  id: number;
-  text: string;
-  imageUploaded: boolean;
-}
-interface LayeredSpecDraft extends TableRowData {
-  id: number;
-  sourceRow: SpecRow;
-  valueIds: Partial<Record<LayeredSpecField, number>>;
-}
-interface SpecValue {
-  id: number;
-  value: string;
-  imageUploaded: boolean;
-}
-interface SpecGroup {
-  field: LayeredSpecField;
-  name: string;
-  selected: boolean;
-  withImage: boolean;
-  values: SpecValue[];
-}
-interface CategoryCascaderOption {
-  label: string;
-  value: string;
-  children?: CategoryCascaderOption[];
-}
 const tabs: TabConfig[] = [
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
