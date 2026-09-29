@@ -62,6 +62,27 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   private void fixture(String status, String source, boolean deleted, long creator) {
     jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99601,'协同大板','SLAB-COLLAB',?,?,?,?,2,10)", status, source, deleted, creator);
   }
+  @Test void listKeepsClientVisibilityAndCreatorScopeAfterSqlFiltering() {
+    fixture("warehouse", "warehouse", false, 1L);
+    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES "
+        + "(99602,'其他创建者大板','SLAB-SCOPE-OTHER','warehouse','warehouse',FALSE,2,2,10),"
+        + "(99603,'来源已删除大板','SLAB-SCOPE-PURGED','warehouse','purged',FALSE,1,2,10),"
+        + "(99604,'运营已删除大板','SLAB-SCOPE-DELETED','warehouse','warehouse',TRUE,1,2,10)");
+
+    identity("supply-chain", "self", "all");
+    assertThat(visibleFixtureIds()).containsExactlyInAnyOrder(99601L, 99604L);
+    identity("supply-chain", "all", "all");
+    assertThat(visibleFixtureIds()).containsExactlyInAnyOrder(99601L, 99602L, 99604L);
+    identity("admin", "self", "all");
+    assertThat(visibleFixtureIds()).containsExactlyInAnyOrder(99601L, 99603L);
+    identity("admin", "all", "all");
+    assertThat(visibleFixtureIds()).containsExactlyInAnyOrder(99601L, 99602L, 99603L);
+  }
+
+  private List<Long> visibleFixtureIds() {
+    return slabs.listWithPrices().stream().map(SlabInventory::getId)
+        .filter(id -> id >= 99601 && id <= 99604).toList();
+  }
   @Test void sourcePricePermissionOnlyChangesWarehouseAndSellingCost() throws Exception {
     fixture("warehouse", "warehouse", true, 1L);
     for (String[] state : new String[][] {{"warehouse", "warehouse"}, {"selling", "selling"}}) {

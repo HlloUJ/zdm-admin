@@ -94,8 +94,9 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
   }
 
   public List<SlabInventory> listWithPrices() {
-    List<SlabInventory> inventory = com.zdm.platform.security.DataScope.filter(identityProvider.require(), baseMapper.selectListWithDetails()).stream()
-        .filter(item -> lifecycle.isSupplyChain() ? !"purged".equals(item.getSourceStatus()) : !Boolean.TRUE.equals(item.getOperationsDeleted())).toList();
+    var identity = identityProvider.require();
+    List<SlabInventory> inventory = baseMapper.selectListWithDetails(lifecycle.isSupplyChain(),
+        com.zdm.platform.security.DataScope.isAll(identity), identity.accountId());
     Map<Long, List<SlabOffShelfRecord>> recordsBySlabId = offShelfRecordService
         .listBySlabIds(inventory.stream().map(SlabInventory::getId).toList())
         .stream()
