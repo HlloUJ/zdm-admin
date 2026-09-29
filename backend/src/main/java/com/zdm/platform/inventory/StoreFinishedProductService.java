@@ -77,7 +77,7 @@ public class StoreFinishedProductService {
 
   public List<PoolProduct> pool() {
     var store = scopes.require();
-    return jdbc.query("""
+    List<Map<String, Object>> rows = jdbc.queryForList("""
         SELECT product.id, product.name, product.sku, product.total_stock,
           supplier.name AS supplier_name, product.category_id
         FROM finished_products product
@@ -88,13 +88,24 @@ public class StoreFinishedProductService {
             WHERE selected.store_id = ? AND selected.finished_product_id = product.id
               AND selected.selection_generation = product.selection_generation)
         ORDER BY product.created_at DESC, product.id DESC
-        """, (row, index) -> {
-          Long id = row.getLong("id");
-          FinishedProduct detailed = publicProduct(id);
-          return new PoolProduct(id, row.getString("name"), row.getString("sku"),
-              row.getInt("total_stock"), detailed.getMainImageUrl(),
-              row.getObject("category_id", Long.class), row.getString("supplier_name"));
-        }, store.storeId());
+        """, store.storeId());
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<Long> ids = rows.stream().map(row -> number(row.get("id"))).toList();
+    Map<Long, FinishedProduct> details = products.withListDetails(
+        productMapper.selectBatchIds(ids)).stream()
+        .collect(java.util.stream.Collectors.toMap(FinishedProduct::getId, product -> product));
+    return rows.stream().map(row -> {
+      Long id = number(row.get("id"));
+      FinishedProduct detailed = details.get(id);
+      if (detailed == null) {
+        throw new IllegalArgumentException("来源商品不存在");
+      }
+      return new PoolProduct(id, (String) row.get("name"), (String) row.get("sku"),
+          ((Number) row.get("total_stock")).intValue(), detailed.getMainImageUrl(),
+          number(row.get("category_id")), (String) row.get("supplier_name"));
+    }).toList();
   }
 
   public List<ProductView> list() {

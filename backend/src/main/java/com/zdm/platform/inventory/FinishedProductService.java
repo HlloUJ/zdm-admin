@@ -119,6 +119,10 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     return attachDetails(product);
   }
 
+  List<FinishedProduct> withListDetails(List<FinishedProduct> products) {
+    return listDetails.attach(products);
+  }
+
   @Transactional
   public FinishedProduct createWithDetails(FinishedProduct product) {
     lifecycle.requireSupplyChain();

@@ -37,6 +37,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Autowired private ProductLifecycleService lifecycle;
   @Autowired private FinishedProductService finishedProducts;
   @Autowired private MockMvc mvc;
+  @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
 
   @DynamicPropertySource
   static void datasource(DynamicPropertyRegistry registry) {
@@ -48,6 +49,37 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @AfterEach
   void clearIdentity() {
     SecurityContextHolder.clearContext();
+  }
+
+  @Test
+  @Transactional
+  void poolQueriesStayBoundedAsProductsGrow() {
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,status) VALUES (99871,1,'商品池测试门店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) "
+        + "VALUES (99871,'候选商品一',2,'selling','selling',FALSE)");
+    identity(99871L);
+
+    sqlSession.clearCache();
+    long beforeOne = selectCount();
+    assertThat(products.pool()).extracting(StoreFinishedProductService.PoolProduct::id).contains(99871L);
+    long one = selectCount() - beforeOne;
+
+    jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) "
+        + "VALUES (99872,'候选商品二',2,'selling','selling',FALSE),"
+        + "(99873,'候选商品三',2,'selling','selling',FALSE)");
+    sqlSession.clearCache();
+    long beforeThree = selectCount();
+    assertThat(products.pool()).extracting(StoreFinishedProductService.PoolProduct::id)
+        .contains(99871L, 99872L, 99873L);
+    long three = selectCount() - beforeThree;
+
+    System.out.printf("store finished pool SELECT count: one=%d, three=%d%n", one, three);
+    assertThat(three).withFailMessage("pool SELECT count: one=%d, three=%d", one, three)
+        .isLessThanOrEqualTo(one + 2);
+  }
+
+  private long selectCount() {
+    return jdbc.queryForObject("SHOW SESSION STATUS LIKE 'Com_select'", (row, index) -> row.getLong("Value"));
   }
 
   @Test
