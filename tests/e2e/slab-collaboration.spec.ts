@@ -12,7 +12,8 @@ const sourceBlockMessage = (source: string) =>
 async function setup(page: Page, status: string, sourceStatus = 'selling', detail = true) {
   await installAdminApiMocks(page);
   const permissions = [prefix + scope(status) + '.view', prefix + 'recycle.purge'];
-  if (detail) permissions.push(prefix + scope(status) + '.detail');
+  if (detail)
+    permissions.push(prefix + scope(status) + (['warehouse', 'selling'].includes(status) ? '.edit' : '.detail'));
   await page.addInitScript((permissions) => {
     localStorage.setItem('zdm-admin-token', 'dev-token');
     localStorage.setItem(
@@ -60,7 +61,7 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
   await page.goto('/slab-management');
   await expect(page.getByRole('main').getByText('协同大板', { exact: true })).toBeVisible();
 }
-for (const status of ['warehouse', 'selling', 'offShelf', 'soldOut', 'recycle']) {
+for (const status of ['offShelf', 'soldOut', 'recycle']) {
   test(`运营 ${status} 详情读取最新数据且不提供编辑`, async ({ page }) => {
     await setup(page, status);
     await page.getByRole('main').locator('.table-actions').getByText('详情', { exact: true }).click();
@@ -127,7 +128,7 @@ test('运营角色候选目录五个状态均显示详情且默认不勾选', as
   for (const [offset, label] of ['仓库中', '已上架', '已下架', '已售完', '回收站'].entries()) {
     const row = rows.nth(index + offset + 1);
     await expect(row.locator('.permission-tab-text')).toHaveText(label);
-    await expect(row.getByRole('checkbox', { name: '详情', exact: true })).not.toBeChecked();
+    await expect(row.getByRole('checkbox', { name: offset < 2 ? '编辑' : '详情', exact: true })).not.toBeChecked();
   }
 });
 
@@ -237,14 +238,12 @@ test('批量下架初次打开和重新打开不显示校验错误，提交时�
 
 for (const [status, actions] of Object.entries({
   warehouse: [
-    ['详情', 'detail'],
-    ['价格', 'price'],
+    ['编辑', 'edit'],
     ['上架', 'shelf'],
     ['删除', 'delete'],
   ],
   selling: [
-    ['详情', 'detail'],
-    ['价格', 'price'],
+    ['编辑', 'edit'],
     ['下架', 'off-shelf'],
   ],
   offShelf: [
@@ -254,7 +253,6 @@ for (const [status, actions] of Object.entries({
   ],
   recycle: [
     ['详情', 'detail'],
-    ['价格', 'price'],
     ['放回仓库', 'restore'],
     ['彻底删除', 'purge'],
   ],

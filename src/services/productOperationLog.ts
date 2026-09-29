@@ -19,8 +19,8 @@ export interface ProductOperationLogRow {
 export const productOperationTypes: Record<string, string> = {
   CREATE: '发布商品',
   SELECT: '放入仓库',
-  UPDATE: '编辑信息',
-  PRICE_UPDATE: '修改价格',
+  UPDATE: '编辑商品',
+  PRICE_UPDATE: '编辑商品',
   SHELF: '上架',
   OFF_SHELF: '下架',
   RESTORE: '放回仓库',
@@ -47,6 +47,7 @@ const fixedSummaries: Record<string, string> = {
   CREATE: '发布商品',
   SELECT: '从运营端已上架商品池挑选商品，放入本店仓库',
   UPDATE: '编辑商品',
+  PRICE_UPDATE: '编辑商品',
   SHELF: '上架商品',
   OFF_SHELF: '下架商品',
   RESTORE: '放回仓库',
@@ -71,6 +72,7 @@ export function productOperationTypeLabel(type: string): string {
 }
 
 export function canonicalProductOperationType(type: string): string {
+  if (type === 'PRICE_UPDATE') return 'UPDATE';
   return ['RESTORE_WAREHOUSE', 'RESTORE_RECYCLE'].includes(type) ? 'RESTORE' : type;
 }
 
@@ -87,7 +89,7 @@ export function productOperationTypeOptions(types: readonly string[]) {
   }));
 }
 
-const commonActions = ['PRICE_UPDATE', 'SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE', 'PURGE', 'SOLD_OUT'];
+const commonActions = ['UPDATE', 'SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE', 'PURGE', 'SOLD_OUT'];
 const supplyEffects = ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'];
 const operationsEffects = [
   'OPERATIONS_SHELF',

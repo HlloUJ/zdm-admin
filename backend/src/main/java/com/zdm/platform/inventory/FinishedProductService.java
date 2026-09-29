@@ -145,7 +145,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     }
     replaceDetails(product);
     syncMediaReferences(product);
-    if(publishNow) { lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,product.getId(),"selling"); }
+    if(publishNow) { lifecycle.shelfDuringCreation(ProductLifecycleService.Kind.FINISHED,product.getId()); }
     FinishedProduct created = attachDetails(getById(product.getId()));
     operationLogs.record(created, null, operationLogs.snapshot(created));
     return created;

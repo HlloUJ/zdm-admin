@@ -53,14 +53,14 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
       throw new org.springframework.security.access.AccessDeniedException("无权访问当前功能");
     }
     permissionGuard.requireView(PERMISSION_PREFIX);
-    permissionGuard.requireAnyPermission(permission("warehouse", "detail"), permission("selling", "detail"),
+    permissionGuard.requireAnyPermission(permission("warehouse", "edit"), permission("selling", "edit"),
         permission("off-shelf", "detail"), permission("sold-out", "detail"), permission("recycle", "detail"));
     permissionGuard.requireDataPermission();
     FinishedProduct product = service.visibleDetail(id);
     if (product == null) { throw new IllegalArgumentException("成品现货不存在或不可访问"); }
     String status = scope(product.getStatus());
     permissionGuard.requireAnyPermission(PERMISSION_PREFIX + ".view", permission(status, "view"));
-    permissionGuard.requirePermission(permission(status, "detail"));
+    permissionGuard.requirePermission(permission(status, List.of("warehouse", "selling").contains(status) ? "edit" : "detail"));
     return ApiResponse.ok(service.withDetails(product));
   }
 
@@ -96,7 +96,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   public ApiResponse<List<StoreLevelPricingDirectory.Level>> priceLevelOptions() {
     permissionGuard.requireView(prefix());
     permissionGuard.requireDataPermission();
-    return ApiResponse.ok(storeLevelDirectory.listEnabledLevels());
+    return ApiResponse.ok(storeLevelDirectory.listOperationalPricingLevels());
   }
 
   @PostMapping("/media")
@@ -121,6 +121,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     return ApiResponse.ok(permissionGuard.filterData(service.listWithDetails()).stream()
         .filter(product -> permissionGuard.hasPermission(prefix() + ".view")
             || permissionGuard.hasPermission(permission(scope(isSupplyChain() ? product.getSourceStatus() : product.getStatus()), "view")))
+        .map(this::visiblePrices)
         .toList());
   }
 
@@ -130,7 +131,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     permissionGuard.requireAnyPermission(permission("warehouse","publish"),permission("selling","publish"));
     permissionGuard.requireDataPermission();
     if(isSupplyChain() && "selling".equals(product.getStatus()) && !"接口获取".equals(product.getPublisherType())) { permissionGuard.requireAnyPermission(permission("warehouse","shelf"),permission("selling","publish")); }
-    return ApiResponse.ok(service.createWithDetails(product));
+    return ApiResponse.ok(visiblePrices(service.createWithDetails(product)));
   }
 
   @PostMapping("/{id}/shelf-check")
@@ -160,36 +161,25 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
       if (!java.util.Objects.equals(existing.getSourceStatus(),product.getStatus())) {
         String action = transitionAction(existing.getSourceStatus(),product.getStatus());
         permissionGuard.requireAnyPermission(permission(scope(existing.getSourceStatus()),action),permission(scope(existing.getSourceStatus()),"batch-"+action));
-        if("selling".equals(product.getStatus()) && permissionGuard.hasPermission(permission(scope(existing.getSourceStatus()),"edit"))) { return ApiResponse.ok(service.updateWithDetails(id,product)); }
-        return ApiResponse.ok(service.sourceTransition(id,product.getStatus(),product.getOffShelfReason(),product.getOffShelfDetail()));
+        if("selling".equals(product.getStatus()) && permissionGuard.hasPermission(permission(scope(existing.getSourceStatus()),"edit"))) { return ApiResponse.ok(visiblePrices(service.updateWithDetails(id,product))); }
+        return ApiResponse.ok(visiblePrices(service.sourceTransition(id,product.getStatus(),product.getOffShelfReason(),product.getOffShelfDetail())));
       }
       permissionGuard.requirePermission(permission(scope(existing.getSourceStatus()),"edit"));
-      return ApiResponse.ok(service.updateWithDetails(id,product));
+      return ApiResponse.ok(visiblePrices(service.updateWithDetails(id,product)));
     }
     if (existing.isSourceUnavailable() || Boolean.TRUE.equals(existing.getOperationsDeleted())) {
       throw new IllegalArgumentException("该商品已被供应链删除或运营已彻底删除，不能执行此操作");
     }
     String source = scope(existing.getStatus());
-    if (permissionGuard.hasPermission(prefix() + ".edit")) {
-      return ApiResponse.ok(service.updateWithDetails(id, product));
-    }
     if (!java.util.Objects.equals(existing.getStatus(), product.getStatus())) {
       String action = transitionAction(existing.getStatus(), product.getStatus());
       permissionGuard.requireAnyPermission(permission(source, action), permission(source, "batch-" + action));
-      if (("warehouse".equals(source) || "selling".equals(source))
-          && permissionGuard.hasPermission(permission(source, "edit"))) {
-        return ApiResponse.ok(service.updateWithDetails(id, product));
-      }
       return ApiResponse.ok(service.updateOperationWithDetails(id, product, false));
     }
-    if (("warehouse".equals(source) || "selling".equals(source))
-        && permissionGuard.hasPermission(permission(source, "edit"))) {
-      return ApiResponse.ok(service.updateWithDetails(id, product));
-    }
     if (!"warehouse".equals(source) && !"selling".equals(source)) {
-      throw new org.springframework.security.access.AccessDeniedException("当前状态不允许编辑价格");
+      throw new org.springframework.security.access.AccessDeniedException("当前状态不允许编辑商品");
     }
-    permissionGuard.requirePermission(permission(source, "price"));
+    permissionGuard.requirePermission(permission(source, "edit"));
     return ApiResponse.ok(service.updateOperationWithDetails(id, product, true));
   }
 
@@ -213,7 +203,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     }
     permissionGuard.requireData(existing);
     String scope = scope(existing.getSourceStatus());
-    permissionGuard.requirePermission(permission(scope, "price"));
+    permissionGuard.requirePermission(permission(scope, "edit"));
     if (!List.of("warehouse", "selling").contains(scope)) {
       throw new IllegalArgumentException("当前状态不能修改成本价");
     }
@@ -227,7 +217,7 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
         throw new IllegalArgumentException("请完善每个规格的成本价");
       }
     }
-    return ApiResponse.ok(service.updateSourceCosts(id, costs));
+    return ApiResponse.ok(visiblePrices(service.updateSourceCosts(id, costs)));
   }
 
   @Override
@@ -244,6 +234,14 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     return ApiResponse.ok(service.removeById(id));
   }
   private boolean isSupplyChain() { return "supply-chain".equals(permissionGuard.identity().clientCode()); }
+  private FinishedProduct visiblePrices(FinishedProduct product) {
+    if (isSupplyChain() && product != null) {
+      product.setGuidePrice(null);
+      product.setGuidePrices(List.of());
+      product.setMarkupPrices(List.of());
+    }
+    return product;
+  }
   private String prefix() { return (isSupplyChain()?"supply-chain.":"admin.")+"finished-stock-management"; }
   private String permission(String scope, String action) {
     return prefix() + "." + scope + "." + action;

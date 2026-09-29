@@ -90,12 +90,18 @@ describe('full function catalog', () => {
       expect(source).toContain(`supply-chain.${module}.off-shelf.restore`);
       expect(source).not.toContain(`supply-chain.${module}.sold-out.edit`);
       expect(source).not.toContain(`supply-chain.${module}.sold-out.delete`);
-      for (const scope of ['warehouse', 'selling', 'off-shelf', 'sold-out', 'recycle']) {
-        expect(source).toContain(`supply-chain.${module}.${scope}.price`);
+      for (const scope of ['warehouse', 'selling']) {
+        expect(source).toContain(`supply-chain.${module}.${scope}.edit`);
+        expect(operations).toContain(`admin.${module}.${scope}.edit`);
       }
-      expect(operations).toContain(`admin.${module}.warehouse.price`);
+      for (const scope of ['off-shelf', 'sold-out', 'recycle']) {
+        expect(source).toContain(`supply-chain.${module}.${scope}.detail`);
+        expect(operations).toContain(`admin.${module}.${scope}.detail`);
+      }
+      expect(source.some((value) => value.startsWith(`supply-chain.${module}.`) && value.endsWith('.price'))).toBe(
+        false,
+      );
       expect(operations).not.toContain(`admin.${module}.warehouse.publish`);
-      expect(operations).not.toContain(`admin.${module}.selling.edit`);
       expect(normalizeTerminalPermissions('supply-chain', [`admin.${module}.warehouse.price`])).toEqual([]);
     }
   });
@@ -114,6 +120,8 @@ describe('full function catalog', () => {
     expect(storeValues).toContain('store.finished-stock-management.warehouse.select');
     expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');
     expect(storeValues).not.toContain('store.finished-stock-management.selling.delete');
+    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['操作日志']);
+    expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');
     const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
     expect(pricing.menus[0].direct).toBe(true);
     expect(pricing.menus[0].pages[0].tabs).toEqual([]);
@@ -190,7 +198,7 @@ describe('full function catalog', () => {
     const operationValues = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));
     expect(operationValues).toContain('admin.slab-management.warehouse.view');
     expect(operationValues).toContain('admin.slab-management.off-shelf.detail');
-    expect(operationValues).toContain('admin.slab-management.recycle.price');
+    expect(operationValues).toContain('admin.slab-management.recycle.detail');
     expect(operationValues).toContain('admin.tenant.tenant-management.unarchived.view');
     expect(operationValues).toContain('admin.tenant.store-level-management.view');
     expect(operationValues).toContain('admin.product-data-center.markup-configuration.finished.view');
@@ -336,8 +344,7 @@ describe('finished stock catalog contract', () => {
         [
           ['查看', 'admin.finished-stock-management.warehouse.view'],
           ['批量上架', 'admin.finished-stock-management.warehouse.batch-shelf'],
-          ['详情', 'admin.finished-stock-management.warehouse.detail'],
-          ['价格', 'admin.finished-stock-management.warehouse.price'],
+          ['编辑', 'admin.finished-stock-management.warehouse.edit'],
           ['上架', 'admin.finished-stock-management.warehouse.shelf'],
           ['删除', 'admin.finished-stock-management.warehouse.delete'],
         ],
@@ -348,8 +355,7 @@ describe('finished stock catalog contract', () => {
         [
           ['查看', 'admin.finished-stock-management.selling.view'],
           ['批量下架', 'admin.finished-stock-management.selling.batch-off-shelf'],
-          ['详情', 'admin.finished-stock-management.selling.detail'],
-          ['价格', 'admin.finished-stock-management.selling.price'],
+          ['编辑', 'admin.finished-stock-management.selling.edit'],
           ['下架', 'admin.finished-stock-management.selling.off-shelf'],
         ],
       ],
@@ -370,7 +376,6 @@ describe('finished stock catalog contract', () => {
         [
           ['查看', 'admin.finished-stock-management.sold-out.view'],
           ['详情', 'admin.finished-stock-management.sold-out.detail'],
-          ['价格', 'admin.finished-stock-management.sold-out.price'],
         ],
       ],
       [
@@ -382,25 +387,24 @@ describe('finished stock catalog contract', () => {
           ['批量彻底删除', 'admin.finished-stock-management.recycle.batch-purge'],
           ['清空回收站', 'admin.finished-stock-management.recycle.clear'],
           ['详情', 'admin.finished-stock-management.recycle.detail'],
-          ['价格', 'admin.finished-stock-management.recycle.price'],
           ['放回仓库', 'admin.finished-stock-management.recycle.restore'],
           ['彻底删除', 'admin.finished-stock-management.recycle.purge'],
         ],
       ],
     ]);
-    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(27);
+    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(23);
     expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);
     const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>
       value.startsWith('admin.finished-stock-management.'),
     );
-    expect(values).toHaveLength(28);
-    expect(new Set(values).size).toBe(28);
+    expect(values).toHaveLength(24);
+    expect(new Set(values).size).toBe(24);
     expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(
       false,
     );
     expect(
       normalizeFunctionCatalogPermissions(fullFunctionCatalog, ['admin.finished-stock-management.selling.edit']),
-    ).toEqual([]);
+    ).toEqual(['admin.finished-stock-management.selling.view', 'admin.finished-stock-management.selling.edit']);
     expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'))).toEqual(
       expect.arrayContaining(values),
     );
@@ -451,15 +455,16 @@ describe('category sorting permissions', () => {
 });
 
 describe('slab operations details', () => {
-  it('registers a detail per operations tab without expanding supply chain or terminal grants', () => {
+  it('registers edit for active stock and detail for read-only stock without expanding terminal grants', () => {
     const page = fullFunctionCatalog
       .flatMap((module) => module.menus)
       .flatMap((menu) => menu.pages)
       .find((item) => item.value === 'admin.slab-management')!;
     expect(page.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已下架', '已售完', '回收站']);
     for (const tab of page.tabs) {
-      expect(tab.actions.filter((action) => action.value.endsWith('.detail'))).toEqual([
-        { label: '详情', value: `${tab.value}.detail` },
+      const active = tab.value.endsWith('.warehouse') || tab.value.endsWith('.selling');
+      expect(tab.actions.filter((action) => action.value.endsWith(active ? '.edit' : '.detail'))).toEqual([
+        { label: active ? '编辑' : '详情', value: `${tab.value}.${active ? 'edit' : 'detail'}` },
       ]);
       expect(tab.actions.some((action) => ['查询', '重置'].includes(action.label))).toBe(false);
     }

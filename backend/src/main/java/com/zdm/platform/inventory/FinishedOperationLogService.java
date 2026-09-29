@@ -355,7 +355,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         default -> "UPDATE";
       };
     }
-    return changes.keySet().stream().allMatch(key -> List.of("指导价", "层级价格").contains(key)) ? "PRICE_UPDATE" : "UPDATE";
+    return "UPDATE";
   }
 
   public FinishedOperationLogPage listPage(String keyword, String type, String operator,
@@ -380,7 +380,9 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
         + "WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
         + sourceTarget + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
         + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' WHEN 'purged' THEN 'SOURCE_PURGE'"
-        + " ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
+        + " ELSE 'SOURCE_INTERNAL' END "
+        + "WHEN operation_type='PRICE_UPDATE' AND operation_source='MANUAL' THEN 'UPDATE' "
+        + "ELSE operation_type END";
     conditions.add("(" + visibleType + ")<>'SOURCE_INTERNAL'");
     if (type != null && !type.isBlank()) {
       if ("RESTORE".equals(type)) {
@@ -446,6 +448,10 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
   }
 
   private void normalizeOperation(FinishedOperationLog log) {
+    if ("PRICE_UPDATE".equals(log.getOperationType()) && "MANUAL".equals(log.getOperationSource())) {
+      log.setOperationType("UPDATE");
+      log.setOperationSummary("编辑商品");
+    }
     if ("admin".equals(log.getBusinessClientCode()) && "PURGE".equals(log.getOperationType())
         && (log.getAfterStatus() == null || log.getAfterStatus().isBlank())) {
       log.setAfterStatus("purged");

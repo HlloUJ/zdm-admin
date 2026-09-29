@@ -4,41 +4,82 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <FinishedStockManagementList
-          :tabs="tabs"
-          :active-tab="activeTab"
-          :filter="filter"
-          :supplier-options="supplierOptions"
-          :toolbar-actions="storeToolbarActions"
-          :selected-count="selected.length"
-          :page="page"
-          :page-size="pageSize"
-          :total="filteredRows.length"
-          empty-description="暂无成品现货管理权限"
-          @tab-change="
-            activeTab = $event as StoreFinishedStatus;
-            resetSelection();
-          "
-          @filter-change="updateStoreListFilter"
-          @search="page = 1"
-          @reset="resetFilter"
-          @toolbar-action="handleStoreToolbarAction"
-          @update:page="page = $event"
-          @update:page-size="pageSize = $event"
-        >
-          <template #breadcrumb>
-            <t-breadcrumb><t-breadcrumb-item>成品现货管理</t-breadcrumb-item></t-breadcrumb>
+        <header class="page-header">
+          <t-breadcrumb><t-breadcrumb-item>成品现货管理</t-breadcrumb-item></t-breadcrumb>
+          <t-link v-if="canGlobal('operation-log.view')" theme="primary" @click="openLogs">操作日志</t-link>
+        </header>
+        <AdminListLayout v-if="tabs.length" class="finished-list-layout">
+          <template #toolbar>
+            <div class="list-controls">
+              <t-tabs
+                v-if="true"
+                :value="activeTab"
+                class="status-tabs"
+                @change="
+                  activeTab = String($event) as StoreFinishedStatus;
+                  resetSelection();
+                "
+              >
+                <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tab.label" />
+              </t-tabs>
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
+                <div class="filter-row">
+                  <div class="filter-fields">
+                    <t-form-item label="商品">
+                      <t-input
+                        :value="filter.keyword"
+                        clearable
+                        placeholder="商品名称 / ID"
+                        @change="updateStoreListFilter('keyword', String($event || ''))"
+                        @enter="page = 1"
+                      />
+                    </t-form-item>
+                    <t-form-item label="商品分类"
+                      ><t-select v-model="filter.category" clearable placeholder="请选择">
+                        <t-option v-for="item in categoryOptions" :key="item" :value="item" :label="item" /> </t-select
+                    ></t-form-item>
+                    <t-form-item label="供应商">
+                      <t-select
+                        :value="filter.supplier"
+                        clearable
+                        placeholder="请选择"
+                        @change="updateStoreListFilter('supplier', String($event || ''))"
+                      >
+                        <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
+                      </t-select>
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="page = 1">
+                      <template #icon><t-icon name="search" /></template>查询
+                    </t-button>
+                    <t-button theme="default" variant="base" @click="resetFilter">
+                      <template #icon><t-icon name="refresh" /></template>重置
+                    </t-button>
+                  </div>
+                </div>
+              </t-form>
+              <div v-if="true" class="table-toolbar">
+                <div class="toolbar-buttons">
+                  <t-button
+                    v-for="action in storeToolbarActions"
+                    :key="action.id"
+                    :theme="action.theme"
+                    :variant="action.variant"
+                    :class="action.className"
+                    :disabled="action.disabled"
+                    @click="handleStoreToolbarAction(action.id)"
+                  >
+                    <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>
+                    {{ action.label }}
+                  </t-button>
+                </div>
+                <div class="selection-info">已选 {{ selected.length }} 项</div>
+              </div>
+            </div>
           </template>
-          <template #header-action>
-            <t-link v-if="canGlobal('operation-log.view')" theme="primary" @click="openLogs">操作日志</t-link>
-          </template>
-          <template #category-filter>
-            <t-select v-model="filter.category" clearable placeholder="请选择">
-              <t-option v-for="item in categoryOptions" :key="item" :value="item" :label="item" />
-            </t-select>
-          </template>
-          <template #table>
-            <SourceUnavailableOverlay :rows="pageRows.filter((item) => item.sourceUnavailable)">
+          <template #table
+            ><SourceUnavailableOverlay :rows="pageRows.filter((item) => item.sourceUnavailable)">
               <t-table
                 :key="activeTab"
                 class="finished-stock-table"
@@ -81,7 +122,16 @@
                 </template>
                 <template #offShelfAt="{ row }">{{ time(row.offShelfAt) }}</template>
                 <template #operation="{ row }">
-                  <FinishedStockRowActions :actions="storeRowButtons" @action="handleStoreRowButton($event, row)" />
+                  <div class="table-actions">
+                    <t-link
+                      v-for="action in storeRowButtons"
+                      :key="action.id"
+                      :theme="action.theme"
+                      hover="color"
+                      @click="handleStoreRowButton(action.id, row)"
+                      >{{ action.label }}</t-link
+                    >
+                  </div>
                 </template>
                 <template #empty>暂无商品</template>
               </t-table>
@@ -90,23 +140,9 @@
                   ><t-icon name="info-circle" />{{ row.sourceMessage || '上游商品不可用' }}</t-space
                 >
                 <t-space size="small">
+                  <t-button v-if="can(activeScope, 'view')" size="small" @click="openDetail(row)">详情</t-button>
                   <t-button
-                    v-if="
-                      can(
-                        row.effectiveStatus === 'offShelf'
-                          ? 'off-shelf'
-                          : row.effectiveStatus === 'soldOut'
-                            ? 'sold-out'
-                            : row.effectiveStatus,
-                        'detail',
-                      )
-                    "
-                    size="small"
-                    @click="openDetail(row)"
-                    >详情</t-button
-                  >
-                  <t-button
-                    v-if="canGlobal('unavailable.purge')"
+                    v-if="can(activeScope, 'view')"
                     size="small"
                     theme="danger"
                     @click="prepareAction('purge', row)"
@@ -114,9 +150,20 @@
                   >
                 </t-space>
               </template>
-            </SourceUnavailableOverlay>
+            </SourceUnavailableOverlay></template
+          >
+          <template #pagination>
+            <AdminPagination
+              :current="page"
+              :page-size="pageSize"
+              :total="filteredRows.length"
+              :page-size-options="[10, 20, 50]"
+              @update:current="page = $event"
+              @update:page-size="pageSize = $event"
+            />
           </template>
-        </FinishedStockManagementList>
+        </AdminListLayout>
+        <t-empty v-else description="暂无成品现货管理权限" />
       </main>
     </div>
 
@@ -175,21 +222,8 @@
           <t-descriptions bordered :column="3">
             <t-descriptions-item label="统一库存">{{ sku.stock }}</t-descriptions-item>
             <t-descriptions-item label="本店成本价">{{ money(sku.costPrice) }}</t-descriptions-item>
-            <t-descriptions-item label="指导价来源">{{
-              sku.guideSource === 'manual' ? '本店手工价格' : '运营端指导价'
-            }}</t-descriptions-item>
+            <t-descriptions-item label="运营端指导价">{{ money(sku.guidePrice) }}</t-descriptions-item>
           </t-descriptions>
-          <t-space align="center" style="margin-top: 16px">
-            <span>本店指导价</span>
-            <t-input-number
-              v-model="guideDrafts[sku.skuId]"
-              :min="0"
-              :decimal-places="2"
-              :disabled="!priceEditable"
-              theme="normal"
-            />
-            <t-button v-if="priceEditable" theme="primary" @click="saveGuide(sku.skuId)">保存指导价</t-button>
-          </t-space>
           <t-table row-key="roleId" :data="sku.rolePrices" :columns="roleColumns" style="margin-top: 16px">
             <template #price="{ row }"
               ><t-input-number
@@ -287,6 +321,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import { finishedStockActions } from '../shared/finishedStockActions';
 import {
   AdminConfirmDialog,
   AdminDialog,
@@ -309,7 +344,6 @@ import {
   listStoreFinishedProducts,
   purgeStoreFinishedProduct,
   purgeStoreFinishedProducts,
-  saveStoreFinishedGuide,
   saveStoreFinishedRolePrice,
   selectStoreFinishedProducts,
   type StoreFinishedLog,
@@ -320,11 +354,22 @@ import {
 } from '@/services/storeFinishedStock';
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
 import FinishedEditChanges from '../management/components/FinishedEditChanges.vue';
-import StoreProductDetail from './product-detail.vue';
-import FinishedStockManagementList, {
-  type FinishedStockToolbarAction,
-} from '../shared/FinishedStockManagementList.vue';
-import FinishedStockRowActions, { type FinishedStockRowAction } from '../shared/FinishedStockRowActions.vue';
+import StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';
+import { AdminListLayout, AdminPagination } from '@/components/foundation';
+interface FinishedStockToolbarAction {
+  id: string;
+  label: string;
+  theme: 'primary' | 'default' | 'danger' | 'warning';
+  variant?: 'base' | 'outline' | 'text';
+  icon?: string;
+  className?: string;
+  disabled?: boolean;
+}
+interface FinishedStockRowAction {
+  id: string;
+  label: string;
+  theme: 'primary' | 'default' | 'danger' | 'warning';
+}
 
 const user = getLoginUser();
 const prefix = 'store.finished-stock-management';
@@ -386,7 +431,6 @@ const current = ref<StoreFinishedProduct | null>(null);
 const detailVisible = ref(false);
 const imagePreview = ref<string | null>(null);
 const priceVisible = ref(false);
-const guideDrafts = reactive<Record<number, number | null>>({});
 const roleDrafts = reactive<Record<string, number | null>>({});
 const roleSources = reactive<Record<string, 'auto' | 'manual'>>({});
 const priceEditable = computed(() =>
@@ -394,7 +438,7 @@ const priceEditable = computed(() =>
     current.value &&
     !current.value.sourceUnavailable &&
     ['warehouse', 'selling'].includes(current.value.effectiveStatus) &&
-    can(activeScope.value, 'price'),
+    can(activeScope.value, 'edit'),
   ),
 );
 const poolVisible = ref(false);
@@ -449,13 +493,12 @@ const logChanges = computed<Record<string, { before: unknown; after: unknown }>>
     const details = JSON.parse(logDetail.value.changeDetails) as Record<string, unknown>;
     return Object.fromEntries(
       Object.entries(details).map(([field, value]) => {
-        const label = field === '指导价' ? '本店指导价' : field;
         const change =
           value && typeof value === 'object' && 'before' in value && 'after' in value
             ? (value as { before: unknown; after: unknown })
             : { before: null, after: value };
         return [
-          label,
+          field,
           ['状态', '来源状态', '运营状态'].includes(field)
             ? { before: stateLabel(change.before as string), after: stateLabel(change.after as string) }
             : change,
@@ -476,27 +519,6 @@ function changeLogPage(page: { current: number; pageSize: number }) {
 }
 const logTypeOptions = productLogFilterOptions('store');
 const logRows = computed(() => logs.value.map(toLogRow));
-const rowActions: Record<
-  string,
-  { kind: ActionKind | 'off-shelf'; label: string; permission: string; theme: 'primary' | 'danger' | 'warning' }[]
-> = {
-  warehouse: [
-    { kind: 'shelf', label: '上架', permission: 'shelf', theme: 'primary' },
-    { kind: 'delete', label: '删除', permission: 'delete', theme: 'danger' },
-  ],
-  selling: [{ kind: 'off-shelf', label: '下架', permission: 'off-shelf', theme: 'warning' }],
-  offShelf: [
-    { kind: 'restore', label: '放回仓库', permission: 'restore', theme: 'primary' },
-    { kind: 'delete', label: '删除', permission: 'delete', theme: 'danger' },
-  ],
-  soldOut: [],
-  recycle: [
-    { kind: 'restore', label: '放回仓库', permission: 'restore', theme: 'primary' },
-    { kind: 'purge', label: '彻底删除', permission: 'purge', theme: 'danger' },
-  ],
-};
-const rowAction = computed(() => rowActions[activeTab.value]?.[0]);
-const secondRowAction = computed(() => rowActions[activeTab.value]?.[1]);
 const batchActions: Record<string, { kind: ActionKind | 'off-shelf'; label: string; permission: string }> = {
   warehouse: { kind: 'batch-shelf', label: '批量上架', permission: 'batch-shelf' },
   selling: { kind: 'off-shelf', label: '批量下架', permission: 'batch-off-shelf' },
@@ -530,11 +552,9 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
     : []),
 ]);
 const storeRowButtons = computed<FinishedStockRowAction[]>(() => [
-  ...(can(activeScope.value, 'detail') ? [{ id: 'detail', label: '详情', theme: 'primary' as const }] : []),
-  ...(can(activeScope.value, 'price') ? [{ id: 'price', label: '价格', theme: 'primary' as const }] : []),
-  ...[rowAction.value, secondRowAction.value]
-    .filter((action) => action && can(activeScope.value, action.permission))
-    .map((action) => ({ id: action!.kind, label: action!.label, theme: action!.theme })),
+  ...finishedStockActions[activeTab.value]
+    .filter((action) => can(activeScope.value, action.permission))
+    .map((action) => ({ id: action.id, label: action.label, theme: action.theme })),
 ]);
 const updateStoreListFilter = (field: 'keyword' | 'supplier', value: string) => {
   filter[field] = value;
@@ -548,8 +568,8 @@ const handleStoreToolbarAction = (action: string) => {
 };
 const handleStoreRowButton = (action: string, row: StoreFinishedProduct) => {
   if (action === 'detail') void openDetail(row);
-  else if (action === 'price') void openPrice(row);
-  else prepareAction(action as ActionKind, row);
+  else if (action === 'edit') void openPrice(row);
+  else prepareAction(action === 'offShelf' ? 'off-shelf' : (action as ActionKind), row);
 };
 const baseColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'select', title: '全选', width: 70 },
@@ -657,7 +677,6 @@ async function openDetail(row: StoreFinishedProduct) {
 }
 function fillPriceDrafts(product: StoreFinishedProduct) {
   for (const sku of product.skus) {
-    guideDrafts[sku.skuId] = sku.guidePrice;
     for (const role of sku.rolePrices) {
       const key = `${sku.skuId}:${role.roleId}`;
       roleDrafts[key] = role.price;
@@ -673,21 +692,6 @@ async function openPrice(row: StoreFinishedProduct) {
 }
 function syncRoleDraft(skuId: number, role: StoreRolePrice) {
   if (roleSources[`${skuId}:${role.roleId}`] === 'auto') roleDrafts[`${skuId}:${role.roleId}`] = role.price;
-}
-async function saveGuide(skuId: number) {
-  const price = guideDrafts[skuId];
-  if (!current.value || price == null || price < 0) {
-    adminFeedback.warning('请输入指导价');
-    return;
-  }
-  try {
-    current.value = await saveStoreFinishedGuide(current.value.id, skuId, price);
-    fillPriceDrafts(current.value);
-    adminFeedback.success('指导价已保存');
-    await load();
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '保存指导价失败'));
-  }
 }
 async function saveRole(skuId: number, roleId: number) {
   if (!current.value) return;
@@ -820,3 +824,94 @@ function resetLogFilter() {
 }
 onMounted(load);
 </script>
+<style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-l);
+}
+.finished-list-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.list-controls {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--td-comp-margin-l);
+}
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-m);
+}
+.filter-fields {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 258px 230px 240px;
+  gap: var(--td-comp-margin-m);
+}
+.filter-fields :deep(.t-form__item) {
+  margin-bottom: 0;
+}
+.filter-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  gap: var(--td-comp-margin-s);
+}
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.toolbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selection-info {
+  color: #6b7280;
+  font-size: 13px;
+}
+:deep(.finished-stock-table .t-table__empty-row > td) {
+  padding-inline: 0;
+}
+.brown-button {
+  color: #fff;
+  background: #8b5e34;
+  border-color: #8b5e34;
+}
+.deep-danger-button {
+  background: #8a1f11;
+  border-color: #8a1f11;
+}
+@media (max-width: 1180px) {
+  .filter-fields {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+@media (max-width: 860px) {
+  .filter-row {
+    display: block;
+  }
+  .filter-fields {
+    grid-template-columns: 1fr;
+  }
+  .filter-actions {
+    margin-top: 12px;
+  }
+}
+
+.table-actions {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.readonly-store-fields :deep(.t-descriptions__content) {
+  background: var(--td-bg-color-component-disabled);
+}
+</style>

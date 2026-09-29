@@ -18,7 +18,7 @@ class FinishedProductPriceServiceTest {
   void acceptsPriceCoefficientBelowOne() {
     FinishedProductPriceMapper mapper = Mockito.mock(FinishedProductPriceMapper.class);
     StoreLevelPricingDirectory directory = Mockito.mock(StoreLevelPricingDirectory.class);
-    when(directory.listEnabledLevels()).thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "核心合作店", 1)));
+    when(directory.listOperationalPricingLevels()).thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "核心合作店", 1)));
 
     FinishedProductPrice requested = new FinishedProductPrice();
     requested.setStoreLevelId(7L);
@@ -48,7 +48,7 @@ class FinishedProductPriceServiceTest {
     existing.setStoreLevelName("已删除的历史级别");
     existing.setSkuId(101L);
     when(mapper.selectList(any())).thenReturn(List.of(existing));
-    when(directory.listEnabledLevels()).thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "当前门店级别", 1)));
+    when(directory.listOperationalPricingLevels()).thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "当前门店级别", 1)));
 
     FinishedProductPrice requested = new FinishedProductPrice();
     requested.setStoreLevelId(7L);
@@ -63,13 +63,13 @@ class FinishedProductPriceServiceTest {
     ArgumentCaptor<FinishedProductPrice> captor = ArgumentCaptor.forClass(FinishedProductPrice.class);
     verify(mapper).insert(captor.capture());
     assertThat(captor.getValue().getStoreLevelName()).isEqualTo("已删除的历史级别");
-    verify(directory).listEnabledLevels();
+    verify(directory).listOperationalPricingLevels();
   }
   @Test
   void rejectsMissingEnabledLevelBeforeDeletingPrices() {
     FinishedProductPriceMapper mapper = Mockito.mock(FinishedProductPriceMapper.class);
     StoreLevelPricingDirectory directory = Mockito.mock(StoreLevelPricingDirectory.class);
-    when(directory.listEnabledLevels()).thenReturn(List.of(
+    when(directory.listOperationalPricingLevels()).thenReturn(List.of(
         new StoreLevelPricingDirectory.Level(7L, "配置级别", 1),
         new StoreLevelPricingDirectory.Level(8L, "手工级别", 2)));
     FinishedProductPrice requested = new FinishedProductPrice();

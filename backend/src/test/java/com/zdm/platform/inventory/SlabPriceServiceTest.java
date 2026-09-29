@@ -21,7 +21,7 @@ class SlabPriceServiceTest {
     SlabPriceMapper mapper = Mockito.mock(SlabPriceMapper.class);
     StoreLevelPricingDirectory levelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
     when(mapper.selectList(any())).thenReturn(List.of());
-    when(levelDirectory.listEnabledLevels())
+    when(levelDirectory.listOperationalPricingLevels())
         .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "社区合作店", 1)));
     SlabPrice requested = price(7L, "0.80", "100.00", "80.00");
 
@@ -41,7 +41,7 @@ class SlabPriceServiceTest {
     SlabPrice historical = price(9L, "1.20", "100.00", "120.00");
     historical.setStoreLevelName("已停用历史级别");
     when(mapper.selectList(any())).thenReturn(List.of(historical));
-    when(levelDirectory.listEnabledLevels())
+    when(levelDirectory.listOperationalPricingLevels())
         .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "当前门店级别", 1)));
 
     SlabPriceService service = createService(mapper, levelDirectory);
@@ -63,7 +63,7 @@ class SlabPriceServiceTest {
     SlabPriceMapper mapper = Mockito.mock(SlabPriceMapper.class);
     StoreLevelPricingDirectory levelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
     when(mapper.selectList(any())).thenReturn(List.of());
-    when(levelDirectory.listEnabledLevels())
+    when(levelDirectory.listOperationalPricingLevels())
         .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "社区合作店", 1)));
 
     assertThatThrownBy(() -> createService(mapper, levelDirectory)
@@ -77,7 +77,7 @@ class SlabPriceServiceTest {
     SlabPriceMapper mapper = Mockito.mock(SlabPriceMapper.class);
     StoreLevelPricingDirectory levelDirectory = Mockito.mock(StoreLevelPricingDirectory.class);
     when(mapper.selectList(any())).thenReturn(List.of());
-    when(levelDirectory.listEnabledLevels())
+    when(levelDirectory.listOperationalPricingLevels())
         .thenReturn(List.of(new StoreLevelPricingDirectory.Level(7L, "社区合作店", 1)));
     SlabMarkupConfiguration configuration = new SlabMarkupConfiguration();
     configuration.setId(8L);

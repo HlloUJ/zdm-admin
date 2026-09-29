@@ -27,8 +27,8 @@
             <t-breadcrumb>
               <t-breadcrumb-item
                 content="成品现货管理"
-                :href="'/finished-stock-management'"
-                :to="{ path: '/finished-stock-management' }"
+                :href="'/supply-chain/finished-stock-management'"
+                :to="{ path: '/supply-chain/finished-stock-management' }"
                 replace
                 @click="closeFormPage"
               />
@@ -44,9 +44,9 @@
             <t-breadcrumb>
               <t-breadcrumb-item
                 content="成品现货管理"
-                :href="'/finished-stock-management'"
+                :href="'/supply-chain/finished-stock-management'"
                 :to="{
-                  path: '/finished-stock-management',
+                  path: '/supply-chain/finished-stock-management',
                 }"
                 replace
                 @click="closeFormPage"
@@ -502,39 +502,7 @@
                           @change="handleSpecCostChange(row, $event)"
                         />
                       </template>
-                      <template
-                        v-for="configuration in productPriceLevels"
-                        #[`markup-${configuration.id}`]="{ row }"
-                        :key="configuration.id"
-                      >
-                        <div class="partner-price-cell">
-                          <div class="price-pair with-source">
-                            <SpecPriceInput
-                              v-model="row.markupPrices[configuration.id].coefficient"
-                              placeholder="系数"
-                              label="系数"
-                              :submitted="submitAttempted"
-                              @change="handleMarkupCoefficientChange(row, configuration.id, $event)"
-                              @commit="markSpecPriceManual(row, configuration.id)"
-                            />
-                            <SpecPriceInput
-                              v-model="row.markupPrices[configuration.id].price"
-                              placeholder="价格"
-                              label="价格"
-                              :submitted="submitAttempted"
-                              @change="handleMarkupPriceChange(row, configuration.id, $event)"
-                              @commit="markSpecPriceManual(row, configuration.id)"
-                            />
-                            <PriceSourceToggle
-                              :source="row.markupPrices[configuration.id].priceSource"
-                              :available="
-                                Boolean(configuration.configurationId) && configuration.priceCoefficient != null
-                              "
-                              @toggle="toggleSpecPriceSource(row, configuration.id)"
-                            />
-                          </div>
-                        </div>
-                      </template>
+
                       <template #guide="{ row }">
                         <div class="price-pair">
                           <SpecPriceInput
@@ -934,50 +902,7 @@
                 @change="handleBatchCostChange"
               />
             </t-form-item>
-            <t-form-item label="指导价">
-              <div class="price-pair wide">
-                <SpecPriceInput
-                  v-model="batchFillForm.guideCoefficient"
-                  placeholder="系数"
-                  label="系数"
-                  optional
-                  :submitted="batchFillSubmitted"
-                  @change="handleBatchCoefficientChange('guideCoefficient', 'guide', $event)"
-                />
-                <SpecPriceInput
-                  v-model="batchFillForm.guide"
-                  placeholder="价格"
-                  label="价格"
-                  optional
-                  :submitted="batchFillSubmitted"
-                  @change="handleBatchPriceChange('guide', 'guideCoefficient', $event)"
-                />
-              </div>
-            </t-form-item>
-            <t-form-item
-              v-for="configuration in productPriceLevels"
-              :key="configuration.id"
-              :label="configuration.name"
-            >
-              <div class="price-pair wide">
-                <SpecPriceInput
-                  v-model="batchMarkupPrices[configuration.id].coefficient"
-                  placeholder="系数"
-                  label="系数"
-                  optional
-                  :submitted="batchFillSubmitted"
-                  @change="handleBatchMarkupChange(configuration.id, 'coefficient', $event)"
-                />
-                <SpecPriceInput
-                  v-model="batchMarkupPrices[configuration.id].price"
-                  placeholder="价格"
-                  label="价格"
-                  optional
-                  :submitted="batchFillSubmitted"
-                  @change="handleBatchMarkupChange(configuration.id, 'price', $event)"
-                />
-              </div>
-            </t-form-item>
+
             <t-form-item v-if="!isOperationsEdit" label="数量">
               <t-input-number v-model="batchFillForm.quantity" theme="normal" :min="0" />
             </t-form-item>
@@ -1025,7 +950,7 @@
     <t-drawer
       v-model:visible="detailDialogVisible"
       header="商品详情"
-      :close-btn="true"
+      :close-btn="false"
       size="min(1240px, 100vw)"
       placement="right"
       :footer="false"
@@ -1035,7 +960,7 @@
         v-if="detailProduct"
         :product="detailProduct"
         :attribute-names="detailAttributeNames"
-        :operations="true"
+        :operations="false"
         :enabled-level-ids="enabledPriceLevels.map((level) => level.id)"
         @preview="openProductMediaPreview"
       />
@@ -1077,21 +1002,21 @@
 </template>
 
 <script setup lang="ts">
-import { materializeLayeredSpec, rebuildLayeredSpecs, specIdentity } from './specModeConversion';
+import { materializeLayeredSpec, rebuildLayeredSpecs, specIdentity } from '../management/specModeConversion';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { finishedStockActions } from '../shared/finishedStockActions';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
-import PriceSourceToggle from './components/PriceSourceToggle.vue';
-import SpecPriceInput from './components/SpecPriceInput.vue';
-import FinishedOperationLogs from './components/FinishedOperationLogs.vue';
+import PriceSourceToggle from '../management/components/PriceSourceToggle.vue';
+import SpecPriceInput from '../management/components/SpecPriceInput.vue';
+import FinishedOperationLogs from '../management/components/FinishedOperationLogs.vue';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
-import { isValidSpecPriceNumber } from './priceValidation';
-import { copySpecDimensions, orderLayeredRows, editableSalesFields } from './layeredSpecs';
-import { resetProductForm } from './productFormState';
+import { isValidSpecPriceNumber } from '../management/priceValidation';
+import { copySpecDimensions, orderLayeredRows, editableSalesFields } from '../management/layeredSpecs';
+import { resetProductForm } from '../management/productFormState';
 import {
   adminFeedback,
   AdminConfirmDialog,
@@ -1133,11 +1058,11 @@ import {
 } from '@/services/finishedProducts';
 import { type ProductAttributeRecord } from '@/services/productAttributes';
 import { type SupplierRecord } from '@/services/suppliers';
-import { sortByOffShelfAtDesc } from './offShelfSorting';
+import { sortByOffShelfAtDesc } from '../management/offShelfSorting';
 import { sortByCreatedAtDesc } from '@/services/recordSorting';
-import ProductDetail from './components/ProductDetail.vue';
-import SourceUnavailableOverlay from './components/SourceUnavailableOverlay.vue';
-import FinishedRowWarnings from './components/FinishedRowWarnings.vue';
+import ProductDetail from '../management/components/ProductDetail.vue';
+import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
+import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
 interface FinishedStockToolbarAction {
   id: string;
@@ -1353,8 +1278,8 @@ const tabs: TabConfig[] = [
 ];
 const pageSizeOptions = [10, 20, 50];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
-const productPermissionPrefix = computed(() => `${'admin'}.finished-stock-management`);
-const sourceBlocked = (row: StockItem) => Boolean(row.sourceUnavailable);
+const productPermissionPrefix = computed(() => `${'supply-chain'}.finished-stock-management`);
+const sourceBlocked = (row: StockItem) => false;
 const activeTab = ref<StockStatus>('warehouse');
 const finishedScope: Record<StockStatus, string> = {
   warehouse: 'warehouse',
@@ -1393,7 +1318,7 @@ const saving = ref(false);
 const selectedKeys = ref<number[]>([]);
 const formPageVisible = ref(false);
 const formPageMode = ref<ProductFormMode>('create');
-const isOperationsEdit = computed(() => formPageMode.value === 'edit');
+const isOperationsEdit = computed(() => false);
 const activeFormSection = ref<FormSectionKey>('description');
 const formAnchorNav = ref<HTMLElement>();
 const formAnchorSlot = ref<HTMLElement>();
@@ -1540,15 +1465,11 @@ const productPriceLevels = computed(() => {
 let priceConfigurationRefresh: Promise<void> | undefined;
 const refreshPriceConfigurations = () => {
   if (!priceConfigurationRefresh)
-    priceConfigurationRefresh = Promise.all([
-      listFinishedMarkupConfigurationOptions(),
-      getFinishedGuidePriceSetting(),
-      listFinishedProductPriceLevelOptions(),
-    ])
+    priceConfigurationRefresh = Promise.all([Promise.resolve([]), Promise.resolve(undefined), Promise.resolve([])])
       .then(([configurations, guide, levels]) => {
         enabledPriceLevels.value = levels;
         markupConfigurations.value = configurations;
-        guidePriceSettingCoefficient.value = guide?.priceCoefficient;
+        guidePriceSettingCoefficient.value = undefined;
         for (const level of productPriceLevels.value) {
           batchMarkupPrices.value[level.id] ??= { coefficient: '', price: '' };
         }
@@ -1921,7 +1842,13 @@ const formatDateTime = (value?: string) => {
   return `${part('year')}/${part('month')}/${part('day')} ${part('hour')}:${part('minute')}`;
 };
 const toStockItem = (record: FinishedProductRecord): StockItem => {
-  const status = normalizeStatus(record.status);
+  record = {
+    ...record,
+    offShelfReason: record.sourceOffShelfReason,
+    offShelfDetail: record.sourceOffShelfDetail,
+    offShelfAt: record.sourceOffShelfAt,
+  };
+  const status = normalizeStatus(record.sourceStatus);
   const publisherType = normalizePublisherType(record.publisherType);
   return {
     id: record.id,
@@ -1990,8 +1917,8 @@ const loadInventoryData = async () => {
     const [options, products, markupResult, guideSetting, bindings] = await Promise.all([
       listFinishedProductFormOptions(),
       listFinishedProducts(),
-      listFinishedMarkupConfigurationOptions(),
-      getFinishedGuidePriceSetting(),
+      Promise.resolve([]),
+      Promise.resolve(undefined),
       listFinishedProductTemplateAttributes(),
     ]);
     productCategories.value = options.categories;
@@ -1999,7 +1926,7 @@ const loadInventoryData = async () => {
     categoryAttributeBindings.value = bindings;
     productSuppliers.value = options.suppliers;
     markupConfigurations.value = markupResult;
-    guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
+    guidePriceSettingCoefficient.value = undefined;
     dataItems.value = products.map(toStockItem);
     selectedKeys.value = [];
   } catch (error) {
@@ -2033,7 +1960,7 @@ const canChooseShelfLater = computed(
 );
 const totalStock = computed(() => specRows.value.reduce((sum, row) => sum + Number(row.quantity || 0), 0));
 const detailMediaUploading = ref(false);
-const productListPath = computed(() => '/finished-stock-management');
+const productListPath = computed(() => '/supply-chain/finished-stock-management');
 const handleMenuReselect = (event: Event) => {
   const detail = (
     event as CustomEvent<{
@@ -2194,7 +2121,7 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     .map(createSalesColumn);
   return [
     ...orderedSpecColumns,
-    ...priceColumnsBase.filter((col) => true),
+    ...priceColumnsBase.filter((col) => !String(col.colKey).startsWith('markup-') && col.colKey !== 'guide'),
     ...remainingSalesColumns,
     ...(!isOperationsEdit.value ? tailColumns : []),
   ];
@@ -2331,23 +2258,6 @@ const handleRowAction = async (action: RowAction, row: StockItem) => {
     return;
   }
   if (action === 'shelf') {
-    {
-      if (checkingShelf.value) return;
-      checkingShelf.value = true;
-      try {
-        await checkFinishedProductShelf(row.id);
-        delete shelfErrors[row.id];
-      } catch (error) {
-        await loadInventoryData();
-        const latest = dataItems.value.find((item) => item.id === row.id);
-        if (latest && !sourceBlocked(latest)) {
-          adminFeedback.warning(error instanceof Error ? error.message : '当前商品无法上架');
-        }
-        return;
-      } finally {
-        checkingShelf.value = false;
-      }
-    }
     openConfirm('shelf', row, `是否上架商品“${row.name}”？`);
     return;
   }
@@ -3326,8 +3236,6 @@ const validateProductForm = () => {
   const pricesComplete = specRows.value.every(
     (row) =>
       isValidSpecPriceNumber(row.cost) &&
-      isValidSpecPriceNumber(row.guideCoefficient) &&
-      isValidSpecPriceNumber(row.guide) &&
       productPriceLevels.value.every((configuration) => {
         const editor = row.markupPrices[configuration.id];
         return isValidSpecPriceNumber(editor?.coefficient) && isValidSpecPriceNumber(editor?.price);
@@ -3363,16 +3271,16 @@ const validateProductForm = () => {
       message: `请填写每条规格的${salesAttributeFields.value.find((field) => field.required && specRows.value.some((row) => !String(row[field.key] ?? '').trim()))?.label ?? '必填销售属性'}`,
     },
     {
-      valid: editingProduct.value != null || guidePriceSettingCoefficient.value != null,
+      valid: true,
       tab: 'sales',
       message: '请先配置成品指导价默认系数',
     },
     {
       valid: pricesComplete,
       tab: 'sales',
-      message: '请完善每条规格的成本价和指导价',
+      message: '请完善每条规格的成本价',
     },
-    { valid: Boolean(productForm.shelfNow), tab: 'sales', message: '请选择上架方式' },
+    { valid: true, tab: 'sales', message: '请选择上架方式' },
   ];
   const failed = checks.find((item) => !item.valid);
   if (failed) {
@@ -3522,7 +3430,7 @@ const submitProductForm = async () => {
     if (isCreate) {
       adminFeedback.created(payload.name);
     } else {
-      adminFeedback.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+      adminFeedback.success('商品信息已保存');
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');
@@ -3581,7 +3489,7 @@ const detailAttributeNames = computed(() =>
 const openProductEditor = async (row: StockItem) => {
   try {
     await refreshPriceConfigurations();
-    const latest = await getFinishedProductDetail(row.id);
+    const latest = (await listFinishedProducts()).find((product) => product.id === row.id);
     if (!latest) {
       adminFeedback.error('商品不存在，请刷新列表');
       return;
@@ -3594,8 +3502,8 @@ const openProductEditor = async (row: StockItem) => {
 const openProductDetail = async (row: StockItem) => {
   try {
     const [latest, levels] = await Promise.all([
-      getFinishedProductDetail(row.id),
-      listFinishedProductPriceLevelOptions(),
+      listFinishedProducts().then((products) => products.find((product) => product.id === row.id)),
+      Promise.resolve(null),
     ]);
     if (!latest) {
       adminFeedback.error('商品不存在，请刷新列表');
@@ -3603,10 +3511,6 @@ const openProductDetail = async (row: StockItem) => {
     }
     if (levels) enabledPriceLevels.value = levels;
     detailProduct.value = toStockItem(latest);
-    {
-      detailProduct.value.createdAt = formatDateTime(latest.createdAt);
-      detailProduct.value.offShelfAt = latest.offShelfAt ? formatDateTime(latest.offShelfAt) : undefined;
-    }
     detailDialogVisible.value = true;
   } catch {
     adminFeedback.error('商品详情加载失败，请重试');
@@ -3666,42 +3570,11 @@ const handleConfirm = async () => {
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
     } else if (type === 'batchShelf') {
       {
-        const ids = [...selectedKeys.value];
-        const failed = new Map<number, string>();
-        let succeeded = 0;
-        for (const id of ids) {
-          delete shelfErrors[id];
-          try {
-            await updateProductStatus(id, 'selling');
-            succeeded++;
-          } catch (error) {
-            failed.set(id, error instanceof Error ? error.message : '上架失败，请重试');
-          }
+        // Publishing rebuilds prices; finish each transaction before starting the next product.
+        for (const id of [...selectedKeys.value]) {
+          await updateProductStatus(id, 'selling');
+          selectedKeys.value = selectedKeys.value.filter((selectedId) => selectedId !== id);
         }
-        await loadInventoryData();
-        for (const [id, message] of failed) {
-          const latest = dataItems.value.find((item) => item.id === id);
-          if (latest?.status === 'selling') {
-            succeeded++;
-            failed.delete(id);
-          } else if (latest && !sourceBlocked(latest)) {
-            shelfErrors[id] = message;
-          }
-        }
-        selectedKeys.value = ids.filter(
-          (id) =>
-            failed.has(id) &&
-            dataItems.value.some((item) => item.id === id && !sourceBlocked(item) && item.status === 'warehouse'),
-        );
-        currentPagination.value.current = Math.min(
-          currentPagination.value.current,
-          Math.max(1, Math.ceil(filteredData.value.length / currentPagination.value.pageSize)),
-        );
-        closeConfirmDialog();
-        const message = `已上架 ${succeeded} 个商品，未上架 ${failed.size} 个商品`;
-        if (failed.size) adminFeedback.warning(message);
-        else adminFeedback.success(message);
-        return;
       }
     } else if (type === 'batchRestore') {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
@@ -3728,13 +3601,7 @@ const handleConfirm = async () => {
       adminFeedback.success('操作已完成');
     }
   } catch (error) {
-    if (type === 'shelf') {
-      closeConfirmDialog();
-      await loadInventoryData();
-      adminFeedback.warning(error instanceof Error ? error.message : '当前商品无法上架');
-    } else {
-      adminFeedback.error(error instanceof Error ? error.message : '操作失败');
-    }
+    adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   } finally {
     saving.value = false;
   }

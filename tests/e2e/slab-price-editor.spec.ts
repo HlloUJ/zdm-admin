@@ -72,6 +72,7 @@ async function setup(
     route.fulfill({ json: { code: 0, data: state.configurations } }),
   );
   await page.route('**/api/admin/slabs/99601', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { code: 0, data: state.product } });
     const payload = route.request().postDataJSON() as SlabPayload;
     state.saves.push(payload);
     return route.fulfill({ json: { code: 0, data: { ...state.product, ...payload } } });
@@ -82,10 +83,10 @@ async function setup(
 }
 
 async function openEditor(page: Page) {
-  await page.getByRole('main').locator('.table-actions').getByText('价格', { exact: true }).click();
-  const editor = page.locator('.t-drawer--open').filter({ has: page.getByText('价格编辑器', { exact: true }) });
-  await expect(editor.getByText('价格编辑器', { exact: true })).toBeVisible();
-  return { editor, level: editor.locator('.price-table__row').filter({ hasText: '4级合伙人' }) };
+  await page.getByRole('main').locator('.table-actions').getByText('编辑', { exact: true }).click();
+  const editor = page.locator('.slab-publish-page');
+  await expect(editor).toBeVisible();
+  return { editor, level: editor.locator('.price-editor__row').filter({ hasText: '4级合伙人' }) };
 }
 
 for (const canViewPrice of [true, false]) {
@@ -146,17 +147,8 @@ for (const canViewPrice of [true, false]) {
     );
     await page.goto('/supply-chain/slab-management');
     const main = page.getByRole('main');
-    await expect(main.locator('.table-actions .t-link')).toHaveText(
-      canViewPrice ? ['详情', '价格', '放回仓库', '删除'] : ['详情', '放回仓库', '删除'],
-    );
-    if (canViewPrice) {
-      await main.locator('.table-actions').getByText('价格', { exact: true }).click();
-      const editor = page.locator('.t-drawer--open');
-      await expect(editor.getByPlaceholder('成本价', { exact: true })).toHaveValue('100.00');
-      await expect(editor.getByPlaceholder('成本价', { exact: true })).toBeDisabled();
-      await expect(editor.getByText('指导价', { exact: true })).toHaveCount(0);
-      await expect(editor.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
-    }
+    await expect(main.locator('.table-actions .t-link')).toHaveText(['详情', '放回仓库', '删除']);
+    await expect(main.locator('.table-actions').getByText('价格', { exact: true })).toHaveCount(0);
   });
 }
 
@@ -173,9 +165,9 @@ for (const status of ['enabled', 'disabled', undefined] as const) {
       }),
     ).toBeVisible();
     await expect(
-      editor.locator('.price-table__row').filter({ hasText: '成本价' }).getByPlaceholder('价格', { exact: true }),
+      editor.locator('.price-editor__row').filter({ hasText: '成本价' }).getByPlaceholder('请输入', { exact: true }),
     ).toBeDisabled();
-    await editor.getByRole('button', { name: '保存', exact: true }).click();
+    await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
     await expect(page.getByText('请完善价格信息', { exact: true })).toBeVisible();
     await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
     expect(state.saves).toHaveLength(0);
@@ -188,8 +180,7 @@ for (const status of ['enabled', 'disabled', undefined] as const) {
     await level.getByPlaceholder('系数', { exact: true }).blur();
     await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
     await expect(level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true })).toBeVisible();
-    await editor.getByRole('button', { name: '保存', exact: true }).click();
-    await page.locator('.t-dialog:visible').getByRole('button', { name: '确认保存价格', exact: true }).click();
+    await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
     await expect(editor).not.toBeVisible();
     expect(state.saves).toHaveLength(1);
     expect(state.saves[0].markupPrices).toEqual([
@@ -233,7 +224,7 @@ for (const source of ['auto', 'manual'] as const) {
   });
 }
 
-test('打开价格编辑器刷新配置和价格，已保存的零成本零售价正常回显', async ({ page }) => {
+test('打开商品编辑页刷新配置和价格，已保存的零成本零售价正常回显', async ({ page }) => {
   const state = await setup(page, 'enabled');
   state.configurations = [];
   state.product.costPrice = 0;
@@ -250,7 +241,7 @@ test('打开价格编辑器刷新配置和价格，已保存的零成本零售�
   ];
   const { editor, level } = await openEditor(page);
   await expect(
-    editor.locator('.price-table__row').filter({ hasText: '成本价' }).getByPlaceholder('价格', { exact: true }),
+    editor.locator('.price-editor__row').filter({ hasText: '成本价' }).getByPlaceholder('请输入', { exact: true }),
   ).toHaveValue('0.00');
   await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('0.00');
   await level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
@@ -281,8 +272,7 @@ test('恢复跟随需确认，确认后按当前启用系数计算并保存自�
   await expect(level.getByPlaceholder('系数', { exact: true })).toHaveValue('1.40');
   await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('1400.00');
   await expect(level.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
-  await editor.getByRole('button', { name: '保存', exact: true }).click();
-  await dialog.getByRole('button', { name: '确认保存价格', exact: true }).click();
+  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(state.saves).toHaveLength(1);
   expect(state.saves[0].markupPrices).toEqual([
@@ -314,8 +304,7 @@ test('停用门店级别不展示历史价格且保存不提交停用级别', as
   );
   const { editor, level } = await openEditor(page);
   await expect(level).toHaveCount(0);
-  await editor.getByRole('button', { name: '保存', exact: true }).click();
-  await page.getByRole('button', { name: '确认保存价格', exact: true }).click();
+  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(editor).toHaveCount(0);
   expect(state.saves).toHaveLength(1);
   expect(state.saves[0].markupPrices).toEqual([]);

@@ -17,7 +17,6 @@ export interface StoreSkuPrice {
   stock: number;
   costPrice: number | null;
   guidePrice: number | null;
-  guideSource: 'auto' | 'manual';
   rolePrices: StoreRolePrice[];
   displayMode?: 'single' | 'layered';
   salesAttributes?: Record<string, string>;
@@ -97,8 +96,6 @@ export const purgeStoreFinishedProduct = (id: number) => request<boolean>(`${bas
 export const purgeStoreFinishedProducts = (productIds: number[]) =>
   request<boolean>(`${base}/batch`, { method: 'DELETE', body: json({ productIds }) });
 export const clearStoreFinishedRecycle = () => request<boolean>(`${base}/recycle`, { method: 'DELETE' });
-export const saveStoreFinishedGuide = (id: number, skuId: number, price: number) =>
-  request<StoreFinishedProduct>(`${base}/${id}/skus/${skuId}/guide-price`, { method: 'PUT', body: json({ price }) });
 export const saveStoreFinishedRolePrice = (
   id: number,
   skuId: number,

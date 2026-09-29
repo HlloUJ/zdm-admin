@@ -131,7 +131,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if(inventory.getStock()==0) {
       lambdaUpdate().eq(SlabInventory::getId,inventory.getId()).set(SlabInventory::getSourceStatus,"soldOut").update();
     }
-    if(publishNow) { lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB,inventory.getId(),"selling"); }
+    if(publishNow) { lifecycle.shelfDuringCreation(ProductLifecycleService.Kind.SLAB,inventory.getId()); }
     if ("selling".equals(inventory.getStatus())) {
       validateReadyForShelf(inventory);
     }
@@ -187,10 +187,9 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     SlabInventory updated = attachPrices(getById(id));
     Map<String, Object> changes = collectChanges(existing, existingPrices, updated);
     if (!changes.isEmpty()) {
-      boolean priceOnly = changes.keySet().stream().allMatch(this::isPriceChange);
       operationLogService.record(
           updated,
-          priceOnly ? "PRICE_UPDATE" : "UPDATE",
+          "UPDATE",
           existing.getSourceStatus(),
           updated.getSourceStatus(),
           null,
@@ -229,7 +228,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     SlabInventory updated = attachPrices(getById(id));
     Map<String, Object> changes = collectChanges(existing, beforePrices, updated);
     if (!changes.isEmpty()) {
-      operationLogService.record(updated, "PRICE_UPDATE", existing.getSourceStatus(), updated.getSourceStatus(),
+      operationLogService.record(updated, "UPDATE", existing.getSourceStatus(), updated.getSourceStatus(),
           null, null, "MANUAL", changes);
     }
     return updated;
@@ -275,7 +274,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     priceService.replacePrices(existing.getId(),requested.getMarkupPrices());
     updated=attachPrices(getById(existing.getId()));
     var changes=collectChanges(existing,before,updated);
-    if(!changes.isEmpty()) { operationLogService.record(updated,"PRICE_UPDATE",existing.getStatus(),updated.getStatus(),null,null,"MANUAL",changes); }
+    if(!changes.isEmpty()) { operationLogService.record(updated,"UPDATE",existing.getStatus(),updated.getStatus(),null,null,"MANUAL",changes); }
     return updated;
   }
 
@@ -620,10 +619,6 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     changes.put(field, values);
   }
 
-  private boolean isPriceChange(String field) {
-    return Set.of("成本价", "指导价", "指导价系数", "价格层级").contains(field) || field.endsWith("价格来源");
-  }
-
   private void applyCreationMetadata(SlabInventory inventory) {
     String publisherType = normalizePublisherType(inventory.getPublisherType());
     inventory.setPublisherType(publisherType);
@@ -768,7 +763,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     List<SlabPublishOption> suppliers = slabSupplierOptionProvider.listSelectableSlabSuppliers().stream()
         .map(item -> new SlabPublishOption(item.id(), item.label(), null, item.status()))
         .toList();
-    List<SlabPublishOption> storeLevels = storeLevelDirectory.listEnabledLevels().stream()
+    List<SlabPublishOption> storeLevels = storeLevelDirectory.listOperationalPricingLevels().stream()
         .map(item -> new SlabPublishOption(item.id(), item.name(), null, "enabled"))
         .toList();
     return new SlabPublishOptions(varieties, origins, textures, colorCategories, grades, suppliers, storeLevels);

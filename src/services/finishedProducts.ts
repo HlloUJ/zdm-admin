@@ -143,7 +143,10 @@ export function releaseTemporaryFinishedProductMedia(mediaId: MediaResource['id'
   return releaseTemporaryMedia('/admin/finished-products/media', mediaId);
 }
 
-export function updateFinishedProduct(id: number, payload: FinishedProductPayload) {
+export function updateFinishedProduct(
+  id: number,
+  payload: FinishedProductPayload | Pick<FinishedProductPayload, 'name' | 'status' | 'guidePrices' | 'markupPrices'>,
+) {
   return request<FinishedProductRecord>(`/admin/finished-products/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
