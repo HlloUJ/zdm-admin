@@ -57,8 +57,20 @@
         </t-descriptions-item>
         <t-descriptions-item label="供应商" :span="2">{{ product.supplier || '未填写' }}</t-descriptions-item>
       </t-descriptions>
+      <t-descriptions v-if="storeMode" bordered :column="3">
+        <t-descriptions-item label="本店状态">{{ storeStatusLabel }}</t-descriptions-item>
+        <t-descriptions-item v-if="product.status === 'offShelf'" label="下架原因">{{
+          product.offShelfReason || '—'
+        }}</t-descriptions-item>
+        <t-descriptions-item v-if="product.status === 'offShelf'" label="下架时间">{{
+          product.offShelfAt?.replace('T', ' ').slice(0, 16) || '—'
+        }}</t-descriptions-item>
+        <t-descriptions-item v-if="product.status === 'offShelf'" label="详细说明" :span="3">{{
+          product.offShelfDetail || '—'
+        }}</t-descriptions-item>
+      </t-descriptions>
     </AdminSectionCard>
-    <AdminSectionCard :class="{ 'product-detail__bordered-card': operations }">
+    <AdminSectionCard v-if="showSales !== false" :class="{ 'product-detail__bordered-card': operations }">
       <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations }">销售信息</h3>
       <h4 v-if="!operations">销售规格与价格</h4>
       <component :is="operations ? SalesLogFullscreen : 'div'" :title="operations ? '销售规格与价格' : undefined">
@@ -143,12 +155,18 @@ interface DetailProduct {
   guidePrices?: FinishedProductGuidePrice[];
   specDimensions?: FinishedSpecDimension[];
 }
-const props = defineProps<{
-  product: DetailProduct;
-  attributeNames: Record<string, string>;
-  operations?: boolean;
-  enabledLevelIds?: number[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    product: DetailProduct;
+    attributeNames: Record<string, string>;
+    operations?: boolean;
+    storeMode?: boolean;
+    storeStatusLabel?: string;
+    showSales?: boolean;
+    enabledLevelIds?: number[];
+  }>(),
+  { showSales: true },
+);
 const emit = defineEmits<{ preview: [media: { url: string }, type: 'image' | 'video'] }>();
 const images = computed(() =>
   props.product.mainImageUrls?.length ? props.product.mainImageUrls : props.product.image ? [props.product.image] : [],
@@ -196,17 +214,23 @@ const columns = computed<PrimaryTableCol[]>(() => {
     ...extraFields.value.map((key) => ({ colKey: key, title: props.attributeNames[key] || key, minWidth: 120 })),
   ];
   const priceColumns = [
-    { colKey: 'cost', title: '成本价', minWidth: 100 },
-    {
-      colKey: 'guide',
-      title: props.operations ? '指导价' : '指导价（系数 / 价格）',
-      minWidth: props.operations ? 130 : 170,
-    },
-    ...levels.value.map(([id, name]) => ({
-      colKey: `price_${id}`,
-      title: props.operations ? name : `${name}（系数 / 价格 / 来源）`,
-      minWidth: props.operations ? 150 : 230,
-    })),
+    { colKey: 'cost', title: props.storeMode ? '本店成本价' : '成本价', minWidth: 100 },
+    ...(props.operations
+      ? [
+          {
+            colKey: 'guide',
+            title: props.storeMode ? '运营端指导价' : '指导价',
+            minWidth: 130,
+          },
+        ]
+      : []),
+    ...(props.operations
+      ? levels.value.map(([id, name]) => ({
+          colKey: `price_${id}`,
+          title: name,
+          minWidth: 150,
+        }))
+      : []),
   ];
   const specColumn = { colKey: 'label', title: '商品规格', minWidth: props.operations ? 270 : 180 };
   if (layeredDimensions.value.length) {
@@ -242,15 +266,17 @@ const rows = computed(() => {
       priceSources: Object.fromEntries(
         prices.map((price) => [price.storeLevelId, price.priceSource === 'manual' ? 'manual' : 'auto']),
       ),
-      cost: (props.operations ? variant.costPrice : undefined) ?? guide?.costPrice ?? prices[0]?.costPrice ?? '—',
-      guide: guide ? `${guide.priceCoefficient} / ${guide.price}` : '—',
+      cost: props.storeMode
+        ? (variant.costPrice ?? '—')
+        : (variant.costPrice ?? guide?.costPrice ?? prices[0]?.costPrice ?? '—'),
+      guide: guide ? (props.storeMode ? String(guide.price) : `${guide.priceCoefficient} / ${guide.price}`) : '—',
       ...Object.fromEntries(
         levels.value.map(([id]) => {
           const price = prices.find((item) => item.storeLevelId === id);
           return [
             `price_${id}`,
             price
-              ? `${price.priceCoefficient} / ${price.price}${props.operations ? '' : ` / ${price.priceSource === 'manual' ? '手工价格' : '跟随配置'}`}`
+              ? `${props.storeMode ? '' : `${price.priceCoefficient} / `}${price.price}${props.operations ? '' : ` / ${price.priceSource === 'manual' ? '手工价格' : '跟随配置'}`}`
               : '—',
           ];
         }),

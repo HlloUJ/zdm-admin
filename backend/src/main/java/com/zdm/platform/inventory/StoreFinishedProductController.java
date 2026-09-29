@@ -35,7 +35,6 @@ public class StoreFinishedProductController {
       ids = ids == null ? null : Collections.unmodifiableList(new ArrayList<>(ids));
     }
   }
-  public record GuidePriceRequest(@NotNull BigDecimal price) {}
   public record RolePriceRequest(BigDecimal price, boolean followConfiguration) {}
 
   private static final String PREFIX = "store.finished-stock-management";
@@ -77,7 +76,8 @@ public class StoreFinishedProductController {
     var product = service.detail(id);
     String scope = scope(product.effectiveStatus());
     guard.requirePermission(PREFIX + "." + scope + ".view");
-    guard.requirePermission(PREFIX + "." + scope + ".detail");
+    guard.requirePermission(PREFIX + "." + scope + "."
+        + (List.of("warehouse", "selling").contains(scope) ? "edit" : "detail"));
     return ApiResponse.ok(product);
   }
 
@@ -117,8 +117,11 @@ public class StoreFinishedProductController {
   public ApiResponse<Boolean> purge(@PathVariable Long id) {
     guard.requireDataPermission();
     var product = service.detail(id);
-    guard.requirePermission(PREFIX + (product.sourceUnavailable()
-        ? ".unavailable.purge" : ".recycle.purge"));
+    if (product.sourceUnavailable()) {
+      guard.requirePermission(PREFIX + "." + scope(product.effectiveStatus()) + ".view");
+    } else {
+      guard.requirePermission(PREFIX + ".recycle.purge");
+    }
     service.purge(id);
     return ApiResponse.ok(true);
   }
@@ -148,20 +151,12 @@ public class StoreFinishedProductController {
     return ApiResponse.ok(true);
   }
 
-  @PutMapping("/{id}/skus/{skuId}/guide-price")
-  public ApiResponse<StoreFinishedProductService.ProductView> guidePrice(@PathVariable Long id,
-      @PathVariable Long skuId, @Valid @RequestBody GuidePriceRequest request) {
-    guard.requireDataPermission();
-    requirePrice(service.detail(id));
-    return ApiResponse.ok(service.saveGuidePrice(id, skuId, request.price()));
-  }
-
   @PutMapping("/{id}/skus/{skuId}/roles/{roleId}/price")
   public ApiResponse<StoreFinishedProductService.ProductView> rolePrice(@PathVariable Long id,
       @PathVariable Long skuId, @PathVariable Long roleId,
       @Valid @RequestBody RolePriceRequest request) {
     guard.requireDataPermission();
-    requirePrice(service.detail(id));
+    requireEdit(service.detail(id));
     return ApiResponse.ok(service.saveRolePrice(id, skuId, roleId, request.price(),
         request.followConfiguration()));
   }
@@ -188,9 +183,9 @@ public class StoreFinishedProductController {
     return ApiResponse.ok(service.logDetail(id));
   }
 
-  private void requirePrice(StoreFinishedProductService.ProductView product) {
+  private void requireEdit(StoreFinishedProductService.ProductView product) {
     String scope = scope(product.effectiveStatus());
-    guard.requirePermission(PREFIX + "." + scope + ".price");
+    guard.requirePermission(PREFIX + "." + scope + ".edit");
   }
 
   private void requireTransition(StoreFinishedProductService.ProductView product,

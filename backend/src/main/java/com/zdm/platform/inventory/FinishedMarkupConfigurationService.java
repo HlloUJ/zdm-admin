@@ -51,7 +51,7 @@ public class FinishedMarkupConfigurationService {
   @Transactional
   public FinishedMarkupConfiguration createConfiguration(FinishedMarkupConfiguration payload) {
     CurrentIdentity identity = requirePlatformScope();
-    StoreLevelPricingDirectory.Level level = storeLevelDirectory.requireEnabledLevel(payload.getStoreLevelId());
+    StoreLevelPricingDirectory.Level level = storeLevelDirectory.requireOperationalPricingLevel(payload.getStoreLevelId());
     payload.setId(null);
     payload.setName(level.name());
     payload.setStatus("enabled");

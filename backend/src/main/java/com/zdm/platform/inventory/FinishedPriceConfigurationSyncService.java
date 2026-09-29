@@ -17,7 +17,8 @@ public class FinishedPriceConfigurationSyncService implements StoreLevelPriceSyn
         SELECT configuration.id, configuration.price_coefficient
         FROM finished_markup_configurations configuration
         INNER JOIN store_levels level ON level.id = configuration.store_level_id
-        WHERE level.id = ? AND level.status = 'enabled'
+        WHERE level.id = ? AND (level.status = 'enabled'
+          OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND configuration.status = 'enabled' AND configuration.legacy_seeded = FALSE
           AND configuration.price_coefficient >= 0
         FOR UPDATE
@@ -49,7 +50,9 @@ public class FinishedPriceConfigurationSyncService implements StoreLevelPriceSyn
         INNER JOIN store_levels level ON level.id = price.store_level_id
         SET price.price_coefficient = ?, price.price = ROUND(price.cost_price * ?, 2)
         WHERE price.source_configuration_id = ? AND price.price_source = 'auto'
-          AND level.status = 'enabled' AND price.cost_price >= 0
+          AND (level.status = 'enabled'
+            OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
+          AND price.cost_price >= 0
         """, configuration.getPriceCoefficient(), configuration.getPriceCoefficient(), configuration.getId());
   }
 
@@ -71,7 +74,9 @@ public class FinishedPriceConfigurationSyncService implements StoreLevelPriceSyn
         LEFT JOIN finished_product_prices price ON price.finished_product_id = guide.finished_product_id
           AND price.sku_id = guide.sku_id AND price.store_level_id = configuration.store_level_id
         WHERE price.id IS NULL AND guide.cost_price >= 0
-          AND level.status = 'enabled' AND configuration.status = 'enabled'
+          AND (level.status = 'enabled'
+            OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
+          AND configuration.status = 'enabled'
           AND configuration.legacy_seeded = FALSE
         """, configuration.getId());
   }

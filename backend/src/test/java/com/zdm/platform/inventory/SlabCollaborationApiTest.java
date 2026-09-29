@@ -62,9 +62,43 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   private void fixture(String status, String source, boolean deleted, long creator) {
     jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99601,'协同大板','SLAB-COLLAB',?,?,?,?,2,10)", status, source, deleted, creator);
   }
+  @Test void sourcePricePermissionOnlyChangesWarehouseAndSellingCost() throws Exception {
+    fixture("warehouse", "warehouse", true, 1L);
+    for (String[] state : new String[][] {{"warehouse", "warehouse"}, {"selling", "selling"}}) {
+      jdbc.update("UPDATE slab_inventory SET source_status=? WHERE id=99601", state[0]);
+      sqlSession.clearCache();
+      identity("supply-chain", "all", "supply-chain.slab-management." + state[1] + ".price");
+      mvc.perform(put("/api/admin/slabs/99601/source-cost").contentType("application/json")
+          .content("{\"costPrice\":21,\"name\":\"夹带名称\"}"))
+          .andExpect(status().isForbidden());
+      identity("supply-chain", "all", "supply-chain.slab-management." + state[1] + ".edit");
+      mvc.perform(put("/api/admin/slabs/99601/source-cost").contentType("application/json")
+          .content("{\"costPrice\":21,\"name\":\"夹带名称\"}"))
+          .andExpect(status().isOk());
+      assertThat(jdbc.queryForObject("SELECT cost_price FROM slab_inventory WHERE id=99601", BigDecimal.class))
+          .isEqualByComparingTo("21");
+      assertThat(jdbc.queryForObject("SELECT name FROM slab_inventory WHERE id=99601", String.class)).isEqualTo("协同大板");
+      assertThat(jdbc.queryForObject("SELECT source_status FROM slab_inventory WHERE id=99601", String.class)).isEqualTo(state[0]);
+    }
+    jdbc.update("UPDATE slab_inventory SET source_status='offShelf' WHERE id=99601");
+    sqlSession.clearCache();
+    identity("supply-chain", "all", "supply-chain.slab-management.off-shelf.edit");
+    mvc.perform(put("/api/admin/slabs/99601/source-cost").contentType("application/json")
+        .content("{\"costPrice\":22}"))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("SELECT cost_price FROM slab_inventory WHERE id=99601", BigDecimal.class))
+        .isEqualByComparingTo("21");
+    jdbc.update("UPDATE slab_inventory SET source_status='soldOut' WHERE id=99601");
+    sqlSession.clearCache();
+    identity("supply-chain", "all", "supply-chain.slab-management.sold-out.edit");
+    mvc.perform(put("/api/admin/slabs/99601/source-cost").contentType("application/json")
+        .content("{\"costPrice\":22}"))
+        .andExpect(status().isBadRequest());
+  }
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void missingOrDisabledPartnerConfigurationAllowsInitialPricingAndManualCompletion(boolean disabledConfiguration) {
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
     jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99609,'未配置合伙人',1)");
     if (disabledConfiguration) {
@@ -169,6 +203,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void sourcePublishDoesNotCalculateDisabledLevelEvenWithEnabledConfiguration(boolean historicalPrice) {
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
     jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99609,'停用四级',1,'disabled')");
     jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99609,99609,'停用四级',1.4,1,'enabled',false)");
@@ -194,6 +229,57 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     identity("admin", "all", "all");
     prices.replacePrices(99601L, List.of());
     assertThat(prices.listPrices(99601L)).hasSize(historicalPrice ? 1 : 0);
+  }
+
+  @Test
+  void supplyChainShelfAndCostEditDoNotRequireOperationsPricing() throws Exception {
+    jdbc.update("UPDATE store_levels SET status='disabled'");
+    fixture("warehouse", "warehouse", true, 1L);
+    jdbc.update("DELETE FROM slab_guide_price_settings");
+    jdbc.update("DELETE FROM slab_markup_configurations");
+    jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id) VALUES (99609,'上架测试供应商','platform',0)");
+    jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99609,1)");
+    jdbc.update("INSERT INTO slab_color_categories (id,name) VALUES (99609,'上架测试色系')");
+    jdbc.update("INSERT INTO slab_colors (id,category_id,name) VALUES (99609,99609,'上架测试颜色')");
+    jdbc.update("INSERT INTO slab_grades (id,code,name) VALUES (99609,'TEST','上架测试等级')");
+    for (long mediaId : List.of(99701L, 99702L, 99703L)) {
+      jdbc.update("INSERT INTO media_assets (id,public_id,storage_key,media_type,mime_type,owner_client_code,status) VALUES (?,UUID(),?,'image','image/png','supply-chain','active')", mediaId, "unpriced-slab-" + mediaId);
+    }
+    jdbc.update("UPDATE slab_inventory SET supplier_id=99609,variety_id=(SELECT MIN(id) FROM slab_varieties),origin_id=(SELECT MIN(id) FROM slab_origins),texture_id=(SELECT MIN(id) FROM slab_textures),color_id=(SELECT MIN(id) FROM slab_colors),grade_id=(SELECT MIN(id) FROM slab_grades),length_mm=2000,width_mm=1800,thickness_mm=20,main_image_media_id=99701,scan_image_media_id=99702,design_image_media_id=99703 WHERE id=99601");
+    identity("supply-chain", "all", "all");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "selling");
+    assertThat(jdbc.queryForObject("SELECT source_status FROM slab_inventory WHERE id=99601", String.class)).isEqualTo("selling");
+    assertThat(jdbc.queryForObject("SELECT guide_price FROM slab_inventory WHERE id=99601", BigDecimal.class)).isNull();
+    assertThat(jdbc.queryForObject("SELECT guide_price_coefficient FROM slab_inventory WHERE id=99601", BigDecimal.class)).isNull();
+    mvc.perform(put("/api/admin/slabs/99601/source-cost").contentType("application/json").content("{\"costPrice\":21}"))
+        .andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT cost_price FROM slab_inventory WHERE id=99601", BigDecimal.class)).isEqualByComparingTo("21");
+    identity("admin", "all", "all");
+    assertThatThrownBy(() -> slabs.updateStatuses(List.of(99601L), "selling", null, null))
+        .isInstanceOf(IllegalArgumentException.class).hasMessage("请完善大板价格后再上架");
+  }
+
+  @Test
+  void disabledLevelAssignedToStoreStillPricesNewSlabs() {
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
+    jdbc.update("UPDATE store_levels SET status='disabled'");
+    jdbc.update("INSERT INTO store_levels (id,name,status,sort_order) VALUES (99619,'已有大板门店级别','enabled',1)");
+    jdbc.update("UPDATE stores SET store_level_id=99619 WHERE id=1");
+    jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99619,99619,'已有大板门店级别',1.4,1,'enabled',false)");
+    jdbc.update("INSERT INTO slab_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    fixture("warehouse", "selling", false, 1L);
+    identity("supply-chain", "all", "all");
+    lifecycle.reprice(ProductLifecycleService.Kind.SLAB, 99601L, false);
+    identity("admin", "all", "all");
+    storeLevels.updateStatus(99619L, "disabled");
+    assertThat(prices.listPrices(99601L)).singleElement().satisfies(price ->
+        assertThat(price.getPrice()).isEqualByComparingTo("14"));
+    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99602,'停用后新大板','SLAB-DISABLED-LEVEL','warehouse','selling',FALSE,1,2,20)");
+    identity("supply-chain", "all", "all");
+    lifecycle.reprice(ProductLifecycleService.Kind.SLAB, 99602L, false);
+    assertThat(jdbc.queryForObject("SELECT price FROM slab_prices WHERE slab_id=99602 AND store_level_id=99619", BigDecimal.class))
+        .isEqualByComparingTo("28");
+    prices.requireCompletePrices(99602L);
   }
 
   @Test void batchOperationsKeepIndividualLogsWithoutBatchNumber() throws Exception {
@@ -252,7 +338,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     String prefix = "admin.slab-management." + permissionScope(state);
     identity("admin", "all", prefix + ".view");
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isForbidden());
-    identity("admin", "all", prefix + ".view", prefix + ".detail");
+    identity("admin", "all", prefix + ".view", prefix + (java.util.List.of("warehouse", "selling").contains(state) ? ".edit" : ".detail"));
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value(state)).andExpect(jsonPath("$.data.stock").value(2));
     String other = "warehouse".equals(state) ? "selling" : "warehouse";
@@ -262,7 +348,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
 
   @Test void detailDoesNotLeakOtherCreatorsOrDeletedOperations() throws Exception {
     fixture("warehouse", "selling", false, 2L);
-    identity("admin", "self", "admin.slab-management.warehouse.view", "admin.slab-management.warehouse.detail");
+    identity("admin", "self", "admin.slab-management.warehouse.view", "admin.slab-management.warehouse.edit");
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isBadRequest());
     identity("admin", "all", "all");
     jdbc.update("UPDATE slab_inventory SET operations_deleted=TRUE WHERE id=99601");

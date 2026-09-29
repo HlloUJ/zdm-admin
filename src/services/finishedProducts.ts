@@ -143,10 +143,20 @@ export function releaseTemporaryFinishedProductMedia(mediaId: MediaResource['id'
   return releaseTemporaryMedia('/admin/finished-products/media', mediaId);
 }
 
-export function updateFinishedProduct(id: number, payload: FinishedProductPayload) {
+export function updateFinishedProduct(
+  id: number,
+  payload: FinishedProductPayload | Pick<FinishedProductPayload, 'name' | 'status' | 'guidePrices' | 'markupPrices'>,
+) {
   return request<FinishedProductRecord>(`/admin/finished-products/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateFinishedProductSourceCosts(id: number, variants: { skuId: number; costPrice: number }[]) {
+  return request<FinishedProductRecord>(`/admin/finished-products/${id}/source-costs`, {
+    method: 'PUT',
+    body: JSON.stringify({ variants }),
   });
 }
 

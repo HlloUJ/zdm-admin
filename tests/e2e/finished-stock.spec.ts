@@ -690,22 +690,29 @@ test('edits prices in a specification table and preserves product details on sav
     }),
   );
   await page.route('**/api/admin/finished-products/71', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { code: 0, data: product } });
     saves += 1;
     const payload = route.request().postDataJSON();
-    expect(payload.detail).toBe('<p>保留详情</p>');
-    expect(payload.variants).toEqual(product.variants);
-    expect(payload.attributes).toEqual(product.attributes);
+    expect(payload.detail).toBeUndefined();
+    expect(payload.variants).toBeUndefined();
+    expect(payload.attributes).toBeUndefined();
+    expect(payload.guidePrices[0].costPrice).toBe(10);
     product = { ...product, ...payload };
     await route.fulfill({ json: { code: 0, data: product } });
   });
   await page.goto('/finished-stock-management');
-  await page.getByText('价格', { exact: true }).click();
-  const editor = page.locator('.product-price-editor');
-  const visibleRows = editor.locator('tbody tr').first().locator('td');
-  await expect(editor.locator('tbody tr')).toHaveCount(2);
-  await expect(editor.locator('thead th')).toHaveText(['商品规格', '成本价*', '指导价*', '一级价格*']);
+  await page.getByText('编辑', { exact: true }).click();
+  const editor = page.locator('.form-shell');
+  const visibleRows = editor.locator('.spec-table-block tbody tr').first().locator('td');
+  await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(2);
+  await expect(editor.locator('.spec-table-block thead th')).toContainText([
+    '商品规格',
+    '成本价*',
+    '指导价*',
+    '一级价格*',
+  ]);
   await expect(editor.locator('.t-select')).toHaveCount(0);
-  await expect(editor.locator('tbody tr').nth(1)).toContainText('规格B');
+  await expect(editor.locator('.spec-table-block tbody tr').nth(1)).toContainText('规格B');
   await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toHaveValue('10.00');
   await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toBeDisabled();
   await visibleRows.nth(2).getByPlaceholder('系数', { exact: true }).fill('3');
@@ -743,12 +750,11 @@ test('edits prices in a specification table and preserves product details on sav
   expect(product.markupPrices[0].priceSource).toBe('auto');
   await expect(visibleRows.nth(3).getByPlaceholder('价格', { exact: true })).toHaveValue('30.00');
 
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await page.getByRole('button', { name: '确认保存', exact: true }).click();
+  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);
   expect(product.guidePrices[1].price).toBe(20);
-  await page.getByText('价格', { exact: true }).click();
+  await page.getByText('编辑', { exact: true }).click();
   await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toHaveValue('10.00');
   await visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }).click();
   await page.getByRole('button', { name: '确认', exact: true }).click();
@@ -756,25 +762,176 @@ test('edits prices in a specification table and preserves product details on sav
     visibleRows.nth(3).getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }),
   ).toBeVisible();
   expect(product.markupPrices[0].priceSource).toBe('auto');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await page.locator('.t-dialog:visible .t-dialog__cancel').click();
-  await page.locator('.price-editor-footer').getByRole('button', { name: '取消', exact: true }).click();
+  await editor.getByRole('button', { name: '取消', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);
-  await page.getByText('价格', { exact: true }).click();
+  await page.getByText('编辑', { exact: true }).click();
   await expect(
     visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }),
   ).toBeVisible();
-  await page.locator('.price-editor-footer').getByRole('button', { name: '取消', exact: true }).click();
+  await editor.getByRole('button', { name: '取消', exact: true }).click();
   product.status = 'recycle';
   await page.reload();
   await page
     .locator('.status-tabs')
     .getByText(/回收站/)
     .click();
-  await page.getByText('价格', { exact: true }).click();
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
-  await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toBeDisabled();
+  await page.getByText('详情', { exact: true }).click();
+  const detail = page.locator('.t-drawer').filter({ hasText: '商品详情' });
+  await expect(detail).toBeVisible();
+  await expect(detail.getByRole('button', { name: '提交商品信息', exact: true })).toHaveCount(0);
+  await expect(page.getByText('价格', { exact: true })).toHaveCount(0);
+});
+
+test('supply-chain product edit exposes cost and excludes operations prices', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  const longSpec = '超长商品规格说明'.repeat(20);
+  const product = {
+    id: 72,
+    name: '供应链成本价商品',
+    sku: 'COST-72',
+    status: 'warehouse',
+    categoryId: 5,
+    supplierId: 2,
+    mainImageMediaId: 1,
+    mainImageMediaIds: [1],
+    mainImageUrls: ['/test-product.png'],
+    videoMediaId: 2,
+    videoUrl: '/test-product.mp4',
+    detail: '<p>保留详情</p>',
+    totalStock: 2,
+    attributes: [{ attributeId: 1, attributeName: 'E2E 共享属性', value: 'E2E 共享属性值' }],
+    variants: [{ id: 821, variantLabel: longSpec, displayMode: 'single', stock: 2, costPrice: 10 }],
+    guidePrice: 20,
+    guidePrices: [{ skuId: 821, variantLabel: '规格A', costPrice: 10, priceCoefficient: 2, price: 20 }],
+    markupPrices: [
+      {
+        skuId: 821,
+        variantLabel: '规格A',
+        storeLevelId: 1,
+        storeLevelName: '一级价格',
+        costPrice: 10,
+        priceCoefficient: 3,
+        price: 30,
+      },
+    ],
+  };
+  let saves = 0;
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/finished-products/price-level-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [{ id: 1, name: '一级价格' }] } }),
+  );
+  await page.route('**/api/admin/finished-products/72', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { code: 0, data: product } });
+    saves += 1;
+    const payload = route.request().postDataJSON();
+    expect(payload.variants[0].costPrice).toBe(15);
+    expect(payload.guidePrices).toBeUndefined();
+    expect(payload.markupPrices).toBeUndefined();
+    await route.fulfill({
+      json: { code: 0, data: { ...product, variants: [{ ...product.variants[0], costPrice: 15 }] } },
+    });
+  });
+
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.getByText('编辑', { exact: true }).click();
+  const editor = page.locator('.form-shell');
+  await page.setViewportSize({ width: 1280, height: 500 });
+  for (const [name, selector] of [
+    ['封面图', '.image-preview-dialog img'],
+    ['播放商品视频', '.image-preview-dialog video'],
+  ] as const) {
+    const thumbnail = editor.getByRole('button', { name, exact: true });
+    await thumbnail.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+    await expect(thumbnail).toBeInViewport();
+    const scrollBeforePreview = await page.evaluate(() => window.scrollY);
+    expect(scrollBeforePreview).toBeGreaterThan(0);
+    await thumbnail.click();
+    const preview = page.locator('.t-dialog:visible').filter({ has: page.locator('.image-preview-dialog') });
+    await expect(preview.locator(selector)).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
+    await preview.locator('.t-dialog__close').click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(editor.locator('.spec-table-block thead th')).toContainText(['商品规格', '成本价*']);
+  const specificationCell = editor.locator('.spec-table-block tbody tr').first().locator('td').first();
+  await expect(specificationCell).toHaveText(longSpec);
+  await expect(specificationCell).toHaveCSS('white-space', 'normal');
+  expect(await specificationCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await expect(editor.getByText('指导价')).toHaveCount(0);
+  await expect(editor.getByText('一级价格')).toHaveCount(0);
+  const cost = editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('价格', { exact: true });
+  await expect(cost).toBeEnabled();
+  await expect(cost).toHaveValue('10.00');
+  await cost.fill('15');
+  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  expect(saves).toBe(1);
+});
+
+test('supply-chain layered product edit exposes cost for each specification', async ({ page }) => {
+  await page.setViewportSize({ width: 1368, height: 858 });
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  const product = {
+    id: 73,
+    name: '分层规格成本价商品',
+    sku: 'COST-73',
+    status: 'warehouse',
+    categoryId: 5,
+    mainImageMediaId: 1,
+    videoMediaId: 2,
+    detail: '<p>分层规格</p>',
+    totalStock: 2,
+    attributes: [],
+    specDimensions: [
+      { key: 'material', name: '销售属性1（共享）', values: ['岩板'] },
+      { key: 'color', name: '销售属性2（共享）', values: ['灰色'] },
+      { key: 'size', name: '销售属性3（共享）', values: ['小', '大'] },
+    ],
+    variants: [
+      {
+        id: 831,
+        variantLabel: '岩板 / 小',
+        displayMode: 'layered',
+        salesAttributes: { material: '岩板', color: '灰色', size: '小' },
+        stock: 1,
+        costPrice: 10,
+      },
+      {
+        id: 832,
+        variantLabel: '岩板 / 大',
+        displayMode: 'layered',
+        salesAttributes: { material: '岩板', color: '灰色', size: '大' },
+        stock: 1,
+        costPrice: 12,
+      },
+    ],
+  };
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/finished-products/price-level-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [] } }),
+  );
+  await page.route('**/api/admin/finished-products/73', (route) => route.fulfill({ json: { code: 0, data: product } }));
+
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.getByText('编辑', { exact: true }).click();
+  const editor = page.locator('.form-shell');
+  await expect(editor.locator('.spec-table-block thead th')).toContainText([
+    '销售属性1（共享）',
+    '销售属性2（共享）',
+    '销售属性3（共享）',
+    '成本价*',
+  ]);
+  await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(2);
+  await expect(
+    editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('价格', { exact: true }),
+  ).toHaveValue('10.00');
+  await expect(
+    editor.locator('.spec-table-block tbody tr').nth(1).getByPlaceholder('价格', { exact: true }),
+  ).toHaveValue('12.00');
 });
 
 test('restores the initial horizontal layout after visiting the off-shelf tab', async ({ page }) => {
@@ -1090,7 +1247,7 @@ test('aligns layered log cells on first display and after fullscreen without a c
 });
 
 for (const coefficient of [1.8, 0, undefined]) {
-  test(`price editor displays persisted level prices with coefficient ${coefficient ?? 'unconfigured'}`, async ({
+  test(`operations product edit displays persisted level prices with coefficient ${coefficient ?? 'unconfigured'}`, async ({
     page,
   }) => {
     await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
@@ -1172,25 +1329,22 @@ for (const coefficient of [1.8, 0, undefined]) {
       return route.fulfill({ json: { code: 0, data: { ...product, ...payload } } });
     });
     await page.goto('/finished-stock-management');
-    await page.getByRole('row').filter({ hasText: product.name }).getByText('详情', { exact: true }).click();
-    await expect(page.locator('.product-detail')).toBeVisible();
-    await expect(page.locator('.product-detail thead')).not.toContainText('4级合伙人');
-    await page.locator('.t-drawer:visible .t-drawer__close-btn').click();
-    await page.getByText('价格', { exact: true }).click();
-    const editor = page.locator('.product-price-editor');
-    const firstLevel = editor.locator('tbody tr').nth(0).locator('td').nth(3);
-    const missingLevel = editor.locator('tbody tr').nth(1).locator('td').nth(3);
-    const zeroCostLevel = editor.locator('tbody tr').nth(2).locator('td').nth(3);
-    await expect(editor.locator('thead')).not.toContainText('4级合伙人');
-    await page.locator('.price-editor-footer').getByRole('button', { name: '取消', exact: true }).click();
+    await page.getByText('编辑', { exact: true }).click();
+    const editor = page.locator('.form-shell');
+    await expect(editor.locator('.spec-table-block thead')).not.toContainText('4级合伙人');
+    await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(3);
+    await editor.getByRole('button', { name: '取消', exact: true }).click();
     await expect(editor).not.toBeVisible();
     levelEnabled = true;
-    await page.getByText('价格', { exact: true }).click();
-    await expect(editor.locator('thead')).toContainText('4级合伙人');
+    await page.getByText('编辑', { exact: true }).click();
+    const firstLevel = editor.locator('.spec-table-block tbody tr').nth(0).locator('td').nth(3);
+    const missingLevel = editor.locator('.spec-table-block tbody tr').nth(1).locator('td').nth(3);
+    const zeroCostLevel = editor.locator('.spec-table-block tbody tr').nth(2).locator('td').nth(3);
+    await expect(editor.locator('.spec-table-block thead')).toContainText('4级合伙人');
     await expect(firstLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
     // Configuration alone must not invent a price absent from the server response.
     await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
-    await page.locator('.price-editor-footer').getByRole('button', { name: '取消', exact: true }).click();
+    await editor.getByRole('button', { name: '取消', exact: true }).click();
     await expect(editor).not.toBeVisible();
     if (coefficient != null) {
       product.markupPrices.push(
@@ -1206,7 +1360,7 @@ for (const coefficient of [1.8, 0, undefined]) {
         })),
       );
     }
-    await page.getByText('价格', { exact: true }).click();
+    await page.getByText('编辑', { exact: true }).click();
     await expect(firstLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
     await expect(firstLevel.getByPlaceholder('系数', { exact: true })).toHaveValue('1.60');
     await expect(firstLevel.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true })).toBeVisible();
@@ -1214,8 +1368,8 @@ for (const coefficient of [1.8, 0, undefined]) {
     if (coefficient == null) {
       await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
       await expect(zeroCostLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
-      await page.getByRole('button', { name: '保存', exact: true }).click();
-      await expect(page.getByText('请完善价格信息', { exact: true })).toBeVisible();
+      await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+      await expect(page.getByText('请完善每条规格的指导价和合伙人价格', { exact: true })).toBeVisible();
       await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
       expect(saves).toHaveLength(0);
       return;
@@ -1223,8 +1377,7 @@ for (const coefficient of [1.8, 0, undefined]) {
     await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue((2000 * coefficient).toFixed(2));
     await expect(zeroCostLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('0.00');
     await expect(missingLevel.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '保存', exact: true }).click();
-    await page.getByRole('button', { name: '确认保存', exact: true }).click();
+    await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
     await expect(editor).not.toBeVisible();
     expect(saves).toHaveLength(1);
     expect(saves[0].markupPrices).toEqual([

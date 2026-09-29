@@ -93,9 +93,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (existing == null) {
       return null;
     }
-    if ("disabled".equals(status)) {
-      requireNoStoreReferences(id);
-    }
     existing.setStatus(status);
     updateById(existing);
     if ("enabled".equals(status)) {
@@ -160,7 +157,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (existing == null) {
       throw new IllegalArgumentException("门店级别不存在");
     }
-    requireNoStoreReferences(id);
     return true;
   }
 
@@ -191,6 +187,19 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     return listEnabled().stream().map(this::toPricingLevel).toList();
   }
 
+  public List<StoreLevel> listOperationalPricing() {
+    return enrich(lambdaQuery()
+        .eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), StoreLevel::getCreatedByAccountId, identityProvider.require().accountId())
+        .and(query -> query.eq(StoreLevel::getStatus, "enabled")
+            .or().inSql(StoreLevel::getId, "SELECT DISTINCT store_level_id FROM stores WHERE store_level_id IS NOT NULL"))
+        .orderByAsc(StoreLevel::getSortOrder).orderByAsc(StoreLevel::getId).list());
+  }
+
+  @Override
+  public List<StoreLevelPricingDirectory.Level> listOperationalPricingLevels() {
+    return listOperationalPricing().stream().map(this::toPricingLevel).toList();
+  }
+
   private String resolveCreatedByName() {
     CurrentIdentity identity = identityProvider.current().orElse(null);
     return identity != null && StringUtils.hasText(identity.displayName())
@@ -211,14 +220,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     if (isPriceConfigured("finished_product_prices", id)
         || isPriceConfigured("slab_prices", id)) {
       throw new IllegalArgumentException(PRODUCT_PRICE_REFERENCED_MESSAGE);
-    }
-  }
-
-  private void requireNoStoreReferences(Long id) {
-    Long storeCount = storeMapper.selectCount(
-        Wrappers.<Store>lambdaQuery().eq(Store::getStoreLevelId, id));
-    if (storeCount > 0) {
-      throw new IllegalArgumentException("该门店级别仍有门店使用，不能停用，请先调整相关门店的级别");
     }
   }
 

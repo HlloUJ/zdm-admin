@@ -5,14 +5,11 @@ const ok = (data: unknown) => ({ code: 0, message: 'ok', data });
 const permissions = [
   'store.finished-stock-management.warehouse.view',
   'store.finished-stock-management.warehouse.select',
-  'store.finished-stock-management.warehouse.detail',
-  'store.finished-stock-management.warehouse.price',
+  'store.finished-stock-management.warehouse.edit',
   'store.finished-stock-management.warehouse.shelf',
   'store.finished-stock-management.selling.view',
-  'store.finished-stock-management.selling.detail',
-  'store.finished-stock-management.selling.price',
+  'store.finished-stock-management.selling.edit',
   'store.finished-stock-management.selling.off-shelf',
-  'store.finished-stock-management.unavailable.purge',
   'store.finished-stock-management.operation-log.view',
   'store.price-configuration.view',
   'store.price-configuration.create',
@@ -71,7 +68,7 @@ function product(overrides: Record<string, unknown> = {}) {
 test('store uses a direct menu, selects an operations product, and edits only its own price', async ({ page }) => {
   await storeLogin(page);
   let records: ReturnType<typeof product>[] = [];
-  let guideWrites = 0;
+  let roleWrites = 0;
   await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok(records) }));
   await page.route('**/api/admin/store-finished-products/pool', (route) =>
     route.fulfill({
@@ -83,9 +80,16 @@ test('store uses a direct menu, selects an operations product, and edits only it
     return route.fulfill({ json: ok(records) });
   });
   await page.route('**/api/admin/store-finished-products/41', (route) => route.fulfill({ json: ok(records[0]) }));
-  await page.route('**/api/admin/store-finished-products/41/skus/101/guide-price', (route) => {
-    guideWrites++;
-    records[0] = product({ skus: [{ ...product().skus[0], guidePrice: 140, guideSource: 'manual' }] });
+  await page.route('**/api/admin/store-finished-products/41/skus/101/roles/8/price', (route) => {
+    roleWrites++;
+    records[0] = product({
+      skus: [
+        {
+          ...product().skus[0],
+          rolePrices: [{ roleId: 8, roleName: '店长', coefficient: 0.8, price: 140, priceSource: 'manual' }],
+        },
+      ],
+    });
     return route.fulfill({ json: ok(records[0]) });
   });
 
@@ -95,6 +99,9 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await expect(menu.getByText('价格配置', { exact: true })).toBeVisible();
   await expect(menu.getByText('商品管理', { exact: true })).toHaveCount(0);
   const main = page.getByRole('main');
+  await expect(main.locator('.filter-row')).toHaveCSS('display', 'flex');
+  await expect(main.locator('.filter-fields')).toHaveCSS('display', 'grid');
+  await expect(main.locator('.table-toolbar')).toHaveCSS('display', 'flex');
   await expect(main.getByText('暂无商品')).toBeVisible();
   await main.getByRole('button', { name: '挑选商品' }).click();
   const dialog = page.locator('.t-dialog:visible');
@@ -102,15 +109,21 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await dialog.locator('tbody .t-checkbox').click();
   await dialog.getByRole('button', { name: '提交' }).click();
   await expect(main.getByText('门店测试商品')).toBeVisible();
-  await main.getByText('价格', { exact: true }).click();
+  await main.getByText(/出售中（0）/).click();
+  await expect(main.getByText('暂无商品')).toBeVisible();
+  await main.getByText(/仓库中（1）/).click();
+  await expect(main.getByText('门店测试商品')).toBeVisible();
+  await main.getByText('编辑', { exact: true }).click();
   const drawer = page.locator('.t-drawer:visible');
   await expect(drawer.getByText('100.00').last()).toBeVisible();
-  await expect(drawer.getByText('运营端指导价')).toBeVisible();
+  await expect(drawer.getByRole('cell', { name: '运营端指导价' })).toBeVisible();
   await expect(drawer.getByText('0.8')).toBeVisible();
   await expect(drawer.getByText('指导价（系数')).toHaveCount(0);
+  await drawer.getByText('手工价格', { exact: true }).click();
   await drawer.locator('.t-input-number input').first().fill('140');
-  await drawer.getByRole('button', { name: '保存指导价' }).click();
-  await expect.poll(() => guideWrites).toBe(1);
+  await drawer.getByRole('button', { name: '保存', exact: true }).click();
+  await expect.poll(() => roleWrites).toBe(1);
+  await expect(drawer.getByRole('cell', { name: '运营端指导价' })).toBeVisible();
 });
 
 test('upstream unavailable row is masked, with detail and purge only', async ({ page }) => {
@@ -175,13 +188,13 @@ test('store operation logs show the same filter, pagination, and detail structur
     id: 1,
     productId: 91,
     productName: '门店测试商品',
-    operationType: 'PRICE_UPDATE',
-    operationSummary: '修改本店指导价',
+    operationType: 'UPDATE',
+    operationSummary: '编辑商品',
     operatorName: '门店员工',
     operatedAt: '2026-09-24T10:00:00',
     beforeStatus: 'warehouse',
     afterStatus: 'warehouse',
-    changeDetails: '{"指导价":{"before":150,"after":140}}',
+    changeDetails: '{"最低价":{"before":150,"after":140}}',
   };
   await page.route('**/api/admin/store-finished-products/operation-logs?**', (route) =>
     route.fulfill({ json: ok({ records: [log], total: 1 }) }),
@@ -193,7 +206,7 @@ test('store operation logs show the same filter, pagination, and detail structur
   await page.getByRole('main').getByText('操作日志').click();
   const drawer = page.locator('.t-drawer:visible');
   await expect(drawer.getByText('门店测试商品')).toBeVisible();
-  await expect(drawer.getByText('修改价格')).toBeVisible();
+  await expect(drawer.getByRole('cell', { name: '编辑商品' }).first()).toBeVisible();
   await expect(drawer.getByRole('columnheader', { name: '操作类型' })).toBeVisible();
   await expect(drawer.getByRole('columnheader', { name: '操作时间' })).toBeVisible();
   await expect(drawer.locator('.t-pagination')).toBeVisible();
@@ -201,5 +214,5 @@ test('store operation logs show the same filter, pagination, and detail structur
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.getByText('状态变化')).toBeVisible();
   await expect(dialog.getByText('变更对比')).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: '本店指导价' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: '最低价' })).toBeVisible();
 });

@@ -73,11 +73,11 @@
   },
   {
     "prefix": "admin.finished-stock-management.warehouse.edit",
-    "scope": "removed"
+    "scope": "admin-only"
   },
   {
     "prefix": "admin.finished-stock-management.selling.edit",
-    "scope": "removed"
+    "scope": "admin-only"
   },
   {
     "prefix": "admin.finished-stock-management.off-shelf.edit",
@@ -101,11 +101,11 @@
   },
   {
     "prefix": "admin.slab-management.warehouse.edit",
-    "scope": "removed"
+    "scope": "admin-only"
   },
   {
     "prefix": "admin.slab-management.selling.edit",
-    "scope": "removed"
+    "scope": "admin-only"
   },
   {
     "prefix": "admin.slab-management.off-shelf.edit",

@@ -239,6 +239,13 @@ export function updateSlab(id: number, payload: SlabPayload) {
   });
 }
 
+export function updateSlabSourceCost(id: number, costPrice: number) {
+  return request<SlabRecord>(`/admin/slabs/${id}/source-cost`, {
+    method: 'PUT',
+    body: JSON.stringify({ costPrice }),
+  });
+}
+
 export function checkSlabAction(
   ids: number[],
   action: 'shelf' | 'offShelf' | 'restore' | 'delete' | 'purge' | 'clearRecycle',

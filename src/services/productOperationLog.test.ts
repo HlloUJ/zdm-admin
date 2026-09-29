@@ -7,8 +7,9 @@ describe('shared product operation vocabulary', () => {
     expect(productOperationSummary({ operationType: 'OFF_SHELF', operationSummary: '下架大板' })).toBe('下架商品');
     expect(productOperationSummary({ operationType: 'OFF_SHELF', operationSummary: '下架商品' })).toBe('下架商品');
     expect(productOperationSummary({ operationType: 'PRICE_UPDATE', operationSummary: '修改本店指导价' })).toBe(
-      '修改本店指导价',
+      '编辑商品',
     );
+    expect(productOperationTypeLabel('PRICE_UPDATE')).toBe('编辑商品');
     expect(productOperationTypeLabel('OPERATIONS_OFF_SHELF')).toBe('运营端下架');
   });
 
@@ -16,5 +17,9 @@ describe('shared product operation vocabulary', () => {
     expect(productOperationTypeOptions(['RESTORE', 'RESTORE_WAREHOUSE', 'RESTORE_RECYCLE'])).toEqual([
       { value: 'RESTORE', label: '放回仓库' },
     ]);
+  });
+
+  it('groups historical manual price changes under product edits', () => {
+    expect(productOperationTypeOptions(['UPDATE', 'PRICE_UPDATE'])).toEqual([{ value: 'UPDATE', label: '编辑商品' }]);
   });
 });

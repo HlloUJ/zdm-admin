@@ -25,7 +25,7 @@ public class StoreFinishedProductService {
   public record RolePrice(Long roleId, String roleName, BigDecimal coefficient, BigDecimal price,
       String priceSource) {}
   public record SkuPrice(Long skuId, String label, Integer stock, BigDecimal costPrice,
-      BigDecimal guidePrice, String guideSource, List<RolePrice> rolePrices,
+      BigDecimal guidePrice, List<RolePrice> rolePrices,
       String displayMode, Map<String, String> salesAttributes, String material,
       String lengthValue, String color, String sizeValue) {
     public SkuPrice {
@@ -281,30 +281,6 @@ public class StoreFinishedProductService {
   }
 
   @Transactional
-  public ProductView saveGuidePrice(Long id, Long skuId, BigDecimal price) {
-    var store = scopes.require();
-    Map<String, Object> listing = listing(store, id, true);
-    Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
-    requirePriceEditable(listing, source);
-    requireSku(source, skuId);
-    requirePrice(price);
-    BigDecimal before = guidePrice(id, skuId, number(listing.get("finished_product_id")));
-    jdbc.update("""
-        INSERT INTO store_finished_guide_prices (listing_id, sku_id, manual_price, updated_by_account_id)
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE manual_price = VALUES(manual_price),
-          updated_by_account_id = VALUES(updated_by_account_id)
-        """, id, skuId, price, store.accountId());
-    Map<String, Object> priceChange = new LinkedHashMap<>();
-    priceChange.put("before", before);
-    priceChange.put("after", price);
-    log(store, id, number(listing.get("finished_product_id")), (String) source.get("name"),
-        "PRICE_UPDATE", "修改本店指导价", (String) listing.get("status"),
-        (String) listing.get("status"), Map.of("SKU ID", skuId, "指导价", priceChange));
-    return detail(id);
-  }
-
-  @Transactional
   public ProductView saveRolePrice(Long id, Long skuId, Long roleId, BigDecimal price,
       boolean followConfiguration) {
     var store = scopes.require();
@@ -344,7 +320,7 @@ public class StoreFinishedProductService {
     priceChange.put("before", before);
     priceChange.put("after", after);
     log(store, id, number(listing.get("finished_product_id")), (String) source.get("name"),
-        "PRICE_UPDATE", "修改角色可售最低价", (String) listing.get("status"),
+        "UPDATE", "编辑商品", (String) listing.get("status"),
         (String) listing.get("status"), Map.of("SKU ID", skuId, "角色ID", roleId,
             "最低价", priceChange, "价格来源", followConfiguration ? "跟随配置" : "手工价格"));
     return detail(id);
@@ -380,7 +356,9 @@ public class StoreFinishedProductService {
       args.add("%" + keyword.trim() + "%");
     }
     if (operationType != null && !operationType.isBlank()) {
-      if ("RESTORE".equals(operationType)) {
+      if ("UPDATE".equals(operationType)) {
+        conditions.append(" AND operation_type IN ('UPDATE','PRICE_UPDATE')");
+      } else if ("RESTORE".equals(operationType)) {
         conditions.append(" AND operation_type IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')");
       } else {
         conditions.append(" AND operation_type = ?");
@@ -429,9 +407,12 @@ public class StoreFinishedProductService {
   }
 
   private static LogEntry logEntry(ResultSet row) throws SQLException {
+    String operationType = row.getString("operation_type");
+    boolean legacyPriceEdit = "PRICE_UPDATE".equals(operationType);
     return new LogEntry(row.getLong("id"), row.getObject("listing_id", Long.class),
         row.getLong("finished_product_id"), row.getString("product_name"),
-        row.getString("operation_type"), row.getString("operation_summary"),
+        legacyPriceEdit ? "UPDATE" : operationType,
+        legacyPriceEdit ? "编辑商品" : row.getString("operation_summary"),
         row.getString("before_status"), row.getString("after_status"),
         row.getString("change_details"), row.getString("operator_name"),
         row.getTimestamp("operated_at").toLocalDateTime());
@@ -484,10 +465,6 @@ public class StoreFinishedProductService {
     BigDecimal operationsGuide = product.getGuidePrices() == null ? null : product.getGuidePrices().stream()
         .filter(price -> Objects.equals(price.getSkuId(), skuId))
         .map(FinishedProductGuidePrice::getPrice).findFirst().orElse(null);
-    List<BigDecimal> manualGuide = jdbc.queryForList("""
-        SELECT manual_price FROM store_finished_guide_prices WHERE listing_id = ? AND sku_id = ?
-        """, BigDecimal.class, listingId, skuId);
-    BigDecimal guide = manualGuide.isEmpty() ? operationsGuide : manualGuide.getFirst();
     List<RolePrice> rolePrices = jdbc.query("""
         SELECT config.role_id, role.name AS role_name, config.price_coefficient,
           override_price.manual_price
@@ -506,8 +483,8 @@ public class StoreFinishedProductService {
           return new RolePrice(row.getLong("role_id"), row.getString("role_name"),
               coefficient, effective, manual == null ? "auto" : "manual");
         }, listingId, skuId, store.tenantId(), store.storeId());
-    return new SkuPrice(skuId, variant.getVariantLabel(), variant.getStock(), cost, guide,
-        manualGuide.isEmpty() ? "auto" : "manual", rolePrices, variant.getDisplayMode(),
+    return new SkuPrice(skuId, variant.getVariantLabel(), variant.getStock(), cost, operationsGuide,
+        rolePrices, variant.getDisplayMode(),
         variant.getSalesAttributes(), variant.getMaterial(), variant.getLengthValue(),
         variant.getColor(), variant.getSizeValue());
   }
@@ -549,17 +526,6 @@ public class StoreFinishedProductService {
         WHERE id = ? AND finished_product_id = ?
         """, Long.class, skuId, source.get("id"));
     if (count == null || count == 0) { throw new IllegalArgumentException("商品规格不存在"); }
-  }
-
-  private BigDecimal guidePrice(Long listingId, Long skuId, Long productId) {
-    List<BigDecimal> manual = jdbc.queryForList("""
-        SELECT manual_price FROM store_finished_guide_prices WHERE listing_id = ? AND sku_id = ?
-        """, BigDecimal.class, listingId, skuId);
-    if (!manual.isEmpty()) { return manual.getFirst(); }
-    List<BigDecimal> source = jdbc.queryForList("""
-        SELECT price FROM finished_product_guide_prices WHERE finished_product_id = ? AND sku_id = ?
-        """, BigDecimal.class, productId, skuId);
-    return source.isEmpty() ? null : source.getFirst();
   }
 
   private BigDecimal rolePrice(CityPartnerStoreScope.Store store, Long listingId,

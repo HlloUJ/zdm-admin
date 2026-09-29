@@ -1034,11 +1034,11 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
-    ['查看', '批量上架', '详情', '价格', '上架', '删除'],
-    ['查看', '批量下架', '详情', '价格', '下架'],
+    ['查看', '批量上架', '编辑', '上架', '删除'],
+    ['查看', '批量下架', '编辑', '下架'],
     ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],
-    ['查看', '详情', '价格'],
-    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '价格', '放回仓库', '彻底删除'],
+    ['查看', '详情'],
+    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],
   ];
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
@@ -1279,6 +1279,33 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   await main.locator('.terminal-tabs').getByText('大板供应商门店管理后台', { exact: true }).click();
   await moduleList.getByText('门店分类管理', { exact: true }).click();
   await expect(matrix.locator('.module-allocation-count')).toHaveText('已下放 8 / 8');
+});
+
+test('assigns supply-chain off-shelf detail rights separately for finished stock and slabs', async ({ page }) => {
+  await page.goto('/terminal-function-allocation');
+  const main = page.getByRole('main');
+  await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
+  await main.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
+  const matrix = main.locator('.permission-matrix');
+  await expect(matrix.getByText('成品现货管理页', { exact: true })).toBeVisible();
+  await expect(matrix.getByText('大板管理页', { exact: true })).toBeVisible();
+  const offShelf = matrix.locator('tbody tr').filter({
+    has: page.locator('.permission-tab-cell').getByText('已下架', { exact: true }),
+  });
+  await expect(offShelf).toHaveCount(2);
+  for (let index = 0; index < 2; index += 1) {
+    const detail = offShelf.nth(index).getByRole('checkbox', { name: '详情', exact: true });
+    await expect(detail).toBeEnabled();
+    await offShelf.nth(index).getByText('详情', { exact: true }).click();
+  }
+
+  const saved = page.waitForRequest(
+    (request) => request.method() === 'PUT' && request.url().endsWith('/terminal-function-policies/supply-chain'),
+  );
+  await main.getByRole('button', { name: '保存', exact: true }).click();
+  const permissions = (await saved).postDataJSON().functionPermissions.split(',');
+  expect(permissions).toContain('supply-chain.finished-stock-management.off-shelf.detail');
+  expect(permissions).toContain('supply-chain.slab-management.off-shelf.detail');
 });
 
 for (const storeType of ['cityPartner', 'slabSupplier']) {

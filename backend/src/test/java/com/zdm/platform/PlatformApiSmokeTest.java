@@ -221,7 +221,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
                 .contentType("application/json").content(mapper.writeValueAsBytes(payload)))
             .andExpect(status().isOk());
         String details = jdbcTemplate.queryForObject(
-            "SELECT change_details FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'PRICE_UPDATE' ORDER BY id DESC LIMIT 1",
+            "SELECT change_details FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'UPDATE' ORDER BY id DESC LIMIT 1",
             String.class, id);
         var changes = mapper.readTree(details);
         assertThat(changes.size()).isEqualTo(2);
@@ -242,7 +242,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
               .contentType("application/json").content(mapper.writeValueAsBytes(payload)))
           .andExpect(status().isOk());
       assertThat(jdbcTemplate.queryForObject(
-          "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'PRICE_UPDATE'",
+          "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id = ? AND operation_type = 'UPDATE'",
           Integer.class, id)).isEqualTo(2);
     } finally {
       jdbcTemplate.update("DELETE FROM media_references WHERE business_domain = 'SLAB' AND business_id = ?", id);
@@ -2192,8 +2192,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "SELECT id FROM store_levels WHERE name = '1级'", Long.class);
     mockMvc.perform(get("/api/admin/store-levels/{id}/disable-preview", referencedLevelId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("该门店级别仍有门店使用，不能停用，请先调整相关门店的级别"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(true));
     mockMvc.perform(get("/api/admin/store-levels/{id}/delete-preview", referencedLevelId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isBadRequest())
@@ -2327,17 +2327,26 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           "SELECT id FROM stores WHERE name = ?", Long.class, archivedStoreName);
       mockMvc.perform(get("/api/admin/store-levels/{id}/disable-preview", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.message").value("该门店级别仍有门店使用，不能停用，请先调整相关门店的级别"));
-      jdbcTemplate.update("DELETE FROM stores WHERE id = ?", archivedReferenceStoreId);
-      archivedReferenceStoreId = null;
-
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").value(true));
       mockMvc.perform(patch("/api/admin/store-levels/{id}/status", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
               .content("{\"status\":\"disabled\"}"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.status").value("disabled"));
+      assertThat(jdbcTemplate.queryForObject("SELECT store_level_id FROM stores WHERE id = ?", Long.class, archivedReferenceStoreId))
+          .isEqualTo(Long.valueOf(levelId));
+      mockMvc.perform(get("/api/admin/store-levels/pricing-options")
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[*].name", hasItem("四级门店")));
+      mockMvc.perform(get("/api/admin/store-levels/{id}/delete-preview", levelId)
+              .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("该门店级别已被门店引用，不能删除"));
+      jdbcTemplate.update("DELETE FROM stores WHERE id = ?", archivedReferenceStoreId);
+      archivedReferenceStoreId = null;
 
       mockMvc.perform(get("/api/admin/store-levels/{id}/disable-preview", levelId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
@@ -5675,6 +5684,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     Long videoCoverMediaId = uploadSlabMedia("video-cover.jpg", "image/jpeg");
 
     Long slabId = null;
+    Long immediatelyListedSlabId = null;
     Long interfaceSlabId = null;
     Long deletedInterfaceSlabId = null;
     try {
@@ -5765,6 +5775,31 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           .andReturn();
       slabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
           slabResult.getResponse().getContentAsString(), "$.data.id").toString());
+
+      MvcResult immediatelyListed = mockMvc.perform(post("/api/admin/slabs")
+              .header("Authorization", "Bearer " + supplyChainToken())
+              .contentType("application/json")
+              .content("""
+                  {"name":"立即上架大板","serialNo":"%s-immediate","supplierId":%d,
+                   "varietyId":1,"originId":1,"textureId":%d,"colorId":%d,"gradeId":%d,
+                   "lengthMm":3200,"widthMm":1800,"thicknessMm":18,"stock":2,"costPrice":100,
+                   "mainImageMediaId":%d,"scanImageMediaId":%d,"designImageMediaId":%d,"status":"selling"}
+                  """.formatted(serialNo, supplierId, textureId, colorId, gradeId,
+                      mainImageMediaId, scanImageMediaId, designImageMediaId)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.sourceStatus").value("selling"))
+          .andReturn();
+      immediatelyListedSlabId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(
+          immediatelyListed.getResponse().getContentAsString(), "$.data.id").toString());
+      assertThat(jdbcTemplate.queryForList(
+          "SELECT operation_type FROM slab_operation_logs WHERE slab_id=? AND business_client_code='supply-chain' ORDER BY id",
+          String.class, immediatelyListedSlabId)).containsExactly("CREATE");
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT after_status FROM slab_operation_logs WHERE slab_id=? AND business_client_code='supply-chain' AND operation_type='CREATE'",
+          String.class, immediatelyListedSlabId)).isEqualTo("selling");
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=? AND business_client_code='admin' AND operation_type='SOURCE_SHELF'",
+          Long.class, immediatelyListedSlabId)).isEqualTo(1L);
 
       String varietyName = jdbcTemplate.queryForObject(
           "SELECT name FROM slab_varieties WHERE id = 1", String.class);
@@ -5970,6 +6005,9 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           slabId,
           interfaceSlabId);
       assertThat(sellingCount).isEqualTo(2);
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=? AND business_client_code='supply-chain' AND operation_type='SHELF'",
+          Long.class, slabId)).isEqualTo(1L);
       Integer unchangedPriceCount = jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM slab_prices WHERE slab_id = ?",
           Integer.class,
@@ -6090,8 +6128,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
               "$.data[?(@.id == " + slabId + ")].offShelfRecords[0].offShelvedByName", hasItem("超级管理员")))
           .andExpect(jsonPath(
               "$.data[?(@.id == " + slabId + ")].offShelfRecords[1].standardReason", hasItem("价格调整")))
-          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].guidePriceCoefficient", hasItem(1.60)))
-          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0].price", hasItem(50.00)));
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].guidePriceCoefficient", hasItem(org.hamcrest.Matchers.nullValue())))
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].markupPrices[0]").doesNotExist());
       assertThat(jdbcTemplate.queryForObject(
           """
           SELECT CONCAT(guide_price_coefficient, ':', guide_price)
@@ -6154,6 +6192,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             slabId);
         jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", slabId);
         jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", slabId);
+      }
+      if (immediatelyListedSlabId != null) {
+        jdbcTemplate.update("DELETE FROM slab_prices WHERE slab_id = ?", immediatelyListedSlabId);
+        jdbcTemplate.update("DELETE FROM slab_inventory WHERE id = ?", immediatelyListedSlabId);
+        jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", immediatelyListedSlabId);
       }
       if (interfaceSlabId != null) {
         jdbcTemplate.update("DELETE FROM slab_operation_logs WHERE slab_id = ?", interfaceSlabId);

@@ -16,12 +16,12 @@ const router = createRouter({
     {
       path: '/supply-chain/finished-stock-management',
       name: 'supplyChainFinishedStock',
-      component: () => import('@/pages/finished-stock/management/index.vue'),
+      component: () => import('@/pages/finished-stock/supply-chain/index.vue'),
     },
     {
       path: '/supply-chain/slab-management',
       name: 'supplyChainSlab',
-      component: () => import('@/pages/slab/management/index.vue'),
+      component: () => import('@/pages/slab/supply-chain/index.vue'),
     },
     {
       path: '/',

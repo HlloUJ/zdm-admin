@@ -104,6 +104,15 @@ public class ProductLifecycleService {
   }
   @Transactional
   public boolean sourceTransition(Kind kind, Long id, String target, String reason, String detail) {
+    return sourceTransition(kind, id, target, reason, detail, true);
+  }
+
+  @Transactional
+  public void shelfDuringCreation(Kind kind, Long id) {
+    sourceTransition(kind, id, "selling", null, null, false);
+  }
+
+  private boolean sourceTransition(Kind kind, Long id, String target, String reason, String detail, boolean recordSourceLog) {
     requireSupplyChain();
     var row=lock(kind,id);
     String source=(String)row.get("source_status");
@@ -138,7 +147,7 @@ public class ProductLifecycleService {
     Map<String,Object> sourceChanges=new LinkedHashMap<>();
     if(reason!=null) { sourceChanges.put("下架原因",Map.of("before","","after",reason)); }
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
-    record(kind,row,"supply-chain",type,label,source,target,sourceChanges);
+    if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,target,sourceChanges); }
     if (kind == Kind.FINISHED) { storeUpstreamLogs.sourceChange(id, source, target); }
     if (kind == Kind.FINISHED && recreate) {
       // Keep old store listings, manual prices and logs as history. The next store selection
@@ -223,17 +232,16 @@ public class ProductLifecycleService {
     if(deleted(row)) { return; }
     var before=priceSnapshot(kind,id);
     var guideRows=jdbc.queryForList("SELECT price_coefficient FROM "+kind.config+"_guide_price_settings WHERE id=1");
-    if(guideRows.isEmpty()) { throw new IllegalArgumentException("请先在运营管理平台配置指导价系数"); }
-    BigDecimal guide=(BigDecimal)guideRows.getFirst().get("price_coefficient");
-    var levels=jdbc.queryForList("SELECT l.id,l.name,c.id AS configuration_id,c.price_coefficient,c.status AS configuration_status FROM store_levels l LEFT JOIN "+kind.config+"_markup_configurations c ON c.store_level_id=l.id WHERE l.status='enabled' ORDER BY l.id");
+    BigDecimal guide=guideRows.isEmpty() ? null : (BigDecimal)guideRows.getFirst().get("price_coefficient");
+    var levels=jdbc.queryForList("SELECT l.id,l.name,c.id AS configuration_id,c.price_coefficient,c.status AS configuration_status FROM store_levels l LEFT JOIN "+kind.config+"_markup_configurations c ON c.store_level_id=l.id WHERE l.status='enabled' OR EXISTS (SELECT 1 FROM stores s WHERE s.store_level_id=l.id) ORDER BY l.id");
     var variants=kind==Kind.FINISHED ? jdbc.queryForList("SELECT id AS sku_id,variant_label,cost_price FROM finished_product_variants WHERE finished_product_id=? ORDER BY id",id):List.of(row);
     if(variants.isEmpty()) { throw new IllegalArgumentException("请完善商品规格与成本价"); }
-    jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=? AND store_level_id IN (SELECT id FROM store_levels WHERE status='enabled')",id);
+    jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=? AND store_level_id IN (SELECT l.id FROM store_levels l WHERE l.status='enabled' OR EXISTS (SELECT 1 FROM stores s WHERE s.store_level_id=l.id))",id);
     if(kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
     for(var variant:variants) {
       BigDecimal cost=(BigDecimal)variant.get("cost_price");
       if(cost==null || cost.signum()<0) { throw new IllegalArgumentException("请完善商品成本价"); }
-      if(kind==Kind.FINISHED) {
+      if(kind==Kind.FINISHED && guide!=null) {
         jdbc.update("INSERT INTO finished_product_guide_prices (finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES (?,?,?,?,?,?)",id,variant.get("sku_id"),variant.get("variant_label"),guide,cost,amount(cost,guide));
       }
       for(var level:levels) {
@@ -255,7 +263,8 @@ public class ProductLifecycleService {
       }
     }
     BigDecimal cost=(BigDecimal)variants.getFirst().get("cost_price");
-    jdbc.update("UPDATE "+kind.table+" SET guide_price=?"+(kind==Kind.SLAB?",guide_price_coefficient=?":"")+" WHERE id=?",kind==Kind.SLAB?new Object[]{amount(cost,guide),guide,id}:new Object[]{amount(cost,guide),id});
+    BigDecimal guidePrice=guide==null ? null : amount(cost,guide);
+    jdbc.update("UPDATE "+kind.table+" SET guide_price=?"+(kind==Kind.SLAB?",guide_price_coefficient=?":"")+" WHERE id=?",kind==Kind.SLAB?new Object[]{guidePrice,guide,id}:new Object[]{guidePrice,id});
     sqlSession.clearCache();
     if(logImpact) { record(kind,row,"admin","PRICE_UPDATE",kind==Kind.FINISHED ? "供应链成本变更，按当前系数重算售价" : null,(String)row.get("status"),(String)row.get("status"),Map.of("价格联动",Map.of("before",before,"after",priceSnapshot(kind,id)))); }
   }
