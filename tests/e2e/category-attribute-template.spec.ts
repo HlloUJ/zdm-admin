@@ -113,6 +113,18 @@ async function setup(page: Page, permissions = ['all']) {
   return versions;
 }
 
+async function expectAccessoryCategorySelected(page: Page) {
+  const accessoryCategory = page.locator('.category-content .t-tree__item[data-value="4"]');
+  // TDesign temporarily keeps the exiting tree item beside the entering item during scope changes.
+  const activeAccessoryCategory = page.locator(
+    '.category-content .t-tree__item[data-value="4"].t-is-active:not(.t-tree__item--leave-active)',
+  );
+  await expect(activeAccessoryCategory).toHaveCount(1);
+  await expect(accessoryCategory).toHaveCount(1);
+  await expect(activeAccessoryCategory.locator('.t-tree__label')).toHaveText('桌腿');
+  await expect(page.locator('.category-content .t-tree__item[data-value="3"]')).toHaveCount(0);
+}
+
 test('tabs retain automatically saved drafts', async ({ page }) => {
   const versions = await setup(page);
   await page.goto('/category-attribute-template');
@@ -125,9 +137,7 @@ test('tabs retain automatically saved drafts', async ({ page }) => {
   await expect(page.getByRole('button', { name: '保存草稿', exact: true })).toHaveCount(0);
   await page.locator('.attribute-table .required-switch').first().click();
   await page.getByText('配件模板', { exact: true }).click();
-  await expect(
-    page.locator('.category-content:visible .t-tree__label:visible').filter({ hasText: '桌腿' }),
-  ).toBeVisible();
+  await expectAccessoryCategorySelected(page);
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   expect((versions.find((v) => v.id === 2)?.content as Record<string, unknown>[])[0]?.requiredFlag).toBe(false);
   await page.getByText('成品现货模板', { exact: true }).click();
@@ -140,9 +150,7 @@ test('tabs retain automatically saved drafts', async ({ page }) => {
   expect(versions.find((v) => v.id === 2)?.versionNo).toBeNull();
   expect((versions.find((v) => v.id === 2)?.content as Record<string, unknown>[])[0]?.requiredFlag).toBe(false);
   await page.getByText('配件模板', { exact: true }).click();
-  await expect(
-    page.locator('.category-content:visible .t-tree__label:visible').filter({ hasText: '桌腿' }),
-  ).toBeVisible();
+  await expectAccessoryCategorySelected(page);
   await expect(page.locator('.version-panel .t-tabs')).toHaveCount(0);
 });
 
@@ -161,9 +169,7 @@ test('only an authorized scope is visible and cannot create versions', async ({ 
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
   await page.waitForLoadState('networkidle');
   if (await continueDraft.isVisible()) await continueDraft.click();
-  await expect(
-    page.locator('.category-content:visible .t-tree__label:visible').filter({ hasText: '桌腿' }),
-  ).toBeVisible();
+  await expectAccessoryCategorySelected(page);
   await expect(page.getByRole('main').locator('.t-tabs__nav-item')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '创建新版本草稿', exact: true })).toHaveCount(0);
 });
