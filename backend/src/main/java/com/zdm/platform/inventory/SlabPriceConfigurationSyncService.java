@@ -21,7 +21,8 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
         SELECT configuration.id, configuration.price_coefficient
         FROM slab_markup_configurations configuration
         INNER JOIN store_levels level ON level.id = configuration.store_level_id
-        WHERE level.id = ? AND level.status = 'enabled'
+        WHERE level.id = ? AND (level.status = 'enabled'
+          OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND configuration.status = 'enabled' AND configuration.legacy_seeded = FALSE
           AND configuration.price_coefficient >= 0
         FOR UPDATE
@@ -73,7 +74,9 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
         LEFT JOIN slab_prices price
           ON price.slab_id = inventory.id AND price.store_level_id = configuration.store_level_id
         WHERE inventory.cost_price IS NOT NULL AND price.id IS NULL
-          AND level.status = 'enabled' AND configuration.status = 'enabled'
+          AND (level.status = 'enabled'
+            OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
+          AND configuration.status = 'enabled'
         """,
         configuration.getId());
   }
@@ -93,7 +96,8 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
             price.price = ROUND(inventory.cost_price * ?, 2)
         WHERE price.source_configuration_id = ?
           AND price.price_source = 'auto'
-          AND level.status = 'enabled'
+          AND (level.status = 'enabled'
+            OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND inventory.cost_price IS NOT NULL
         """,
         configuration.getPriceCoefficient(),

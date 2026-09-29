@@ -49,7 +49,7 @@ public class SlabPriceService {
   public void requireCompletePrices(Long slabId) {
     List<SlabPrice> prices = listPrices(slabId);
     Set<Long> pricedLevels = prices.stream().map(SlabPrice::getStoreLevelId).collect(Collectors.toSet());
-    if (prices.isEmpty() || storeLevelDirectory.listEnabledLevels().stream().anyMatch(level -> !pricedLevels.contains(level.id()))) {
+    if (prices.isEmpty() || storeLevelDirectory.listOperationalPricingLevels().stream().anyMatch(level -> !pricedLevels.contains(level.id()))) {
       throw new IllegalArgumentException("请完善全部大板价格");
     }
   }
@@ -65,7 +65,7 @@ public class SlabPriceService {
         .stream()
         .collect(Collectors.toMap(SlabMarkupConfiguration::getStoreLevelId, configuration -> configuration));
     Map<Long, String> levelNames = new LinkedHashMap<>();
-    storeLevelDirectory.listEnabledLevels().forEach(level -> levelNames.putIfAbsent(level.id(), level.name()));
+    storeLevelDirectory.listOperationalPricingLevels().forEach(level -> levelNames.putIfAbsent(level.id(), level.name()));
     Set<Long> expectedIds = levelNames.keySet();
     if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
       return;

@@ -145,7 +145,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     }
     replaceDetails(product);
     syncMediaReferences(product);
-    if(publishNow) { lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,product.getId(),"selling"); }
+    if(publishNow) { lifecycle.shelfDuringCreation(ProductLifecycleService.Kind.FINISHED,product.getId()); }
     FinishedProduct created = attachDetails(getById(product.getId()));
     operationLogs.record(created, null, operationLogs.snapshot(created));
     return created;
@@ -203,6 +203,40 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,id,requestedStatus);
       updated=attachDetails(getById(id));
     }
+    return updated;
+  }
+
+  @Transactional
+  public FinishedProduct updateSourceCosts(Long id, Map<Long, java.math.BigDecimal> requested) {
+    lifecycle.requireSupplyChain();
+    lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
+    FinishedProduct existing = attachDetails(getById(id));
+    if (existing == null || !List.of("warehouse", "selling").contains(existing.getSourceStatus())) {
+      throw new IllegalArgumentException("当前状态不能修改成本价");
+    }
+    Map<Long, java.math.BigDecimal> current = sourceCosts(existing);
+    if (requested.size() != current.size() || !requested.keySet().equals(current.keySet())) {
+      throw new IllegalArgumentException("商品规格已变化，请刷新后重试");
+    }
+    for (java.math.BigDecimal cost : requested.values()) {
+      if (cost == null || cost.signum() < 0 || cost.stripTrailingZeros().scale() > 2) {
+        throw new IllegalArgumentException("请完善每个规格的成本价");
+      }
+    }
+    boolean changed = requested.entrySet().stream()
+        .anyMatch(entry -> current.get(entry.getKey()) == null
+            || current.get(entry.getKey()).compareTo(entry.getValue()) != 0);
+    if (!changed) { return existing; }
+    Map<String, Object> before = operationLogs.snapshot(existing);
+    requested.forEach((skuId, cost) -> {
+      int updated = jdbcTemplate.update(
+          "UPDATE finished_product_variants SET cost_price=? WHERE id=? AND finished_product_id=?",
+          cost, skuId, id);
+      if (updated != 1) { throw new IllegalArgumentException("商品规格已变化，请刷新后重试"); }
+    });
+    lifecycle.reprice(ProductLifecycleService.Kind.FINISHED, id, true);
+    FinishedProduct updated = attachDetails(getById(id));
+    operationLogs.record(updated, before, operationLogs.snapshot(updated));
     return updated;
   }
 

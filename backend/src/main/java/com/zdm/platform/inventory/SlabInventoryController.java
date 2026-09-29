@@ -7,6 +7,7 @@ import com.zdm.platform.media.MediaStorageService;
 import com.zdm.platform.media.MediaUploadResponse;
 import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -80,21 +81,21 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @GetMapping
   public ApiResponse<List<SlabInventory>> list() {
     permissionGuard.requireView(prefix());
-    return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()));
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()).stream().map(this::visiblePrices).toList());
   }
 
   @GetMapping("/{id}")
   public ApiResponse<SlabInventory> detail(@PathVariable Long id) {
     permissionGuard.requireView(prefix());
-    permissionGuard.requireAnyPermission(permission("warehouse", "detail"), permission("selling", "detail"),
+    permissionGuard.requireAnyPermission(permission("warehouse", "edit"), permission("selling", "edit"),
         permission("off-shelf", "detail"), permission("sold-out", "detail"), permission("recycle", "detail"));
     permissionGuard.requireDataPermission();
     SlabInventory item = service.visibleDetail(id);
     if (item == null) { throw new IllegalArgumentException("大板不存在或不可访问"); }
     String scope = statusScope(isSupplyChain() ? item.getSourceStatus() : item.getStatus());
     permissionGuard.requireAnyPermission(prefix() + ".view", permission(scope, "view"));
-    permissionGuard.requirePermission(permission(scope, "detail"));
-    return ApiResponse.ok(item);
+    permissionGuard.requirePermission(permission(scope, List.of("warehouse", "selling").contains(scope) ? "edit" : "detail"));
+    return ApiResponse.ok(visiblePrices(item));
   }
 
   @GetMapping("/operation-logs")
@@ -118,7 +119,7 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   public ApiResponse<SlabInventory> create(@Valid @RequestBody SlabInventory inventory) {
     permissionGuard.requireAnyPermission(permission("warehouse","publish"),permission("selling","publish"));
     if(isSupplyChain() && "selling".equals(inventory.getStatus()) && !"接口获取".equals(inventory.getPublisherType())) { permissionGuard.requireAnyPermission(permission("warehouse","shelf"),permission("selling","publish")); }
-    return ApiResponse.ok(service.createWithPrices(inventory));
+    return ApiResponse.ok(visiblePrices(service.createWithPrices(inventory)));
   }
 
   @Override
@@ -129,9 +130,31 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     if(existing==null) { throw new IllegalArgumentException("大板不存在"); }
     String scope = statusScope(isSupplyChain()?existing.getSourceStatus():existing.getStatus());
     if (!List.of("warehouse","selling").contains(scope)) { throw new IllegalArgumentException("当前状态不能编辑"); }
-    permissionGuard.requirePermission(permission(scope,isSupplyChain()?"edit":"price"));
+    permissionGuard.requirePermission(permission(scope,"edit"));
     if(isSupplyChain() && !Objects.equals(existing.getSourceStatus(),inventory.getStatus())) { requireStatusTransition(existing.getSourceStatus(),inventory.getStatus()); }
-    return ApiResponse.ok(service.updateWithPrices(id, inventory));
+    return ApiResponse.ok(visiblePrices(service.updateWithPrices(id, inventory)));
+  }
+
+  public record SourceCostRequest(BigDecimal costPrice) {}
+
+  @PutMapping("/{id}/source-cost")
+  public ApiResponse<SlabInventory> updateSourceCost(
+      @PathVariable Long id, @RequestBody SourceCostRequest request) {
+    if (!isSupplyChain()) {
+      throw new org.springframework.security.access.AccessDeniedException("此操作属于供应链协同系统");
+    }
+    permissionGuard.requireDataPermission();
+    SlabInventory existing = service.getById(id);
+    if (existing == null || "purged".equals(existing.getSourceStatus())) {
+      throw new IllegalArgumentException("大板不存在或已被删除");
+    }
+    permissionGuard.requireData(existing);
+    String scope = statusScope(existing.getSourceStatus());
+    permissionGuard.requirePermission(permission(scope, "edit"));
+    if (!List.of("warehouse", "selling").contains(scope)) {
+      throw new IllegalArgumentException("当前状态不能修改成本价");
+    }
+    return ApiResponse.ok(visiblePrices(service.updateSourceCost(id, request == null ? null : request.costPrice())));
   }
 
   public record ActionCheckRequest(List<Long> ids, String action) {
@@ -265,6 +288,14 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   }
 
   private boolean isSupplyChain() { return "supply-chain".equals(permissionGuard.identity().clientCode()); }
+  private SlabInventory visiblePrices(SlabInventory item) {
+    if (isSupplyChain() && item != null) {
+      item.setGuidePrice(null);
+      item.setGuidePriceCoefficient(null);
+      item.setMarkupPrices(List.of());
+    }
+    return item;
+  }
   private String prefix() { return (isSupplyChain()?"supply-chain.":"admin.")+"slab-management"; }
   private String permission(String scope, String action) {
     return prefix() + "." + scope + "." + action;

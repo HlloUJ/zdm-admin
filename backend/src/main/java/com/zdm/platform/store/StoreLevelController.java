@@ -40,7 +40,7 @@ public class StoreLevelController {
         "admin.product-data-center.markup-configuration.finished.create",
         "admin.product-data-center.markup-configuration.slab.view",
         "admin.product-data-center.markup-configuration.slab.create");
-    return ApiResponse.ok(permissionGuard.filterData(service.listEnabled()));
+    return ApiResponse.ok(permissionGuard.filterData(service.listOperationalPricing()));
   }
 
   @PostMapping

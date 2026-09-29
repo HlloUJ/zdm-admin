@@ -354,22 +354,21 @@ test('大板隐藏停用级别历史价格，启用级别缺失价格不预计�
 
   await page.goto('/slab-management');
   const row = page.getByRole('row', { name: /独立价格大板/ });
-  await row.getByText('价格', { exact: true }).click();
-  const drawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
+  await row.getByText('编辑', { exact: true }).click();
+  const drawer = page.locator('.slab-publish-page');
   await expect(drawer.getByText('历史门店级别', { exact: false })).toHaveCount(0);
   await expect(drawer.getByText('当前发布模板', { exact: true })).toHaveCount(0);
   await expect(drawer.locator('input[value="175.00"]')).toHaveCount(0);
 
   await page.reload();
-  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
-  await row.getByText('价格', { exact: true }).click();
+  await row.getByText('编辑', { exact: true }).click();
   await expect(drawer).toBeVisible();
-  const historicalRow = drawer.locator('.price-table__row').filter({ hasText: '历史门店级别' });
+  const historicalRow = drawer.locator('.price-editor__row').filter({ hasText: '历史门店级别' });
   await expect(historicalRow).toHaveCount(0);
-  const configuredCurrentLevel = drawer.locator('.price-table__row').filter({ hasText: '1级' });
+  const configuredCurrentLevel = drawer.locator('.price-editor__row').filter({ hasText: '1级' });
   await expect(configuredCurrentLevel.getByRole('textbox').first()).toHaveValue('1.20');
   await expect(configuredCurrentLevel.getByRole('textbox').last()).toHaveValue('');
-  const unconfiguredCurrentLevel = drawer.locator('.price-table__row').filter({ hasText: '2级' });
+  const unconfiguredCurrentLevel = drawer.locator('.price-editor__row').filter({ hasText: '2级' });
   await expect(unconfiguredCurrentLevel.getByRole('textbox').first()).toHaveValue('');
   await expect(unconfiguredCurrentLevel.getByRole('textbox').last()).toHaveValue('');
 });
@@ -459,10 +458,10 @@ test('大板缺少中间级别价格时仍按门店级别顺序展示', async ({
   await page.goto('/slab-management');
   await page
     .getByRole('row', { name: /缺失中间级别价格大板/ })
-    .getByText('价格', { exact: true })
+    .getByText('编辑', { exact: true })
     .click();
-  const drawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
-  const rows = drawer.locator('.price-table__row');
+  const drawer = page.locator('.slab-publish-page');
+  const rows = drawer.locator('.price-editor__row');
   await expect(rows).toHaveCount(5);
   await expect(rows.nth(2)).toContainText('1级');
   await expect(rows.nth(3)).toContainText('2级');

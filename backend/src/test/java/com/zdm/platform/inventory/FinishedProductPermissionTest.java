@@ -41,7 +41,8 @@ class FinishedProductPermissionTest {
     when(service.getById(1L)).thenReturn(product("selling"));
     sourceController("selling.edit").update(1L,request);
     verify(service).updateWithDetails(1L,request);
-    assertThatThrownBy(() -> controller("selling.edit").update(1L,request)).isInstanceOf(AccessDeniedException.class);
+    controller("selling.edit").update(1L,request);
+    verify(service).updateOperationWithDetails(1L,request,true);
   }
   @Test void statusPermissionsUseRestrictedUpdateAndRejectOtherOperations() {
     for (String permission : List.of("warehouse.shelf", "warehouse.batch-shelf")) {
@@ -57,10 +58,10 @@ class FinishedProductPermissionTest {
   @Test void priceCannotEditOtherFieldsOrChangeStatus() {
     when(service.getById(1L)).thenReturn(product("warehouse"));
     FinishedProduct request = product("warehouse");
-    controller("warehouse.price").update(1L, request);
+    controller("warehouse.edit").update(1L, request);
     verify(service).updateOperationWithDetails(1L, request, true);
     verify(service, never()).updateWithDetails(any(), any());
-    assertThatThrownBy(() -> controller("warehouse.price").update(1L, product("selling"))).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> controller("warehouse.edit").update(1L, product("selling"))).isInstanceOf(AccessDeniedException.class);
     when(service.getById(1L)).thenReturn(product("soldOut"));
     assertThatThrownBy(() -> controller("sold-out.price").update(1L, product("soldOut"))).isInstanceOf(AccessDeniedException.class);
   }

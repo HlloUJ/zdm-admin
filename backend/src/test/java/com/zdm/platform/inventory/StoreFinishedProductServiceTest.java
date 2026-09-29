@@ -2,6 +2,8 @@ package com.zdm.platform.inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.support.SpringContainerTestSupport;
@@ -10,17 +12,21 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest
+@AutoConfigureMockMvc(addFilters = false)
 @Testcontainers(disabledWithoutDocker = true)
 class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
@@ -30,6 +36,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Autowired private StoreFinishedPriceConfigurationService configurations;
   @Autowired private ProductLifecycleService lifecycle;
   @Autowired private FinishedProductService finishedProducts;
+  @Autowired private MockMvc mvc;
 
   @DynamicPropertySource
   static void datasource(DynamicPropertyRegistry registry) {
@@ -41,6 +48,27 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @AfterEach
   void clearIdentity() {
     SecurityContextHolder.clearContext();
+  }
+
+  @Test
+  @Transactional
+  void unavailablePurgeUsesVisibleTabGrantWhileOrdinaryRecycleStillNeedsPurgeGrant() throws Exception {
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,status) VALUES (99851,1,'权限测试门店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) VALUES (99851,'不可用商品',1,'selling','offShelf',FALSE),(99852,'正常商品',1,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO store_finished_products (id,tenant_id,store_id,finished_product_id,status,selected_by_account_id) VALUES (99851,1,99851,99851,'selling',1),(99852,1,99851,99852,'recycle',1)");
+
+    identityWithPermissions(99851L, "store.finished-stock-management.operation-log.view");
+    mvc.perform(delete("/api/admin/store-finished-products/99851")).andExpect(status().isForbidden());
+    identityWithPermissions(99851L, "store.finished-stock-management.warehouse.view");
+    mvc.perform(delete("/api/admin/store-finished-products/99851")).andExpect(status().isForbidden());
+    identityWithPermissions(99851L, "store.finished-stock-management.selling.view");
+    mvc.perform(delete("/api/admin/store-finished-products/99851")).andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_products WHERE id=99851", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=99851 AND operation_type='PURGE'", Long.class)).isEqualTo(1);
+
+    identityWithPermissions(99851L, "store.finished-stock-management.recycle.view");
+    mvc.perform(delete("/api/admin/store-finished-products/99852")).andExpect(status().isForbidden());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_products WHERE id=99852", Long.class)).isEqualTo(1);
   }
 
   @Test
@@ -63,14 +91,13 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     configurations.create(99802L, new BigDecimal("0.8000"));
     assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).price()).isEqualByComparingTo("80.00");
     products.saveRolePrice(listingId, 99811L, 99801L, new BigDecimal("50"), false);
-    products.saveGuidePrice(listingId, 99811L, new BigDecimal("140"));
     assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).price()).isEqualByComparingTo("50");
     assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).roleId()).isEqualTo(99801L);
     jdbc.update("UPDATE finished_product_prices SET price=200 WHERE finished_product_id=99801");
     jdbc.update("UPDATE finished_product_guide_prices SET price=170 WHERE finished_product_id=99801");
     var repriced = products.detail(listingId).skus().getFirst();
     assertThat(repriced.costPrice()).isEqualByComparingTo("200");
-    assertThat(repriced.guidePrice()).isEqualByComparingTo("140");
+    assertThat(repriced.guidePrice()).isEqualByComparingTo("170");
     assertThat(repriced.rolePrices().stream().filter(item -> item.roleId() == 99802L).findFirst().orElseThrow().price())
         .isEqualByComparingTo("160.00");
     assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).price()).isEqualByComparingTo("50");
@@ -111,7 +138,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
     identity(99831L);
     long historicalId = products.select(List.of(99831L)).getFirst().id();
-    products.saveGuidePrice(historicalId, 99841L, new BigDecimal("25"));
+    jdbc.update("INSERT INTO store_finished_guide_prices (listing_id,sku_id,manual_price,updated_by_account_id) VALUES (?,?,?,?)",
+        historicalId, 99841L, 25, 1);
     jdbc.update("INSERT INTO store_finished_role_price_overrides (listing_id,sku_id,role_id,manual_price,updated_by_account_id) VALUES (?,?,?,?,?)",
         historicalId, 99841L, 99831L, 12, 1);
     jdbc.update("UPDATE finished_products SET source_status='offShelf',status='recycle',operations_deleted=TRUE WHERE id=99831");
@@ -200,6 +228,13 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   private void identity(Long storeId) {
     CurrentIdentity identity = new CurrentIdentity(1L, 1L, 1L, null, "admin", 1L, storeId,
         "门店测试员工", "self", List.of("STORE_ADMIN"), List.of("self"));
+    SecurityContextHolder.getContext().setAuthentication(
+        new UsernamePasswordAuthenticationToken(identity, null, List.of()));
+  }
+
+  private void identityWithPermissions(Long storeId, String... permissions) {
+    CurrentIdentity identity = new CurrentIdentity(1L, 1L, 1L, null, "admin", 1L, storeId,
+        "门店测试员工", "self", List.of("STORE_ADMIN"), List.of(permissions));
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken(identity, null, List.of()));
   }

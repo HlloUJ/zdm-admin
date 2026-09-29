@@ -38,8 +38,11 @@ public class FinishedProductPriceService {
 
   public void requireCompletePrices(Long productId, List<FinishedProductVariant> variants) {
     List<FinishedProductPrice> prices = listPrices(productId);
-    Set<Long> expectedLevels = storeLevelDirectory.listEnabledLevels().stream()
+    Set<Long> expectedLevels = storeLevelDirectory.listOperationalPricingLevels().stream()
         .map(StoreLevelPricingDirectory.Level::id).collect(Collectors.toSet());
+    if (expectedLevels.isEmpty()) {
+      throw new IllegalArgumentException("请先在门店级别管理配置门店级别");
+    }
     for (FinishedProductVariant variant : variants) {
       List<FinishedProductPrice> skuPrices = prices.stream()
           .filter(price -> variant.getId().equals(price.getSkuId())
@@ -58,7 +61,7 @@ public class FinishedProductPriceService {
   public void replacePrices(Long productId, List<FinishedProductPrice> requestedPrices) {
     List<FinishedProductPrice> existingPrices = listPrices(productId);
     Map<Long, String> levelNames = new LinkedHashMap<>();
-    storeLevelDirectory.listEnabledLevels().forEach(level -> levelNames.put(level.id(), level.name()));
+    storeLevelDirectory.listOperationalPricingLevels().forEach(level -> levelNames.put(level.id(), level.name()));
     existingPrices.forEach(price -> {
       if (levelNames.containsKey(price.getStoreLevelId())) {
         levelNames.put(price.getStoreLevelId(), price.getStoreLevelName());

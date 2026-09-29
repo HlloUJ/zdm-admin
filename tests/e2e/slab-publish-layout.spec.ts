@@ -79,38 +79,57 @@ test('供应链编辑复用发布页三段表单并回填数据', async ({ page 
 });
 
 test('已上传视频点击空白区域打开播放器，删除后才允许重新上传', async ({ page }) => {
+  const videoSlab = {
+    id: 6,
+    name: '视频大板',
+    status: 'warehouse',
+    sourceStatus: 'warehouse',
+    mainImageUrl: '/test-slab.png',
+    mainImageMediaId: 41,
+    videoUrl: '/test-slab.mp4',
+    videoMediaId: 42,
+  };
   await page.route('**/api/admin/slabs', (route) =>
     route.fulfill({
       json: {
         code: 0,
-        data: [
-          {
-            id: 6,
-            name: '视频大板',
-            status: 'warehouse',
-            sourceStatus: 'warehouse',
-            videoUrl: '/test-slab.mp4',
-            videoMediaId: 42,
-          },
-        ],
+        data: [videoSlab],
       },
     }),
   );
+  await page.route('**/api/admin/slabs/6', (route) => route.fulfill({ json: { code: 0, data: videoSlab } }));
   await page.reload();
+  await page.setViewportSize({ width: 1280, height: 500 });
   await page
     .getByRole('row', { name: /视频大板/ })
     .getByText('编辑', { exact: true })
     .click();
   const dialog = page.locator('.slab-publish-page');
+  const image = dialog.getByRole('button', { name: '1:1主图', exact: true });
+  await image.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  const scrollBeforeImagePreview = await page.evaluate(() => window.scrollY);
+  expect(scrollBeforeImagePreview).toBeGreaterThan(0);
+  await image.click();
+  const imagePreview = page.locator('.t-dialog:visible').filter({ has: page.locator('img.upload-large-preview') });
+  await expect(imagePreview.locator('img.upload-large-preview')).toHaveAttribute('src', '/test-slab.png');
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforeImagePreview);
+  await imagePreview.locator('.t-dialog__close').click();
+  await expect(imagePreview).not.toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforeImagePreview);
   const box = dialog.locator('.admin-media-upload').filter({ hasText: '商品视频' });
+  await box.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  const scrollBeforePreview = await page.evaluate(() => window.scrollY);
+  expect(scrollBeforePreview).toBeGreaterThan(0);
   let choosers = 0;
   page.on('filechooser', () => choosers++);
   await box.click({ position: { x: 8, y: 80 } });
   const player = page.locator('video.upload-large-preview');
   await expect(player).toBeVisible();
   await expect(player).toHaveAttribute('src', '/test-slab.mp4');
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
   expect(choosers).toBe(0);
   await page.locator('.t-dialog:visible').filter({ has: player }).locator('.t-dialog__close').click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
   await box.getByRole('button', { name: '删除', exact: true }).click();
   await expect(box.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
   const chooser = page.waitForEvent('filechooser');

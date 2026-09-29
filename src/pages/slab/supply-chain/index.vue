@@ -489,6 +489,16 @@
               :label-width="isProductFormPage ? '116px' : '96px'"
               colon
             >
+              <t-form-item label="成本价" name="cost" required-mark>
+                <SpecPriceInput
+                  v-model="productForm.cost"
+                  label="成本价"
+                  placeholder="请输入"
+                  :submitted="productPriceSubmitted"
+                  :disabled="readonlyProductFields"
+                  @change="handleCostChange"
+                />
+              </t-form-item>
               <div :class="isProductFormPage ? undefined : 'dialog-form-grid'">
                 <t-form-item label="供应商" name="supplier" required-mark>
                   <t-select
@@ -528,76 +538,14 @@
                   />
                 </t-form-item>
               </div>
-
-              <div class="section-title">价格设置</div>
-              <div :key="productPriceSession" class="price-editor">
-                <div class="price-editor__head">
-                  <span>价格层级</span>
-                  <span><span class="price-required-star">*</span>价格系数</span>
-                  <span><span class="price-required-star">*</span>价格</span>
-                  <span />
-                </div>
-                <div class="price-editor__row">
-                  <span>成本价（基准）</span>
-                  <span>—</span>
-                  <SpecPriceInput
-                    v-model="productForm.cost"
-                    label="成本价"
-                    placeholder="请输入"
-                    :submitted="productPriceSubmitted"
-                    :disabled="readonlyProductFields"
-                    @change="handleCostChange"
-                  />
-                  <span />
-                </div>
-                <div class="price-editor__row">
-                  <span>指导价</span>
-                  <SpecPriceInput
-                    v-model="productForm.guideRatio"
-                    label="系数"
-                    placeholder="系数"
-                    :submitted="productPriceSubmitted"
-                    :disabled="productMode === 'view'"
-                    @change="handleGuideRatioChange"
-                  />
-                  <SpecPriceInput
-                    v-model="productForm.guidePrice"
-                    label="价格"
-                    placeholder="价格"
-                    :submitted="productPriceSubmitted"
-                    :disabled="productMode === 'view'"
-                    @change="handleGuidePriceChange"
-                  />
-                  <span />
-                </div>
-                <div v-for="item in partnerPriceRows" :key="item.id" class="price-editor__row">
-                  <span>{{ item.label }}</span>
-                  <SpecPriceInput
-                    v-model="productForm.markupPrices[item.id].ratio"
-                    label="系数"
-                    placeholder="系数"
-                    :submitted="productPriceSubmitted"
-                    :disabled="productMode === 'view'"
-                    @change="handlePartnerRatioChange(item.id)"
-                    @commit="markProductPriceManual(item.id)"
-                  />
-                  <SpecPriceInput
-                    v-model="productForm.markupPrices[item.id].price"
-                    label="价格"
-                    placeholder="价格"
-                    :submitted="productPriceSubmitted"
-                    :disabled="productMode === 'view'"
-                    @change="handlePartnerPriceChange(item.id)"
-                    @commit="markProductPriceManual(item.id)"
-                  />
-                  <PriceSourceToggle
-                    :source="productForm.markupPrices[item.id]?.priceSource"
-                    :available="hasActivePriceConfiguration(item.id)"
-                    :readonly="productMode === 'view' || saving"
-                    @toggle="toggleProductPriceSource(item.id)"
-                  />
-                </div>
-              </div>
+              <t-form-item v-if="isProductFormPage" label="上架" required-mark>
+                <t-radio-group v-model="publishTargetStatus">
+                  <t-radio value="selling" :disabled="!canPublishToShelf">立刻上架</t-radio>
+                  <t-radio value="warehouse" :disabled="productMode === 'edit' && editingSourceStatus === 'selling'"
+                    >暂不上架</t-radio
+                  >
+                </t-radio-group>
+              </t-form-item>
             </t-form>
           </template>
         </SlabProductFormLayout>
@@ -677,24 +625,6 @@
             <t-descriptions-item label="库存">{{ detailDrawerRow.stock ?? '-' }}</t-descriptions-item>
             <t-descriptions-item label="大板编号" :span="3">{{ detailDrawerRow.code }}</t-descriptions-item>
           </t-descriptions>
-          <t-table
-            class="detail-price-table"
-            row-key="label"
-            :data="detailPriceRows.filter((row) => row.label !== '成本价')"
-            :columns="[
-              { colKey: 'label', title: '价格层级' },
-              { colKey: 'ratio', title: '价格系数' },
-              { colKey: 'price', title: '价格' },
-            ]"
-            bordered
-          >
-            <template #price="{ row }">
-              <t-space align="center" size="small">
-                <span>{{ row.price }}</span>
-                <PriceSourceToggle v-if="row.priceSource" :source="row.priceSource" :available="false" readonly />
-              </t-space>
-            </template>
-          </t-table>
         </AdminSectionCard>
       </t-space>
     </t-drawer>
@@ -785,24 +715,10 @@
                     {{ row.after }}
                   </t-descriptions-item>
                 </t-descriptions>
-                <t-table
-                  class="operation-log-detail__prices"
-                  row-key="label"
-                  :data="creationLogPrices"
-                  :columns="creationLogPriceColumns"
-                  bordered
-                >
-                  <template #price="{ row }">
-                    <t-space align="center" size="small">
-                      <span>{{ row.price }}</span>
-                      <PriceSourceToggle v-if="row.priceSource" :source="row.priceSource" :available="false" readonly />
-                    </t-space>
-                  </template>
-                </t-table>
               </AdminSectionCard>
             </t-space>
           </template>
-          <template v-else-if="operationLogChangeRows.length">
+          <template v-else-if="operationLogChangeRows.length && operationLogDetail?.operationType !== 'OFF_SHELF'">
             <div class="operation-log-detail__section-title operation-log-detail__section-title--spaced">
               {{ operationLogIsCreate ? '创建时信息' : '变更对比' }}
               <t-tag theme="primary" variant="light">{{ operationLogChangeRows.length }} 项</t-tag>
@@ -901,59 +817,24 @@
       :footer="false"
       @close="closePriceDrawer"
     >
-      <div class="price-drawer-content">
+      <div class="price-drawer-content price-drawer-content--source">
         <div class="drawer-actions">
           <t-button v-if="!priceDrawerReadonly" theme="primary" block @click="saveBatchPrice">
             <template #icon><t-icon name="save" /></template>
             保存
           </t-button>
         </div>
-        <t-form ref="priceDrawerFormRef" :data="priceDrawerForm" class="price-drawer-form">
-          <div :key="drawerPriceSession" class="price-table">
-            <div class="price-table__head">
-              <span>价格层级</span>
-              <span><span class="price-required-star">*</span>价格系数</span>
-              <span><span class="price-required-star">*</span>价格</span>
-              <span />
-            </div>
-            <div
-              v-for="(row, index) in batchPriceRows"
-              :key="row.configurationId ?? row.label"
-              class="price-table__row"
-            >
-              <span>{{ row.label }}</span>
-              <span v-if="index === 0">—</span>
-              <SpecPriceInput
-                v-else
-                :model-value="row.ratio ?? ''"
-                label="系数"
-                placeholder="系数"
-                :submitted="drawerPriceSubmitted"
-                :disabled="priceDrawerReadonly || index === 0"
-                @update:model-value="row.ratio = $event"
-                @change="handleBatchRatioChange(index)"
-                @commit="markDrawerPriceManual(row)"
-              />
-              <SpecPriceInput
-                v-model="row.price"
-                label="价格"
-                placeholder="价格"
-                :submitted="drawerPriceSubmitted"
-                :disabled="priceDrawerReadonly || index === 0"
-                @change="handleBatchPriceChange(index)"
-                @commit="markDrawerPriceManual(row)"
-              />
-              <PriceSourceToggle
-                v-if="row.configurationId != null"
-                :source="row.priceSource"
-                :available="hasActivePriceConfiguration(row.configurationId)"
-                :readonly="priceDrawerReadonly || saving"
-                @toggle="toggleDrawerPriceSource(row)"
-              />
-              <span v-else />
-            </div>
-          </div>
-        </t-form>
+        <div class="source-cost-editor">
+          <span>成本价<span class="price-required-star">*</span></span>
+          <SpecPriceInput
+            v-if="batchPriceRows[0]"
+            v-model="batchPriceRows[0].price"
+            label="成本价"
+            placeholder="成本价"
+            :submitted="drawerPriceSubmitted"
+            :disabled="priceDrawerReadonly"
+          />
+        </div>
       </div>
     </t-drawer>
 
@@ -1057,13 +938,13 @@
 </template>
 
 <script setup lang="ts">
-import SlabProductFormLayout from './components/SlabProductFormLayout.vue';
+import SlabProductFormLayout from '../management/components/SlabProductFormLayout.vue';
 import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
 import SpecPriceInput from '@/pages/finished-stock/management/components/SpecPriceInput.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import SlabRowWarnings from './components/SlabRowWarnings.vue';
+import SlabRowWarnings from '../management/components/SlabRowWarnings.vue';
 import SourceUnavailableOverlay from '@/pages/finished-stock/management/components/SourceUnavailableOverlay.vue';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
 import ProductLogFieldValue from '@/components/product-logs/ProductLogFieldValue.vue';
@@ -1367,8 +1248,8 @@ const makeProductForm = (): ProductForm => ({
 });
 const activeTab = ref<SlabTab>('warehouse');
 const loginUser = computed(() => getLoginUser());
-const productPermissionPrefix = computed(() => `${'admin'}.slab-management`);
-const sourceBlocked = (row: SlabItem) => Boolean(row.sourceUnavailable);
+const productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);
+const sourceBlocked = (row: SlabItem) => false;
 const slabPermissionScope: Record<SlabTab, string> = {
   warehouse: 'warehouse',
   selling: 'selling',
@@ -1397,7 +1278,7 @@ const drawerPriceSubmitted = ref(false);
 const productPriceSession = ref(0);
 const drawerPriceSession = ref(0);
 const productMode = ref<ProductMode>('create');
-const readonlyProductFields = computed(() => productMode.value === 'view' || productMode.value === 'edit');
+const readonlyProductFields = computed(() => productMode.value === 'view');
 const isProductFormPage = computed(() => productDialogVisible.value && productMode.value !== 'view');
 const productLayoutRef = ref<InstanceType<typeof SlabProductFormLayout>>();
 const focusProductSection = (key: string) => {
@@ -1471,7 +1352,7 @@ const offShelfHistoryColumns: PrimaryTableCol<SlabOffShelfRecord>[] = [
   { colKey: 'offShelvedByName', title: '下架人', width: 110 },
   { colKey: 'offShelvedAt', title: '下架时间', width: 170 },
 ];
-const operationTypeOptions = computed(() => productLogFilterOptions('admin'));
+const operationTypeOptions = computed(() => productLogFilterOptions('supply-chain'));
 const toOperationLogRow = (row: SlabOperationLogRecord): ProductOperationLogRow => ({
   id: row.id,
   subjectName: row.slabName,
@@ -1804,32 +1685,17 @@ const creationLogSales = computed(() => {
 });
 const creationLogPriceColumns = computed(() => [
   { colKey: 'label', title: '价格层级' },
-  { colKey: 'coefficient', title: '价格系数' },
   { colKey: 'price', title: '价格' },
 ]);
 const creationLogPrices = computed(() => {
   if (!operationLogIsCreate.value) return [];
   const rows = operationLogChangeRows.value;
   const value = (field: string) => rows.find((row) => row.field === field)?.after ?? '未填写';
-  const tiers = rows.find((row) => row.field === '价格层级')?.priceTiers ?? [];
-  return [
-    { label: '指导价', coefficient: value('指导价系数'), price: value('指导价') },
-    ...tiers.map((tier) => ({
-      label: tier.label,
-      coefficient: tier.afterCoefficient,
-      price: tier.afterPrice,
-      priceSource:
-        value(`${tier.label}价格来源`) === '跟随配置'
-          ? ('auto' as const)
-          : value(`${tier.label}价格来源`) === '手工价格'
-            ? ('manual' as const)
-            : undefined,
-    })),
-  ];
+  return [{ label: '成本价', price: value('成本价') }];
 });
 const operationSourceLabel = (source: SlabOperationLogRecord['operationSource']) =>
   ({
-    MANUAL: '运营管理平台',
+    MANUAL: '供应链协同系统',
     EXTERNAL_API: '外部接口',
     SYSTEM: '系统任务',
     SUPPLY_CHAIN: '供应链协同系统',
@@ -1987,6 +1853,7 @@ const productAreaSquareMeter = computed(() => {
   return Number(((length * width) / 1000000).toFixed(2));
 });
 const toSlabItem = (record: SlabRecord): SlabItem => {
+  record = { ...record, status: record.sourceStatus as SlabRecord['status'] };
   const variety = varietyById(record.varietyId);
   const supplier = supplierById(record.supplierId);
   return {
@@ -2104,12 +1971,12 @@ const loadSlabs = async () => {
     const [records, publishOptionsResult, markupResult, guideSetting] = await Promise.all([
       listSlabs(),
       getSlabPublishOptions(),
-      listSlabMarkupConfigurationOptions(),
-      getSlabGuidePriceSetting(),
+      Promise.resolve([]),
+      Promise.resolve(undefined),
     ]);
     Object.assign(publishOptions, publishOptionsResult);
     markupConfigurations.value = markupResult;
-    guidePriceSettingCoefficient.value = guideSetting?.priceCoefficient;
+    guidePriceSettingCoefficient.value = undefined;
     tableData.value = records.map(toSlabItem);
     const selectableIds = new Set(tableData.value.filter((row) => !sourceBlocked(row)).map((row) => row.id));
     selectedKeys.value = selectedKeys.value.filter((id) => selectableIds.has(id));
@@ -2179,8 +2046,7 @@ const reasonFormRules = computed<Record<string, FormRule[]>>(() => ({
 const batchPriceRows = reactive<DrawerPriceRow[]>([]);
 const priceDrawerForm = reactive({ rows: batchPriceRows });
 const priceDrawerSize = computed(() => {
-  const longestLabelLength = batchPriceRows.reduce((length, row) => Math.max(length, row.label.length), 0);
-  return `${Math.max(620, longestLabelLength * 16 + 430)}px`;
+  return 'min(calc(200px + 2 * var(--td-comp-paddingLR-l)), calc(100vw - 32px))';
 });
 const uploadItems: {
   key: UploadItemKey;
@@ -2446,7 +2312,9 @@ const pageAllSelected = computed(
 const pagePartiallySelected = computed(
   () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,
 );
-const priceDrawerReadonly = computed(() => activeTab.value === 'soldOut' || activeTab.value === 'recycle');
+const priceDrawerReadonly = computed(
+  () => activeTab.value === 'soldOut' || activeTab.value === 'recycle' || activeTab.value === 'offShelf',
+);
 const productDialogTitle = computed(() => {
   if (productMode.value === 'create') return '发布商品';
   if (productMode.value === 'edit') return '编辑商品';
@@ -2888,7 +2756,7 @@ const openProductEditor = async (row: SlabItem) => {
     const [latest, options, configurations] = await Promise.all([
       getSlabDetail(row.id),
       getSlabPublishOptions(),
-      listSlabMarkupConfigurationOptions(),
+      Promise.resolve([]),
     ]);
     Object.assign(publishOptions, options);
     markupConfigurations.value = configurations;
@@ -3118,51 +2986,6 @@ const handleProductSubmit = async () => {
     closeProductDialog();
     return;
   }
-  if (productMode.value === 'edit') {
-    const editingItem = tableData.value.find((item) => item.id === editingRowId.value);
-    if (!editingItem) return;
-    const validPrices =
-      isValidSalesNumber(productForm.cost, 0) &&
-      isValidSalesNumber(productForm.guideRatio, 0) &&
-      isValidSalesNumber(productForm.guidePrice, 0) &&
-      salesPriceRows.value.every((item) => {
-        const price = productForm.markupPrices[item.id];
-        return price && isValidSalesNumber(price.ratio, 0) && isValidSalesNumber(price.price, 0);
-      });
-    if (!validPrices) {
-      focusProductSection('sales');
-      adminFeedback.warning('请完善价格信息');
-      return;
-    }
-    const cost = toNumber(productForm.cost);
-    const payload: SlabPayload = {
-      name: editingItem.name,
-      serialNo: editingItem.code,
-      status: editingItem.status,
-      costPrice: cost,
-      guidePrice: toNumber(productForm.guidePrice),
-      guidePriceCoefficient: Number(toNumber(productForm.guideRatio).toFixed(4)),
-      markupPrices: salesPriceRows.value.map((item) => ({
-        storeLevelId: item.id,
-        priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
-        costPrice: cost,
-        price: toNumber(productForm.markupPrices[item.id].price),
-        priceSource: productForm.markupPrices[item.id].priceSource,
-        sourceConfigurationId: productForm.markupPrices[item.id].sourceConfigurationId,
-      })),
-    };
-    saving.value = true;
-    try {
-      upsertSlabItem(await updateSlab(editingItem.id, payload));
-      closeProductDialog();
-      adminFeedback.actionSuccess({ action: '保存', target: editingItem.name });
-    } catch (error) {
-      adminFeedback.actionError({ action: '保存', error, fallback: '请稍后重试', target: editingItem.name });
-    } finally {
-      saving.value = false;
-    }
-    return;
-  }
   const missingRequiredUploads = uploadItems.filter((item) => item.required && !uploadPreviews[item.key]);
   uploadItems.forEach((item) => {
     uploadErrors[item.key] = missingRequiredUploads.some((missingItem) => missingItem.key === item.key);
@@ -3194,18 +3017,9 @@ const handleProductSubmit = async () => {
     adminFeedback.warning('请完善基础信息');
     return;
   }
-  if (productMode.value === 'create' && guidePriceSettingCoefficient.value == null) {
-    focusProductSection('sales');
-    adminFeedback.warning('请先配置大板指导价默认价格系数');
-    return;
-  }
   const normalizedStock = String(productForm.stock ?? '').trim();
-  const hasInvalidSalesPrice = salesPriceRows.value.some((item) => {
-    const editor = productForm.markupPrices[item.id];
-    return !editor || !isValidSalesNumber(editor.ratio, 0) || !isValidSalesNumber(editor.price, 0);
-  });
-  const hasInvalidGuidePrice =
-    !isValidSalesNumber(productForm.guideRatio, 0) || !isValidSalesNumber(productForm.guidePrice, 0);
+  const hasInvalidSalesPrice = false;
+  const hasInvalidGuidePrice = false;
   const hasInvalidSalesInformation =
     !String(productForm.supplier ?? '').trim() ||
     !isValidSalesNumber(productForm.cost, 0) ||
@@ -3265,22 +3079,14 @@ const handleProductSubmit = async () => {
     corner4WidthMm: productForm.corner4Width ? toNumber(productForm.corner4Width) : undefined,
     areaSquareMeter: productAreaSquareMeter.value,
     costPrice: toNumber(productForm.cost),
-    guidePrice: toNumber(productForm.guidePrice),
-    guidePriceCoefficient: Number(toNumber(productForm.guideRatio).toFixed(4)),
-    markupPrices: salesPriceRows.value.map((item) => ({
-      storeLevelId: item.id,
-      priceCoefficient: Number(toNumber(productForm.markupPrices[item.id].ratio).toFixed(4)),
-      costPrice: toNumber(productForm.cost),
-      price: toNumber(productForm.markupPrices[item.id].price),
-      priceSource: productForm.markupPrices[item.id].priceSource,
-      sourceConfigurationId: productForm.markupPrices[item.id].sourceConfigurationId,
-      variantKey: '',
-    })),
-    status: editingItem?.status || publishTargetStatus.value,
+    guidePrice: undefined,
+    guidePriceCoefficient: undefined,
+    markupPrices: undefined,
+    status: publishTargetStatus.value,
   };
   saving.value = true;
   try {
-    if (editingItem) {
+    if (productMode.value === 'edit' && editingItem) {
       upsertSlabItem(await updateSlab(editingItem.id, payload));
     } else {
       upsertSlabItem(await createSlab(payload));
@@ -3400,11 +3206,8 @@ const shelfBlockingMessage = (row: SlabItem) => {
     return '请完善大板基础信息后再上架';
   }
   if (!row.supplierId) return '请完善大板销售信息后再上架';
-  if (!isValidSalesNumber(row.price.cost, 0) || !isValidSalesNumber(row.price.guide, 0)) {
+  if (!isValidSalesNumber(row.price.cost, 0)) {
     return '请完善大板价格后再上架';
-  }
-  if (!(row.markupPrices ?? []).length) {
-    return '请完善全部大板价格后再上架';
   }
   return '';
 };
@@ -3480,12 +3283,6 @@ const handleBatchAction = async (action: BatchAction) => {
   openConfirm('clearRecycle', null, '清空后所有回收站大板将无法恢复，是否清空回收站？');
 };
 const handleRowAction = async (action: RowAction, row: SlabItem) => {
-  if (!sourceBlocked(row)) {
-    await loadSlabs();
-    const latest = tableData.value.find((item) => item.id === row.id);
-    if (!latest || sourceBlocked(latest)) return;
-    row = latest;
-  }
   if (sourceBlocked(row) && !['purge', 'detail'].includes(action)) return;
   if (['shelf', 'offShelf', 'restore', 'delete', 'purge'].includes(action)) {
     if (
@@ -3573,44 +3370,7 @@ const handleConfirmSubmit = async () => {
     if (type === 'savePrice' && row) {
       const costPrice = toNumber(batchPriceRows[0]?.price ?? '');
       {
-        const nextMarkupPrices: SlabPrice[] = batchPriceRows
-          .slice(1)
-          .filter(
-            (
-              item,
-            ): item is DrawerPriceRow & {
-              configurationId: number;
-            } => item.configurationId != null,
-          )
-          .map((item) => ({
-            storeLevelId: item.configurationId,
-            priceCoefficient: Number(toNumber(item.ratio ?? '').toFixed(4)),
-            costPrice,
-            price: toNumber(item.price),
-            priceSource: item.priceSource,
-            sourceConfigurationId: item.sourceConfigurationId,
-            variantKey: '',
-          }));
-        const guidePrice = batchPriceRows.find((item) => item.label === '指导价')?.price;
-        const guidePriceCoefficient = batchPriceRows.find((item) => item.label === '指导价')?.ratio;
-        const nextPrice = {
-          cost: String(costPrice),
-          guide: guidePrice == null ? row.price.guide : String(toNumber(guidePrice)),
-          level1: row.price.level1,
-          level2: row.price.level2,
-          level3: row.price.level3,
-        };
-        upsertSlabItem(
-          await updateSlab(
-            row.id,
-            toSlabPayload(row, {
-              price: nextPrice,
-              guidePriceCoefficient:
-                guidePriceCoefficient == null ? row.guidePriceCoefficient : toNumber(guidePriceCoefficient),
-              markupPrices: nextMarkupPrices,
-            }),
-          ),
-        );
+        upsertSlabItem(await updateSlabSourceCost(row.id, costPrice));
         closePriceDrawer();
       }
     }
@@ -3804,9 +3564,7 @@ const closePriceDrawer = () => {
 const saveBatchPrice = async () => {
   if (priceDrawerReadonly.value || saving.value) return;
   drawerPriceSubmitted.value = true;
-  const hasInvalidPrice = batchPriceRows.some(
-    (row, index) => !isValidSalesNumber(row.price, 0) || (index > 0 && !isValidSalesNumber(row.ratio, 0)),
-  );
+  const hasInvalidPrice = !isValidSalesNumber(batchPriceRows[0]?.price ?? '', 0);
   if (hasInvalidPrice) {
     await priceDrawerFormRef.value?.validate({ trigger: 'all', showErrorMessage: true });
     adminFeedback.warning('请完善价格信息');

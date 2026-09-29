@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zdm.platform.security.CurrentIdentity;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -104,7 +105,10 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     jdbc.update("INSERT INTO product_categories (id,name,scope,created_by_account_id) VALUES (99001,'测试分类','finished',1)");
     jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id,created_by_account_id) VALUES (99001,'测试供应商','platform',0,1)");
     jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99001,2)");
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99550,'运营测试级别',1,'enabled')");
+    jdbc.update("INSERT INTO finished_markup_configurations (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order) VALUES (99550,'运营测试级别',99550,1.5,'enabled',false,1)");
     jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
     identityFor("supply-chain","all", "warehouse.view", "warehouse.publish", "warehouse.shelf");
     long image = upload("image/png", "test.png");
@@ -121,11 +125,11 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     String storedDetail = jdbc.queryForObject("SELECT detail FROM finished_products WHERE id=?", String.class, id);
     assertThat(storedDetail).contains("media:" + image, "media:" + video).doesNotContain("/api/open/media/");
     var mediaReferences = jdbc.queryForList("SELECT field_key,media_id FROM media_references WHERE business_domain='FINISHED_PRODUCT' AND business_id=? ORDER BY field_key", id);
-    ObjectNode request = created.deepCopy();
+    ObjectNode request = (ObjectNode) operationRecord(id);
     request.put("name", "夹带名称").put("detail", "<p>夹带详情</p>").put("totalStock", 999);
     ((ObjectNode) request.path("variants").get(0)).put("stock", 999);
     ((ObjectNode) request.path("guidePrices").get(0)).put("priceCoefficient", 3).put("price", 30);
-    identity("all", "warehouse.view", "warehouse.price");
+    identity("all", "warehouse.view", "warehouse.edit");
     JsonNode priced = data(mvc.perform(put("/api/admin/finished-products/{id}", id).contentType("application/json").content(json.writeValueAsBytes(request))));
     assertThat(priced.path("name").asText()).isEqualTo("原始商品");
     assertThat(priced.path("totalStock").asInt()).isEqualTo(5);
@@ -213,7 +217,7 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
       sqlSession.clearCache();
       identity("all", state[1] + ".view");
       mvc.perform(get("/api/admin/finished-products/{id}", id)).andExpect(status().isForbidden());
-      identity("all", state[1] + ".detail", state[1] + ".view");
+      identity("all", state[1] + (List.of("warehouse", "selling").contains(state[1]) ? ".edit" : ".detail"), state[1] + ".view");
       JsonNode detail = data(mvc.perform(get("/api/admin/finished-products/{id}", id)));
       assertThat(detail.path("id").asLong()).isEqualTo(id);
       assertThat(detail.path("variants").size()).isEqualTo(1);
@@ -223,7 +227,7 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     }
     jdbc.update("UPDATE finished_products SET status='warehouse', source_status='offShelf' WHERE id=?", id);
     sqlSession.clearCache();
-    identity("self", "warehouse.view", "warehouse.detail");
+    identity("self", "warehouse.view", "warehouse.edit");
     mvc.perform(get("/api/admin/finished-products/{id}", id)).andExpect(status().isOk())
         .andExpect(jsonPath("$.data.sourceUnavailable").value(true));
     jdbc.update("UPDATE finished_products SET source_status='purged' WHERE id=?", id);
@@ -236,7 +240,7 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
       fullIdentity(client);
       mvc.perform(get("/api/admin/finished-products/{id}", id)).andExpect(status().isForbidden());
     }
-    identity("all", "warehouse.view", "warehouse.detail");
+    identity("all", "warehouse.view", "warehouse.edit");
     jdbc.update("UPDATE finished_products SET operations_deleted=1 WHERE id=?", id);
     sqlSession.clearCache();
     mvc.perform(get("/api/admin/finished-products/{id}", id)).andExpect(status().isBadRequest());
@@ -258,14 +262,16 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     product.put("status", "selling");
     long productId = product.path("id").asLong();
     long skuId = product.path("variants").get(0).path("id").asLong();
-    assertThat(product.path("guidePrices").get(0).path("skuId").asLong()).isEqualTo(skuId);
+    assertThat(product.path("guidePrices").size()).isZero();
+    assertThat(operationRecord(productId).path("guidePrices").get(0).path("skuId").asLong()).isEqualTo(skuId);
     ((ObjectNode) product.path("variants").get(0)).put("variantLabel", "修改后的规格").put("stock", 7);
     fullIdentity("supply-chain");
     ObjectNode updated = (ObjectNode)data(mvc.perform(put("/api/admin/finished-products/{id}", productId)
         .contentType("application/json").content(json.writeValueAsBytes(product))));
     assertThat(updated.path("variants").get(0).path("id").asLong()).isEqualTo(skuId);
-    assertThat(updated.path("guidePrices").get(0).path("skuId").asLong()).isEqualTo(skuId);
-    assertThat(updated.path("guidePrices").get(0).path("variantLabel").asText()).isEqualTo("修改后的规格");
+    assertThat(updated.path("guidePrices").size()).isZero();
+    assertThat(operationRecord(productId).path("guidePrices").get(0).path("skuId").asLong()).isEqualTo(skuId);
+    assertThat(operationRecord(productId).path("guidePrices").get(0).path("variantLabel").asText()).isEqualTo("修改后的规格");
     // New rows receive fresh IDs without replacing existing rows.
     ObjectNode added = updated.withArray("variants").addObject();
     added.put("variantLabel", "新增规格").put("displayMode", "single").put("stock", 2).put("costPrice", 20);
@@ -275,7 +281,8 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
         .contentType("application/json").content(json.writeValueAsBytes(updated))));
     long newSkuId = updated.path("variants").get(1).path("id").asLong();
     assertThat(newSkuId).isNotEqualTo(skuId).isPositive();
-    assertThat(updated.path("guidePrices").size()).isEqualTo(2);
+    assertThat(updated.path("guidePrices").size()).isZero();
+    assertThat(operationRecord(productId).path("guidePrices").size()).isEqualTo(2);
     assertThat(updated.path("variants").get(0).path("id").asLong()).isEqualTo(skuId);
     updated.put("status", "selling");
     ObjectNode invalid = updated.deepCopy();
@@ -299,10 +306,10 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     assertThat(removed.path("variants").get(0).path("id").asLong()).isEqualTo(skuId);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_product_guide_prices WHERE sku_id=?",Long.class,newSkuId)).isZero();
     fullIdentity("admin");
-    ((ObjectNode)removed.path("guidePrices").get(0)).put("skuId",99199);
+    ((ObjectNode)removed.withArray("guidePrices").addObject()).put("skuId",99199);
     removed.put("status", "warehouse");
     mvc.perform(put("/api/admin/finished-products/{id}", productId).contentType("application/json")
-        .content(json.writeValueAsBytes(removed))).andExpect(status().isForbidden());
+        .content(json.writeValueAsBytes(removed))).andExpect(status().isBadRequest());
   }
 
   @org.junit.jupiter.params.ParameterizedTest
@@ -382,6 +389,44 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=?",String.class,id)).isEqualTo("selling");
   }
 
+  @Test
+  void supplyChainShelfAndCostEditDoNotRequireOperationsPricing() throws Exception {
+    ObjectNode created = sourceFixture("平台发布", "warehouse");
+    long id = created.path("id").asLong();
+    long skuId = created.path("variants").get(0).path("id").asLong();
+    jdbc.update("DELETE FROM finished_guide_price_settings");
+    jdbc.update("DELETE FROM finished_markup_configurations");
+    sourceStatus(id, "selling");
+    assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?", String.class, id)).isEqualTo("selling");
+    assertThat(jdbc.queryForObject("SELECT guide_price FROM finished_products WHERE id=?", BigDecimal.class, id)).isNull();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_product_guide_prices WHERE finished_product_id=?", Long.class, id)).isZero();
+    identityFor("supply-chain", "all", "selling.view", "selling.edit");
+    mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id).contentType("application/json")
+        .content("{\"variants\":[{\"skuId\":" + skuId + ",\"costPrice\":21}]}"))
+        .andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT cost_price FROM finished_product_variants WHERE id=?", BigDecimal.class, skuId))
+        .isEqualByComparingTo("21");
+    identity("all", "warehouse.view", "warehouse.shelf");
+    mvc.perform(post("/api/admin/finished-products/{id}/shelf-check", id))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("请完善每条规格的指导价后再上架"));
+  }
+
+  @Test
+  void supplyChainCanCreateAlreadyShelvedProductWithoutOperationsPricing() throws Exception {
+    long id = sourceFixture("平台发布", "selling", false).path("id").asLong();
+    assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?", String.class, id)).isEqualTo("selling");
+    assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=?", String.class, id)).isEqualTo("warehouse");
+    assertThat(jdbc.queryForObject("SELECT guide_price FROM finished_products WHERE id=?", BigDecimal.class, id)).isNull();
+  }
+
+  @Test
+  void operationsShelfRequiresAtLeastOneEnabledStoreLevel() throws Exception {
+    long id = sourceFixture("平台发布", "selling").path("id").asLong();
+    identity("all", "warehouse.view", "warehouse.shelf");
+    mvc.perform(post("/api/admin/finished-products/{id}/shelf-check", id))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("请先在门店级别管理配置门店级别"));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"guide", "cost", "stock", "image", "category"})
   void operationsShelfRejectsIncompleteProductInformation(String missing) throws Exception {
@@ -420,12 +465,42 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     mvc.perform(post("/api/admin/finished-products/{id}/shelf-check",id)).andExpect(status().isForbidden());
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"warehouse", "selling"})
+  void sourcePublishAndLaterShelfHaveDistinctLogs(String initialStatus) throws Exception {
+    long id = sourceFixture("平台发布", initialStatus).path("id").asLong();
+    assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?", String.class, id))
+        .isEqualTo(initialStatus);
+    assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=? AND business_client_code='supply-chain' ORDER BY id", String.class, id))
+        .containsExactly("CREATE");
+    assertThat(jdbc.queryForObject("SELECT after_status FROM finished_operation_logs WHERE product_id=? AND business_client_code='supply-chain' AND operation_type='CREATE'", String.class, id))
+        .isEqualTo(initialStatus);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=? AND business_client_code='admin' AND operation_type='SOURCE_SHELF'", Long.class, id))
+        .isEqualTo("selling".equals(initialStatus) ? 1L : 0L);
+
+    if ("warehouse".equals(initialStatus)) {
+      sourceStatus(id, "selling");
+      assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=? AND business_client_code='supply-chain' ORDER BY id", String.class, id))
+          .containsExactly("CREATE", "SHELF");
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=? AND business_client_code='admin' AND operation_type='SOURCE_SHELF'", Long.class, id))
+          .isEqualTo(1L);
+    }
+  }
+
   private ObjectNode sourceFixture(String publisher,String status) throws Exception {
+    return sourceFixture(publisher, status, true);
+  }
+  private ObjectNode sourceFixture(String publisher,String status,boolean configureGuide) throws Exception {
     jdbc.update("INSERT INTO product_categories (id,name,scope,created_by_account_id) VALUES (99010,'跨端测试分类','finished',1)");
     jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id,created_by_account_id) VALUES (99010,'跨端测试供应商','platform',0,1)");
     jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99010,2)");
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
-    jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    if (configureGuide) {
+      jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    } else {
+      jdbc.update("DELETE FROM finished_guide_price_settings");
+    }
     fullIdentity("supply-chain");
     ObjectNode payload=(ObjectNode)json.readTree("""
         {"name":"跨端商品","categoryId":99010,"supplierId":99010,"detail":"<p>待核对商品资料</p>",
@@ -449,8 +524,44 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     ObjectNode row=sourceRecord(id);row.put("status",target).put("offShelfReason","库存异常");
     data(mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))));
   }
+  @Test void sourcePricePermissionOnlyChangesWarehouseAndSellingCosts() throws Exception {
+    ObjectNode created = sourceFixture("平台发布", "warehouse");
+    long id = created.path("id").asLong();
+    long skuId = created.path("variants").get(0).path("id").asLong();
+    for (String[] state : new String[][] {{"warehouse", "warehouse"}, {"selling", "selling"}}) {
+      jdbc.update("UPDATE finished_products SET source_status=? WHERE id=?", state[0], id);
+      sqlSession.clearCache();
+      String payload = "{\"variants\":[{\"skuId\":" + skuId + ",\"costPrice\":21}],\"name\":\"夹带名称\"}";
+      identityFor("supply-chain", "all", state[1] + ".view", state[1] + ".price");
+      mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id)
+          .contentType("application/json").content(payload)).andExpect(status().isForbidden());
+      identityFor("supply-chain", "all", state[1] + ".view", state[1] + ".edit");
+      mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id)
+          .contentType("application/json").content(payload)).andExpect(status().isOk());
+      assertThat(jdbc.queryForObject("SELECT cost_price FROM finished_product_variants WHERE id=?", BigDecimal.class, skuId))
+          .isEqualByComparingTo("21");
+      assertThat(jdbc.queryForObject("SELECT name FROM finished_products WHERE id=?", String.class, id)).isEqualTo("跨端商品");
+      assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?", String.class, id)).isEqualTo(state[0]);
+    }
+    jdbc.update("UPDATE finished_products SET source_status='offShelf' WHERE id=?", id);
+    sqlSession.clearCache();
+    identityFor("supply-chain", "all", "off-shelf.view", "off-shelf.edit");
+    mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id)
+        .contentType("application/json").content("{\"variants\":[{\"skuId\":" + skuId + ",\"costPrice\":22}]}"))
+        .andExpect(status().isBadRequest());
+    assertThat(jdbc.queryForObject("SELECT cost_price FROM finished_product_variants WHERE id=?", BigDecimal.class, skuId))
+        .isEqualByComparingTo("21");
+    jdbc.update("UPDATE finished_products SET source_status='soldOut' WHERE id=?", id);
+    sqlSession.clearCache();
+    identityFor("supply-chain", "all", "sold-out.view", "sold-out.edit");
+    mvc.perform(put("/api/admin/finished-products/{id}/source-costs", id)
+        .contentType("application/json").content("{\"variants\":[{\"skuId\":" + skuId + ",\"costPrice\":22}]}"))
+        .andExpect(status().isBadRequest());
+  }
   @Test void publicationGateAndIndependentLifecyclesSurviveDeletionAndRepublication() throws Exception {
     long id=sourceFixture("平台发布","warehouse").path("id").asLong();
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99550,'运营测试级别',1,'enabled')");
+    jdbc.update("INSERT INTO finished_markup_configurations (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order) VALUES (99550,'运营测试级别',99550,1.5,'enabled',false,1)");
     assertThat(operationRecord(id)).isNull();
     sourceStatus(id,"selling");
     ObjectNode ops=(ObjectNode)operationRecord(id);

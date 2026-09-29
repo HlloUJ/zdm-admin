@@ -39,6 +39,7 @@ class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
   @Autowired private FinishedProductPriceService prices;
   @Autowired private FinishedPriceConfigurationSyncService sync;
   @Autowired private FinishedMarkupConfigurationMapper configurations;
+  @Autowired private com.zdm.platform.store.StoreLevelService storeLevels;
   private final String token = "Bearer " + TokenAuthenticationFilter.createAccountToken(1L);
   @DynamicPropertySource static void datasource(DynamicPropertyRegistry registry) {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -47,7 +48,40 @@ class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
   }
 
   @Test
+  @org.springframework.transaction.annotation.Transactional
+  void disabledLevelAssignedToStoreStillPricesNewFinishedProducts() {
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
+    jdbc.update("UPDATE store_levels SET status='disabled'");
+    jdbc.update("INSERT INTO store_levels (id,name,status,sort_order) VALUES (99407,'已有门店级别','enabled',1)");
+    jdbc.update("UPDATE stores SET store_level_id=99407 WHERE id=1");
+    jdbc.update("INSERT INTO finished_markup_configurations (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order) VALUES (99407,'已有门店级别',99407,1.5,'enabled',false,1)");
+    jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
+    authenticateDirectService();
+    storeLevels.updateStatus(99407L, "disabled");
+    assertThat(storeLevels.listEnabledLevels()).extracting(com.zdm.platform.common.StoreLevelPricingDirectory.Level::id)
+        .doesNotContain(99407L);
+    assertThat(storeLevels.listOperationalPricingLevels()).extracting(com.zdm.platform.common.StoreLevelPricingDirectory.Level::id)
+        .contains(99407L);
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> storeLevels.requireEnabled(99407L))
+        .hasMessage("门店级别已停用");
+
+    jdbc.update("INSERT INTO finished_products (id,name,sku,source_status,status,operations_deleted,created_by_account_id) VALUES (99407,'停用后新成品','disabled-still-served','selling','warehouse',FALSE,1)");
+    jdbc.update("INSERT INTO finished_product_variants (id,finished_product_id,variant_label,stock,cost_price) VALUES (99471,99407,'规格A',1,20)");
+    authenticateSupplyChain();
+    lifecycle.reprice(ProductLifecycleService.Kind.FINISHED, 99407L, false);
+    assertThat(jdbc.queryForObject("SELECT price FROM finished_product_prices WHERE finished_product_id=99407 AND store_level_id=99407", BigDecimal.class))
+        .isEqualByComparingTo("30");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stores store JOIN finished_product_prices price ON price.store_level_id=store.store_level_id WHERE store.id=1 AND price.finished_product_id=99407", Long.class))
+        .isEqualTo(1L);
+    FinishedProductVariant variant = new FinishedProductVariant();
+    variant.setId(99471L);
+    prices.requireCompletePrices(99407L, List.of(variant));
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
   void followsOnlyAutoPricesAndFreezesDisabledConfiguration() throws Exception {
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status = 'disabled'");
     jdbc.update("INSERT INTO store_levels (id, name, sort_order) VALUES (99101, '来源测试级别', 1)");
     jdbc.update("INSERT INTO finished_products (id, name, sku) VALUES (99101, '来源测试商品', 'source-test')");
@@ -345,6 +379,7 @@ class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
   @Test
   @org.springframework.transaction.annotation.Transactional
   void disabledStoreLevelKeepsHistoricalPriceOutsideCurrentPricing() {
+    jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
     jdbc.update("INSERT INTO store_levels (id,name,status,sort_order) VALUES (99405,'已停用四级','disabled',1),(99406,'启用级别','enabled',2)");
     jdbc.update("INSERT INTO finished_markup_configurations (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order) VALUES (99405,'已停用四级',99405,1.4,'enabled',false,1),(99406,'启用级别',99406,2,'enabled',false,2)");

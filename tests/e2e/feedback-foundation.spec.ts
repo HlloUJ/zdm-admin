@@ -537,13 +537,12 @@ test('shows recycled slab prices without allowing edits', async ({ page }) => {
   await page.getByText('回收站 2', { exact: true }).click();
 
   const recycleRow = page.getByRole('row', { name: /回收站大板 07/ });
-  await recycleRow.getByText('价格', { exact: true }).click();
-  const priceDrawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
-  await expect(priceDrawer).toBeVisible();
-  await expect(priceDrawer.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
-  const priceInputs = priceDrawer.getByRole('textbox');
-  await expect(priceInputs.first()).toBeDisabled();
-  await expect(priceInputs.last()).toBeDisabled();
+  await recycleRow.getByText('详情', { exact: true }).click();
+  const detailDrawer = page.locator('.t-drawer').filter({ hasText: '大板详情' });
+  await expect(detailDrawer).toBeVisible();
+  await expect(detailDrawer.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+  await expect(recycleRow.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(recycleRow.getByText('价格', { exact: true })).toHaveCount(0);
 });
 
 test('restores the guide price coefficient from the slab independent price', async ({ page }) => {
@@ -588,12 +587,37 @@ test('restores the guide price coefficient from the slab independent price', asy
     });
   });
 
+  await page.route('**/api/admin/slabs/32', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          id: 32,
+          supplierId: 1,
+          varietyId: 1,
+          name: '宝格丽黑大板',
+          serialNo: 'SLAB-E2E-032',
+          warehouse: '云浮仓',
+          publisherType: '平台发布',
+          lengthMm: 3200,
+          widthMm: 1800,
+          thicknessMm: 18,
+          costPrice: 2000,
+          guidePrice: 100,
+          guidePriceCoefficient: 0.05,
+          markupPrices: [],
+          status: 'warehouse',
+          createdAt: '2026-08-24T16:06:28',
+        },
+      },
+    }),
+  );
+
   await page.goto('/slab-management');
   const slabRow = page.getByRole('row', { name: /宝格丽黑大板/ });
-  await slabRow.getByText('价格', { exact: true }).click();
+  await slabRow.getByText('编辑', { exact: true }).click();
 
-  const priceDrawer = page.locator('.t-drawer').filter({ hasText: '价格编辑器' });
-  const guideRow = priceDrawer.locator('.price-table__row').filter({ hasText: '指导价' });
+  const guideRow = page.locator('.slab-publish-page .price-editor__row').filter({ hasText: '指导价' });
   const guideInputs = guideRow.getByRole('textbox');
   await expect(guideInputs.nth(0)).toHaveValue('0.05');
   await expect(guideInputs.nth(1)).toHaveValue('100.00');
@@ -608,7 +632,7 @@ test('shows only assigned slab tabs and operations', async ({ page }) => {
         name: '回收站查看员',
         phone: '15926626949',
         roles: ['SLAB_RECYCLE_VIEWER'],
-        permissions: ['admin.slab-management.recycle.view', 'admin.slab-management.recycle.price'],
+        permissions: ['admin.slab-management.recycle.view', 'admin.slab-management.recycle.detail'],
         dataPermission: 'all',
       }),
     );
@@ -626,7 +650,7 @@ test('shows only assigned slab tabs and operations', async ({ page }) => {
   await expect(page.getByRole('row', { name: /雪花白大板 06/ })).toHaveCount(0);
   await expect(page.locator('.toolbar-buttons button')).toHaveCount(0);
   const recycleActions = page.getByRole('row', { name: /回收站大板 07/ }).locator('.table-actions .t-link');
-  expect((await recycleActions.allTextContents()).map((text) => text.trim())).toEqual(['价格']);
+  expect((await recycleActions.allTextContents()).map((text) => text.trim())).toEqual(['详情']);
 });
 
 test('places clear recycle after batch purge and permanently deletes every recycled slab', async ({ page }) => {

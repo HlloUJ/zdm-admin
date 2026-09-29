@@ -27,7 +27,9 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       + "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')"
       + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
       + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' WHEN 'purged' THEN 'SOURCE_PURGE'"
-      + " ELSE 'SOURCE_INTERNAL' END ELSE operation_type END";
+      + " ELSE 'SOURCE_INTERNAL' END "
+      + "WHEN operation_type='PRICE_UPDATE' AND operation_source='MANUAL' THEN 'UPDATE' "
+      + "ELSE operation_type END";
   private static final String EXTERNAL_API_SOURCE = "EXTERNAL_API";
   private static final Map<String, String> REFERENCE_TABLES = Map.of(
       "供应商ID", "suppliers",
@@ -86,6 +88,9 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
           SlabOperationLog record = BeanPropertyRowMapper.newInstance(SlabOperationLog.class).mapRow(rs, rowNum);
           if (record == null) { throw new IllegalStateException("大板操作日志映射失败"); }
           record.setOperationType(rs.getString("visible_operation_type"));
+          if ("UPDATE".equals(record.getOperationType()) && "PRICE_UPDATE".equals(rs.getString("operation_type"))) {
+            record.setOperationSummary("编辑商品");
+          }
           if ("PURGE".equals(record.getOperationType()) && record.getAfterStatus() == null) {
             record.setAfterStatus("purged");
           }

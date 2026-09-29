@@ -50,6 +50,40 @@ test('one tab hides rail and only grants requested row operation', async ({ page
   await expect(main.getByRole('radio', { name: '立刻上架', exact: true })).toBeDisabled();
   await expect(main.getByRole('radio', { name: '暂不上架', exact: true })).toBeEnabled();
 });
+for (const canViewPrice of [true, false]) {
+  test(`supply-chain off-shelf detail is ${canViewPrice ? 'read-only when granted' : 'hidden without permission'}`, async ({
+    page,
+  }) => {
+    await setup(
+      page,
+      [
+        'supply-chain.finished-stock-management.off-shelf.view',
+        'supply-chain.finished-stock-management.off-shelf.detail',
+        'supply-chain.finished-stock-management.off-shelf.restore',
+        'supply-chain.finished-stock-management.off-shelf.delete',
+        ...(canViewPrice ? ['supply-chain.finished-stock-management.off-shelf.price'] : []),
+      ],
+      'supply-chain',
+    );
+    const product = {
+      id: 72,
+      name: '已下架成本商品',
+      status: 'offShelf',
+      sourceStatus: 'offShelf',
+      totalStock: 1,
+      variants: [{ id: 821, variantLabel: '标准规格', displayMode: 'single', stock: 1, costPrice: 10 }],
+      guidePrices: [{ skuId: 821, price: 20, priceCoefficient: 2 }],
+      markupPrices: [],
+    };
+    await page.route('**/api/admin/finished-products', (route) =>
+      route.fulfill({ json: { code: 0, data: [product] } }),
+    );
+    await page.goto('/supply-chain/finished-stock-management');
+    const main = page.getByRole('main');
+    await expect(main.locator('.table-actions .t-link')).toHaveText(['详情', '放回仓库', '删除']);
+    await expect(main.locator('.table-actions').getByText('价格', { exact: true })).toHaveCount(0);
+  });
+}
 test('multiple tabs exclude unauthorized default and fall back to selling', async ({ page }) => {
   await setup(page, [prefix + 'selling.view', prefix + 'sold-out.view']);
   const formOptionsLoaded = page.waitForResponse(
@@ -80,8 +114,6 @@ test('log-only access does not expose unauthorized warehouse content', async ({ 
 });
 
 for (const [status, scope] of [
-  ['warehouse', 'warehouse'],
-  ['selling', 'selling'],
   ['offShelf', 'off-shelf'],
   ['soldOut', 'sold-out'],
   ['recycle', 'recycle'],
@@ -230,12 +262,11 @@ test('operations role catalog exposes detail permission for all five finished st
   for (const [index, label] of statusNames.entries()) {
     const statusRow = rows.nth(firstIndex + index + 1);
     await expect(statusRow.locator('.permission-tab-text')).toHaveText(label);
-    await expect(statusRow.getByText('详情', { exact: true })).toBeVisible();
+    await expect(statusRow.getByText(index < 2 ? '编辑' : '详情', { exact: true })).toBeVisible();
   }
   const listed = rows.nth(firstIndex + 2);
   await expect(listed.getByRole('checkbox', { name: '查看', exact: true })).toBeChecked();
-  await expect(listed.getByRole('checkbox', { name: '详情', exact: true })).toBeChecked();
-  await expect(listed.getByRole('checkbox', { name: '价格', exact: true })).not.toBeChecked();
+  await expect(listed.getByRole('checkbox', { name: '编辑', exact: true })).not.toBeChecked();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
 });
 
@@ -243,7 +274,7 @@ for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
   test(`source availability ${sourceStatus} keeps operations blocked and distinguishes permanent deletion`, async ({
     page,
   }, testInfo) => {
-    await setup(page, [prefix + 'selling.view', prefix + 'selling.detail', prefix + 'recycle.purge']);
+    await setup(page, [prefix + 'selling.view', prefix + 'selling.edit', prefix + 'recycle.purge']);
     const product = {
       id: 72,
       name: '来源状态验收商品',
