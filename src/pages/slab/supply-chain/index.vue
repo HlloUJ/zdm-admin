@@ -938,6 +938,11 @@
 </template>
 
 <script setup lang="ts">
+import {
+  formatSlabPriceTierChanges,
+  buildSlabPriceTierComparison,
+  type OperationLogPriceTierRow,
+} from '../shared/operationLogPriceTiers';
 import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import SlabProductFormLayout from '../management/components/SlabProductFormLayout.vue';
 import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
@@ -1043,16 +1048,6 @@ interface OperationLogChangeRow {
   mediaType?: 'image' | 'video';
   afterMedia?: OperationLogMediaValue;
   beforeMedia?: OperationLogMediaValue;
-}
-interface OperationLogPriceTierRow {
-  key: string;
-  label: string;
-  beforeCoefficient: string;
-  beforePrice: string;
-  afterCoefficient: string;
-  afterPrice: string;
-  beforeSource?: 'auto' | 'manual';
-  afterSource?: 'auto' | 'manual';
 }
 interface OperationLogMediaValue {
   available: boolean;
@@ -1375,35 +1370,7 @@ const operationLogSourceLabel = (row: ProductOperationLogRow) =>
   operationSourceLabel((row.operationSource || 'MANUAL') as SlabOperationLogRecord['operationSource']);
 const operationLogShowReason = (row: ProductOperationLogRow) =>
   !['SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'].includes(row.operationType);
-const formatPriceTierChanges = (value: unknown): string | null => {
-  if (!Array.isArray(value)) return null;
-  return value
-    .map((item) => {
-      if (!item || typeof item !== 'object') return String(item ?? '-');
-      const price = item as {
-        configurationId?: number;
-        storeLevelId?: number;
-        storeLevelName?: string;
-        priceCoefficient?: number;
-        markupRate?: number;
-        price?: number;
-      };
-      const levelId = price.storeLevelId ?? price.configurationId;
-      const label =
-        price.storeLevelName ||
-        markupConfigurations.value.find((configuration) => configuration.storeLevelId === levelId)?.name ||
-        `门店级别 ${levelId ?? '-'}`;
-      const coefficient =
-        price.priceCoefficient == null
-          ? price.markupRate == null
-            ? '-'
-            : (1 + Number(price.markupRate) / 100).toFixed(2)
-          : Number(price.priceCoefficient).toFixed(2);
-      const formattedPrice = price.price == null ? '-' : Number(price.price).toFixed(2);
-      return `${label}：价格系数 ${coefficient}，价格 ${formattedPrice}`;
-    })
-    .join('；');
-};
+const formatPriceTierChanges = (value: unknown) => formatSlabPriceTierChanges(value, markupConfigurations.value);
 const formatOperationValue = (value: unknown, field?: string): string => {
   if (value == null || value === '') return '未填写';
   if (field === '状态' || field === '来源状态') return operationStatusLabels[value as SlabStatus] || String(value);
@@ -1411,59 +1378,8 @@ const formatOperationValue = (value: unknown, field?: string): string => {
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 };
-const normalizePriceTierChanges = (value: unknown) => {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((item) => {
-    if (!item || typeof item !== 'object') return [];
-    const price = item as {
-      configurationId?: number;
-      storeLevelId?: number;
-      storeLevelName?: string;
-      priceCoefficient?: number;
-      markupRate?: number;
-      price?: number;
-      priceSource?: 'auto' | 'manual';
-    };
-    const levelId = price.storeLevelId ?? price.configurationId;
-    const key = String(levelId ?? 'unknown');
-    return [
-      {
-        key,
-        source: price.priceSource,
-        label:
-          price.storeLevelName ||
-          markupConfigurations.value.find((configuration) => configuration.storeLevelId === levelId)?.name ||
-          `门店级别 ${levelId ?? '-'}`,
-        coefficient:
-          price.priceCoefficient == null
-            ? price.markupRate == null
-              ? '未填写'
-              : (1 + Number(price.markupRate) / 100).toFixed(2)
-            : Number(price.priceCoefficient).toFixed(2),
-        price: price.price == null ? '未填写' : Number(price.price).toFixed(2),
-      },
-    ];
-  });
-};
-const buildPriceTierComparison = (before: unknown, after: unknown): OperationLogPriceTierRow[] => {
-  const beforeTiers = normalizePriceTierChanges(before);
-  const afterTiers = normalizePriceTierChanges(after);
-  const keys = [...new Set([...beforeTiers.map((item) => item.key), ...afterTiers.map((item) => item.key)])];
-  return keys.map((key) => {
-    const beforeTier = beforeTiers.find((item) => item.key === key);
-    const afterTier = afterTiers.find((item) => item.key === key);
-    return {
-      key,
-      label: afterTier?.label || beforeTier?.label || `价格层级 ${key}`,
-      beforeCoefficient: beforeTier?.coefficient || '未填写',
-      beforePrice: beforeTier?.price || '未填写',
-      afterCoefficient: afterTier?.coefficient || '未填写',
-      afterPrice: afterTier?.price || '未填写',
-      beforeSource: beforeTier?.source,
-      afterSource: afterTier?.source,
-    };
-  });
-};
+const buildPriceTierComparison = (before: unknown, after: unknown) =>
+  buildSlabPriceTierComparison(before, after, markupConfigurations.value);
 const operationLogReferenceLabels: Record<string, string> = {
   供应商ID: '供应商',
   品种ID: '品种',
