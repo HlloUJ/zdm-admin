@@ -101,8 +101,11 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         .listBySlabIds(inventory.stream().map(SlabInventory::getId).toList())
         .stream()
         .collect(Collectors.groupingBy(SlabOffShelfRecord::getSlabId));
+    Map<Long, List<SlabPrice>> pricesBySlabId = priceService
+        .listPricesBySlabIds(inventory.stream().map(SlabInventory::getId).toList());
     inventory.forEach(item -> {
-      attachPrices(item);
+      attachMediaUrls(item);
+      item.setMarkupPrices(pricesBySlabId.getOrDefault(item.getId(), List.of()));
       item.setOffShelfRecords(recordsBySlabId.getOrDefault(item.getId(), List.of()));
     });
     return inventory;

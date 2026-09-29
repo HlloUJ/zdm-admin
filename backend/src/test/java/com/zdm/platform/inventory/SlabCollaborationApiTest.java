@@ -83,6 +83,50 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     return slabs.listWithPrices().stream().map(SlabInventory::getId)
         .filter(id -> id >= 99601 && id <= 99604).toList();
   }
+  @Test void slabListPriceQueriesStayBoundedAsInventoryGrows() {
+    fixture("warehouse", "warehouse", false, 1L);
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99609,'列表价格级别',1)");
+    jdbc.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,"
+        + "price_coefficient,cost_price,price,price_source) "
+        + "VALUES (99601,99609,'旧级别名称',1.2,10,12,'manual')");
+    identity("admin", "all", "all");
+    sqlSession.clearCache();
+    long beforeOne = selectCount();
+    var oneSlab = slabs.listWithPrices().stream().filter(item -> item.getId() == 99601L)
+        .findFirst().orElseThrow();
+    long one = selectCount() - beforeOne;
+    assertThat(oneSlab.getMarkupPrices()).extracting(SlabPrice::getStoreLevelName)
+        .containsExactly("列表价格级别");
+
+    jdbc.update("INSERT INTO slab_inventory "
+        + "(id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) "
+        + "VALUES (99602,'列表大板二','SLAB-LIST-2','warehouse','warehouse',FALSE,1,2,10),"
+        + "(99603,'列表大板三','SLAB-LIST-3','warehouse','warehouse',FALSE,1,2,10)");
+    jdbc.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,"
+        + "price_coefficient,cost_price,price,price_source) "
+        + "VALUES (99602,99609,'旧级别名称',1.2,10,12,'manual'),"
+        + "(99603,99609,'旧级别名称',1.2,10,12,'manual')");
+    sqlSession.clearCache();
+    long beforeThree = selectCount();
+    var threeSlabs = slabs.listWithPrices().stream()
+        .filter(item -> item.getId() >= 99601L && item.getId() <= 99603L).toList();
+    long three = selectCount() - beforeThree;
+    assertThat(threeSlabs).hasSize(3);
+    for (var slab : threeSlabs) {
+      assertThat(slab.getMarkupPrices()).extracting(SlabPrice::getId)
+          .containsExactlyElementsOf(prices.listPrices(slab.getId()).stream().map(SlabPrice::getId).toList());
+      assertThat(slab.getMarkupPrices()).extracting(SlabPrice::getStoreLevelName)
+          .containsExactly("列表价格级别");
+    }
+    System.out.printf("slab list SELECT count: one=%d, three=%d%n", one, three);
+    assertThat(three).withFailMessage("slab list SELECT count: one=%d, three=%d", one, three)
+        .isLessThanOrEqualTo(one + 2);
+  }
+
+  private long selectCount() {
+    return jdbc.queryForObject("SHOW SESSION STATUS LIKE 'Com_select'",
+        (row, index) -> row.getLong("Value"));
+  }
   @Test void sourcePricePermissionOnlyChangesWarehouseAndSellingCost() throws Exception {
     fixture("warehouse", "warehouse", true, 1L);
     for (String[] state : new String[][] {{"warehouse", "warehouse"}, {"selling", "selling"}}) {
