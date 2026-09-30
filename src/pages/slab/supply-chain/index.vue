@@ -939,6 +939,7 @@
 
 <script setup lang="ts">
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber, toSlabPayload } from '../shared/slabPageMapping';
+import { buildSlabPriceRows } from '../shared/slabPriceRows';
 import {
   tabs,
   pageSizeOptions,
@@ -2323,55 +2324,8 @@ const handleBatchPriceChange = (index: number, _value?: unknown, context?: Sales
   calculateBatchRatio(row);
   if (String(row.ratio ?? '').trim()) clearPriceDrawerFieldError(`rows.${index}.ratio`);
 };
-const buildPriceRows = (row: SlabItem, mode: 'detail' | 'edit' = 'detail'): DrawerPriceRow[] => {
-  const snapshots = (row.markupPrices ?? []).filter((price) =>
-    publishOptions.storeLevels.some((level) => level.id === price.storeLevelId),
-  );
-  const cost = toNumber(row.price.cost);
-  const guidePrice = row.price.guide;
-  const guideRatio =
-    row.guidePriceCoefficient != null
-      ? formatRatio(row.guidePriceCoefficient)
-      : cost > 0 && String(guidePrice).trim()
-        ? formatRatio(toNumber(guidePrice) / cost)
-        : '';
-  const configuredRows: DrawerPriceRow[] = snapshots.map((snapshot) => ({
-    configurationId: snapshot.storeLevelId,
-    label:
-      publishOptions.storeLevels.find((level) => level.id === snapshot.storeLevelId)?.label ||
-      markupConfigurations.value.find((item) => item.storeLevelId === snapshot.storeLevelId)?.name ||
-      snapshot.storeLevelName ||
-      `门店级别${snapshot.storeLevelId}`,
-    ratio: formatRatio(Number(snapshot.priceCoefficient)),
-    price: String(snapshot.price),
-    priceSource: snapshot.priceSource ?? 'manual',
-    sourceConfigurationId: snapshot.sourceConfigurationId,
-  }));
-  const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.storeLevelId));
-  publishOptions.storeLevels.forEach((level) => {
-    if (snapshotIds.has(level.id)) return;
-    const configuration = activeConfigurationForLevel(level.id);
-    const ratio = configuration == null ? '' : formatRatio(Number(configuration.priceCoefficient));
-    configuredRows.push({
-      configurationId: level.id,
-      label: level.label,
-      ratio,
-      // Match the finished-stock editor: only saved prices populate the price field.
-      price: mode === 'detail' && cost && ratio ? formatPrice(cost * toNumber(ratio)) : '',
-      priceSource: configuration == null ? 'manual' : 'auto',
-      sourceConfigurationId: configuration?.id,
-    });
-  });
-  return [
-    { label: '成本价', price: row.price.cost },
-    {
-      label: '指导价',
-      ratio: guideRatio,
-      price: guidePrice,
-    },
-    ...sortRowsByStoreLevel(configuredRows, (configuredRow) => configuredRow.configurationId),
-  ];
-};
+const buildPriceRows = (row: SlabItem, mode: 'detail' | 'edit' = 'detail'): DrawerPriceRow[] =>
+  buildSlabPriceRows(row, mode, publishOptions.storeLevels, markupConfigurations.value);
 const fillPriceRows = (row: SlabItem) => {
   batchPriceRows.splice(0, batchPriceRows.length, ...buildPriceRows(row, 'edit'));
 };
