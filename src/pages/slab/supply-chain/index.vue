@@ -938,7 +938,7 @@
 </template>
 
 <script setup lang="ts">
-import { fillSlabProductForm, formatPrice, formatRatio, toNumber, toSlabPayload } from '../shared/slabPageMapping';
+import { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';
 import { buildSlabPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
 import {
@@ -958,7 +958,6 @@ import {
   type CornerFieldKey,
   type MeasurementField,
 } from '../shared/slabPageModel';
-import {} from '../shared/operationLogPriceTiers';
 import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import SlabProductFormLayout from '../management/components/SlabProductFormLayout.vue';
 import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
@@ -982,11 +981,7 @@ import {
   AdminSectionCard,
   type AdminMediaValue,
 } from '@/components/foundation';
-import {
-  getSlabGuidePriceSetting,
-  listSlabMarkupConfigurationOptions,
-  type SlabMarkupConfigurationRecord,
-} from '@/services/slabMarkupConfigurations';
+import { type SlabMarkupConfigurationRecord } from '@/services/slabMarkupConfigurations';
 import { createVideoFirstFrame } from '@/services/media';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -1009,7 +1004,6 @@ import {
   checkSlabAction,
   type SlabPayload,
   type SlabOperationLogRecord,
-  type SlabOperationType,
   type SlabOffShelfRecord,
   type SlabPublishTargetStatus,
   type SlabPublisherType,
@@ -1041,7 +1035,7 @@ type SalesNumberChangeContext = {
 const activeTab = ref<SlabTab>('warehouse');
 const loginUser = computed(() => getLoginUser());
 const productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);
-const sourceBlocked = (row: SlabItem) => false;
+const sourceBlocked = (_row: SlabItem) => false;
 const slabPermissionScope: Record<SlabTab, string> = {
   warehouse: 'warehouse',
   selling: 'selling',
@@ -1178,16 +1172,6 @@ const {
   () => markupConfigurations.value,
   () => operationStatusLabels,
 );
-const creationLogPriceColumns = computed(() => [
-  { colKey: 'label', title: '价格层级' },
-  { colKey: 'price', title: '价格' },
-]);
-const creationLogPrices = computed(() => {
-  if (!operationLogIsCreate.value) return [];
-  const rows = operationLogChangeRows.value;
-  const value = (field: string) => rows.find((row) => row.field === field)?.after ?? '未填写';
-  return [{ label: '成本价', price: value('成本价') }];
-});
 const operationSourceLabel = (source: SlabOperationLogRecord['operationSource']) =>
   ({
     MANUAL: '供应链协同系统',
@@ -1408,7 +1392,7 @@ const upsertSlabItem = (record: SlabRecord) => {
 const loadSlabs = async () => {
   loading.value = true;
   try {
-    const [records, publishOptionsResult, markupResult, guideSetting] = await Promise.all([
+    const [records, publishOptionsResult, markupResult] = await Promise.all([
       listSlabs(),
       getSlabPublishOptions(),
       Promise.resolve([]),
@@ -1484,7 +1468,6 @@ const reasonFormRules = computed<Record<string, FormRule[]>>(() => ({
   detail: [],
 }));
 const batchPriceRows = reactive<DrawerPriceRow[]>([]);
-const priceDrawerForm = reactive({ rows: batchPriceRows });
 const priceDrawerSize = computed(() => {
   return 'min(calc(200px + 2 * var(--td-comp-paddingLR-l)), calc(100vw - 32px))';
 });
@@ -1562,8 +1545,6 @@ const salesPriceRows = computed(() => {
   return sortRowsByStoreLevel(rows, (row) => row.id);
 });
 const partnerPriceRows = computed(() => salesPriceRows.value);
-const guideRatioFieldName = computed(() => 'guideRatio');
-const guidePriceFieldName = computed(() => 'guidePrice');
 const isValidMeasurement = (value: unknown, required: boolean) => {
   const normalizedValue = String(value ?? '').trim();
   if (!normalizedValue) return !required;
@@ -1948,30 +1929,6 @@ const toggleCurrentPage = (checked: boolean) => {
   }
   selectedKeys.value = selectedKeys.value.filter((id) => !currentPageIds.value.includes(id));
 };
-const activeConfigurationForLevel = (storeLevelId: number) =>
-  markupConfigurations.value.find((item) => item.storeLevelId === storeLevelId && item.status === 'enabled');
-const hasActivePriceConfiguration = (levelId: number) => activeConfigurationForLevel(levelId)?.priceCoefficient != null;
-const markProductPriceManual = (levelId: number) => {
-  const editor = productForm.markupPrices[levelId];
-  if (!editor) return;
-  editor.priceSource = 'manual';
-  editor.sourceConfigurationId = undefined;
-};
-const markDrawerPriceManual = (row: DrawerPriceRow) => {
-  if (row.configurationId == null) return;
-  row.priceSource = 'manual';
-  row.sourceConfigurationId = undefined;
-};
-const toggleProductPriceSource = (levelId: number) => {
-  if (productMode.value === 'view' || saving.value) return;
-  if (productForm.markupPrices[levelId]?.priceSource === 'auto') markProductPriceManual(levelId);
-  else restoreProductAutoPrice(levelId);
-};
-const toggleDrawerPriceSource = (row: DrawerPriceRow) => {
-  if (priceDrawerReadonly.value || saving.value) return;
-  if (row.priceSource === 'auto') markDrawerPriceManual(row);
-  else restoreBatchAutoPrice(row);
-};
 const calculateProductPrice = (configurationId: number) => {
   const cost = toNumber(productForm.cost);
   const editor = productForm.markupPrices[configurationId];
@@ -1980,26 +1937,12 @@ const calculateProductPrice = (configurationId: number) => {
   editor.price = formatPrice(cost * ratio);
   clearSalesFieldError(`markupPrices.${configurationId}.price`);
 };
-const calculateProductRatio = (configurationId: number) => {
-  const cost = toNumber(productForm.cost);
-  const editor = productForm.markupPrices[configurationId];
-  const price = toNumber(editor?.price ?? '');
-  if (!editor || !isValidSalesNumber(productForm.cost, 0) || !isValidSalesNumber(editor.price, 0) || !cost) return;
-  editor.ratio = formatRatio(price / cost);
-};
 const calculateGuidePrice = () => {
   const cost = toNumber(productForm.cost);
   const ratio = toNumber(productForm.guideRatio);
   if (!isValidSalesNumber(productForm.cost, 0) || !isValidSalesNumber(productForm.guideRatio, 0)) return;
   productForm.guidePrice = formatPrice(cost * ratio);
   clearSalesFieldError('guidePrice');
-};
-const calculateGuideRatio = () => {
-  const cost = toNumber(productForm.cost);
-  const price = toNumber(productForm.guidePrice);
-  if (!isValidSalesNumber(productForm.cost, 0) || !isValidSalesNumber(productForm.guidePrice, 0)) return;
-  if (!cost) return;
-  productForm.guideRatio = formatRatio(price / cost);
 };
 const recalculateProductPrices = () => {
   calculateGuidePrice();
@@ -2027,80 +1970,6 @@ const initializeProductMarkupPrices = (prices: SlabPrice[] = []) => {
       ];
     }),
   );
-};
-const restoreProductAutoPrice = (storeLevelId: number) => {
-  const configuration = activeConfigurationForLevel(storeLevelId);
-  const editor = productForm.markupPrices[storeLevelId];
-  if (!configuration || configuration.priceCoefficient == null || !editor) return;
-  editor.ratio = formatRatio(Number(configuration.priceCoefficient));
-  editor.priceSource = 'auto';
-  editor.sourceConfigurationId = configuration.id;
-  calculateProductPrice(storeLevelId);
-};
-const calculateBatchPrice = (row: DrawerPriceRow) => {
-  const costValue = batchPriceRows[0]?.price ?? '';
-  const cost = toNumber(costValue);
-  const ratio = toNumber(row.ratio ?? '');
-  if (!isValidSalesNumber(costValue, 0) || !isValidSalesNumber(row.ratio, 0)) return;
-  row.price = formatPrice(cost * ratio);
-};
-const calculateBatchRatio = (row: DrawerPriceRow) => {
-  const costValue = batchPriceRows[0]?.price ?? '';
-  const cost = toNumber(costValue);
-  const price = toNumber(row.price);
-  if (!isValidSalesNumber(costValue, 0) || !isValidSalesNumber(row.price, 0) || !cost) return;
-  row.ratio = (price / cost).toFixed(2);
-};
-const restoreBatchAutoPrice = (row: DrawerPriceRow) => {
-  if (row.configurationId == null) return;
-  const configuration = activeConfigurationForLevel(row.configurationId);
-  if (!configuration || configuration.priceCoefficient == null) return;
-  row.ratio = formatRatio(Number(configuration.priceCoefficient));
-  row.priceSource = 'auto';
-  row.sourceConfigurationId = configuration.id;
-  calculateBatchPrice(row);
-};
-const clearPriceDrawerFieldError = (field: string) => {
-  priceDrawerFormRef.value?.clearValidate([field]);
-};
-const handleBatchCostChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props') return;
-  const costRow = batchPriceRows[0];
-  if (!costRow) return;
-  if (String(costRow.price ?? '').trim()) clearPriceDrawerFieldError('rows.0.price');
-  if (!String(costRow.price ?? '').trim()) {
-    batchPriceRows.slice(1).forEach((row, index) => {
-      row.price = '';
-      clearPriceDrawerFieldError(`rows.${index + 1}.price`);
-    });
-    return;
-  }
-  if (!isValidSalesNumber(costRow.price, 0)) return;
-  batchPriceRows.slice(1).forEach((row, index) => {
-    calculateBatchPrice(row);
-    clearPriceDrawerFieldError(`rows.${index + 1}.price`);
-  });
-};
-const handleBatchRatioChange = (index: number, _value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props') return;
-  const row = batchPriceRows[index];
-  if (!row) return;
-  const field = `rows.${index}.ratio`;
-  if (!String(row.ratio ?? '').trim() || isValidSalesNumber(row.ratio, 0)) clearPriceDrawerFieldError(field);
-  calculateBatchPrice(row);
-  if (String(row.price ?? '').trim()) clearPriceDrawerFieldError(`rows.${index}.price`);
-};
-const handleBatchPriceChange = (index: number, _value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props') return;
-  const row = batchPriceRows[index];
-  if (!row) return;
-  if (String(row.price ?? '').trim()) clearPriceDrawerFieldError(`rows.${index}.price`);
-  if (index === 0) {
-    handleBatchCostChange(_value, context);
-    return;
-  }
-  calculateBatchRatio(row);
-  if (String(row.ratio ?? '').trim()) clearPriceDrawerFieldError(`rows.${index}.ratio`);
 };
 const buildPriceRows = (row: SlabItem, mode: 'detail' | 'edit' = 'detail'): DrawerPriceRow[] =>
   buildSlabPriceRows(row, mode, publishOptions.storeLevels, markupConfigurations.value);
@@ -2259,9 +2128,6 @@ const handleStockKeydown = (
   if (/^\d$/.test(event.key) || allowedKeys.includes(event.key)) return;
   event.preventDefault();
 };
-const clearSalesNumberFieldError = (field: string, value: unknown, minimum: number) => {
-  if (!String(value ?? '').trim() || isValidSalesNumber(value, minimum)) clearSalesFieldError(field);
-};
 const handleCostChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
   if (context?.type === 'props') return;
   if (String(productForm.cost ?? '').trim()) clearSalesFieldError('cost');
@@ -2276,31 +2142,6 @@ const handleCostChange = (_value?: unknown, context?: SalesNumberChangeContext) 
   }
   if (!isValidSalesNumber(productForm.cost, 0)) return;
   recalculateProductPrices();
-};
-const handleGuideRatioChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props') return;
-  clearSalesNumberFieldError(guideRatioFieldName.value, productForm.guideRatio, 0);
-  calculateGuidePrice();
-};
-const handleGuidePriceChange = (_value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props') return;
-  if (String(productForm.guidePrice ?? '').trim()) clearSalesFieldError(guidePriceFieldName.value);
-  calculateGuideRatio();
-};
-const handlePartnerRatioChange = (configurationId: number, _value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props') return;
-  clearSalesNumberFieldError(
-    `markupPrices.${configurationId}.ratio`,
-    productForm.markupPrices[configurationId]?.ratio,
-    0,
-  );
-  calculateProductPrice(configurationId);
-};
-const handlePartnerPriceChange = (configurationId: number, _value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props') return;
-  const field = `markupPrices.${configurationId}.price`;
-  if (String(productForm.markupPrices[configurationId]?.price ?? '').trim()) clearSalesFieldError(field);
-  calculateProductRatio(configurationId);
 };
 const handleMeasurementChange = (field: MeasurementField) => {
   const value = String(productForm[field] ?? '').trim();
@@ -2457,7 +2298,7 @@ const handleProductSubmit = async () => {
     saving.value = false;
   }
 };
-const uploadSlabMedia = async (item: (typeof uploadItems)[number], file: File): Promise<AdminMediaValue> => {
+const uploadSlabMedia = async (_item: (typeof uploadItems)[number], file: File): Promise<AdminMediaValue> => {
   let nextVideoUrl: string | undefined;
   try {
     if (file.type.startsWith('video/')) {

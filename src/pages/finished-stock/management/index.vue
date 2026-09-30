@@ -1092,7 +1092,6 @@ import type {
   SpecMode,
   LayeredSpecField,
   BatchFilterField,
-  DecimalField,
   ConfirmType,
   ProductFormMode,
   TabConfig,
@@ -1151,13 +1150,9 @@ import {
   releaseTemporaryFinishedProductMedia,
   updateFinishedProduct,
   uploadFinishedProductMedia,
-  type FinishedProductAttributeEntry,
   type FinishedProductPayload,
   type FinishedSpecDimension,
   type FinishedProductRecord,
-  type FinishedProductGuidePrice,
-  type FinishedProductPrice,
-  type FinishedProductVariant,
 } from '@/services/finishedProducts';
 import { type ProductCategoryRecord } from '@/services/productCategories';
 import {
@@ -1952,7 +1947,7 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     .map(createSalesColumn);
   return [
     ...orderedSpecColumns,
-    ...priceColumnsBase.filter((col) => true),
+    ...priceColumnsBase,
     ...remainingSalesColumns,
     ...(!isOperationsEdit.value ? tailColumns : []),
   ];

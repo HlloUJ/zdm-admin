@@ -1017,7 +1017,6 @@ import type {
   SpecMode,
   LayeredSpecField,
   BatchFilterField,
-  DecimalField,
   ConfirmType,
   ProductFormMode,
   TabConfig,
@@ -1041,7 +1040,6 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { finishedStockActions } from '../shared/finishedStockActions';
 import ProductRichEditor from '@/components/ProductRichEditor.vue';
-import PriceSourceToggle from '../management/components/PriceSourceToggle.vue';
 import SpecPriceInput from '../management/components/SpecPriceInput.vue';
 import FinishedOperationLogs from '../management/components/FinishedOperationLogs.vue';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
@@ -1059,30 +1057,19 @@ import {
   getSafeErrorMessage,
   type AdminMediaValue,
 } from '@/components/foundation';
-import {
-  getFinishedGuidePriceSetting,
-  listFinishedMarkupConfigurationOptions,
-  type FinishedMarkupConfigurationRecord,
-} from '@/services/finishedMarkupConfigurations';
+import { type FinishedMarkupConfigurationRecord } from '@/services/finishedMarkupConfigurations';
 import {
   createFinishedProduct,
-  checkFinishedProductShelf,
-  listFinishedProductPriceLevelOptions,
   type FinishedProductPriceLevelOption,
   deleteFinishedProduct,
   listFinishedProducts,
-  getFinishedProductDetail,
   listFinishedProductFormOptions,
   releaseTemporaryFinishedProductMedia,
   updateFinishedProduct,
   uploadFinishedProductMedia,
-  type FinishedProductAttributeEntry,
   type FinishedProductPayload,
   type FinishedSpecDimension,
   type FinishedProductRecord,
-  type FinishedProductGuidePrice,
-  type FinishedProductPrice,
-  type FinishedProductVariant,
 } from '@/services/finishedProducts';
 import { type ProductCategoryRecord } from '@/services/productCategories';
 import {
@@ -1109,7 +1096,7 @@ const tabs: TabConfig[] = [
 const pageSizeOptions = [10, 20, 50];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
 const productPermissionPrefix = computed(() => `${'supply-chain'}.finished-stock-management`);
-const sourceBlocked = (row: StockItem) => false;
+const sourceBlocked = (_row: StockItem) => false;
 const activeTab = ref<StockStatus>('warehouse');
 const finishedScope: Record<StockStatus, string> = {
   warehouse: 'warehouse',
@@ -1296,7 +1283,7 @@ let priceConfigurationRefresh: Promise<void> | undefined;
 const refreshPriceConfigurations = () => {
   if (!priceConfigurationRefresh)
     priceConfigurationRefresh = Promise.all([Promise.resolve([]), Promise.resolve(undefined), Promise.resolve([])])
-      .then(([configurations, guide, levels]) => {
+      .then(([configurations, , levels]) => {
         enabledPriceLevels.value = levels;
         markupConfigurations.value = configurations;
         guidePriceSettingCoefficient.value = undefined;
@@ -1324,7 +1311,6 @@ const refreshPriceConfigurations = () => {
 const guidePriceSettingCoefficient = ref<number>();
 const dataItems = ref<StockItem[]>([]);
 const shelfErrors = reactive<Record<number, string>>({});
-const checkingShelf = ref(false);
 const categoryCascaderOptions = computed<CategoryCascaderOption[]>(() => {
   const enabled = productCategories.value.filter(
     (category) => category.scope === 'finished' && category.status !== 'disabled',
@@ -1672,7 +1658,7 @@ const loadInventoryData = async () => {
   if (!finishedTabs.value.length) return;
   loading.value = true;
   try {
-    const [options, products, markupResult, guideSetting, bindings] = await Promise.all([
+    const [options, products, markupResult, , bindings] = await Promise.all([
       listFinishedProductFormOptions(),
       listFinishedProducts(),
       Promise.resolve([]),
@@ -2220,14 +2206,7 @@ const {
   handleSpecCostChange,
   handleSpecCoefficientChange,
   handleSpecPriceChange,
-  toggleSpecPriceSource,
-  markSpecPriceManual,
-  handleMarkupCoefficientChange,
-  handleMarkupPriceChange,
-  handleBatchMarkupChange,
   handleBatchCostChange,
-  handleBatchCoefficientChange,
-  handleBatchPriceChange,
 } = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
 const openSpecDialog = async (preserveCurrent = false) => {
   validatedSpecDraftIds.value = new Set();

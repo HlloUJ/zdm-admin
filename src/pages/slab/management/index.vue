@@ -1077,7 +1077,6 @@ import {
   type CornerFieldKey,
   type MeasurementField,
 } from '../shared/slabPageModel';
-import {} from '../shared/operationLogPriceTiers';
 import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import SlabProductFormLayout from './components/SlabProductFormLayout.vue';
 import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
@@ -1123,12 +1122,10 @@ import {
   resolveSlabPublishTargetStatus,
   uploadSlabImage,
   updateSlab,
-  updateSlabSourceCost,
   updateSlabStatuses,
   checkSlabAction,
   type SlabPayload,
   type SlabOperationLogRecord,
-  type SlabOperationType,
   type SlabOffShelfRecord,
   type SlabPublishTargetStatus,
   type SlabPublisherType,
@@ -1199,13 +1196,6 @@ const focusProductSection = (key: string) => {
 const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');
 const productTab = ref('images');
 const editingRowId = ref<number | null>(null);
-const editingSourceStatus = computed(() => tableData.value.find((row) => row.id === editingRowId.value)?.status);
-const canPublishToShelf = computed(
-  () =>
-    editingSourceStatus.value === 'selling' ||
-    hasSlabAction('warehouse', 'shelf') ||
-    (productMode.value === 'create' && hasSlabAction('selling', 'publish')),
-);
 const productFormRef = ref<FormInstanceFunctions>();
 const salesFormRef = ref<FormInstanceFunctions>();
 const priceDrawerFormRef = ref<FormInstanceFunctions>();
@@ -2651,7 +2641,7 @@ const handleProductSubmit = async () => {
     saving.value = false;
   }
 };
-const uploadSlabMedia = async (item: (typeof uploadItems)[number], file: File): Promise<AdminMediaValue> => {
+const uploadSlabMedia = async (_item: (typeof uploadItems)[number], file: File): Promise<AdminMediaValue> => {
   let nextVideoUrl: string | undefined;
   try {
     if (file.type.startsWith('video/')) {
