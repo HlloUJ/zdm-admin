@@ -1077,6 +1077,7 @@
 </template>
 
 <script setup lang="ts">
+import { filterFinishedStockItems } from '../shared/finishedStockListFilter';
 import { buildFinishedStockTemplateFields } from '../shared/finishedStockTemplateFields';
 import { useFinishedStockPriceEditor } from '../shared/finishedStockPriceEditor';
 import { useFinishedStockSpecRows } from '../shared/finishedStockSpecRows';
@@ -1161,8 +1162,6 @@ import {
 } from '@/services/finishedProducts';
 import { type ProductAttributeRecord } from '@/services/productAttributes';
 import { type SupplierRecord } from '@/services/suppliers';
-import { sortByOffShelfAtDesc } from './offShelfSorting';
-import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import ProductDetail from './components/ProductDetail.vue';
 import SourceUnavailableOverlay from './components/SourceUnavailableOverlay.vue';
 import FinishedRowWarnings from './components/FinishedRowWarnings.vue';
@@ -1808,23 +1807,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshVisibleProductTemplate);
   document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);
 });
-const filteredData = computed(() => {
-  const filter = currentAppliedFilter.value;
-  const keyword = filter.keyword.trim().toLocaleLowerCase();
-  const sorted =
-    activeTab.value === 'offShelf' ? sortByOffShelfAtDesc(dataItems.value) : sortByCreatedAtDesc(dataItems.value);
-  return sorted.filter((item) => {
-    if (item.status !== activeTab.value) return false;
-    if (
-      keyword &&
-      ![item.name, String(item.id), item.code].some((value) => value.toLocaleLowerCase().includes(keyword))
-    )
-      return false;
-    if (filter.category && item.category !== filter.category) return false;
-    if (filter.supplier && item.supplier !== filter.supplier) return false;
-    return true;
-  });
-});
+const filteredData = computed(() =>
+  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value),
+);
 const paginationTotal = computed(() => filteredData.value.length);
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
