@@ -941,6 +941,7 @@
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';
 import { buildSlabPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
+import { filterSlabItems, latestOffShelfRecord, offShelfTimestamp } from '../shared/slabListFilter';
 import {
   tabs,
   pageSizeOptions,
@@ -1297,17 +1298,6 @@ const formatSize = (record: SlabRecord) => {
   const dimensions = [record.lengthMm, record.widthMm, record.thicknessMm];
   return dimensions.some((item) => item == null) ? '-' : `${dimensions.join(' x ')}mm`;
 };
-const offShelfTimestamp = (record?: SlabOffShelfRecord) => {
-  if (!record?.offShelvedAt) return 0;
-  const timestamp = new Date(record.offShelvedAt).getTime();
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-};
-const latestOffShelfRecord = (row: SlabItem) =>
-  row.offShelfRecords.reduce<SlabOffShelfRecord | undefined>((latest, current) => {
-    if (!latest) return current;
-    const timeDifference = offShelfTimestamp(current) - offShelfTimestamp(latest);
-    return timeDifference > 0 || (timeDifference === 0 && current.id > latest.id) ? current : latest;
-  }, undefined);
 const productAreaSquareMeter = computed(() => {
   if (!isValidMeasurement(productForm.length, true) || !isValidMeasurement(productForm.width, true)) return undefined;
   const length = Number(productForm.length);
@@ -1741,61 +1731,7 @@ const productDialogTitle = computed(() => {
   if (productMode.value === 'edit') return '编辑商品';
   return '查看商品';
 });
-const filteredData = computed(() => {
-  const filter = currentAppliedFilter.value;
-  const matchedItems = tableData.value.filter((item) => {
-    const statusMatched = item.status === activeTab.value;
-    const keyword = filter.keyword.trim().toLowerCase();
-    const keywordMatched =
-      !keyword ||
-      String(item.id).includes(keyword) ||
-      item.name.toLowerCase().includes(keyword) ||
-      item.code.toLowerCase().includes(keyword);
-    const varietyMatched = !filter.variety || item.variety === filter.variety;
-    const originMatched = !filter.origin || item.origin === filter.origin;
-    const textureMatched = !filter.texture || item.texture === filter.texture;
-    const colorMatched = !filter.color || item.color === filter.color;
-    const gradeMatched = !filter.grade || item.grade === filter.grade;
-    const supplierKeyword = filter.supplier.trim().toLowerCase();
-    const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);
-    const latestRecord = latestOffShelfRecord(item);
-    const offShelfReasonMatched =
-      activeTab.value !== 'offShelf' ||
-      !filter.offShelfReason ||
-      latestRecord?.standardReason === filter.offShelfReason;
-    const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();
-    const offShelvedByMatched =
-      activeTab.value !== 'offShelf' ||
-      !offShelvedByKeyword ||
-      latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);
-    const [offShelfStartDate, offShelfEndDate] = filter.offShelfDateRange;
-    const offShelfTime = offShelfTimestamp(latestRecord);
-    const offShelfDateMatched =
-      activeTab.value !== 'offShelf' ||
-      ((!offShelfStartDate || offShelfTime >= new Date(`${offShelfStartDate}T00:00:00`).getTime()) &&
-        (!offShelfEndDate || offShelfTime <= new Date(`${offShelfEndDate}T23:59:59.999`).getTime()));
-    return (
-      statusMatched &&
-      keywordMatched &&
-      varietyMatched &&
-      originMatched &&
-      textureMatched &&
-      colorMatched &&
-      gradeMatched &&
-      supplierMatched &&
-      offShelfReasonMatched &&
-      offShelvedByMatched &&
-      offShelfDateMatched
-    );
-  });
-  if (activeTab.value !== 'offShelf') return matchedItems;
-  return matchedItems.sort((left, right) => {
-    const leftRecord = latestOffShelfRecord(left);
-    const rightRecord = latestOffShelfRecord(right);
-    const timeDifference = offShelfTimestamp(rightRecord) - offShelfTimestamp(leftRecord);
-    return timeDifference || (rightRecord?.id ?? 0) - (leftRecord?.id ?? 0) || right.id - left.id;
-  });
-});
+const filteredData = computed(() => filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value));
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
   return filteredData.value.slice(start, start + currentPagination.value.pageSize);
