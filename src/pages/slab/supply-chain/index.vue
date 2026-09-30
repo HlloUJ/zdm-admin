@@ -958,8 +958,7 @@ import {
   type CornerFieldKey,
   type MeasurementField,
 } from '../shared/slabPageModel';
-import {
-} from '../shared/operationLogPriceTiers';
+import {} from '../shared/operationLogPriceTiers';
 import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import SlabProductFormLayout from '../management/components/SlabProductFormLayout.vue';
 import PriceSourceToggle from '@/pages/finished-stock/management/components/PriceSourceToggle.vue';
@@ -1174,7 +1173,11 @@ const {
   creationLogImages,
   creationLogBase,
   creationLogSales,
-} = useSlabOperationLogPresentation(operationLogDetail, () => markupConfigurations.value, () => operationStatusLabels);
+} = useSlabOperationLogPresentation(
+  operationLogDetail,
+  () => markupConfigurations.value,
+  () => operationStatusLabels,
+);
 const creationLogPriceColumns = computed(() => [
   { colKey: 'label', title: '价格层级' },
   { colKey: 'price', title: '价格' },

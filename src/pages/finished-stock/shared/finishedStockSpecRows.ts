@@ -37,9 +37,7 @@ export const useFinishedStockSpecRows = (
     );
   };
   const defaultGuideCoefficient = () =>
-    getGuideCoefficient() == null
-      ? ''
-      : Number(getGuideCoefficient()).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+    getGuideCoefficient() == null ? '' : Number(getGuideCoefficient()).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
     id: createDraftId(),
     mode: getSpecMode(),

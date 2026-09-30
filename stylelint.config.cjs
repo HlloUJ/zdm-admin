@@ -16,7 +16,7 @@ module.exports = {
   overrides: [
     {
       files: [
-        'src/pages/{finished-stock,slab}/{management,supply-chain}/index.css',
+        'src/pages/{finished-stock,slab}/{management,supply-chain,shared}/index.css',
         'src/pages/finished-stock/store/index.css',
       ],
       rules: {

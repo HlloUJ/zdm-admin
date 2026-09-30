@@ -13,9 +13,10 @@ export const buildSlabPriceRows = (
     markupConfigurations.find((item) => item.storeLevelId === storeLevelId && item.status === 'enabled');
   const sortRowsByStoreLevel = (rows: DrawerPriceRow[]) => {
     const orderById = new Map(storeLevels.map((level, index) => [level.id, index]));
-    return [...rows].sort((left, right) =>
-      (orderById.get(left.configurationId ?? -1) ?? Number.MAX_SAFE_INTEGER) -
-      (orderById.get(right.configurationId ?? -1) ?? Number.MAX_SAFE_INTEGER),
+    return [...rows].sort(
+      (left, right) =>
+        (orderById.get(left.configurationId ?? -1) ?? Number.MAX_SAFE_INTEGER) -
+        (orderById.get(right.configurationId ?? -1) ?? Number.MAX_SAFE_INTEGER),
     );
   };
   const snapshots = (row.markupPrices ?? []).filter((price) =>

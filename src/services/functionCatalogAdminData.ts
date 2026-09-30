@@ -440,4 +440,3 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
     ],
   },
 ];
-

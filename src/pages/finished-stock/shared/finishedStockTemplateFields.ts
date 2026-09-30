@@ -60,8 +60,7 @@ export const buildFinishedStockTemplateFields = (
             role: 'sales',
             attributeId,
             label:
-              productAttributes.find((attribute) => attribute.id === attributeId)?.name ??
-              `销售属性 ${attributeId}`,
+              productAttributes.find((attribute) => attribute.id === attributeId)?.name ?? `销售属性 ${attributeId}`,
             required: false,
             type: 'input',
             options: [],
