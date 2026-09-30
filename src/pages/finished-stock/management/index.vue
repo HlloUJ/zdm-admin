@@ -1106,13 +1106,11 @@ import type {
   PriceRow,
   BatchFillForm,
   SingleSpecItem,
-  LayeredSpecDraft,
   SpecValue,
   SpecGroup,
   CategoryCascaderOption,
 } from '../shared/finishedStockPageModel';
 import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
-import { materializeLayeredSpec, rebuildLayeredSpecs, specIdentity } from './specModeConversion';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
