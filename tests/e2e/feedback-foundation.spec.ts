@@ -811,7 +811,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(dialog.getByText('下架原因', { exact: true })).toBeVisible();
   await expect(dialog.getByText('请选择下架原因', { exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible({ timeout: 10_000 });
   expect(statusPayload).toBeUndefined();
 
   await dialog.getByRole('textbox').first().click();

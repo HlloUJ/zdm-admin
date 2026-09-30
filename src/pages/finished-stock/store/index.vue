@@ -317,11 +317,17 @@
 </template>
 
 <script setup lang="ts">
+import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';
 import { computed, onMounted, reactive, ref } from 'vue';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { finishedStockActions } from '../shared/finishedStockActions';
+import {
+  parseStoreOperationLogChanges,
+  storeOperationLogSourceLabel as logSourceLabel,
+  toStoreOperationLogRow as toLogRow,
+} from './storeOperationLog';
 import {
   AdminConfirmDialog,
   AdminDialog,
@@ -332,7 +338,7 @@ import {
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
-import { productLogFilterOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
+import { productLogFilterOptions } from '@/services/productOperationLog';
 import {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,
@@ -356,21 +362,6 @@ import SourceUnavailableOverlay from '../management/components/SourceUnavailable
 import FinishedEditChanges from '../management/components/FinishedEditChanges.vue';
 import StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
-interface FinishedStockToolbarAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-  variant?: 'base' | 'outline' | 'text';
-  icon?: string;
-  className?: string;
-  disabled?: boolean;
-}
-interface FinishedStockRowAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-}
-
 const user = getLoginUser();
 const prefix = 'store.finished-stock-management';
 const can = (tab: string, action: string) => hasPermission(user, `${prefix}.${tab}.${action}`);
@@ -459,26 +450,7 @@ const logTotal = ref(0);
 const logLoading = ref(false);
 const logDetail = ref<StoreFinishedLog | null>(null);
 const logDetailVisible = ref(false);
-const toLogRow = (row: StoreFinishedLog): ProductOperationLogRow => ({
-  id: row.id,
-  subjectName: row.productName,
-  subjectId: row.productId,
-  operationType: row.operationType,
-  operationSummary: row.operationSummary,
-  operatorName: row.operatorName,
-  operatedAt: row.operatedAt,
-  beforeStatus:
-    row.operationType.startsWith('SOURCE_') || row.operationType.startsWith('OPERATIONS_') ? null : row.beforeStatus,
-  afterStatus:
-    row.operationType.startsWith('SOURCE_') || row.operationType.startsWith('OPERATIONS_') ? null : row.afterStatus,
-});
 const logDetailRow = computed(() => logDetail.value && toLogRow(logDetail.value));
-const logSourceLabel = (row: ProductOperationLogRow) =>
-  row.operationType.startsWith('SOURCE_')
-    ? '供应链协同系统'
-    : row.operationType.startsWith('OPERATIONS_')
-      ? '运营管理平台'
-      : '合伙人门店';
 async function openLogDetail(id: number) {
   try {
     logDetail.value = await getStoreFinishedLog(id);
@@ -487,28 +459,7 @@ async function openLogDetail(id: number) {
     adminFeedback.error(getSafeErrorMessage(error, '操作详情加载失败'));
   }
 }
-const logChanges = computed<Record<string, { before: unknown; after: unknown }>>(() => {
-  if (!logDetail.value?.changeDetails) return {};
-  try {
-    const details = JSON.parse(logDetail.value.changeDetails) as Record<string, unknown>;
-    return Object.fromEntries(
-      Object.entries(details).map(([field, value]) => {
-        const change =
-          value && typeof value === 'object' && 'before' in value && 'after' in value
-            ? (value as { before: unknown; after: unknown })
-            : { before: null, after: value };
-        return [
-          field,
-          ['状态', '来源状态', '运营状态'].includes(field)
-            ? { before: stateLabel(change.before as string), after: stateLabel(change.after as string) }
-            : change,
-        ];
-      }),
-    );
-  } catch {
-    return {};
-  }
-});
+const logChanges = computed(() => parseStoreOperationLogChanges(logDetail.value?.changeDetails, stateLabel));
 const logFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
 const appliedLogFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
 const logPagination = reactive({ current: 1, pageSize: 10 });
@@ -824,94 +775,4 @@ function resetLogFilter() {
 }
 onMounted(load);
 </script>
-<style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-.finished-list-layout {
-  grid-template-columns: minmax(0, 1fr);
-}
-.list-controls {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  gap: var(--td-comp-margin-l);
-}
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-m);
-}
-.filter-fields {
-  display: grid;
-  flex: 1;
-  grid-template-columns: 258px 230px 240px;
-  gap: var(--td-comp-margin-m);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-self: flex-start;
-  gap: var(--td-comp-margin-s);
-}
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.toolbar-buttons {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.selection-info {
-  color: #6b7280;
-  font-size: 13px;
-}
-:deep(.finished-stock-table .t-table__empty-row > td) {
-  padding-inline: 0;
-}
-.brown-button {
-  color: #fff;
-  background: #8b5e34;
-  border-color: #8b5e34;
-}
-.deep-danger-button {
-  background: #8a1f11;
-  border-color: #8a1f11;
-}
-@media (max-width: 1180px) {
-  .filter-fields {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
-  }
-}
-@media (max-width: 860px) {
-  .filter-row {
-    display: block;
-  }
-  .filter-fields {
-    grid-template-columns: 1fr;
-  }
-  .filter-actions {
-    margin-top: 12px;
-  }
-}
-
-.table-actions {
-  display: flex;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.readonly-store-fields :deep(.t-descriptions__content) {
-  background: var(--td-bg-color-component-disabled);
-}
-</style>
+<style scoped src="./index.css"></style>

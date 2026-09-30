@@ -171,7 +171,6 @@ import {
   filterFunctionCatalogByPermissions,
   getFunctionCatalogPermissionValues,
   normalizeFunctionCatalogPermissions,
-  type FunctionModule,
 } from '@/services/functionCatalog';
 import { getLoginUser } from '@/services/auth';
 import { hasAnyPermission, hasPermission } from '@/services/adminPermissions';
@@ -482,14 +481,6 @@ const openPermissionDialog = (row: RoleItem) => {
 const closePermissionDialog = () => {
   permissionDialogVisible.value = false;
   permissionRole.value = null;
-  permissionDraft.functionPermissions = [];
-};
-
-const selectAllPermissions = () => {
-  permissionDraft.functionPermissions = [...allPermissionValues.value];
-};
-
-const clearAllPermissions = () => {
   permissionDraft.functionPermissions = [];
 };
 

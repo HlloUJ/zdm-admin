@@ -291,6 +291,8 @@ function supervisorFixture({ unhealthy = false, blocked = false } = {}) {
       if (blocked) throw new Error('共享数据库正由另一任务执行结构任务');
       return { branch: 'codex/task' };
     },
+    log: () => {},
+    error: () => {},
   });
   supervisor.child = Object.assign(new EventEmitter(), { pid: 122, exitCode: null });
   supervisor.currentWorktree = root;
