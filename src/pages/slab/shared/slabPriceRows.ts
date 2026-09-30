@@ -67,3 +67,51 @@ export const buildSlabPriceRows = (
     ...sortRowsByStoreLevel(configuredRows),
   ];
 };
+
+/** Price rows shown while publishing or editing; snapshots keep their recorded source. */
+export function buildSlabSalesPriceRows(
+  editingRowId: number | null,
+  items: SlabItem[],
+  storeLevels: SlabPublishOption[],
+  markupConfigurations: SlabMarkupConfigurationRecord[],
+) {
+  const savedPrices = editingRowId == null ? [] : (items.find((item) => item.id === editingRowId)?.markupPrices ?? []);
+  const rows: {
+    id: number;
+    label: string;
+    priceCoefficient?: number;
+    priceSource?: 'auto' | 'manual';
+    sourceConfigurationId?: number;
+  }[] = savedPrices
+    .filter((price) => storeLevels.some((level) => level.id === price.storeLevelId))
+    .map((price) => ({
+      id: price.storeLevelId,
+      label:
+        storeLevels.find((level) => level.id === price.storeLevelId)?.label ||
+        markupConfigurations.find((item) => item.storeLevelId === price.storeLevelId)?.name ||
+        price.storeLevelName ||
+        `门店级别${price.storeLevelId}`,
+      priceCoefficient: Number(price.priceCoefficient),
+      priceSource: price.priceSource ?? 'manual',
+      sourceConfigurationId: price.sourceConfigurationId,
+    }));
+  const savedIds = new Set(rows.map((item) => item.id));
+  storeLevels.forEach((level) => {
+    if (savedIds.has(level.id)) return;
+    const configuration = markupConfigurations.find(
+      (item) => item.storeLevelId === level.id && item.status === 'enabled',
+    );
+    rows.push({
+      id: level.id,
+      label: level.label,
+      priceCoefficient: configuration == null ? undefined : Number(configuration.priceCoefficient),
+      priceSource: configuration == null ? 'manual' : 'auto',
+      sourceConfigurationId: configuration?.id,
+    });
+  });
+  const orderById = new Map(storeLevels.map((level, index) => [level.id, index]));
+  return rows.sort(
+    (left, right) =>
+      (orderById.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (orderById.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+  );
+}
