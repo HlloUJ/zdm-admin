@@ -939,8 +939,10 @@
 
 <script setup lang="ts">
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';
-import { buildSlabPriceRows } from '../shared/slabPriceRows';
+import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
+import { useSlabOperationLogs } from '../shared/useSlabOperationLogs';
+import { slabBatchButtons, slabRowButtons, type SlabBatchAction, type SlabRowAction } from '../shared/slabPageActions';
 import { filterSlabItems, latestOffShelfRecord, offShelfTimestamp } from '../shared/slabListFilter';
 import { createSlabFormRules } from '../shared/slabFormRules';
 import {
@@ -951,7 +953,6 @@ import {
   makeFilterState,
   makeProductForm,
   type FilterState,
-  type OperationLogFilterState,
   type OperationLogMediaValue,
   type DrawerPriceRow,
   type DetailMediaItem,
@@ -993,7 +994,6 @@ import {
   deleteSlab,
   deleteSlabs,
   getSlabPublishOptions,
-  listSlabOperationLogs,
   listSlabs,
   getSlabDetail,
   removeSlab,
@@ -1018,8 +1018,8 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 type PublisherType = SlabPublisherType;
 type SlabTab = SlabStatus;
 type ProductMode = 'create' | 'edit' | 'view';
-type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
-type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
+type RowAction = SlabRowAction;
+type BatchAction = SlabBatchAction;
 type ConfirmType =
   | 'shelf'
   | 'delete'
@@ -1092,27 +1092,22 @@ const priceDrawerVisible = ref(false);
 const priceDrawerRowId = ref<number | null>(null);
 const detailDrawerVisible = ref(false);
 const detailDrawerRow = ref<SlabItem | null>(null);
-const operationLogDrawerVisible = ref(false);
-const operationLogLoading = ref(false);
-const operationLogs = ref<SlabOperationLogRecord[]>([]);
-const operationLogTotal = ref(0);
-const operationLogDetailVisible = ref(false);
-const operationLogDetail = ref<SlabOperationLogRecord | null>(null);
-const makeOperationLogFilter = (): OperationLogFilterState => ({
-  keyword: '',
-  operationType: '',
-  operatorName: '',
-  dateRange: [],
-});
-const operationLogFilter = reactive(makeOperationLogFilter());
-const appliedOperationLogFilter = reactive(makeOperationLogFilter());
-const operationLogPagination = reactive({ current: 1, pageSize: 10 });
-const updateOperationLogFilter = (field: string, value: string | string[]) =>
-  Object.assign(operationLogFilter, { [field]: value });
-const changeOperationLogPage = (page: { current: number; pageSize: number }) => {
-  Object.assign(operationLogPagination, page);
-  void loadOperationLogs();
-};
+const {
+  operationLogDrawerVisible,
+  operationLogLoading,
+  operationLogs,
+  operationLogTotal,
+  operationLogDetailVisible,
+  operationLogDetail,
+  operationLogFilter,
+  operationLogPagination,
+  updateOperationLogFilter,
+  changeOperationLogPage,
+  openOperationLogDrawer,
+  handleOperationLogSearch,
+  handleOperationLogReset,
+  openOperationLogDetailById,
+} = useSlabOperationLogs();
 const detailPriceRows = ref<DrawerPriceRow[]>([]);
 const detailMediaItems = computed<DetailMediaItem[]>(() => {
   const row = detailDrawerRow.value;
@@ -1487,54 +1482,9 @@ const cornerFields: {
   { key: 'corner4Length', label: '扣角4长' },
   { key: 'corner4Width', label: '扣角4宽' },
 ];
-function sortRowsByStoreLevel<T>(rows: T[], resolveId: (row: T) => number | undefined): T[] {
-  const orderById = new Map(publishOptions.storeLevels.map((level, index) => [level.id, index]));
-  return [...rows].sort((left, right) => {
-    const leftOrder = orderById.get(resolveId(left) ?? -1) ?? Number.MAX_SAFE_INTEGER;
-    const rightOrder = orderById.get(resolveId(right) ?? -1) ?? Number.MAX_SAFE_INTEGER;
-    return leftOrder - rightOrder;
-  });
-}
-const salesPriceRows = computed(() => {
-  const savedPrices =
-    editingRowId.value == null
-      ? []
-      : (tableData.value.find((item) => item.id === editingRowId.value)?.markupPrices ?? []);
-  const rows: {
-    id: number;
-    label: string;
-    priceCoefficient?: number;
-    priceSource?: 'auto' | 'manual';
-    sourceConfigurationId?: number;
-  }[] = savedPrices
-    .filter((price) => publishOptions.storeLevels.some((level) => level.id === price.storeLevelId))
-    .map((price) => ({
-      id: price.storeLevelId,
-      label:
-        publishOptions.storeLevels.find((level) => level.id === price.storeLevelId)?.label ||
-        markupConfigurations.value.find((item) => item.storeLevelId === price.storeLevelId)?.name ||
-        price.storeLevelName ||
-        `门店级别${price.storeLevelId}`,
-      priceCoefficient: Number(price.priceCoefficient),
-      priceSource: price.priceSource ?? 'manual',
-      sourceConfigurationId: price.sourceConfigurationId,
-    }));
-  const savedIds = new Set(rows.map((item) => item.id));
-  publishOptions.storeLevels.forEach((level) => {
-    if (savedIds.has(level.id)) return;
-    const configuration = markupConfigurations.value.find(
-      (item) => item.storeLevelId === level.id && item.status === 'enabled',
-    );
-    rows.push({
-      id: level.id,
-      label: level.label,
-      priceCoefficient: configuration == null ? undefined : Number(configuration.priceCoefficient),
-      priceSource: configuration == null ? 'manual' : 'auto',
-      sourceConfigurationId: configuration?.id,
-    });
-  });
-  return sortRowsByStoreLevel(rows, (row) => row.id);
-});
+const salesPriceRows = computed(() =>
+  buildSlabSalesPriceRows(editingRowId.value, tableData.value, publishOptions.storeLevels, markupConfigurations.value),
+);
 const partnerPriceRows = computed(() => salesPriceRows.value);
 const { isValidMeasurement, isValidSalesNumber, salesRules, stockInputProps, productRules } = createSlabFormRules(
   invalidMeasurementFields,
@@ -1618,100 +1568,12 @@ const pageData = computed(() => {
 const shelfErrors = reactive<Record<number, string>>({});
 const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
-const batchButtons = computed(() => {
-  const map: Record<
-    SlabTab,
-    {
-      label: string;
-      action: BatchAction;
-      theme: 'primary' | 'danger' | 'default';
-      icon: string;
-      className?: string;
-    }[]
-  > = {
-    warehouse: [
-      { label: '发布商品', action: 'publish', theme: 'primary', icon: 'add' },
-      { label: '批量上架', action: 'batchShelf', theme: 'primary', icon: 'upload' },
-    ],
-    selling: [
-      { label: '发布商品', action: 'publish', theme: 'primary', icon: 'add' },
-      { label: '批量下架', action: 'batchOffShelf', theme: 'default', icon: 'download', className: 'brown-button' },
-    ],
-    offShelf: [{ label: '批量放回到仓库', action: 'batchRestore', theme: 'primary', icon: 'rollback' }],
-    soldOut: [],
-    recycle: [
-      { label: '批量放回到仓库', action: 'batchRestore', theme: 'primary', icon: 'rollback' },
-      { label: '批量彻底删除', action: 'batchPurge', theme: 'danger', icon: 'delete', className: 'dark-red-button' },
-      { label: '清空回收站', action: 'clearRecycle', theme: 'danger', icon: 'clear' },
-    ],
-  };
-  const actionPermissions: Record<BatchAction, string> = {
-    publish: 'publish',
-    batchShelf: 'batch-shelf',
-    batchOffShelf: 'batch-off-shelf',
-    batchRestore: 'batch-restore',
-    batchPurge: 'batch-purge',
-    clearRecycle: 'clear',
-  };
-  return map[activeTab.value].filter((button) => hasSlabAction(activeTab.value, actionPermissions[button.action]));
-});
+const batchButtons = computed(() => slabBatchButtons(activeTab.value, hasSlabAction));
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
   const count = tableData.value.filter((item) => item.status === tab.value).length;
   return count ? `${tab.label} ${count}` : tab.label;
 };
-const rowActions = (): {
-  label: string;
-  action: RowAction;
-  theme: 'primary' | 'warning' | 'danger' | 'default';
-}[] => {
-  const filterActions = (
-    actions: {
-      label: string;
-      action: RowAction;
-      theme: 'primary' | 'warning' | 'danger' | 'default';
-    }[],
-  ) => {
-    const actionPermissions: Partial<Record<RowAction, string>> = {
-      detail: 'detail',
-      price: 'price',
-      shelf: 'shelf',
-      edit: 'edit',
-      delete: 'delete',
-      offShelf: 'off-shelf',
-      restore: 'restore',
-      purge: 'purge',
-    };
-    return actions.filter((action) => hasSlabAction(activeTab.value, actionPermissions[action.action]!));
-  };
-  if (activeTab.value === 'warehouse') {
-    return filterActions([
-      { label: '上架', action: 'shelf', theme: 'primary' },
-      { label: '编辑', action: 'edit', theme: 'primary' },
-      { label: '删除', action: 'delete', theme: 'danger' },
-    ]);
-  }
-  if (activeTab.value === 'selling') {
-    return filterActions([
-      { label: '下架', action: 'offShelf', theme: 'warning' },
-      { label: '编辑', action: 'edit', theme: 'primary' },
-    ]);
-  }
-  if (activeTab.value === 'offShelf') {
-    return filterActions([
-      { label: '详情', action: 'detail', theme: 'primary' },
-      { label: '放回仓库', action: 'restore', theme: 'primary' },
-      { label: '删除', action: 'delete', theme: 'danger' },
-    ]);
-  }
-  if (activeTab.value === 'soldOut') {
-    return filterActions([{ label: '详情', action: 'detail', theme: 'primary' }]);
-  }
-  return filterActions([
-    { label: '详情', action: 'detail', theme: 'primary' },
-    { label: '放回仓库', action: 'restore', theme: 'primary' },
-    { label: '彻底删除', action: 'purge', theme: 'danger' },
-  ]);
-};
+const rowActions = () => slabRowButtons(activeTab.value, hasSlabAction);
 const handleTabChange = () => {
   selectedKeys.value = [];
   ensureCurrentPage();
@@ -2308,45 +2170,6 @@ const handleRowAction = async (action: RowAction, row: SlabItem) => {
   if (action === 'restore') openConfirm('restore', row, `是否放回仓库“${row.name}”？`);
   if (action === 'purge') openConfirm('purge', row, `彻底删除后无法恢复，是否彻底删除大板“${row.name}”？`);
   if (action === 'offShelf') openReasonDialog('offShelf', row);
-};
-const loadOperationLogs = async () => {
-  operationLogLoading.value = true;
-  try {
-    const [startDate, endDate] = appliedOperationLogFilter.dateRange;
-    const result = await listSlabOperationLogs({
-      keyword: appliedOperationLogFilter.keyword.trim(),
-      operationType: appliedOperationLogFilter.operationType,
-      operatorName: appliedOperationLogFilter.operatorName.trim(),
-      startDate,
-      endDate,
-      page: operationLogPagination.current,
-      pageSize: operationLogPagination.pageSize,
-    });
-    operationLogs.value = result.records;
-    operationLogTotal.value = result.total;
-  } catch (error) {
-    adminFeedback.actionError({ action: '加载操作日志', error, fallback: '请稍后重试' });
-  } finally {
-    operationLogLoading.value = false;
-  }
-};
-const openOperationLogDrawer = async () => {
-  operationLogDrawerVisible.value = true;
-  operationLogPagination.current = 1;
-  await loadOperationLogs();
-};
-const handleOperationLogSearch = async () => {
-  Object.assign(appliedOperationLogFilter, operationLogFilter, { dateRange: [...operationLogFilter.dateRange] });
-  operationLogPagination.current = 1;
-  await loadOperationLogs();
-};
-const handleOperationLogReset = async () => {
-  Object.assign(operationLogFilter, makeOperationLogFilter());
-  await handleOperationLogSearch();
-};
-const openOperationLogDetailById = (id: number) => {
-  operationLogDetail.value = operationLogs.value.find((record) => record.id === id) || null;
-  operationLogDetailVisible.value = Boolean(operationLogDetail.value);
 };
 const openConfirm = (type: ConfirmType, row: SlabItem | null, content: string) => {
   confirmState.type = type;
