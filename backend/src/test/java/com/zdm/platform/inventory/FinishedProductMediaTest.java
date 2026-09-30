@@ -19,11 +19,13 @@ class FinishedProductMediaTest {
   private final MediaReferenceService references = mock(MediaReferenceService.class);
   private final FinishedProductService service = new FinishedProductService(
       null, null, null, null, null, assets, null, references, null, mock(FinishedOperationLogService.class), mock(ProductLifecycleService.class));
+  private final FinishedProductWriteValidator validator = new FinishedProductWriteValidator(
+      null, assets, null, null, null);
 
   @Test
   void savesFiveImagesAndUsesFirstAsCover() {
     FinishedProduct product = product(List.of(11L, 12L, 13L, 14L, 15L));
-    ReflectionTestUtils.invokeMethod(service, "validateMedia", product);
+    validator.validateMedia(product);
     ReflectionTestUtils.invokeMethod(service, "syncMediaReferences", product);
     assertThat(product.getMainImageMediaId()).isEqualTo(11L);
     verify(references).replace("FINISHED_PRODUCT", 1L,
@@ -36,7 +38,7 @@ class FinishedProductMediaTest {
     for (List<Long> ids : List.of(List.<Long>of(), List.of(11L, 11L),
         List.of(11L, 12L, 13L, 14L, 15L, 16L))) {
       FinishedProduct product = product(ids);
-      assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateMedia", product))
+      assertThatThrownBy(() -> validator.validateMedia(product))
           .isInstanceOf(IllegalArgumentException.class);
     }
   }
@@ -45,17 +47,17 @@ class FinishedProductMediaTest {
   void acceptsLegacySingleImageAndRejectsVideoAsImage() {
     FinishedProduct product = product(null);
     product.setMainImageMediaId(11L);
-    ReflectionTestUtils.invokeMethod(service, "validateMedia", product);
+    validator.validateMedia(product);
     assertThat(product.getMainImageMediaIds()).containsExactly(11L);
     product.setMainImageMediaIds(List.of(20L));
-    assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateMedia", product))
+    assertThatThrownBy(() -> validator.validateMedia(product))
         .isInstanceOf(IllegalArgumentException.class).hasMessage("请上传商品主图");
   }
 
   @Test
   void replacementSendsOnlyRemainingImagesToReferenceLifecycle() {
     FinishedProduct product = product(List.of(15L, 12L));
-    ReflectionTestUtils.invokeMethod(service, "validateMedia", product);
+    validator.validateMedia(product);
     ReflectionTestUtils.invokeMethod(service, "syncMediaReferences", product);
     verify(references).replace("FINISHED_PRODUCT", 1L,
         Map.of("mainImage", 15L, "mainImage2", 12L, "video", 20L));

@@ -13,9 +13,12 @@ public interface SlabInventoryMapper extends BaseMapper<SlabInventory> {
       LEFT JOIN slab_varieties variety ON variety.id = si.variety_id
       LEFT JOIN slab_origins origin ON origin.id = si.origin_id
       LEFT JOIN suppliers supplier ON supplier.id = si.supplier_id
+      WHERE ((#{supplyChain} = TRUE AND si.source_status <> 'purged')
+        OR (#{supplyChain} = FALSE AND si.operations_deleted = FALSE))
+        AND (#{allData} = TRUE OR si.created_by_account_id = #{accountId})
       ORDER BY si.created_at DESC, si.id DESC
       """)
-  List<SlabInventory> selectListWithDetails();
+  List<SlabInventory> selectListWithDetails(boolean supplyChain, boolean allData, Long accountId);
 
   @Select("""
       SELECT si.*, variety.name AS variety_name, origin.name AS origin_name, supplier.name AS supplier_name

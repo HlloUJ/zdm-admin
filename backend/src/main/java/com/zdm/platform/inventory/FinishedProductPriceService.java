@@ -36,6 +36,18 @@ public class FinishedProductPriceService {
     return prices;
   }
 
+  public Map<Long, List<FinishedProductPrice>> listPricesByProductIds(List<Long> productIds) {
+    if (productIds.isEmpty()) {
+      return Map.of();
+    }
+    return mapper.selectList(Wrappers.<FinishedProductPrice>lambdaQuery()
+        .in(FinishedProductPrice::getFinishedProductId, productIds)
+        .orderByAsc(FinishedProductPrice::getFinishedProductId)
+        .orderByAsc(FinishedProductPrice::getSkuId)
+        .orderByAsc(FinishedProductPrice::getId)).stream()
+        .collect(Collectors.groupingBy(FinishedProductPrice::getFinishedProductId));
+  }
+
   public void requireCompletePrices(Long productId, List<FinishedProductVariant> variants) {
     List<FinishedProductPrice> prices = listPrices(productId);
     Set<Long> expectedLevels = storeLevelDirectory.listOperationalPricingLevels().stream()

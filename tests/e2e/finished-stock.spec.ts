@@ -1721,7 +1721,7 @@ test('preserves sparse SKU identities and values when editing without changing d
   const color = dialog.locator('.spec-group').filter({ hasText: '颜色' });
   const size = dialog.locator('.spec-group').filter({ hasText: '尺寸' });
   await color.getByPlaceholder('请输入属性值').first().fill('未确认颜色');
-  await size.locator('.spec-group-head').dragTo(color.locator('.spec-group-head'));
+  await size.locator('.spec-group-head').dragTo(color, { targetPosition: { x: 10, y: 10 } });
   await expect(dialog.locator('.spec-group-title')).toHaveText(['尺寸', '颜色']);
   await dialog.getByRole('button', { name: '重置', exact: true }).click();
   await expect(dialog.locator('.spec-group-title')).toHaveText(['颜色', '尺寸']);

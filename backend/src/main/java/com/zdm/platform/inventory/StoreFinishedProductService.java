@@ -5,8 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -65,6 +64,7 @@ public class StoreFinishedProductService {
   private final FinishedProductService products;
   private final FinishedProductMapper productMapper;
   private final ObjectMapper json;
+  private final StoreFinishedLogReader logReader;
 
   public StoreFinishedProductService(JdbcTemplate jdbc, CityPartnerStoreScope scopes,
       FinishedProductService products, FinishedProductMapper productMapper, ObjectMapper json) {
@@ -73,11 +73,12 @@ public class StoreFinishedProductService {
     this.products = products;
     this.productMapper = productMapper;
     this.json = json;
+    this.logReader = new StoreFinishedLogReader(jdbc, scopes);
   }
 
   public List<PoolProduct> pool() {
     var store = scopes.require();
-    return jdbc.query("""
+    List<Map<String, Object>> rows = jdbc.queryForList("""
         SELECT product.id, product.name, product.sku, product.total_stock,
           supplier.name AS supplier_name, product.category_id
         FROM finished_products product
@@ -88,25 +89,37 @@ public class StoreFinishedProductService {
             WHERE selected.store_id = ? AND selected.finished_product_id = product.id
               AND selected.selection_generation = product.selection_generation)
         ORDER BY product.created_at DESC, product.id DESC
-        """, (row, index) -> {
-          Long id = row.getLong("id");
-          FinishedProduct detailed = publicProduct(id);
-          return new PoolProduct(id, row.getString("name"), row.getString("sku"),
-              row.getInt("total_stock"), detailed.getMainImageUrl(),
-              row.getObject("category_id", Long.class), row.getString("supplier_name"));
-        }, store.storeId());
+        """, store.storeId());
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<Long> ids = rows.stream().map(row -> number(row.get("id"))).toList();
+    Map<Long, FinishedProduct> details = products.withListDetails(
+        productMapper.selectBatchIds(ids)).stream()
+        .collect(java.util.stream.Collectors.toMap(FinishedProduct::getId, product -> product));
+    return rows.stream().map(row -> {
+      Long id = number(row.get("id"));
+      FinishedProduct detailed = details.get(id);
+      if (detailed == null) {
+        throw new IllegalArgumentException("来源商品不存在");
+      }
+      return new PoolProduct(id, (String) row.get("name"), (String) row.get("sku"),
+          ((Number) row.get("total_stock")).intValue(), detailed.getMainImageUrl(),
+          number(row.get("category_id")), (String) row.get("supplier_name"));
+    }).toList();
   }
 
   public List<ProductView> list() {
     var store = scopes.require();
-    List<Long> ids = jdbc.queryForList("""
-        SELECT listing.id FROM store_finished_products listing
+    List<Map<String, Object>> listings = jdbc.queryForList("""
+        SELECT listing.* FROM store_finished_products listing
         JOIN finished_products product ON product.id = listing.finished_product_id
           AND product.selection_generation = listing.selection_generation
         WHERE listing.tenant_id = ? AND listing.store_id = ?
         ORDER BY listing.created_at DESC, listing.id DESC
-        """, Long.class, store.tenantId(), store.storeId());
-    return ids.stream().map(id -> view(store, listing(store, id, false))).toList();
+        """, store.tenantId(), store.storeId());
+    if (listings.isEmpty()) { return List.of(); }
+    return listViews(store, listings);
   }
 
   public ProductView detail(Long id) {
@@ -327,101 +340,92 @@ public class StoreFinishedProductService {
   }
 
   public List<LogEntry> logs() {
-    var store = scopes.require();
-    return jdbc.query("""
-        SELECT id, listing_id, finished_product_id, product_name, operation_type,
-          operation_summary, before_status, after_status, change_details,
-          operator_name, operated_at
-        FROM store_finished_operation_logs
-        WHERE tenant_id = ? AND store_id = ? ORDER BY operated_at DESC, id DESC
-        """, (row, index) -> new LogEntry(row.getLong("id"),
-        row.getObject("listing_id", Long.class), row.getLong("finished_product_id"),
-        row.getString("product_name"), row.getString("operation_type"),
-        row.getString("operation_summary"), row.getString("before_status"),
-        row.getString("after_status"), row.getString("change_details"),
-        row.getString("operator_name"), row.getTimestamp("operated_at").toLocalDateTime()),
-        store.tenantId(), store.storeId());
+    return logReader.logs();
   }
 
   public LogPage logPage(String keyword, String operationType, String operatorName,
       String startDate, String endDate, int requestedPage, int requestedSize) {
-    var store = scopes.require();
-    int page = Math.max(1, requestedPage);
-    int size = Math.clamp(requestedSize, 1, 100);
-    StringBuilder conditions = new StringBuilder("tenant_id = ? AND store_id = ?");
-    List<Object> args = new ArrayList<>(List.of(store.tenantId(), store.storeId()));
-    if (keyword != null && !keyword.isBlank()) {
-      conditions.append(" AND (product_name LIKE ? OR CAST(finished_product_id AS CHAR) LIKE ?)");
-      args.add("%" + keyword.trim() + "%");
-      args.add("%" + keyword.trim() + "%");
-    }
-    if (operationType != null && !operationType.isBlank()) {
-      if ("UPDATE".equals(operationType)) {
-        conditions.append(" AND operation_type IN ('UPDATE','PRICE_UPDATE')");
-      } else if ("RESTORE".equals(operationType)) {
-        conditions.append(" AND operation_type IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')");
-      } else {
-        conditions.append(" AND operation_type = ?");
-        args.add(operationType);
-      }
-    }
-    if (operatorName != null && !operatorName.isBlank()) {
-      conditions.append(" AND operator_name LIKE ?");
-      args.add("%" + operatorName.trim() + "%");
-    }
-    if (startDate != null && !startDate.isBlank()) {
-      conditions.append(" AND operated_at >= ?");
-      args.add(startDate + " 00:00:00");
-    }
-    if (endDate != null && !endDate.isBlank()) {
-      conditions.append(" AND operated_at < DATE_ADD(?, INTERVAL 1 DAY)");
-      args.add(endDate);
-    }
-    Long count = jdbc.queryForObject(
-        "SELECT COUNT(*) FROM store_finished_operation_logs WHERE " + conditions,
-        Long.class, args.toArray());
-    long total = count == null ? 0L : count;
-    List<Object> pageArgs = new ArrayList<>(args);
-    pageArgs.add(size);
-    pageArgs.add((page - 1) * size);
-    List<LogEntry> records = jdbc.query("""
-        SELECT id, listing_id, finished_product_id, product_name, operation_type,
-          operation_summary, before_status, after_status, change_details,
-          operator_name, operated_at
-        FROM store_finished_operation_logs WHERE
-        """ + conditions + " ORDER BY operated_at DESC, id DESC LIMIT ? OFFSET ?",
-        (row, index) -> logEntry(row), pageArgs.toArray());
-    return new LogPage(records, total, page, size);
+    return logReader.logPage(keyword, operationType, operatorName,
+        startDate, endDate, requestedPage, requestedSize);
   }
 
   public LogEntry logDetail(Long id) {
-    var store = scopes.require();
-    return jdbc.query("""
-        SELECT id, listing_id, finished_product_id, product_name, operation_type,
-          operation_summary, before_status, after_status, change_details,
-          operator_name, operated_at
-        FROM store_finished_operation_logs WHERE id = ? AND tenant_id = ? AND store_id = ?
-        """, (row, index) -> logEntry(row), id, store.tenantId(), store.storeId())
-        .stream().findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("本门店操作日志不存在"));
+    return logReader.logDetail(id);
   }
 
-  private static LogEntry logEntry(ResultSet row) throws SQLException {
-    String operationType = row.getString("operation_type");
-    boolean legacyPriceEdit = "PRICE_UPDATE".equals(operationType);
-    return new LogEntry(row.getLong("id"), row.getObject("listing_id", Long.class),
-        row.getLong("finished_product_id"), row.getString("product_name"),
-        legacyPriceEdit ? "UPDATE" : operationType,
-        legacyPriceEdit ? "编辑商品" : row.getString("operation_summary"),
-        row.getString("before_status"), row.getString("after_status"),
-        row.getString("change_details"), row.getString("operator_name"),
-        row.getTimestamp("operated_at").toLocalDateTime());
+  private record RolePriceKey(Long listingId, Long skuId, Long roleId) {}
+
+  private List<ProductView> listViews(CityPartnerStoreScope.Store store,
+      List<Map<String, Object>> listings) {
+    List<Long> productIds = listings.stream()
+        .map(listing -> number(listing.get("finished_product_id"))).distinct().toList();
+    List<Long> listingIds = listings.stream().map(listing -> number(listing.get("id"))).toList();
+    Map<Long, FinishedProduct> productById = new LinkedHashMap<>();
+    products.withListDetails(productMapper.selectBatchIds(productIds))
+        .forEach(product -> productById.put(product.getId(), product));
+    Map<Long, Map<String, Object>> sourceById = new LinkedHashMap<>();
+    queryByIds("SELECT * FROM finished_products WHERE id IN (", productIds)
+        .forEach(source -> sourceById.put(number(source.get("id")), source));
+    Map<Long, String> supplierNames = namesById("suppliers", productById.values().stream()
+        .map(FinishedProduct::getSupplierId).filter(Objects::nonNull).distinct().toList());
+    Map<Long, String> categoryNames = namesById("product_categories", productById.values().stream()
+        .map(FinishedProduct::getCategoryId).filter(Objects::nonNull).distinct().toList());
+    List<Map<String, Object>> configurations = jdbc.queryForList("""
+        SELECT config.role_id, role.name AS role_name, config.price_coefficient
+        FROM store_finished_role_price_configurations config
+        JOIN roles role ON role.id = config.role_id AND role.status = 'enabled'
+        WHERE config.tenant_id = ? AND config.store_id = ? AND config.status = 'enabled'
+        ORDER BY role.created_at DESC, role.id DESC
+        """, store.tenantId(), store.storeId());
+    Map<RolePriceKey, BigDecimal> manualPrices = new LinkedHashMap<>();
+    queryByIds("SELECT listing_id, sku_id, role_id, manual_price "
+        + "FROM store_finished_role_price_overrides WHERE listing_id IN (", listingIds)
+        .forEach(row -> manualPrices.put(new RolePriceKey(number(row.get("listing_id")),
+            number(row.get("sku_id")), number(row.get("role_id"))),
+            (BigDecimal) row.get("manual_price")));
+    return listings.stream().map(listing -> {
+      Long productId = number(listing.get("finished_product_id"));
+      FinishedProduct product = productById.get(productId);
+      if (product == null) { throw new IllegalArgumentException("来源商品不存在"); }
+      Map<String, Object> source = sourceById.get(productId);
+      if (source == null) { throw new IllegalArgumentException("来源商品不存在"); }
+      Long listingId = number(listing.get("id"));
+      return renderView(listing, product, source,
+          supplierNames.get(product.getSupplierId()), categoryNames.get(product.getCategoryId()),
+          variant -> skuPriceFromBatch(store, product, variant, listingId,
+              configurations, manualPrices));
+    }).toList();
+  }
+
+  private List<Map<String, Object>> queryByIds(String sqlPrefix, List<Long> ids) {
+    String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+    return jdbc.queryForList(sqlPrefix + placeholders + ")", ids.toArray());
+  }
+
+  private Map<Long, String> namesById(String table, List<Long> ids) {
+    if (ids.isEmpty()) { return Map.of(); }
+    Map<Long, String> names = new LinkedHashMap<>();
+    queryByIds("SELECT id, name FROM " + table + " WHERE id IN (", ids)
+        .forEach(row -> names.put(number(row.get("id")), (String) row.get("name")));
+    return names;
   }
 
   private ProductView view(CityPartnerStoreScope.Store store, Map<String, Object> listing) {
     Long productId = number(listing.get("finished_product_id"));
     FinishedProduct product = publicProduct(productId);
     Map<String, Object> source = source(productId, false);
+    String supplierName = jdbc.query("SELECT name FROM suppliers WHERE id = ?",
+        (row, index) -> row.getString("name"), product.getSupplierId()).stream().findFirst().orElse(null);
+    String categoryName = jdbc.query("SELECT name FROM product_categories WHERE id = ?",
+        (row, index) -> row.getString("name"), product.getCategoryId()).stream().findFirst().orElse(null);
+    return renderView(listing, product, source, supplierName, categoryName,
+        variant -> skuPrice(store, listing, product, variant));
+  }
+
+  private ProductView renderView(Map<String, Object> listing, FinishedProduct product,
+      Map<String, Object> source, String supplierName, String categoryName,
+      Function<FinishedProductVariant, SkuPrice> priceForVariant) {
+    Long productId = number(listing.get("finished_product_id"));
     boolean unavailable = !isUsable(source);
     String status = (String) listing.get("status");
     String effective = "selling".equals(status) && stock(source) == 0 ? "soldOut" : status;
@@ -439,12 +443,8 @@ public class StoreFinishedProductService {
       reasons.add("该商品当前未在运营端上架");
     }
     String reason = reasons.isEmpty() ? null : String.join("；", reasons);
-    String supplierName = jdbc.query("SELECT name FROM suppliers WHERE id = ?",
-        (row, index) -> row.getString("name"), product.getSupplierId()).stream().findFirst().orElse(null);
-    String categoryName = jdbc.query("SELECT name FROM product_categories WHERE id = ?",
-        (row, index) -> row.getString("name"), product.getCategoryId()).stream().findFirst().orElse(null);
     List<SkuPrice> prices = product.getVariants() == null ? List.of()
-        : product.getVariants().stream().map(variant -> skuPrice(store, listing, product, variant)).toList();
+        : product.getVariants().stream().map(priceForVariant).toList();
     return new ProductView(number(listing.get("id")), productId, product.getName(), product.getSku(),
         status, effective, unavailable, reason, product.getTotalStock(), product.getMainImageUrl(),
         product.getMainImageUrls() == null ? List.of() : product.getMainImageUrls(), product.getVideoUrl(),
@@ -458,13 +458,8 @@ public class StoreFinishedProductService {
       FinishedProduct product, FinishedProductVariant variant) {
     Long listingId = number(listing.get("id"));
     Long skuId = variant.getId();
-    BigDecimal cost = product.getMarkupPrices() == null ? null : product.getMarkupPrices().stream()
-        .filter(price -> Objects.equals(price.getSkuId(), skuId)
-            && Objects.equals(price.getStoreLevelId(), store.storeLevelId()))
-        .map(FinishedProductPrice::getPrice).findFirst().orElse(null);
-    BigDecimal operationsGuide = product.getGuidePrices() == null ? null : product.getGuidePrices().stream()
-        .filter(price -> Objects.equals(price.getSkuId(), skuId))
-        .map(FinishedProductGuidePrice::getPrice).findFirst().orElse(null);
+    BigDecimal cost = partnerPrice(store, product, skuId);
+    BigDecimal operationsGuide = guidePrice(product, skuId);
     List<RolePrice> rolePrices = jdbc.query("""
         SELECT config.role_id, role.name AS role_name, config.price_coefficient,
           override_price.manual_price
@@ -483,10 +478,46 @@ public class StoreFinishedProductService {
           return new RolePrice(row.getLong("role_id"), row.getString("role_name"),
               coefficient, effective, manual == null ? "auto" : "manual");
         }, listingId, skuId, store.tenantId(), store.storeId());
-    return new SkuPrice(skuId, variant.getVariantLabel(), variant.getStock(), cost, operationsGuide,
-        rolePrices, variant.getDisplayMode(),
-        variant.getSalesAttributes(), variant.getMaterial(), variant.getLengthValue(),
-        variant.getColor(), variant.getSizeValue());
+    return skuPriceView(variant, cost, operationsGuide, rolePrices);
+  }
+
+  private SkuPrice skuPriceFromBatch(CityPartnerStoreScope.Store store,
+      FinishedProduct product, FinishedProductVariant variant, Long listingId,
+      List<Map<String, Object>> configurations, Map<RolePriceKey, BigDecimal> manualPrices) {
+    Long skuId = variant.getId();
+    BigDecimal cost = partnerPrice(store, product, skuId);
+    BigDecimal operationsGuide = guidePrice(product, skuId);
+    List<RolePrice> rolePrices = configurations.stream().map(config -> {
+      Long roleId = number(config.get("role_id"));
+      BigDecimal coefficient = (BigDecimal) config.get("price_coefficient");
+      BigDecimal manual = manualPrices.get(new RolePriceKey(listingId, skuId, roleId));
+      BigDecimal effective = manual == null && cost != null
+          ? cost.multiply(coefficient).setScale(2, RoundingMode.HALF_UP) : manual;
+      return new RolePrice(roleId, (String) config.get("role_name"), coefficient,
+          effective, manual == null ? "auto" : "manual");
+    }).toList();
+    return skuPriceView(variant, cost, operationsGuide, rolePrices);
+  }
+
+  private BigDecimal partnerPrice(CityPartnerStoreScope.Store store,
+      FinishedProduct product, Long skuId) {
+    return product.getMarkupPrices() == null ? null : product.getMarkupPrices().stream()
+        .filter(price -> Objects.equals(price.getSkuId(), skuId)
+            && Objects.equals(price.getStoreLevelId(), store.storeLevelId()))
+        .map(FinishedProductPrice::getPrice).findFirst().orElse(null);
+  }
+
+  private BigDecimal guidePrice(FinishedProduct product, Long skuId) {
+    return product.getGuidePrices() == null ? null : product.getGuidePrices().stream()
+        .filter(price -> Objects.equals(price.getSkuId(), skuId))
+        .map(FinishedProductGuidePrice::getPrice).findFirst().orElse(null);
+  }
+
+  private SkuPrice skuPriceView(FinishedProductVariant variant, BigDecimal cost,
+      BigDecimal operationsGuide, List<RolePrice> rolePrices) {
+    return new SkuPrice(variant.getId(), variant.getVariantLabel(), variant.getStock(), cost,
+        operationsGuide, rolePrices, variant.getDisplayMode(), variant.getSalesAttributes(),
+        variant.getMaterial(), variant.getLengthValue(), variant.getColor(), variant.getSizeValue());
   }
 
   private FinishedProduct publicProduct(Long productId) {

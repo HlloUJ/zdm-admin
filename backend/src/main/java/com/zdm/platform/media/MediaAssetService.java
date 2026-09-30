@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,6 +100,15 @@ public class MediaAssetService extends ServiceImpl<MediaAssetMapper, MediaAsset>
     }
     MediaAsset asset = getById(mediaId);
     return asset == null || "deleted".equals(asset.getStatus()) ? null : publicUrl(asset);
+  }
+
+  public Map<Long, String> publicUrls(Collection<Long> mediaIds) {
+    if (mediaIds.isEmpty()) {
+      return Map.of();
+    }
+    return listByIds(mediaIds).stream()
+        .filter(asset -> !"deleted".equals(asset.getStatus()))
+        .collect(Collectors.toMap(MediaAsset::getId, this::publicUrl));
   }
 
   public Resource load(String publicId) {

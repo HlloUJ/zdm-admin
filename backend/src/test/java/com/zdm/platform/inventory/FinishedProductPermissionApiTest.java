@@ -55,6 +55,7 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
   @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
+  @Autowired private FinishedProductService products;
 
   private void identity(String scope, String... actions) { identityFor("admin",scope,actions); }
   private void identityFor(String client,String scope,String... actions) {
@@ -63,6 +64,52 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
   }
   @AfterEach void clear() { SecurityContextHolder.clearContext(); }
+
+  @Test void listQueriesDoNotGrowWithProductCount() {
+    identity("all", "warehouse.view");
+    jdbc.update("INSERT INTO finished_products (id,name,status,created_by_account_id) VALUES (99001,'商品一','warehouse',1)");
+    long beforeSingle = selectCount();
+    assertThat(products.listWithDetails()).extracting(FinishedProduct::getId).contains(99001L);
+    long singleQueries = selectCount() - beforeSingle;
+
+    jdbc.update("INSERT INTO finished_products (id,name,status,created_by_account_id) VALUES "
+        + "(99002,'商品二','warehouse',1),(99003,'商品三','warehouse',1)");
+    sqlSession.clearCache();
+    long beforeThree = selectCount();
+    assertThat(products.listWithDetails()).extracting(FinishedProduct::getId).contains(99001L, 99002L, 99003L);
+    long threeQueries = selectCount() - beforeThree;
+    System.out.printf("finished list SELECT count: one=%d, three=%d%n", singleQueries, threeQueries);
+    assertThat(threeQueries).withFailMessage("list SELECT count: one=%d, three=%d", singleQueries, threeQueries)
+        .isLessThanOrEqualTo(singleQueries + 2);
+
+    sqlSession.clearCache();
+    long beforeLegacy = selectCount();
+    long legacyStart = System.nanoTime();
+    List<FinishedProduct> legacy = products.lambdaQuery()
+        .eq(FinishedProduct::getOperationsDeleted, false)
+        .orderByDesc(FinishedProduct::getCreatedAt)
+        .orderByDesc(FinishedProduct::getId)
+        .list().stream().map(products::withDetails).toList();
+    long legacyNanos = System.nanoTime() - legacyStart;
+    long legacyQueries = selectCount() - beforeLegacy;
+
+    sqlSession.clearCache();
+    long beforeBatch = selectCount();
+    long batchStart = System.nanoTime();
+    List<FinishedProduct> batch = products.listWithDetails();
+    long batchNanos = System.nanoTime() - batchStart;
+    long batchQueries = selectCount() - beforeBatch;
+    System.out.printf("finished list 3-product baseline: %d SELECT, %.2f ms; batch: %d SELECT, %.2f ms%n",
+        legacyQueries, legacyNanos / 1_000_000.0, batchQueries, batchNanos / 1_000_000.0);
+    JsonNode batchJson = json.valueToTree(batch);
+    JsonNode legacyJson = json.valueToTree(legacy);
+    assertThat(batchJson).isEqualTo(legacyJson);
+    assertThat(batchQueries).isLessThan(legacyQueries);
+  }
+
+  private long selectCount() {
+    return jdbc.queryForObject("SHOW SESSION STATUS LIKE 'Com_select'", (row, index) -> row.getLong("Value"));
+  }
 
   @Test void tabViewLoadsOptionsWithoutGrantingBaseDataManagement() throws Exception {
     jdbc.update("INSERT INTO product_categories (id,name,scope,created_by_account_id) VALUES (99001,'本人分类','finished',1),(99002,'他人分类','finished',2),(99003,'配件分类','accessory',1)");
@@ -122,6 +169,10 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     payload.put("detail", "<p>原始详情</p><img src=\"media:" + image + "\"><video src=\"media:" + video + "\" controls></video>");
     JsonNode created = data(mvc.perform(post("/api/admin/finished-products").contentType("application/json").content(json.writeValueAsBytes(payload))));
     long id = created.path("id").asLong();
+    JsonNode singleDetails = json.valueToTree(products.withDetails(products.getById(id)));
+    JsonNode listDetails = json.valueToTree(products.listWithDetails().stream()
+        .filter(product -> product.getId().equals(id)).findFirst().orElseThrow());
+    assertThat(listDetails).isEqualTo(singleDetails);
     String storedDetail = jdbc.queryForObject("SELECT detail FROM finished_products WHERE id=?", String.class, id);
     assertThat(storedDetail).contains("media:" + image, "media:" + video).doesNotContain("/api/open/media/");
     var mediaReferences = jdbc.queryForList("SELECT field_key,media_id FROM media_references WHERE business_domain='FINISHED_PRODUCT' AND business_id=? ORDER BY field_key", id);

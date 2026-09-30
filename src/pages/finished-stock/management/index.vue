@@ -1077,6 +1077,39 @@
 </template>
 
 <script setup lang="ts">
+import { filterFinishedStockItems } from '../shared/finishedStockListFilter';
+import { buildFinishedStockTemplateFields } from '../shared/finishedStockTemplateFields';
+import { useFinishedStockPriceEditor } from '../shared/finishedStockPriceEditor';
+import { useFinishedStockSpecRows } from '../shared/finishedStockSpecRows';
+import { buildFinishedProductPayload, buildFinishedOperationsPricePayload } from '../shared/finishedStockPayload';
+import type {
+  FinishedStockToolbarAction,
+  FinishedStockRowAction,
+  StockStatus,
+  PublisherType,
+  RowAction,
+  BatchAction,
+  FormSectionKey,
+  SpecMode,
+  LayeredSpecField,
+  BatchFilterField,
+  ConfirmType,
+  ProductFormMode,
+  TabConfig,
+  FilterState,
+  PaginationState,
+  StockItem,
+  ProductForm,
+  SpecRow,
+  PriceRow,
+  BatchFillForm,
+  SingleSpecItem,
+  LayeredSpecDraft,
+  SpecValue,
+  SpecGroup,
+  CategoryCascaderOption,
+} from '../shared/finishedStockPageModel';
+import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import { materializeLayeredSpec, rebuildLayeredSpecs, specIdentity } from './specModeConversion';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -1118,13 +1151,9 @@ import {
   releaseTemporaryFinishedProductMedia,
   updateFinishedProduct,
   uploadFinishedProductMedia,
-  type FinishedProductAttributeEntry,
   type FinishedProductPayload,
   type FinishedSpecDimension,
   type FinishedProductRecord,
-  type FinishedProductGuidePrice,
-  type FinishedProductPrice,
-  type FinishedProductVariant,
 } from '@/services/finishedProducts';
 import { type ProductCategoryRecord } from '@/services/productCategories';
 import {
@@ -1133,217 +1162,12 @@ import {
 } from '@/services/finishedProducts';
 import { type ProductAttributeRecord } from '@/services/productAttributes';
 import { type SupplierRecord } from '@/services/suppliers';
-import { sortByOffShelfAtDesc } from './offShelfSorting';
-import { sortByCreatedAtDesc } from '@/services/recordSorting';
 import ProductDetail from './components/ProductDetail.vue';
 import SourceUnavailableOverlay from './components/SourceUnavailableOverlay.vue';
 import FinishedRowWarnings from './components/FinishedRowWarnings.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
-interface FinishedStockToolbarAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-  variant?: 'base' | 'outline' | 'text';
-  icon?: string;
-  className?: string;
-  disabled?: boolean;
-}
-interface FinishedStockRowAction {
-  id: string;
-  label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
-}
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
-type PublisherType = '平台发布' | '接口获取';
-type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
-type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
-type FormSectionKey = 'description' | 'base' | 'sales';
-type SpecMode = 'single' | 'layered';
-type LayeredSpecField = 'material' | 'length' | 'color' | 'size' | `attribute_${number}`;
-type BatchFilterField = 'specText' | LayeredSpecField;
-type DecimalField =
-  | 'cost'
-  | 'guideCoefficient'
-  | 'guide'
-  | 'level1Coefficient'
-  | 'level1'
-  | 'level2Coefficient'
-  | 'level2'
-  | 'level3Coefficient'
-  | 'level3';
-type ConfirmType =
-  'shelf' | 'delete' | 'restore' | 'purge' | 'batchShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
-type ProductFormMode = 'create' | 'edit';
-interface TabConfig {
-  value: StockStatus;
-  label: string;
-  count?: number;
-}
-interface FilterState {
-  keyword: string;
-  category: string;
-  supplier: string;
-}
-interface PaginationState {
-  current: number;
-  pageSize: number;
-}
-interface StockItem {
-  sourceUnavailable?: boolean;
-  sourceStatus?: string;
-  sourceMessage?: string;
-  id: number;
-  createdByName: string;
-  offShelfByName?: string;
-  createdAt?: string;
-  code: string;
-  image: string;
-  name: string;
-  categoryId?: number;
-  supplierId?: number;
-  category: string;
-  stock: number;
-  supplier: string;
-  publisherType: PublisherType;
-  isExternalSupplier: boolean;
-  guidePrice?: number;
-  priceRange: string;
-  status: StockStatus;
-  offShelfReason?: string;
-  offShelfAt?: string;
-  offShelfDetail?: string;
-  markupPrices?: FinishedProductPrice[];
-  guidePrices?: FinishedProductGuidePrice[];
-  mainImageMediaId?: number;
-  mainImageMediaIds?: number[];
-  mainImageUrls?: string[];
-  videoMediaId?: number;
-  videoUrl?: string;
-  detail: string;
-  attributes: FinishedProductAttributeEntry[];
-  variants: FinishedProductVariant[];
-  specDimensions?: FinishedSpecDimension[];
-}
-interface ProductForm {
-  supplier: string;
-  name: string;
-  brand: string;
-  model: string;
-  style: string;
-  shape: string;
-  material: string;
-  craftTexture: string;
-  layers: string;
-  functionText: string;
-  waterproof: string;
-  loadBearing: string;
-  origin: string;
-  installDesc: string;
-  detail: string;
-  totalStock: number;
-  merchantCode: string;
-  shelfNow: 'now' | 'later';
-  [key: string]: string | number;
-}
-interface SpecRow extends TableRowData {
-  _specOriginFields?: LayeredSpecField[];
-  _specValueIds?: Partial<Record<LayeredSpecField, number>>;
-  id: number;
-  skuId?: number;
-  mode: SpecMode;
-  specText: string;
-  specImage: boolean;
-  material: string;
-  materialImage: boolean;
-  length: string;
-  lengthImage: boolean;
-  color: string;
-  colorImage: boolean;
-  size: string;
-  sizeImage: boolean;
-  costCoefficient: string;
-  cost: string;
-  guideCoefficient: string;
-  guide: string;
-  level1Coefficient: string;
-  level1: string;
-  level2Coefficient: string;
-  level2: string;
-  level3Coefficient: string;
-  level3: string;
-  quantity: number | null;
-  markupPrices: Record<
-    number,
-    {
-      coefficient: string;
-      price: string;
-      priceSource?: 'auto' | 'manual';
-      sourceConfigurationId?: number;
-    }
-  >;
-}
-interface PriceRow extends TableRowData {
-  id: number;
-  mode: SpecMode;
-  specText: string;
-  material: string;
-  length: string;
-  color: string;
-  size: string;
-  stock: number;
-  costCoefficient: string;
-  cost: string;
-  guideCoefficient: string;
-  guide: string;
-  level1Coefficient: string;
-  level1: string;
-  level2Coefficient: string;
-  level2: string;
-  level3Coefficient: string;
-  level3: string;
-}
-interface BatchFillForm {
-  cost: string;
-  guideCoefficient: string;
-  guide: string;
-  level1Coefficient: string;
-  level1: string;
-  level2Coefficient: string;
-  level2: string;
-  level3Coefficient: string;
-  level3: string;
-  quantity: number | null;
-}
-interface SingleSpecItem {
-  sourceRow?: SpecRow;
-  id: number;
-  text: string;
-  imageUploaded: boolean;
-}
-interface LayeredSpecDraft extends TableRowData {
-  id: number;
-  sourceRow: SpecRow;
-  valueIds: Partial<Record<LayeredSpecField, number>>;
-}
-interface SpecValue {
-  id: number;
-  value: string;
-  imageUploaded: boolean;
-}
-interface SpecGroup {
-  field: LayeredSpecField;
-  name: string;
-  selected: boolean;
-  withImage: boolean;
-  values: SpecValue[];
-}
-interface CategoryCascaderOption {
-  label: string;
-  value: string;
-  children?: CategoryCascaderOption[];
-}
 const tabs: TabConfig[] = [
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
@@ -1715,71 +1539,15 @@ const batchMarkupPrices = ref<
     }
   >
 >({});
-const templateAttributeFields = computed(() => {
-  const fields = categoryAttributeBindings.value
-    .filter((attribute) => attribute.categoryId === selectedCategoryId.value)
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((attribute) => ({
-      key: `attribute_${attribute.attributeId}` as const,
-      role: attribute.attributeRole,
-      attributeId: attribute.attributeId,
-      label: attribute.name,
-      required: attribute.requiredFlag,
-      type: attribute.valueType === 'select' ? ('select' as const) : ('input' as const),
-      options: attribute.options.map((option) => option.value),
-    }));
-  for (const dimension of confirmedSpecDimensions.value) {
-    const existing = fields.find((field) => field.key === dimension.key);
-    if (existing) existing.label = dimension.name;
-    else if (/^attribute_\d+$/.test(dimension.key))
-      fields.push({
-        key: dimension.key as `attribute_${number}`,
-        attributeId: Number(dimension.key.slice(10)),
-        role: 'sales',
-        label: dimension.name,
-        required: false,
-        type: 'input',
-        options: [],
-      });
-  }
-  const product = editingProduct.value;
-  if (product && product.categoryId === selectedCategoryId.value) {
-    for (const entry of product.attributes) {
-      if (!fields.some((field) => field.attributeId === entry.attributeId)) {
-        fields.push({
-          key: `attribute_${entry.attributeId}`,
-          role: 'product',
-          attributeId: entry.attributeId,
-          label: entry.attributeName,
-          required: false,
-          type: 'input',
-          options: [],
-        });
-      }
-    }
-    for (const variant of product.variants) {
-      for (const key of Object.keys(variant.salesAttributes ?? {})) {
-        if (!/^attribute_\d+$/.test(key)) continue;
-        const attributeId = Number(key.slice(10));
-        if (!fields.some((field) => field.attributeId === attributeId)) {
-          fields.push({
-            key: `attribute_${attributeId}`,
-            role: 'sales',
-            attributeId,
-            label:
-              productAttributes.value.find((attribute) => attribute.id === attributeId)?.name ??
-              `销售属性 ${attributeId}`,
-            required: false,
-            type: 'input',
-            options: [],
-          });
-        }
-      }
-    }
-  }
-  return fields;
-});
+const templateAttributeFields = computed(() =>
+  buildFinishedStockTemplateFields(
+    selectedCategoryId.value,
+    categoryAttributeBindings.value,
+    confirmedSpecDimensions.value,
+    editingProduct.value,
+    productAttributes.value,
+  ),
+);
 const attributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'product'));
 const salesAttributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'sales'));
 const layeredFieldLabels = computed<Record<string, string>>(() => ({
@@ -1903,22 +1671,6 @@ const supplierIdByName = (name: string) =>
 const formatPriceRange = (guidePrice?: number) => {
   const value = Number(guidePrice ?? 0);
   return value > 0 ? `￥${value.toFixed(2)}` : '-';
-};
-const formatDateTime = (value?: string) => {
-  if (!value) return '-';
-  const timestamp = new Date(`${value.replace(' ', 'T').replace(/Z$/, '')}Z`);
-  if (Number.isNaN(timestamp.getTime())) return '-';
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(timestamp);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-  return `${part('year')}/${part('month')}/${part('day')} ${part('hour')}:${part('minute')}`;
 };
 const toStockItem = (record: FinishedProductRecord): StockItem => {
   const status = normalizeStatus(record.status);
@@ -2055,23 +1807,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshVisibleProductTemplate);
   document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);
 });
-const filteredData = computed(() => {
-  const filter = currentAppliedFilter.value;
-  const keyword = filter.keyword.trim().toLocaleLowerCase();
-  const sorted =
-    activeTab.value === 'offShelf' ? sortByOffShelfAtDesc(dataItems.value) : sortByCreatedAtDesc(dataItems.value);
-  return sorted.filter((item) => {
-    if (item.status !== activeTab.value) return false;
-    if (
-      keyword &&
-      ![item.name, String(item.id), item.code].some((value) => value.toLocaleLowerCase().includes(keyword))
-    )
-      return false;
-    if (filter.category && item.category !== filter.category) return false;
-    if (filter.supplier && item.supplier !== filter.supplier) return false;
-    return true;
-  });
-});
+const filteredData = computed(() =>
+  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value),
+);
 const paginationTotal = computed(() => filteredData.value.length);
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
@@ -2194,7 +1932,7 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     .map(createSalesColumn);
   return [
     ...orderedSpecColumns,
-    ...priceColumnsBase.filter((col) => true),
+    ...priceColumnsBase,
     ...remainingSalesColumns,
     ...(!isOperationsEdit.value ? tailColumns : []),
   ];
@@ -2445,96 +2183,12 @@ const createSpecValue = (value = '', imageUploaded = false): SpecValue => ({
   value,
   imageUploaded,
 });
-const createMarkupEditors = (prices: FinishedProductPrice[] = []) => {
-  const existingById = new Map(prices.map((item) => [item.storeLevelId, item]));
-  return Object.fromEntries(
-    productPriceLevels.value.map((configuration) => {
-      const existing = existingById.get(configuration.id);
-      const coefficient = existing ? Number(existing.priceCoefficient) : configuration.priceCoefficient;
-      return [
-        configuration.id,
-        {
-          coefficient: coefficient == null ? '' : coefficient.toFixed(4).replace(/0+$/, '').replace(/\.$/, ''),
-          price: existing ? String(existing.price) : '',
-          priceSource: existing
-            ? (existing.priceSource ?? 'manual')
-            : configuration.configurationId
-              ? ('auto' as const)
-              : ('manual' as const),
-          sourceConfigurationId:
-            existing?.sourceConfigurationId ?? (existing ? undefined : configuration.configurationId),
-        },
-      ];
-    }),
-  );
-};
-const defaultGuideCoefficient = () =>
-  guidePriceSettingCoefficient.value == null
-    ? ''
-    : Number(guidePriceSettingCoefficient.value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-const createBaseSpecRow = (partial: Partial<SpecRow>): SpecRow => ({
-  id: createDraftId(),
-  mode: confirmedSpecMode.value,
-  specText: '',
-  specImage: false,
-  material: '',
-  materialImage: false,
-  length: '',
-  lengthImage: false,
-  color: '',
-  colorImage: false,
-  size: '',
-  sizeImage: false,
-  costCoefficient: '',
-  cost: '',
-  guideCoefficient: defaultGuideCoefficient(),
-  guide: '',
-  level1Coefficient: '',
-  level1: '',
-  level2Coefficient: '',
-  level2: '',
-  level3Coefficient: '',
-  level3: '',
-  quantity: null,
-  markupPrices: createMarkupEditors(),
-  ...partial,
-});
-const createEditSpecRows = (row: StockItem): SpecRow[] => {
-  if (row.variants.length) {
-    return row.variants.map((variant, index) => {
-      const markupPrices = row.markupPrices?.filter((price) => price.skuId === variant.id) ?? [];
-      const guidePrice = row.guidePrices?.find((price) => price.skuId === variant.id);
-      return createBaseSpecRow({
-        id: row.id * 100 + index + 1,
-        mode: variant.displayMode,
-        specText: variant.displayMode === 'single' ? variant.variantLabel : '',
-        ...variant.salesAttributes,
-        material: variant.material || '',
-        length: variant.lengthValue || '',
-        color: variant.color || '',
-        size: variant.sizeValue || '',
-        costCoefficient: '1',
-        cost: String(variant.costPrice ?? guidePrice?.costPrice ?? markupPrices[0]?.costPrice ?? ''),
-        guideCoefficient: guidePrice == null ? '' : String(Number(guidePrice.priceCoefficient)),
-        guide: guidePrice == null ? '' : String(guidePrice.price),
-        quantity: variant.stock,
-        skuId: variant.id,
-        markupPrices: createMarkupEditors(markupPrices),
-      });
-    });
-  }
-  return [
-    createBaseSpecRow({
-      id: row.id * 10 + 1,
-      mode: 'single',
-      specText: row.name,
-      guideCoefficient: '',
-      guide: row.guidePrice == null ? '' : String(row.guidePrice),
-      quantity: row.stock,
-      merchantCode: row.code,
-    }),
-  ];
-};
+const { createMarkupEditors, createBaseSpecRow, createEditSpecRows } = useFinishedStockSpecRows(
+  createDraftId,
+  () => confirmedSpecMode.value,
+  () => guidePriceSettingCoefficient.value,
+  () => productPriceLevels.value,
+);
 const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
   formPageMode.value = mode;
   formPageVisible.value = true;
@@ -2630,172 +2284,21 @@ const releasePendingProductMedia = (media: AdminMediaValue) => {
   pendingUploadedMediaIds.delete(mediaId);
   void releaseTemporaryFinishedProductMedia(mediaId);
 };
-const formatDecimalValue = (row: SpecRow | PriceRow | BatchFillForm, field: DecimalField) => {
-  const rawValue = String(row[field] ?? '').trim();
-  if (!rawValue) {
-    row[field] = '';
-    return;
-  }
-  const value = Number(rawValue);
-  row[field] = Number.isFinite(value) ? value.toFixed(2) : '';
-};
-const decimalNumber = (value: string) => {
-  if (!isValidSpecPriceNumber(value)) return null;
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : null;
-};
-const syncSpecPriceByCoefficient = (row: SpecRow, coefficientField: DecimalField, priceField: DecimalField) => {
-  const cost = decimalNumber(row.cost);
-  const coefficient = decimalNumber(row[coefficientField]);
-  if (cost === null || coefficient === null) return;
-  row[priceField] = (cost * coefficient).toFixed(2);
-};
-const syncSpecCoefficientByPrice = (row: SpecRow, priceField: DecimalField, coefficientField: DecimalField) => {
-  const cost = decimalNumber(row.cost);
-  const price = decimalNumber(row[priceField]);
-  if (cost === null || cost === 0 || price === null) return;
-  row[coefficientField] = (price / cost).toFixed(2);
-};
-const syncAllSpecPricesByCost = (row: SpecRow) => {
-  (
-    [
-      ['guideCoefficient', 'guide'],
-      ['level1Coefficient', 'level1'],
-      ['level2Coefficient', 'level2'],
-      ['level3Coefficient', 'level3'],
-    ] as [DecimalField, DecimalField][]
-  ).forEach(([coefficientField, priceField]) => {
-    syncSpecPriceByCoefficient(row, coefficientField, priceField);
-  });
-  productPriceLevels.value.forEach((configuration) => {
-    const editor = row.markupPrices[configuration.id];
-    const cost = decimalNumber(row.cost);
-    const coefficient = decimalNumber(editor?.coefficient);
-    if (editor && cost !== null && coefficient !== null) editor.price = (cost * coefficient).toFixed(2);
-  });
-};
-const handleSpecCostChange = (row: SpecRow, value: unknown) => {
-  row.cost = String(value ?? '');
-  if (!row.cost.trim()) {
-    row.guide = '';
-    Object.values(row.markupPrices).forEach((editor) => {
-      editor.price = '';
-    });
-    return;
-  }
-  if (!isValidSpecPriceNumber(row.cost)) return;
-  syncAllSpecPricesByCost(row);
-};
-const handleSpecCoefficientChange = (
-  row: SpecRow,
-  coefficientField: DecimalField,
-  priceField: DecimalField,
-  value: unknown,
-) => {
-  row[coefficientField] = String(value ?? '');
-  if (!isValidSpecPriceNumber(row[coefficientField])) return;
-  syncSpecPriceByCoefficient(row, coefficientField, priceField);
-};
-const handleSpecPriceChange = (
-  row: SpecRow,
-  priceField: DecimalField,
-  coefficientField: DecimalField,
-  value: unknown,
-) => {
-  row[priceField] = String(value ?? '');
-  if (!isValidSpecPriceNumber(row[priceField])) return;
-  syncSpecCoefficientByPrice(row, priceField, coefficientField);
-};
-const toggleSpecPriceSource = (row: SpecRow, levelId: number) => {
-  const editor = row.markupPrices[levelId];
-  if (editor.priceSource === 'auto') {
-    editor.priceSource = 'manual';
-    editor.sourceConfigurationId = undefined;
-  } else restoreSpecAutoPrice(row, levelId);
-};
-const restoreSpecAutoPrice = (row: SpecRow, levelId: number) => {
-  const configuration = productPriceLevels.value.find((level) => level.id === levelId);
-  if (!configuration?.configurationId || configuration.priceCoefficient == null) return;
-  const editor = row.markupPrices[levelId];
-  editor.coefficient = String(configuration.priceCoefficient);
-  editor.priceSource = 'auto';
-  editor.sourceConfigurationId = configuration.configurationId;
-  if (isValidSpecPriceNumber(row.cost)) editor.price = (Number(row.cost) * configuration.priceCoefficient).toFixed(2);
-};
-const markSpecPriceManual = (row: SpecRow, levelId: number) => {
-  row.markupPrices[levelId].priceSource = 'manual';
-  row.markupPrices[levelId].sourceConfigurationId = undefined;
-};
-const handleMarkupCoefficientChange = (row: SpecRow, configurationId: number, value: unknown) => {
-  const editor = row.markupPrices[configurationId];
-  if (!editor) return;
-  editor.coefficient = String(value ?? '');
-  if (!isValidSpecPriceNumber(editor.coefficient)) return;
-  const cost = decimalNumber(row.cost);
-  const coefficient = decimalNumber(editor.coefficient);
-  if (cost !== null && coefficient !== null && coefficient >= 0) editor.price = (cost * coefficient).toFixed(2);
-};
-const handleMarkupPriceChange = (row: SpecRow, configurationId: number, value: unknown) => {
-  const editor = row.markupPrices[configurationId];
-  if (!editor) return;
-  editor.price = String(value ?? '');
-  if (!isValidSpecPriceNumber(editor.price)) return;
-  const cost = decimalNumber(row.cost);
-  const price = decimalNumber(editor.price);
-  if (cost !== null && cost > 0 && price !== null && price >= 0) editor.coefficient = (price / cost).toFixed(2);
-};
-const syncBatchPriceByCoefficient = (coefficientField: DecimalField, priceField: DecimalField) => {
-  if (!isValidSpecPriceNumber(batchFillForm.cost) || !isValidSpecPriceNumber(batchFillForm[coefficientField])) return;
-  const cost = decimalNumber(batchFillForm.cost);
-  const coefficient = decimalNumber(batchFillForm[coefficientField]);
-  if (cost === null || coefficient === null) return;
-  batchFillForm[priceField] = (cost * coefficient).toFixed(2);
-};
-const syncBatchCoefficientByPrice = (priceField: DecimalField, coefficientField: DecimalField) => {
-  if (!isValidSpecPriceNumber(batchFillForm.cost) || !isValidSpecPriceNumber(batchFillForm[priceField])) return;
-  const cost = decimalNumber(batchFillForm.cost);
-  const price = decimalNumber(batchFillForm[priceField]);
-  if (cost === null || cost === 0 || price === null) return;
-  batchFillForm[coefficientField] = (price / cost).toFixed(2);
-};
-const syncAllBatchPricesByCost = () => {
-  (
-    [
-      ['guideCoefficient', 'guide'],
-      ['level1Coefficient', 'level1'],
-      ['level2Coefficient', 'level2'],
-      ['level3Coefficient', 'level3'],
-    ] as [DecimalField, DecimalField][]
-  ).forEach(([coefficientField, priceField]) => {
-    syncBatchPriceByCoefficient(coefficientField, priceField);
-  });
-};
-const handleBatchMarkupChange = (id: number, field: 'coefficient' | 'price', value: unknown) => {
-  const editor = batchMarkupPrices.value[id];
-  editor[field] = String(value ?? '');
-  if (!isValidSpecPriceNumber(editor[field]) || !isValidSpecPriceNumber(batchFillForm.cost)) return;
-  const cost = decimalNumber(batchFillForm.cost);
-  const amount = decimalNumber(editor[field]);
-  if (cost === null || amount === null) return;
-  if (field === 'coefficient') editor.price = (cost * amount).toFixed(2);
-  else if (cost > 0) editor.coefficient = (amount / cost).toFixed(2);
-};
-const handleBatchCostChange = (value: unknown) => {
-  batchFillForm.cost = String(value ?? '');
-  if (!isValidSpecPriceNumber(batchFillForm.cost)) return;
-  syncAllBatchPricesByCost();
-  for (const [id, editor] of Object.entries(batchMarkupPrices.value)) {
-    handleBatchMarkupChange(Number(id), 'coefficient', editor.coefficient);
-  }
-};
-const handleBatchCoefficientChange = (coefficientField: DecimalField, priceField: DecimalField, value: unknown) => {
-  batchFillForm[coefficientField] = String(value ?? '');
-  syncBatchPriceByCoefficient(coefficientField, priceField);
-};
-const handleBatchPriceChange = (priceField: DecimalField, coefficientField: DecimalField, value: unknown) => {
-  batchFillForm[priceField] = String(value ?? '');
-  syncBatchCoefficientByPrice(priceField, coefficientField);
-};
+const {
+  formatDecimalValue,
+  decimalNumber,
+  handleSpecCostChange,
+  handleSpecCoefficientChange,
+  handleSpecPriceChange,
+  toggleSpecPriceSource,
+  markSpecPriceManual,
+  handleMarkupCoefficientChange,
+  handleMarkupPriceChange,
+  handleBatchMarkupChange,
+  handleBatchCostChange,
+  handleBatchCoefficientChange,
+  handleBatchPriceChange,
+} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
 const openSpecDialog = async (preserveCurrent = false) => {
   validatedSpecDraftIds.value = new Set();
   try {
@@ -3392,82 +2895,35 @@ const specVariantLabel = (row: SpecRow) =>
     .filter(Boolean)
     .join(' / ') ||
   '未命名规格';
-const buildProductPayloadFromForm = (): FinishedProductPayload => {
-  const stock = totalStock.value || Number(productForm.totalStock || 0);
-  const guidePrice = Number(specRows.value[0]?.guide || 0);
-  const status = productForm.shelfNow === 'now' ? 'selling' : 'warehouse';
-  return {
+const buildProductPayloadFromForm = (): FinishedProductPayload =>
+  buildFinishedProductPayload({
+    totalStock: totalStock.value,
+    form: productForm,
+    specRows: specRows.value,
     categoryId: selectedCategoryId.value,
     supplierId: supplierIdByName(productForm.supplier),
-    name: productForm.name.trim(),
-    sku: productForm.merchantCode.trim(),
     mainImageMediaId: mainImageMedia.value!.mediaId!,
     mainImageMediaIds: mainImages.value.map((image) => image.mediaId!),
     videoMediaId: videoMedia.value!.mediaId!,
-    detail: productForm.detail.trim(),
-    totalStock: stock,
-    guidePrice: guidePrice > 0 ? guidePrice : undefined,
-    attributeDisplayOrder: {
-      product: attributeFields.value.map((field) => String(field.attributeId)),
-      sales: salesAttributeFields.value.map((field) => field.key),
-    },
-    attributes: attributeFields.value
-      .map((field) => ({
-        attributeId: field.attributeId,
-        attributeName: field.label,
-        value: String(productForm[field.key] ?? '').trim(),
-      }))
-      .filter((attribute) => attribute.value),
-    specDimensions: confirmedSpecMode.value === 'layered' ? confirmedSpecDimensions.value : [],
-    variants: specRows.value.map((row) => ({
-      id: row.skuId,
-      variantLabel: specVariantLabel(row),
-      displayMode: row.mode,
-      salesAttributes: Object.fromEntries(
-        salesAttributeFields.value.map((field) => [field.key, String(row[field.key] ?? '').trim()]),
-      ),
-      material: row.material || undefined,
-      lengthValue: row.length || undefined,
-      color: row.color || undefined,
-      sizeValue: row.size || undefined,
-      costPrice: Number(row.cost),
-      stock: Number(row.quantity || 0),
-    })),
+    attributeFields: attributeFields.value,
+    salesAttributeFields: salesAttributeFields.value,
+    specMode: confirmedSpecMode.value,
+    specDimensions: confirmedSpecDimensions.value,
+    variantLabel: specVariantLabel,
     offShelfReason: editingProduct.value?.offShelfReason,
     offShelfDetail: editingProduct.value?.offShelfDetail,
-    status,
-  };
-};
+  });
 const buildOperationsPricePayload = (): Pick<
   FinishedProductPayload,
   'name' | 'status' | 'guidePrices' | 'markupPrices'
-> => ({
-  name: editingProduct.value!.name,
-  status: editingProduct.value!.status,
-  guidePrices: specRows.value.map((row) => ({
-    skuId: row.skuId!,
-    variantLabel: specVariantLabel(row),
-    costPrice: Number(row.cost),
-    priceCoefficient: Number(row.guideCoefficient),
-    price: Number(row.guide),
-  })),
-  markupPrices: specRows.value.flatMap((row) =>
-    productPriceLevels.value.map((level) => {
-      const price = row.markupPrices[level.id];
-      return {
-        skuId: row.skuId!,
-        variantLabel: specVariantLabel(row),
-        storeLevelId: level.id,
-        storeLevelName: level.name,
-        costPrice: Number(row.cost),
-        priceCoefficient: Number(price.coefficient),
-        price: Number(price.price),
-        priceSource: price.priceSource,
-        sourceConfigurationId: price.sourceConfigurationId,
-      };
-    }),
-  ),
-});
+> =>
+  buildFinishedOperationsPricePayload({
+    name: editingProduct.value!.name,
+    status: editingProduct.value!.status,
+    specRows: specRows.value,
+    priceLevels: productPriceLevels.value,
+    variantLabel: specVariantLabel,
+  });
 const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {
   const nextItem = toStockItem(record);
   if (offShelfReason) nextItem.offShelfReason = offShelfReason;
@@ -3741,985 +3197,4 @@ const handleConfirm = async () => {
 };
 </script>
 
-<style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-.finished-list-layout {
-  grid-template-columns: minmax(0, 1fr);
-}
-.list-controls {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  gap: var(--td-comp-margin-l);
-}
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-m);
-}
-.filter-fields {
-  display: grid;
-  flex: 1;
-  grid-template-columns: 258px 230px 240px;
-  gap: var(--td-comp-margin-m);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-self: flex-start;
-  gap: var(--td-comp-margin-s);
-}
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.toolbar-buttons {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.selection-info {
-  color: #6b7280;
-  font-size: 13px;
-}
-:deep(.finished-stock-table .t-table__empty-row > td) {
-  padding-inline: 0;
-}
-.brown-button {
-  color: #fff;
-  background: #8b5e34;
-  border-color: #8b5e34;
-}
-.deep-danger-button {
-  background: #8a1f11;
-  border-color: #8a1f11;
-}
-@media (max-width: 1180px) {
-  .filter-fields {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
-  }
-}
-@media (max-width: 860px) {
-  .filter-row {
-    display: block;
-  }
-  .filter-fields {
-    grid-template-columns: 1fr;
-  }
-  .filter-actions {
-    margin-top: 12px;
-  }
-}
-
-.table-actions {
-  display: flex;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.table-actions {
-  display: flex;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.main-image-upload-grid :deep(.admin-media-upload > strong) {
-  font: var(--td-font-body-small);
-  font-weight: 400;
-  color: var(--td-text-color-placeholder);
-}
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-.brand,
-.top-actions,
-.user-entry,
-.page-header,
-.filter-row,
-.table-toolbar,
-.toolbar-buttons,
-.form-title-row,
-.selected-category,
-.drawer-head {
-  display: flex;
-  align-items: center;
-}
-
-.brand {
-  width: 224px;
-  height: 100%;
-  flex-shrink: 0;
-  gap: 12px;
-}
-
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  background: var(--td-brand-color);
-  border-radius: 4px;
-  font: var(--td-font-title-small);
-}
-
-.brand-title {
-  color: var(--td-text-color-primary);
-  font: var(--td-font-title-medium);
-}
-
-.brand-subtitle {
-  margin-top: 2px;
-  color: var(--td-text-color-placeholder);
-  font: var(--td-font-body-small);
-}
-
-.top-actions {
-  margin-left: auto;
-  flex-shrink: 0;
-  gap: var(--td-comp-margin-s);
-}
-
-.user-entry {
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-  padding: 0 var(--td-comp-paddingLR-s);
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
-}
-
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-  align-items: stretch;
-  background: var(--td-bg-color-page);
-}
-
-.side-nav {
-  width: 248px;
-  flex-shrink: 0;
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-s) 0;
-  background: var(--td-bg-color-container);
-  border-right: 1px solid var(--td-component-border);
-}
-
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
-
-/* Keep the sticky submit bar flush with the viewport at the end of the form. */
-.admin-layout > .admin-shell > .page.page--form {
-  padding-bottom: 0 !important;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-
-.breadcrumb-link {
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-
-.breadcrumb-link:hover {
-  color: var(--td-brand-color);
-}
-
-.table-empty {
-  width: 100%;
-  padding: 28px 0;
-  color: var(--td-text-color-placeholder);
-  text-align: center;
-}
-
-.off-shelf-reason-cell {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-.off-shelf-reason-secondary {
-  display: block;
-  overflow: hidden;
-  color: var(--td-text-color-placeholder);
-  font: var(--td-font-body-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.product-image {
-  width: 64px;
-  height: 64px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-}
-
-.product-image img,
-.detail-panel img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.preview-trigger {
-  padding: 0;
-  cursor: zoom-in;
-  background: transparent;
-  border: 0;
-}
-
-.preview-trigger:hover img {
-  transform: scale(1.04);
-}
-
-.preview-trigger img {
-  transition: transform 0.2s ease;
-}
-
-.image-preview-dialog {
-  display: flex;
-  min-height: 620px;
-  align-items: center;
-  justify-content: center;
-  background: var(--td-bg-color-secondarycontainer);
-}
-
-.image-preview-dialog img,
-.image-preview-dialog video {
-  display: block;
-  width: min(900px, 100%);
-  height: min(760px, calc(100vh - 220px));
-  object-fit: contain;
-}
-
-.product-meta,
-.tenant-cell,
-.price-cell {
-  display: grid;
-  gap: 4px;
-}
-
-.product-code,
-.store-text {
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.form-shell {
-  display: grid;
-  gap: var(--zdm-admin-section-gap);
-}
-
-.form-title-row {
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.form-title-row h1 {
-  margin: 0 0 8px;
-  font-size: 20px;
-}
-
-.selected-category {
-  gap: 12px;
-  color: #4b5563;
-  font-size: 13px;
-}
-
-.form-anchor-card {
-  box-shadow:
-    0 6px 18px rgb(0 0 0 / 24%),
-    0 2px 4px rgb(0 0 0 / 16%);
-  position: fixed;
-  z-index: 10;
-  box-sizing: border-box;
-}
-
-.form-heading-card,
-.form-section {
-  box-shadow: none;
-}
-
-.form-section {
-  min-width: 0;
-}
-
-.required-content-error {
-  border-color: var(--td-error-color);
-}
-
-.form-section-title {
-  margin: 0 0 var(--td-comp-margin-xxl);
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-  text-align: left;
-}
-
-.form-grid {
-  display: grid;
-  gap: 16px 20px;
-}
-
-.form-grid.two {
-  grid-template-columns: repeat(2, minmax(240px, 1fr));
-}
-
-.form-grid.three {
-  grid-template-columns: repeat(3, minmax(210px, 1fr));
-}
-
-.supplier-form {
-  margin-top: var(--td-comp-margin-xxl);
-}
-
-.product-attributes {
-  display: grid;
-  grid-template-columns: 116px minmax(0, 1fr);
-  margin-top: var(--td-comp-margin-xxl);
-}
-
-.product-attributes-title {
-  margin: 0;
-  padding-right: var(--td-comp-paddingLR-xl);
-  text-align: right;
-  font: var(--td-font-body-medium);
-  font-weight: 400;
-  color: var(--td-text-color-primary);
-}
-
-.product-attributes-required {
-  color: var(--td-error-color);
-}
-
-.product-attribute-label {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-}
-
-.product-attributes-panel {
-  min-width: 0;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-secondarycontainer);
-  border-radius: var(--td-radius-medium);
-}
-
-.product-attributes-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--td-comp-margin-xl) var(--td-comp-margin-xxl);
-}
-
-.upload-grid {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(auto-fit, 180px);
-  gap: 16px;
-  margin-bottom: 22px;
-}
-
-.upload-box {
-  position: relative;
-  display: grid;
-  height: 132px;
-  color: #4b5563;
-  cursor: pointer;
-  background: #f9fafb;
-  border: 1px dashed #b8c2d4;
-  border-radius: 8px;
-  place-items: center;
-}
-
-.upload-box.uploaded {
-  color: #1664ff;
-  background: #eef5ff;
-  border-color: #1664ff;
-}
-
-.upload-box.error {
-  color: #d54941;
-  background: #fff5f5;
-  border-color: #d54941;
-}
-
-.upload-box strong {
-  color: #111827;
-}
-
-.upload-box .t-icon {
-  color: #1664ff;
-  font-size: 24px;
-}
-
-.upload-box.error .t-icon {
-  color: #d54941;
-}
-
-.required-star {
-  position: absolute;
-  top: 8px;
-  left: 10px;
-  color: #d54941;
-  font-weight: 700;
-}
-
-.rich-editor {
-  max-width: 920px;
-}
-
-.section-title {
-  margin: 20px 0 14px;
-  color: #111827;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.spec-table-block {
-  isolation: isolate;
-  width: 100%;
-  min-width: 0;
-}
-
-:deep(.spec-table-block .t-table__th),
-:deep(.spec-table-block .t-table__td) {
-  white-space: nowrap;
-  border-right: 1px solid var(--td-component-border);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-:deep(.spec-table-block .t-table__th:first-child),
-:deep(.spec-table-block .t-table__td:first-child) {
-  border-left: 1px solid var(--td-component-border);
-}
-
-.spec-table-block :deep(.t-table thead th) {
-  background: var(--td-bg-color-secondarycontainer);
-  border-top: 1px solid var(--td-component-border);
-}
-
-.spec-table-block .price-pair {
-  width: max-content;
-  grid-template-columns: 64px 88px;
-}
-
-.spec-table-block .price-pair.with-source {
-  grid-template-columns: 64px 88px 24px;
-}
-
-.spec-table-block .decimal-input {
-  min-width: 88px;
-}
-
-.spec-table-actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 8px;
-  margin-top: var(--td-comp-margin-xxl);
-}
-
-.spec-name-cell {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-}
-
-.spec-name-cell > span {
-  white-space: nowrap;
-}
-
-.spec-thumb {
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  flex: 0 0 40px;
-  align-items: center;
-  justify-content: center;
-  color: #1664ff;
-  cursor: pointer;
-  background: #eef5ff;
-  border: 1px dashed #8bb4ff;
-  border-radius: 6px;
-}
-
-.spec-thumb.mini {
-  width: 28px;
-  height: 28px;
-  flex-basis: 28px;
-}
-
-.price-pair {
-  display: grid;
-  align-items: start;
-  grid-template-columns: 54px minmax(72px, 1fr);
-  gap: 6px;
-}
-
-.price-pair.with-source {
-  grid-template-columns: 54px minmax(72px, 1fr) 24px;
-}
-
-.price-pair.wide {
-  grid-template-columns: 88px minmax(120px, 1fr);
-}
-
-.quantity-editor {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.quantity-editor :deep(.t-input-number),
-.stock-input {
-  width: 72px;
-}
-
-.decimal-input {
-  width: 100%;
-}
-
-.form-submit-bar {
-  background: var(--td-bg-color-container);
-  box-shadow:
-    0 -6px 18px rgb(0 0 0 / 24%),
-    0 -2px 4px rgb(0 0 0 / 16%);
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  z-index: 3;
-}
-
-.category-picker {
-  display: flex;
-  gap: 12px;
-  min-height: 280px;
-  padding-bottom: 4px;
-  overflow-x: auto;
-}
-
-.category-column {
-  flex: 0 0 260px;
-  padding: 8px;
-  background: var(--td-bg-color-secondarycontainer);
-  border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-medium);
-}
-
-.category-column-title {
-  padding: 6px 10px 10px;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.category-option-list {
-  height: 252px;
-  overflow-y: auto;
-}
-
-.category-option-list :deep(.t-empty) {
-  margin-top: 72px;
-}
-
-.category-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  height: 38px;
-  padding: 0 10px;
-  color: var(--td-text-color-primary);
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  border-radius: var(--td-radius-default);
-}
-
-.category-option.active {
-  color: var(--td-brand-color);
-  background: var(--td-brand-color-light);
-  font-weight: 700;
-}
-
-.category-picker-path {
-  margin-top: 12px;
-  color: var(--td-text-color-secondary);
-}
-
-.spec-dialog {
-  display: grid;
-  gap: 18px;
-}
-
-.single-spec-editor,
-.layered-spec-editor,
-.spec-group {
-  display: grid;
-  gap: 10px;
-}
-
-.spec-section-title {
-  color: #111827;
-  font-weight: 700;
-}
-
-.single-spec-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.single-spec-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.layered-values {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.layered-value-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.spec-value-drag-handle {
-  display: inline-flex;
-  cursor: grab;
-}
-
-.spec-add-hidden {
-  visibility: hidden;
-}
-
-.spec-upload-box {
-  width: 72px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  color: #1664ff;
-  cursor: pointer;
-  background: #eef5ff;
-  border: 1px dashed #8bb4ff;
-  border-radius: 6px;
-  font-size: 12px;
-}
-
-.spec-upload-box.small {
-  width: 40px;
-  height: 32px;
-}
-
-.spec-add-button {
-  justify-self: end;
-}
-
-.inline-editor,
-.selected-tags {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.selected-tags {
-  flex-wrap: wrap;
-}
-
-.spec-attr-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 12px;
-  color: #4b5563;
-  cursor: pointer;
-  background: #f9fafb;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-}
-
-.spec-attr-tag.active {
-  color: #1664ff;
-  background: #eef5ff;
-  border-color: #8bb4ff;
-  font-weight: 600;
-}
-
-.spec-attr-tag.disabled {
-  color: #9ca3af;
-  cursor: not-allowed;
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-}
-
-.layered-empty {
-  padding: 20px;
-  color: #9ca3af;
-  text-align: center;
-  background: #f9fafb;
-  border: 1px dashed #d1d5db;
-  border-radius: 6px;
-}
-
-.spec-group {
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-
-.spec-group-head {
-  cursor: grab;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.spec-group-title {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #111827;
-  font-weight: 700;
-}
-
-.dialog-reset-row {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.spec-dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.price-editor-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
-.drawer-head {
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-:deep(.t-drawer) {
-  max-width: calc(100vw - 32px);
-}
-
-.drawer-head div {
-  display: grid;
-  gap: 4px;
-}
-
-.drawer-head span {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.batch-fill-panel {
-  display: grid;
-  gap: 16px;
-}
-
-.batch-section {
-  padding: 14px;
-  background: #fff;
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
-}
-
-.batch-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.batch-section-head strong {
-  color: #111827;
-  font-size: 14px;
-}
-
-.batch-section-head span,
-.batch-match-tip {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.batch-filter-list {
-  display: grid;
-  gap: 12px;
-}
-
-.batch-filter-row {
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.batch-filter-label {
-  padding-top: 5px;
-  color: #374151;
-  font-weight: 600;
-}
-
-.batch-filter-values {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.batch-chip {
-  height: 28px;
-  padding: 0 12px;
-  color: #4b5563;
-  cursor: pointer;
-  background: #f9fafb;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-}
-
-.batch-chip.active {
-  color: #1664ff;
-  background: #eef5ff;
-  border-color: #8bb4ff;
-  font-weight: 600;
-}
-
-.batch-match-tip {
-  margin-top: 12px;
-}
-
-.batch-field-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px 28px;
-}
-
-.batch-field-grid > :deep(.t-form__item) {
-  min-width: 0;
-  margin-bottom: 0;
-}
-
-.batch-field-grid :deep(.t-form__label) {
-  font-size: var(--td-font-size-body-small);
-}
-
-.batch-field-grid .price-pair.wide {
-  width: 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.batch-field-grid :deep(.t-input-number) {
-  max-width: 100%;
-}
-
-.detail-panel {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 20px;
-}
-
-.detail-panel img {
-  height: 220px;
-  border-radius: 8px;
-}
-
-.detail-info h2 {
-  margin: 0 0 12px;
-}
-
-.detail-info p {
-  margin: 8px 0;
-  color: #4b5563;
-}
-
-@media (max-width: 1180px) {
-  .product-attributes-grid,
-  .form-grid.three {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
-  }
-}
-
-@media (max-width: 860px) {
-  .product-attributes {
-    grid-template-columns: 1fr;
-    gap: var(--td-comp-margin-m);
-  }
-
-  .product-attributes-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .form-title-row {
-    display: block;
-  }
-
-  .form-grid.two,
-  .form-grid.three,
-  .category-picker,
-  .detail-panel {
-    grid-template-columns: 1fr;
-  }
-}
-.readonly-product-fields :deep(.t-descriptions__content) {
-  background: var(--td-bg-color-component-disabled);
-}
-.readonly-spec-value {
-  display: block;
-  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-s);
-  background: var(--td-bg-color-component-disabled);
-}
-</style>
+<style scoped src="../shared/index.css"></style>

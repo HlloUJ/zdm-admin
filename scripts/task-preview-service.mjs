@@ -570,6 +570,8 @@ export class PreviewSupervisor {
       spawn,
       waitForPreview,
       checkSelectedPreview,
+      log: console.log,
+      error: console.error,
       ...dependencies,
     };
   }
@@ -626,7 +628,7 @@ export class PreviewSupervisor {
     this.restartAttempts += 1;
     const delay = restartDelay(this.restartAttempts);
     this.transition('retrying', this.lastError);
-    console.error(`任务预览将在 ${Math.round(delay / 1_000)} 秒后重试：${this.lastError || '进程退出'}`);
+    this.dependencies.error(`任务预览将在 ${Math.round(delay / 1_000)} 秒后重试：${this.lastError || '进程退出'}`);
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null;
       void this.enqueue(() => this.launchSelected()).catch((error) => {
@@ -670,7 +672,7 @@ export class PreviewSupervisor {
           return this.status();
         }
       } catch (error) {
-        console.log(`当前任务预览检查未通过，按启动保护流程恢复：${error.message}`);
+        this.dependencies.log(`当前任务预览检查未通过，按启动保护流程恢复：${error.message}`);
       }
     }
     this.gateway.useIntegration();
@@ -686,7 +688,7 @@ export class PreviewSupervisor {
     this.currentWorktree = resolved.root;
     this.currentTaskArgs = [...taskArgs];
     this.transition('starting');
-    console.log(`启动当前任务预览：${resolved.branch} (${resolved.root})`);
+    this.dependencies.log(`启动当前任务预览：${resolved.branch} (${resolved.root})`);
     const child = this.dependencies.spawn(command.command, command.args, {
       cwd: resolved.root,
       env: {
@@ -717,7 +719,7 @@ export class PreviewSupervisor {
       const metadata = await this.dependencies.waitForPreview(resolved.root, child);
       this.restartAttempts = 0;
       this.transition('running');
-      console.log(`当前任务预览已就绪：${CURRENT_TASK_PREVIEW_URL} (${metadata.branch})`);
+      this.dependencies.log(`当前任务预览已就绪：${CURRENT_TASK_PREVIEW_URL} (${metadata.branch})`);
       return this.status();
     } catch (error) {
       if (this.child === child) await this.stopOwnedChild();
@@ -759,7 +761,7 @@ export class PreviewSupervisor {
         });
         if (result.status !== 0) throw new Error(`任务前端已停止，但后端停止失败：${worktree}`);
       }
-      console.log('当前任务预览已停止；5175 已回退到集成环境。');
+      this.dependencies.log('当前任务预览已停止；5175 已回退到集成环境。');
       return this.status();
     });
   }

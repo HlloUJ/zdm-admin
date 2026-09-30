@@ -37,6 +37,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Autowired private ProductLifecycleService lifecycle;
   @Autowired private FinishedProductService finishedProducts;
   @Autowired private MockMvc mvc;
+  @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
 
   @DynamicPropertySource
   static void datasource(DynamicPropertyRegistry registry) {
@@ -48,6 +49,99 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @AfterEach
   void clearIdentity() {
     SecurityContextHolder.clearContext();
+  }
+
+  @Test
+  @Transactional
+  void poolQueriesStayBoundedAsProductsGrow() {
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,status) VALUES (99871,1,'商品池测试门店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) "
+        + "VALUES (99871,'候选商品一',2,'selling','selling',FALSE)");
+    identity(99871L);
+
+    sqlSession.clearCache();
+    long beforeOne = selectCount();
+    assertThat(products.pool()).extracting(StoreFinishedProductService.PoolProduct::id).contains(99871L);
+    long one = selectCount() - beforeOne;
+
+    jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) "
+        + "VALUES (99872,'候选商品二',2,'selling','selling',FALSE),"
+        + "(99873,'候选商品三',2,'selling','selling',FALSE)");
+    sqlSession.clearCache();
+    long beforeThree = selectCount();
+    assertThat(products.pool()).extracting(StoreFinishedProductService.PoolProduct::id)
+        .contains(99871L, 99872L, 99873L);
+    long three = selectCount() - beforeThree;
+
+    System.out.printf("store finished pool SELECT count: one=%d, three=%d%n", one, three);
+    assertThat(three).withFailMessage("pool SELECT count: one=%d, three=%d", one, three)
+        .isLessThanOrEqualTo(one + 2);
+  }
+
+  @Test
+  @Transactional
+  void listUsesBoundedQueriesAndMatchesIndividualDetails() {
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99861,'列表测试级别',1)");
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,store_level_id,status) "
+        + "VALUES (99861,1,'列表测试门店','cityPartner',99861,'enabled')");
+    jdbc.update("INSERT INTO roles (id,tenant_id,store_id,client_code,name,code,status) "
+        + "VALUES (99861,1,99861,'admin','列表角色','STORE_LIST_TEST','enabled')");
+    jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id) "
+        + "VALUES (99861,'列表供应商','platform',0)");
+    jdbc.update("INSERT INTO product_categories (id,name,scope) VALUES (99861,'列表分类','finished')");
+    jdbc.update("INSERT INTO store_finished_role_price_configurations "
+        + "(tenant_id,store_id,role_id,price_coefficient,status,created_by_account_id) "
+        + "VALUES (1,99861,99861,1.2,'enabled',1)");
+    insertListProduct(99861L);
+    identity(99861L);
+
+    sqlSession.clearCache();
+    long beforeOne = selectCount();
+    var oneProduct = products.list();
+    long one = selectCount() - beforeOne;
+    assertThat(oneProduct).hasSize(1);
+    assertThat(oneProduct.getFirst()).isEqualTo(products.detail(99861L));
+
+    insertListProduct(99862L);
+    insertListProduct(99863L);
+    jdbc.update("INSERT INTO store_finished_role_price_overrides "
+        + "(listing_id,sku_id,role_id,manual_price,updated_by_account_id) "
+        + "VALUES (99862,99872,99861,75,1)");
+    sqlSession.clearCache();
+    long beforeThree = selectCount();
+    var threeProducts = products.list();
+    long three = selectCount() - beforeThree;
+    assertThat(threeProducts).hasSize(3);
+    for (var product : threeProducts) {
+      assertThat(product).isEqualTo(products.detail(product.id()));
+    }
+    System.out.printf("store finished list SELECT count: one=%d, three=%d%n", one, three);
+    assertThat(three).withFailMessage("store list SELECT count: one=%d, three=%d", one, three)
+        .isLessThanOrEqualTo(one + 2);
+  }
+
+  private void insertListProduct(long id) {
+    long skuId = id + 10;
+    jdbc.update("INSERT INTO finished_products "
+        + "(id,name,sku,supplier_id,category_id,total_stock,status,source_status,operations_deleted) "
+        + "VALUES (?,'列表商品',?,99861,99861,2,'selling','selling',FALSE)", id, "list-" + id);
+    jdbc.update("INSERT INTO finished_product_variants "
+        + "(id,finished_product_id,variant_label,stock,cost_price) "
+        + "VALUES (?,?,'规格 A',2,60)", skuId, id);
+    jdbc.update("INSERT INTO finished_product_prices "
+        + "(finished_product_id,sku_id,variant_label,store_level_id,store_level_name,"
+        + "price_coefficient,cost_price,price,price_source) "
+        + "VALUES (?,?,'规格 A',99861,'列表测试级别',1,60,100,'manual')", id, skuId);
+    jdbc.update("INSERT INTO finished_product_guide_prices "
+        + "(finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) "
+        + "VALUES (?,?,'规格 A',1,60,150)", id, skuId);
+    jdbc.update("INSERT INTO store_finished_products "
+        + "(id,tenant_id,store_id,finished_product_id,status,selected_by_account_id) "
+        + "VALUES (?,1,99861,?,'warehouse',1)", id, id);
+  }
+
+  private long selectCount() {
+    return jdbc.queryForObject("SHOW SESSION STATUS LIKE 'Com_select'", (row, index) -> row.getLong("Value"));
   }
 
   @Test

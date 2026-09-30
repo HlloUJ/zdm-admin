@@ -104,9 +104,7 @@ public class StoreFinishedProductController {
   public ApiResponse<List<StoreFinishedProductService.ProductView>> batch(
       @Valid @RequestBody BatchRequest request) {
     guard.requireDataPermission();
-    if (request.ids().size() > 100 || request.ids().stream().distinct().count() != request.ids().size()) {
-      throw new IllegalArgumentException("批量操作最多 100 件且不能重复");
-    }
+    requireUniqueBatchIds(request.ids());
     var products = request.ids().stream().map(service::detail).toList();
     products.forEach(product -> requireTransition(product, request.target(), true));
     return ApiResponse.ok(service.changeStatusBatch(request.ids(), request.target(),
@@ -130,10 +128,7 @@ public class StoreFinishedProductController {
   public ApiResponse<Boolean> purgeBatch(@Valid @RequestBody SelectRequest request) {
     guard.requirePermission(PREFIX + ".recycle.batch-purge");
     guard.requireDataPermission();
-    if (request.productIds().size() > 100 || request.productIds().stream().distinct().count()
-        != request.productIds().size()) {
-      throw new IllegalArgumentException("批量操作最多 100 件且不能重复");
-    }
+    requireUniqueBatchIds(request.productIds());
     request.productIds().forEach(id -> {
       if (!"recycle".equals(service.detail(id).status())) {
         throw new IllegalArgumentException("只能批量彻底删除回收站商品");
@@ -181,6 +176,12 @@ public class StoreFinishedProductController {
     guard.requirePermission(PREFIX + ".operation-log.view");
     guard.requireDataPermission();
     return ApiResponse.ok(service.logDetail(id));
+  }
+
+  private static void requireUniqueBatchIds(List<Long> ids) {
+    if (ids.size() > 100 || ids.stream().distinct().count() != ids.size()) {
+      throw new IllegalArgumentException("批量操作最多 100 件且不能重复");
+    }
   }
 
   private void requireEdit(StoreFinishedProductService.ProductView product) {

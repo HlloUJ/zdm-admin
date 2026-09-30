@@ -13,4 +13,15 @@ module.exports = {
     'no-duplicate-selectors': null,
     'rule-empty-line-before': null,
   },
+  overrides: [
+    {
+      files: [
+        'src/pages/{finished-stock,slab}/{management,supply-chain,shared}/index.css',
+        'src/pages/finished-stock/store/index.css',
+      ],
+      rules: {
+        'selector-pseudo-class-no-unknown': [true, { ignorePseudoClasses: ['deep'] }],
+      },
+    },
+  ],
 };

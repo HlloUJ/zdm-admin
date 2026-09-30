@@ -5,6 +5,7 @@ import com.zdm.platform.media.MediaAssetService;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -66,11 +67,15 @@ final class FinishedProductDetailContent {
   }
 
   String render(String html) {
+    return render(html, assets::publicUrl);
+  }
+
+  String render(String html, Function<Long, String> mediaUrl) {
     Document document = clean(html);
     for (Element media : document.select("img, video")) {
       String source = media.attr("src");
       if (source.matches("media:[0-9]+")) {
-        String url = assets.publicUrl(Long.valueOf(source.substring(STORED_PREFIX.length())));
+        String url = mediaUrl.apply(Long.valueOf(source.substring(STORED_PREFIX.length())));
         if (url == null) {
           media.remove();
         } else {

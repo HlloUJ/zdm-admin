@@ -46,6 +46,24 @@ public class SlabPriceService {
     return prices;
   }
 
+  public Map<Long, List<SlabPrice>> listPricesBySlabIds(List<Long> slabIds) {
+    if (slabIds.isEmpty()) { return Map.of(); }
+    List<SlabPrice> prices = mapper.selectList(Wrappers.<SlabPrice>lambdaQuery()
+        .in(SlabPrice::getSlabId, slabIds).orderByAsc(SlabPrice::getId));
+    Map<Long, StoreLevelPricingDirectory.Level> levels = new LinkedHashMap<>();
+    Map<Long, List<SlabPrice>> bySlabId = new LinkedHashMap<>();
+    for (SlabPrice price : prices) {
+      Long levelId = price.getStoreLevelId();
+      if (!levels.containsKey(levelId)) {
+        levels.put(levelId, storeLevelDirectory.findLevel(levelId));
+      }
+      StoreLevelPricingDirectory.Level level = levels.get(levelId);
+      if (level != null) { price.setStoreLevelName(level.name()); }
+      bySlabId.computeIfAbsent(price.getSlabId(), ignored -> new ArrayList<>()).add(price);
+    }
+    return bySlabId;
+  }
+
   public void requireCompletePrices(Long slabId) {
     List<SlabPrice> prices = listPrices(slabId);
     Set<Long> pricedLevels = prices.stream().map(SlabPrice::getStoreLevelId).collect(Collectors.toSet());
