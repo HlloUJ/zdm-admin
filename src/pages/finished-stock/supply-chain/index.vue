@@ -3084,4 +3084,4 @@ const handleConfirm = async () => {
 };
 </script>
 
-<style scoped src="./index.css"></style>
+<style scoped src="../shared/index.css"></style>
