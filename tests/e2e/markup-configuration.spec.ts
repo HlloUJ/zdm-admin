@@ -197,6 +197,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
     .dragTo(page.getByRole('row').filter({ hasText: '区域合作店' }).locator('td').nth(1));
   expect((await finishedReorderRequest).postDataJSON()).toEqual({ orderedIds: [4, 3] });
   await expect(page.getByText('已更新排序“城市中心店”', { exact: true })).toBeVisible();
+  await page.getByText('已更新排序“城市中心店”', { exact: true }).first().waitFor({ state: 'detached' });
 
   const guideCoefficientInput = page.locator('.guide-coefficient-input input');
   await expect(guideCoefficientInput).toHaveValue('1.50');
