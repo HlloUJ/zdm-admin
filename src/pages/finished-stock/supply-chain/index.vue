@@ -1002,6 +1002,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildFinishedProductPayload, buildFinishedOperationsPricePayload } from '../shared/finishedStockPayload';
 import type {
   FinishedStockToolbarAction,
   FinishedStockRowAction,
@@ -3110,82 +3111,35 @@ const specVariantLabel = (row: SpecRow) =>
     .filter(Boolean)
     .join(' / ') ||
   '未命名规格';
-const buildProductPayloadFromForm = (): FinishedProductPayload => {
-  const stock = totalStock.value || Number(productForm.totalStock || 0);
-  const guidePrice = Number(specRows.value[0]?.guide || 0);
-  const status = productForm.shelfNow === 'now' ? 'selling' : 'warehouse';
-  return {
+const buildProductPayloadFromForm = (): FinishedProductPayload =>
+  buildFinishedProductPayload({
+    totalStock: totalStock.value,
+    form: productForm,
+    specRows: specRows.value,
     categoryId: selectedCategoryId.value,
     supplierId: supplierIdByName(productForm.supplier),
-    name: productForm.name.trim(),
-    sku: productForm.merchantCode.trim(),
     mainImageMediaId: mainImageMedia.value!.mediaId!,
     mainImageMediaIds: mainImages.value.map((image) => image.mediaId!),
     videoMediaId: videoMedia.value!.mediaId!,
-    detail: productForm.detail.trim(),
-    totalStock: stock,
-    guidePrice: guidePrice > 0 ? guidePrice : undefined,
-    attributeDisplayOrder: {
-      product: attributeFields.value.map((field) => String(field.attributeId)),
-      sales: salesAttributeFields.value.map((field) => field.key),
-    },
-    attributes: attributeFields.value
-      .map((field) => ({
-        attributeId: field.attributeId,
-        attributeName: field.label,
-        value: String(productForm[field.key] ?? '').trim(),
-      }))
-      .filter((attribute) => attribute.value),
-    specDimensions: confirmedSpecMode.value === 'layered' ? confirmedSpecDimensions.value : [],
-    variants: specRows.value.map((row) => ({
-      id: row.skuId,
-      variantLabel: specVariantLabel(row),
-      displayMode: row.mode,
-      salesAttributes: Object.fromEntries(
-        salesAttributeFields.value.map((field) => [field.key, String(row[field.key] ?? '').trim()]),
-      ),
-      material: row.material || undefined,
-      lengthValue: row.length || undefined,
-      color: row.color || undefined,
-      sizeValue: row.size || undefined,
-      costPrice: Number(row.cost),
-      stock: Number(row.quantity || 0),
-    })),
+    attributeFields: attributeFields.value,
+    salesAttributeFields: salesAttributeFields.value,
+    specMode: confirmedSpecMode.value,
+    specDimensions: confirmedSpecDimensions.value,
+    variantLabel: specVariantLabel,
     offShelfReason: editingProduct.value?.offShelfReason,
     offShelfDetail: editingProduct.value?.offShelfDetail,
-    status,
-  };
-};
+  });
 const buildOperationsPricePayload = (): Pick<
   FinishedProductPayload,
   'name' | 'status' | 'guidePrices' | 'markupPrices'
-> => ({
-  name: editingProduct.value!.name,
-  status: editingProduct.value!.status,
-  guidePrices: specRows.value.map((row) => ({
-    skuId: row.skuId!,
-    variantLabel: specVariantLabel(row),
-    costPrice: Number(row.cost),
-    priceCoefficient: Number(row.guideCoefficient),
-    price: Number(row.guide),
-  })),
-  markupPrices: specRows.value.flatMap((row) =>
-    productPriceLevels.value.map((level) => {
-      const price = row.markupPrices[level.id];
-      return {
-        skuId: row.skuId!,
-        variantLabel: specVariantLabel(row),
-        storeLevelId: level.id,
-        storeLevelName: level.name,
-        costPrice: Number(row.cost),
-        priceCoefficient: Number(price.coefficient),
-        price: Number(price.price),
-        priceSource: price.priceSource,
-        sourceConfigurationId: price.sourceConfigurationId,
-      };
-    }),
-  ),
-});
+> =>
+  buildFinishedOperationsPricePayload({
+    name: editingProduct.value!.name,
+    status: editingProduct.value!.status,
+    specRows: specRows.value,
+    priceLevels: productPriceLevels.value,
+    variantLabel: specVariantLabel,
+  });
 const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {
   const nextItem = toStockItem(record);
   if (offShelfReason) nextItem.offShelfReason = offShelfReason;
