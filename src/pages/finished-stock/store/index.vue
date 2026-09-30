@@ -319,15 +319,12 @@
 <script setup lang="ts">
 import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useStoreFinishedLogs } from './useStoreFinishedLogs';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { finishedStockActions } from '../shared/finishedStockActions';
-import {
-  parseStoreOperationLogChanges,
-  storeOperationLogSourceLabel as logSourceLabel,
-  toStoreOperationLogRow as toLogRow,
-} from './storeOperationLog';
+import { storeOperationLogSourceLabel as logSourceLabel } from './storeOperationLog';
 import {
   AdminConfirmDialog,
   AdminDialog,
@@ -338,21 +335,17 @@ import {
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
-import { productLogFilterOptions } from '@/services/productOperationLog';
 import {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,
   clearStoreFinishedRecycle,
   getStoreFinishedProduct,
-  getStoreFinishedLog,
-  listStoreFinishedLogs,
   listStoreFinishedPool,
   listStoreFinishedProducts,
   purgeStoreFinishedProduct,
   purgeStoreFinishedProducts,
   saveStoreFinishedRolePrice,
   selectStoreFinishedProducts,
-  type StoreFinishedLog,
   type StoreFinishedProduct,
   type StoreFinishedStatus,
   type StorePoolProduct,
@@ -444,32 +437,24 @@ const offShelf = reactive({ reason: '', detail: '' });
 const pendingOffShelf = ref<{ ids: number[]; batch: boolean } | null>(null);
 type ActionKind = 'shelf' | 'delete' | 'restore' | 'purge' | 'batch-shelf' | 'batch-restore' | 'batch-purge' | 'clear';
 const confirm = ref<{ kind: ActionKind; label: string; product?: StoreFinishedProduct; ids?: number[] } | null>(null);
-const logsVisible = ref(false);
-const logs = ref<StoreFinishedLog[]>([]);
-const logTotal = ref(0);
-const logLoading = ref(false);
-const logDetail = ref<StoreFinishedLog | null>(null);
-const logDetailVisible = ref(false);
-const logDetailRow = computed(() => logDetail.value && toLogRow(logDetail.value));
-async function openLogDetail(id: number) {
-  try {
-    logDetail.value = await getStoreFinishedLog(id);
-    logDetailVisible.value = true;
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '操作详情加载失败'));
-  }
-}
-const logChanges = computed(() => parseStoreOperationLogChanges(logDetail.value?.changeDetails, stateLabel));
-const logFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
-const appliedLogFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
-const logPagination = reactive({ current: 1, pageSize: 10 });
-const updateLogFilter = (field: string, value: string | string[]) => Object.assign(logFilter, { [field]: value });
-function changeLogPage(page: { current: number; pageSize: number }) {
-  Object.assign(logPagination, page);
-  void loadLogs();
-}
-const logTypeOptions = productLogFilterOptions('store');
-const logRows = computed(() => logs.value.map(toLogRow));
+const {
+  logsVisible,
+  logTotal,
+  logLoading,
+  logDetailVisible,
+  logDetailRow,
+  logChanges,
+  logFilter,
+  logPagination,
+  logTypeOptions,
+  logRows,
+  openLogDetail,
+  updateLogFilter,
+  changeLogPage,
+  openLogs,
+  searchLogs,
+  resetLogFilter,
+} = useStoreFinishedLogs(stateLabel);
 const batchActions: Record<string, { kind: ActionKind | 'off-shelf'; label: string; permission: string }> = {
   warehouse: { kind: 'batch-shelf', label: '批量上架', permission: 'batch-shelf' },
   selling: { kind: 'off-shelf', label: '批量下架', permission: 'batch-off-shelf' },
@@ -736,42 +721,6 @@ async function runConfirmed() {
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '操作失败'));
   }
-}
-async function openLogs() {
-  Object.assign(logFilter, { keyword: '', operationType: '', operatorName: '', dateRange: [] });
-  Object.assign(appliedLogFilter, logFilter);
-  logPagination.current = 1;
-  logsVisible.value = true;
-  await loadLogs();
-}
-async function loadLogs() {
-  logLoading.value = true;
-  try {
-    const result = await listStoreFinishedLogs({
-      keyword: appliedLogFilter.keyword,
-      operationType: appliedLogFilter.operationType,
-      operatorName: appliedLogFilter.operatorName,
-      startDate: appliedLogFilter.dateRange[0] || '',
-      endDate: appliedLogFilter.dateRange[1] || '',
-      page: logPagination.current,
-      pageSize: logPagination.pageSize,
-    });
-    logs.value = result.records;
-    logTotal.value = result.total;
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '操作日志加载失败'));
-  } finally {
-    logLoading.value = false;
-  }
-}
-function searchLogs() {
-  Object.assign(appliedLogFilter, logFilter, { dateRange: [...logFilter.dateRange] });
-  logPagination.current = 1;
-  void loadLogs();
-}
-function resetLogFilter() {
-  Object.assign(logFilter, { keyword: '', operationType: '', operatorName: '', dateRange: [] });
-  searchLogs();
 }
 onMounted(load);
 </script>
