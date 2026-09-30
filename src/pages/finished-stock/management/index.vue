@@ -1077,6 +1077,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildFinishedStockTemplateFields } from '../shared/finishedStockTemplateFields';
 import { buildFinishedProductPayload, buildFinishedOperationsPricePayload } from '../shared/finishedStockPayload';
 import type {
   FinishedStockToolbarAction,
@@ -1542,71 +1543,15 @@ const batchMarkupPrices = ref<
     }
   >
 >({});
-const templateAttributeFields = computed(() => {
-  const fields = categoryAttributeBindings.value
-    .filter((attribute) => attribute.categoryId === selectedCategoryId.value)
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((attribute) => ({
-      key: `attribute_${attribute.attributeId}` as const,
-      role: attribute.attributeRole,
-      attributeId: attribute.attributeId,
-      label: attribute.name,
-      required: attribute.requiredFlag,
-      type: attribute.valueType === 'select' ? ('select' as const) : ('input' as const),
-      options: attribute.options.map((option) => option.value),
-    }));
-  for (const dimension of confirmedSpecDimensions.value) {
-    const existing = fields.find((field) => field.key === dimension.key);
-    if (existing) existing.label = dimension.name;
-    else if (/^attribute_\d+$/.test(dimension.key))
-      fields.push({
-        key: dimension.key as `attribute_${number}`,
-        attributeId: Number(dimension.key.slice(10)),
-        role: 'sales',
-        label: dimension.name,
-        required: false,
-        type: 'input',
-        options: [],
-      });
-  }
-  const product = editingProduct.value;
-  if (product && product.categoryId === selectedCategoryId.value) {
-    for (const entry of product.attributes) {
-      if (!fields.some((field) => field.attributeId === entry.attributeId)) {
-        fields.push({
-          key: `attribute_${entry.attributeId}`,
-          role: 'product',
-          attributeId: entry.attributeId,
-          label: entry.attributeName,
-          required: false,
-          type: 'input',
-          options: [],
-        });
-      }
-    }
-    for (const variant of product.variants) {
-      for (const key of Object.keys(variant.salesAttributes ?? {})) {
-        if (!/^attribute_\d+$/.test(key)) continue;
-        const attributeId = Number(key.slice(10));
-        if (!fields.some((field) => field.attributeId === attributeId)) {
-          fields.push({
-            key: `attribute_${attributeId}`,
-            role: 'sales',
-            attributeId,
-            label:
-              productAttributes.value.find((attribute) => attribute.id === attributeId)?.name ??
-              `销售属性 ${attributeId}`,
-            required: false,
-            type: 'input',
-            options: [],
-          });
-        }
-      }
-    }
-  }
-  return fields;
-});
+const templateAttributeFields = computed(() =>
+  buildFinishedStockTemplateFields(
+    selectedCategoryId.value,
+    categoryAttributeBindings.value,
+    confirmedSpecDimensions.value,
+    editingProduct.value,
+    productAttributes.value,
+  ),
+);
 const attributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'product'));
 const salesAttributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'sales'));
 const layeredFieldLabels = computed<Record<string, string>>(() => ({
