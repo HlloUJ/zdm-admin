@@ -22,7 +22,7 @@
             </nav>
           </AdminSectionCard>
         </div>
-        <header v-if="formPageVisible || !finishedTabs.length" class="page-header">
+        <header v-if="!formPageVisible && !finishedTabs.length" class="page-header">
           <div>
             <t-breadcrumb>
               <t-breadcrumb-item
@@ -32,7 +32,6 @@
                 replace
                 @click="closeFormPage"
               />
-              <t-breadcrumb-item v-if="formPageVisible">{{ formPageTitle }}</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
           <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="operationLogsVisible = true"
@@ -330,6 +329,8 @@
                       v-model="mainImageSlots[index]"
                       :title="index === 0 ? '封面图' : `商品主图${index + 1}`"
                       :show-title="true"
+                      :show-file-name="formPageMode !== 'edit'"
+                      preview-on-filled-click
                       accept="image/*"
                       :error-message="submitAttempted && !mainImageMedia && index === 0 ? '请上传图片' : ''"
                       :upload="(file) => uploadProductMedia(file, 'image')"
@@ -344,6 +345,8 @@
                       v-model="videoMedia"
                       title="商品视频"
                       :show-title="false"
+                      :show-file-name="formPageMode !== 'edit'"
+                      preview-on-filled-click
                       accept="video/*"
                       media-type="video"
                       :error-message="submitAttempted && !videoMedia ? '请上传视频' : ''"

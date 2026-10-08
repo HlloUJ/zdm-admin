@@ -152,6 +152,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await picker.getByRole('button', { name: '奢石餐桌' }).click();
   await page.getByRole('button', { name: '确认，下一步' }).click();
 
+  await expect(page.locator('main.page--form > header.page-header')).toHaveCount(0);
   await expect(page.getByText('当前分类：成品现货 > 餐桌 > 石材餐桌 > 奢石餐桌')).toBeVisible();
   const images = page.locator('.t-form__item').filter({ hasText: '最多上传5张图片' });
   const video = page.locator('.t-form__item').filter({ hasText: '最多上传1段视频' });
@@ -191,6 +192,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
     await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(index + 1);
   }
   await expect(emptyUploads).toHaveCount(0);
+  await expect(images.locator('input[type="file"]')).toHaveCount(0);
   await images.getByRole('button', { name: '删除', exact: true }).first().click();
   await expect(emptyUploads).toHaveCount(1);
   await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(4);
@@ -201,6 +203,12 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await expect(preview.locator('.image-preview-dialog img')).toHaveAttribute('src', '/test-product.png');
   await preview.locator('.t-dialog__close').click();
   await expect(preview).not.toBeVisible();
+  await images
+    .getByRole('button', { name: '商品主图2', exact: true })
+    .locator('..')
+    .click({ position: { x: 8, y: 80 } });
+  await expect(preview.locator('.image-preview-dialog img')).toBeVisible();
+  await preview.locator('.t-dialog__close').click();
 
   const videoBytes = await page.evaluate(async () => {
     const canvas = document.createElement('canvas');
@@ -242,6 +250,9 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await expect.poll(() => player.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
   await preview.locator('.t-dialog__close').click();
   await expect(player).toHaveCount(0);
+  await video.locator('.admin-media-upload').click({ position: { x: 8, y: 80 } });
+  await expect(preview.locator('video')).toBeVisible();
+  await preview.locator('.t-dialog__close').click();
 });
 
 test('edits an initially empty rich product description with real toolbar actions', async ({ page }) => {
@@ -837,6 +848,7 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await page.goto('/supply-chain/finished-stock-management');
   await page.getByText('编辑', { exact: true }).click();
   const editor = page.locator('.form-shell');
+  await expect(page.locator('main.page--form > header.page-header')).toHaveCount(0);
   await page.setViewportSize({ width: 1280, height: 500 });
   for (const [name, selector] of [
     ['封面图', '.image-preview-dialog img'],
@@ -853,6 +865,9 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
     await preview.locator('.t-dialog__close').click();
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
+    await thumbnail.locator('..').click({ position: { x: 8, y: 80 } });
+    await expect(preview.locator(selector)).toBeVisible();
+    await preview.locator('.t-dialog__close').click();
   }
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(editor.locator('.spec-table-block thead th')).toContainText(['商品规格', '成本价*']);
