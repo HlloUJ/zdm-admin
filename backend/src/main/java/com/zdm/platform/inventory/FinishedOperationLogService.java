@@ -152,6 +152,15 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
 
   @Transactional
   public void record(FinishedProduct product, Map<String, Object> before, Map<String, Object> after) {
+    record(product, before, after, null);
+  }
+
+  @Transactional
+  public void recordEdit(FinishedProduct product, Map<String, Object> before, Map<String, Object> after) {
+    record(product, before, after, "UPDATE");
+  }
+
+  private void record(FinishedProduct product, Map<String, Object> before, Map<String, Object> after, String forcedType) {
     Map<String, Object> changes = new LinkedHashMap<>();
     Map<String, Object> source = after == null ? before : after;
     source.forEach((key, value) -> {
@@ -170,7 +179,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     if (changes.isEmpty()) { return; }
     String previousStatus = before == null ? null : (String) before.get("状态");
     String nextStatus = after == null ? null : (String) after.get("状态");
-    String type = operationType(before, after, previousStatus, nextStatus, changes);
+    String type = forcedType == null ? operationType(before, after, previousStatus, nextStatus, changes) : forcedType;
     if (before != null && after != null) { retainChangedVariants(before, after, changes); }
     if (before != null && after != null && after.get("字段顺序") != null
         && List.of("商品属性", "销售规格", "指导价", "层级价格", "规格维度").stream().anyMatch(changes::containsKey)) {

@@ -538,6 +538,53 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     }
   }
 
+  @Test
+  void editingAndShelvingRecordsOneEditWithStatusChange() throws Exception {
+    long id = sourceFixture("平台发布", "warehouse").path("id").asLong();
+    ObjectNode edited = sourceRecord(id);
+    edited.put("name", "编辑后商品").put("status", "selling");
+    data(mvc.perform(put("/api/admin/finished-products/{id}/edit", id)
+        .contentType("application/json").content(json.writeValueAsBytes(edited))));
+
+    assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=? AND business_client_code='supply-chain' ORDER BY id", String.class, id))
+        .containsExactly("CREATE", "UPDATE");
+    var editLog = jdbc.queryForMap("SELECT before_status,after_status,change_details FROM finished_operation_logs WHERE product_id=? AND business_client_code='supply-chain' AND operation_type='UPDATE'", id);
+    assertThat(editLog.get("before_status")).isEqualTo("warehouse");
+    assertThat(editLog.get("after_status")).isEqualTo("selling");
+    JsonNode changes = json.readTree((String) editLog.get("change_details"));
+    assertThat(changes.path("状态").path("before").asText()).isEqualTo("warehouse");
+    assertThat(changes.path("状态").path("after").asText()).isEqualTo("selling");
+    assertThat(changes.path("商品名称").path("after").asText()).isEqualTo("编辑后商品");
+    assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?", String.class, id))
+        .isEqualTo("selling");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=? AND business_client_code='admin' AND operation_type='SOURCE_SHELF'", Long.class, id))
+        .isEqualTo(1L);
+  }
+
+  @Test
+  void editingSellingProductToWarehouseRecordsOnlyOneEdit() throws Exception {
+    long id = sourceFixture("平台发布", "selling").path("id").asLong();
+    ObjectNode edited = sourceRecord(id);
+    edited.put("name", "暂不上架商品").put("status", "warehouse");
+    mvc.perform(put("/api/admin/finished-products/{id}", id)
+        .contentType("application/json").content(json.writeValueAsBytes(edited))).andExpect(status().isForbidden());
+    data(mvc.perform(put("/api/admin/finished-products/{id}/edit", id)
+        .contentType("application/json").content(json.writeValueAsBytes(edited))));
+
+    assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=? AND business_client_code='supply-chain' ORDER BY id", String.class, id))
+        .containsExactly("CREATE", "UPDATE");
+    var editLog = jdbc.queryForMap("SELECT before_status,after_status,change_details FROM finished_operation_logs WHERE product_id=? AND business_client_code='supply-chain' AND operation_type='UPDATE'", id);
+    assertThat(editLog.get("before_status")).isEqualTo("selling");
+    assertThat(editLog.get("after_status")).isEqualTo("warehouse");
+    JsonNode changes = json.readTree((String) editLog.get("change_details"));
+    assertThat(changes.path("状态").path("before").asText()).isEqualTo("selling");
+    assertThat(changes.path("状态").path("after").asText()).isEqualTo("warehouse");
+    assertThat(changes.path("商品名称").path("after").asText()).isEqualTo("暂不上架商品");
+    assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?", String.class, id))
+        .isEqualTo("warehouse");
+    assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
+  }
+
   private ObjectNode sourceFixture(String publisher,String status) throws Exception {
     return sourceFixture(publisher, status, true);
   }

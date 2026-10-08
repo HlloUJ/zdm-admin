@@ -152,6 +152,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await picker.getByRole('button', { name: '奢石餐桌' }).click();
   await page.getByRole('button', { name: '确认，下一步' }).click();
 
+  await expect(page.locator('main.page--form > header.page-header')).toHaveCount(0);
   await expect(page.getByText('当前分类：成品现货 > 餐桌 > 石材餐桌 > 奢石餐桌')).toBeVisible();
   const images = page.locator('.t-form__item').filter({ hasText: '最多上传5张图片' });
   const video = page.locator('.t-form__item').filter({ hasText: '最多上传1段视频' });
@@ -191,6 +192,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
     await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(index + 1);
   }
   await expect(emptyUploads).toHaveCount(0);
+  await expect(images.locator('input[type="file"]')).toHaveCount(0);
   await images.getByRole('button', { name: '删除', exact: true }).first().click();
   await expect(emptyUploads).toHaveCount(1);
   await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(4);
@@ -201,6 +203,12 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await expect(preview.locator('.image-preview-dialog img')).toHaveAttribute('src', '/test-product.png');
   await preview.locator('.t-dialog__close').click();
   await expect(preview).not.toBeVisible();
+  await images
+    .getByRole('button', { name: '商品主图2', exact: true })
+    .locator('..')
+    .click({ position: { x: 8, y: 80 } });
+  await expect(preview.locator('.image-preview-dialog img')).toBeVisible();
+  await preview.locator('.t-dialog__close').click();
 
   const videoBytes = await page.evaluate(async () => {
     const canvas = document.createElement('canvas');
@@ -242,6 +250,9 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await expect.poll(() => player.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
   await preview.locator('.t-dialog__close').click();
   await expect(player).toHaveCount(0);
+  await video.locator('.admin-media-upload').click({ position: { x: 8, y: 80 } });
+  await expect(preview.locator('video')).toBeVisible();
+  await preview.locator('.t-dialog__close').click();
 });
 
 test('edits an initially empty rich product description with real toolbar actions', async ({ page }) => {
@@ -822,7 +833,7 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, data: [{ id: 1, name: '一级价格' }] } }),
   );
-  await page.route('**/api/admin/finished-products/72', async (route) => {
+  await page.route(/\/api\/admin\/finished-products\/72(?:\/edit)?$/, async (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { code: 0, data: product } });
     saves += 1;
     const payload = route.request().postDataJSON();
@@ -837,6 +848,7 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await page.goto('/supply-chain/finished-stock-management');
   await page.getByText('编辑', { exact: true }).click();
   const editor = page.locator('.form-shell');
+  await expect(page.locator('main.page--form > header.page-header')).toHaveCount(0);
   await page.setViewportSize({ width: 1280, height: 500 });
   for (const [name, selector] of [
     ['封面图', '.image-preview-dialog img'],
@@ -853,6 +865,9 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
     await preview.locator('.t-dialog__close').click();
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
+    await thumbnail.locator('..').click({ position: { x: 8, y: 80 } });
+    await expect(preview.locator(selector)).toBeVisible();
+    await preview.locator('.t-dialog__close').click();
   }
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(editor.locator('.spec-table-block thead th')).toContainText(['商品规格', '成本价*']);
@@ -869,6 +884,34 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);
+});
+
+test('supply-chain edit can select temporarily not shelved for a selling product', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  const product = {
+    id: 74,
+    name: '已上架商品',
+    status: 'selling',
+    sourceStatus: 'selling',
+    categoryId: 5,
+    supplierId: 2,
+    mainImageMediaId: 1,
+    videoMediaId: 2,
+    detail: '<p>商品详情</p>',
+    totalStock: 1,
+    attributes: [],
+    variants: [{ id: 841, variantLabel: '单规格', displayMode: 'single', stock: 1, costPrice: 10 }],
+  };
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/finished-products/74', (route) => route.fulfill({ json: { code: 0, data: product } }));
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+  await page.getByText('编辑', { exact: true }).click();
+  const later = page.getByRole('radio', { name: '暂不上架' });
+  await expect(later).toBeEnabled();
+  await page.locator('.t-radio').filter({ hasText: '暂不上架' }).click();
+  await expect(later).toBeChecked();
 });
 
 test('supply-chain layered product edit exposes cost for each specification', async ({ page }) => {
@@ -1601,7 +1644,7 @@ async function openSpecConversionFixture(
     })),
   };
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
-  await page.route('**/api/admin/finished-products/95', (route) =>
+  await page.route(/\/api\/admin\/finished-products\/95(?:\/edit)?$/, (route) =>
     route.fulfill({ json: { code: 0, data: { ...product, ...route.request().postDataJSON() } } }),
   );
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
@@ -1705,7 +1748,7 @@ for (const originalMode of ['single', 'layered'] as const) {
     await table.getByPlaceholder('价格', { exact: true }).fill('30');
     await table.locator('.quantity-editor input').fill('1');
     const requestPromise = page.waitForRequest(
-      (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+      (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
     );
     await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
     const variants = (await requestPromise).postDataJSON().variants;
@@ -1730,7 +1773,7 @@ test('preserves sparse SKU identities and values when editing without changing d
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(page.locator('.spec-table-block tbody tr')).toHaveCount(2);
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;
@@ -1781,7 +1824,7 @@ test('rebuilds eight distinct specifications from three edited dimensions withou
     await row.locator('.quantity-editor input').fill('1');
   }
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;
@@ -1819,7 +1862,7 @@ test('retains matched specification attributes and SKU data when adding and remo
     }
   }
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;
@@ -1865,7 +1908,7 @@ test('prefills corresponding non-dimension attributes when a saved specification
     await row.locator('.quantity-editor input').fill('1');
   }
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;

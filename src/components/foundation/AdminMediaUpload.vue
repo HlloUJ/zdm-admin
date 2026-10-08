@@ -2,6 +2,7 @@
   <div
     class="admin-media-upload"
     :class="{ 'is-disabled': disabled, 'is-error': Boolean(errorMessage), 'is-loading': loading }"
+    @click="previewFilled"
   >
     <span v-if="required && showTitle" class="admin-media-upload__required">*</span>
     <t-button
@@ -41,9 +42,10 @@
     />
     <t-loading v-else-if="loading" size="small" />
     <t-icon v-else name="add" />
-    <span>{{ modelValue?.name || label }}</span>
+    <span v-if="!modelValue || showFileName">{{ modelValue?.name || label }}</span>
     <span v-if="errorMessage" class="admin-media-upload__error">{{ errorMessage }}</span>
     <input
+      v-if="!previewOnFilledClick || !modelValue"
       class="admin-media-upload__input"
       type="file"
       :accept="accept"
@@ -76,6 +78,8 @@ const props = withDefaults(
     mediaType?: 'image' | 'video';
     required?: boolean;
     showTitle?: boolean;
+    showFileName?: boolean;
+    previewOnFilledClick?: boolean;
     disabled?: boolean;
     errorMessage?: string;
     upload: (file: File) => Promise<AdminMediaValue>;
@@ -87,6 +91,8 @@ const props = withDefaults(
     mediaType: 'image',
     required: false,
     showTitle: true,
+    showFileName: true,
+    previewOnFilledClick: false,
     disabled: false,
     errorMessage: '',
   },
@@ -101,6 +107,10 @@ const emit = defineEmits<{
 
 const loading = ref(false);
 const previewUrl = computed(() => props.modelValue?.coverUrl || props.modelValue?.url);
+
+const previewFilled = () => {
+  if (props.previewOnFilledClick && props.modelValue && !props.disabled) emit('preview', props.modelValue);
+};
 
 const selectFile = async (event: Event) => {
   const input = event.target as HTMLInputElement;
