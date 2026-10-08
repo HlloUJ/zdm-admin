@@ -20,6 +20,9 @@
           <t-form-item label="操作类型">
             <t-select
               :value="filter.operationType"
+              :popup-props="operationTypePopupMinWidth
+                ? { overlayInnerStyle: { width: 'auto', minWidth: operationTypePopupMinWidth } }
+                : undefined"
               clearable
               placeholder="请选择"
               @change="emit('filter-change', 'operationType', String($event || ''))"
@@ -140,6 +143,7 @@ const props = withDefaults(
     filter: Filter;
     pagination: Pagination;
     typeOptions: { value: string; label: string }[];
+    operationTypePopupMinWidth?: string;
     subjectLabel: string;
     keywordPlaceholder: string;
     subjectCodeLabel?: string;

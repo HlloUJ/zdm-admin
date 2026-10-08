@@ -37,15 +37,15 @@ export const productOperationTypes: Record<string, string> = {
   SOURCE_DELETE_TO_RECYCLE: '供应链删除至回收站',
   SOURCE_PURGE: '供应链彻底删除',
   SOURCE_INTERNAL: '供应链状态变更',
-  OPERATIONS_OFF_SHELF: '运营端下架',
-  OPERATIONS_SHELF: '运营端上架',
-  OPERATIONS_DELETE_TO_RECYCLE: '运营端删除至回收站',
-  OPERATIONS_PURGE: '运营端彻底删除',
+  OPERATIONS_OFF_SHELF: '运营管理平台下架',
+  OPERATIONS_SHELF: '运营管理平台上架',
+  OPERATIONS_DELETE_TO_RECYCLE: '运营管理平台删除至回收站',
+  OPERATIONS_PURGE: '运营管理平台彻底删除',
 };
 
 const fixedSummaries: Record<string, string> = {
   CREATE: '发布商品',
-  SELECT: '从运营端已上架商品池挑选商品，放入本店仓库',
+  SELECT: '从商品中心放入本店仓库',
   UPDATE: '编辑商品',
   PRICE_UPDATE: '编辑商品',
   SHELF: '上架商品',
@@ -61,10 +61,10 @@ const fixedSummaries: Record<string, string> = {
   SOURCE_DELETE: '供应链已彻底删除该商品',
   SOURCE_DELETE_TO_RECYCLE: '供应链已将该商品删除至回收站',
   SOURCE_PURGE: '供应链已彻底删除该商品',
-  OPERATIONS_OFF_SHELF: '运营端已下架该商品',
-  OPERATIONS_SHELF: '运营端已重新上架该商品',
-  OPERATIONS_DELETE_TO_RECYCLE: '运营端已将该商品删除至回收站',
-  OPERATIONS_PURGE: '运营端已彻底删除该商品',
+  OPERATIONS_OFF_SHELF: '运营管理平台已下架该商品',
+  OPERATIONS_SHELF: '运营管理平台已重新上架该商品',
+  OPERATIONS_DELETE_TO_RECYCLE: '运营管理平台已将该商品删除至回收站',
+  OPERATIONS_PURGE: '运营管理平台已彻底删除该商品',
 };
 
 export function productOperationTypeLabel(type: string): string {

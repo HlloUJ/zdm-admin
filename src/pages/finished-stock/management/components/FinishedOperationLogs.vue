@@ -9,6 +9,7 @@
     :filter="filter"
     :pagination="pagination"
     :type-options="typeOptions"
+    operation-type-popup-min-width="240px"
     subject-label="商品"
     keyword-placeholder="商品名称/ID"
     :status-label="state"

@@ -28,6 +28,8 @@ public class ProductLifecycleService {
       this.logKey=logKey; this.logName=logName; this.logCode=logCode; this.code=code; this.config=config;
     }
   }
+  private final org.springframework.beans.factory.ObjectProvider<FinishedProductService> finishedProducts;
+  private final FinishedInvalidationMedia invalidationMedia;
   private final FinishedProductArrivalLogService arrivalLogs;
   private final SlabOperationLogService slabLogs;
   private final StoreFinishedUpstreamLogService storeUpstreamLogs;
@@ -35,7 +37,9 @@ public class ProductLifecycleService {
   private final CurrentIdentityProvider identities;
   private final ObjectMapper json;
   private final org.mybatis.spring.SqlSessionTemplate sqlSession;
-  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs, SlabOperationLogService slabLogs, StoreFinishedUpstreamLogService storeUpstreamLogs) {
+  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs, SlabOperationLogService slabLogs, StoreFinishedUpstreamLogService storeUpstreamLogs, org.springframework.beans.factory.ObjectProvider<FinishedProductService> finishedProducts, FinishedInvalidationMedia invalidationMedia) {
+    this.invalidationMedia = invalidationMedia;
+    this.finishedProducts = finishedProducts;
     this.slabLogs=slabLogs;
     this.arrivalLogs=arrivalLogs;
     this.storeUpstreamLogs=storeUpstreamLogs;
@@ -66,6 +70,12 @@ public class ProductLifecycleService {
   public void requireOperational(String source, Boolean deleted) {
     if (Boolean.TRUE.equals(deleted)) { throw new IllegalArgumentException("运营商品已被彻底删除"); }
     if (unavailable(source)) { throw new IllegalArgumentException("来源商品未上架或已删除，只能彻底删除运营商品"); }
+  }
+  public void requireFinishedOperational(FinishedProduct product) {
+    requireOperational(product.getSourceStatus(), product.getOperationsDeleted());
+    if (product.getOperationsInvalidatedReason() != null) {
+      throw new IllegalArgumentException(product.getOperationsInvalidatedReason());
+    }
   }
   public Map<String,Object> lock(Kind kind, Long id) {
     var rows=jdbc.queryForList("SELECT * FROM "+kind.table+" WHERE id=? FOR UPDATE", id);
@@ -134,6 +144,18 @@ public class ProductLifecycleService {
     if(reason!=null && reason.length()>80 || detail!=null && detail.length()>500) { throw new IllegalArgumentException("下架说明超出长度限制"); }
     boolean publish="selling".equals(target);
     boolean recreate=publish && deleted(row);
+    if (kind == Kind.FINISHED && List.of("offShelf", "recycle", "purged").contains(target)) {
+      String invalidReason = sourceBlockMessage(target, null) + "，请彻底删除后重新获取";
+      if (!deleted(row) && row.get("operations_invalidated_at") == null) {
+        var service = finishedProducts.getObject();
+        try {
+          var snapshotNode = (com.fasterxml.jackson.databind.node.ObjectNode) json.valueToTree(service.withDetails(service.getById(id)));
+          invalidationMedia.capture(snapshotNode, id, "FINISHED_OPERATIONS_INVALIDATION", id);
+          String snapshot = json.writeValueAsString(snapshotNode);
+          jdbc.update("UPDATE finished_products SET operations_invalidated_reason=?,operations_invalidated_at=NOW(),operations_invalidated_snapshot=? WHERE id=?", invalidReason, snapshot, id);
+        } catch (JsonProcessingException error) { throw new IllegalStateException("运营失效快照保存失败", error); }
+      }
+    }
     String blockReason = switch (target) {
       case "offShelf" -> "OFF_SHELF";
       case "recycle" -> "DELETE_TO_RECYCLE";
@@ -153,6 +175,9 @@ public class ProductLifecycleService {
       jdbc.update("UPDATE "+kind.table+" SET operations_deleted=FALSE,status='warehouse' WHERE id=?",id);
       if(kind==Kind.FINISHED) { jdbc.update("UPDATE finished_products SET off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?",id); }
       else { jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'",id); }
+      if (kind == Kind.FINISHED) {
+        jdbc.update("UPDATE finished_products SET operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
+      }
       reprice(kind,id,false);
     }
     String type=switch(target) { case "selling" -> "SHELF"; case "offShelf" -> "OFF_SHELF"; case "warehouse" -> kind == Kind.FINISHED ? "RESTORE" : "RESTORE_WAREHOUSE"; case "purged" -> "PURGE"; default -> "DELETE_TO_RECYCLE"; };
@@ -162,13 +187,9 @@ public class ProductLifecycleService {
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
     if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,target,sourceChanges); }
     if (kind == Kind.FINISHED) { storeUpstreamLogs.sourceChange(id, source, target); }
-    if (kind == Kind.FINISHED && recreate) {
-      // Keep old store listings, manual prices and logs as history. The next store selection
-      // receives a new listing ID and its own prices after operations shelves the product.
-      jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1 WHERE id=?", id);
-    }
+
     if ((!deleted(row) || recreate) && (kind != Kind.FINISHED || List.of("selling", "offShelf", "recycle", "purged").contains(target))) {
-      String result=kind!=Kind.FINISHED ? null : publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : "来源重新上架，解除遮罩并保留运营状态") :
+      String result=kind!=Kind.FINISHED ? null : publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : (kind == Kind.FINISHED ? "供应链已重新上架，原运营商品仍失效" : "来源重新上架，解除遮罩并保留运营状态")) :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
       Map<String,Object> changes=new LinkedHashMap<>();
       changes.put("来源状态",Map.of("before",source,"after",target));
@@ -217,7 +238,7 @@ public class ProductLifecycleService {
     if (isSupplyChain()) { throw new AccessDeniedException("此操作属于运营管理平台"); }
     var row=lock(kind,id);
     if (deleted(row)) { throw new IllegalArgumentException("运营商品已被彻底删除"); }
-    if (!"recycle".equals(row.get("status")) && !unavailable((String)row.get("source_status"))) {
+    if (!"recycle".equals(row.get("status")) && !unavailable((String)row.get("source_status")) && !(kind == Kind.FINISHED && row.get("operations_invalidated_at") != null)) {
       throw new IllegalArgumentException("只有回收站或来源已删除的商品可以彻底删除");
     }
     record(kind,row,"admin","PURGE",kind==Kind.FINISHED ? "彻底删除运营商品" : null,(String)row.get("status"),"purged",Map.of());
@@ -228,6 +249,12 @@ public class ProductLifecycleService {
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
     if (kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
     else { jdbc.update("UPDATE slab_inventory SET guide_price_coefficient=NULL WHERE id=?",id); }
+    if (kind == Kind.FINISHED && row.get("operations_invalidated_at") != null && !unavailable((String) row.get("source_status"))) {
+      jdbc.update("UPDATE finished_products SET operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL,off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?", id);
+      reprice(kind, id, false);
+      sqlSession.clearCache();
+      arrivalLogs.record(id, (String) row.get("source_status"));
+    }
     sqlSession.clearCache();
     return "purged".equals(row.get("source_status"));
   }

@@ -45,15 +45,29 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
   private String sourceStatus = "warehouse";
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private String sourceBlockReason;
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String operationsInvalidatedReason;
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String operationsInvalidatedSnapshot;
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public String getOperationsInvalidatedSnapshot() { return operationsInvalidatedSnapshot; }
+  public void setOperationsInvalidatedSnapshot(String value) { operationsInvalidatedSnapshot = value; }
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private java.time.LocalDateTime operationsInvalidatedAt;
+  public String getOperationsInvalidatedReason() { return operationsInvalidatedReason; }
+  public void setOperationsInvalidatedReason(String value) { operationsInvalidatedReason = value; }
+  public java.time.LocalDateTime getOperationsInvalidatedAt() { return operationsInvalidatedAt; }
+  public void setOperationsInvalidatedAt(java.time.LocalDateTime value) { operationsInvalidatedAt = value; }
   private Boolean operationsDeleted = false;
   public String getSourceStatus() { return sourceStatus; }
   public void setSourceStatus(String value) { sourceStatus = value; }
   public String getSourceBlockReason() { return sourceBlockReason; }
   public void setSourceBlockReason(String value) { sourceBlockReason = value; }
-  public String getSourceMessage() { return ProductLifecycleService.sourceBlockMessage(sourceStatus, sourceBlockReason); }
+  public String getSourceMessage() { return operationsInvalidatedReason != null ? operationsInvalidatedReason : ProductLifecycleService.sourceBlockMessage(sourceStatus, sourceBlockReason); }
   public Boolean getOperationsDeleted() { return operationsDeleted; }
   public void setOperationsDeleted(Boolean value) { operationsDeleted = value; }
-  public boolean isSourceUnavailable() { return ProductLifecycleService.unavailable(sourceStatus); }
+  public boolean isSourceUnavailable() { return operationsInvalidatedReason != null || ProductLifecycleService.unavailable(sourceStatus); }
 
   private Long categoryId;
   private Long supplierId;

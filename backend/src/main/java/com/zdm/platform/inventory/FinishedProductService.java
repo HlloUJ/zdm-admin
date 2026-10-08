@@ -25,6 +25,10 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   private static final String MEDIA_DOMAIN = "FINISHED_PRODUCT";
   private static final String PLATFORM_PUBLISHER = "平台发布";
 
+  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+      .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+  @org.springframework.beans.factory.annotation.Autowired
+  private FinishedInvalidationMedia invalidationMedia;
   private final ProductLifecycleService lifecycle;
   private final FinishedProductPriceService priceService;
   private final FinishedProductGuidePriceService guidePriceService;
@@ -102,7 +106,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
         .orderByDesc(FinishedProduct::getCreatedAt)
         .orderByDesc(FinishedProduct::getId)
         .list();
-    return listDetails.attach(products);
+    return listDetails.attach(products).stream().map(this::operationalSnapshot).toList();
   }
 
   public FinishedProduct visibleDetail(Long id) {
@@ -116,7 +120,22 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
   }
 
   public FinishedProduct withDetails(FinishedProduct product) {
-    return attachDetails(product);
+    return operationalSnapshot(attachDetails(product));
+  }
+
+  private FinishedProduct operationalSnapshot(FinishedProduct product) {
+    if (product == null || lifecycle.isSupplyChain() || identityProvider.require().storeId() != null
+        || product.getOperationsInvalidatedSnapshot() == null) { return product; }
+    try {
+      var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(product.getOperationsInvalidatedSnapshot());
+      invalidationMedia.render(snapshot, false);
+      FinishedProduct frozen = objectMapper.treeToValue(snapshot, FinishedProduct.class);
+      frozen.setOperationsInvalidatedReason(product.getOperationsInvalidatedReason());
+      frozen.setOperationsInvalidatedAt(product.getOperationsInvalidatedAt());
+      frozen.setSourceStatus(product.getSourceStatus());
+      frozen.setOperationsDeleted(product.getOperationsDeleted());
+      return frozen;
+    } catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("运营失效快照读取失败", error); }
   }
 
   List<FinishedProduct> withListDetails(List<FinishedProduct> products) {
@@ -261,7 +280,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (lifecycle.isSupplyChain()) { throw new org.springframework.security.access.AccessDeniedException("此操作属于运营管理平台"); }
     lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
     FinishedProduct product = attachDetails(getById(id));
-    lifecycle.requireOperational(product.getSourceStatus(), product.getOperationsDeleted());
+    lifecycle.requireFinishedOperational(product);
     validateOperationsShelf(product);
   }
 
@@ -307,7 +326,7 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
     FinishedProduct existing = attachDetails(getById(id));
     if (existing == null) { throw new IllegalArgumentException("运营商品不存在"); }
-    lifecycle.requireOperational(existing.getSourceStatus(), existing.getOperationsDeleted());
+    lifecycle.requireFinishedOperational(existing);
     Map<String,Object> before = operationLogs.snapshot(existing);
     if (priceOnly) {
       Map<Long,java.math.BigDecimal> costs = sourceCosts(existing);

@@ -10,7 +10,7 @@ describe('shared product operation vocabulary', () => {
       '编辑商品',
     );
     expect(productOperationTypeLabel('PRICE_UPDATE')).toBe('编辑商品');
-    expect(productOperationTypeLabel('OPERATIONS_OFF_SHELF')).toBe('运营端下架');
+    expect(productOperationTypeLabel('OPERATIONS_OFF_SHELF')).toBe('运营管理平台下架');
   });
 
   it('offers one restore filter while retaining historical restore codes', () => {

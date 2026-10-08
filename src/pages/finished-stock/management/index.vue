@@ -251,6 +251,8 @@
                     <span>{{ row.sourceMessage || '上游商品不可用' }}</span>
                   </t-space>
                   <t-space size="small">
+                    <t-checkbox v-if="hasFinishedAction('batch-purge', 'recycle')" :checked="selectedKeySet.has(row.id)"
+                      @change="(checked: boolean) => toggleRow(row.id, checked)">选择</t-checkbox>
                     <t-button
                       v-if="hasFinishedAction(['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
                       size="small"
@@ -1846,7 +1848,11 @@ const batchButtons = computed(() => {
       { action: 'clearRecycle', label: '清空回收站', theme: 'danger', icon: 'clear' },
     ],
   };
-  return map[activeTab.value].filter((button) => hasFinishedAction(finishedActionCodes[button.action]));
+  const actions = [...map[activeTab.value]];
+  if (activeTab.value !== 'recycle' && pageData.value.some(sourceBlocked) && hasFinishedAction('batch-purge', 'recycle')) {
+    actions.push({ action: 'batchPurge', label: '批量彻底删除', theme: 'danger', icon: 'delete', className: 'deep-danger-button' });
+  }
+  return actions.filter((button) => hasFinishedAction(finishedActionCodes[button.action], button.action === 'batchPurge' ? 'recycle' : activeTab.value));
 });
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
   batchButtons.value.map((button) => ({
@@ -2012,7 +2018,7 @@ const handleReset = () => {
   handleSearch();
 };
 const toggleRow = (id: number, checked: boolean) => {
-  if (dataItems.value.some((row) => row.id === id && sourceBlocked(row))) return;
+  if (dataItems.value.some((row) => row.id === id && sourceBlocked(row)) && !hasFinishedAction('batch-purge', 'recycle')) return;
   if (checked) {
     selectedKeys.value = Array.from(new Set([...selectedKeys.value, id]));
   } else {
@@ -2022,7 +2028,7 @@ const toggleRow = (id: number, checked: boolean) => {
 const toggleCurrentPage = (checked: boolean) => {
   if (checked) {
     selectedKeys.value = Array.from(
-      new Set([...selectedKeys.value, ...pageData.value.filter((item) => !sourceBlocked(item)).map((item) => item.id)]),
+      new Set([...selectedKeys.value, ...pageData.value.filter((item) => !sourceBlocked(item) || hasFinishedAction('batch-purge', 'recycle')).map((item) => item.id)]),
     );
   } else {
     const currentIds = new Set(pageData.value.map((item) => item.id));
@@ -2717,6 +2723,7 @@ const handleConfirm = async () => {
     } else if (type === 'purge' && product) {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
+      if (sourceBlocked(product)) await loadInventoryData();
     } else if (type === 'batchShelf') {
       {
         const ids = [...selectedKeys.value];
@@ -2760,10 +2767,12 @@ const handleConfirm = async () => {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
       selectedKeys.value = [];
     } else if (type === 'batchPurge') {
+      const includesInvalid = dataItems.value.some((item) => selectedKeys.value.includes(item.id) && sourceBlocked(item));
       await Promise.all(selectedKeys.value.map((id) => deleteFinishedProduct(id)));
       const selected = new Set(selectedKeys.value);
       dataItems.value = dataItems.value.filter((item) => !selected.has(item.id));
       selectedKeys.value = [];
+      if (includesInvalid) await loadInventoryData();
     } else if (type === 'clearRecycle') {
       const recycleIds = dataItems.value.filter((item) => item.status === 'recycle').map((item) => item.id);
       await Promise.all(recycleIds.map((id) => deleteFinishedProduct(id)));

@@ -49,6 +49,27 @@ class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
 
   @Test
   @org.springframework.transaction.annotation.Transactional
+  void deletingInvalidOperationsRecordAfterSourceRecoveryCreatesFreshWarehouseRecord() {
+    jdbc.update("UPDATE store_levels SET status='disabled'");
+    jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,3) ON DUPLICATE KEY UPDATE price_coefficient=3");
+    jdbc.update("""
+        INSERT INTO finished_products
+          (id,name,sku,source_status,status,operations_deleted,operations_invalidated_reason,operations_invalidated_at)
+        VALUES (99408,'来源恢复后重新入仓','recovered-source','selling','selling',FALSE,'来源曾下架',NOW())
+        """);
+    jdbc.update("INSERT INTO finished_product_variants (id,finished_product_id,variant_label,stock,cost_price) VALUES (99408,99408,'规格A',1,20)");
+    jdbc.update("INSERT INTO finished_product_guide_prices (finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES (99408,99408,'规格A',3,20,999)");
+    authenticateDirectService();
+    lifecycle.purgeOperations(ProductLifecycleService.Kind.FINISHED, 99408L);
+    assertThat(jdbc.queryForObject("SELECT operations_deleted FROM finished_products WHERE id=99408", Boolean.class)).isFalse();
+    assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=99408", String.class)).isEqualTo("warehouse");
+    assertThat(jdbc.queryForObject("SELECT operations_invalidated_reason FROM finished_products WHERE id=99408", String.class)).isNull();
+    assertThat(jdbc.queryForObject("SELECT price FROM finished_product_guide_prices WHERE finished_product_id=99408", BigDecimal.class)).isEqualByComparingTo("60");
+    assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=99408 AND business_client_code='admin' ORDER BY id", String.class)).containsExactly("PURGE", "SOURCE_SHELF");
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
   void disabledLevelAssignedToStoreStillPricesNewFinishedProducts() {
     jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
@@ -172,7 +193,7 @@ class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=99202",String.class)).isEqualTo("selling");
     assertThat(jdbc.queryForObject("SELECT price FROM finished_product_guide_prices WHERE finished_product_id=99202",BigDecimal.class)).isEqualByComparingTo("123");
     assertThat(jdbc.queryForObject("SELECT operation_summary FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='admin' ORDER BY id DESC LIMIT 1",String.class))
-        .isEqualTo("来源重新上架，解除遮罩并保留运营状态");
+        .isEqualTo("供应链已重新上架，原运营商品仍失效");
     assertThat(jdbc.queryForObject("SELECT before_status FROM finished_operation_logs WHERE id=?",String.class,firstId)).isNull();
     assertThat(jdbc.queryForObject("SELECT before_status FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='admin' ORDER BY id DESC LIMIT 1",String.class)).isEqualTo("selling");
     // Existing records are normalized for reading and filtering, without rewriting history.

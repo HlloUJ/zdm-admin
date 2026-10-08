@@ -2,7 +2,7 @@ import { computed, reactive, ref } from 'vue';
 import { adminFeedback, getSafeErrorMessage } from '@/components/foundation';
 import { productLogFilterOptions } from '@/services/productOperationLog';
 import { getStoreFinishedLog, listStoreFinishedLogs, type StoreFinishedLog } from '@/services/storeFinishedStock';
-import { parseStoreOperationLogChanges, toStoreOperationLogRow as toLogRow } from './storeOperationLog';
+import { isStoreStatusOperation, parseStoreOperationLogChanges, toStoreOperationLogRow as toLogRow } from './storeOperationLog';
 
 /** State and requests for the store-owned operation log, independent of the public product log. */
 export function useStoreFinishedLogs(stateLabel: (value?: string | null) => string) {
@@ -13,7 +13,22 @@ export function useStoreFinishedLogs(stateLabel: (value?: string | null) => stri
   const logDetail = ref<StoreFinishedLog | null>(null);
   const logDetailVisible = ref(false);
   const logDetailRow = computed(() => logDetail.value && toLogRow(logDetail.value));
-  const logChanges = computed(() => parseStoreOperationLogChanges(logDetail.value?.changeDetails, stateLabel));
+  const logChanges = computed(() => logDetail.value && isStoreStatusOperation(logDetail.value.operationType)
+    ? {} : parseStoreOperationLogChanges(logDetail.value?.changeDetails, stateLabel));
+  const logSnapshot = computed(() =>
+    Object.fromEntries(Object.entries(logChanges.value).map(([field, change]) => [field, change.after])),
+  );
+  const logMedia = computed(() => {
+    const items = logChanges.value['媒体']?.after;
+    return Array.isArray(items)
+      ? (items as {
+          field: string;
+          mediaId: number;
+          resource?: { available: boolean; url?: string; mediaType: string; message?: string };
+        }[])
+      : [];
+  });
+  const logAfterHtml = computed(() => String(logChanges.value['宝贝详情']?.after || ''));
   const logFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
   const appliedLogFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
   const logPagination = reactive({ current: 1, pageSize: 10 });
@@ -76,6 +91,9 @@ export function useStoreFinishedLogs(stateLabel: (value?: string | null) => stri
     logDetailVisible,
     logDetailRow,
     logChanges,
+    logSnapshot,
+    logMedia,
+    logAfterHtml,
     logFilter,
     logPagination,
     logTypeOptions,

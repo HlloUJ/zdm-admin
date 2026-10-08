@@ -29,6 +29,7 @@ const props = defineProps<{
   other: Record<string, unknown>;
   highlightChanges?: boolean;
   priceOnly?: boolean;
+  storeMode?: boolean;
 }>();
 type LoggedVariant = Partial<FinishedProductVariant> & { skuId?: number; variantKey?: string };
 const variantIdentity = (row: { skuId?: number; id?: number; variantKey?: string }) =>
@@ -97,15 +98,23 @@ const attributeName = (key: string) =>
 const text = (value: unknown) => (value == null || value === '' ? '未记录' : String(value));
 const money = (value: number | undefined) => (value == null ? '未记录' : Number(value).toFixed(2));
 const priceCell = (coefficient?: number, price?: number, source?: string) =>
-  h('div', [
-    h('div', `系数：${money(coefficient)}`),
-    h('div', { class: 'historical-price-line' }, [
-      h('span', `价格：${money(price)}`),
-      ...(source
-        ? [h(PriceSourceToggle, { source: source === 'auto' ? 'auto' : 'manual', available: false, readonly: true })]
-        : []),
-    ]),
-  ]);
+  props.storeMode
+    ? money(price)
+    : h('div', [
+        h('div', `系数：${money(coefficient)}`),
+        h('div', { class: 'historical-price-line' }, [
+          h('span', `价格：${money(price)}`),
+          ...(source
+            ? [
+                h(PriceSourceToggle, {
+                  source: source === 'auto' ? 'auto' : 'manual',
+                  available: false,
+                  readonly: true,
+                }),
+              ]
+            : []),
+        ]),
+      ]);
 const rows = computed(() =>
   orderLayeredRows(
     variants.value.map((variant, index) => {
@@ -159,7 +168,7 @@ const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   },
   ...levels.value.map(([id, name]) => ({
     colKey: `level_${id}`,
-    title: name,
+    title: props.storeMode ? `${name}价` : name,
     minWidth: 170,
     cell: (_h: unknown, { row }: { row: TableRowData }) =>
       priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),
@@ -213,7 +222,9 @@ function changedCell(row: TableRowData, key: string): boolean {
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() =>
   baseColumns.value
     .filter(
-      (column) => !isSupplyChain.value || (column.colKey !== 'guide' && !String(column.colKey).startsWith('level_')),
+      (column) =>
+        (!props.storeMode || column.colKey !== 'cost') &&
+        (!isSupplyChain.value || (column.colKey !== 'guide' && !String(column.colKey).startsWith('level_'))),
     )
     .map((column) => ({
       ...column,
