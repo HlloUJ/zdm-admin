@@ -162,8 +162,6 @@
                   ><t-icon name="info-circle" />{{ row.sourceMessage || '上游商品不可用' }}</t-space
                 >
                 <t-space size="small">
-                  <t-checkbox v-if="can('recycle', 'batch-purge')" :checked="selected.includes(row.id)"
-                    @change="(checked: boolean) => toggleRow(row.id, checked, true)">选择</t-checkbox>
                   <t-button v-if="can(activeScope, 'view')" size="small" @click="openDetail(row)">详情</t-button>
                   <t-button
                     v-if="can(activeScope, 'view')"
@@ -595,7 +593,7 @@ const filteredRows = computed(() =>
 const pageRows = computed(() =>
   filteredRows.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
 );
-const selectablePageIds = computed(() => pageRows.value.filter((row) => !row.sourceUnavailable || can('recycle', 'batch-purge')).map((row) => row.id));
+const selectablePageIds = computed(() => pageRows.value.filter((row) => !row.sourceUnavailable).map((row) => row.id));
 const pageAllSelected = computed(
   () => selectablePageIds.value.length > 0 && selectablePageIds.value.every((id) => selected.value.includes(id)),
 );
@@ -751,7 +749,7 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
         },
       ]
     : []),
-  ...((activeTab.value === 'recycle' || pageRows.value.some((row) => row.sourceUnavailable)) && can('recycle', 'batch-purge')
+  ...(activeTab.value === 'recycle' && can('recycle', 'batch-purge')
     ? [
         {
           id: 'batch-purge',
@@ -867,7 +865,7 @@ async function refreshAvailability(ids: number[], allowBlocked = false) {
   try {
     const latest = await listStoreFinishedProducts();
     rows.value = latest;
-    selected.value = selected.value.filter((id) => latest.some((item) => item.id === id && (!item.sourceUnavailable || (allowBlocked && can('recycle', 'batch-purge')))));
+    selected.value = selected.value.filter((id) => latest.some((item) => item.id === id && !item.sourceUnavailable));
     const missing = ids.some((id) => !latest.some((item) => item.id === id));
     if (missing) adminFeedback.warning('商品不存在或不可访问');
     const blocked = ids.some((id) => latest.some((item) => item.id === id && item.sourceUnavailable));
@@ -883,15 +881,15 @@ async function previewRowImage(row: StoreFinishedProduct) {
   const latest = rows.value.find((item) => item.id === row.id);
   if (latest?.imageUrl) imagePreview.value = latest.imageUrl;
 }
-async function toggleRow(id: number, checked: boolean, allowBlocked = false) {
-  if (!(await refreshAvailability([id], allowBlocked && can('recycle', 'batch-purge')))) return;
+async function toggleRow(id: number, checked: boolean) {
+  if (!(await refreshAvailability([id]))) return;
   selected.value = checked ? [...new Set([...selected.value, id])] : selected.value.filter((item) => item !== id);
 }
 async function togglePage(checked: boolean) {
   const ids = pageRows.value.map((item) => item.id);
   if (!(await refreshAvailability(ids, true))) return;
   if (checked) {
-    const available = ids.filter((id) => rows.value.some((item) => item.id === id && (!item.sourceUnavailable || can('recycle', 'batch-purge'))));
+    const available = ids.filter((id) => rows.value.some((item) => item.id === id && !item.sourceUnavailable));
     selected.value = [...new Set([...selected.value, ...available])];
   } else selected.value = selected.value.filter((id) => !ids.includes(id));
 }

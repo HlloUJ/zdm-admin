@@ -484,7 +484,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     jdbc.update("UPDATE finished_products SET status='selling' WHERE id=99831");
     assertThat(products.pool()).isEmpty();
     assertThatThrownBy(() -> products.select(List.of(99831L))).hasMessageContaining("本店已存在");
-    assertThatThrownBy(() -> products.changeStatus(historicalId, "selling", null, null)).hasMessageContaining("上游商品不可用");
+    assertThatThrownBy(() -> products.changeStatus(historicalId, "selling", null, null)).hasMessage("来源已失效");
     products.purge(historicalId);
     assertThat(products.pool()).extracting(StoreFinishedProductService.PoolProduct::id).containsExactly(99831L);
     long freshId = products.select(List.of(99831L)).getFirst().id();
@@ -532,7 +532,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(products.detail(99821L).status()).isEqualTo("selling");
     assertThat(products.detail(99821L).sourceMessage())
-        .isEqualTo("运营端已下架该商品，请彻底删除后重新选择");
+        .isEqualTo("该商品已被运营管理平台下架");
     products.purge(99821L);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_products WHERE id=99821",
         Integer.class)).isEqualTo(1);
@@ -565,13 +565,17 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     upstreamLogs.sourceChange(99891L, "offShelf", "selling");
     upstreamLogs.operationsChange(99891L, "SHELF", "warehouse", "selling");
     identity(99891L);
+    jdbc.update("UPDATE store_finished_products SET invalidated_reason='供应链已下架该商品，请彻底删除后重新选择' WHERE id=?", first);
     var retained = products.detail(first);
+    assertThat(retained.sourceMessage()).isEqualTo("该商品已被供应链下架");
+    assertThat(products.list().stream().filter(row -> row.id().equals(first)).findFirst().orElseThrow().sourceMessage())
+        .isEqualTo(retained.sourceMessage());
     assertThat(retained.sourceUnavailable()).isTrue();
     assertThat(retained.effectiveStatus()).isEqualTo("selling");
     assertThat(retained.name()).isEqualTo("原商品");
     assertThat(retained.skus().getFirst().label()).isEqualTo("原规格");
     assertThat(products.pool()).isEmpty();
-    assertThatThrownBy(() -> products.changeStatus(first, "recycle", null, null)).hasMessageContaining("上游商品不可用");
+    assertThatThrownBy(() -> products.changeStatus(first, "recycle", null, null)).hasMessage("该商品已被供应链下架");
     assertThatThrownBy(() -> products.detail(other)).isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> products.purge(other)).isInstanceOf(IllegalArgumentException.class);
     jdbc.update("UPDATE finished_products SET total_stock=2 WHERE id=99891");

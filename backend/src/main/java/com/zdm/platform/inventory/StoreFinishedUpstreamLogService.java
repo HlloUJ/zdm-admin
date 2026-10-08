@@ -70,7 +70,7 @@ public class StoreFinishedUpstreamLogService {
     }
     if (List.of("SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_PURGE",
         "OPERATIONS_OFF_SHELF", "OPERATIONS_DELETE_TO_RECYCLE", "OPERATIONS_PURGE").contains(type)) {
-      storeProducts.getObject().invalidateFromUpstream(productId, summary + "，请彻底删除后重新选择");
+      storeProducts.getObject().invalidateFromUpstream(productId, FinishedSourceMessage.normalize(summary));
     }
     var actor = identities.require();
     jdbc.update("""

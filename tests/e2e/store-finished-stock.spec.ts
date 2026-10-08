@@ -1003,27 +1003,25 @@ test('selection log displays historical product, store prices and media without 
   await expect(dialog.locator('img')).toHaveAttribute('src', imageUrl);
 });
 
-test('invalid warehouse records support explicit batch purge without recovery', async ({ page }) => {
+test('invalid warehouse overlay excludes selection and shows only the source reason', async ({ page }) => {
   await storeLogin(page);
-  const blocked = product({ sourceUnavailable: true, sourceMessage: '来源曾下架，旧记录永久失效' });
-  let deleted = false;
-  let ids: number[] = [];
+  const blocked = product({ sourceUnavailable: true, sourceMessage: '该商品已被运营管理平台下架' });
   await page.route('**/api/admin/store-finished-products**', (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (route.request().method() === 'DELETE' && path.endsWith('/batch')) {
-      ids = route.request().postDataJSON().productIds;
-      deleted = true;
-      return route.fulfill({ json: ok(true) });
-    }
-    return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : deleted ? [] : [blocked]) });
+    return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : path.endsWith('/41') ? blocked : [blocked]) });
   });
   await page.goto('/store/finished-stock-management');
   const main = page.getByRole('main');
-  await expect(main.locator('.source-unavailable-overlay')).toContainText('永久失效');
-  await main.locator('.source-unavailable-overlay').getByText('选择', { exact: true }).click();
-  await expect(main.getByText('已选 1 项')).toBeVisible();
-  await main.getByRole('button', { name: '批量彻底删除', exact: true }).click();
-  await page.locator('.t-dialog:visible').getByRole('button', { name: '确认批量彻底删除', exact: true }).click();
-  await expect.poll(() => ids).toEqual([41]);
-  await expect(main.locator('.source-unavailable-overlay')).toHaveCount(0);
+  const overlay = main.locator('.source-unavailable-overlay');
+  await expect(overlay).toContainText('该商品已被运营管理平台下架');
+  await expect(overlay).not.toContainText('请彻底删除后重新选择');
+  await expect(overlay.getByRole('checkbox')).toHaveCount(0);
+  await expect(overlay.getByRole('button', { name: '详情', exact: true })).toBeVisible();
+  await expect(overlay.getByRole('button', { name: '彻底删除', exact: true })).toBeVisible();
+  await expect(main.getByRole('button', { name: '批量彻底删除', exact: true })).toHaveCount(0);
+  await main.locator('thead .t-checkbox').click();
+  await expect(main.getByText('已选 0 项')).toBeVisible();
+  await overlay.getByRole('button', { name: '详情', exact: true }).click();
+  const detail = page.locator('.t-drawer').filter({ has: page.getByText('商品详情', { exact: true }) });
+  await expect(detail.locator('.t-alert')).toHaveText('该商品已被运营管理平台下架');
 });

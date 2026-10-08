@@ -251,8 +251,6 @@
                     <span>{{ row.sourceMessage || '上游商品不可用' }}</span>
                   </t-space>
                   <t-space size="small">
-                    <t-checkbox v-if="hasFinishedAction('batch-purge', 'recycle')" :checked="selectedKeySet.has(row.id)"
-                      @change="(checked: boolean) => toggleRow(row.id, checked)">选择</t-checkbox>
                     <t-button
                       v-if="hasFinishedAction(['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
                       size="small"
@@ -1849,9 +1847,6 @@ const batchButtons = computed(() => {
     ],
   };
   const actions = [...map[activeTab.value]];
-  if (activeTab.value !== 'recycle' && pageData.value.some(sourceBlocked) && hasFinishedAction('batch-purge', 'recycle')) {
-    actions.push({ action: 'batchPurge', label: '批量彻底删除', theme: 'danger', icon: 'delete', className: 'deep-danger-button' });
-  }
   return actions.filter((button) => hasFinishedAction(finishedActionCodes[button.action], button.action === 'batchPurge' ? 'recycle' : activeTab.value));
 });
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
@@ -2018,7 +2013,7 @@ const handleReset = () => {
   handleSearch();
 };
 const toggleRow = (id: number, checked: boolean) => {
-  if (dataItems.value.some((row) => row.id === id && sourceBlocked(row)) && !hasFinishedAction('batch-purge', 'recycle')) return;
+  if (dataItems.value.some((row) => row.id === id && sourceBlocked(row))) return;
   if (checked) {
     selectedKeys.value = Array.from(new Set([...selectedKeys.value, id]));
   } else {
@@ -2028,7 +2023,7 @@ const toggleRow = (id: number, checked: boolean) => {
 const toggleCurrentPage = (checked: boolean) => {
   if (checked) {
     selectedKeys.value = Array.from(
-      new Set([...selectedKeys.value, ...pageData.value.filter((item) => !sourceBlocked(item) || hasFinishedAction('batch-purge', 'recycle')).map((item) => item.id)]),
+      new Set([...selectedKeys.value, ...pageData.value.filter((item) => !sourceBlocked(item)).map((item) => item.id)]),
     );
   } else {
     const currentIds = new Set(pageData.value.map((item) => item.id));

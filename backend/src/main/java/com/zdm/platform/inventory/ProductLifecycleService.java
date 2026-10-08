@@ -72,10 +72,8 @@ public class ProductLifecycleService {
     if (unavailable(source)) { throw new IllegalArgumentException("来源商品未上架或已删除，只能彻底删除运营商品"); }
   }
   public void requireFinishedOperational(FinishedProduct product) {
+    if (product.isSourceUnavailable()) { throw new IllegalArgumentException(product.getSourceMessage()); }
     requireOperational(product.getSourceStatus(), product.getOperationsDeleted());
-    if (product.getOperationsInvalidatedReason() != null) {
-      throw new IllegalArgumentException(product.getOperationsInvalidatedReason());
-    }
   }
   public Map<String,Object> lock(Kind kind, Long id) {
     var rows=jdbc.queryForList("SELECT * FROM "+kind.table+" WHERE id=? FOR UPDATE", id);
@@ -145,7 +143,7 @@ public class ProductLifecycleService {
     boolean publish="selling".equals(target);
     boolean recreate=publish && deleted(row);
     if (kind == Kind.FINISHED && List.of("offShelf", "recycle", "purged").contains(target)) {
-      String invalidReason = sourceBlockMessage(target, null) + "，请彻底删除后重新获取";
+      String invalidReason = sourceBlockMessage(target, null);
       if (!deleted(row) && row.get("operations_invalidated_at") == null) {
         var service = finishedProducts.getObject();
         try {

@@ -357,7 +357,7 @@ public class StoreFinishedProductService {
       return purge(store, listing, source);
     }
     if (invalidated(listing) || !isUsable(source)) {
-      throw new IllegalArgumentException("上游商品不可用，只能查看或彻底删除");
+      throw new IllegalArgumentException(sourceMessage(listing, source));
     }
     if ("selling".equals(current) && stock(source) == 0) {
       throw new IllegalArgumentException("统一库存已售完，不能改变商品状态");
@@ -546,6 +546,7 @@ public class StoreFinishedProductService {
     try {
       var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(listing.get("invalidated_snapshot").toString());
       invalidationMedia.render(snapshot, true);
+      snapshot.put("sourceMessage", FinishedSourceMessage.normalize((String) listing.get("invalidated_reason")));
       return json.treeToValue(snapshot, ProductView.class);
     }
     catch (JsonProcessingException error) { throw new IllegalStateException("门店失效快照读取失败", error); }
@@ -636,20 +637,7 @@ public class StoreFinishedProductService {
     boolean unavailable = invalidated(listing) || !isUsable(source);
     String status = (String) listing.get("status");
     String effective = !invalidated(listing) && "selling".equals(status) && stock(source) == 0 ? "soldOut" : status;
-    List<String> reasons = new ArrayList<>();
-    if (!List.of("selling", "soldOut").contains(product.getSourceStatus())) {
-      reasons.add(product.getSourceMessage());
-    }
-    if (Boolean.TRUE.equals(product.getOperationsDeleted())) {
-      reasons.add("该商品已被运营端彻底删除");
-    } else if ("recycle".equals(product.getStatus())) {
-      reasons.add("该商品已被运营端删除至回收站");
-    } else if ("offShelf".equals(product.getStatus())) {
-      reasons.add("该商品已被运营端下架");
-    } else if ("warehouse".equals(product.getStatus())) {
-      reasons.add("该商品当前未在运营端上架");
-    }
-    String reason = invalidated(listing) ? (String) listing.get("invalidated_reason") : reasons.isEmpty() ? null : String.join("；", reasons);
+    String reason = sourceMessage(listing, source);
     List<SkuPrice> prices = product.getVariants() == null ? List.of()
         : product.getVariants().stream().map(priceForVariant).toList();
     ProductView rendered = new ProductView(number(listing.get("id")), productId, product.getName(), product.getSku(),
@@ -809,8 +797,30 @@ public class StoreFinishedProductService {
     }
   }
 
+  private String sourceMessage(Map<String, Object> listing, Map<String, Object> source) {
+    if (invalidated(listing)) {
+      return FinishedSourceMessage.normalize((String) listing.get("invalidated_reason"));
+    }
+    List<String> reasons = new ArrayList<>();
+    String supply = ProductLifecycleService.sourceBlockMessage((String) source.get("source_status"), (String) source.get("source_block_reason"));
+    if (supply != null) { reasons.add(supply); }
+    if (source.get("operations_invalidated_reason") != null) {
+      reasons.add(FinishedSourceMessage.normalize((String) source.get("operations_invalidated_reason")));
+    } else if (Boolean.TRUE.equals(source.get("operations_deleted"))) {
+      reasons.add("该商品已被运营管理平台彻底删除");
+    } else if ("recycle".equals(source.get("status"))) {
+      reasons.add("该商品已被运营管理平台删除至回收站");
+    } else if ("offShelf".equals(source.get("status"))) {
+      reasons.add("该商品已被运营管理平台下架");
+    } else if ("warehouse".equals(source.get("status"))) {
+      reasons.add("该商品当前未在运营管理平台上架");
+    }
+    return reasons.isEmpty() ? null : String.join("；", reasons.stream().distinct().toList());
+  }
+
   private void requirePriceEditable(Map<String, Object> listing, Map<String, Object> source) {
-    if (invalidated(listing) || !isUsable(source) || !List.of("warehouse", "selling").contains(listing.get("status"))
+    if (invalidated(listing) || !isUsable(source)) { throw new IllegalArgumentException(sourceMessage(listing, source)); }
+    if (!List.of("warehouse", "selling").contains(listing.get("status"))
         || "selling".equals(listing.get("status")) && stock(source) == 0) {
       throw new IllegalArgumentException("当前商品只能查看价格，不能修改");
     }

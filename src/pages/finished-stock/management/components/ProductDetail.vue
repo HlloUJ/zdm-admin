@@ -180,7 +180,7 @@ function previewDescription(resource: { url?: string; mediaType: string }) {
   if (resource.url) emit('preview', { url: resource.url }, resource.mediaType === 'video' ? 'video' : 'image');
 }
 const sourceMessage = computed(
-  () => `${props.product.sourceMessage || '上游商品不可用'}，当前仅可查看资料或按权限彻底删除。`,
+  () => props.product.sourceMessage || '上游商品不可用',
 );
 const dimensions = computed(() => props.product.specDimensions ?? []);
 const layeredDimensions = computed(() =>
