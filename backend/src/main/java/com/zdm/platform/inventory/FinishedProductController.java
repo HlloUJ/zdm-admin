@@ -151,6 +151,19 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   @PutMapping("/{id}")
   public ApiResponse<FinishedProduct> update(
       @PathVariable Long id, @Valid @RequestBody FinishedProduct product) {
+    return updateProduct(id, product, false);
+  }
+
+  @PutMapping("/{id}/edit")
+  public ApiResponse<FinishedProduct> edit(
+      @PathVariable Long id, @Valid @RequestBody FinishedProduct product) {
+    if (!isSupplyChain()) {
+      throw new org.springframework.security.access.AccessDeniedException("此操作属于供应链协同系统");
+    }
+    return updateProduct(id, product, true);
+  }
+
+  private ApiResponse<FinishedProduct> updateProduct(Long id, FinishedProduct product, boolean editForm) {
     permissionGuard.requireDataPermission();
     FinishedProduct existing = service.getById(id);
     if (existing == null) {
@@ -158,14 +171,23 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
     }
     permissionGuard.requireData(existing);
     if (isSupplyChain()) {
+      if (editForm) {
+        permissionGuard.requirePermission(permission(scope(existing.getSourceStatus()), "edit"));
+      }
       if (!java.util.Objects.equals(existing.getSourceStatus(),product.getStatus())) {
-        String action = transitionAction(existing.getSourceStatus(),product.getStatus());
+        boolean editToWarehouse = editForm && "selling".equals(existing.getSourceStatus()) && "warehouse".equals(product.getStatus());
+        String action = editToWarehouse ? "off-shelf" : transitionAction(existing.getSourceStatus(),product.getStatus());
         permissionGuard.requireAnyPermission(permission(scope(existing.getSourceStatus()),action),permission(scope(existing.getSourceStatus()),"batch-"+action));
+        if (editToWarehouse || (editForm && "warehouse".equals(existing.getSourceStatus()) && "selling".equals(product.getStatus()))) {
+          return ApiResponse.ok(visiblePrices(service.updateWithDetails(id, product, true)));
+        }
         if("selling".equals(product.getStatus()) && permissionGuard.hasPermission(permission(scope(existing.getSourceStatus()),"edit"))) { return ApiResponse.ok(visiblePrices(service.updateWithDetails(id,product))); }
         return ApiResponse.ok(visiblePrices(service.sourceTransition(id,product.getStatus(),product.getOffShelfReason(),product.getOffShelfDetail())));
       }
       permissionGuard.requirePermission(permission(scope(existing.getSourceStatus()),"edit"));
-      return ApiResponse.ok(visiblePrices(service.updateWithDetails(id,product)));
+      return ApiResponse.ok(visiblePrices(editForm
+          ? service.updateWithDetails(id, product, true)
+          : service.updateWithDetails(id, product)));
     }
     if (existing.isSourceUnavailable() || Boolean.TRUE.equals(existing.getOperationsDeleted())) {
       throw new IllegalArgumentException("该商品已被供应链删除或运营已彻底删除，不能执行此操作");

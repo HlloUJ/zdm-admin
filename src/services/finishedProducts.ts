@@ -153,6 +153,13 @@ export function updateFinishedProduct(
   });
 }
 
+export function editFinishedProduct(id: number, payload: FinishedProductPayload) {
+  return request<FinishedProductRecord>(`/admin/finished-products/${id}/edit`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function updateFinishedProductSourceCosts(id: number, variants: { skuId: number; costPrice: number }[]) {
   return request<FinishedProductRecord>(`/admin/finished-products/${id}/source-costs`, {
     method: 'PUT',

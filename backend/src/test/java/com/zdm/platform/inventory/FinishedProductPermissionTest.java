@@ -78,5 +78,23 @@ class FinishedProductPermissionTest {
     sourceController("warehouse.edit","warehouse.shelf").update(1L,request);
     verify(service).updateWithDetails(1L,request);
     assertThatThrownBy(() -> sourceController("warehouse.edit").update(1L,request)).isInstanceOf(AccessDeniedException.class);
+    sourceController("warehouse.edit", "warehouse.shelf").edit(1L, request);
+    verify(service).updateWithDetails(1L, request, true);
+    assertThatThrownBy(() -> sourceController("warehouse.shelf").edit(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
+  }
+
+  @Test void returningSellingProductToWarehouseRequiresEditAndOffShelfPermissions() {
+    FinishedProduct existing = product("selling");
+    when(service.getById(1L)).thenReturn(existing);
+    FinishedProduct request = product("warehouse");
+    sourceController("selling.edit", "selling.off-shelf").edit(1L, request);
+    verify(service).updateWithDetails(1L, request, true);
+    assertThatThrownBy(() -> sourceController("selling.edit").edit(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> sourceController("selling.off-shelf").edit(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> sourceController("selling.edit", "selling.off-shelf").update(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
   }
 }

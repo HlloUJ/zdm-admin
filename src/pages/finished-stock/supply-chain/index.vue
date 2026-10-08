@@ -22,7 +22,7 @@
             </nav>
           </AdminSectionCard>
         </div>
-        <header v-if="formPageVisible || !finishedTabs.length" class="page-header">
+        <header v-if="!formPageVisible && !finishedTabs.length" class="page-header">
           <div>
             <t-breadcrumb>
               <t-breadcrumb-item
@@ -32,7 +32,6 @@
                 replace
                 @click="closeFormPage"
               />
-              <t-breadcrumb-item v-if="formPageVisible">{{ formPageTitle }}</t-breadcrumb-item>
             </t-breadcrumb>
           </div>
           <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="operationLogsVisible = true"
@@ -330,6 +329,8 @@
                       v-model="mainImageSlots[index]"
                       :title="index === 0 ? '封面图' : `商品主图${index + 1}`"
                       :show-title="true"
+                      :show-file-name="formPageMode !== 'edit'"
+                      preview-on-filled-click
                       accept="image/*"
                       :error-message="submitAttempted && !mainImageMedia && index === 0 ? '请上传图片' : ''"
                       :upload="(file) => uploadProductMedia(file, 'image')"
@@ -344,6 +345,8 @@
                       v-model="videoMedia"
                       title="商品视频"
                       :show-title="false"
+                      :show-file-name="formPageMode !== 'edit'"
+                      preview-on-filled-click
                       accept="video/*"
                       media-type="video"
                       :error-message="submitAttempted && !videoMedia ? '请上传视频' : ''"
@@ -1063,6 +1066,7 @@ import {
   createFinishedProduct,
   type FinishedProductPriceLevelOption,
   deleteFinishedProduct,
+  editFinishedProduct,
   listFinishedProducts,
   listFinishedProductFormOptions,
   releaseTemporaryFinishedProductMedia,
@@ -1697,7 +1701,11 @@ const canChooseShelfNow = computed(
     hasFinishedAction('batch-shelf', editingProduct.value?.status || 'warehouse'),
 );
 const canChooseShelfLater = computed(
-  () => !editingProduct.value || editingProduct.value.status === 'warehouse' || hasLegacyEditPermission(),
+  () =>
+    !editingProduct.value ||
+    editingProduct.value.status === 'warehouse' ||
+    (editingProduct.value.status === 'selling' &&
+      (hasFinishedAction('off-shelf', 'selling') || hasFinishedAction('batch-off-shelf', 'selling'))),
 );
 const totalStock = computed(() => specRows.value.reduce((sum, row) => sum + Number(row.quantity || 0), 0));
 const detailMediaUploading = ref(false);
@@ -2455,7 +2463,7 @@ const submitProductForm = async () => {
   try {
     const payload = buildProductPayloadFromForm();
     if (formPageMode.value === 'edit' && editingProduct.value) {
-      const updated = await updateFinishedProduct(editingProduct.value.id, payload);
+      const updated = await editFinishedProduct(editingProduct.value.id, payload);
       upsertStockItem(updated);
     } else {
       const created = await createFinishedProduct(payload);

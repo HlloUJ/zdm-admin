@@ -158,6 +158,11 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
 
   @Transactional
   public FinishedProduct updateWithDetails(Long id, FinishedProduct product) {
+    return updateWithDetails(id, product, false);
+  }
+
+  @Transactional
+  public FinishedProduct updateWithDetails(Long id, FinishedProduct product, boolean editForm) {
     lifecycle.requireSupplyChain();
     lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
     FinishedProduct existing = attachDetails(getById(id));
@@ -203,8 +208,14 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     if (costChanged) { lifecycle.reprice(ProductLifecycleService.Kind.FINISHED, id, true); }
     syncMediaReferences(product);
     FinishedProduct updated = attachDetails(getById(id));
-    operationLogs.record(updated, before, operationLogs.snapshot(updated));
-    if(lifecycle.isSupplyChain() && !requestedStatus.equals(existing.getSourceStatus())) {
+    boolean statusChanged = lifecycle.isSupplyChain() && !requestedStatus.equals(existing.getSourceStatus());
+    if (editForm && statusChanged) {
+      lifecycle.sourceTransitionDuringEdit(ProductLifecycleService.Kind.FINISHED, id, requestedStatus);
+      updated = attachDetails(getById(id));
+    }
+    if (editForm) { operationLogs.recordEdit(updated, before, operationLogs.snapshot(updated)); }
+    else { operationLogs.record(updated, before, operationLogs.snapshot(updated)); }
+    if (!editForm && statusChanged) {
       lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,id,requestedStatus);
       updated=attachDetails(getById(id));
     }
