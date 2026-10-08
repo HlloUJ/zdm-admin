@@ -112,6 +112,19 @@ public class ProductLifecycleService {
     sourceTransition(kind, id, "selling", null, null, false);
   }
 
+  @Transactional
+  public boolean sourceTransitionDuringEdit(Kind kind, Long id, String target) {
+    if (kind == Kind.FINISHED && "warehouse".equals(target)) {
+      requireSupplyChain();
+      var row = lock(kind, id);
+      if (!"selling".equals(row.get("source_status"))) { throw new IllegalArgumentException("当前供应链状态不允许此操作"); }
+      jdbc.update("UPDATE finished_products SET source_status='warehouse',source_block_reason=NULL WHERE id=?", id);
+      sqlSession.clearCache();
+      return false;
+    }
+    return sourceTransition(kind, id, target, null, null, false);
+  }
+
   private boolean sourceTransition(Kind kind, Long id, String target, String reason, String detail, boolean recordSourceLog) {
     requireSupplyChain();
     var row=lock(kind,id);

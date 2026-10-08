@@ -833,7 +833,7 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
     route.fulfill({ json: { code: 0, data: [{ id: 1, name: '一级价格' }] } }),
   );
-  await page.route('**/api/admin/finished-products/72', async (route) => {
+  await page.route(/\/api\/admin\/finished-products\/72(?:\/edit)?$/, async (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { code: 0, data: product } });
     saves += 1;
     const payload = route.request().postDataJSON();
@@ -884,6 +884,34 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);
+});
+
+test('supply-chain edit can select temporarily not shelved for a selling product', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  const product = {
+    id: 74,
+    name: '已上架商品',
+    status: 'selling',
+    sourceStatus: 'selling',
+    categoryId: 5,
+    supplierId: 2,
+    mainImageMediaId: 1,
+    videoMediaId: 2,
+    detail: '<p>商品详情</p>',
+    totalStock: 1,
+    attributes: [],
+    variants: [{ id: 841, variantLabel: '单规格', displayMode: 'single', stock: 1, costPrice: 10 }],
+  };
+  await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/finished-products/74', (route) => route.fulfill({ json: { code: 0, data: product } }));
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+  await page.getByText('编辑', { exact: true }).click();
+  const later = page.getByRole('radio', { name: '暂不上架' });
+  await expect(later).toBeEnabled();
+  await page.locator('.t-radio').filter({ hasText: '暂不上架' }).click();
+  await expect(later).toBeChecked();
 });
 
 test('supply-chain layered product edit exposes cost for each specification', async ({ page }) => {
@@ -1616,7 +1644,7 @@ async function openSpecConversionFixture(
     })),
   };
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
-  await page.route('**/api/admin/finished-products/95', (route) =>
+  await page.route(/\/api\/admin\/finished-products\/95(?:\/edit)?$/, (route) =>
     route.fulfill({ json: { code: 0, data: { ...product, ...route.request().postDataJSON() } } }),
   );
   await page.route('**/api/admin/finished-products/price-level-options', (route) =>
@@ -1720,7 +1748,7 @@ for (const originalMode of ['single', 'layered'] as const) {
     await table.getByPlaceholder('价格', { exact: true }).fill('30');
     await table.locator('.quantity-editor input').fill('1');
     const requestPromise = page.waitForRequest(
-      (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+      (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
     );
     await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
     const variants = (await requestPromise).postDataJSON().variants;
@@ -1745,7 +1773,7 @@ test('preserves sparse SKU identities and values when editing without changing d
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(page.locator('.spec-table-block tbody tr')).toHaveCount(2);
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;
@@ -1796,7 +1824,7 @@ test('rebuilds eight distinct specifications from three edited dimensions withou
     await row.locator('.quantity-editor input').fill('1');
   }
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;
@@ -1834,7 +1862,7 @@ test('retains matched specification attributes and SKU data when adding and remo
     }
   }
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;
@@ -1880,7 +1908,7 @@ test('prefills corresponding non-dimension attributes when a saved specification
     await row.locator('.quantity-editor input').fill('1');
   }
   const requestPromise = page.waitForRequest(
-    (request) => request.url().endsWith('/finished-products/95') && request.method() === 'PUT',
+    (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
   await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
   const variants = (await requestPromise).postDataJSON().variants;

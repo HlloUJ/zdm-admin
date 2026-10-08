@@ -204,6 +204,10 @@ const displayChanges = computed(() => {
     );
   const operationType = detail.value?.operationType || '';
   if (['DELETE_TO_RECYCLE', 'PURGE'].includes(operationType)) return {};
+  if (operationType === 'UPDATE' && getLoginUser().clientCode === 'supply-chain') {
+    // detailRow still shows beforeStatus/afterStatus under 操作信息 > 状态变化.
+    return Object.fromEntries(Object.entries(changes.value).filter(([field]) => field !== '状态'));
+  }
   return ['SHELF', 'OFF_SHELF', 'RESTORE', 'RESTORE_WAREHOUSE'].includes(operationType)
     ? Object.fromEntries(
         Object.entries(changes.value).filter(

@@ -95,6 +95,36 @@ describe('finished operation logs', () => {
     expect(vm.richText('after')).toContain('/api/open/media/detail-video');
     expect(wrapper.find('input').exists()).toBe(false);
   });
+  it('shows edit status changes in operation information without repeating them in field changes', async () => {
+    vi.mocked(getLoginUser).mockReturnValue({ clientCode: 'supply-chain' } as ReturnType<typeof getLoginUser>);
+    vi.mocked(getFinishedOperationLog).mockResolvedValueOnce({
+      id: 2,
+      productId: 54,
+      productName: '商品',
+      operationType: 'UPDATE',
+      operationSummary: '编辑商品',
+      beforeStatus: 'warehouse',
+      afterStatus: 'selling',
+      operatorName: '员工',
+      operatedAt: '2026-09-30T08:51:00',
+      operationSource: 'MANUAL',
+      changeDetails: JSON.stringify({
+        状态: { before: 'warehouse', after: 'selling' },
+        商品名称: { before: '旧商品', after: '商品' },
+      }),
+    });
+    const wrapper = mount(FinishedOperationLogs, { props: { visible: false }, shallow: true });
+    const vm = wrapper.vm as unknown as {
+      showDetail: (id: number) => Promise<void>;
+      displayChanges: Record<string, unknown>;
+    };
+    await vm.showDetail(2);
+    expect(wrapper.findComponent(ProductOperationLogTemplate).props('detail')).toEqual(
+      expect.objectContaining({ beforeStatus: 'warehouse', afterStatus: 'selling' }),
+    );
+    expect(vm.displayChanges).toHaveProperty('商品名称');
+    expect(vm.displayChanges).not.toHaveProperty('状态');
+  });
   it('shows price origin changes using business labels', () => {
     const wrapper = mount(FinishedLogValue, { props: { value: { priceSource: 'auto', stock: 0 } } });
     expect(wrapper.text()).toContain('价格来源：跟随配置');

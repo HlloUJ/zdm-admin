@@ -1066,6 +1066,7 @@ import {
   createFinishedProduct,
   type FinishedProductPriceLevelOption,
   deleteFinishedProduct,
+  editFinishedProduct,
   listFinishedProducts,
   listFinishedProductFormOptions,
   releaseTemporaryFinishedProductMedia,
@@ -1700,7 +1701,11 @@ const canChooseShelfNow = computed(
     hasFinishedAction('batch-shelf', editingProduct.value?.status || 'warehouse'),
 );
 const canChooseShelfLater = computed(
-  () => !editingProduct.value || editingProduct.value.status === 'warehouse' || hasLegacyEditPermission(),
+  () =>
+    !editingProduct.value ||
+    editingProduct.value.status === 'warehouse' ||
+    (editingProduct.value.status === 'selling' &&
+      (hasFinishedAction('off-shelf', 'selling') || hasFinishedAction('batch-off-shelf', 'selling'))),
 );
 const totalStock = computed(() => specRows.value.reduce((sum, row) => sum + Number(row.quantity || 0), 0));
 const detailMediaUploading = ref(false);
@@ -2458,7 +2463,7 @@ const submitProductForm = async () => {
   try {
     const payload = buildProductPayloadFromForm();
     if (formPageMode.value === 'edit' && editingProduct.value) {
-      const updated = await updateFinishedProduct(editingProduct.value.id, payload);
+      const updated = await editFinishedProduct(editingProduct.value.id, payload);
       upsertStockItem(updated);
     } else {
       const created = await createFinishedProduct(payload);
