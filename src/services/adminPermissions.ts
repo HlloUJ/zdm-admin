@@ -217,7 +217,9 @@ export function hasMenuPermission(user: LoginUser, prefix?: string) {
     return ['finished', 'accessory'].some((scope) => user.permissions.includes(`${prefix}.${scope}.view`));
   }
   if (prefix === 'store.price-configuration') {
-    return ['price', 'discount'].some((kind) => user.permissions.includes(`${prefix}.${kind}.view`));
+    return ['price', 'discount'].some((kind) =>
+      ['finished', 'accessory'].some((scope) => user.permissions.includes(`${prefix}.${kind}.${scope}.view`)),
+    );
   }
   return user.permissions.some(
     (permission) =>

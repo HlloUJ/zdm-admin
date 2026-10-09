@@ -144,16 +144,32 @@ describe('full function catalog', () => {
     const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
     expect(pricing.menus[0].direct).toBe(true);
     expect(pricing.menus[0].pages[0].actions).toEqual([]);
-    expect(pricing.menus[0].pages[0].tabs.map((tab) => [tab.label, tab.value])).toEqual([
-      ['价格系数', 'store.price-configuration.price'],
-      ['折扣系数', 'store.price-configuration.discount'],
+    expect(pricing.menus[0].pages[0].tabs.map((tab) => [tab.parentLabel, tab.label, tab.value])).toEqual([
+      ['价格系数', '成品现货', 'store.price-configuration.price.finished'],
+      ['价格系数', '配件', 'store.price-configuration.price.accessory'],
+      ['折扣系数', '成品现货', 'store.price-configuration.discount.finished'],
+      ['折扣系数', '配件', 'store.price-configuration.discount.accessory'],
     ]);
     for (const tab of pricing.menus[0].pages[0].tabs) {
-      expect(tab.actions.map((action) => action.value)).toEqual(
-        ['view', 'create', 'edit', 'toggle-status', 'delete'].map((action) => `${tab.value}.${action}`),
-      );
+      const actions = [
+        'view',
+        'create',
+        'edit',
+        ...(tab.parentLabel === '价格系数' ? ['batch-set'] : []),
+        'toggle-status',
+        'delete',
+      ];
+      expect(tab.actions.map((action) => action.value)).toEqual(actions.map((action) => `${tab.value}.${action}`));
+      expect(tab.actions.map((action) => action.label)).toEqual([
+        '查看',
+        '设置',
+        '修改设置',
+        ...(tab.parentLabel === '价格系数' ? ['批量设置'] : []),
+        '停用/启用',
+        '删除',
+      ]);
     }
-    expect(getFunctionCatalogPermissionValues([pricing])).toHaveLength(10);
+    expect(getFunctionCatalogPermissionValues([pricing])).toHaveLength(22);
     expect(storeValues).not.toContain('store.price-configuration.view');
     for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {
       const values = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience(audience));

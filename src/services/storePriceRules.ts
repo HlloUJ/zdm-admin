@@ -1,7 +1,9 @@
 import { request } from './http';
 
 export type StorePriceRuleKind = 'price' | 'discount';
+export type StorePriceScope = 'finished' | 'accessory';
 export interface StorePriceRule {
+  scope: StorePriceScope;
   id: number;
   categoryId: number | null;
   roleId: number | null;
@@ -31,15 +33,29 @@ export interface StorePriceRulePayload {
   coefficient: number;
 }
 const base = '/admin/store-price-rules';
-export const listStorePriceRules = (kind: StorePriceRuleKind) => request<StorePriceRule[]>(`${base}/${kind}`);
-export const listStorePriceCategories = () => request<StorePriceCategory[]>(`${base}/price/categories`);
-export const listStoreDiscountRoles = () => request<StorePriceRole[]>(`${base}/discount/roles`);
-export const saveStorePriceRule = (kind: StorePriceRuleKind, payload: StorePriceRulePayload, id?: number) =>
-  request<StorePriceRule>(`${base}/${kind}${id == null ? '' : `/${id}`}`, {
+const scoped = (path: string, scope: StorePriceScope) => `${base}/${path}?scope=${scope}`;
+export const listStorePriceRules = (kind: StorePriceRuleKind, scope: StorePriceScope) =>
+  request<StorePriceRule[]>(scoped(kind, scope));
+export const listStorePriceCategories = (scope: StorePriceScope) =>
+  request<StorePriceCategory[]>(scoped('price/categories', scope));
+export const listStoreDiscountRoles = (scope: StorePriceScope) =>
+  request<StorePriceRole[]>(scoped('discount/roles', scope));
+export const saveStorePriceRule = (
+  kind: StorePriceRuleKind,
+  scope: StorePriceScope,
+  payload: StorePriceRulePayload,
+  id?: number,
+) =>
+  request<StorePriceRule>(scoped(`${kind}${id == null ? '' : `/${id}`}`, scope), {
     method: id == null ? 'POST' : 'PUT',
     body: JSON.stringify(payload),
   });
-export const statusStorePriceRule = (kind: StorePriceRuleKind, id: number, status: string) =>
-  request<StorePriceRule>(`${base}/${kind}/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
-export const deleteStorePriceRule = (kind: StorePriceRuleKind, id: number) =>
-  request<boolean>(`${base}/${kind}/${id}`, { method: 'DELETE' });
+export const saveStorePriceBatch = (scope: StorePriceScope, categoryIds: number[], coefficient: number) =>
+  request<StorePriceRule[]>(scoped('price/batch', scope), {
+    method: 'POST',
+    body: JSON.stringify({ categoryIds, coefficient }),
+  });
+export const statusStorePriceRule = (kind: StorePriceRuleKind, scope: StorePriceScope, id: number, status: string) =>
+  request<StorePriceRule>(scoped(`${kind}/${id}/status`, scope), { method: 'PUT', body: JSON.stringify({ status }) });
+export const deleteStorePriceRule = (kind: StorePriceRuleKind, scope: StorePriceScope, id: number) =>
+  request<boolean>(scoped(`${kind}/${id}`, scope), { method: 'DELETE' });

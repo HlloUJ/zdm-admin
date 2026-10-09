@@ -178,16 +178,20 @@ export const storePriceConfiguration: FunctionModule = {
           label: '价格配置页',
           value: 'store.price-configuration',
           actions: [],
-          tabs: (['price', 'discount'] as const).map((kind) => ({
-            label: kind === 'price' ? '价格系数' : '折扣系数',
-            value: `store.price-configuration.${kind}`,
-            actions: [
-              ['create', '新增'],
-              ['edit', '编辑'],
-              ['toggle-status', '停用/启用'],
-              ['delete', '删除'],
-            ].map(([code, label]) => ({ label, value: `store.price-configuration.${kind}.${code}` })),
-          })),
+          tabs: (['price', 'discount'] as const).flatMap((kind) =>
+            (['finished', 'accessory'] as const).map((scope) => ({
+              parentLabel: kind === 'price' ? '价格系数' : '折扣系数',
+              label: scope === 'finished' ? '成品现货' : '配件',
+              value: `store.price-configuration.${kind}.${scope}`,
+              actions: [
+                ['create', '设置'],
+                ['edit', '修改设置'],
+                ...(kind === 'price' ? [['batch-set', '批量设置']] : []),
+                ['toggle-status', '停用/启用'],
+                ['delete', '删除'],
+              ].map(([code, label]) => ({ label, value: `store.price-configuration.${kind}.${scope}.${code}` })),
+            })),
+          ),
         },
       ],
     },
