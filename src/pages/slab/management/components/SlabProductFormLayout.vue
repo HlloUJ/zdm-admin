@@ -17,7 +17,7 @@
         </nav>
       </AdminSectionCard>
     </div>
-    <header class="page-header">
+    <header v-if="!hideBreadcrumb" class="page-header">
       <t-breadcrumb aria-label="页面导航">
         <t-breadcrumb-item
           ><t-link theme="default" :disabled="loading" @click="emit('close')">大板管理</t-link></t-breadcrumb-item
@@ -82,7 +82,12 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { AdminSectionCard } from '@/components/foundation';
-const props = defineProps<{ mode: 'create' | 'edit' | 'view'; title: string; loading: boolean }>();
+const props = defineProps<{
+  mode: 'create' | 'edit' | 'view';
+  title: string;
+  loading: boolean;
+  hideBreadcrumb?: boolean;
+}>();
 const visible = defineModel<boolean>('visible', { required: true });
 const activeSection = defineModel<string>('activeSection', { required: true });
 const emit = defineEmits<{ confirm: []; close: [] }>();
