@@ -345,9 +345,9 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       case "PHYSICAL_DELETE" -> "物理删除大板";
       case "PURGE" -> "彻底删除商品";
       case "SOLD_OUT" -> "商品售罄";
-      case "SOURCE_OFF_SHELF" -> "供应链已下架该商品";
-      case "SOURCE_DELETE_TO_RECYCLE" -> "供应链已将该商品删除至回收站";
-      case "SOURCE_PURGE" -> "供应链已彻底删除该商品";
+      case "SOURCE_OFF_SHELF" -> "该商品已被供应链下架";
+      case "SOURCE_DELETE_TO_RECYCLE" -> "该商品已被供应链删除至回收站";
+      case "SOURCE_PURGE" -> "该商品已被供应链彻底删除";
       case "SOURCE_INTERNAL" -> "供应链状态变更";
       case "UPDATE" -> "编辑商品";
       case "PRICE_UPDATE" -> changes.containsKey("价格联动") ? "供应链成本变更，按当前系数重算售价" : "修改价格";

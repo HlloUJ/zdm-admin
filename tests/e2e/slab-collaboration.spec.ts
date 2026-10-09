@@ -65,7 +65,7 @@ for (const status of ['offShelf', 'soldOut', 'recycle']) {
   test(`运营 ${status} 详情读取最新数据且不提供编辑`, async ({ page }) => {
     await setup(page, status);
     await page.getByRole('main').locator('.table-actions').getByText('详情', { exact: true }).click();
-    const drawer = page.locator('.t-drawer:visible');
+    const drawer = page.locator('.t-drawer--open').filter({ hasText: '大板详情' });
     await expect(drawer.getByText('最新协同大板', { exact: true })).toBeVisible();
     await expect(drawer.getByText('库存异常', { exact: true })).toHaveCount(0);
     await expect(drawer.getByText('待核对库存', { exact: true })).toHaveCount(0);
@@ -405,3 +405,193 @@ test('彻底删除操作日志显示删除终态，与成品现货一致', async
   await logRow.getByText('详情', { exact: true }).click();
   await expect(page.locator('.t-dialog:visible')).toContainText('仓库中 → 已彻底删除');
 });
+
+for (const reason of ['该商品已被供应链下架', '该商品已被供应链删除至回收站', '该商品已被供应链彻底删除']) {
+  test(`上游恢复后运营旧大板仍保持遮罩：${reason}`, async ({ page }) => {
+    await setup(page, 'selling', 'selling');
+    const record = {
+      id: 99601,
+      name: '失效时的大板',
+      serialNo: 'SLAB-COLLAB',
+      status: 'selling',
+      sourceStatus: 'selling',
+      sourceUnavailable: true,
+      sourceMessage: reason,
+      costPrice: 10,
+      stock: 2,
+      offShelfRecords: [],
+    };
+    await page.route('**/api/admin/slabs', (route) => route.fulfill({ json: { code: 0, data: [record] } }));
+    await page.route('**/api/admin/slabs/99601', (route) => route.fulfill({ json: { code: 0, data: record } }));
+    await page.reload();
+    const main = page.getByRole('main');
+    const overlay = main.locator('.source-unavailable-overlay');
+    await expect(overlay).toContainText(reason);
+    await expect(overlay.getByRole('button')).toHaveCount(2);
+    await expect(main.locator('tbody input[type="checkbox"]')).toBeDisabled();
+    await overlay.getByRole('button', { name: '详情', exact: true }).click();
+    const drawer = page.locator('.t-drawer--open').filter({ hasText: '大板详情' });
+    await expect(drawer).toContainText(reason);
+    await expect(drawer.getByText('失效时的大板', { exact: true })).toBeVisible();
+    await expect(drawer.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+  });
+}
+
+for (const [source, operationType, oldSummary] of [
+  ['offShelf', 'SOURCE_OFF_SHELF', '供应链已下架该商品'],
+  ['recycle', 'SOURCE_DELETE_TO_RECYCLE', '供应链已将该商品删除至回收站'],
+  ['purged', 'SOURCE_PURGE', '供应链已彻底删除该商品'],
+]) {
+  test(`大板 ${source} 旧日志列表及详情文案与遮罩一致`, async ({ page }) => {
+    await setup(page, 'selling', source);
+    await page.addInitScript(() => {
+      const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+      user.permissions.push('admin.slab-management.operation-log.view');
+      localStorage.setItem('zdm-admin-user', JSON.stringify(user));
+    });
+    await page.route('**/api/admin/slabs/operation-logs?**', (route) =>
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            records: [
+              {
+                id: 991,
+                slabId: 99601,
+                slabName: '协同大板',
+                slabSerialNo: 'SLAB-COLLAB',
+                operationType,
+                operationSummary: oldSummary,
+                beforeStatus: 'selling',
+                afterStatus: 'selling',
+                operationSource: 'SUPPLY_CHAIN',
+                operatorName: '供应链操作人',
+                operatedAt: '2026-10-09T11:45:00',
+              },
+            ],
+            total: 1,
+            page: 1,
+            pageSize: 10,
+          },
+        },
+      }),
+    );
+    await page.reload();
+    const expected = sourceBlockMessage(source);
+    await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toContainText(expected);
+    await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+    const row = page.locator('.t-drawer--open tbody tr').filter({ hasText: '协同大板' });
+    await expect(row).toContainText(expected);
+    await expect(row).not.toContainText(oldSummary);
+    await row.getByText('详情', { exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    await expect(dialog).toContainText(expected);
+    await expect(dialog).not.toContainText(oldSummary);
+  });
+}
+
+test('大板供应链上架入仓的列表和详情文案与成品现货一致', async ({ page }) => {
+  await setup(page, 'warehouse');
+  await page.addInitScript(() => {
+    const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    user.permissions.push('admin.slab-management.operation-log.view');
+    localStorage.setItem('zdm-admin-user', JSON.stringify(user));
+  });
+  const expected = '供应链已上架，商品进入运营管理平台仓库';
+  await page.route('**/api/admin/slabs/operation-logs?**', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          records: [
+            {
+              id: 991,
+              slabId: 99601,
+              slabName: '协同大板',
+              slabSerialNo: 'SLAB-COLLAB',
+              operationType: 'SOURCE_SHELF',
+              operationSummary: expected,
+              beforeStatus: null,
+              afterStatus: 'warehouse',
+              operationSource: 'SUPPLY_CHAIN',
+              operatorName: '供应链操作人',
+              operatedAt: '2026-10-09T11:44:00',
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 10,
+        },
+      },
+    }),
+  );
+  await page.reload();
+  await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toHaveCount(0);
+  await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  const row = page.locator('.t-drawer--open tbody tr').filter({ hasText: '协同大板' });
+  await expect(row).toContainText(expected);
+  await row.getByText('详情', { exact: true }).click();
+  await expect(page.locator('.t-dialog:visible')).toContainText(expected);
+});
+
+for (const sourceRestored of [true, false]) {
+  test(`删除失效大板后立即同步仓库，来源已恢复=${sourceRestored}`, async ({ page }) => {
+    await setup(page, 'selling', 'offShelf');
+    await page.addInitScript(() => {
+      const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+      user.permissions.push('admin.slab-management.warehouse.view', 'admin.slab-management.warehouse.edit');
+      localStorage.setItem('zdm-admin-user', JSON.stringify(user));
+    });
+    const oldRecord = {
+      id: 99601,
+      name: '协同大板',
+      serialNo: 'SLAB-COLLAB',
+      status: 'selling',
+      sourceStatus: sourceRestored ? 'selling' : 'offShelf',
+      sourceUnavailable: true,
+      sourceMessage: '该商品已被供应链下架',
+      stock: 2,
+      costPrice: 10,
+      offShelfRecords: [],
+    };
+    const freshRecord = {
+      ...oldRecord,
+      name: '重新入仓大板',
+      status: 'warehouse',
+      sourceStatus: 'selling',
+      sourceUnavailable: false,
+      sourceMessage: null,
+      costPrice: 30,
+    };
+    let purged = false;
+    let refreshedAfterPurge = 0;
+    await page.route('**/api/admin/slabs', (route) => {
+      if (purged) refreshedAfterPurge++;
+      return route.fulfill({ json: { code: 0, data: purged ? (sourceRestored ? [freshRecord] : []) : [oldRecord] } });
+    });
+    await page.route('**/api/admin/slabs/99601', (route) => {
+      if (route.request().method() === 'DELETE') {
+        purged = true;
+        return route.fulfill({ json: { code: 0, data: true } });
+      }
+      return route.fulfill({ json: { code: 0, data: oldRecord } });
+    });
+    await page.reload();
+    const main = page.getByRole('main');
+    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+    await main.locator('.source-unavailable-overlay').getByRole('button', { name: '彻底删除', exact: true }).click();
+    await page.locator('.t-dialog:visible').getByRole('button', { name: '确认彻底删除', exact: true }).click();
+    await expect.poll(() => refreshedAfterPurge).toBeGreaterThan(0);
+    const warehouse = main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '仓库中' });
+    await warehouse.click();
+    await expect(main.locator('.source-unavailable-overlay')).toHaveCount(0);
+    await expect(main.getByText('协同大板', { exact: true })).toHaveCount(0);
+    if (sourceRestored) {
+      await expect(main.getByText('重新入仓大板', { exact: true })).toBeVisible();
+      await expect(warehouse).toContainText('1');
+    } else {
+      await expect(main.getByText('重新入仓大板', { exact: true })).toHaveCount(0);
+      await expect(main.getByText('暂无数据', { exact: true })).toBeVisible();
+    }
+  });
+}

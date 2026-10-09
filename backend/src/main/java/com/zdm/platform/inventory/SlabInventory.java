@@ -21,15 +21,29 @@ public class SlabInventory extends BaseEntity implements com.zdm.platform.securi
   private String sourceStatus = "warehouse";
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private String sourceBlockReason;
+  @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
+  private String operationsInvalidatedReason;
+  @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
+  private java.time.LocalDateTime operationsInvalidatedAt;
+  @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
+  private String operationsInvalidatedSnapshot;
+  public String getOperationsInvalidatedReason() { return operationsInvalidatedReason; }
+  public void setOperationsInvalidatedReason(String value) { operationsInvalidatedReason = value; }
+  public java.time.LocalDateTime getOperationsInvalidatedAt() { return operationsInvalidatedAt; }
+  public void setOperationsInvalidatedAt(java.time.LocalDateTime value) { operationsInvalidatedAt = value; }
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public String getOperationsInvalidatedSnapshot() { return operationsInvalidatedSnapshot; }
+  public void setOperationsInvalidatedSnapshot(String value) { operationsInvalidatedSnapshot = value; }
+  public boolean isOperationsSnapshotMissing() { return operationsInvalidatedAt != null && operationsInvalidatedSnapshot == null; }
   private Boolean operationsDeleted = false;
   public String getSourceStatus() { return sourceStatus; }
   public void setSourceStatus(String value) { sourceStatus = value; }
   public String getSourceBlockReason() { return sourceBlockReason; }
   public void setSourceBlockReason(String value) { sourceBlockReason = value; }
-  public String getSourceMessage() { return ProductLifecycleService.sourceBlockMessage(sourceStatus, sourceBlockReason); }
+  public String getSourceMessage() { return operationsInvalidatedReason != null ? operationsInvalidatedReason : ProductLifecycleService.sourceBlockMessage(sourceStatus, sourceBlockReason); }
   public Boolean getOperationsDeleted() { return operationsDeleted; }
   public void setOperationsDeleted(Boolean value) { operationsDeleted = value; }
-  public boolean isSourceUnavailable() { return ProductLifecycleService.unavailable(sourceStatus); }
+  public boolean isSourceUnavailable() { return operationsInvalidatedAt != null || ProductLifecycleService.unavailable(sourceStatus); }
 
   @NotBlank
   private String name;

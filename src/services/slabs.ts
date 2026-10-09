@@ -31,6 +31,7 @@ export interface SlabRecord {
   sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
   sourceMessage?: string;
+  operationsSnapshotMissing?: boolean;
   operationsDeleted?: boolean;
   sourceOffShelfRecords?: SlabOffShelfRecord[];
   stock?: number;

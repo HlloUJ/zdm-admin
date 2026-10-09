@@ -97,7 +97,11 @@
                           />
                         </t-select>
                       </t-form-item>
-                      <t-form-item v-if="activeTab !== 'offShelf'" label="供应商" class="supplier-filter">
+                      <t-form-item
+                        v-if="activeTab !== 'offShelf'"
+                        label="供应商"
+                        class="supplier-filter supplier-filter--aligned"
+                      >
                         <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
                           <t-option
                             v-for="item in supplierFilterOptions"
@@ -613,6 +617,12 @@
       @close="closeDetailDrawer"
     >
       <t-space v-if="detailDrawerRow" direction="vertical" size="large" class="slab-detail-drawer">
+        <t-alert v-if="sourceBlocked(detailDrawerRow)" theme="warning" :message="detailDrawerRow.sourceMessage" />
+        <t-alert
+          v-if="detailDrawerRow.operationsSnapshotMissing"
+          theme="warning"
+          message="历史失效详情快照缺失，当前展示来源资料，不代表失效时的商品和价格。"
+        />
         <AdminSectionCard class="slab-detail-section">
           <h3 class="slab-detail-section-title">图文描述</h3>
           <div class="slab-detail-media-grid">
@@ -715,6 +725,7 @@
       :status-label="operationLogStatusLabel"
       :format-time="formatDateTime"
       :source-label="operationLogSourceLabel"
+      :summary-label="finishedProductOperationSummary"
       :show-reason="operationLogShowReason"
       @filter-change="updateOperationLogFilter"
       @search="handleOperationLogSearch"
@@ -1091,7 +1102,11 @@ import SlabRowWarnings from './components/SlabRowWarnings.vue';
 import SourceUnavailableOverlay from '@/pages/finished-stock/management/components/SourceUnavailableOverlay.vue';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
 import ProductLogFieldValue from '@/components/product-logs/ProductLogFieldValue.vue';
-import { productLogFilterOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
+import {
+  finishedProductOperationSummary,
+  productLogFilterOptions,
+  type ProductOperationLogRow,
+} from '@/services/productOperationLog';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import {
   adminFeedback,
@@ -1449,6 +1464,7 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     sourceUnavailable: record.sourceUnavailable,
     sourceStatus: record.sourceStatus,
     sourceMessage: record.sourceMessage,
+    operationsSnapshotMissing: record.operationsSnapshotMissing,
     stock: record.stock,
     sourceOffShelfRecords: record.sourceOffShelfRecords,
     supplierId: record.supplierId,
@@ -2632,6 +2648,7 @@ const handleConfirmSubmit = async () => {
     if (type === 'purge' && row) {
       await deleteSlab(row.id);
       tableData.value = tableData.value.filter((item) => item.id !== row.id);
+      if (sourceBlocked(row)) await loadSlabs();
     }
     if (type === 'batchPurge') {
       const selectedIds = [...selectedKeys.value];

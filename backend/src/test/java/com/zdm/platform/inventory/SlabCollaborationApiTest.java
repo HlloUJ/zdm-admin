@@ -441,7 +441,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records())
         .extracting(SlabOperationLog::getOperationType).containsExactly("SOURCE_PURGE", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_OFF_SHELF");
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records())
-        .extracting(SlabOperationLog::getOperationSummary).containsExactly("供应链已彻底删除该商品", "供应链已将该商品删除至回收站", "供应链已下架该商品");
+        .extracting(SlabOperationLog::getOperationSummary).containsExactly("该商品已被供应链彻底删除", "该商品已被供应链删除至回收站", "该商品已被供应链下架");
     for (var log : logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records()) {
       assertThat(log.getStandardReason()).isNull();
       assertThat(log.getDetailReason()).isNull();
@@ -464,6 +464,107 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     slabs.removeById(99601L);
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isBadRequest());
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=99601", Integer.class)).isEqualTo(7);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false,10", "false,30", "true,30"})
+  void invalidatedOperationsRequirePurgeBeforeFreshArrival(boolean purgeBeforeSourceRestore, int newCost) throws Exception {
+    fixture("selling", "selling", false, 1L);
+    jdbc.update("INSERT INTO suppliers (id,name,status,owner_scope,owner_id) VALUES (99609,'失效回归供应商','enabled','platform',0)");
+    jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99609,1)");
+    jdbc.update("INSERT INTO slab_color_categories (id,name) VALUES (99609,'失效回归色系')");
+    jdbc.update("INSERT INTO slab_colors (id,category_id,name) VALUES (99609,99609,'失效回归颜色')");
+    jdbc.update("INSERT INTO slab_grades (id,code,name) VALUES (99609,'TEST','失效回归等级')");
+    for (long mediaId : List.of(99701L, 99702L, 99703L)) {
+      jdbc.update("INSERT INTO media_assets (id,public_id,storage_key,media_type,mime_type,owner_client_code,status) VALUES (?,UUID(),?,'image','image/png','supply-chain','active')", mediaId, "invalid-slab-" + mediaId);
+    }
+    jdbc.update("UPDATE slab_inventory SET supplier_id=99609,variety_id=(SELECT MIN(id) FROM slab_varieties),origin_id=(SELECT MIN(id) FROM slab_origins),texture_id=(SELECT MIN(id) FROM slab_textures),color_id=99609,grade_id=99609,length_mm=2000,width_mm=1800,thickness_mm=20,main_image_media_id=99701,scan_image_media_id=99702,design_image_media_id=99703,guide_price=20 WHERE id=99601");
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99609,'失效价格级别',1,'enabled')");
+    jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99609,99609,'失效价格配置',1.4,1,'enabled',false)");
+    jdbc.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source) VALUES (99601,99609,'失效价格级别',9,10,90,'manual')");
+    identity("supply-chain", "all", "all");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "offShelf", "库存异常", "失效回归");
+    String frozen = jdbc.queryForObject("SELECT operations_invalidated_snapshot FROM slab_inventory WHERE id=99601", String.class);
+    assertThat(frozen).contains("协同大板");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM media_references WHERE business_domain='SLAB_OPERATIONS_INVALIDATION' AND business_id=99601", Integer.class)).isEqualTo(3);
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "recycle");
+    identity("admin", "all", "all");
+    mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sourceMessage").value("该商品已被供应链删除至回收站"));
+    if (purgeBeforeSourceRestore) { slabs.removeById(99601L); }
+    identity("supply-chain", "all", "all");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "warehouse");
+    jdbc.update("UPDATE slab_inventory SET name='新的来源名称',cost_price=? WHERE id=99601", newCost);
+    sqlSession.clearCache();
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "selling");
+    identity("admin", "all", "all");
+    if (!purgeBeforeSourceRestore) {
+      mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.sourceStatus").value("selling"))
+          .andExpect(jsonPath("$.data.sourceUnavailable").value(true))
+          .andExpect(jsonPath("$.data.status").value("selling"))
+          .andExpect(jsonPath("$.data.name").value("协同大板"))
+          .andExpect(jsonPath("$.data.costPrice").value(10))
+          .andExpect(jsonPath("$.data.markupPrices[0].price").value(90))
+          .andExpect(jsonPath("$.data.sourceMessage").value("该商品已被供应链删除至回收站"));
+      mvc.perform(get("/api/admin/slabs")).andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[0].sourceUnavailable").value(true))
+          .andExpect(jsonPath("$.data[0].name").value("协同大板"))
+          .andExpect(jsonPath("$.data[0].markupPrices[0].price").value(90));
+      mvc.perform(put("/api/admin/slabs/99601").contentType("application/json")
+          .content("{\"name\":\"尝试编辑失效大板\",\"costPrice\":30,\"markupPrices\":[]}"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.message").value("该商品已被供应链删除至回收站"));
+      assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_SHELF", null, null, null, 1, 10).total()).isZero();
+      mvc.perform(put("/api/admin/slabs/batch-status").contentType("application/json")
+          .content("{\"ids\":[99601],\"status\":\"offShelf\",\"reason\":\"库存异常\"}"))
+          .andExpect(status().isBadRequest());
+      assertThatThrownBy(() -> slabs.checkAction(List.of(99601L), "shelf"))
+          .isInstanceOf(IllegalArgumentException.class);
+      slabs.removeById(99601L);
+    }
+    assertThat(logs.listPage("SLAB-COLLAB", "PURGE", null, null, null, 1, 10).records())
+        .extracting(SlabOperationLog::getSlabName).containsExactly("协同大板");
+    SlabInventory fresh = slabs.visibleDetail(99601L);
+    assertThat(fresh.isSourceUnavailable()).isFalse();
+    assertThat(fresh.getOperationsInvalidatedAt()).isNull();
+    assertThat(fresh.getName()).isEqualTo("新的来源名称");
+    assertThat(fresh.getStatus()).isEqualTo("warehouse");
+    assertThat(fresh.getMarkupPrices().stream().filter(price -> price.getStoreLevelId().equals(99609L)).findFirst().orElseThrow().getPrice()).isEqualByComparingTo(BigDecimal.valueOf(newCost).multiply(new BigDecimal("1.4")));
+    assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_SHELF", null, null, null, 1, 10).total()).isEqualTo(1);
+    assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 20).records())
+        .extracting(SlabOperationLog::getOperationType).contains("PURGE", "SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM media_references WHERE business_domain='SLAB_OPERATIONS_INVALIDATION' AND business_id=99601", Integer.class)).isZero();
+  }
+
+  @Test void frozenDetailsKeepOperationsOffShelfHistorySeparateFromSource() throws Exception {
+    fixture("offShelf", "selling", false, 1L);
+    jdbc.update("INSERT INTO slab_off_shelf_records (slab_id,business_client_code,standard_reason,off_shelved_at,off_shelved_by_name) VALUES (99601,'admin','运营原下架原因',NOW(),'运营操作人')");
+    identity("supply-chain", "all", "all");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "offShelf", "库存异常", null);
+    identity("admin", "all", "all");
+    mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.offShelfRecords[0].standardReason").value("运营原下架原因"))
+        .andExpect(jsonPath("$.data.sourceOffShelfRecords[0].standardReason").value("库存异常"));
+    mvc.perform(get("/api/admin/slabs")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].offShelfRecords[0].standardReason").value("运营原下架原因"));
+  }
+
+  @Test void invalidatedAutomaticPricesIgnoreConfigurationSynchronization() {
+    fixture("selling", "selling", false, 1L);
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99609,'冻结自动价格级别',1,'enabled')");
+    jdbc.update("INSERT INTO slab_markup_configurations (id,store_level_id,name,price_coefficient,sort_order,status,legacy_seeded) VALUES (99609,99609,'冻结自动价格配置',2,1,'enabled',false)");
+    jdbc.update("INSERT INTO slab_prices (slab_id,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source,source_configuration_id) VALUES (99601,99609,'冻结自动价格级别',2,10,20,'auto',99609)");
+    identity("supply-chain", "all", "all");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "offShelf", "库存异常", null);
+    jdbc.update("UPDATE slab_inventory SET cost_price=30 WHERE id=99601");
+    identity("admin", "all", "all");
+    SlabMarkupConfiguration changed = new SlabMarkupConfiguration();
+    changed.setPriceCoefficient(new BigDecimal("3"));
+    SlabMarkupConfiguration updated = priceConfigurations.updateConfiguration(99609L, changed);
+    assertThat(updated.getSynchronizedPriceCount()).isZero();
+    assertThat(jdbc.queryForObject("SELECT price FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", BigDecimal.class)).isEqualByComparingTo("20");
+    assertThat(slabs.visibleDetail(99601L).getCostPrice()).isEqualByComparingTo("10");
   }
 
   @Test void sourceOnlyRecordDoesNotCreateOperationsOrOperationsLogs() {

@@ -126,6 +126,7 @@ test('aligns grade before supplier while keeping slab filter actions on the righ
   await page.goto('/slab-management');
 
   const primaryItems = page.locator('.filter-primary-row .t-form__item');
+  await expect(primaryItems).toHaveCount(5);
   const itemBoxes = await primaryItems.evaluateAll((items) =>
     items.map((item) => {
       const box = item.getBoundingClientRect();
@@ -141,7 +142,7 @@ test('aligns grade before supplier while keeping slab filter actions on the righ
   expect(gradeBox?.x).toBe((await page.locator('.slab-keyword-filter').boundingBox())?.x);
   expect(supplierBox!.x - gradeBox!.x - gradeBox!.width).toBeCloseTo(20, 0);
   expect(resetBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
-  await expect(page.locator('.supplier-filter')).toHaveCSS('width', '234px');
+  expect(supplierBox!.x + supplierBox!.width).toBeCloseTo(itemBoxes[1].right, 0);
   await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
 });
 
