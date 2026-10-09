@@ -21,9 +21,9 @@ const permissions = [
   'store.finished-stock-management.recycle.clear',
   'store.finished-stock-management.operation-log.view',
   'store.price-configuration.price.finished.view',
-  'store.price-configuration.price.finished.create',
+  'store.price-configuration.price.finished.batch-set',
   'store.price-configuration.discount.finished.view',
-  'store.price-configuration.discount.finished.create',
+  'store.price-configuration.discount.finished.batch-set',
 ];
 
 async function storeLogin(page: Page) {
@@ -531,7 +531,6 @@ test('store price configuration separates category prices from role discounts', 
           categoryId: null,
           targetName: '店长',
           coefficient: 0.8,
-          status: 'enabled',
           createdAt: '2026-09-24T10:00:00',
         },
       ]),
@@ -553,8 +552,9 @@ test('store price configuration separates category prices from role discounts', 
   await expect(main.getByText('0.80', { exact: true })).toBeVisible();
   await expect(main.locator('th').getByText('折扣系数', { exact: true })).toBeVisible();
   await expect(main.getByText('指导价设置')).toHaveCount(0);
-  await main.getByRole('row').filter({ hasText: '导购' }).getByText('设置', { exact: true }).click();
-  await expect(page.locator('.t-dialog:visible').getByText('角色', { exact: true })).toBeVisible();
+  await main.getByRole('row').filter({ hasText: '导购' }).locator('.t-checkbox').click();
+  await main.getByRole('button', { name: '批量设置', exact: true }).click();
+  await expect(page.locator('.t-dialog:visible').getByText('已选角色', { exact: true })).toBeVisible();
   const coefficient = page.locator('.t-dialog:visible .t-input-number input');
   await coefficient.fill('1.2');
   await coefficient.blur();

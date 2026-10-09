@@ -28,7 +28,7 @@
                     <t-link theme="primary"><t-icon name="help-circle" />说明</t-link>
                     <template #content>
                       <div class="price-help">
-                        <p>价格系数优先本分类，其次最近上级；没有可继承配置时需手工填写商品价格。</p>
+                        <p>各分类独立设置价格系数；未设置时需手工填写商品价格。</p>
                         <p>未配置角色折扣时按正常售价计算，不比较角色之间的折扣高低。</p>
                         <p>配置仅用于自动计算，商品手工修改后以商品价格为准。新配置将在商品模块接入后生效。</p>
                       </div>
@@ -45,7 +45,7 @@
                     <template #prefix-icon><t-icon name="search" /></template>
                   </t-input>
                   <t-button
-                    v-if="activeKind === 'price' && can('batch-set')"
+                    v-if="can('batch-set')"
                     theme="primary"
                     :disabled="selectedIds.length === 0 || saving"
                     @click="openBatch"
@@ -81,58 +81,15 @@
                 <template #coefficient="{ row }">{{
                   row.rule ? Number(row.rule.coefficient).toFixed(2) : '—'
                 }}</template>
-                <template #effectiveCoefficient="{ row }">{{
-                  row.effectiveCoefficient == null ? '未配置' : Number(row.effectiveCoefficient).toFixed(2)
-                }}</template>
-                <template #sourceName="{ row }">{{
-                  row.effectiveCoefficient == null
-                    ? '—'
-                    : row.sourceName === row.name
-                      ? '本分类'
-                      : `继承${row.sourceName}`
-                }}</template>
                 <template #discount="{ row }">{{
-                  row.rule?.status === 'enabled'
-                    ? `${Number((Number(row.rule.coefficient) * 10).toFixed(2))}折`
-                    : '按正常售价'
+                  row.rule ? `${Number((Number(row.rule.coefficient) * 10).toFixed(2))}折` : '按正常售价'
                 }}</template>
-                <template #status="{ row }"
-                  ><t-tag
-                    v-if="row.rule"
-                    :theme="row.rule.status === 'enabled' ? 'success' : 'danger'"
-                    variant="light"
-                    >{{ row.rule.status === 'enabled' ? '已启用' : '已停用' }}</t-tag
-                  ><span v-else>未配置</span></template
-                >
-                <template #operation="{ row }">
-                  <t-space size="small">
-                    <t-link
-                      v-if="canSet(row)"
-                      theme="primary"
-                      :disabled="row.status !== 'enabled' || saving"
-                      @click="openSetting(row)"
-                      >设置</t-link
-                    >
-                    <t-link
-                      v-if="row.rule && can('toggle-status')"
-                      :theme="row.rule.status === 'enabled' ? 'warning' : 'success'"
-                      @click="confirmAction = { kind: 'status', row }"
-                      >{{ row.rule.status === 'enabled' ? '停用' : '启用' }}</t-link
-                    >
-                    <t-link
-                      v-if="row.rule && can('delete')"
-                      theme="danger"
-                      @click="confirmAction = { kind: 'delete', row }"
-                      >删除</t-link
-                    >
-                  </t-space>
-                </template>
                 <template #empty>{{ activeKind === 'price' ? '暂无门店分类' : '暂无门店角色' }}</template>
               </t-table>
               <p>
                 {{
                   activeKind === 'price'
-                    ? '未配置且无上级可继承时，上架商品需手工填写价格。'
+                    ? '未设置价格系数的分类，上架商品需手工填写价格。'
                     : '配置用于自动计算，商品手工修改后以商品价格为准。'
                 }}
               </p>
@@ -143,33 +100,21 @@
     </div>
     <AdminDialog
       v-model:visible="formVisible"
-      :header="batchMode ? '批量设置价格系数' : `设置${kindLabel}`"
+      :header="`批量设置${kindLabel}`"
       :confirm-btn="{ content: '提交', loading: saving }"
       @confirm="save"
       @cancel="formVisible = false"
       @close="formVisible = false"
     >
       <t-form label-align="top" :data="form" colon>
-        <t-form-item :label="batchMode ? '已选分类' : activeKind === 'price' ? '分类' : '角色'">
-          {{ batchMode ? `已选择 ${selectedIds.length} 个分类；现有配置仅修改系数，保留启停状态。` : editing?.name }}
+        <t-form-item :label="activeKind === 'price' ? '已选分类' : '已选角色'">
+          已选择 {{ selectedIds.length }} 个{{ activeKind === 'price' ? '分类' : '角色' }}
         </t-form-item>
         <t-form-item :label="kindLabel"
           ><t-input-number v-model="form.coefficient" :decimal-places="2" :min="0.01" :max="999" theme="normal"
         /></t-form-item>
       </t-form>
     </AdminDialog>
-    <AdminConfirmDialog
-      :visible="Boolean(confirmAction)"
-      :action="
-        confirmAction?.kind === 'delete' ? '删除' : confirmAction?.row.rule?.status === 'enabled' ? '停用' : '启用'
-      "
-      object-type="价格配置"
-      :object-name="confirmAction?.row.name"
-      @confirm="runConfirmed"
-      @cancel="confirmAction = null"
-      @close="confirmAction = null"
-      @update:visible="!$event && (confirmAction = null)"
-    />
   </div>
 </template>
 <script setup lang="ts">
@@ -178,7 +123,6 @@ import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import {
-  AdminConfirmDialog,
   AdminDialog,
   AdminListLayout,
   AdminPageHeader,
@@ -191,10 +135,7 @@ import {
   listStorePriceRules,
   listStorePriceCategories,
   listStoreDiscountRoles,
-  saveStorePriceRule,
   saveStorePriceBatch,
-  statusStorePriceRule,
-  deleteStorePriceRule,
   type StorePriceRuleKind,
   type StorePriceScope,
   type StorePriceRule,
@@ -208,8 +149,6 @@ interface DisplayRow extends TableRowData {
   depth: number;
   hasChildren: boolean;
   rule?: StorePriceRule;
-  effectiveCoefficient?: number | null;
-  sourceName?: string;
 }
 const user = computed(getLoginUser);
 const entries = (['price', 'discount'] as const).flatMap((kind) =>
@@ -247,13 +186,9 @@ const collapsedIds = ref<number[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const formVisible = ref(false);
-const batchMode = ref(false);
-const editing = ref<DisplayRow | null>(null);
 const form = reactive<{ coefficient: number | null }>({ coefficient: null });
-const confirmAction = ref<{ kind: 'status' | 'delete'; row: DisplayRow } | null>(null);
 const ruleFor = (id: number) =>
   rules.value.find((rule) => (activeKind.value === 'price' ? rule.categoryId : rule.roleId) === id);
-const canSet = (row: DisplayRow) => can(row.rule ? 'edit' : 'create');
 const displayRows = computed<DisplayRow[]>(() => {
   if (activeKind.value === 'discount')
     return roles.value
@@ -283,28 +218,21 @@ const displayRows = computed<DisplayRow[]>(() => {
   return result;
 });
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(activeKind.value === 'price' && can('batch-set')
+  ...(can('batch-set')
     ? [
         {
           colKey: 'row-select',
           type: 'multiple' as const,
           width: 48,
           checkProps: ({ row }: { row: TableRowData }) => ({
-            disabled: row.status !== 'enabled' || !canSet(row as DisplayRow),
+            disabled: row.status !== 'enabled',
           }),
         },
       ]
     : []),
   { colKey: 'name', title: activeKind.value === 'price' ? '分类名称' : '角色', minWidth: 180 },
   { colKey: 'coefficient', title: activeKind.value === 'price' ? '本分类系数' : '折扣系数', width: 120 },
-  ...(activeKind.value === 'price'
-    ? [
-        { colKey: 'effectiveCoefficient', title: '生效系数', width: 120 },
-        { colKey: 'sourceName', title: '配置来源', minWidth: 140 },
-      ]
-    : [{ colKey: 'discount', title: '折扣说明', width: 120 }]),
-  { colKey: 'status', title: '状态', width: 95 },
-  { colKey: 'operation', title: '操作', width: 175 },
+  ...(activeKind.value === 'discount' ? [{ colKey: 'discount', title: '折扣说明', width: 120 }] : []),
 ]);
 function selectRows(keys: (string | number)[]) {
   selectedIds.value = keys.map(Number);
@@ -340,15 +268,7 @@ async function load() {
     if (current === revision) loading.value = false;
   }
 }
-function openSetting(row: DisplayRow) {
-  editing.value = row;
-  batchMode.value = false;
-  form.coefficient = row.rule ? Number(row.rule.coefficient) : null;
-  formVisible.value = true;
-}
 function openBatch() {
-  editing.value = null;
-  batchMode.value = true;
   form.coefficient = null;
   formVisible.value = true;
 }
@@ -361,18 +281,7 @@ async function save() {
   const key = activeKey.value;
   saving.value = true;
   try {
-    if (batchMode.value) await saveStorePriceBatch(activeScope.value, selectedIds.value, form.coefficient);
-    else if (editing.value)
-      await saveStorePriceRule(
-        activeKind.value,
-        activeScope.value,
-        {
-          categoryId: activeKind.value === 'price' ? editing.value.id : null,
-          roleId: activeKind.value === 'discount' ? editing.value.id : null,
-          coefficient: form.coefficient,
-        },
-        editing.value.rule?.id,
-      );
+    await saveStorePriceBatch(activeKind.value, activeScope.value, selectedIds.value, form.coefficient);
     if (key === activeKey.value) {
       formVisible.value = false;
       selectedIds.value = [];
@@ -381,31 +290,6 @@ async function save() {
     }
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '保存失败'));
-  } finally {
-    saving.value = false;
-  }
-}
-async function runConfirmed() {
-  const action = confirmAction.value;
-  if (!action?.row.rule || saving.value) return;
-  const key = activeKey.value;
-  saving.value = true;
-  try {
-    if (action.kind === 'delete') await deleteStorePriceRule(activeKind.value, activeScope.value, action.row.rule.id);
-    else
-      await statusStorePriceRule(
-        activeKind.value,
-        activeScope.value,
-        action.row.rule.id,
-        action.row.rule.status === 'enabled' ? 'disabled' : 'enabled',
-      );
-    if (key === activeKey.value) {
-      confirmAction.value = null;
-      adminFeedback.success('操作成功');
-      await load();
-    }
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '操作失败'));
   } finally {
     saving.value = false;
   }
@@ -429,7 +313,6 @@ watch(
     roles.value = [];
     loading.value = false;
     formVisible.value = false;
-    confirmAction.value = null;
     void load();
   },
   { immediate: true },
