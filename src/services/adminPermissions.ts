@@ -216,6 +216,9 @@ export function hasMenuPermission(user: LoginUser, prefix?: string) {
   if (prefix === 'admin.tenant.store-category-management') {
     return ['finished', 'accessory'].some((scope) => user.permissions.includes(`${prefix}.${scope}.view`));
   }
+  if (prefix === 'store.price-configuration') {
+    return ['price', 'discount'].some((kind) => user.permissions.includes(`${prefix}.${kind}.view`));
+  }
   return user.permissions.some(
     (permission) =>
       permission === `${prefix}.view` || (permission.startsWith(`${prefix}.`) && permission.endsWith('.view')),

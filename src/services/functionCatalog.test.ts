@@ -143,8 +143,18 @@ describe('full function catalog', () => {
     expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');
     const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
     expect(pricing.menus[0].direct).toBe(true);
-    expect(pricing.menus[0].pages[0].tabs).toEqual([]);
-    expect(storeValues).toContain('store.price-configuration.view');
+    expect(pricing.menus[0].pages[0].actions).toEqual([]);
+    expect(pricing.menus[0].pages[0].tabs.map((tab) => [tab.label, tab.value])).toEqual([
+      ['价格系数', 'store.price-configuration.price'],
+      ['折扣系数', 'store.price-configuration.discount'],
+    ]);
+    for (const tab of pricing.menus[0].pages[0].tabs) {
+      expect(tab.actions.map((action) => action.value)).toEqual(
+        ['view', 'create', 'edit', 'toggle-status', 'delete'].map((action) => `${tab.value}.${action}`),
+      );
+    }
+    expect(getFunctionCatalogPermissionValues([pricing])).toHaveLength(10);
+    expect(storeValues).not.toContain('store.price-configuration.view');
     for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {
       const values = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience(audience));
       expect(values.some((value) => value.startsWith('store.'))).toBe(false);

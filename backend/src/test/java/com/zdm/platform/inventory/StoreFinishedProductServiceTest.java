@@ -36,6 +36,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private StoreFinishedProductService products;
   @Autowired private StoreFinishedPriceConfigurationService configurations;
+  @Autowired private StorePriceRuleService priceRules;
   @Autowired private ProductLifecycleService lifecycle;
   @Autowired private StoreFinishedUpstreamLogService upstreamLogs;
   @Autowired private FinishedProductService finishedProducts;
@@ -667,6 +668,89 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
           .singleElement().satisfies(log -> assertThat(log.operatedAt()).isEqualTo(expected));
       assertThat(reader.logDetail(99894L).operatedAt()).isEqualTo(expected);
     }
+  }
+
+  @Test
+  @Transactional
+  void priceRulesUseStoreCategoriesAndPreserveLegacyPrices() {
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES "
+        + "(99961,1,'新定价甲店','cityPartner','enabled'),(99962,1,'新定价乙店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO store_categories(id,store_id,scope,parent_id,name) VALUES "
+        + "(99961,99961,'finished',NULL,'餐桌'),(99962,99961,'finished',99961,'石材餐桌'),"
+        + "(99963,99961,'finished',99962,'奢石餐桌'),(99964,99962,'finished',NULL,'他店分类')");
+    jdbc.update("INSERT INTO roles(id,name,code,client_code,tenant_id,store_id,status) VALUES "
+        + "(99961,'店长','rule-manager','admin',1,99961,'enabled'),"
+        + "(99962,'导购','rule-sales','admin',1,99961,'enabled'),"
+        + "(99963,'他店角色','rule-other','admin',1,99962,'enabled')");
+    identity(99961L);
+    configurations.create(99961L, new BigDecimal("3.00"));
+    assertThatThrownBy(() -> priceRules.save("price", null, null, null, new BigDecimal("2.00")))
+        .isInstanceOf(IllegalArgumentException.class);
+    var parent = priceRules.save("price", null, 99961L, null, new BigDecimal("2.50"));
+    var child = priceRules.save("price", null, 99962L, null, new BigDecimal("3.00"));
+    assertThat(priceRules.categories()).filteredOn(item -> item.id().equals(99963L)).singleElement()
+        .satisfies(item -> {
+          assertThat(item.effectiveCoefficient()).isEqualByComparingTo("3.00");
+          assertThat(item.sourceName()).isEqualTo("石材餐桌");
+        });
+    priceRules.status("price", child.id(), "disabled");
+    assertThat(priceRules.categories()).filteredOn(item -> item.id().equals(99963L)).singleElement()
+        .satisfies(item -> assertThat(item.effectiveCoefficient()).isEqualByComparingTo("2.50"));
+    priceRules.delete("price", parent.id());
+    assertThat(priceRules.categories()).filteredOn(item -> item.id().equals(99963L)).singleElement()
+        .satisfies(item -> {
+          assertThat(item.effectiveCoefficient()).isNull();
+          assertThat(item.sourceName()).isEqualTo("未配置");
+        });
+    priceRules.save("discount", null, null, 99961L, new BigDecimal("0.90"));
+    priceRules.save("discount", null, null, 99962L, new BigDecimal("0.10"));
+    assertThat(configurations.list()).singleElement()
+        .satisfies(item -> assertThat(item.priceCoefficient()).isEqualByComparingTo("3.00"));
+    assertThatThrownBy(() -> priceRules.save("price", null, null, null, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.save("price", null, 99964L, null, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.save("discount", null, null, 99963L, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.save("price", null, null, null, new BigDecimal("1.234")))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.save("discount", null, 99961L, 99961L, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    identity(99962L);
+    assertThat(priceRules.list("price")).isEmpty();
+    assertThatThrownBy(() -> priceRules.status("price", child.id(), "disabled"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.delete("price", child.id()))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @Transactional
+  void priceRuleApisRequireEachTabAndOperationPermission() throws Exception {
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES (99971,1,'定价权限店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO store_categories(id,store_id,scope,name) VALUES (99971,99971,'finished','定价分类')");
+    identityWithPermissions(99971L, "store.price-configuration.view");
+    mvc.perform(get("/api/admin/store-price-rules/price")).andExpect(status().isForbidden());
+    identityWithPermissions(99971L, "store.price-configuration.price.view");
+    mvc.perform(get("/api/admin/store-price-rules/price")).andExpect(status().isOk());
+    mvc.perform(get("/api/admin/store-price-rules/price/categories")).andExpect(status().isOk());
+    mvc.perform(get("/api/admin/store-price-rules/discount")).andExpect(status().isForbidden());
+    mvc.perform(get("/api/admin/store-price-rules/discount/roles")).andExpect(status().isForbidden());
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/admin/store-price-rules/price")
+        .contentType("application/json").content("{\"coefficient\":2}"))
+        .andExpect(status().isForbidden());
+    identityWithPermissions(99971L, "store.price-configuration.price.create");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/admin/store-price-rules/price")
+        .contentType("application/json").content("{\"categoryId\":99971,\"coefficient\":2}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.targetName").value("定价分类"));
+    Long id = priceRules.list("price").getFirst().id();
+    mvc.perform(delete("/api/admin/store-price-rules/price/" + id)).andExpect(status().isForbidden());
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/store-price-rules/price/" + id)
+        .contentType("application/json").content("{\"coefficient\":3}"))
+        .andExpect(status().isForbidden());
+    identityWithPermissions(99971L, "store.price-configuration.discount.view");
+    mvc.perform(get("/api/admin/store-price-rules/discount/roles")).andExpect(status().isOk());
+    mvc.perform(get("/api/admin/store-price-rules/price/categories")).andExpect(status().isForbidden());
   }
 
   private void upstreamIdentity(String clientCode) {

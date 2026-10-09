@@ -20,8 +20,10 @@ const permissions = [
   'store.finished-stock-management.recycle.batch-purge',
   'store.finished-stock-management.recycle.clear',
   'store.finished-stock-management.operation-log.view',
-  'store.price-configuration.view',
-  'store.price-configuration.create',
+  'store.price-configuration.price.view',
+  'store.price-configuration.price.create',
+  'store.price-configuration.discount.view',
+  'store.price-configuration.discount.create',
 ];
 
 async function storeLogin(page: Page) {
@@ -514,23 +516,26 @@ test('store submission race refreshes upstream overlay instead of an ordinary er
   await expect(page.getByText('上游商品不可用，只能查看或彻底删除', { exact: true })).toHaveCount(0);
 });
 
-test('store price configuration has roles and coefficients without tabs or guide settings', async ({ page }) => {
+test('store price configuration separates category prices from role discounts', async ({ page }) => {
   await storeLogin(page);
-  await page.route('**/api/admin/store-finished-price-configurations', (route) =>
+  await page.route('**/api/admin/store-price-rules/price', (route) => route.fulfill({ json: ok([]) }));
+  await page.route('**/api/admin/store-price-rules/price/categories', (route) => route.fulfill({ json: ok([]) }));
+  await page.route('**/api/admin/store-price-rules/discount', (route) =>
     route.fulfill({
       json: ok([
         {
           id: 1,
           roleId: 8,
-          roleName: '店长',
-          priceCoefficient: 0.8,
+          categoryId: null,
+          targetName: '店长',
+          coefficient: 0.8,
           status: 'enabled',
           createdAt: '2026-09-24T10:00:00',
         },
       ]),
     }),
   );
-  await page.route('**/api/admin/store-finished-price-configurations/roles', (route) =>
+  await page.route('**/api/admin/store-price-rules/discount/roles', (route) =>
     route.fulfill({
       json: ok([
         { id: 8, name: '店长', status: 'enabled' },
@@ -540,10 +545,11 @@ test('store price configuration has roles and coefficients without tabs or guide
   );
   await page.goto('/store/price-configuration');
   const main = page.getByRole('main');
+  await expect(main.locator('.t-tabs__nav-item')).toHaveText(['价格系数', '折扣系数']);
+  await main.locator('.t-tabs__nav-item').filter({ hasText: '折扣系数' }).click();
   await expect(main.getByText('店长', { exact: true })).toBeVisible();
   await expect(main.getByText('0.80', { exact: true })).toBeVisible();
-  await expect(main.getByText('最低可售价价格系数', { exact: true })).toBeVisible();
-  await expect(main.locator('.t-tabs')).toHaveCount(0);
+  await expect(main.locator('th').getByText('折扣系数', { exact: true })).toBeVisible();
   await expect(main.getByText('指导价设置')).toHaveCount(0);
   await main.getByRole('button', { name: '新增' }).click();
   await expect(page.locator('.t-dialog:visible').getByText('角色', { exact: true })).toBeVisible();
