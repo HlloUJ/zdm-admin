@@ -41,7 +41,9 @@
           >
             {{ attribute.value || '未填写' }}
           </t-descriptions-item>
-          <t-descriptions-item label="供应商" :span="3">{{ product.supplier || '未填写' }}</t-descriptions-item>
+          <t-descriptions-item v-if="!storeMode && !poolMode" label="供应商" :span="3">{{
+            product.supplier || '未填写'
+          }}</t-descriptions-item>
         </t-descriptions>
       </template>
       <t-descriptions v-else bordered :column="2">
@@ -55,18 +57,8 @@
         >
           {{ attribute.value || '未填写' }}
         </t-descriptions-item>
-        <t-descriptions-item label="供应商" :span="2">{{ product.supplier || '未填写' }}</t-descriptions-item>
-      </t-descriptions>
-      <t-descriptions v-if="storeMode" bordered :column="3">
-        <t-descriptions-item label="本店状态">{{ storeStatusLabel }}</t-descriptions-item>
-        <t-descriptions-item v-if="product.status === 'offShelf'" label="下架原因">{{
-          product.offShelfReason || '—'
-        }}</t-descriptions-item>
-        <t-descriptions-item v-if="product.status === 'offShelf'" label="下架时间">{{
-          product.offShelfAt?.replace('T', ' ').slice(0, 16) || '—'
-        }}</t-descriptions-item>
-        <t-descriptions-item v-if="product.status === 'offShelf'" label="详细说明" :span="3">{{
-          product.offShelfDetail || '—'
+        <t-descriptions-item v-if="!storeMode && !poolMode" label="供应商" :span="2">{{
+          product.supplier || '未填写'
         }}</t-descriptions-item>
       </t-descriptions>
     </AdminSectionCard>
@@ -89,7 +81,7 @@
               <div class="product-code">SKU ID：{{ row.skuId }}</div>
             </div>
           </template>
-          <template v-for="key in operations ? ['cost', 'guide'] : []" :key="key" #[key]="{ row }">
+          <template v-for="key in operations ? ['cost', 'guide', 'partner'] : []" :key="key" #[key]="{ row }">
             <span class="product-detail__price">{{ row[key] }}</span>
           </template>
           <template v-for="[id] in operations ? levels : []" :key="id" #[`price_${id}`]="{ row }">
@@ -133,7 +125,7 @@ interface DetailProduct {
   name: string;
   code: string;
   category: string;
-  supplier: string;
+  supplier?: string;
   stock: number;
   publisherType: string;
   status: string;
@@ -152,7 +144,8 @@ interface DetailProduct {
   attributes: FinishedProductAttributeEntry[];
   variants: FinishedProductVariant[];
   markupPrices?: FinishedProductPrice[];
-  guidePrices?: FinishedProductGuidePrice[];
+  guidePrices?: (Pick<FinishedProductGuidePrice, 'skuId' | 'price'> & Partial<FinishedProductGuidePrice>)[];
+  partnerPrices?: { skuId: number; price: number }[];
   specDimensions?: FinishedSpecDimension[];
 }
 const props = withDefaults(
@@ -161,7 +154,8 @@ const props = withDefaults(
     attributeNames: Record<string, string>;
     operations?: boolean;
     storeMode?: boolean;
-    storeStatusLabel?: string;
+    poolMode?: boolean;
+    storeLevelName?: string;
     showSales?: boolean;
     enabledLevelIds?: number[];
   }>(),
@@ -184,9 +178,7 @@ const descriptionMedia = computed(() => {
 function previewDescription(resource: { url?: string; mediaType: string }) {
   if (resource.url) emit('preview', { url: resource.url }, resource.mediaType === 'video' ? 'video' : 'image');
 }
-const sourceMessage = computed(
-  () => `${props.product.sourceMessage || '上游商品不可用'}，当前仅可查看资料或按权限彻底删除。`,
-);
+const sourceMessage = computed(() => props.product.sourceMessage || '上游商品不可用');
 const dimensions = computed(() => props.product.specDimensions ?? []);
 const layeredDimensions = computed(() =>
   props.operations && props.product.variants[0]?.displayMode === 'layered' ? dimensions.value : [],
@@ -214,15 +206,26 @@ const columns = computed<PrimaryTableCol[]>(() => {
     ...extraFields.value.map((key) => ({ colKey: key, title: props.attributeNames[key] || key, minWidth: 120 })),
   ];
   const priceColumns = [
-    { colKey: 'cost', title: props.storeMode ? '本店成本价' : '成本价', minWidth: 100 },
+    ...(props.poolMode
+      ? []
+      : [
+          {
+            colKey: 'cost',
+            title: props.storeMode ? (props.storeLevelName ? `${props.storeLevelName}价` : '—') : '成本价',
+            minWidth: 100,
+          },
+        ]),
     ...(props.operations
       ? [
           {
             colKey: 'guide',
-            title: props.storeMode ? '运营端指导价' : '指导价',
+            title: '指导价',
             minWidth: 130,
           },
         ]
+      : []),
+    ...(props.poolMode
+      ? [{ colKey: 'partner', title: props.storeLevelName ? `${props.storeLevelName}价` : '—', minWidth: 130 }]
       : []),
     ...(props.operations
       ? levels.value.map(([id, name]) => ({
@@ -269,7 +272,12 @@ const rows = computed(() => {
       cost: props.storeMode
         ? (variant.costPrice ?? '—')
         : (variant.costPrice ?? guide?.costPrice ?? prices[0]?.costPrice ?? '—'),
-      guide: guide ? (props.storeMode ? String(guide.price) : `${guide.priceCoefficient} / ${guide.price}`) : '—',
+      guide: guide
+        ? props.storeMode || props.poolMode
+          ? String(guide.price)
+          : `${guide.priceCoefficient} / ${guide.price}`
+        : '—',
+      partner: props.product.partnerPrices?.find((price) => price.skuId === variant.id)?.price ?? '—',
       ...Object.fromEntries(
         levels.value.map(([id]) => {
           const price = prices.find((item) => item.storeLevelId === id);

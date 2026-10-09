@@ -36,19 +36,52 @@ public class StoreFinishedProductService {
   public record ProductView(Long id, Long productId, String name, String merchantCode,
       String status, String effectiveStatus, boolean sourceUnavailable, String sourceMessage,
       Integer totalStock, String imageUrl, List<String> imageUrls, String videoUrl,
-      String detail, Long categoryId, String categoryName, Long supplierId, String supplierName,
+      String detail, Long categoryId, String categoryName,
       List<FinishedProductAttributeEntry> attributes, List<FinishedSpecDimension> specDimensions,
-      List<SkuPrice> skus, LocalDateTime createdAt, String offShelfReason,
-      String offShelfDetail, LocalDateTime offShelfAt) {
+      List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
+      String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
+      String storeLevelName) {
     public ProductView {
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
       specDimensions = specDimensions == null ? null : List.copyOf(specDimensions);
       skus = List.copyOf(skus);
+      attributeNames = Map.copyOf(attributeNames);
     }
+
+    public List<String> imageUrls() { return List.copyOf(imageUrls); }
+    public List<FinishedProductAttributeEntry> attributes() { return List.copyOf(attributes); }
+    public List<FinishedSpecDimension> specDimensions() {
+      return specDimensions == null ? null : List.copyOf(specDimensions);
+    }
+    public List<SkuPrice> skus() { return List.copyOf(skus); }
+    public Map<String, String> attributeNames() { return Map.copyOf(attributeNames); }
   }
   public record PoolProduct(Long id, String name, String merchantCode, Integer totalStock,
-      String imageUrl, Long categoryId, String supplierName) {}
+      String imageUrl, Long categoryId, BigDecimal guidePriceMin,
+      BigDecimal guidePriceMax, BigDecimal partnerPriceMin, BigDecimal partnerPriceMax,
+      String storeLevelName) {}
+  public record PoolSku(Long skuId, String label, Integer stock, BigDecimal guidePrice,
+      BigDecimal partnerPrice, String displayMode, Map<String, String> salesAttributes,
+      String material, String lengthValue, String color, String sizeValue) {
+    public PoolSku {
+      salesAttributes = salesAttributes == null ? null
+          : Collections.unmodifiableMap(new LinkedHashMap<>(salesAttributes));
+    }
+  }
+  public record PoolDetail(Long id, String name, String merchantCode, Integer totalStock,
+      String imageUrl, List<String> imageUrls, String videoUrl, String detail,
+      String categoryName, List<FinishedProductAttributeEntry> attributes,
+      List<FinishedSpecDimension> specDimensions, List<PoolSku> skus, Map<String, String> attributeNames,
+      String storeLevelName) {
+    public PoolDetail {
+      imageUrls = List.copyOf(imageUrls);
+      attributes = List.copyOf(attributes);
+      specDimensions = List.copyOf(specDimensions);
+      skus = List.copyOf(skus);
+      attributeNames = Map.copyOf(attributeNames);
+    }
+  }
   public record LogEntry(Long id, Long listingId, Long productId, String productName,
       String operationType, String operationSummary, String beforeStatus, String afterStatus,
       String changeDetails, String operatorName, LocalDateTime operatedAt) {}
@@ -59,35 +92,60 @@ public class StoreFinishedProductService {
   }
   public record EffectiveMinimumPrice(BigDecimal price, Long roleId) {}
 
+  private final FinishedInvalidationMedia invalidationMedia;
   private final JdbcTemplate jdbc;
   private final CityPartnerStoreScope scopes;
   private final FinishedProductService products;
   private final FinishedProductMapper productMapper;
   private final ObjectMapper json;
   private final StoreFinishedLogReader logReader;
+  private final StoreFinishedSelectionSnapshot selectionSnapshots;
 
   public StoreFinishedProductService(JdbcTemplate jdbc, CityPartnerStoreScope scopes,
-      FinishedProductService products, FinishedProductMapper productMapper, ObjectMapper json) {
+      FinishedProductService products, FinishedProductMapper productMapper, ObjectMapper json, StoreFinishedSelectionSnapshot selectionSnapshots, FinishedInvalidationMedia invalidationMedia) {
+    this.invalidationMedia = invalidationMedia;
     this.jdbc = jdbc;
     this.scopes = scopes;
     this.products = products;
     this.productMapper = productMapper;
     this.json = json;
-    this.logReader = new StoreFinishedLogReader(jdbc, scopes);
+    this.selectionSnapshots = selectionSnapshots;
+    this.logReader = new StoreFinishedLogReader(jdbc, scopes, selectionSnapshots);
+  }
+
+  public record PoolCategory(Long id, Long parentId, String name) {}
+
+  public List<PoolCategory> listCategories() {
+    scopes.require();
+    return jdbc.query("""
+        SELECT id, parent_id, name FROM product_categories
+        WHERE scope = 'finished' AND tenant_id IS NULL AND status = 'enabled'
+        ORDER BY sort_order, id
+        """, (row, index) -> new PoolCategory(row.getLong("id"),
+            row.getObject("parent_id", Long.class), row.getString("name")));
+  }
+
+  public List<PoolCategory> poolCategories() {
+    scopes.require();
+    return jdbc.query("""
+        SELECT id, parent_id, name FROM product_categories
+        WHERE scope = 'finished' AND tenant_id IS NULL
+        ORDER BY sort_order, id
+        """, (row, index) -> new PoolCategory(row.getLong("id"),
+            row.getObject("parent_id", Long.class), row.getString("name")));
   }
 
   public List<PoolProduct> pool() {
     var store = scopes.require();
     List<Map<String, Object>> rows = jdbc.queryForList("""
         SELECT product.id, product.name, product.sku, product.total_stock,
-          supplier.name AS supplier_name, product.category_id
+          product.category_id
         FROM finished_products product
-        LEFT JOIN suppliers supplier ON supplier.id = product.supplier_id
         WHERE product.status = 'selling' AND product.source_status IN ('selling', 'soldOut')
-          AND product.operations_deleted = FALSE AND product.total_stock > 0
+          AND product.operations_deleted = FALSE AND product.operations_invalidated_at IS NULL AND product.total_stock > 0
           AND NOT EXISTS (SELECT 1 FROM store_finished_products selected
             WHERE selected.store_id = ? AND selected.finished_product_id = product.id
-              AND selected.selection_generation = product.selection_generation)
+)
         ORDER BY product.created_at DESC, product.id DESC
         """, store.storeId());
     if (rows.isEmpty()) {
@@ -97,6 +155,8 @@ public class StoreFinishedProductService {
     Map<Long, FinishedProduct> details = products.withListDetails(
         productMapper.selectBatchIds(ids)).stream()
         .collect(java.util.stream.Collectors.toMap(FinishedProduct::getId, product -> product));
+    String storeLevelName = store.storeLevelId() == null ? null
+        : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
     return rows.stream().map(row -> {
       Long id = number(row.get("id"));
       FinishedProduct detailed = details.get(id);
@@ -105,16 +165,121 @@ public class StoreFinishedProductService {
       }
       return new PoolProduct(id, (String) row.get("name"), (String) row.get("sku"),
           ((Number) row.get("total_stock")).intValue(), detailed.getMainImageUrl(),
-          number(row.get("category_id")), (String) row.get("supplier_name"));
+          number(row.get("category_id")),
+          priceBound(detailed, sku -> guidePrice(detailed, sku.getId()), false),
+          priceBound(detailed, sku -> guidePrice(detailed, sku.getId()), true),
+          priceBound(detailed, sku -> partnerPrice(store, detailed, sku.getId()), false),
+          priceBound(detailed, sku -> partnerPrice(store, detailed, sku.getId()), true), storeLevelName);
     }).toList();
+  }
+
+  private BigDecimal priceBound(FinishedProduct product,
+      Function<FinishedProductVariant, BigDecimal> price, boolean maximum) {
+    var values = (product.getVariants() == null ? List.<FinishedProductVariant>of()
+        : product.getVariants()).stream().map(price).filter(Objects::nonNull);
+    return (maximum ? values.max(BigDecimal::compareTo) : values.min(BigDecimal::compareTo))
+        .orElse(null);
+  }
+
+  public PoolDetail poolDetail(Long id) {
+    var store = scopes.require();
+    Long available = jdbc.queryForObject("""
+        SELECT COUNT(*) FROM finished_products product
+        WHERE product.id = ? AND product.status = 'selling'
+          AND product.source_status IN ('selling', 'soldOut')
+          AND product.operations_deleted = FALSE AND product.operations_invalidated_at IS NULL AND product.total_stock > 0
+          AND NOT EXISTS (SELECT 1 FROM store_finished_products selected
+            WHERE selected.store_id = ? AND selected.finished_product_id = product.id
+)
+        """, Long.class, id, store.storeId());
+    if (available == null || available == 0) {
+      throw new IllegalArgumentException("商品不存在或不可挑选");
+    }
+    FinishedProduct product = publicProduct(id);
+    String categoryName = poolCategoryPath(product.getCategoryId());
+    List<PoolSku> skus = (product.getVariants() == null ? List.<FinishedProductVariant>of()
+        : product.getVariants()).stream().map(sku -> new PoolSku(sku.getId(),
+            sku.getVariantLabel(), sku.getStock(), guidePrice(product, sku.getId()),
+            partnerPrice(store, product, sku.getId()), sku.getDisplayMode(),
+            sku.getSalesAttributes(), sku.getMaterial(), sku.getLengthValue(),
+            sku.getColor(), sku.getSizeValue())).toList();
+    return new PoolDetail(id, product.getName(), product.getSku(), product.getTotalStock(),
+        product.getMainImageUrl(), product.getMainImageUrls() == null ? List.of()
+            : product.getMainImageUrls(), product.getVideoUrl(), product.getDetail(),
+        categoryName, product.getAttributes() == null ? List.of()
+            : product.getAttributes(), product.getSpecDimensions() == null ? List.of()
+            : product.getSpecDimensions(), skus, poolAttributeNames(skus),
+        store.storeLevelId() == null ? null
+            : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId()));
+  }
+
+  private String poolCategoryPath(Long categoryId) {
+    List<String> names = new ArrayList<>();
+    java.util.Set<Long> visited = new java.util.HashSet<>();
+    Long current = categoryId;
+    while (current != null && current != 0 && visited.add(current)) {
+      List<Map<String, Object>> rows = jdbc.queryForList("""
+          SELECT name, parent_id FROM product_categories
+          WHERE id = ? AND scope = 'finished' AND tenant_id IS NULL
+          """, current);
+      if (rows.isEmpty()) {
+        names.addFirst("历史上级类目已不可用");
+        break;
+      }
+      names.addFirst((String) rows.getFirst().get("name"));
+      current = number(rows.getFirst().get("parent_id"));
+    }
+    return names.isEmpty() ? null : String.join(" / ", names);
+  }
+
+  private Map<Long, String> categoryPaths() {
+    Map<Long, Map<String, Object>> categories = new LinkedHashMap<>();
+    jdbc.queryForList("SELECT id,name,parent_id FROM product_categories WHERE scope='finished' AND tenant_id IS NULL")
+        .forEach(row -> categories.put(number(row.get("id")), row));
+    Map<Long, String> paths = new LinkedHashMap<>();
+    for (Long id : categories.keySet()) {
+      List<String> names = new ArrayList<>();
+      java.util.Set<Long> visited = new java.util.HashSet<>();
+      Long current = id;
+      while (current != null && current != 0 && visited.add(current)) {
+        Map<String, Object> category = categories.get(current);
+        if (category == null) {
+          names.addFirst("历史上级类目已不可用");
+          break;
+        }
+        names.addFirst((String) category.get("name"));
+        current = number(category.get("parent_id"));
+      }
+      paths.put(id, String.join(" / ", names));
+    }
+    return paths;
+  }
+
+  private Map<String, String> poolAttributeNames(List<PoolSku> skus) {
+    return attributeNamesForKeys(skus.stream().filter(sku -> sku.salesAttributes() != null)
+        .flatMap(sku -> sku.salesAttributes().keySet().stream()).toList());
+  }
+
+  private Map<String, String> attributeNamesForKeys(List<String> keys) {
+    List<Long> ids = keys.stream()
+        .filter(key -> key.matches("attribute_[0-9]{1,18}"))
+        .map(key -> Long.valueOf(key.substring("attribute_".length()))).distinct().toList();
+    if (ids.isEmpty()) { return Map.of(); }
+    Map<String, String> names = new LinkedHashMap<>();
+    queryByIds("SELECT id, name FROM product_attributes WHERE scope IN ('shared', 'finished') AND id IN (", ids)
+        .forEach(row -> names.put("attribute_" + number(row.get("id")), (String) row.get("name")));
+    return names;
   }
 
   public List<ProductView> list() {
     var store = scopes.require();
     List<Map<String, Object>> listings = jdbc.queryForList("""
-        SELECT listing.* FROM store_finished_products listing
+        SELECT listing.*, (SELECT history.operator_name FROM store_finished_operation_logs history
+          WHERE history.listing_id = listing.id AND history.tenant_id = listing.tenant_id
+            AND history.store_id = listing.store_id AND history.operation_type = 'SELECT'
+          ORDER BY history.id LIMIT 1) AS created_by_name
+        FROM store_finished_products listing
         JOIN finished_products product ON product.id = listing.finished_product_id
-          AND product.selection_generation = listing.selection_generation
         WHERE listing.tenant_id = ? AND listing.store_id = ?
         ORDER BY listing.created_at DESC, listing.id DESC
         """, store.tenantId(), store.storeId());
@@ -158,24 +323,24 @@ public class StoreFinishedProductService {
       }
       Long exists = jdbc.queryForObject("""
           SELECT COUNT(*) FROM store_finished_products
-          WHERE store_id = ? AND finished_product_id = ? AND selection_generation = ?
-          """, Long.class, store.storeId(), productId, source.get("selection_generation"));
+          WHERE store_id = ? AND finished_product_id = ?
+          """, Long.class, store.storeId(), productId);
       if (exists != null && exists > 0) {
-        throw new IllegalArgumentException("该商品已在本门店成品现货中");
+        throw new IllegalArgumentException("本店已存在该商品，请先彻底删除旧记录后再重新选择");
       }
+      Map<String, Object> snapshot = selectionSnapshots.capture(poolDetail(productId), store.storeLevelId());
       jdbc.update("""
           INSERT INTO store_finished_products
-            (tenant_id, store_id, finished_product_id, selection_generation,
-             status, selected_by_account_id)
-          VALUES (?, ?, ?, ?, 'warehouse', ?)
-          """, store.tenantId(), store.storeId(), productId,
-          source.get("selection_generation"), store.accountId());
+            (tenant_id, store_id, finished_product_id, status, selected_by_account_id, selection_generation)
+          VALUES (?, ?, ?, 'warehouse', ?, ?)
+          """, store.tenantId(), store.storeId(), productId, store.accountId(), source.get("selection_generation"));
       Long listingId = jdbc.queryForObject("""
           SELECT id FROM store_finished_products
-          WHERE store_id = ? AND finished_product_id = ? AND selection_generation = ?
-          """, Long.class, store.storeId(), productId, source.get("selection_generation"));
-      log(store, listingId, productId, (String) source.get("name"), "SELECT", "从运营端已上架商品池挑选商品，放入本店仓库",
-          null, "warehouse", Map.of("商品ID", productId));
+          WHERE store_id = ? AND finished_product_id = ?
+          """, Long.class, store.storeId(), productId);
+      Long logId = log(store, listingId, productId, (String) source.get("name"), "SELECT", "从运营端已上架商品池挑选商品，放入本店仓库",
+          null, "warehouse", snapshot);
+      selectionSnapshots.retain(logId, snapshot);
       selected.add(detail(listingId));
     }
     return selected;
@@ -184,14 +349,15 @@ public class StoreFinishedProductService {
   @Transactional
   public ProductView changeStatus(Long id, String target, String reason, String detail) {
     var store = scopes.require();
-    Map<String, Object> listing = listing(store, id, true);
+    Map<String, Object> listing = listing(store, id, false);
     Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
+    listing = listing(store, id, true);
     String current = (String) listing.get("status");
     if ("purged".equals(target)) {
       return purge(store, listing, source);
     }
-    if (!isUsable(source)) {
-      throw new IllegalArgumentException("上游商品不可用，只能查看或彻底删除");
+    if (invalidated(listing) || !isUsable(source)) {
+      throw new IllegalArgumentException(sourceMessage(listing, source));
     }
     if ("selling".equals(current) && stock(source) == 0) {
       throw new IllegalArgumentException("统一库存已售完，不能改变商品状态");
@@ -255,8 +421,9 @@ public class StoreFinishedProductService {
   @Transactional
   public void purge(Long id) {
     var store = scopes.require();
-    Map<String, Object> listing = listing(store, id, true);
+    Map<String, Object> listing = listing(store, id, false);
     Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
+    listing = listing(store, id, true);
     purge(store, listing, source);
   }
 
@@ -271,7 +438,6 @@ public class StoreFinishedProductService {
     List<Long> ids = jdbc.queryForList("""
         SELECT listing.id FROM store_finished_products listing
         JOIN finished_products product ON product.id = listing.finished_product_id
-          AND product.selection_generation = listing.selection_generation
         WHERE listing.tenant_id = ? AND listing.store_id = ? AND listing.status = 'recycle'
         """, Long.class, store.tenantId(), store.storeId());
     purgeBatch(ids);
@@ -280,7 +446,7 @@ public class StoreFinishedProductService {
   private ProductView purge(CityPartnerStoreScope.Store store, Map<String, Object> listing,
       Map<String, Object> source) {
     String current = (String) listing.get("status");
-    if (!"recycle".equals(current) && isUsable(source)) {
+    if (!"recycle".equals(current) && !invalidated(listing) && isUsable(source)) {
       throw new IllegalArgumentException("只有回收站或上游不可用的商品可以彻底删除");
     }
     Long listingId = number(listing.get("id"));
@@ -297,8 +463,9 @@ public class StoreFinishedProductService {
   public ProductView saveRolePrice(Long id, Long skuId, Long roleId, BigDecimal price,
       boolean followConfiguration) {
     var store = scopes.require();
-    Map<String, Object> listing = listing(store, id, true);
+    Map<String, Object> listing = listing(store, id, false);
     Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
+    listing = listing(store, id, true);
     requirePriceEditable(listing, source);
     requireSku(source, skuId);
     Long configuration = jdbc.queryForObject("""
@@ -353,6 +520,43 @@ public class StoreFinishedProductService {
     return logReader.logDetail(id);
   }
 
+  // Internal upstream propagation only: ownership is loaded from each persisted listing.
+  void invalidateFromUpstream(Long productId, String reason) {
+    for (Map<String, Object> row : jdbc.queryForList("""
+        SELECT listing.*, store.store_level_id FROM store_finished_products listing
+        JOIN stores store ON store.id=listing.store_id AND store.tenant_id=listing.tenant_id
+        JOIN finished_products product ON product.id=listing.finished_product_id
+        WHERE listing.finished_product_id=? AND listing.selection_generation=product.selection_generation
+        """, productId)) {
+      if (invalidated(row)) {
+        jdbc.update("UPDATE store_finished_products SET invalidated_reason=? WHERE id=?", reason, row.get("id"));
+        continue;
+      }
+      var owner = new CityPartnerStoreScope.Store(number(row.get("tenant_id")), number(row.get("store_id")),
+          number(row.get("store_level_id")), null, null);
+      try {
+        var snapshot = json.valueToTree(view(owner, row));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) snapshot).put("sourceUnavailable", true)
+            .put("sourceMessage", reason);
+        invalidationMedia.capture((com.fasterxml.jackson.databind.node.ObjectNode) snapshot, productId,
+            "STORE_FINISHED_INVALIDATION", number(row.get("id")));
+        jdbc.update("UPDATE store_finished_products SET invalidated_reason=?,invalidated_at=NOW(),invalidated_snapshot=? WHERE id=? AND invalidated_at IS NULL",
+            reason, json.writeValueAsString(snapshot), row.get("id"));
+      } catch (JsonProcessingException error) { throw new IllegalStateException("门店失效快照保存失败", error); }
+    }
+  }
+
+  private ProductView frozenView(Map<String, Object> listing) {
+    if (!invalidated(listing) || listing.get("invalidated_snapshot") == null) { return null; }
+    try {
+      var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(listing.get("invalidated_snapshot").toString());
+      invalidationMedia.render(snapshot, true);
+      snapshot.put("sourceMessage", FinishedSourceMessage.normalize((String) listing.get("invalidated_reason")));
+      return json.treeToValue(snapshot, ProductView.class);
+    }
+    catch (JsonProcessingException error) { throw new IllegalStateException("门店失效快照读取失败", error); }
+  }
+
   private record RolePriceKey(Long listingId, Long skuId, Long roleId) {}
 
   private List<ProductView> listViews(CityPartnerStoreScope.Store store,
@@ -366,10 +570,13 @@ public class StoreFinishedProductService {
     Map<Long, Map<String, Object>> sourceById = new LinkedHashMap<>();
     queryByIds("SELECT * FROM finished_products WHERE id IN (", productIds)
         .forEach(source -> sourceById.put(number(source.get("id")), source));
-    Map<Long, String> supplierNames = namesById("suppliers", productById.values().stream()
-        .map(FinishedProduct::getSupplierId).filter(Objects::nonNull).distinct().toList());
-    Map<Long, String> categoryNames = namesById("product_categories", productById.values().stream()
-        .map(FinishedProduct::getCategoryId).filter(Objects::nonNull).distinct().toList());
+    Map<Long, String> categoryNames = categoryPaths();
+    Map<String, String> attributeNames = attributeNamesForKeys(productById.values().stream()
+        .filter(product -> product.getVariants() != null).flatMap(product -> product.getVariants().stream())
+        .filter(variant -> variant.getSalesAttributes() != null)
+        .flatMap(variant -> variant.getSalesAttributes().keySet().stream()).toList());
+    String storeLevelName = store.storeLevelId() == null ? null
+        : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
     List<Map<String, Object>> configurations = jdbc.queryForList("""
         SELECT config.role_id, role.name AS role_name, config.price_coefficient
         FROM store_finished_role_price_configurations config
@@ -384,6 +591,8 @@ public class StoreFinishedProductService {
             number(row.get("sku_id")), number(row.get("role_id"))),
             (BigDecimal) row.get("manual_price")));
     return listings.stream().map(listing -> {
+      ProductView frozen = frozenView(listing);
+      if (frozen != null) { return frozen; }
       Long productId = number(listing.get("finished_product_id"));
       FinishedProduct product = productById.get(productId);
       if (product == null) { throw new IllegalArgumentException("来源商品不存在"); }
@@ -391,8 +600,8 @@ public class StoreFinishedProductService {
       if (source == null) { throw new IllegalArgumentException("来源商品不存在"); }
       Long listingId = number(listing.get("id"));
       return renderView(listing, product, source,
-          supplierNames.get(product.getSupplierId()), categoryNames.get(product.getCategoryId()),
-          variant -> skuPriceFromBatch(store, product, variant, listingId,
+          product.getCategoryId() == null ? null : categoryNames.get(product.getCategoryId()),
+          attributeNames, storeLevelName, variant -> skuPriceFromBatch(store, product, variant, listingId,
               configurations, manualPrices));
     }).toList();
   }
@@ -411,47 +620,96 @@ public class StoreFinishedProductService {
   }
 
   private ProductView view(CityPartnerStoreScope.Store store, Map<String, Object> listing) {
+    ProductView frozen = frozenView(listing);
+    if (frozen != null) { return frozen; }
     Long productId = number(listing.get("finished_product_id"));
     FinishedProduct product = publicProduct(productId);
     Map<String, Object> source = source(productId, false);
-    String supplierName = jdbc.query("SELECT name FROM suppliers WHERE id = ?",
-        (row, index) -> row.getString("name"), product.getSupplierId()).stream().findFirst().orElse(null);
-    String categoryName = jdbc.query("SELECT name FROM product_categories WHERE id = ?",
-        (row, index) -> row.getString("name"), product.getCategoryId()).stream().findFirst().orElse(null);
-    return renderView(listing, product, source, supplierName, categoryName,
+    String categoryName = categoryPaths().get(product.getCategoryId());
+    Map<String, String> attributeNames = attributeNamesForKeys(product.getVariants() == null ? List.of()
+        : product.getVariants().stream().filter(variant -> variant.getSalesAttributes() != null)
+            .flatMap(variant -> variant.getSalesAttributes().keySet().stream()).toList());
+    String storeLevelName = store.storeLevelId() == null ? null
+        : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
+    return renderView(listing, product, source, categoryName, attributeNames, storeLevelName,
         variant -> skuPrice(store, listing, product, variant));
   }
 
   private ProductView renderView(Map<String, Object> listing, FinishedProduct product,
-      Map<String, Object> source, String supplierName, String categoryName,
-      Function<FinishedProductVariant, SkuPrice> priceForVariant) {
+      Map<String, Object> source, String categoryName, Map<String, String> attributeNames,
+      String storeLevelName, Function<FinishedProductVariant, SkuPrice> priceForVariant) {
     Long productId = number(listing.get("finished_product_id"));
-    boolean unavailable = !isUsable(source);
+    boolean unavailable = invalidated(listing) || !isUsable(source);
     String status = (String) listing.get("status");
-    String effective = "selling".equals(status) && stock(source) == 0 ? "soldOut" : status;
-    List<String> reasons = new ArrayList<>();
-    if (!List.of("selling", "soldOut").contains(product.getSourceStatus())) {
-      reasons.add(product.getSourceMessage());
-    }
-    if (Boolean.TRUE.equals(product.getOperationsDeleted())) {
-      reasons.add("该商品已被运营端彻底删除");
-    } else if ("recycle".equals(product.getStatus())) {
-      reasons.add("该商品已被运营端删除至回收站");
-    } else if ("offShelf".equals(product.getStatus())) {
-      reasons.add("该商品已被运营端下架");
-    } else if ("warehouse".equals(product.getStatus())) {
-      reasons.add("该商品当前未在运营端上架");
-    }
-    String reason = reasons.isEmpty() ? null : String.join("；", reasons);
+    String effective = !invalidated(listing) && "selling".equals(status) && stock(source) == 0 ? "soldOut" : status;
+    String reason = sourceMessage(listing, source);
     List<SkuPrice> prices = product.getVariants() == null ? List.of()
         : product.getVariants().stream().map(priceForVariant).toList();
-    return new ProductView(number(listing.get("id")), productId, product.getName(), product.getSku(),
+    ProductView rendered = new ProductView(number(listing.get("id")), productId, product.getName(), product.getSku(),
         status, effective, unavailable, reason, product.getTotalStock(), product.getMainImageUrl(),
         product.getMainImageUrls() == null ? List.of() : product.getMainImageUrls(), product.getVideoUrl(),
-        product.getDetail(), product.getCategoryId(), categoryName, product.getSupplierId(), supplierName,
+        product.getDetail(), product.getCategoryId(), categoryName,
         product.getAttributes() == null ? List.of() : product.getAttributes(), product.getSpecDimensions(),
-        prices, timestamp(listing.get("created_at")), (String) listing.get("off_shelf_reason"),
-        (String) listing.get("off_shelf_detail"), timestamp(listing.get("off_shelf_at")));
+        prices, (String) listing.get("created_by_name"), timestamp(listing.get("created_at")), (String) listing.get("off_shelf_reason"),
+        (String) listing.get("off_shelf_detail"), timestamp(listing.get("off_shelf_at")),
+        attributeNames.entrySet().stream().filter(entry -> prices.stream()
+            .anyMatch(sku -> sku.salesAttributes() != null && sku.salesAttributes().containsKey(entry.getKey())))
+            .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName);
+    return legacyHistoricalView(listing, rendered);
+  }
+
+  // Pre-migration invalid records have no invalidation-time snapshot. Use their genuine
+  // selection snapshot, explicitly labelled; never pretend current source prices are historical.
+  private ProductView legacyHistoricalView(Map<String, Object> listing, ProductView current) {
+    if (!invalidated(listing) || listing.get("invalidated_snapshot") != null) { return current; }
+    List<String> logs = jdbc.queryForList("""
+        SELECT change_details FROM store_finished_operation_logs
+        WHERE listing_id=? AND tenant_id=? AND store_id=? AND operation_type='SELECT'
+        ORDER BY id LIMIT 1
+        """, String.class, listing.get("id"), listing.get("tenant_id"), listing.get("store_id"));
+    try {
+      var result = (com.fasterxml.jackson.databind.node.ObjectNode) json.valueToTree(current);
+      if (logs.isEmpty() || logs.getFirst() == null) {
+        result.put("sourceMessage", current.sourceMessage() + "；缺少历史详情快照");
+        result.putArray("skus");
+        return json.treeToValue(result, ProductView.class);
+      }
+      var snapshot = json.readTree(selectionSnapshots.resolve(logs.getFirst()));
+      if (!snapshot.has("销售规格")) {
+        result.put("sourceMessage", current.sourceMessage() + "；缺少历史详情快照");
+        result.putArray("skus");
+        return json.treeToValue(result, ProductView.class);
+      }
+      Map<String, String> fields = Map.of("商品名称", "name", "商品分类", "categoryName",
+          "商品属性", "attributes", "规格维度", "specDimensions", "总库存", "totalStock",
+          "门店级别", "storeLevelName", "销售属性名称", "attributeNames");
+      fields.forEach((from, to) -> { if (snapshot.hasNonNull(from)) { result.set(to, snapshot.get(from)); } });
+      var skus = result.putArray("skus");
+      for (var archived : snapshot.path("销售规格")) {
+        var sku = skus.addObject();
+        sku.setAll((com.fasterxml.jackson.databind.node.ObjectNode) archived.deepCopy());
+        sku.set("label", sku.remove("variantLabel"));
+        sku.putArray("rolePrices");
+        for (var guide : snapshot.path("指导价")) {
+          if (guide.path("skuId").equals(archived.path("skuId"))) { sku.set("guidePrice", guide.path("price")); }
+        }
+        for (var tier : snapshot.path("层级价格")) {
+          if (tier.path("skuId").equals(archived.path("skuId"))) { sku.set("costPrice", tier.path("price")); }
+        }
+      }
+      var images = result.putArray("imageUrls");
+      result.putNull("imageUrl"); result.putNull("videoUrl");
+      for (var media : snapshot.path("媒体")) {
+        var url = media.path("resource").get("url");
+        if (url == null) { continue; }
+        if (media.path("field").asText().startsWith("mainImage")) { images.add(url); }
+        if (media.path("field").asText().equals("video")) { result.set("videoUrl", url); }
+      }
+      if (!images.isEmpty()) { result.set("imageUrl", images.get(0)); }
+      result.put("detail", snapshot.path("宝贝详情").asText(""));
+      result.put("sourceMessage", current.sourceMessage() + "；历史详情为首次选入快照");
+      return json.treeToValue(result, ProductView.class);
+    } catch (JsonProcessingException error) { throw new IllegalStateException("门店历史详情快照读取失败", error); }
   }
 
   private SkuPrice skuPrice(CityPartnerStoreScope.Store store, Map<String, Object> listing,
@@ -544,8 +802,30 @@ public class StoreFinishedProductService {
     }
   }
 
+  private String sourceMessage(Map<String, Object> listing, Map<String, Object> source) {
+    if (invalidated(listing)) {
+      return FinishedSourceMessage.normalize((String) listing.get("invalidated_reason"));
+    }
+    List<String> reasons = new ArrayList<>();
+    String supply = ProductLifecycleService.sourceBlockMessage((String) source.get("source_status"), (String) source.get("source_block_reason"));
+    if (supply != null) { reasons.add(supply); }
+    if (source.get("operations_invalidated_reason") != null) {
+      reasons.add(FinishedSourceMessage.normalize((String) source.get("operations_invalidated_reason")));
+    } else if (Boolean.TRUE.equals(source.get("operations_deleted"))) {
+      reasons.add("该商品已被运营管理平台彻底删除");
+    } else if ("recycle".equals(source.get("status"))) {
+      reasons.add("该商品已被运营管理平台删除至回收站");
+    } else if ("offShelf".equals(source.get("status"))) {
+      reasons.add("该商品已被运营管理平台下架");
+    } else if ("warehouse".equals(source.get("status"))) {
+      reasons.add("该商品当前未在运营管理平台上架");
+    }
+    return reasons.isEmpty() ? null : String.join("；", reasons.stream().distinct().toList());
+  }
+
   private void requirePriceEditable(Map<String, Object> listing, Map<String, Object> source) {
-    if (!isUsable(source) || !List.of("warehouse", "selling").contains(listing.get("status"))
+    if (invalidated(listing) || !isUsable(source)) { throw new IllegalArgumentException(sourceMessage(listing, source)); }
+    if (!List.of("warehouse", "selling").contains(listing.get("status"))
         || "selling".equals(listing.get("status")) && stock(source) == 0) {
       throw new IllegalArgumentException("当前商品只能查看价格，不能修改");
     }
@@ -583,9 +863,12 @@ public class StoreFinishedProductService {
 
   private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
     List<Map<String, Object>> rows = jdbc.queryForList("""
-        SELECT listing.* FROM store_finished_products listing
+        SELECT listing.*, (SELECT history.operator_name FROM store_finished_operation_logs history
+          WHERE history.listing_id = listing.id AND history.tenant_id = listing.tenant_id
+            AND history.store_id = listing.store_id AND history.operation_type = 'SELECT'
+          ORDER BY history.id LIMIT 1) AS created_by_name
+        FROM store_finished_products listing
         JOIN finished_products product ON product.id = listing.finished_product_id
-          AND product.selection_generation = listing.selection_generation
         WHERE listing.id = ? AND listing.tenant_id = ? AND listing.store_id = ?
         """ + (lock ? " FOR UPDATE" : ""), id, store.tenantId(), store.storeId());
     if (rows.isEmpty()) { throw new IllegalArgumentException("本门店商品不存在或不可访问"); }
@@ -599,16 +882,20 @@ public class StoreFinishedProductService {
     return rows.getFirst();
   }
 
+  private static boolean invalidated(Map<String, Object> listing) {
+    return listing.get("invalidated_at") != null;
+  }
+
   private static boolean isSelectable(Map<String, Object> source) {
     return "selling".equals(source.get("status"))
         && List.of("selling", "soldOut").contains(source.get("source_status"))
-        && !flag(source.get("operations_deleted")) && stock(source) > 0;
+        && source.get("operations_invalidated_at") == null && !flag(source.get("operations_deleted")) && stock(source) > 0;
   }
 
   private static boolean isUsable(Map<String, Object> source) {
     return List.of("selling", "soldOut").contains(source.get("status"))
         && List.of("selling", "soldOut").contains(source.get("source_status"))
-        && !flag(source.get("operations_deleted"));
+        && source.get("operations_invalidated_at") == null && !flag(source.get("operations_deleted"));
   }
 
   private static boolean flag(Object value) {
@@ -625,6 +912,7 @@ public class StoreFinishedProductService {
   }
 
   private static LocalDateTime timestamp(Object value) {
+    if (value instanceof LocalDateTime time) { return time; }
     return value instanceof Timestamp time ? time.toLocalDateTime() : null;
   }
 
@@ -634,7 +922,7 @@ public class StoreFinishedProductService {
     }
   }
 
-  private void log(CityPartnerStoreScope.Store store, Long listingId, Long productId,
+  private Long log(CityPartnerStoreScope.Store store, Long listingId, Long productId,
       String name, String type, String summary, String before, String after,
       Map<String, Object> changes) {
     String serialized;
@@ -651,5 +939,6 @@ public class StoreFinishedProductService {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, store.tenantId(), store.storeId(), listingId, productId, name, type, summary,
         before, after, serialized, store.accountId(), store.operatorName());
+    return jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
   }
 }

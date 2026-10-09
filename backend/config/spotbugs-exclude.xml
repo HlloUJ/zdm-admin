@@ -17,7 +17,11 @@
   </Match>
   <!-- Spring owns this injected JdbcTemplate, as with other inventory services. -->
   <Match>
-    <Class name="com.zdm.platform.inventory.CityPartnerStoreScope"/>
+    <Or>
+      <Class name="com.zdm.platform.inventory.CityPartnerStoreScope"/>
+      <Class name="com.zdm.platform.inventory.FinishedInvalidationMedia"/>
+      <Class name="com.zdm.platform.inventory.StoreFinishedSelectionSnapshot"/>
+    </Or>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
 </FindBugsFilter>

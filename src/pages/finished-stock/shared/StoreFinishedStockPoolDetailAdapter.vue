@@ -2,10 +2,9 @@
   <ProductDetail
     :product="detail"
     :attribute-names="attributeNames"
-    :enabled-level-ids="roleIds"
     :store-level-name="product.storeLevelName || undefined"
     operations
-    store-mode
+    pool-mode
     @preview="(media, type) => (preview = { url: media.url, kind: type })"
   />
   <AdminDialog
@@ -34,10 +33,9 @@
 import { computed, ref } from 'vue';
 import { AdminDialog } from '@/components/foundation';
 import ProductDetail from '../management/components/ProductDetail.vue';
-import type { StoreFinishedProduct } from '@/services/storeFinishedStock';
-import type { FinishedProductPrice, FinishedProductGuidePrice } from '@/services/finishedProducts';
+import type { StorePoolDetail } from '@/services/storeFinishedStock';
 
-const props = defineProps<{ product: StoreFinishedProduct }>();
+const props = defineProps<{ product: StorePoolDetail }>();
 const preview = ref<{ url: string; kind: 'image' | 'video' } | null>(null);
 const attributeNames = computed(() => ({
   ...Object.fromEntries([
@@ -46,22 +44,14 @@ const attributeNames = computed(() => ({
   ]),
   ...props.product.attributeNames,
 }));
-const roleIds = computed(() => [
-  ...new Set(props.product.skus.flatMap((sku) => sku.rolePrices.map((role) => role.roleId))),
-]);
 const detail = computed(() => ({
-  id: props.product.productId,
+  id: props.product.id,
   name: props.product.name,
   code: props.product.merchantCode,
   category: props.product.categoryName || '',
   stock: props.product.totalStock,
   publisherType: '',
-  status: props.product.effectiveStatus,
-  offShelfReason: props.product.offShelfReason,
-  offShelfAt: props.product.offShelfAt,
-  offShelfDetail: props.product.offShelfDetail,
-  sourceUnavailable: props.product.sourceUnavailable,
-  sourceMessage: props.product.sourceMessage,
+  status: 'selling',
   createdByName: '',
   image: props.product.imageUrl || '',
   mainImageUrls: props.product.imageUrls,
@@ -74,41 +64,17 @@ const detail = computed(() => ({
     variantLabel: sku.label,
     displayMode: sku.displayMode || 'single',
     salesAttributes: sku.salesAttributes,
-    material: sku.material,
-    lengthValue: sku.lengthValue,
-    color: sku.color,
-    sizeValue: sku.sizeValue,
+    material: sku.material ?? sku.salesAttributes?.material,
+    lengthValue: sku.lengthValue ?? sku.salesAttributes?.length,
+    color: sku.color ?? sku.salesAttributes?.color,
+    sizeValue: sku.sizeValue ?? sku.salesAttributes?.size,
     stock: sku.stock,
-    costPrice: sku.costPrice ?? undefined,
   })),
-  guidePrices: props.product.skus.flatMap((sku): FinishedProductGuidePrice[] =>
-    sku.guidePrice == null
-      ? []
-      : [
-          {
-            skuId: sku.skuId,
-            price: sku.guidePrice,
-            priceCoefficient: 0,
-            costPrice: sku.costPrice ?? 0,
-          },
-        ],
+  guidePrices: props.product.skus.flatMap((sku) =>
+    sku.guidePrice == null ? [] : [{ skuId: sku.skuId, price: sku.guidePrice }],
   ),
-  markupPrices: props.product.skus.flatMap((sku): FinishedProductPrice[] =>
-    sku.rolePrices.flatMap((role) =>
-      role.price == null
-        ? []
-        : [
-            {
-              skuId: sku.skuId,
-              storeLevelId: role.roleId,
-              storeLevelName: role.roleName,
-              priceCoefficient: role.coefficient,
-              costPrice: sku.costPrice ?? 0,
-              price: role.price,
-              priceSource: role.priceSource,
-            },
-          ],
-    ),
+  partnerPrices: props.product.skus.flatMap((sku) =>
+    sku.partnerPrice == null ? [] : [{ skuId: sku.skuId, price: sku.partnerPrice }],
   ),
 }));
 </script>

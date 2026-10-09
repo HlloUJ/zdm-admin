@@ -46,11 +46,32 @@ public class StoreFinishedProductController {
     this.guard = guard;
   }
 
+  @GetMapping("/categories")
+  public ApiResponse<List<StoreFinishedProductService.PoolCategory>> categories() {
+    guard.requireView(PREFIX);
+    guard.requireDataPermission();
+    return ApiResponse.ok(service.listCategories());
+  }
+
+  @GetMapping("/pool-categories")
+  public ApiResponse<List<StoreFinishedProductService.PoolCategory>> poolCategories() {
+    guard.requirePermission(PREFIX + ".warehouse.select");
+    guard.requireDataPermission();
+    return ApiResponse.ok(service.poolCategories());
+  }
+
   @GetMapping("/pool")
   public ApiResponse<List<StoreFinishedProductService.PoolProduct>> pool() {
     guard.requirePermission(PREFIX + ".warehouse.select");
     guard.requireDataPermission();
     return ApiResponse.ok(service.pool());
+  }
+
+  @GetMapping("/pool/{id}")
+  public ApiResponse<StoreFinishedProductService.PoolDetail> poolDetail(@PathVariable Long id) {
+    guard.requirePermission(PREFIX + ".warehouse.select");
+    guard.requireDataPermission();
+    return ApiResponse.ok(service.poolDetail(id));
   }
 
   @PostMapping("/select")
@@ -76,8 +97,10 @@ public class StoreFinishedProductController {
     var product = service.detail(id);
     String scope = scope(product.effectiveStatus());
     guard.requirePermission(PREFIX + "." + scope + ".view");
-    guard.requirePermission(PREFIX + "." + scope + "."
-        + (List.of("warehouse", "selling").contains(scope) ? "edit" : "detail"));
+    if (!product.sourceUnavailable()) {
+      guard.requirePermission(PREFIX + "." + scope + "."
+          + (List.of("warehouse", "selling").contains(scope) ? "edit" : "detail"));
+    }
     return ApiResponse.ok(product);
   }
 
@@ -130,8 +153,9 @@ public class StoreFinishedProductController {
     guard.requireDataPermission();
     requireUniqueBatchIds(request.productIds());
     request.productIds().forEach(id -> {
-      if (!"recycle".equals(service.detail(id).status())) {
-        throw new IllegalArgumentException("只能批量彻底删除回收站商品");
+      var product = service.detail(id);
+      if (!"recycle".equals(product.status()) && !product.sourceUnavailable()) {
+        throw new IllegalArgumentException("只能批量彻底删除回收站或来源失效商品");
       }
     });
     service.purgeBatch(request.productIds());
