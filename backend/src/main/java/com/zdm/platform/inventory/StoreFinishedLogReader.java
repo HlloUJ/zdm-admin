@@ -11,10 +11,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 final class StoreFinishedLogReader {
   private final JdbcTemplate jdbc;
   private final CityPartnerStoreScope scopes;
+  private final StoreFinishedSelectionSnapshot snapshots;
 
-  StoreFinishedLogReader(JdbcTemplate jdbc, CityPartnerStoreScope scopes) {
+  StoreFinishedLogReader(JdbcTemplate jdbc, CityPartnerStoreScope scopes, StoreFinishedSelectionSnapshot snapshots) {
     this.jdbc = jdbc;
     this.scopes = scopes;
+    this.snapshots = snapshots;
   }
 
   public List<LogEntry> logs() {
@@ -29,7 +31,7 @@ final class StoreFinishedLogReader {
         row.getObject("listing_id", Long.class), row.getLong("finished_product_id"),
         row.getString("product_name"), row.getString("operation_type"),
         row.getString("operation_summary"), row.getString("before_status"),
-        row.getString("after_status"), row.getString("change_details"),
+        row.getString("after_status"), snapshots.withoutSupplier(row.getString("change_details")),
         row.getString("operator_name"), row.getTimestamp("operated_at").toLocalDateTime()),
         store.tenantId(), store.storeId());
   }
@@ -87,7 +89,7 @@ final class StoreFinishedLogReader {
 
   public LogEntry logDetail(Long id) {
     var store = scopes.require();
-    return jdbc.query("""
+    LogEntry log = jdbc.query("""
         SELECT id, listing_id, finished_product_id, product_name, operation_type,
           operation_summary, before_status, after_status, change_details,
           operator_name, operated_at
@@ -95,9 +97,13 @@ final class StoreFinishedLogReader {
         """, (row, index) -> logEntry(row), id, store.tenantId(), store.storeId())
         .stream().findFirst()
         .orElseThrow(() -> new IllegalArgumentException("本门店操作日志不存在"));
+    if (!"SELECT".equals(log.operationType())) { return log; }
+    return new LogEntry(log.id(), log.listingId(), log.productId(), log.productName(),
+        log.operationType(), log.operationSummary(), log.beforeStatus(), log.afterStatus(),
+        snapshots.resolve(log.changeDetails()), log.operatorName(), log.operatedAt());
   }
 
-  private static LogEntry logEntry(ResultSet row) throws SQLException {
+  private LogEntry logEntry(ResultSet row) throws SQLException {
     String operationType = row.getString("operation_type");
     boolean legacyPriceEdit = "PRICE_UPDATE".equals(operationType);
     return new LogEntry(row.getLong("id"), row.getObject("listing_id", Long.class),
@@ -105,7 +111,7 @@ final class StoreFinishedLogReader {
         legacyPriceEdit ? "UPDATE" : operationType,
         legacyPriceEdit ? "编辑商品" : row.getString("operation_summary"),
         row.getString("before_status"), row.getString("after_status"),
-        row.getString("change_details"), row.getString("operator_name"),
+        snapshots.withoutSupplier(row.getString("change_details")), row.getString("operator_name"),
         row.getTimestamp("operated_at").toLocalDateTime());
   }
 

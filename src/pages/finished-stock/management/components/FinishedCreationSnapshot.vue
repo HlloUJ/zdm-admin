@@ -61,14 +61,16 @@
           :label="attribute.attributeName"
           >{{ text(attribute.value) }}</t-descriptions-item
         >
-        <t-descriptions-item label="供应商" :span="3">{{ text(snapshot['供应商']) }}</t-descriptions-item>
+        <t-descriptions-item v-if="!storeMode" label="供应商" :span="3">{{
+          text(snapshot['供应商'])
+        }}</t-descriptions-item>
       </t-descriptions>
     </AdminSectionCard>
     <AdminSectionCard>
       <h3 class="creation-section-title creation-sales-title">销售信息</h3>
       <SalesLogFullscreen>
         <h4>销售规格</h4>
-        <FinishedSalesLogTable :snapshot="snapshot" :other="{}" />
+        <FinishedSalesLogTable :snapshot="snapshot" :other="{}" :store-mode="storeMode" />
       </SalesLogFullscreen>
       <t-descriptions bordered :column="3" class="creation-sales-summary">
         <t-descriptions-item label="总库存" :span="isSupplyChain ? 1 : 3">{{
@@ -110,6 +112,7 @@ const props = defineProps<{
   media: Media[];
   richText: string;
   categoryHint?: string;
+  storeMode?: boolean;
 }>();
 const isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');
 const emit = defineEmits<{ preview: [resource: Resource] }>();

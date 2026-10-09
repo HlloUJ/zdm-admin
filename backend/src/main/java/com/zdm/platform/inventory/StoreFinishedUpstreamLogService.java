@@ -4,18 +4,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Map;
+import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /** Records one store-owned audit event per selected listing affected by an upstream change. */
 @Service
 public class StoreFinishedUpstreamLogService {
+  private final org.springframework.beans.factory.ObjectProvider<StoreFinishedProductService> storeProducts;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final CurrentIdentityProvider identities;
 
   public StoreFinishedUpstreamLogService(JdbcTemplate jdbc, ObjectMapper json,
-      CurrentIdentityProvider identities) {
+      CurrentIdentityProvider identities, org.springframework.beans.factory.ObjectProvider<StoreFinishedProductService> storeProducts) {
+    this.storeProducts = storeProducts;
     this.jdbc = jdbc;
     this.json = json;
     this.identities = identities;
@@ -65,6 +68,11 @@ public class StoreFinishedUpstreamLogService {
     } catch (JsonProcessingException error) {
       throw new IllegalStateException("门店上游操作日志序列化失败", error);
     }
+    if (List.of("SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_PURGE",
+        "OPERATIONS_OFF_SHELF", "OPERATIONS_DELETE_TO_RECYCLE", "OPERATIONS_PURGE").contains(type)) {
+      storeProducts.getObject().invalidateFromUpstream(productId, FinishedSourceMessage.normalize(summary));
+    }
+    summary = FinishedSourceMessage.normalize(summary);
     var actor = identities.require();
     jdbc.update("""
         INSERT INTO store_finished_operation_logs
@@ -76,7 +84,7 @@ public class StoreFinishedUpstreamLogService {
         FROM store_finished_products listing
         JOIN finished_products product ON product.id = listing.finished_product_id
         WHERE listing.finished_product_id = ?
-          AND listing.selection_generation = product.selection_generation
+
         """, type, summary, changes, actor.accountId(), actor.displayName(), productId);
   }
 }

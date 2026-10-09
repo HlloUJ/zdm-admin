@@ -674,7 +674,9 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     sourceStatus(id,"warehouse");
     assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
     sourceStatus(id,"selling");
-    assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isFalse();
+    assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
+    fullIdentity("admin");
+    mvc.perform(put("/api/admin/finished-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(ops))).andExpect(status().isBadRequest());
     assertThat(operationRecord(id).path("status").asText()).isEqualTo("selling");
     sourceStatus(id,"offShelf");fullIdentity("admin");
     data(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/finished-products/{id}",id)));
