@@ -62,6 +62,7 @@ export interface SlabItem {
   sourceUnavailable?: boolean;
   sourceStatus?: string;
   sourceMessage?: string;
+  operationsSnapshotMissing?: boolean;
   stock?: number;
   sourceOffShelfRecords?: SlabOffShelfRecord[];
   id: number;

@@ -74,6 +74,7 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
         LEFT JOIN slab_prices price
           ON price.slab_id = inventory.id AND price.store_level_id = configuration.store_level_id
         WHERE inventory.cost_price IS NOT NULL AND price.id IS NULL
+          AND inventory.operations_invalidated_at IS NULL
           AND (level.status = 'enabled'
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND configuration.status = 'enabled'
@@ -99,6 +100,7 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
           AND (level.status = 'enabled'
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND inventory.cost_price IS NOT NULL
+          AND inventory.operations_invalidated_at IS NULL
         """,
         configuration.getPriceCoefficient(),
         configuration.getPriceCoefficient(),

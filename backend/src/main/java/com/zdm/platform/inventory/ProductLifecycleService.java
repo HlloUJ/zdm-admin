@@ -30,6 +30,8 @@ public class ProductLifecycleService {
   }
   private final org.springframework.beans.factory.ObjectProvider<FinishedProductService> finishedProducts;
   private final FinishedInvalidationMedia invalidationMedia;
+  private final org.springframework.beans.factory.ObjectProvider<SlabInventoryService> slabProducts;
+  private final SlabInvalidationSnapshotService slabSnapshots;
   private final FinishedProductArrivalLogService arrivalLogs;
   private final SlabOperationLogService slabLogs;
   private final StoreFinishedUpstreamLogService storeUpstreamLogs;
@@ -37,7 +39,8 @@ public class ProductLifecycleService {
   private final CurrentIdentityProvider identities;
   private final ObjectMapper json;
   private final org.mybatis.spring.SqlSessionTemplate sqlSession;
-  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs, SlabOperationLogService slabLogs, StoreFinishedUpstreamLogService storeUpstreamLogs, org.springframework.beans.factory.ObjectProvider<FinishedProductService> finishedProducts, FinishedInvalidationMedia invalidationMedia) {
+  public ProductLifecycleService(JdbcTemplate jdbc, CurrentIdentityProvider identities, ObjectMapper json, org.mybatis.spring.SqlSessionTemplate sqlSession, FinishedProductArrivalLogService arrivalLogs, SlabOperationLogService slabLogs, StoreFinishedUpstreamLogService storeUpstreamLogs, org.springframework.beans.factory.ObjectProvider<FinishedProductService> finishedProducts, FinishedInvalidationMedia invalidationMedia, org.springframework.beans.factory.ObjectProvider<SlabInventoryService> slabProducts, SlabInvalidationSnapshotService slabSnapshots) {
+    this.slabProducts = slabProducts; this.slabSnapshots = slabSnapshots;
     this.invalidationMedia = invalidationMedia;
     this.finishedProducts = finishedProducts;
     this.slabLogs=slabLogs;
@@ -74,6 +77,10 @@ public class ProductLifecycleService {
   public void requireFinishedOperational(FinishedProduct product) {
     if (product.isSourceUnavailable()) { throw new IllegalArgumentException(product.getSourceMessage()); }
     requireOperational(product.getSourceStatus(), product.getOperationsDeleted());
+  }
+  public void requireSlabOperational(SlabInventory item) {
+    if (item.isSourceUnavailable()) { throw new IllegalArgumentException(item.getSourceMessage()); }
+    requireOperational(item.getSourceStatus(), item.getOperationsDeleted());
   }
   public Map<String,Object> lock(Kind kind, Long id) {
     var rows=jdbc.queryForList("SELECT * FROM "+kind.table+" WHERE id=? FOR UPDATE", id);
@@ -156,6 +163,15 @@ public class ProductLifecycleService {
         jdbc.update("UPDATE finished_products SET operations_invalidated_reason=? WHERE id=?", invalidReason, id);
       }
     }
+    if (kind == Kind.SLAB && !deleted(row) && List.of("offShelf", "recycle", "purged").contains(target)) {
+      String invalidReason = sourceBlockMessage(target, null);
+      if (row.get("operations_invalidated_at") == null) {
+        String snapshot = slabSnapshots.capture(slabProducts.getObject().visibleDetail(id));
+        jdbc.update("UPDATE slab_inventory SET operations_invalidated_reason=?,operations_invalidated_at=NOW(),operations_invalidated_snapshot=? WHERE id=?", invalidReason, snapshot, id);
+      } else {
+        jdbc.update("UPDATE slab_inventory SET operations_invalidated_reason=? WHERE id=?", invalidReason, id);
+      }
+    }
     String blockReason = switch (target) {
       case "offShelf" -> "OFF_SHELF";
       case "recycle" -> "DELETE_TO_RECYCLE";
@@ -178,6 +194,9 @@ public class ProductLifecycleService {
       if (kind == Kind.FINISHED) {
         jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
       }
+      if (kind == Kind.SLAB) {
+        jdbc.update("UPDATE slab_inventory SET operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
+      }
       reprice(kind,id,false);
     }
     String type=switch(target) { case "selling" -> "SHELF"; case "offShelf" -> "OFF_SHELF"; case "warehouse" -> kind == Kind.FINISHED ? "RESTORE" : "RESTORE_WAREHOUSE"; case "purged" -> "PURGE"; default -> "DELETE_TO_RECYCLE"; };
@@ -188,8 +207,8 @@ public class ProductLifecycleService {
     if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,target,sourceChanges); }
     if (kind == Kind.FINISHED) { storeUpstreamLogs.sourceChange(id, source, target); }
 
-    // Restoring the source does not change an existing finished operations record.
-    boolean affectsOperations = kind != Kind.FINISHED || recreate || List.of("offShelf", "recycle", "purged").contains(target);
+    // Restoring the source does not revive an existing downstream operations record.
+    boolean affectsOperations = recreate || List.of("offShelf", "recycle", "purged").contains(target);
     if ((!deleted(row) || recreate) && affectsOperations) {
       String result=kind!=Kind.FINISHED ? null : publish ? "来源已上架，商品进入运营仓库并计算价格" :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
@@ -240,10 +259,17 @@ public class ProductLifecycleService {
     if (isSupplyChain()) { throw new AccessDeniedException("此操作属于运营管理平台"); }
     var row=lock(kind,id);
     if (deleted(row)) { throw new IllegalArgumentException("运营商品已被彻底删除"); }
-    if (!"recycle".equals(row.get("status")) && !unavailable((String)row.get("source_status")) && !(kind == Kind.FINISHED && row.get("operations_invalidated_at") != null)) {
+    if (!"recycle".equals(row.get("status")) && !unavailable((String)row.get("source_status")) && row.get("operations_invalidated_at") == null) {
       throw new IllegalArgumentException("只有回收站或来源已删除的商品可以彻底删除");
     }
-    record(kind,row,"admin","PURGE",kind==Kind.FINISHED ? "彻底删除运营商品" : null,(String)row.get("status"),"purged",Map.of());
+    Map<String,Object> purgeLogRow = row;
+    if (kind == Kind.SLAB && row.get("operations_invalidated_snapshot") != null) {
+      SlabInventory frozen = slabProducts.getObject().visibleDetail(id);
+      purgeLogRow = new LinkedHashMap<>(row);
+      purgeLogRow.put("name", frozen.getName());
+      purgeLogRow.put("serial_no", frozen.getSerialNo());
+    }
+    record(kind,purgeLogRow,"admin","PURGE",kind==Kind.FINISHED ? "彻底删除运营商品" : null,(String)row.get("status"),"purged",Map.of());
     if (kind == Kind.FINISHED) {
       storeUpstreamLogs.operationsChange(id, "PURGE", (String) row.get("status"), "purged");
     }
@@ -251,11 +277,18 @@ public class ProductLifecycleService {
     jdbc.update("DELETE FROM "+kind.prices+" WHERE "+kind.priceKey+"=?",id);
     if (kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
     else { jdbc.update("UPDATE slab_inventory SET guide_price_coefficient=NULL WHERE id=?",id); }
-    if (kind == Kind.FINISHED && row.get("operations_invalidated_at") != null && !unavailable((String) row.get("source_status"))) {
-      jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL,off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?", id);
+    if (kind == Kind.SLAB) { slabSnapshots.release(id); }
+    if (row.get("operations_invalidated_at") != null && !unavailable((String) row.get("source_status"))) {
+      if (kind == Kind.FINISHED) {
+        jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL,off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?", id);
+      } else {
+        jdbc.update("UPDATE slab_inventory SET operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
+        jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'", id);
+      }
       reprice(kind, id, false);
       sqlSession.clearCache();
-      arrivalLogs.record(id, (String) row.get("source_status"));
+      if (kind == Kind.FINISHED) { arrivalLogs.record(id, (String) row.get("source_status")); }
+      else { record(kind, row, "admin", "SOURCE_SHELF", null, null, "warehouse", slabLogs.arrivalSnapshot(id)); }
     }
     sqlSession.clearCache();
     return "purged".equals(row.get("source_status"));
@@ -271,7 +304,7 @@ public class ProductLifecycleService {
   @Transactional
   public void reprice(Kind kind, Long id, boolean logImpact) {
     var row=lock(kind,id);
-    if(deleted(row)) { return; }
+    if(deleted(row) || kind == Kind.SLAB && row.get("operations_invalidated_at") != null) { return; }
     var before=priceSnapshot(kind,id);
     var guideRows=jdbc.queryForList("SELECT price_coefficient FROM "+kind.config+"_guide_price_settings WHERE id=1");
     BigDecimal guide=guideRows.isEmpty() ? null : (BigDecimal)guideRows.getFirst().get("price_coefficient");
