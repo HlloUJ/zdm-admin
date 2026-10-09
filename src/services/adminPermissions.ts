@@ -36,7 +36,7 @@ export const adminMenuEntries: AdminMenuEntry[] = [
   {
     label: '价格配置',
     path: '/store/price-configuration',
-    icon: 'money-circle',
+    icon: 'money',
     permissionPrefix: 'store.price-configuration',
   },
   {

@@ -21,7 +21,7 @@
                     <t-button theme="primary" @click="page = 1"
                       ><template #icon><t-icon name="search" /></template>查询</t-button
                     >
-                    <t-button variant="base" @click="reset"
+                    <t-button theme="default" variant="base" @click="reset"
                       ><template #icon><t-icon name="refresh" /></template>重置</t-button
                     >
                   </div>
@@ -37,13 +37,13 @@
           <template #table>
             <t-table row-key="id" :data="visibleRows" :columns="columns" :loading="loading" hover table-layout="fixed">
               <template #index="{ rowIndex }">{{ (page - 1) * pageSize + rowIndex + 1 }}</template>
-              <template #priceCoefficient="{ row }">{{ Number(row.priceCoefficient).toFixed(4) }}</template>
+              <template #priceCoefficient="{ row }">{{ Number(row.priceCoefficient).toFixed(2) }}</template>
               <template #status="{ row }"
                 ><t-tag :theme="row.status === 'enabled' ? 'success' : 'danger'" variant="light">{{
                   row.status === 'enabled' ? '已启用' : '已停用'
                 }}</t-tag></template
               >
-              <template #createdAt="{ row }">{{ time(row.createdAt) }}</template>
+              <template #createdAt="{ row }">{{ row.createdAt ? formatProductDateTime(row.createdAt) : '—' }}</template>
               <template #operation="{ row }">
                 <t-space size="small">
                   <t-link v-if="can('edit')" theme="primary" @click="openEdit(row)">编辑</t-link>
@@ -75,7 +75,7 @@
       @cancel="formVisible = false"
       @close="formVisible = false"
     >
-      <t-form label-width="96px" :data="form" colon>
+      <t-form class="price-configuration-form" label-align="top" :data="form" colon>
         <t-form-item label="角色" name="roleId">
           <t-select v-model="form.roleId" :disabled="Boolean(editing)" placeholder="请选择角色" clearable>
             <t-option
@@ -87,11 +87,21 @@
             />
           </t-select>
         </t-form-item>
-        <t-form-item label="价格系数" name="priceCoefficient"
-          ><t-input-number v-model="form.priceCoefficient" :decimal-places="4" :min="0" :max="999" theme="normal"
+        <t-form-item label="最低可售价价格系数" name="priceCoefficient"
+          ><t-input-number
+            v-model="form.priceCoefficient"
+            class="price-coefficient-input"
+            :decimal-places="2"
+            :min="0"
+            :max="999"
+            theme="normal"
         /></t-form-item>
+        <t-alert class="price-configuration-tip" theme="info">
+          <template #message>
+            <div>角色最低可售价 = 本店成本价 × 最低可售价价格系数；<br />可在商品价格中单独手工修改。</div>
+          </template>
+        </t-alert>
       </t-form>
-      <t-alert theme="info" message="角色最低可售价 = 本店成本价 × 价格系数；可在商品价格中单独手工修改。" />
     </AdminDialog>
     <AdminConfirmDialog
       :visible="Boolean(confirmAction)"
@@ -121,6 +131,7 @@ import {
 } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
+import { formatProductDateTime } from '@/utils/formatProductDateTime';
 import {
   createStorePriceConfiguration,
   deleteStorePriceConfiguration,
@@ -155,15 +166,12 @@ const visibleRows = computed(() =>
 const columns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'index', title: '序号', width: 75 },
   { colKey: 'roleName', title: '角色', minWidth: 160 },
-  { colKey: 'priceCoefficient', title: '价格系数', width: 130 },
+  { colKey: 'priceCoefficient', title: '最低可售价价格系数', width: 180 },
   { colKey: 'status', title: '状态', width: 100 },
   { colKey: 'createdByName', title: '创建人', width: 120 },
   { colKey: 'createdAt', title: '创建时间', width: 180 },
   { colKey: 'operation', title: '操作', width: 190, fixed: 'right' },
 ];
-function time(value?: string) {
-  return value ? value.replace('T', ' ').slice(0, 16).replaceAll('-', '/') : '—';
-}
 async function load() {
   loading.value = true;
   try {
@@ -225,3 +233,55 @@ async function runConfirmed() {
 }
 onMounted(load);
 </script>
+
+<style scoped>
+.list-controls {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--td-comp-margin-l);
+}
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-m);
+}
+.filter-fields {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+}
+.filter-fields :deep(.t-form__item) {
+  width: 260px;
+  margin-bottom: 0;
+}
+.filter-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--td-comp-margin-s);
+}
+.price-configuration-form {
+  display: grid;
+  gap: var(--td-comp-margin-l);
+}
+.price-configuration-form :deep(.t-form__item) {
+  margin-bottom: 0;
+}
+.price-configuration-form :deep(.t-form__label--top) {
+  min-height: 0;
+  line-height: var(--td-line-height-body-medium);
+  margin-bottom: var(--td-comp-margin-s);
+}
+.price-configuration-tip {
+  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-s);
+}
+.price-configuration-tip :deep(.t-alert__content) {
+  font: var(--td-font-body-small);
+}
+.price-coefficient-input {
+  width: 100%;
+}
+</style>

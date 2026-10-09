@@ -541,11 +541,16 @@ test('store price configuration has roles and coefficients without tabs or guide
   await page.goto('/store/price-configuration');
   const main = page.getByRole('main');
   await expect(main.getByText('店长', { exact: true })).toBeVisible();
-  await expect(main.getByText('0.8000')).toBeVisible();
+  await expect(main.getByText('0.80', { exact: true })).toBeVisible();
+  await expect(main.getByText('最低可售价价格系数', { exact: true })).toBeVisible();
   await expect(main.locator('.t-tabs')).toHaveCount(0);
   await expect(main.getByText('指导价设置')).toHaveCount(0);
   await main.getByRole('button', { name: '新增' }).click();
   await expect(page.locator('.t-dialog:visible').getByText('角色', { exact: true })).toBeVisible();
+  const coefficient = page.locator('.t-dialog:visible .t-input-number input');
+  await coefficient.fill('1.2');
+  await coefficient.blur();
+  await expect(coefficient).toHaveValue('1.20');
 });
 
 test('store operation logs show the same filter, pagination, and detail structure', async ({ page }) => {
