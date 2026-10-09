@@ -2504,12 +2504,11 @@ const submitReason = async () => {
   saving.value = true;
   try {
     if (reasonState.isBatch) {
-      await Promise.all(
-        selectedKeys.value.map((id) =>
-          updateProductStatus(id, 'offShelf', reasonForm.reason, reasonForm.detail.trim()),
-        ),
-      );
-      selectedKeys.value = [];
+      // Snapshot retention writes media references; complete each transaction before the next product.
+      for (const id of [...selectedKeys.value]) {
+        await updateProductStatus(id, 'offShelf', reasonForm.reason, reasonForm.detail.trim());
+        selectedKeys.value = selectedKeys.value.filter((selectedId) => selectedId !== id);
+      }
       adminFeedback.success('已批量下架');
     } else if (reasonState.product) {
       await updateProductStatus(reasonState.product.id, 'offShelf', reasonForm.reason, reasonForm.detail.trim());

@@ -188,8 +188,10 @@ public class ProductLifecycleService {
     if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,target,sourceChanges); }
     if (kind == Kind.FINISHED) { storeUpstreamLogs.sourceChange(id, source, target); }
 
-    if ((!deleted(row) || recreate) && (kind != Kind.FINISHED || List.of("selling", "offShelf", "recycle", "purged").contains(target))) {
-      String result=kind!=Kind.FINISHED ? null : publish ? (recreate ? "来源已上架，商品进入运营仓库并计算价格" : (kind == Kind.FINISHED ? "供应链已重新上架，原运营商品仍失效" : "来源重新上架，解除遮罩并保留运营状态")) :
+    // Restoring the source does not change an existing finished operations record.
+    boolean affectsOperations = kind != Kind.FINISHED || recreate || List.of("offShelf", "recycle", "purged").contains(target);
+    if ((!deleted(row) || recreate) && affectsOperations) {
+      String result=kind!=Kind.FINISHED ? null : publish ? "来源已上架，商品进入运营仓库并计算价格" :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
       Map<String,Object> changes=new LinkedHashMap<>();
       changes.put("来源状态",Map.of("before",source,"after",target));
