@@ -40,6 +40,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Autowired private StoreFinishedUpstreamLogService upstreamLogs;
   @Autowired private FinishedProductService finishedProducts;
   @Autowired private MockMvc mvc;
+  @Autowired private StoreFinishedSelectionSnapshot selectionSnapshots;
   @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
 
   @DynamicPropertySource
@@ -480,7 +481,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT manual_price FROM store_finished_role_price_overrides WHERE listing_id=?", BigDecimal.class, historicalId))
         .isEqualByComparingTo("12");
     assertThat(products.logs()).extracting(StoreFinishedProductService.LogEntry::operationType)
-        .contains("SELECT", "SOURCE_SHELF");
+        .contains("SELECT").doesNotContain("SOURCE_SHELF");
     jdbc.update("UPDATE finished_products SET status='selling' WHERE id=99831");
     assertThat(products.pool()).isEmpty();
     assertThatThrownBy(() -> products.select(List.of(99831L))).hasMessageContaining("本店已存在");
@@ -563,7 +564,9 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     jdbc.update("UPDATE finished_product_variants SET variant_label='新规格',cost_price=99 WHERE id=99891");
     sqlSession.clearCache();
     upstreamLogs.sourceChange(99891L, "offShelf", "selling");
+    upstreamIdentity("admin");
     upstreamLogs.operationsChange(99891L, "SHELF", "warehouse", "selling");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE finished_product_id=99891 AND operation_type IN ('SOURCE_SHELF','OPERATIONS_SHELF')",Long.class)).isZero();
     identity(99891L);
     jdbc.update("UPDATE store_finished_products SET invalidated_reason='供应链已下架该商品，请彻底删除后重新选择' WHERE id=?", first);
     var retained = products.detail(first);
@@ -627,7 +630,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     upstreamLogs.operationsChange(99893L, "DELETE_TO_RECYCLE", "offShelf", "recycle");
     identity(99893L);
     assertThat(products.detail(listing).sourceMessage()).isEqualTo("该商品已被运营管理平台彻底删除");
-    assertThat(products.logPage("99893", "", "", "", "", 1, 100).total()).isEqualTo(oldLogCount + 3);
+    assertThat(products.logPage("99893", "", "", "", "", 1, 100).total()).isEqualTo(oldLogCount + 2);
     products.purge(listing);
     long fresh = products.select(List.of(99893L)).getFirst().id();
     upstreamIdentity("admin");
@@ -637,6 +640,33 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(products.detail(fresh).sourceMessage()).isEqualTo("该商品已被运营管理平台删除至回收站");
     assertThat(products.logPage("99893", "OPERATIONS_OFF_SHELF", "", "", "", 1, 100).records())
         .extracting(StoreFinishedProductService.LogEntry::operationSummary).containsOnly("该商品已被运营管理平台下架");
+  }
+
+  @Test
+  void logTimesPreserveDatabaseLocalDateTimeAcrossConnectionTimeZones() {
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99894,'时间测试级别',1)");
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,store_level_id,status) VALUES (99894,1,'时间测试门店','cityPartner',99894,'enabled')");
+    jdbc.update("""
+        INSERT INTO store_finished_operation_logs
+          (id,tenant_id,store_id,finished_product_id,product_name,operation_type,
+           operation_summary,before_status,after_status,change_details,operator_name,operated_at)
+        VALUES (99894,1,99894,99894,'时间测试商品','OFF_SHELF','下架商品',
+          'selling','offShelf','{}','时间测试员工','2026-10-09 10:34:02')
+        """);
+    identity(99894L);
+    var expected = java.time.LocalDateTime.of(2026, 10, 9, 10, 34, 2);
+    var scopes = new CityPartnerStoreScope(new com.zdm.platform.security.CurrentIdentityProvider(), jdbc);
+    for (String zone : List.of("Asia/Shanghai", "UTC")) {
+      String url = MYSQL.getJdbcUrl();
+      var datasource = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+          url + (url.contains("?") ? "&" : "?") + "connectionTimeZone=" + zone,
+          MYSQL.getUsername(), MYSQL.getPassword());
+      var reader = new StoreFinishedLogReader(new JdbcTemplate(datasource), scopes, selectionSnapshots);
+      assertThat(reader.logs()).singleElement().satisfies(log -> assertThat(log.operatedAt()).isEqualTo(expected));
+      assertThat(reader.logPage("99894", "OFF_SHELF", "", "2026-10-09", "2026-10-09", 1, 10).records())
+          .singleElement().satisfies(log -> assertThat(log.operatedAt()).isEqualTo(expected));
+      assertThat(reader.logDetail(99894L).operatedAt()).isEqualTo(expected);
+    }
   }
 
   private void upstreamIdentity(String clientCode) {

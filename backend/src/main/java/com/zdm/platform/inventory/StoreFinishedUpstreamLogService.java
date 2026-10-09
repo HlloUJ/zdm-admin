@@ -29,15 +29,13 @@ public class StoreFinishedUpstreamLogService {
       case "offShelf" -> "SOURCE_OFF_SHELF";
       case "recycle" -> "SOURCE_DELETE_TO_RECYCLE";
       case "purged" -> "SOURCE_PURGE";
-      case "selling" -> "SOURCE_SHELF";
       default -> null;
     };
     if (type == null) { return; }
     String summary = switch (type) {
       case "SOURCE_OFF_SHELF" -> "供应链已下架该商品";
       case "SOURCE_DELETE_TO_RECYCLE" -> "供应链已将该商品删除至回收站";
-      case "SOURCE_PURGE" -> "供应链已彻底删除该商品";
-      default -> "供应链已重新上架该商品";
+      default -> "供应链已彻底删除该商品";
     };
     record(productId, type, summary, "来源状态", before, after);
   }
@@ -47,15 +45,13 @@ public class StoreFinishedUpstreamLogService {
       case "OFF_SHELF" -> "OPERATIONS_OFF_SHELF";
       case "DELETE_TO_RECYCLE" -> "OPERATIONS_DELETE_TO_RECYCLE";
       case "PURGE" -> "OPERATIONS_PURGE";
-      case "SHELF" -> "OPERATIONS_SHELF";
       default -> null;
     };
     if (storeType == null) { return; }
     String summary = switch (storeType) {
       case "OPERATIONS_OFF_SHELF" -> "运营端已下架该商品";
       case "OPERATIONS_DELETE_TO_RECYCLE" -> "运营端已将该商品删除至回收站";
-      case "OPERATIONS_PURGE" -> "运营端已彻底删除该商品";
-      default -> "运营端已重新上架该商品";
+      default -> "运营端已彻底删除该商品";
     };
     record(productId, storeType, summary, "运营状态", before, after);
   }

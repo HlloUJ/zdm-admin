@@ -190,33 +190,35 @@ class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
         .isEqualTo("该商品已被供应链下架");
     lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,99202L,"selling");
     assertThat(jdbc.queryForObject("SELECT source_block_reason FROM finished_products WHERE id=99202",String.class)).isNull();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='supply-chain' AND operation_type='SHELF'",Long.class)).isEqualTo(2);
+    assertThat(jdbc.queryForObject("SELECT operations_invalidated_at FROM finished_products WHERE id=99202",java.sql.Timestamp.class)).isNotNull();
     assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=99202",String.class)).isEqualTo("selling");
     assertThat(jdbc.queryForObject("SELECT price FROM finished_product_guide_prices WHERE finished_product_id=99202",BigDecimal.class)).isEqualByComparingTo("123");
     assertThat(jdbc.queryForObject("SELECT operation_summary FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='admin' ORDER BY id DESC LIMIT 1",String.class))
-        .isEqualTo("供应链已重新上架，原运营商品仍失效");
+        .isEqualTo("供应链已下架该商品");
     assertThat(jdbc.queryForObject("SELECT before_status FROM finished_operation_logs WHERE id=?",String.class,firstId)).isNull();
     assertThat(jdbc.queryForObject("SELECT before_status FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='admin' ORDER BY id DESC LIMIT 1",String.class)).isEqualTo("selling");
     // Existing records are normalized for reading and filtering, without rewriting history.
     jdbc.update("UPDATE finished_operation_logs SET operation_type='SOURCE_SYNC',before_status='warehouse',operation_summary='旧入仓文案' WHERE id=?",firstId);
     authenticateDirectService();
     var page=logs.listPage("上架日志商品","SOURCE_SHELF",null,null,null,1,20);
-    assertThat(page.total()).isEqualTo(2);
+    assertThat(page.total()).isEqualTo(1);
     assertThat(page.records()).allMatch(log -> "SOURCE_SHELF".equals(log.getOperationType()));
     assertThat(logs.detail(firstId).getBeforeStatus()).isNull();
     assertThat(logs.detail(firstId).getAfterStatus()).isEqualTo("warehouse");
     assertThat(logs.detail(firstId).getOperationSummary()).isEqualTo(FinishedOperationLogService.SOURCE_SHELF_SUMMARY);
     assertThat(logs.listPage("上架日志商品","SOURCE_SYNC",null,null,null,1,20).total()).isZero();
-    assertThat(logs.listPage("上架日志商品",null,null,null,null,1,20).total()).isEqualTo(3);
+    assertThat(logs.listPage("上架日志商品",null,null,null,null,1,20).total()).isEqualTo(2);
     assertThat(logs.listPage("上架日志商品","SOURCE_OFF_SHELF",null,null,null,1,20).records())
         .singleElement().satisfies(log -> assertThat(log.getOperationSummary()).isEqualTo("供应链已下架该商品"));
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='supply-chain' AND operation_type='RESTORE'",Long.class)).isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT operation_type FROM finished_operation_logs WHERE id=?",String.class,firstId)).isEqualTo("SOURCE_SYNC");
     org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
         new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity,null,List.of()));
-    long expectedOperationsLogs = 3;
+    long expectedOperationsLogs = 2;
     for (String target : List.of("offShelf", "recycle", "warehouse", "selling", "offShelf", "recycle", "purged")) {
       lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,99202L,target,"调整",null);
-      if (List.of("offShelf", "selling", "recycle", "purged").contains(target)) { expectedOperationsLogs++; }
+      if (List.of("offShelf", "recycle", "purged").contains(target)) { expectedOperationsLogs++; }
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=99202 AND business_client_code='admin'",Long.class))
           .as("运营日志数量：%s", target).isEqualTo(expectedOperationsLogs);
       assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=99202",String.class)).isEqualTo("selling");

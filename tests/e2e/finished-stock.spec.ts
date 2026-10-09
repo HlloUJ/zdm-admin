@@ -1939,3 +1939,67 @@ test('prefills corresponding non-dimension attributes when a saved specification
     expect(variant.stock).toBe(1);
   }
 });
+
+for (const failSecond of [false, true]) {
+  test(`supply-chain batch off shelf serializes requests and ${failSecond ? 'keeps failed selections' : 'completes all products'}`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+    await installFinishedMocks(page);
+    const products = [71, 72, 73].map((id) => ({
+      id,
+      name: `批量下架商品${id}`,
+      status: 'selling',
+      sourceStatus: 'selling',
+      categoryId: 5,
+      supplierId: 2,
+      totalStock: 1,
+      attributes: [],
+      variants: [{ id: id * 10, variantLabel: '单规格', displayMode: 'single', stock: 1, costPrice: 10 }],
+    }));
+    const requests: number[] = [];
+    let active = 0;
+    let maxActive = 0;
+    await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: products } }));
+    await page.route(/\/api\/admin\/finished-products\/7[123]$/, async (route) => {
+      const id = Number(new URL(route.request().url()).pathname.split('/').pop());
+      const product = products.find((item) => item.id === id)!;
+      if (route.request().method() !== 'PUT') return route.fulfill({ json: { code: 0, data: product } });
+      requests.push(id);
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      expect(route.request().postDataJSON()).toMatchObject({
+        status: 'offShelf',
+        offShelfReason: '价格调整',
+        offShelfDetail: '批量调整',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      active -= 1;
+      if (failSecond && id === 72)
+        return route.fulfill({ status: 400, json: { code: 400, message: '商品状态已变化', data: null } });
+      product.status = 'offShelf';
+      product.sourceStatus = 'offShelf';
+      return route.fulfill({ json: { code: 0, data: product } });
+    });
+    await page.goto('/supply-chain/finished-stock-management');
+    const main = page.getByRole('main');
+    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+    await main.locator('thead .t-checkbox').click();
+    await main.getByRole('button', { name: '批量下架', exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    await dialog.locator('.t-select').click();
+    await page.getByText('价格调整', { exact: true }).click();
+    await dialog.locator('textarea').fill('  批量调整  ');
+    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    await expect(page.getByText(failSecond ? '商品状态已变化' : '已批量下架', { exact: true })).toBeVisible();
+    expect(maxActive).toBe(1);
+    expect(requests).toEqual(failSecond ? [73, 72] : [73, 72, 71]);
+    if (failSecond) {
+      await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(2);
+      await expect(main.getByText('批量下架商品73', { exact: true })).toHaveCount(0);
+    } else {
+      await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(0);
+      await expect(main.getByText('批量下架商品73', { exact: true })).toHaveCount(0);
+    }
+  });
+}
