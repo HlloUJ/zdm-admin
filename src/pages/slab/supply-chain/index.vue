@@ -294,6 +294,7 @@
           v-model:active-section="productTab"
           :mode="productMode"
           :title="productDialogTitle"
+          :hide-breadcrumb="productMode === 'create'"
           :loading="saving"
           @confirm="handleProductSubmit"
           @close="closeProductDialog"
@@ -704,7 +705,7 @@
                     {{ operationLogDetail.slabName }}
                   </t-descriptions-item>
                   <t-descriptions-item v-for="row in creationLogBase" :key="row.field" :label="row.field">
-                    {{ row.after }}
+                    {{ row.after === '未填写' ? '-' : row.after }}
                   </t-descriptions-item>
                 </t-descriptions>
               </AdminSectionCard>
@@ -712,7 +713,7 @@
                 <h3 class="slab-creation-title">销售信息</h3>
                 <t-descriptions bordered :column="3" layout="horizontal">
                   <t-descriptions-item v-for="row in creationLogSales" :key="row.field" :label="row.field">
-                    {{ row.after }}
+                    {{ row.after === '未填写' ? '-' : row.after }}
                   </t-descriptions-item>
                 </t-descriptions>
               </AdminSectionCard>

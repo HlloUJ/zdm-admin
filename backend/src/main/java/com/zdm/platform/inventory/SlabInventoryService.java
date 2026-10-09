@@ -31,6 +31,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       "warehouse", "selling", "offShelf", "soldOut", "recycle");
 
   private final ProductLifecycleService lifecycle;
+  private final SlabInvalidationSnapshotService invalidationSnapshots;
   private final SlabInventoryReferenceService referenceCatalog;
   private final SlabPriceService priceService;
   private final SlabOffShelfRecordService offShelfRecordService;
@@ -48,7 +49,8 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       MediaCleanupService mediaCleanupService,
       MediaReferenceService mediaReferenceService,
       SlabOperationLogService operationLogService,
-      CurrentIdentityProvider identityProvider, ProductLifecycleService lifecycle) {
+      CurrentIdentityProvider identityProvider, ProductLifecycleService lifecycle, SlabInvalidationSnapshotService invalidationSnapshots) {
+    this.invalidationSnapshots = invalidationSnapshots;
     this.lifecycle = lifecycle;
     this.referenceCatalog = referenceCatalog;
     this.priceService = priceService;
@@ -70,7 +72,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if (!lifecycle.isSupplyChain()) {
       item.setSourceOffShelfRecords(offShelfRecordService.listSourceBySlabId(id));
     }
-    return item;
+    return lifecycle.isSupplyChain() ? item : invalidationSnapshots.render(item);
   }
 
   public List<SlabInventory> listWithPrices() {
@@ -88,7 +90,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       item.setMarkupPrices(pricesBySlabId.getOrDefault(item.getId(), List.of()));
       item.setOffShelfRecords(recordsBySlabId.getOrDefault(item.getId(), List.of()));
     });
-    return inventory;
+    return lifecycle.isSupplyChain() ? inventory : inventory.stream().map(invalidationSnapshots::render).toList();
   }
 
   @Transactional
@@ -160,7 +162,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     inventory.setCreatedAt(existing.getCreatedAt());
     inventory.setPublisherType(existing.getPublisherType());
     inventory.setSourceStatus(inventory.getStock() == 0 ? "soldOut" : existing.getSourceStatus());
-    inventory.setStatus(inventory.getStock() == 0 && !"recycle".equals(existing.getStatus()) ? "soldOut" : existing.getStatus());
+    inventory.setStatus(inventory.getStock() == 0 && existing.getOperationsInvalidatedAt() == null && !"recycle".equals(existing.getStatus()) ? "soldOut" : existing.getStatus());
     try {
       updateById(inventory);
     } catch (DuplicateKeyException exception) {
@@ -242,7 +244,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     if(cost == null || cost.signum()<0) { throw new IllegalArgumentException("请完善成本价"); }
   }
   private SlabInventory updateOperationsPrice(SlabInventory existing,SlabInventory requested) {
-    lifecycle.requireOperational(existing.getSourceStatus(),existing.getOperationsDeleted());
+    lifecycle.requireSlabOperational(existing);
     if (!List.of("warehouse","selling").contains(existing.getStatus())) { throw new IllegalArgumentException("当前状态不能编辑价格"); }
     if(requested.getCostPrice()==null || existing.getCostPrice().compareTo(requested.getCostPrice())!=0
         || requested.getMarkupPrices()==null || requested.getMarkupPrices().stream().anyMatch(p -> p.getCostPrice()==null || existing.getCostPrice().compareTo(p.getCostPrice())!=0)) {
@@ -270,7 +272,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       return true;
     }
     SlabInventory inventory = requireDeletable(id);
-    lifecycle.requireOperational(inventory.getSourceStatus(),inventory.getOperationsDeleted());
+    lifecycle.requireSlabOperational(inventory);
     String normalizedReason = normalizeOptionalText(reason);
     String normalizedDetail = normalizeOptionalText(detail);
     operationLogService.record(
@@ -361,7 +363,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
         }
         continue;
       }
-      if (!lifecycle.isSupplyChain()) { lifecycle.requireOperational(item.getSourceStatus(), item.getOperationsDeleted()); }
+      if (!lifecycle.isSupplyChain()) { lifecycle.requireSlabOperational(item); }
       String target = switch (action) {
         case "shelf" -> "selling";
         case "offShelf" -> "offShelf";
@@ -411,7 +413,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       throw new IllegalArgumentException("部分大板不存在或已被删除");
     }
     inventory.forEach(item -> {
-      lifecycle.requireOperational(item.getSourceStatus(),item.getOperationsDeleted());
+      lifecycle.requireSlabOperational(item);
       validateStatusTransition(item, status);
     });
     lambdaUpdate()

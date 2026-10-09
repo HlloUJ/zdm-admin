@@ -738,6 +738,13 @@
   margin-bottom: var(--td-comp-margin-l);
 }
 
+@media (min-width: 961px) {
+  .filter-secondary-row :deep(.t-form__item.supplier-filter--aligned) {
+    /* Match the first row's second-column end: 234px keyword, 184px grade and four 20px gaps. */
+    width: calc(234px + (100% - 234px - 80px) / 4 - 184px);
+  }
+}
+
 @media (max-width: 1100px) {
   .upload-grid,
   .publish-base-grid,

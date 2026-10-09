@@ -29,8 +29,7 @@ test('发布直接进入三段整页表单，导航固定且返回保留列表�
   await expect(form).toBeVisible();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await expect(form.getByRole('heading', { level: 2 })).toHaveText(['图文描述', '基础信息', '销售信息']);
-  await expect(form.locator('.t-breadcrumb')).toContainText('大板管理');
-  await expect(form.locator('.t-breadcrumb')).toContainText('发布商品');
+  await expect(form.locator('.t-breadcrumb')).toHaveCount(0);
   const sales = form.locator('#slab-product-sales');
   await expect(sales.locator('.t-form__label')).toHaveText([/成本价/, /供应商/, /库存/, /大板编号/, /上架/]);
   await expect(sales.locator('.t-form-item__cost').getByRole('textbox')).toHaveCount(1);
