@@ -2,7 +2,11 @@ import { computed, reactive, ref } from 'vue';
 import { adminFeedback, getSafeErrorMessage } from '@/components/foundation';
 import { productLogFilterOptions } from '@/services/productOperationLog';
 import { getStoreFinishedLog, listStoreFinishedLogs, type StoreFinishedLog } from '@/services/storeFinishedStock';
-import { isStoreStatusOperation, parseStoreOperationLogChanges, toStoreOperationLogRow as toLogRow } from './storeOperationLog';
+import {
+  isStoreStatusOperation,
+  parseStoreOperationLogChanges,
+  toStoreOperationLogRow as toLogRow,
+} from './storeOperationLog';
 
 /** State and requests for the store-owned operation log, independent of the public product log. */
 export function useStoreFinishedLogs(stateLabel: (value?: string | null) => string) {
@@ -13,8 +17,11 @@ export function useStoreFinishedLogs(stateLabel: (value?: string | null) => stri
   const logDetail = ref<StoreFinishedLog | null>(null);
   const logDetailVisible = ref(false);
   const logDetailRow = computed(() => logDetail.value && toLogRow(logDetail.value));
-  const logChanges = computed(() => logDetail.value && isStoreStatusOperation(logDetail.value.operationType)
-    ? {} : parseStoreOperationLogChanges(logDetail.value?.changeDetails, stateLabel));
+  const logChanges = computed(() =>
+    logDetail.value && isStoreStatusOperation(logDetail.value.operationType)
+      ? {}
+      : parseStoreOperationLogChanges(logDetail.value?.changeDetails, stateLabel),
+  );
   const logSnapshot = computed(() =>
     Object.fromEntries(Object.entries(logChanges.value).map(([field, change]) => [field, change.after])),
   );
@@ -28,7 +35,12 @@ export function useStoreFinishedLogs(stateLabel: (value?: string | null) => stri
         }[])
       : [];
   });
-  const logAfterHtml = computed(() => String(logChanges.value['宝贝详情']?.after || ''));
+  const logAfterHtml = computed(() =>
+    String(logChanges.value['宝贝详情']?.after || '').replace(
+      /media:(\d+)/g,
+      (_match, id) => logMedia.value.find((media) => media.mediaId === Number(id))?.resource?.url || '',
+    ),
+  );
   const logFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
   const appliedLogFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
   const logPagination = reactive({ current: 1, pageSize: 10 });

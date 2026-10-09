@@ -22,7 +22,7 @@
             </nav>
           </AdminSectionCard>
         </div>
-        <header v-if="formPageVisible || !finishedTabs.length" class="page-header">
+        <header v-if="!formPageVisible && !finishedTabs.length" class="page-header">
           <div>
             <t-breadcrumb>
               <t-breadcrumb-item
@@ -1249,22 +1249,16 @@ watch(
   },
   { flush: 'post' },
 );
-const formSections = computed<
-  {
-    key: FormSectionKey;
-    label: string;
-  }[]
->(() =>
-  isOperationsEdit.value
-    ? [{ key: 'sales', label: '销售信息' }]
-    : [
-        { key: 'description', label: '图文描述' },
-        { key: 'base', label: '基础信息' },
-        { key: 'sales', label: '销售信息' },
-      ],
-);
+const formSections: { key: FormSectionKey; label: string }[] = [
+  { key: 'description', label: '图文描述' },
+  { key: 'base', label: '基础信息' },
+  { key: 'sales', label: '销售信息' },
+];
 const scrollToFormSection = (key: FormSectionKey) => {
-  const section = document.getElementById(`finished-product-${key}`);
+  const section =
+    isOperationsEdit.value && key !== 'sales'
+      ? document.querySelectorAll('.readonly-product-fields .zdm-admin-section-card')[key === 'description' ? 0 : 1]
+      : document.getElementById(`finished-product-${key}`);
   if (!section) return;
   activeFormSection.value = key;
   updateFormAnchorPosition();
@@ -1847,7 +1841,9 @@ const batchButtons = computed(() => {
     ],
   };
   const actions = [...map[activeTab.value]];
-  return actions.filter((button) => hasFinishedAction(finishedActionCodes[button.action], button.action === 'batchPurge' ? 'recycle' : activeTab.value));
+  return actions.filter((button) =>
+    hasFinishedAction(finishedActionCodes[button.action], button.action === 'batchPurge' ? 'recycle' : activeTab.value),
+  );
 });
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
   batchButtons.value.map((button) => ({
@@ -2195,7 +2191,7 @@ const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
   if (route.query.form !== mode) {
     router.replace({ path: productListPath.value, query: { form: mode } });
   }
-  activeFormSection.value = isOperationsEdit.value ? 'sales' : 'description';
+  activeFormSection.value = 'description';
   submitAttempted.value = false;
   resetProductForm(productForm, createEmptyProductForm());
   specRows.value = [];
@@ -2762,7 +2758,9 @@ const handleConfirm = async () => {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
       selectedKeys.value = [];
     } else if (type === 'batchPurge') {
-      const includesInvalid = dataItems.value.some((item) => selectedKeys.value.includes(item.id) && sourceBlocked(item));
+      const includesInvalid = dataItems.value.some(
+        (item) => selectedKeys.value.includes(item.id) && sourceBlocked(item),
+      );
       await Promise.all(selectedKeys.value.map((id) => deleteFinishedProduct(id)));
       const selected = new Set(selectedKeys.value);
       dataItems.value = dataItems.value.filter((item) => !selected.has(item.id));
@@ -2798,4 +2796,6 @@ const handleConfirm = async () => {
 };
 </script>
 
-<style scoped src="../shared/index.css"></style>
+<style scoped>
+@import url('../shared/index.css');
+</style>

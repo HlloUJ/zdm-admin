@@ -490,7 +490,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     long freshId = products.select(List.of(99831L)).getFirst().id();
     assertThat(freshId).isNotEqualTo(historicalId);
     assertThat(jdbc.queryForList("SELECT selection_generation FROM store_finished_products WHERE finished_product_id=99831 ORDER BY id", Long.class))
-        .containsExactly(0L);
+        .containsExactly(1L);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_guide_prices WHERE listing_id=?", Long.class, freshId)).isZero();
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_role_price_overrides WHERE listing_id=?", Long.class, freshId)).isZero();
   }
@@ -532,7 +532,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(products.detail(99821L).status()).isEqualTo("selling");
     assertThat(products.detail(99821L).sourceMessage())
-        .isEqualTo("该商品已被运营管理平台下架");
+        .isEqualTo("该商品已被供应链彻底删除");
     products.purge(99821L);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_products WHERE id=99821",
         Integer.class)).isEqualTo(1);
@@ -589,6 +589,54 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
         .extracting(StoreFinishedProductService.LogEntry::listingId).contains(first, fresh).doesNotContain(other);
     identity(99892L);
     assertThat(products.detail(other).sourceUnavailable()).isTrue();
+  }
+
+  @Test
+  @Transactional
+  void sourceReasonsAdvanceWithinOneRoundWithoutReplacingSnapshotsOrAffectingOldRounds() {
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99893,'提示测试级别',1)");
+    jdbc.update("INSERT INTO stores (id,tenant_id,name,type,store_level_id,status) VALUES (99893,1,'提示测试门店','cityPartner',99893,'enabled')");
+    jdbc.update("INSERT INTO finished_products (id,name,sku,total_stock,status,source_status,operations_deleted) VALUES (99893,'提示原商品','reason-test',2,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO finished_product_variants (id,finished_product_id,variant_label,stock,cost_price) VALUES (99893,99893,'原规格',2,10)");
+    identity(99893L);
+    long listing = products.select(List.of(99893L)).getFirst().id();
+    upstreamIdentity("supply-chain");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99893L, "offShelf", "其他", "测试");
+    String snapshot = jdbc.queryForObject("SELECT invalidated_snapshot FROM store_finished_products WHERE id=?", String.class, listing);
+    String operationsSnapshot = jdbc.queryForObject("SELECT operations_invalidated_snapshot FROM finished_products WHERE id=99893", String.class);
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99893L, "recycle");
+    assertThat(jdbc.queryForObject("SELECT operations_invalidated_reason FROM finished_products WHERE id=99893", String.class))
+        .isEqualTo("该商品已被供应链删除至回收站");
+    identity(99893L);
+    assertThat(products.detail(listing).sourceMessage()).isEqualTo("该商品已被供应链删除至回收站");
+    upstreamIdentity("supply-chain");
+    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99893L, "purged");
+    assertThat(jdbc.queryForObject("SELECT operations_invalidated_reason FROM finished_products WHERE id=99893", String.class))
+        .isEqualTo("该商品已被供应链彻底删除");
+    assertThat(jdbc.queryForObject("SELECT invalidated_snapshot FROM store_finished_products WHERE id=?", String.class, listing)).isEqualTo(snapshot);
+    assertThat(jdbc.queryForObject("SELECT operations_invalidated_snapshot FROM finished_products WHERE id=99893", String.class)).isEqualTo(operationsSnapshot);
+    upstreamIdentity("admin");
+    lifecycle.purgeOperations(ProductLifecycleService.Kind.FINISHED, 99893L);
+    identity(99893L);
+    assertThat(products.detail(listing).sourceMessage()).isEqualTo("该商品已被运营管理平台彻底删除");
+    long oldLogCount = products.logPage("99893", "", "", "", "", 1, 100).total();
+    jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,status='selling',source_status='selling',operations_deleted=FALSE,operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=99893");
+    upstreamIdentity("admin");
+    upstreamLogs.operationsChange(99893L, "SHELF", "warehouse", "selling");
+    upstreamLogs.operationsChange(99893L, "OFF_SHELF", "selling", "offShelf");
+    upstreamLogs.operationsChange(99893L, "DELETE_TO_RECYCLE", "offShelf", "recycle");
+    identity(99893L);
+    assertThat(products.detail(listing).sourceMessage()).isEqualTo("该商品已被运营管理平台彻底删除");
+    assertThat(products.logPage("99893", "", "", "", "", 1, 100).total()).isEqualTo(oldLogCount + 3);
+    products.purge(listing);
+    long fresh = products.select(List.of(99893L)).getFirst().id();
+    upstreamIdentity("admin");
+    upstreamLogs.operationsChange(99893L, "OFF_SHELF", "selling", "offShelf");
+    upstreamLogs.operationsChange(99893L, "DELETE_TO_RECYCLE", "offShelf", "recycle");
+    identity(99893L);
+    assertThat(products.detail(fresh).sourceMessage()).isEqualTo("该商品已被运营管理平台删除至回收站");
+    assertThat(products.logPage("99893", "OPERATIONS_OFF_SHELF", "", "", "", 1, 100).records())
+        .extracting(StoreFinishedProductService.LogEntry::operationSummary).containsOnly("该商品已被运营管理平台下架");
   }
 
   private void upstreamIdentity(String clientCode) {

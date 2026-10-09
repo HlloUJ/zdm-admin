@@ -2,12 +2,22 @@ import type { ProductOperationLogRow } from '@/services/productOperationLog';
 import type { StoreFinishedLog } from '@/services/storeFinishedStock';
 
 export const isStoreStatusOperation = (type: string) =>
-  ['SHELF', 'OFF_SHELF', 'RESTORE', 'RESTORE_WAREHOUSE', 'RESTORE_RECYCLE',
-    'DELETE_TO_RECYCLE', 'PURGE', 'PHYSICAL_DELETE', 'SOLD_OUT', 'STATUS_UPDATE'].includes(type);
+  [
+    'SHELF',
+    'OFF_SHELF',
+    'RESTORE',
+    'RESTORE_WAREHOUSE',
+    'RESTORE_RECYCLE',
+    'DELETE_TO_RECYCLE',
+    'PURGE',
+    'PHYSICAL_DELETE',
+    'SOLD_OUT',
+    'STATUS_UPDATE',
+  ].includes(type);
 
 export const toStoreOperationLogRow = (row: StoreFinishedLog): ProductOperationLogRow => {
-  const reasons = row.operationType === 'OFF_SHELF'
-    ? parseStoreOperationLogChanges(row.changeDetails, (value) => value || '') : {};
+  const reasons =
+    row.operationType === 'OFF_SHELF' ? parseStoreOperationLogChanges(row.changeDetails, (value) => value || '') : {};
   return {
     id: row.id,
     subjectName: row.productName,

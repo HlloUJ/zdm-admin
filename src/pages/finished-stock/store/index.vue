@@ -431,6 +431,7 @@
       :status-label="stateLabel"
       :format-time="time"
       :source-label="logSourceLabel"
+      :summary-label="finishedProductOperationSummary"
       @filter-change="updateLogFilter"
       @search="searchLogs"
       @reset="resetLogFilter"
@@ -481,6 +482,7 @@ import {
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
+import { finishedProductOperationSummary } from '@/services/productOperationLog';
 import {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,

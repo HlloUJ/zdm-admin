@@ -193,7 +193,11 @@ function comparableCell(snapshot: Record<string, unknown>, variant: LoggedVarian
   if (key === 'quantity') return variant.stock;
   if (key === 'cost') {
     if (isSupplyChain.value) return variant.costPrice;
-    return guide?.costPrice ?? partners.find((item) => variantIdentity(item) === variantIdentity(variant))?.costPrice;
+    return (
+      (props.storeMode ? undefined : variant.costPrice) ??
+      guide?.costPrice ??
+      partners.find((item) => variantIdentity(item) === variantIdentity(variant))?.costPrice
+    );
   }
   if (key === 'guide') return [guide?.priceCoefficient, guide?.price];
   if (key.startsWith('level_')) {

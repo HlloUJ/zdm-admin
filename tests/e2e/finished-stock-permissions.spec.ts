@@ -306,9 +306,7 @@ for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
     await expect(overlay.getByRole('button')).toHaveText(['详情', '彻底删除']);
     await overlay.getByRole('button', { name: '详情', exact: true }).click();
     const drawer = page.locator('.t-drawer:visible');
-    await expect(drawer.locator('.t-alert')).toContainText(
-      `${product.sourceMessage}，当前仅可查看资料或按权限彻底删除。`,
-    );
+    await expect(drawer.locator('.t-alert')).toHaveText(product.sourceMessage);
     await expect(drawer.getByText('保留商品资料', { exact: true })).toBeVisible();
     await expect(drawer.locator('input,textarea')).toHaveCount(0);
     if (sourceStatus === 'recycle')

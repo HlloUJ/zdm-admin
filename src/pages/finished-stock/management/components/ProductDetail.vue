@@ -61,7 +61,6 @@
           product.supplier || '未填写'
         }}</t-descriptions-item>
       </t-descriptions>
-
     </AdminSectionCard>
     <AdminSectionCard v-if="showSales !== false" :class="{ 'product-detail__bordered-card': operations }">
       <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations }">销售信息</h3>
@@ -179,9 +178,7 @@ const descriptionMedia = computed(() => {
 function previewDescription(resource: { url?: string; mediaType: string }) {
   if (resource.url) emit('preview', { url: resource.url }, resource.mediaType === 'video' ? 'video' : 'image');
 }
-const sourceMessage = computed(
-  () => props.product.sourceMessage || '上游商品不可用',
-);
+const sourceMessage = computed(() => props.product.sourceMessage || '上游商品不可用');
 const dimensions = computed(() => props.product.specDimensions ?? []);
 const layeredDimensions = computed(() =>
   props.operations && props.product.variants[0]?.displayMode === 'layered' ? dimensions.value : [],
@@ -209,7 +206,15 @@ const columns = computed<PrimaryTableCol[]>(() => {
     ...extraFields.value.map((key) => ({ colKey: key, title: props.attributeNames[key] || key, minWidth: 120 })),
   ];
   const priceColumns = [
-    ...(props.poolMode ? [] : [{ colKey: 'cost', title: props.storeMode ? (props.storeLevelName ? `${props.storeLevelName}价` : '—') : '成本价', minWidth: 100 }]),
+    ...(props.poolMode
+      ? []
+      : [
+          {
+            colKey: 'cost',
+            title: props.storeMode ? (props.storeLevelName ? `${props.storeLevelName}价` : '—') : '成本价',
+            minWidth: 100,
+          },
+        ]),
     ...(props.operations
       ? [
           {

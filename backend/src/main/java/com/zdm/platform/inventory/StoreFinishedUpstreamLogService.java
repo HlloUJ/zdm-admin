@@ -72,6 +72,7 @@ public class StoreFinishedUpstreamLogService {
         "OPERATIONS_OFF_SHELF", "OPERATIONS_DELETE_TO_RECYCLE", "OPERATIONS_PURGE").contains(type)) {
       storeProducts.getObject().invalidateFromUpstream(productId, FinishedSourceMessage.normalize(summary));
     }
+    summary = FinishedSourceMessage.normalize(summary);
     var actor = identities.require();
     jdbc.update("""
         INSERT INTO store_finished_operation_logs

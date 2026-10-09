@@ -36,12 +36,17 @@ describe('store finished-stock operation log', () => {
   });
 
   it('presents both upstream status fields as source status while preserving local status wording', () => {
-    const label = (value?: string | null) => value === 'selling' ? '出售中' : '已下架';
+    const label = (value?: string | null) => (value === 'selling' ? '出售中' : '已下架');
     for (const field of ['来源状态', '运营状态']) {
-      expect(parseStoreOperationLogChanges(JSON.stringify({
-        [field]: { before: 'selling', after: 'offShelf' },
-        状态: { before: 'selling', after: 'offShelf' },
-      }), label)).toEqual({
+      expect(
+        parseStoreOperationLogChanges(
+          JSON.stringify({
+            [field]: { before: 'selling', after: 'offShelf' },
+            状态: { before: 'selling', after: 'offShelf' },
+          }),
+          label,
+        ),
+      ).toEqual({
         来源状态: { before: '已上架', after: '已下架' },
         状态: { before: '出售中', after: '已下架' },
       });
@@ -49,8 +54,18 @@ describe('store finished-stock operation log', () => {
   });
 
   it('suppresses only store state comparisons and exposes off-shelf reasons', () => {
-    for (const type of ['SHELF', 'OFF_SHELF', 'RESTORE', 'RESTORE_WAREHOUSE', 'RESTORE_RECYCLE',
-      'DELETE_TO_RECYCLE', 'PURGE', 'PHYSICAL_DELETE', 'SOLD_OUT', 'STATUS_UPDATE']) {
+    for (const type of [
+      'SHELF',
+      'OFF_SHELF',
+      'RESTORE',
+      'RESTORE_WAREHOUSE',
+      'RESTORE_RECYCLE',
+      'DELETE_TO_RECYCLE',
+      'PURGE',
+      'PHYSICAL_DELETE',
+      'SOLD_OUT',
+      'STATUS_UPDATE',
+    ]) {
       expect(isStoreStatusOperation(type)).toBe(true);
     }
     for (const type of ['SELECT', 'UPDATE', 'PRICE_UPDATE', 'SOURCE_OFF_SHELF', 'OPERATIONS_OFF_SHELF']) {

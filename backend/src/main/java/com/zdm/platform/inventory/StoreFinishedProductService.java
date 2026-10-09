@@ -331,9 +331,9 @@ public class StoreFinishedProductService {
       Map<String, Object> snapshot = selectionSnapshots.capture(poolDetail(productId), store.storeLevelId());
       jdbc.update("""
           INSERT INTO store_finished_products
-            (tenant_id, store_id, finished_product_id, status, selected_by_account_id)
-          VALUES (?, ?, ?, 'warehouse', ?)
-          """, store.tenantId(), store.storeId(), productId, store.accountId());
+            (tenant_id, store_id, finished_product_id, status, selected_by_account_id, selection_generation)
+          VALUES (?, ?, ?, 'warehouse', ?, ?)
+          """, store.tenantId(), store.storeId(), productId, store.accountId(), source.get("selection_generation"));
       Long listingId = jdbc.queryForObject("""
           SELECT id FROM store_finished_products
           WHERE store_id = ? AND finished_product_id = ?
@@ -525,8 +525,13 @@ public class StoreFinishedProductService {
     for (Map<String, Object> row : jdbc.queryForList("""
         SELECT listing.*, store.store_level_id FROM store_finished_products listing
         JOIN stores store ON store.id=listing.store_id AND store.tenant_id=listing.tenant_id
-        WHERE listing.finished_product_id=? AND listing.invalidated_at IS NULL
+        JOIN finished_products product ON product.id=listing.finished_product_id
+        WHERE listing.finished_product_id=? AND listing.selection_generation=product.selection_generation
         """, productId)) {
+      if (invalidated(row)) {
+        jdbc.update("UPDATE store_finished_products SET invalidated_reason=? WHERE id=?", reason, row.get("id"));
+        continue;
+      }
       var owner = new CityPartnerStoreScope.Store(number(row.get("tenant_id")), number(row.get("store_id")),
           number(row.get("store_level_id")), null, null);
       try {

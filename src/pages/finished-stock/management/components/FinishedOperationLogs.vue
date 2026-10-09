@@ -15,6 +15,7 @@
     :status-label="state"
     :format-time="time"
     :source-label="sourceLabel"
+    :summary-label="finishedProductOperationSummary"
     @filter-change="updateFilter"
     @search="search"
     @reset="reset"
@@ -67,7 +68,11 @@ import DOMPurify from 'dompurify';
 import { getLoginUser } from '@/services/auth';
 import { AdminDialog, adminFeedback } from '@/components/foundation';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
-import { productLogFilterOptions, type ProductOperationLogRow } from '@/services/productOperationLog';
+import {
+  finishedProductOperationSummary,
+  productLogFilterOptions,
+  type ProductOperationLogRow,
+} from '@/services/productOperationLog';
 import {
   listFinishedOperationLogs,
   getFinishedOperationLog,

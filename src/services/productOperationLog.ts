@@ -67,6 +67,22 @@ const fixedSummaries: Record<string, string> = {
   OPERATIONS_PURGE: '运营管理平台已彻底删除该商品',
 };
 
+const finishedSourceSummaries: Record<string, string> = {
+  SOURCE_OFF_SHELF: '该商品已被供应链下架',
+  SOURCE_DELETE: '该商品已被供应链彻底删除',
+  SOURCE_DELETE_TO_RECYCLE: '该商品已被供应链删除至回收站',
+  SOURCE_PURGE: '该商品已被供应链彻底删除',
+  OPERATIONS_OFF_SHELF: '该商品已被运营管理平台下架',
+  OPERATIONS_DELETE_TO_RECYCLE: '该商品已被运营管理平台删除至回收站',
+  OPERATIONS_PURGE: '该商品已被运营管理平台彻底删除',
+};
+
+export function finishedProductOperationSummary(
+  row: Pick<ProductOperationLogRow, 'operationType' | 'operationSummary'>,
+): string {
+  return finishedSourceSummaries[row.operationType] || productOperationSummary(row);
+}
+
 export function productOperationTypeLabel(type: string): string {
   return productOperationTypes[type] || type;
 }

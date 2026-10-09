@@ -152,6 +152,8 @@ public class ProductLifecycleService {
           String snapshot = json.writeValueAsString(snapshotNode);
           jdbc.update("UPDATE finished_products SET operations_invalidated_reason=?,operations_invalidated_at=NOW(),operations_invalidated_snapshot=? WHERE id=?", invalidReason, snapshot, id);
         } catch (JsonProcessingException error) { throw new IllegalStateException("运营失效快照保存失败", error); }
+      } else if (!deleted(row)) {
+        jdbc.update("UPDATE finished_products SET operations_invalidated_reason=? WHERE id=?", invalidReason, id);
       }
     }
     String blockReason = switch (target) {
@@ -174,7 +176,7 @@ public class ProductLifecycleService {
       if(kind==Kind.FINISHED) { jdbc.update("UPDATE finished_products SET off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?",id); }
       else { jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'",id); }
       if (kind == Kind.FINISHED) {
-        jdbc.update("UPDATE finished_products SET operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
+        jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
       }
       reprice(kind,id,false);
     }
@@ -248,7 +250,7 @@ public class ProductLifecycleService {
     if (kind==Kind.FINISHED) { jdbc.update("DELETE FROM finished_product_guide_prices WHERE finished_product_id=?",id); }
     else { jdbc.update("UPDATE slab_inventory SET guide_price_coefficient=NULL WHERE id=?",id); }
     if (kind == Kind.FINISHED && row.get("operations_invalidated_at") != null && !unavailable((String) row.get("source_status"))) {
-      jdbc.update("UPDATE finished_products SET operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL,off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?", id);
+      jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL,off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?", id);
       reprice(kind, id, false);
       sqlSession.clearCache();
       arrivalLogs.record(id, (String) row.get("source_status"));

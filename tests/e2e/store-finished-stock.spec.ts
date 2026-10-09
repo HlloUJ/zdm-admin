@@ -78,179 +78,182 @@ function product(overrides: Record<string, unknown> = {}) {
 }
 
 for (const displayMode of ['single', 'layered'] as const) {
-test(`${displayMode} product center shows price ranges and read-only details without supply costs`, async ({ page }) => {
-  await storeLogin(page);
-  const imageUrl =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6bEAAAAASUVORK5CYII=';
-  let writes = 0;
-  await page.route('**/api/admin/store-finished-products**', (route) => {
-    const request = route.request();
-    if (request.method() !== 'GET') writes++;
-    const path = new URL(request.url()).pathname;
-    if (path.endsWith('/pool-categories')) {
-      return route.fulfill({
-        json: ok([
-          { id: 1, name: '家具' },
-          { id: 2, parentId: 1, name: '桌椅' },
-          { id: 3, parentId: 2, name: '餐桌' },
-          { id: 4, name: '灯具' },
-        ]),
-      });
-    }
-    if (path.endsWith('/pool/91')) {
-      return route.fulfill({
-        json: ok({
-          id: 91,
-          name: '门店测试商品',
-          merchantCode: 'STORE-91',
-          totalStock: 5,
-          imageUrls: [],
-          categoryName: '家具 / 桌椅 / 餐桌',
-          storeLevelName: '区域合作门店',
-          attributeNames: { attribute_57: '销售属性（共享）', attribute_63: '销售属性（专属）' },
-          supplierName: '平台供应商',
-          detail: '<p>商品中心只读详情</p>',
-          attributes: [{ attributeId: 1, attributeName: '材质', value: '天然石' }],
-          specDimensions: [{ key: 'color', name: '颜色', values: ['白色', '黑色'] }],
-          skus: [
-            {
-              skuId: 101,
-              label: '白色',
-              stock: 3,
-              displayMode,
-              salesAttributes: { color: '白色', attribute_57: '纹理 A', attribute_63: '光面' },
-              guidePrice: 150,
-              partnerPrice: 100,
-            },
-            {
-              skuId: 102,
-              label: '黑色',
-              stock: 2,
-              displayMode,
-              salesAttributes: { color: '黑色', attribute_57: '纹理 B', attribute_63: '哑光' },
-              guidePrice: 180,
-              partnerPrice: 120,
-            },
-          ],
-        }),
-      });
-    }
-    if (path.endsWith('/pool')) {
-      return route.fulfill({
-        json: ok([
-          {
+  test(`${displayMode} product center shows price ranges and read-only details without supply costs`, async ({
+    page,
+  }) => {
+    await storeLogin(page);
+    const imageUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6bEAAAAASUVORK5CYII=';
+    let writes = 0;
+    await page.route('**/api/admin/store-finished-products**', (route) => {
+      const request = route.request();
+      if (request.method() !== 'GET') writes++;
+      const path = new URL(request.url()).pathname;
+      if (path.endsWith('/pool-categories')) {
+        return route.fulfill({
+          json: ok([
+            { id: 1, name: '家具' },
+            { id: 2, parentId: 1, name: '桌椅' },
+            { id: 3, parentId: 2, name: '餐桌' },
+            { id: 4, name: '灯具' },
+          ]),
+        });
+      }
+      if (path.endsWith('/pool/91')) {
+        return route.fulfill({
+          json: ok({
             id: 91,
             name: '门店测试商品',
             merchantCode: 'STORE-91',
             totalStock: 5,
-            imageUrl,
+            imageUrls: [],
+            categoryName: '家具 / 桌椅 / 餐桌',
             storeLevelName: '区域合作门店',
-            categoryId: 3,
-            guidePriceMin: 150,
-            guidePriceMax: 180,
-            partnerPriceMin: 100,
-            partnerPriceMax: 120,
-          },
-        ]),
-      });
-    }
-    return route.fulfill({ json: ok([]) });
+            attributeNames: { attribute_57: '销售属性（共享）', attribute_63: '销售属性（专属）' },
+            supplierName: '平台供应商',
+            detail: '<p>商品中心只读详情</p>',
+            attributes: [{ attributeId: 1, attributeName: '材质', value: '天然石' }],
+            specDimensions: [{ key: 'color', name: '颜色', values: ['白色', '黑色'] }],
+            skus: [
+              {
+                skuId: 101,
+                label: '白色',
+                stock: 3,
+                displayMode,
+                salesAttributes: { color: '白色', attribute_57: '纹理 A', attribute_63: '光面' },
+                guidePrice: 150,
+                partnerPrice: 100,
+              },
+              {
+                skuId: 102,
+                label: '黑色',
+                stock: 2,
+                displayMode,
+                salesAttributes: { color: '黑色', attribute_57: '纹理 B', attribute_63: '哑光' },
+                guidePrice: 180,
+                partnerPrice: 120,
+              },
+            ],
+          }),
+        });
+      }
+      if (path.endsWith('/pool')) {
+        return route.fulfill({
+          json: ok([
+            {
+              id: 91,
+              name: '门店测试商品',
+              merchantCode: 'STORE-91',
+              totalStock: 5,
+              imageUrl,
+              storeLevelName: '区域合作门店',
+              categoryId: 3,
+              guidePriceMin: 150,
+              guidePriceMax: 180,
+              partnerPriceMin: 100,
+              partnerPriceMax: 120,
+            },
+          ]),
+        });
+      }
+      return route.fulfill({ json: ok([]) });
+    });
+    await page.goto('/store/finished-stock-management');
+    await page.getByRole('button', { name: '商品中心' }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    await expect(dialog.getByText('商品中心', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: '批量选择', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: '取消', exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: '选择', exact: true })).toHaveCount(0);
+    await expect(dialog.locator('.t-dialog__footer')).toHaveCount(0);
+    await expect(dialog.locator('.toolbar-buttons').getByRole('button', { name: '批量选择', exact: true })).toHaveClass(
+      /t-button--theme-primary/,
+    );
+    const keyword = dialog.getByPlaceholder('商品名称 / ID');
+    const search = dialog.getByRole('button', { name: '查询', exact: true });
+    const reset = dialog.getByRole('button', { name: '重置', exact: true });
+    const initialInputWidth = await keyword.evaluate((element) => element.clientWidth);
+    await keyword.fill('用于检查宽度是否稳定的很长商品名称或商品ID1234567890');
+    expect(await keyword.evaluate((element) => element.clientWidth)).toBe(initialInputWidth);
+    await expect
+      .poll(async () => {
+        const tableBox = (await dialog.locator('.t-table').boundingBox())!;
+        const resetBox = (await reset.boundingBox())!;
+        return Math.abs(resetBox.x + resetBox.width - tableBox.x - tableBox.width);
+      })
+      .toBeLessThanOrEqual(1);
+    await keyword.fill('不存在');
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
+    await search.click();
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
+    await keyword.fill('91');
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
+    await search.click();
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
+    await reset.click();
+    await expect(keyword).toHaveValue('');
+    const category = dialog.locator('.t-form .t-select-input');
+    await category.click();
+    await page.getByText('灯具', { exact: true }).click();
+    await expect(page.locator('.t-cascader-panel:visible')).toHaveCount(0);
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
+    await search.click();
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
+    await category.click();
+    await page.getByText('家具', { exact: true }).hover();
+    await page.getByText('桌椅', { exact: true }).hover();
+    await page.getByText('餐桌', { exact: true }).click();
+    await expect(category.getByText('餐桌', { exact: true })).toBeVisible();
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
+    await search.click();
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
+    await reset.click();
+    await expect(category.getByText('餐桌', { exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole('columnheader', { name: '商品主图', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('columnheader', { name: '区域合作门店价', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('columnheader', { name: '合伙人价', exact: true })).toHaveCount(0);
+    await expect(dialog.getByText('150.00 ~ 180.00', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('100.00 ~ 120.00', { exact: true })).toBeVisible();
+    await dialog.locator('tbody .t-image').click();
+    const imageDialog = page.locator('.t-dialog:visible').filter({ hasText: '商品主图' }).last();
+    await expect(imageDialog.locator('img[alt="商品主图"]')).toHaveAttribute('src', imageUrl);
+    await imageDialog.locator('.t-dialog__close').click();
+    const selectButton = dialog.getByRole('button', { name: '批量选择', exact: true });
+    await expect(selectButton).toBeEnabled();
+    await selectButton.click();
+    await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
+    expect(writes).toBe(0);
+    expect((await dialog.boundingBox())!.width).toBeGreaterThan(1100);
+    expect(
+      (await dialog.getByRole('columnheader', { name: '商品名称/ID', exact: true }).boundingBox())!.width,
+    ).toBeGreaterThan(400);
+    await dialog.locator('thead .t-checkbox').click();
+    await dialog.getByText('详情', { exact: true }).click();
+    const drawer = page.locator('.t-drawer:visible');
+    await expect(drawer.getByText('商品中心只读详情')).toBeVisible();
+    await expect(drawer.getByText('基础信息', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('供应商', { exact: true })).toHaveCount(0);
+    await expect(drawer.getByText('平台供应商', { exact: true })).toHaveCount(0);
+    await expect(drawer.getByText('家具 / 桌椅 / 餐桌', { exact: true })).toBeVisible();
+    await expect(drawer.getByRole('columnheader', { name: '销售属性（共享）', exact: true })).toBeVisible();
+    await expect(drawer.getByRole('columnheader', { name: '销售属性（专属）', exact: true })).toBeVisible();
+    await expect(drawer.getByText(/attribute_\d+/)).toHaveCount(0);
+    if (displayMode === 'single') {
+      await expect(drawer.getByText('SKU ID：101', { exact: true })).toBeVisible();
+      await expect(drawer.getByText('SKU ID：102', { exact: true })).toBeVisible();
+    } else await expect(drawer.getByText(/SKU ID/)).toHaveCount(0);
+    await expect(drawer.getByText('销售信息', { exact: true })).toBeVisible();
+    await expect(drawer.getByRole('columnheader', { name: '指导价', exact: true })).toBeVisible();
+    await expect(drawer.getByRole('columnheader', { name: '区域合作门店价', exact: true })).toBeVisible();
+    await expect(drawer.getByText('成本价', { exact: false })).toHaveCount(0);
+    await expect(drawer.locator('input:visible, textarea:visible, .t-input-number:visible')).toHaveCount(0);
+    await expect(drawer.getByRole('cell', { name: '100', exact: true })).toBeVisible();
+    await expect(drawer.getByRole('cell', { name: '120', exact: true })).toBeVisible();
+    await expect(drawer.getByRole('cell', { name: '白色', exact: true })).toBeVisible();
+    expect(writes).toBe(0);
+    await drawer.locator('.t-drawer__close-btn').click();
+    await expect(dialog.locator('tbody .t-checkbox')).toHaveClass(/t-is-checked/);
   });
-  await page.goto('/store/finished-stock-management');
-  await page.getByRole('button', { name: '商品中心' }).click();
-  const dialog = page.locator('.t-dialog:visible');
-  await expect(dialog.getByText('商品中心', { exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '批量选择', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '取消', exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: '选择', exact: true })).toHaveCount(0);
-  await expect(dialog.locator('.t-dialog__footer')).toHaveCount(0);
-  await expect(dialog.locator('.toolbar-buttons').getByRole('button', { name: '批量选择', exact: true })).toHaveClass(
-    /t-button--theme-primary/,
-  );
-  const keyword = dialog.getByPlaceholder('商品名称 / ID');
-  const search = dialog.getByRole('button', { name: '查询', exact: true });
-  const reset = dialog.getByRole('button', { name: '重置', exact: true });
-  const initialInputWidth = await keyword.evaluate((element) => element.clientWidth);
-  await keyword.fill('用于检查宽度是否稳定的很长商品名称或商品ID1234567890');
-  expect(await keyword.evaluate((element) => element.clientWidth)).toBe(initialInputWidth);
-  await expect
-    .poll(async () => {
-      const tableBox = (await dialog.locator('.t-table').boundingBox())!;
-      const resetBox = (await reset.boundingBox())!;
-      return Math.abs(resetBox.x + resetBox.width - tableBox.x - tableBox.width);
-    })
-    .toBeLessThanOrEqual(1);
-  await keyword.fill('不存在');
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
-  await search.click();
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
-  await keyword.fill('91');
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
-  await search.click();
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
-  await reset.click();
-  await expect(keyword).toHaveValue('');
-  const category = dialog.locator('.t-form .t-select-input');
-  await category.click();
-  await page.getByText('灯具', { exact: true }).click();
-  await expect(page.locator('.t-cascader-panel:visible')).toHaveCount(0);
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
-  await search.click();
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
-  await category.click();
-  await page.getByText('家具', { exact: true }).hover();
-  await page.getByText('桌椅', { exact: true }).hover();
-  await page.getByText('餐桌', { exact: true }).click();
-  await expect(category.getByText('餐桌', { exact: true })).toBeVisible();
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(0);
-  await search.click();
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveCount(1);
-  await reset.click();
-  await expect(category.getByText('餐桌', { exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole('columnheader', { name: '商品主图', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('columnheader', { name: '区域合作门店价', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('columnheader', { name: '合伙人价', exact: true })).toHaveCount(0);
-  await expect(dialog.getByText('150.00 ~ 180.00', { exact: true })).toBeVisible();
-  await expect(dialog.getByText('100.00 ~ 120.00', { exact: true })).toBeVisible();
-  await dialog.locator('tbody .t-image').click();
-  const imageDialog = page.locator('.t-dialog:visible').filter({ hasText: '商品主图' }).last();
-  await expect(imageDialog.locator('img[alt="商品主图"]')).toHaveAttribute('src', imageUrl);
-  await imageDialog.locator('.t-dialog__close').click();
-  const selectButton = dialog.getByRole('button', { name: '批量选择', exact: true });
-  await expect(selectButton).toBeEnabled();
-  await selectButton.click();
-  await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
-  expect(writes).toBe(0);
-  expect((await dialog.boundingBox())!.width).toBeGreaterThan(1100);
-  expect((await dialog.getByRole('columnheader', { name: '商品名称/ID', exact: true }).boundingBox())!.width).toBeGreaterThan(400);
-  await dialog.locator('thead .t-checkbox').click();
-  await dialog.getByText('详情', { exact: true }).click();
-  const drawer = page.locator('.t-drawer:visible');
-  await expect(drawer.getByText('商品中心只读详情')).toBeVisible();
-  await expect(drawer.getByText('基础信息', { exact: true })).toBeVisible();
-  await expect(drawer.getByText('供应商', { exact: true })).toHaveCount(0);
-  await expect(drawer.getByText('平台供应商', { exact: true })).toHaveCount(0);
-  await expect(drawer.getByText('家具 / 桌椅 / 餐桌', { exact: true })).toBeVisible();
-  await expect(drawer.getByRole('columnheader', { name: '销售属性（共享）', exact: true })).toBeVisible();
-  await expect(drawer.getByRole('columnheader', { name: '销售属性（专属）', exact: true })).toBeVisible();
-  await expect(drawer.getByText(/attribute_\d+/)).toHaveCount(0);
-  if (displayMode === 'single') {
-    await expect(drawer.getByText('SKU ID：101', { exact: true })).toBeVisible();
-    await expect(drawer.getByText('SKU ID：102', { exact: true })).toBeVisible();
-  } else await expect(drawer.getByText(/SKU ID/)).toHaveCount(0);
-  await expect(drawer.getByText('销售信息', { exact: true })).toBeVisible();
-  await expect(drawer.getByRole('columnheader', { name: '指导价', exact: true })).toBeVisible();
-  await expect(drawer.getByRole('columnheader', { name: '区域合作门店价', exact: true })).toBeVisible();
-  await expect(drawer.getByText('成本价', { exact: false })).toHaveCount(0);
-  await expect(drawer.locator('input:visible, textarea:visible, .t-input-number:visible')).toHaveCount(0);
-  await expect(drawer.getByRole('cell', { name: '100', exact: true })).toBeVisible();
-  await expect(drawer.getByRole('cell', { name: '120', exact: true })).toBeVisible();
-  await expect(drawer.getByRole('cell', { name: '白色', exact: true })).toBeVisible();
-  expect(writes).toBe(0);
-  await drawer.locator('.t-drawer__close-btn').click();
-  await expect(dialog.locator('tbody .t-checkbox')).toHaveClass(/t-is-checked/);
-});
-
 }
 
 test('store uses a direct menu, selects an operations product, and edits only its own price', async ({ page }) => {
@@ -427,7 +430,9 @@ for (const entry of ['门店详情', '商品中心详情']) {
       const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (event) => chunks.push(event.data);
-      const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
+      const stopped = new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+      });
       recorder.start();
       const context = canvas.getContext('2d')!;
       context.fillStyle = 'blue';
@@ -439,7 +444,8 @@ for (const entry of ['门店详情', '商品中心详情']) {
       return Array.from(new Uint8Array(await new Blob(chunks, { type: 'video/webm' }).arrayBuffer()));
     });
     await page.route('**/store-preview.webm', (route) =>
-      route.fulfill({ contentType: 'video/webm', body: Buffer.from(videoBytes) }));
+      route.fulfill({ contentType: 'video/webm', body: Buffer.from(videoBytes) }),
+    );
     const value = product({
       detail: '<p>竖向商品视频</p><video src="/store-preview.webm"></video>',
       sourceUnavailable: true,
@@ -447,13 +453,19 @@ for (const entry of ['门店详情', '商品中心详情']) {
     });
     await page.route('**/api/admin/store-finished-products**', (route) => {
       const path = new URL(route.request().url()).pathname;
-      if (path.endsWith('/pool/91')) return route.fulfill({ json: ok({ ...value, id: 91, attributeNames: {}, storeLevelName: '中心店' }) });
+      if (path.endsWith('/pool/91'))
+        return route.fulfill({ json: ok({ ...value, id: 91, attributeNames: {}, storeLevelName: '中心店' }) });
       if (path.endsWith('/pool')) return route.fulfill({ json: ok([{ id: 91, name: value.name }]) });
       if (path.endsWith('/41')) return route.fulfill({ json: ok(value) });
-      return route.fulfill({ json: ok(path.endsWith('/categories') || path.endsWith('/pool-categories') || entry === '商品中心详情' ? [] : [value]) });
+      return route.fulfill({
+        json: ok(
+          path.endsWith('/categories') || path.endsWith('/pool-categories') || entry === '商品中心详情' ? [] : [value],
+        ),
+      });
     });
     await page.goto('/store/finished-stock-management');
-    if (entry === '门店详情') await page.locator('.source-unavailable-overlay').getByRole('button', { name: '详情', exact: true }).click();
+    if (entry === '门店详情')
+      await page.locator('.source-unavailable-overlay').getByRole('button', { name: '详情', exact: true }).click();
     else {
       await page.getByRole('main').getByRole('button', { name: '商品中心', exact: true }).click();
       await page.locator('.t-dialog:visible').getByText('详情', { exact: true }).click();
@@ -577,24 +589,34 @@ for (const operationType of ['SOURCE_OFF_SHELF', 'OPERATIONS_OFF_SHELF']) {
     await storeLogin(page);
     const source = operationType.startsWith('SOURCE_');
     const log = {
-      id: 8, productId: 91, productName: '门店历史商品', operationType,
+      id: 8,
+      productId: 91,
+      productName: '门店历史商品',
+      operationType,
       operationSummary: source ? '供应链已下架该商品' : '运营端已下架该商品',
-      operatorName: '上游操作员', operatedAt: '2026-10-08T10:00:00',
-      beforeStatus: 'warehouse', afterStatus: 'warehouse',
+      operatorName: '上游操作员',
+      operatedAt: '2026-10-08T10:00:00',
+      beforeStatus: 'warehouse',
+      afterStatus: 'warehouse',
       changeDetails: JSON.stringify({ [source ? '来源状态' : '运营状态']: { before: 'selling', after: 'offShelf' } }),
     };
     await page.route('**/api/admin/store-finished-products**', (route) => {
       const path = new URL(route.request().url()).pathname;
       if (path.endsWith('/operation-logs/8')) return route.fulfill({ json: ok(log) });
       if (path.endsWith('/operation-logs')) return route.fulfill({ json: ok({ records: [log], total: 1 }) });
-      return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : [product({ status: 'selling', effectiveStatus: 'selling' })]) });
+      return route.fulfill({
+        json: ok(path.endsWith('/categories') ? [] : [product({ status: 'selling', effectiveStatus: 'selling' })]),
+      });
     });
     await page.goto('/store/finished-stock-management');
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+    const expectedSummary = source ? '该商品已被供应链下架' : '该商品已被运营管理平台下架';
+    await expect(page.locator('.t-drawer--open').getByText(expectedSummary, { exact: true })).toBeVisible();
     await page.locator('.t-drawer--open').getByText('详情', { exact: true }).click();
     const detail = page.locator('.t-dialog:visible');
     await expect(detail.getByText('状态变化', { exact: true })).toBeVisible();
     await expect(detail.getByText('仓库中 → 仓库中', { exact: true })).toBeVisible();
+    await expect(detail.getByText(expectedSummary, { exact: true })).toBeVisible();
     const changes = detail.locator('.change-pair');
     await expect(detail.getByRole('heading', { name: '来源状态', exact: true })).toBeVisible();
     await expect(detail.getByRole('heading', { name: '运营状态', exact: true })).toHaveCount(0);
@@ -605,14 +627,25 @@ for (const operationType of ['SOURCE_OFF_SHELF', 'OPERATIONS_OFF_SHELF']) {
 }
 
 for (const operationType of ['SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE', 'PURGE']) {
-  test(`${operationType} store log omits duplicate comparison and keeps only off-shelf explanation`, async ({ page }) => {
+  test(`${operationType} store log omits duplicate comparison and keeps only off-shelf explanation`, async ({
+    page,
+  }) => {
     await storeLogin(page);
     const log = {
-      id: 9, productId: 91, productName: '本门店商品', operationType,
-      operationSummary: '本门店状态操作', operatorName: '门店员工', operatedAt: '2026-10-08T10:00:00',
-      beforeStatus: 'warehouse', afterStatus: 'selling',
-      changeDetails: JSON.stringify({ 状态: { before: 'warehouse', after: 'selling' },
-        下架原因: '商品信息调整', 详细说明: '调整规格后重新上架' }),
+      id: 9,
+      productId: 91,
+      productName: '本门店商品',
+      operationType,
+      operationSummary: '本门店状态操作',
+      operatorName: '门店员工',
+      operatedAt: '2026-10-08T10:00:00',
+      beforeStatus: 'warehouse',
+      afterStatus: 'selling',
+      changeDetails: JSON.stringify({
+        状态: { before: 'warehouse', after: 'selling' },
+        下架原因: '商品信息调整',
+        详细说明: '调整规格后重新上架',
+      }),
     };
     await page.route('**/api/admin/store-finished-products**', (route) => {
       const path = new URL(route.request().url()).pathname;
@@ -970,8 +1003,16 @@ test('selection log displays historical product, store prices and media without 
       销售属性名称: { attribute_57: '历史销售属性' },
       指导价: [{ skuId: 101, price: 300 }],
       层级价格: [{ skuId: 101, storeLevelId: 2, storeLevelName: '挑选时门店级别', price: 120 }],
-      宝贝详情: '<p>挑选时完整图文</p>',
-      媒体: [{ field: 'mainImage', mediaId: 1, resource: { available: true, url: imageUrl, mediaType: 'image' } }],
+      宝贝详情: '<p>挑选时完整图文</p><p><img src="media:2"></p><p><video src="media:3"></video></p>',
+      媒体: [
+        { field: 'mainImage', mediaId: 1, resource: { available: true, url: imageUrl, mediaType: 'image' } },
+        { field: 'detailImage', mediaId: 2, resource: { available: true, url: imageUrl, mediaType: 'image' } },
+        {
+          field: 'detailVideo',
+          mediaId: 3,
+          resource: { available: true, url: '/test-detail.mp4', mediaType: 'video' },
+        },
+      ],
     }),
   };
   await page.route('**/api/admin/store-finished-products**', (route) => {
@@ -994,13 +1035,17 @@ test('selection log displays historical product, store prices and media without 
   await expect(dialog.getByText('供应商', { exact: true })).toHaveCount(0);
   await expect(dialog.getByText('挑选时供应商', { exact: true })).toHaveCount(0);
   await expect(dialog.getByText('挑选时完整图文', { exact: true })).toBeVisible();
+  const richText = dialog.locator('.historical-rich-text');
+  await expect(richText.getByText('历史媒体已不可用')).toHaveCount(0);
+  await expect(richText.locator('img')).toHaveAttribute('src', imageUrl);
+  await expect(richText.locator('video')).toHaveAttribute('src', '/test-detail.mp4');
   const historicalSales = dialog.locator('.creation-snapshot-sections .sales-log-table');
   await expect(historicalSales.getByRole('columnheader', { name: '挑选时门店级别价', exact: true })).toBeVisible();
   await expect(historicalSales.getByRole('columnheader', { name: '历史销售属性', exact: true })).toBeVisible();
   await expect(dialog.getByText('120.00', { exact: true })).toBeVisible();
   await expect(dialog.getByText('成本价', { exact: true })).toHaveCount(0);
   await expect(dialog.getByText(/系数：/)).toHaveCount(0);
-  await expect(dialog.locator('img')).toHaveAttribute('src', imageUrl);
+  await expect(dialog.getByRole('button', { name: '查看商品主图' }).locator('img')).toHaveAttribute('src', imageUrl);
 });
 
 test('invalid warehouse overlay excludes selection and shows only the source reason', async ({ page }) => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { productOperationSummary, productOperationTypeLabel, productOperationTypeOptions } from './productOperationLog';
+import {
+  finishedProductOperationSummary,
+  productOperationSummary,
+  productOperationTypeLabel,
+  productOperationTypeOptions,
+} from './productOperationLog';
 
 describe('shared product operation vocabulary', () => {
   it('uses one label and summary for the same action across product types', () => {
@@ -11,6 +16,19 @@ describe('shared product operation vocabulary', () => {
     );
     expect(productOperationTypeLabel('PRICE_UPDATE')).toBe('编辑商品');
     expect(productOperationTypeLabel('OPERATIONS_OFF_SHELF')).toBe('运营管理平台下架');
+  });
+
+  it.each([
+    ['SOURCE_OFF_SHELF', '该商品已被供应链下架'],
+    ['SOURCE_DELETE_TO_RECYCLE', '该商品已被供应链删除至回收站'],
+    ['SOURCE_PURGE', '该商品已被供应链彻底删除'],
+    ['OPERATIONS_OFF_SHELF', '该商品已被运营管理平台下架'],
+    ['OPERATIONS_DELETE_TO_RECYCLE', '该商品已被运营管理平台删除至回收站'],
+    ['OPERATIONS_PURGE', '该商品已被运营管理平台彻底删除'],
+  ])('aligns finished-stock %s summaries without rewriting unrelated product logs', (operationType, expected) => {
+    const row = { operationType, operationSummary: '旧日志文案' };
+    expect(finishedProductOperationSummary(row)).toBe(expected);
+    expect(productOperationSummary(row)).not.toBe(expected);
   });
 
   it('offers one restore filter while retaining historical restore codes', () => {

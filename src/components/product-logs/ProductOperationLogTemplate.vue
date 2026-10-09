@@ -20,9 +20,11 @@
           <t-form-item label="操作类型">
             <t-select
               :value="filter.operationType"
-              :popup-props="operationTypePopupMinWidth
-                ? { overlayInnerStyle: { width: 'auto', minWidth: operationTypePopupMinWidth } }
-                : undefined"
+              :popup-props="
+                operationTypePopupMinWidth
+                  ? { overlayInnerStyle: { width: 'auto', minWidth: operationTypePopupMinWidth } }
+                  : undefined
+              "
               clearable
               placeholder="请选择"
               @change="emit('filter-change', 'operationType', String($event || ''))"
@@ -66,7 +68,7 @@
           <div v-if="row.subjectCode && subjectCodeLabel">{{ subjectCodeLabel }}：{{ row.subjectCode }}</div>
         </template>
         <template #operationType="{ row }">{{ productOperationTypeLabel(row.operationType) }}</template>
-        <template #operationSummary="{ row }">{{ productOperationSummary(row) }}</template>
+        <template #operationSummary="{ row }">{{ summaryLabel(row) }}</template>
         <template #operatedAt="{ row }">{{ formatTime(row.operatedAt) }}</template>
         <template #operation="{ row }"
           ><t-link theme="primary" @click="emit('open-detail', row.id)">详情</t-link></template
@@ -99,7 +101,7 @@
         <t-descriptions-item label="操作人">{{ detail.operatorName }}</t-descriptions-item>
         <t-descriptions-item label="操作时间">{{ formatTime(detail.operatedAt) }}</t-descriptions-item>
         <t-descriptions-item label="操作来源">{{ sourceLabel(detail) }}</t-descriptions-item>
-        <t-descriptions-item label="操作内容">{{ productOperationSummary(detail) }}</t-descriptions-item>
+        <t-descriptions-item label="操作内容">{{ summaryLabel(detail) }}</t-descriptions-item>
         <t-descriptions-item v-if="detail.beforeStatus || detail.afterStatus" label="状态变化">
           {{ statusLabel(detail.beforeStatus) }} → {{ statusLabel(detail.afterStatus) }}
         </t-descriptions-item>
@@ -151,8 +153,15 @@ const props = withDefaults(
     formatTime?: (value?: string) => string;
     sourceLabel: (row: ProductOperationLogRow) => string;
     showReason?: (row: ProductOperationLogRow) => boolean;
+    summaryLabel?: (row: ProductOperationLogRow) => string;
   }>(),
-  { loading: false, subjectCodeLabel: '', formatTime: productLogTime, showReason: () => true },
+  {
+    loading: false,
+    subjectCodeLabel: '',
+    formatTime: productLogTime,
+    showReason: () => true,
+    summaryLabel: productOperationSummary,
+  },
 );
 const emit = defineEmits<{
   'update:visible': [value: boolean];

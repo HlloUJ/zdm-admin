@@ -61,7 +61,9 @@
           :label="attribute.attributeName"
           >{{ text(attribute.value) }}</t-descriptions-item
         >
-        <t-descriptions-item v-if="!storeMode" label="供应商" :span="3">{{ text(snapshot['供应商']) }}</t-descriptions-item>
+        <t-descriptions-item v-if="!storeMode" label="供应商" :span="3">{{
+          text(snapshot['供应商'])
+        }}</t-descriptions-item>
       </t-descriptions>
     </AdminSectionCard>
     <AdminSectionCard>
