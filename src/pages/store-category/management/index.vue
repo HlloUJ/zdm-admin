@@ -9,7 +9,7 @@
         <AdminPageHeader :breadcrumbs="['门店分类管理']" />
 
         <t-alert v-if="tipVisible" theme="info" class="page-tip" close-btn @close="tipVisible = false">
-          门店分类最多支持 3 级；已有商品使用中的分类不支持删除；停用后不可用于新商品上架，历史商品保留原分类。
+          商品分类最多支持 3 级；已关联商品的分类不支持删除；停用后不可用于新商品发布，历史商品保留原分类。
         </t-alert>
         <AdminListLayout class="category-list-layout">
           <template #toolbar>
@@ -194,7 +194,6 @@ import {
   AdminPageHeader,
 } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
-import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
@@ -378,6 +377,9 @@ const toggleNode = (node: CategoryNode) => {
   else nextIds.add(node.id);
   expandedNodeIds.value = nextIds;
 };
+
+// 分类 API 返回数据库本地时间，不进行 UTC 时区转换。
+const formatDateTime = (value?: string) => (value ? value.replace(/-/g, '/').replace('T', ' ').slice(0, 16) : '-');
 
 const createdAtTimestamp = (record: Pick<StoreCategoryRecord, 'createdAt'>) => {
   const timestamp = new Date(record.createdAt ?? '').getTime();
@@ -702,6 +704,16 @@ watch(
   gap: var(--td-comp-margin-s);
 }
 
+/* 与商品分类管理一致，将排序标识放在行左侧，名称列紧随其后。 */
+.category-list-layout :deep(.category-table--sortable th:first-child),
+.category-list-layout :deep(.category-table--sortable td:first-child) {
+  padding-left: 0;
+  padding-right: 8px;
+}
+.category-list-layout :deep(.category-table--sortable th:nth-child(2)),
+.category-list-layout :deep(.category-table--sortable td:nth-child(2)) {
+  padding-left: 0;
+}
 .category-empty {
   margin-top: var(--td-comp-margin-xl);
 }

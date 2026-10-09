@@ -32,7 +32,7 @@ async function setup(page: Page, permissions: string[]) {
       productCount: 0,
       status: 'enabled',
       createdByName: '其他员工',
-      createdAt: '2026-10-09T06:28:00',
+      createdAt: '2026-10-09T14:28:00',
     },
     { id: 2, scope: 'finished', parentId: 1, name: '成品二级', sortOrder: 1, productCount: 0, status: 'enabled' },
     { id: 3, scope: 'finished', parentId: 2, name: '成品三级', sortOrder: 1, productCount: 0, status: 'enabled' },
@@ -61,6 +61,22 @@ test('switches isolated category types and limits maintenance to three levels', 
   await expect(page.locator('.t-tabs__nav-item').filter({ hasText: '成品现货分类' })).toBeVisible();
   await expect(page.locator('.t-tabs__nav-item').filter({ hasText: '配件分类' })).toBeVisible();
   await expect(page.getByText('其他员工', { exact: true })).toBeVisible();
+  const dragIcon = page.locator('tbody [data-category-id]').first();
+  await expect(dragIcon).toBeVisible();
+  const dragSpace = await dragIcon.evaluate((icon) => {
+    const cell = icon.closest('td')!;
+    const style = getComputedStyle(cell);
+    return {
+      available: cell.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+      required: icon.getBoundingClientRect().width,
+      inset: icon.getBoundingClientRect().left - cell.getBoundingClientRect().left,
+      nameInset: parseFloat(getComputedStyle(cell.nextElementSibling!).paddingLeft),
+    };
+  });
+  expect(dragSpace.required).toBeGreaterThan(0);
+  expect(dragSpace.available).toBeGreaterThanOrEqual(dragSpace.required);
+  expect(dragSpace.inset).toBe(0);
+  expect(dragSpace.nameInset).toBe(0);
   await expect(page.getByText('2026/10/09 14:28', { exact: true })).toBeVisible();
   await page.getByRole('row').filter({ hasText: '成品一级' }).getByRole('button', { name: '展开下级分类' }).click();
   await page.getByRole('row').filter({ hasText: '成品二级' }).getByRole('button', { name: '展开下级分类' }).click();
