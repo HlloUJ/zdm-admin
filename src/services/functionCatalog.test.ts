@@ -48,6 +48,25 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
+  it('registers two independent store category tabs with scoped maintenance actions', () => {
+    const prefix = 'admin.tenant.store-category-management';
+    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;
+    const page = module.menus[0].pages[0];
+    expect(page.actions).toEqual([]);
+    expect(page.tabs.map((tab) => [tab.label, tab.value])).toEqual([
+      ['成品现货分类', `${prefix}.finished`],
+      ['配件分类', `${prefix}.accessory`],
+    ]);
+    for (const tab of page.tabs) {
+      expect(tab.actions.map((action) => action.value)).toEqual(
+        ['view', 'create-root', 'create-child', 'edit', 'sort', 'toggle-status', 'delete'].map(
+          (action) => `${tab.value}.${action}`,
+        ),
+      );
+    }
+    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(14);
+  });
+
   it('keeps platform, supplier and store capabilities in their respective audiences', () => {
     expect(fullFunctionCatalog.map((module) => module.value)).toEqual([
       'admin.tenant',
@@ -179,15 +198,15 @@ describe('full function catalog', () => {
     ]);
     expect(
       normalizeTerminalPermissions('store', [
-        'admin.tenant.store-category-management.create-root',
+        'admin.tenant.store-category-management.finished.create-root',
         'store.goods.finished-stock.查询',
         'admin.permission-management.employee-management.query',
         'admin.permission-management.employee-management.reset',
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.create-root',
+      'admin.tenant.store-category-management.finished.view',
+      'admin.tenant.store-category-management.finished.create-root',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.permission',
     ]);
@@ -202,7 +221,7 @@ describe('full function catalog', () => {
     expect(operationValues).toContain('admin.tenant.tenant-management.unarchived.view');
     expect(operationValues).toContain('admin.tenant.store-level-management.view');
     expect(operationValues).toContain('admin.product-data-center.markup-configuration.finished.view');
-    expect(operationValues).not.toContain('admin.tenant.store-category-management.view');
+    expect(operationValues).not.toContain('admin.tenant.store-category-management.finished.view');
 
     expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('store'))).not.toContain(
       'admin.product-data-center.markup-configuration.finished.view',
@@ -230,15 +249,15 @@ describe('full function catalog', () => {
       'admin.tenant.store-level-management.view',
     );
     expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.supplier)).toContain(
-      'admin.tenant.store-category-management.view',
+      'admin.tenant.store-category-management.finished.view',
     );
 
     const storeRoleCatalog = filterFunctionCatalogByPermissions(terminalFunctionTrees.store, [
-      'admin.tenant.store-category-management.create-root',
+      'admin.tenant.store-category-management.finished.create-root',
     ]);
     expect(getFunctionCatalogPermissionValues(storeRoleCatalog)).toEqual([
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.create-root',
+      'admin.tenant.store-category-management.finished.view',
+      'admin.tenant.store-category-management.finished.create-root',
     ]);
   });
 
@@ -249,7 +268,7 @@ describe('full function catalog', () => {
         'admin.product-data-center.category.finished.enable',
         'admin.product-data-center.category.accessory.disable',
       ]),
-    ).toEqual(['admin.tenant.store-category-management.view', 'admin.tenant.store-category-management.toggle-status']);
+    ).toEqual([]);
   });
 
   it('maps legacy store grants to both tab views but never grants permanent delete implicitly', () => {
@@ -449,8 +468,10 @@ describe('category sorting permissions', () => {
         normalizeFunctionCatalogPermissions(fullFunctionCatalog, [`${prefix}.move-up`, `${prefix}.move-down`]),
       ).toEqual([`${prefix}.view`, `${prefix}.sort`]);
     }
-    expect(values).toContain('admin.tenant.store-category-management.move-up');
-    expect(values).toContain('admin.tenant.store-category-management.move-down');
+    expect(values).not.toContain('admin.tenant.store-category-management.move-up');
+    expect(values).not.toContain('admin.tenant.store-category-management.move-down');
+    for (const scope of ['finished', 'accessory'])
+      expect(values).toContain(`admin.tenant.store-category-management.${scope}.sort`);
   });
 });
 

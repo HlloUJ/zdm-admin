@@ -1,9 +1,11 @@
 import { request } from './http';
 
+export type StoreCategoryScope = 'finished' | 'accessory';
 export type StoreCategoryStatus = 'enabled' | 'disabled';
 
 export interface StoreCategoryRecord {
   id: number;
+  scope: StoreCategoryScope;
   parentId?: number | null;
   name: string;
   sortOrder: number;
@@ -15,43 +17,36 @@ export interface StoreCategoryRecord {
 }
 
 export interface StoreCategoryCreatePayload {
+  scope: StoreCategoryScope;
   parentId?: number | null;
   name: string;
   status: StoreCategoryStatus;
 }
 
-export function listStoreCategories() {
-  return request<StoreCategoryRecord[]>('/admin/store-categories');
-}
-
-export function createStoreCategory(payload: StoreCategoryCreatePayload) {
-  return request<StoreCategoryRecord>('/admin/store-categories', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function updateStoreCategory(id: number, name: string) {
-  return request<StoreCategoryRecord>(`/admin/store-categories/${id}`, {
+const base = '/admin/store-categories';
+export const listStoreCategories = (scope: StoreCategoryScope) =>
+  request<StoreCategoryRecord[]>(`${base}?scope=${scope}`);
+export const createStoreCategory = (payload: StoreCategoryCreatePayload) =>
+  request<StoreCategoryRecord>(base, { method: 'POST', body: JSON.stringify(payload) });
+export const updateStoreCategory = (
+  id: number,
+  scope: StoreCategoryScope,
+  name: string,
+  status?: StoreCategoryStatus,
+) =>
+  request<StoreCategoryRecord>(`${base}/${id}?scope=${scope}`, {
     method: 'PUT',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, status }),
   });
-}
-
-export function updateStoreCategoryStatus(id: number, status: StoreCategoryStatus) {
-  return request<StoreCategoryRecord>(`/admin/store-categories/${id}/status`, {
+export const updateStoreCategoryStatus = (id: number, scope: StoreCategoryScope, status: StoreCategoryStatus) =>
+  request<StoreCategoryRecord>(`${base}/${id}/status?scope=${scope}`, {
     method: 'PUT',
     body: JSON.stringify({ status }),
   });
-}
-
-export function moveStoreCategory(id: number, direction: 'up' | 'down') {
-  return request<StoreCategoryRecord>(`/admin/store-categories/${id}/move`, {
+export const sortStoreCategories = (scope: StoreCategoryScope, parentId: number | null, orderedIds: number[]) =>
+  request<StoreCategoryRecord[]>(`${base}/sort`, {
     method: 'PUT',
-    body: JSON.stringify({ direction }),
+    body: JSON.stringify({ scope, parentId, orderedIds }),
   });
-}
-
-export function deleteStoreCategory(id: number) {
-  return request<boolean>(`/admin/store-categories/${id}`, { method: 'DELETE' });
-}
+export const deleteStoreCategory = (id: number, scope: StoreCategoryScope) =>
+  request<boolean>(`${base}/${id}?scope=${scope}`, { method: 'DELETE' });
