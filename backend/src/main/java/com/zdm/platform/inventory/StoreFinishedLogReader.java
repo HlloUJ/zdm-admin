@@ -4,6 +4,7 @@ import com.zdm.platform.inventory.StoreFinishedProductService.LogEntry;
 import com.zdm.platform.inventory.StoreFinishedProductService.LogPage;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,7 +33,7 @@ final class StoreFinishedLogReader {
         row.getString("product_name"), row.getString("operation_type"),
         row.getString("operation_summary"), row.getString("before_status"),
         row.getString("after_status"), snapshots.withoutSupplier(row.getString("change_details")),
-        row.getString("operator_name"), row.getTimestamp("operated_at").toLocalDateTime()),
+        row.getString("operator_name"), row.getObject("operated_at", LocalDateTime.class)),
         store.tenantId(), store.storeId());
   }
 
@@ -112,7 +113,7 @@ final class StoreFinishedLogReader {
         legacyPriceEdit ? "编辑商品" : row.getString("operation_summary"),
         row.getString("before_status"), row.getString("after_status"),
         snapshots.withoutSupplier(row.getString("change_details")), row.getString("operator_name"),
-        row.getTimestamp("operated_at").toLocalDateTime());
+        row.getObject("operated_at", LocalDateTime.class));
   }
 
 }
