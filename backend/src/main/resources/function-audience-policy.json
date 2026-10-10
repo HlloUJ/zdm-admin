@@ -134,5 +134,17 @@
   {
     "prefix": "admin.permission-management.employee-management.supply-chain.create",
     "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.edit",
+    "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.toggle-status",
+    "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.delete",
+    "scope": "internal-management"
   }
 ]

@@ -1509,7 +1509,9 @@ test('supply chain manages its own roles independently of creation source', asyn
   ).toHaveText(['编辑', '权限', '删除']);
 });
 
-test('platform roles stay on its own client and supply-chain opening records are read-only', async ({ page }) => {
+test('platform roles stay on its own client and supply-chain administrators have account operations', async ({
+  page,
+}) => {
   const roleRequests: string[] = [];
   page.on('request', (r) => {
     if (r.url().includes('/api/admin/roles?')) roleRequests.push(r.url());
@@ -1539,7 +1541,7 @@ test('platform roles stay on its own client and supply-chain opening records are
   const row = page.locator('tbody tr').filter({ hasText: '初始管理员' });
   await expect(row).toBeVisible();
   await expect(row).toContainText('管理员');
-  await expect(row.locator('.table-actions .t-link')).toHaveCount(0);
+  await expect(row.locator('.table-actions .t-link')).toHaveText(['编辑', '停用', '删除']);
   await expect(page.getByRole('main').getByRole('button', { name: '邀请员工', exact: true })).toBeVisible();
   await expect(page.getByRole('main').locator('.zdm-admin-filter-form')).toBeVisible();
   await page.locator('.name-filter input').fill('不匹配的姓名');
@@ -1548,6 +1550,63 @@ test('platform roles stay on its own client and supply-chain opening records are
   await page.getByRole('button', { name: '重置', exact: true }).click();
   await expect(row).toBeVisible();
   expect(roleRequests.every((url) => new URL(url).searchParams.get('clientCode') === 'admin')).toBe(true);
+});
+
+test('platform edits, disables, enables and deletes only the selected supply-chain administrator', async ({ page }) => {
+  let administrator = {
+    id: 901,
+    name: '供应链管理员',
+    phone: '15926627771',
+    gender: 'female',
+    remark: '',
+    status: 'enabled',
+    identityType: 'supply_chain_admin',
+  };
+  await page.route(/\/api\/admin\/employees\?clientCode=supply-chain$/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, data: [administrator] }) }),
+  );
+  const mutations: string[] = [];
+  await page.route(/\/api\/admin\/supply-chain-administrators\/901(?:\/status)?$/, (route) => {
+    mutations.push(route.request().method() + ' ' + new URL(route.request().url()).pathname);
+    if (route.request().method() === 'DELETE') {
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, data: true }) });
+    }
+    administrator = { ...administrator, ...route.request().postDataJSON() };
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, data: administrator }) });
+  });
+  await page.goto('/employee-management');
+  await page.getByRole('main').locator('.t-tabs__nav-item').filter({ hasText: '供应链协同系统' }).click();
+  const row = page.locator('tbody tr').filter({ hasText: '15926627771' });
+  await expect(row.locator('.table-actions .t-link')).toHaveText(['编辑', '停用', '删除']);
+  await row.getByText('编辑', { exact: true }).click();
+  const profile = page.locator('.t-dialog:visible').filter({ hasText: '编辑资料' });
+  await expect(profile).toBeVisible();
+  await profile.locator('input').first().fill('供应链管理员新名');
+  await profile.locator('textarea').fill('管理员备注');
+  await profile.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(profile).toBeHidden();
+  await expect(row).toContainText('供应链管理员新名');
+  for (const action of ['停用', '启用']) {
+    await row.getByText(action, { exact: true }).last().click();
+    const confirm = page.locator('.t-dialog:visible').filter({ hasText: `是否${action}员工` });
+    await confirm.getByRole('button', { name: `确认${action}`, exact: true }).click();
+    await expect(confirm).toBeHidden();
+    await expect(row.locator('.table-actions .t-link')).toHaveText([
+      '编辑',
+      action === '停用' ? '启用' : '停用',
+      '删除',
+    ]);
+  }
+  await row.getByText('删除', { exact: true }).click();
+  const confirm = page.locator('.t-dialog:visible').filter({ hasText: '是否删除员工' });
+  await confirm.getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(row).toHaveCount(0);
+  expect(mutations).toEqual([
+    'PUT /api/admin/supply-chain-administrators/901',
+    'PATCH /api/admin/supply-chain-administrators/901/status',
+    'PATCH /api/admin/supply-chain-administrators/901/status',
+    'DELETE /api/admin/supply-chain-administrators/901',
+  ]);
 });
 
 test('shows only granted attribute tabs and falls back to the first accessible tab', async ({ page }) => {

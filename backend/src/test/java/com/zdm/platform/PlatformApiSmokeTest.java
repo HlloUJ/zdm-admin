@@ -5174,6 +5174,63 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     }
   }
 
+  @Test
+  void platformAdministratorLifecycleIsIsolatedFromOtherAccountIdentities() throws Exception {
+    for (boolean otherIdentity : List.of(false, true)) {
+      String phone=otherIdentity ? "15926627782" : "15926627781";
+      String invite=supplyAdminInvite();
+      mockMvc.perform(post("/api/open/employee-invites/{token}/register",invite).contentType("application/json")
+          .content("""
+              {"phone":"%s","verifyCode":"888888","name":"管理员原名","gender":"male"}
+              """.formatted(phone))).andExpect(status().isOk());
+      Long accountId=jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?",Long.class,phone);
+      Long id=jdbcTemplate.queryForObject("SELECT id FROM account_identities WHERE account_id=? AND client_code='supply-chain'",Long.class,accountId);
+      Long otherId=null;
+      try {
+        if (otherIdentity) {
+          jdbcTemplate.update("INSERT INTO account_identities(account_id,client_code,identity_type,subject_id,status) VALUES (?,'admin','tenant_admin',?,'enabled')",accountId,accountId);
+          otherId=jdbcTemplate.queryForObject("SELECT id FROM account_identities WHERE account_id=? AND client_code='admin'",Long.class,accountId);
+        }
+        String supplySession=sessionTokens.issue(authAccounts.findByIdentityId(id));
+        String base="/api/admin/supply-chain-administrators/"+id;
+        String profile="{\"name\":\"管理员新名\",\"gender\":\"female\",\"remark\":\"独立资料\",\"phone\":\"15900000999\",\"roleIds\":\"1\"}";
+        mockMvc.perform(put(base).header("Authorization","Bearer "+supplySession).contentType("application/json").content(profile)).andExpect(status().isForbidden());
+        mockMvc.perform(patch(base+"/status").header("Authorization","Bearer "+supplySession).contentType("application/json").content("{\"status\":\"disabled\"}")).andExpect(status().isForbidden());
+        mockMvc.perform(delete(base).header("Authorization","Bearer "+supplySession)).andExpect(status().isForbidden());
+        mockMvc.perform(put(base).header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN).contentType("application/json").content(profile))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value("管理员新名"))
+            .andExpect(jsonPath("$.data.gender").value("female")).andExpect(jsonPath("$.data.remark").value("独立资料"))
+            .andExpect(jsonPath("$.data.phone").value(phone));
+        assertThat(authAccounts.findByIdentityId(id).getDisplayName()).isEqualTo("管理员新名");
+        assertThat(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?",String.class,accountId)).isEqualTo("管理员原名");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_roles WHERE account_id=?",Integer.class,accountId)).isZero();
+        mockMvc.perform(patch(base+"/status").header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN).contentType("application/json").content("{\"status\":\"disabled\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("disabled"));
+        assertThat(authAccounts.findByIdentityId(id)).isNull();
+        mockMvc.perform(get("/api/admin/roles").header("Authorization","Bearer "+supplySession)).andExpect(status().isUnauthorized());
+        mockMvc.perform(patch(base+"/status").header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN).contentType("application/json").content("{\"status\":\"enabled\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("enabled"));
+        assertThat(authAccounts.findByIdentityId(id)).isNotNull();
+        mockMvc.perform(delete(base).header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_identities WHERE id=?",Integer.class,id)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM supply_chain_admin_profiles WHERE identity_id=?",Integer.class,id)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employee_invite_acceptances WHERE account_id=?",Integer.class,accountId)).isEqualTo(1);
+        if (otherIdentity) {
+          assertThat(authAccounts.findByIdentityId(otherId)).isNotNull();
+          assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?",String.class,accountId)).isEqualTo(phone);
+        } else {
+          assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?",String.class,accountId)).isNull();
+        }
+      } finally {
+        jdbcTemplate.update("DELETE FROM auth_sessions WHERE account_id=?",accountId);
+        jdbcTemplate.update("DELETE FROM account_identities WHERE account_id=?",accountId);
+        jdbcTemplate.update("DELETE FROM employee_invite_acceptances WHERE account_id=?",accountId);
+        jdbcTemplate.update("DELETE FROM employee_invites WHERE token=?",invite);
+        jdbcTemplate.update("DELETE FROM accounts WHERE id=?",accountId);
+      }
+    }
+  }
+
   private String supplyAdminInvite() throws Exception {
     MvcResult result=mockMvc.perform(post("/api/admin/employee-invites").param("clientCode","supply-chain")
         .header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN))

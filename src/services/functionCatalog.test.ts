@@ -207,7 +207,7 @@ describe('full function catalog', () => {
     }
   });
 
-  it('limits platform supply-chain administration to the opening invitation and its record', () => {
+  it('limits platform supply-chain administration to administrator account management', () => {
     const pages = filterFunctionCatalogByAudience('admin')
       .flatMap((m) => m.menus)
       .flatMap((m) => m.pages);
@@ -217,11 +217,11 @@ describe('full function catalog', () => {
     expect(roles.actions.every((a) => !a.value.includes('.supply-chain'))).toBe(true);
     const employees = pages.find((p) => p.value === 'admin.permission-management.employee-management')!;
     const supplyTab = employees.tabs.find((t) => t.value.endsWith('.supply-chain'))!;
-    expect(supplyTab.actions.map((a) => a.label)).toEqual(['查看', '邀请员工']);
+    expect(supplyTab.actions.map((a) => a.label)).toEqual(['查看', '邀请员工', '编辑', '停用/启用', '删除']);
     expect(
       normalizeFunctionCatalogPermissions(filterFunctionCatalogByAudience('admin'), [
         'admin.permission-management.role-management.supply-chain.view',
-        'admin.permission-management.employee-management.supply-chain.edit',
+        'admin.permission-management.employee-management.supply-chain.permission',
       ]),
     ).toEqual([]);
   });

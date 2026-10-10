@@ -83,7 +83,7 @@
                 {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
               </template>
               <template #gender="{ row }">
-                {{ row.identityType === 'supply_chain_admin' ? '-' : genderLabel(row.gender) }}
+                {{ genderLabel(row.gender) || '-' }}
               </template>
               <template #roles="{ row }">
                 <span>{{ row.identityType === 'supply_chain_admin' ? '管理员' : roleNames(row.roleIds) }}</span>
@@ -101,7 +101,7 @@
               <template #operation="{ row }">
                 <div class="table-actions">
                   <t-link
-                    v-if="canEditEmployee && row.id !== loginUser.employeeId"
+                    v-if="canEditEmployee && !isCurrentEmployee(row)"
                     theme="primary"
                     hover="color"
                     @click="openProfileDialog(row)"
@@ -109,9 +109,7 @@
                     编辑
                   </t-link>
                   <t-link
-                    v-if="
-                      canConfigureEmployeePermission && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId
-                    "
+                    v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)"
                     theme="primary"
                     hover="color"
                     @click="openPermissionDialog(row)"
@@ -119,7 +117,7 @@
                     角色
                   </t-link>
                   <t-link
-                    v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
+                    v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)"
                     :theme="row.status === 'normal' ? 'warning' : 'success'"
                     hover="color"
                     @click="openStatusConfirm(row)"
@@ -127,7 +125,7 @@
                     {{ row.status === 'normal' ? '停用' : '启用' }}
                   </t-link>
                   <t-link
-                    v-if="canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId"
+                    v-if="canDeleteEmployee && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)"
                     theme="danger"
                     hover="color"
                     @click="openDeleteConfirm(row)"
@@ -136,14 +134,10 @@
                   </t-link>
                   <span
                     v-if="
-                      !(canEditEmployee && row.id !== loginUser.employeeId) &&
-                      !(
-                        canConfigureEmployeePermission &&
-                        !isSuperAdminEmployee(row) &&
-                        row.id !== loginUser.employeeId
-                      ) &&
-                      !(canToggleEmployeeStatus && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId) &&
-                      !(canDeleteEmployee && !isSuperAdminEmployee(row) && row.id !== loginUser.employeeId)
+                      !(canEditEmployee && !isCurrentEmployee(row)) &&
+                      !(canConfigureEmployeePermission && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)) &&
+                      !(canToggleEmployeeStatus && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)) &&
+                      !(canDeleteEmployee && !isSuperAdminEmployee(row) && !isCurrentEmployee(row))
                     "
                     class="table-action-placeholder"
                   >
@@ -284,6 +278,9 @@ import {
 } from '@/services/functionCatalog';
 import {
   deleteEmployee,
+  deleteSupplyChainAdministrator,
+  updateSupplyChainAdministrator,
+  setSupplyChainAdministratorStatus,
   listEmployees,
   updateEmployee,
   updateEmployeePermissions,
@@ -303,7 +300,7 @@ interface EmployeeItem {
   id: number;
   identityType?: string;
   name: string;
-  gender: Exclude<Gender, ''>;
+  gender: Gender;
   phone: string;
   roleIds: string[];
   status: EmployeeStatus;
@@ -358,20 +355,15 @@ const isInternalAdministration = computed(
 
 const isPlatformSupplyChain = computed(() => isInternalAdministration.value && managedClient.value === 'supply-chain');
 const canCreateEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.create`));
-const canEditEmployee = computed(
-  () => !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.edit`),
-);
+const canEditEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.edit`));
 const canConfigureEmployeePermission = computed(
   () =>
     !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.permission`),
 );
-const canToggleEmployeeStatus = computed(
-  () =>
-    !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.toggle-status`),
+const canToggleEmployeeStatus = computed(() =>
+  hasPermission(loginUser.value, `${managementPermissionPrefix.value}.toggle-status`),
 );
-const canDeleteEmployee = computed(
-  () => !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.delete`),
-);
+const canDeleteEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.delete`));
 const operationRoleOptions = computed(() =>
   isPlatformSupplyChain.value
     ? [{ label: '管理员', value: 'supply_chain_admin' }]
@@ -523,6 +515,11 @@ const roleNames = (roleIds: string[]) =>
     .filter(Boolean)
     .join('、') || '-';
 
+const isCurrentEmployee = (row: EmployeeItem) =>
+  row.identityType === 'supply_chain_admin'
+    ? row.id === loginUser.value.identityId
+    : row.id === loginUser.value.employeeId;
+
 const isSuperAdminEmployee = (employee: EmployeeItem) =>
   employee.roleIds.some(
     (roleId) => operationRoles.value.find((role) => String(role.id) === roleId)?.code === 'SUPER_ADMIN',
@@ -551,7 +548,7 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
     id: record.id,
     identityType: record.identityType,
     name: record.name,
-    gender: record.gender ?? 'male',
+    gender: record.gender ?? (record.identityType === 'supply_chain_admin' ? '' : 'male'),
     phone: record.phone,
     roleIds,
     status: normalizeStatus(record.status),
@@ -566,7 +563,7 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
 
 const toEmployeePayload = (employee: EmployeeItem): EmployeePayload => ({
   name: employee.name,
-  gender: employee.gender,
+  gender: employee.gender || undefined,
   phone: employee.phone,
   status: toBackendStatus(employee.status),
   roleIds: employee.roleIds.join(','),
@@ -655,7 +652,7 @@ const copyInviteLink = async () => {
 };
 
 const openProfileDialog = (row: EmployeeItem) => {
-  if (row.id === loginUser.value.employeeId) {
+  if (isCurrentEmployee(row)) {
     adminFeedback.warning('不能编辑当前登录员工');
     return;
   }
@@ -676,7 +673,7 @@ const openPermissionDialog = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员天然拥有全量权限，无需配置权限');
     return;
   }
-  if (row.id === loginUser.value.employeeId) {
+  if (isCurrentEmployee(row)) {
     adminFeedback.warning('不能修改当前登录员工的角色');
     return;
   }
@@ -696,7 +693,9 @@ const handleProfileSubmit = async () => {
 
   if (activeEmployee.value) {
     try {
-      const updated = await updateEmployee(
+      const updated = await (
+        activeEmployee.value.identityType === 'supply_chain_admin' ? updateSupplyChainAdministrator : updateEmployee
+      )(
         activeEmployee.value.id,
         toEmployeePayload({
           ...activeEmployee.value,
@@ -761,6 +760,7 @@ const handleReset = () => {
 };
 
 const validateEmployeeBeforeEnable = (row: EmployeeItem) => {
+  if (row.identityType === 'supply_chain_admin') return true;
   const missingRole = row.roleIds.length === 0;
   const missingDataPermission = !row.dataPermission;
   if (missingRole && missingDataPermission) {
@@ -783,7 +783,7 @@ const openStatusConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员不可停用或启用');
     return;
   }
-  if (row.id === loginUser.value.employeeId) {
+  if (isCurrentEmployee(row)) {
     adminFeedback.warning('不能停用当前登录员工');
     return;
   }
@@ -800,7 +800,7 @@ const openDeleteConfirm = (row: EmployeeItem) => {
     adminFeedback.warning('超级管理员不可删除');
     return;
   }
-  if (row.id === loginUser.value.employeeId) {
+  if (isCurrentEmployee(row)) {
     adminFeedback.warning('不能删除当前登录员工');
     return;
   }
@@ -826,18 +826,26 @@ const handleConfirmSubmit = async () => {
 
   try {
     if (confirmType.value === 'delete') {
-      await deleteEmployee(confirmEmployee.value.id);
+      await (
+        confirmEmployee.value.identityType === 'supply_chain_admin' ? deleteSupplyChainAdministrator : deleteEmployee
+      )(confirmEmployee.value.id);
       employees.value = employees.value.filter((employee) => employee.id !== confirmEmployee.value?.id);
       if (pagination.current > pageCount.value) pagination.current = pageCount.value;
       adminFeedback.deleted(confirmEmployee.value.name);
     } else {
-      const updated = await updateEmployee(
-        confirmEmployee.value.id,
-        toEmployeePayload({
-          ...confirmEmployee.value,
-          status: confirmType.value === 'disable' ? 'disabled' : 'normal',
-        }),
-      );
+      const updated =
+        confirmEmployee.value.identityType === 'supply_chain_admin'
+          ? await setSupplyChainAdministratorStatus(
+              confirmEmployee.value.id,
+              confirmType.value === 'disable' ? 'disabled' : 'enabled',
+            )
+          : await updateEmployee(
+              confirmEmployee.value.id,
+              toEmployeePayload({
+                ...confirmEmployee.value,
+                status: confirmType.value === 'disable' ? 'disabled' : 'normal',
+              }),
+            );
       const targetIndex = employees.value.findIndex((employee) => employee.id === confirmEmployee.value?.id);
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));

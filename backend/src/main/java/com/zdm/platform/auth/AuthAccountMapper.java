@@ -14,7 +14,7 @@ public interface AuthAccountMapper {
         ai.identity_type AS identityType,
         ai.client_code AS clientCode,
         a.phone,
-        COALESCE(e.name, a.display_name) AS displayName,
+        COALESCE(e.name, sap.name, a.display_name) AS displayName,
         a.status,
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
@@ -28,6 +28,7 @@ public interface AuthAccountMapper {
         ON ai.account_id = a.id
        AND ai.client_code IN ('admin', 'supply-chain')
        AND ai.status = 'enabled'
+      LEFT JOIN supply_chain_admin_profiles sap ON sap.identity_id = ai.id
       LEFT JOIN employees e
         ON ai.identity_type = 'employee'
        AND e.id = ai.subject_id
@@ -57,6 +58,7 @@ public interface AuthAccountMapper {
       JOIN account_identities ai
         ON ai.account_id = a.id AND ai.client_code IN ('admin', 'supply-chain') AND ai.status = 'enabled'
       JOIN stores s ON s.id = ai.store_id AND s.status = 'disabled'
+      LEFT JOIN supply_chain_admin_profiles sap ON sap.identity_id = ai.id
       LEFT JOIN employees e
         ON ai.identity_type = 'employee' AND e.id = ai.subject_id
        AND e.client_code = ai.client_code AND e.account_id = a.id AND e.status = 'enabled'
@@ -83,7 +85,7 @@ public interface AuthAccountMapper {
         ai.identity_type AS identityType,
         ai.client_code AS clientCode,
         a.phone,
-        COALESCE(e.name, a.display_name) AS displayName,
+        COALESCE(e.name, sap.name, a.display_name) AS displayName,
         a.status,
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
@@ -97,6 +99,7 @@ public interface AuthAccountMapper {
         ON ai.account_id = a.id
        AND ai.client_code IN ('admin', 'supply-chain')
        AND ai.status = 'enabled'
+      LEFT JOIN supply_chain_admin_profiles sap ON sap.identity_id = ai.id
       LEFT JOIN employees e
         ON ai.identity_type = 'employee'
        AND e.id = ai.subject_id
@@ -140,7 +143,7 @@ public interface AuthAccountMapper {
         ai.identity_type AS identityType,
         ai.client_code AS clientCode,
         a.phone,
-        COALESCE(e.name, a.display_name) AS displayName,
+        COALESCE(e.name, sap.name, a.display_name) AS displayName,
         a.status,
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
@@ -154,6 +157,7 @@ public interface AuthAccountMapper {
         ON ai.account_id = a.id
        AND ai.client_code IN ('admin', 'supply-chain')
        AND ai.status = 'enabled'
+      LEFT JOIN supply_chain_admin_profiles sap ON sap.identity_id = ai.id
       LEFT JOIN employees e
         ON ai.identity_type = 'employee'
        AND e.id = ai.subject_id
@@ -184,7 +188,7 @@ public interface AuthAccountMapper {
         ai.identity_type AS identityType,
         ai.client_code AS clientCode,
         a.phone,
-        COALESCE(e.name, a.display_name) AS displayName,
+        COALESCE(e.name, sap.name, a.display_name) AS displayName,
         a.status,
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
@@ -196,6 +200,7 @@ public interface AuthAccountMapper {
       FROM accounts a
       JOIN account_identities ai
         ON ai.account_id = a.id AND ai.client_code IN ('admin', 'supply-chain') AND ai.status = 'enabled'
+      LEFT JOIN supply_chain_admin_profiles sap ON sap.identity_id = ai.id
       LEFT JOIN employees e
         ON ai.identity_type = 'employee' AND e.id = ai.subject_id
        AND e.client_code = ai.client_code AND e.account_id = a.id AND e.status = 'enabled'
