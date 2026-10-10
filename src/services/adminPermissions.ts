@@ -209,7 +209,17 @@ export function hasPermissionPrefix(user: LoginUser, prefix?: string) {
   return user.permissions.some((permission) => permission === prefix || permission.startsWith(`${prefix}.`));
 }
 
+export function isPlatformSuperAdmin(user: LoginUser) {
+  return (
+    (user.clientCode == null || user.clientCode === 'admin') &&
+    user.tenantId == null &&
+    user.storeId == null &&
+    isSuperAdmin(user)
+  );
+}
+
 export function hasMenuPermission(user: LoginUser, prefix?: string) {
+  if (prefix === 'admin.permission-management.terminal-function-allocation') return isPlatformSuperAdmin(user);
   if (!prefix) return isSuperAdmin(user) || user.permissions.includes('all');
   if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;
   if (isSuperAdmin(user) || user.permissions.includes('all')) return true;
