@@ -4,7 +4,12 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 
 @TableName("store_categories")
-public class StoreCategory extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class StoreCategory extends BaseEntity {
+  private String scope;
+
+  public String getScope() { return scope; }
+  public void setScope(String scope) { this.scope = scope; }
+
   private Long storeId;
   private Long parentId;
   private String name;

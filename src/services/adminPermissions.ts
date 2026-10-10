@@ -36,7 +36,7 @@ export const adminMenuEntries: AdminMenuEntry[] = [
   {
     label: '价格配置',
     path: '/store/price-configuration',
-    icon: 'money-circle',
+    icon: 'money',
     permissionPrefix: 'store.price-configuration',
   },
   {
@@ -213,6 +213,14 @@ export function hasMenuPermission(user: LoginUser, prefix?: string) {
   if (!prefix) return isSuperAdmin(user) || user.permissions.includes('all');
   if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;
   if (isSuperAdmin(user) || user.permissions.includes('all')) return true;
+  if (prefix === 'admin.tenant.store-category-management') {
+    return ['finished', 'accessory'].some((scope) => user.permissions.includes(`${prefix}.${scope}.view`));
+  }
+  if (prefix === 'store.price-configuration') {
+    return ['price', 'discount'].some((kind) =>
+      ['finished', 'accessory'].some((scope) => user.permissions.includes(`${prefix}.${kind}.${scope}.view`)),
+    );
+  }
   return user.permissions.some(
     (permission) =>
       permission === `${prefix}.view` || (permission.startsWith(`${prefix}.`) && permission.endsWith('.view')),

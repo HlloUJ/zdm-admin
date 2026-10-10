@@ -20,8 +20,10 @@ const permissions = [
   'store.finished-stock-management.recycle.batch-purge',
   'store.finished-stock-management.recycle.clear',
   'store.finished-stock-management.operation-log.view',
-  'store.price-configuration.view',
-  'store.price-configuration.create',
+  'store.price-configuration.price.finished.view',
+  'store.price-configuration.price.finished.batch-set',
+  'store.price-configuration.discount.finished.view',
+  'store.price-configuration.discount.finished.batch-set',
 ];
 
 async function storeLogin(page: Page) {
@@ -514,23 +516,27 @@ test('store submission race refreshes upstream overlay instead of an ordinary er
   await expect(page.getByText('上游商品不可用，只能查看或彻底删除', { exact: true })).toHaveCount(0);
 });
 
-test('store price configuration has roles and coefficients without tabs or guide settings', async ({ page }) => {
+test('store price configuration separates category prices from role discounts', async ({ page }) => {
   await storeLogin(page);
-  await page.route('**/api/admin/store-finished-price-configurations', (route) =>
+  await page.route('**/api/admin/store-price-rules/price?scope=*', (route) => route.fulfill({ json: ok([]) }));
+  await page.route('**/api/admin/store-price-rules/price/categories?scope=*', (route) =>
+    route.fulfill({ json: ok([]) }),
+  );
+  await page.route('**/api/admin/store-price-rules/discount?scope=*', (route) =>
     route.fulfill({
       json: ok([
         {
           id: 1,
           roleId: 8,
-          roleName: '店长',
-          priceCoefficient: 0.8,
-          status: 'enabled',
+          categoryId: null,
+          targetName: '店长',
+          coefficient: 0.8,
           createdAt: '2026-09-24T10:00:00',
         },
       ]),
     }),
   );
-  await page.route('**/api/admin/store-finished-price-configurations/roles', (route) =>
+  await page.route('**/api/admin/store-price-rules/discount/roles?scope=*', (route) =>
     route.fulfill({
       json: ok([
         { id: 8, name: '店长', status: 'enabled' },
@@ -540,12 +546,20 @@ test('store price configuration has roles and coefficients without tabs or guide
   );
   await page.goto('/store/price-configuration');
   const main = page.getByRole('main');
-  await expect(main.getByText('店长', { exact: true })).toBeVisible();
-  await expect(main.getByText('0.8000')).toBeVisible();
   await expect(main.locator('.t-tabs')).toHaveCount(0);
+  await main.locator('.price-menu .t-menu__item').filter({ hasText: '成品现货' }).last().click();
+  await expect(main.getByText('店长', { exact: true })).toBeVisible();
+  await expect(main.getByText('0.80', { exact: true })).toBeVisible();
+  await expect(main.locator('th').getByText('折扣系数', { exact: true })).toBeVisible();
   await expect(main.getByText('指导价设置')).toHaveCount(0);
-  await main.getByRole('button', { name: '新增' }).click();
-  await expect(page.locator('.t-dialog:visible').getByText('角色', { exact: true })).toBeVisible();
+  await expect(main.getByRole('row').filter({ hasText: '导购' })).toHaveCount(0);
+  await main.getByRole('row').filter({ hasText: '店长' }).locator('.t-checkbox').click();
+  await main.getByRole('button', { name: '批量设置', exact: true }).click();
+  await expect(page.locator('.t-dialog:visible').getByText('已选角色', { exact: true })).toBeVisible();
+  const coefficient = page.locator('.t-dialog:visible .t-input-number input');
+  await coefficient.fill('0.75');
+  await coefficient.blur();
+  await expect(coefficient).toHaveValue('0.75');
 });
 
 test('store operation logs show the same filter, pagination, and detail structure', async ({ page }) => {

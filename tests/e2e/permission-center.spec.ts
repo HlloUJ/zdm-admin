@@ -2,16 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
 
-const storeCategoryCatalogActionLabels = [
-  '查看',
-  '新增一级分类',
-  '新增下级',
-  '编辑',
-  '上移',
-  '下移',
-  '停用/启用',
-  '删除',
-];
+const storeCategoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '排序', '停用/启用', '删除'];
 const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '排序', '停用/启用', '删除'];
 const productSecondMenuLabels = ['商品公共基础数据', '成品现货基础数据', '大板基础数据'];
 const adminProductSecondMenuLabels = ['成品现货管理', '大板管理', ...productSecondMenuLabels];
@@ -1253,7 +1244,12 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       '删除',
     ]);
     await moduleList.getByText('门店分类管理', { exact: true }).click();
-    await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(storeCategoryCatalogActionLabels);
+    await expect(matrix.getByText('成品现货分类', { exact: true })).toBeVisible();
+    await expect(matrix.getByText('配件分类', { exact: true })).toBeVisible();
+    await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+      ...storeCategoryCatalogActionLabels,
+      ...storeCategoryCatalogActionLabels,
+    ]);
     await moduleList.getByText('权限管理', { exact: true }).click();
     await expect(matrix.getByText('员工管理页', { exact: true })).toBeVisible();
     await expect(matrix.getByText('角色管理页', { exact: true })).toBeVisible();
@@ -1268,7 +1264,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   );
   await main.getByRole('button', { name: '保存', exact: true }).click();
   const payload = (await saved).postDataJSON();
-  expect(payload.functionPermissions.split(',')).toHaveLength(8);
+  expect(payload.functionPermissions.split(',')).toHaveLength(14);
   expect(
     payload.functionPermissions
       .split(',')
@@ -1278,7 +1274,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   await page.reload();
   await main.locator('.terminal-tabs').getByText('大板供应商门店管理后台', { exact: true }).click();
   await moduleList.getByText('门店分类管理', { exact: true }).click();
-  await expect(matrix.locator('.module-allocation-count')).toHaveText('已下放 8 / 8');
+  await expect(matrix.locator('.module-allocation-count')).toHaveText('已下放 14 / 14');
 });
 
 test('assigns supply-chain off-shelf detail rights separately for finished stock and slabs', async ({ page }) => {

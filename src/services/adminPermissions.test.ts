@@ -42,12 +42,12 @@ describe('admin menu permissions', () => {
 
   it('exposes store-category menu only with its view permission', () => {
     const viewUser = {
-      ...createUser(['admin.tenant.store-category-management.view']),
+      ...createUser(['admin.tenant.store-category-management.finished.view']),
       tenantId: 1,
       storeId: 1,
       storeType: 'cityPartner' as const,
     };
-    const actionOnlyUser = createUser(['admin.tenant.store-category-management.create-root']);
+    const actionOnlyUser = createUser(['admin.tenant.store-category-management.finished.create-root']);
 
     expect(hasMenuPermission(viewUser, 'admin.tenant.store-category-management')).toBe(true);
     expect(getFirstAccessiblePath(viewUser)).toBe('/store-category-management');
@@ -118,7 +118,7 @@ describe('super administrator identity', () => {
 describe('function audience boundaries', () => {
   it('never exposes store categories to platform identities including super administrators', () => {
     for (const roles of [['SUPER_ADMIN'], ['ADMIN_MANAGER']]) {
-      const user = { ...createUser(['all', 'admin.tenant.store-category-management.view']), roles };
+      const user = { ...createUser(['all', 'admin.tenant.store-category-management.finished.view']), roles };
       expect(hasMenuPermission(user, 'admin.tenant.store-category-management')).toBe(false);
       expect(hasPermission(user, 'admin.tenant.store-category-management.edit')).toBe(false);
     }
