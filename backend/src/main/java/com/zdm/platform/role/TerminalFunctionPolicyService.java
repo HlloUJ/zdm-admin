@@ -18,8 +18,16 @@ public class TerminalFunctionPolicyService
     this.permissionGuard = permissionGuard;
   }
 
+  private void requirePlatformSuperAdmin() {
+    var identity = permissionGuard.identity();
+    if (!"admin".equals(identity.clientCode()) || identity.tenantId() != null
+        || identity.storeId() != null || !identity.isSuperAdmin()) {
+      throw new AccessDeniedException("仅运营平台超级管理员可配置终端功能");
+    }
+  }
+
   public List<TerminalFunctionPolicy> listPolicies() {
-    permissionGuard.requirePermission("admin.permission-management.terminal-function-allocation.view");
+    requirePlatformSuperAdmin();
     return lambdaQuery().orderByAsc(TerminalFunctionPolicy::getId).list().stream().peek(policy ->
         policy.setFunctionPermissions(String.join(",", FunctionAudiencePolicy.filter(
             FunctionPermissionNormalizer.normalize(List.of(policy.getFunctionPermissions() == null
@@ -28,7 +36,7 @@ public class TerminalFunctionPolicyService
 
   @Transactional
   public TerminalFunctionPolicy savePolicy(String terminal, String functionPermissions) {
-    permissionGuard.requirePermission("admin.permission-management.terminal-function-allocation.save");
+    requirePlatformSuperAdmin();
     if (!List.of("store", "supplier", "supply-chain").contains(terminal)) {
       throw new IllegalArgumentException("未知的用户端类型");
     }

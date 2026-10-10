@@ -426,20 +426,6 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
           },
         ],
       },
-      {
-        label: '终端功能分配',
-        value: 'admin.permission-management.terminal-function-allocation.menu',
-        direct: false,
-        pages: [
-          {
-            label: '终端功能分配页',
-            value: 'admin.permission-management.terminal-function-allocation',
-            audiences: ['admin'],
-            actions: [{ label: '保存', value: 'admin.permission-management.terminal-function-allocation.save' }],
-            tabs: [],
-          },
-        ],
-      },
     ],
   },
 ];

@@ -4506,12 +4506,12 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
-  void platformAllocationViewAndSavePermissionsAreIndependent() throws Exception {
+  void platformAllocationCannotBeDelegatedThroughLegacyPermissions() throws Exception {
     String token = createStoreScopedEmployee(99112L, "15926629112", "终端配置测试员",
         "admin.permission-management.terminal-function-allocation.view");
     usePlatformTestIdentity(99112L);
     mockMvc.perform(get("/api/admin/terminal-function-policies")
-            .header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+            .header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
     mockMvc.perform(put("/api/admin/terminal-function-policies/supplier")
             .header("Authorization", "Bearer " + token).contentType("application/json")
             .content("{\"functionPermissions\":\"admin.supplier-management.view\"}"))
@@ -4522,8 +4522,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(put("/api/admin/terminal-function-policies/supplier")
             .header("Authorization", "Bearer " + token).contentType("application/json")
             .content("{\"functionPermissions\":\"admin.supplier-management.view\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.functionPermissions").value("admin.supplier-management.view"));
+        .andExpect(status().isForbidden());
   }
 
   @Test

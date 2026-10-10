@@ -45,7 +45,7 @@
   },
   {
     "prefix": "admin.permission-management.terminal-function-allocation",
-    "scope": "admin-only"
+    "scope": "removed"
   },
   {
     "prefix": "supply-chain",

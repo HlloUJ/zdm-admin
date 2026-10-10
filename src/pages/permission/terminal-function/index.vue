@@ -5,7 +5,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
 
-      <main class="page">
+      <main v-if="canSave" class="page">
         <header class="page-header">
           <div>
             <t-breadcrumb>
@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import { getLoginUser } from '@/services/auth';
-import { hasPermission } from '@/services/adminPermissions';
+import { isPlatformSuperAdmin } from '@/services/adminPermissions';
 import { adminFeedback } from '@/components/foundation';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -66,9 +66,7 @@ import {
   type TerminalFunctionPolicyRecord,
 } from '@/services/terminalFunctionPolicies';
 
-const canSave = computed(() =>
-  hasPermission(getLoginUser(), 'admin.permission-management.terminal-function-allocation.save'),
-);
+const canSave = computed(() => isPlatformSuperAdmin(getLoginUser()));
 
 const activeTerminal = ref<TerminalType>('store');
 const activeModuleValue = ref(terminalFunctionTrees.store[0]?.value ?? '');
@@ -148,7 +146,9 @@ watch(
   { immediate: true },
 );
 
-onMounted(loadAllocation);
+onMounted(() => {
+  if (canSave.value) void loadAllocation();
+});
 </script>
 
 <style scoped>

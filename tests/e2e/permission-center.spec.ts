@@ -1164,10 +1164,8 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('权限管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(5);
-  await expect(
-    roleMatrix.locator('tbody tr').filter({ hasText: '终端功能分配页' }).locator('.permission-action-grid .t-checkbox'),
-  ).toHaveText(['查看', '保存']);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(4);
+  await expect(roleMatrix.getByText('终端功能分配页', { exact: true })).toHaveCount(0);
   await expect(roleMatrix.getByText('员工管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('员工管理页', { exact: true })).toBeVisible();
   const employeePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '员工管理页' });
@@ -1336,7 +1334,7 @@ for (const storeType of ['cityPartner', 'slabSupplier']) {
   });
 }
 
-test('allows platform allocation viewers to inspect without a save action', async ({ page }) => {
+test('rejects platform allocation access with legacy view permission', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'zdm-admin-user',
@@ -1351,8 +1349,8 @@ test('allows platform allocation viewers to inspect without a save action', asyn
     );
   });
   await page.goto('/terminal-function-allocation');
-  await expect(page.getByRole('main').locator('.permission-module-item')).toHaveCount(5);
-  await expect(page.getByRole('main').getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+  await expect(page).not.toHaveURL(/terminal-function-allocation$/);
+  await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
 });
 
 test('allocates supply chain employee and role management and persists selection', async ({ page }) => {
@@ -1515,3 +1513,30 @@ test('shows only granted attribute-value tabs and falls back to the first access
   await expect(main.getByText('E2E 成品现货专属值', { exact: true })).toBeVisible();
   await expect(main.getByText('E2E 共享属性值', { exact: true })).toHaveCount(0);
 });
+
+for (const identity of [
+  { name: '普通平台all账号', clientCode: 'admin', roles: ['ADMIN_MANAGER'] },
+  { name: '供应链超级管理员', clientCode: 'supply-chain', roles: ['SUPER_ADMIN'] },
+  { name: '有租户归属的超级管理员', clientCode: 'admin', roles: ['SUPER_ADMIN'], tenantId: 1 },
+]) {
+  test(`terminal allocation rejects ${identity.name} even with all and legacy permissions`, async ({ page }) => {
+    await page.addInitScript((user) => {
+      window.localStorage.setItem(
+        'zdm-admin-user',
+        JSON.stringify({
+          id: 19,
+          phone: '15900000019',
+          ...user,
+          permissions: [
+            'all',
+            'admin.permission-management.terminal-function-allocation.view',
+            'admin.permission-management.terminal-function-allocation.save',
+          ],
+        }),
+      );
+    }, identity);
+    await page.goto('/terminal-function-allocation');
+    await expect(page).not.toHaveURL(/terminal-function-allocation$/);
+    await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
+  });
+}
