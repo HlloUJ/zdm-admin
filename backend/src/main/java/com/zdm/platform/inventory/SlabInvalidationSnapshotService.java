@@ -37,6 +37,7 @@ public class SlabInvalidationSnapshotService {
     if (current.getOperationsInvalidatedSnapshot() == null) { return current; }
     try {
       SlabInventory frozen = json.readValue(current.getOperationsInvalidatedSnapshot(), SlabInventory.class);
+      frozen.setCreatedByAccountId(current.getCreatedByAccountId());
       frozen.setOperationsInvalidatedSnapshot(current.getOperationsInvalidatedSnapshot());
       frozen.setOperationsInvalidatedAt(current.getOperationsInvalidatedAt());
       frozen.setOperationsInvalidatedReason(current.getOperationsInvalidatedReason());

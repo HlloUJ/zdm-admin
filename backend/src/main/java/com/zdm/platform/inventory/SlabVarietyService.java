@@ -1,17 +1,14 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVariety> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class SlabVarietyService extends CreatorAwareService<SlabVarietyMapper, SlabVariety> {
   private static final String DUPLICATE_NAME_MESSAGE = "品种名称已存在";
   private static final String REFERENCED_MESSAGE =
       "该品种已被大板库存引用，不能删除，请先停用该品种";
@@ -30,7 +27,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
   public SlabVariety createVariety(SlabVariety variety) {
     variety.setId(null);
     normalizeAndValidateName(variety, null);
-    variety.setCreatedByName(resolveCreatedByName());
     variety.setCreatedByAccountId(identityProvider.require().accountId());
     save(variety);
     return variety;
@@ -45,7 +41,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
 
     payload.setId(id);
     payload.setStatus(existing.getStatus());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateName(payload, id);
     updateById(payload);
@@ -83,12 +78,6 @@ public class SlabVarietyService extends ServiceImpl<SlabVarietyMapper, SlabVarie
     }
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName()
-        : DEFAULT_CREATED_BY_NAME;
-  }
 
   private void normalizeAndValidateName(SlabVariety variety, Long excludedVarietyId) {
     String varietyName = variety.getName().trim();

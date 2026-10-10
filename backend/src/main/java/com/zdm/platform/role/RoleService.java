@@ -1,6 +1,6 @@
 package com.zdm.platform.role;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.common.FunctionPermissionNormalizer;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
@@ -14,12 +14,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class RoleService extends ServiceImpl<RoleMapper, Role> {
+public class RoleService extends CreatorAwareService<RoleMapper, Role> {
   private static final String SUPER_ADMIN_CODE = "SUPER_ADMIN";
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private static final String ROLE_PERMISSION_PREFIX = "admin.permission-management.role-management";
   private static final String EMPLOYEE_ASSIGN_PERMISSION =
       "admin.permission-management.employee-management.permission";
@@ -91,7 +89,6 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     if (SUPER_ADMIN_CODE.equals(role.getCode())) {
       throw new IllegalArgumentException("超级管理员是系统内置角色");
     }
-    role.setCreatedByName(resolveCreatedByName());
     role.setCreatedByAccountId(identityProvider.require().accountId());
     return save(role);
   }
@@ -112,7 +109,6 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     payload.setTenantId(existing.getTenantId());
     payload.setStoreId(existing.getStoreId());
     payload.setDataScope("all");
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     if (isSuperAdminRole(existing)) {
       payload.setCode(SUPER_ADMIN_CODE);
@@ -170,10 +166,6 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
-    if ("supply-chain".equals(identityProvider.require().clientCode())
-        && !"supply-chain".equals(role.getCreatedByClientCode())) {
-      throw new AccessDeniedException("运营平台创建或来源未确认的角色仅可由运营平台维护");
-    }
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), role.getCreatedByAccountId());
     RoleScope scope = requireCurrentScope(role.getClientCode());
     if (!Objects.equals(role.getTenantId(), scope.tenantId())
@@ -202,7 +194,11 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
 
   private RoleScope requireCurrentScope(String clientCode) {
     CurrentIdentity identity = identityProvider.require();
-    String client = com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode);
+    String client = clientCode == null ? identity.clientCode() : clientCode;
+    if (!Objects.equals(client, identity.clientCode())) {
+      throw new AccessDeniedException("当前身份只能管理所属业务端的角色");
+    }
+    com.zdm.platform.security.ManagedClientScope.resolve(identity, client);
     if (identity.tenantId() == null && identity.storeId() == null) {
       return new RoleScope(null, null, client, client);
     }
@@ -317,11 +313,5 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
     jdbcTemplate.update("DELETE FROM account_roles WHERE role_id = ?", roleId);
   }
 
-  private String resolveCreatedByName() {
-    return identityProvider.current()
-        .map(CurrentIdentity::displayName)
-        .filter(StringUtils::hasText)
-        .orElse(DEFAULT_CREATED_BY_NAME);
-  }
 
 }

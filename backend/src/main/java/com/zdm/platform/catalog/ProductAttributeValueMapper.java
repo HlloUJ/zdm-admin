@@ -15,7 +15,6 @@ public interface ProductAttributeValueMapper extends BaseMapper<ProductAttribute
         attribute_value.value,
         attribute_value.code,
         attribute_value.status,
-        attribute_value.created_by_name,
         attribute_value.created_by_account_id,
         attribute_value.created_at,
         attribute_value.updated_at,
@@ -34,7 +33,6 @@ public interface ProductAttributeValueMapper extends BaseMapper<ProductAttribute
         attribute_value.value,
         attribute_value.code,
         attribute_value.status,
-        attribute_value.created_by_name,
         attribute_value.created_by_account_id,
         attribute_value.created_at,
         attribute_value.updated_at

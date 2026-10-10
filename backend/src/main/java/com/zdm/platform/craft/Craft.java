@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 @TableName("crafts")
-public class Craft extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class Craft extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotBlank
   private String name;
 
@@ -23,6 +23,7 @@ public class Craft extends BaseEntity implements com.zdm.platform.security.Creat
   @TableField(exist = false)
   private String imageUrl;
   private String pricingMethod;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
 

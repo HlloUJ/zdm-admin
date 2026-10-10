@@ -19,7 +19,13 @@
       <template v-else>
         <div class="page-title">
           <h1>{{ invitedSystemName }}员工注册</h1>
-          <p>请完成信息填写，提交后等待管理员启用。</p>
+          <p>
+            {{
+              invitedIdentityType === 'supply_chain_admin'
+                ? '请完成信息填写，注册后即可登录供应链协同系统。'
+                : '请完成信息填写，提交后等待管理员启用。'
+            }}
+          </p>
         </div>
 
         <t-steps class="invite-steps" :current="step - 1" theme="dot">
@@ -127,7 +133,10 @@ const resultTitle = ref('注册信息已提交');
 const resultMessage = ref('注册信息已提交，请等待管理员分配权限并启用本平台员工身份，启用后即可登录。');
 
 const showRegistrationResult = (result: EmployeeInviteRegisterResponse) => {
-  if (result.existingEmployee && !result.canLogin && result.status === 'disabled') {
+  if (result.identityType === 'supply_chain_admin' && result.canLogin) {
+    resultTitle.value = '管理员身份已建立';
+    resultMessage.value = '您已成为供应链协同系统管理员，可使用该手机号登录供应链协同系统。';
+  } else if (result.existingEmployee && !result.canLogin && result.status === 'disabled') {
     resultTitle.value = '当前员工身份尚未启用';
     resultMessage.value =
       '该手机号码已在本平台存在员工身份，无需重复注册。当前身份尚未启用，请联系本平台管理员确认权限配置及启用状态。';
@@ -141,6 +150,7 @@ const showRegistrationResult = (result: EmployeeInviteRegisterResponse) => {
 };
 const pageError = ref('');
 const invitedSystemName = ref('');
+const invitedIdentityType = ref('employee');
 const step = ref<1 | 2>(1);
 const countDown = ref(0);
 const phoneFormRef = ref<FormInstanceFunctions>();
@@ -270,6 +280,7 @@ onMounted(async () => {
   }
   try {
     const invite = await inspectEmployeeInvite(token.value);
+    invitedIdentityType.value = invite.identityType ?? 'employee';
     invitedSystemName.value = invite.clientCode === 'supply-chain' ? '供应链协同系统' : '运营管理平台';
   } catch (error) {
     pageError.value = error instanceof Error ? error.message : '邀请链接校验失败';

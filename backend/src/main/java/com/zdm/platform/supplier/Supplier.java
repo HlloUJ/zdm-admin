@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
 @TableName("suppliers")
-public class Supplier extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class Supplier extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotBlank
   private String name;
 
@@ -22,6 +22,7 @@ public class Supplier extends BaseEntity implements com.zdm.platform.security.Cr
   private String region;
   private String address;
   private String qualificationStatus;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private String remark;

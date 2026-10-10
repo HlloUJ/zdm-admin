@@ -1,6 +1,6 @@
 package com.zdm.platform.employee;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.ManagedClientScope;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, EmployeeInvite> {
+public class EmployeeInviteService extends CreatorAwareService<EmployeeInviteMapper, EmployeeInvite> {
   private static final String ACTIVE = "active";
   private static final String EXPIRED = "expired";
   private static final String USED = "used";
@@ -21,13 +21,16 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private final EmployeeService employeeService;
+  private final SupplyChainAdminService supplyChainAdmins;
   private final CurrentIdentityProvider identityProvider;
 
   private final PermissionGuard permissionGuard;
   private final EmployeeInviteAccess inviteAccess;
   private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
-  public EmployeeInviteService(EmployeeService employeeService, CurrentIdentityProvider identityProvider, PermissionGuard permissionGuard, EmployeeInviteAccess inviteAccess, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+  public EmployeeInviteService(EmployeeService employeeService, CurrentIdentityProvider identityProvider, PermissionGuard permissionGuard, EmployeeInviteAccess inviteAccess, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
+      SupplyChainAdminService supplyChainAdmins) {
+    this.supplyChainAdmins = supplyChainAdmins;
     this.permissionGuard = permissionGuard;
     this.inviteAccess = inviteAccess;
     this.jdbcTemplate = jdbcTemplate;
@@ -46,23 +49,25 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     EmployeeInvite invite = new EmployeeInvite();
     invite.setToken(generateToken());
     invite.setClientCode(client);
+    if ("admin".equals(identity.clientCode()) && "supply-chain".equals(client)) {
+      invite.setTargetIdentityType("supply_chain_admin");
+    }
     invite.setTenantId(identity.tenantId());
     invite.setStoreId(identity.storeId());
     invite.setCreatedByAccountId(identity.accountId());
     invite.setCreatedByIdentityId(identity.identityId());
-    invite.setCreatedByName(identity.displayName());
     invite.setStatus(ACTIVE);
     LocalDateTime createdAt = LocalDateTime.now().withNano(0);
     invite.setCreatedAt(createdAt);
     invite.setExpiresAt(createdAt.plusMinutes(5));
     save(invite);
-    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode());
+    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode(), invite.getTargetIdentityType());
   }
 
   public EmployeeInviteResponse inspectInvite(String token) {
     EmployeeInvite invite = requireActiveInvite(token);
     inviteAccess.requireValidIssuer(invite);
-    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode());
+    return new EmployeeInviteResponse(invite.getToken(), invite.getExpiresAt(), invite.getClientCode(), invite.getTargetIdentityType());
   }
 
   public Boolean requestCode(String token, RequestInviteCodeRequest request) {
@@ -79,7 +84,7 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     if (!employeeService.hasAccount(request.phone())) {
       return new EmployeeInviteVerifyResponse(true, null);
     }
-    EmployeeInviteRegisterResponse response = employeeService.registerInvitedEmployee(invite,
+    EmployeeInviteRegisterResponse response = registerIdentity(invite,
         new EmployeeInviteRegisterRequest(request.phone(), request.verifyCode(), null, null));
     recordAcceptance(invite, response);
     return new EmployeeInviteVerifyResponse(false, response);
@@ -90,9 +95,15 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     EmployeeInvite invite = lockActiveInvite(token);
     requireDevCode(request.verifyCode());
     inviteAccess.requireValidIssuer(invite);
-    EmployeeInviteRegisterResponse response = employeeService.registerInvitedEmployee(invite, request);
+    EmployeeInviteRegisterResponse response = registerIdentity(invite, request);
     recordAcceptance(invite, response);
     return response;
+  }
+
+  private EmployeeInviteRegisterResponse registerIdentity(EmployeeInvite invite, EmployeeInviteRegisterRequest request) {
+    return "supply_chain_admin".equals(invite.getTargetIdentityType())
+        ? supplyChainAdmins.accept(invite, request)
+        : employeeService.registerInvitedEmployee(invite, request);
   }
 
   private EmployeeInvite lockActiveInvite(String token) {
@@ -100,6 +111,11 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
   }
 
   private void recordAcceptance(EmployeeInvite invite, EmployeeInviteRegisterResponse response) {
+    if ("supply_chain_admin".equals(invite.getTargetIdentityType())) {
+      invite.setStatus(USED);
+      invite.setUsedAt(LocalDateTime.now().withNano(0));
+      updateById(invite);
+    }
     // One audit record per person; retries neither overwrite the first result nor extend the link.
     jdbcTemplate.update("""
         INSERT INTO employee_invite_acceptances

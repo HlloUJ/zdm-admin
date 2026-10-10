@@ -60,7 +60,7 @@ class FinishedProductRichTextApiTest extends SpringContainerTestSupport {
   void productTemplateOptionsUseLatestPublishedSnapshotOnly() throws Exception {
     jdbc.update("INSERT INTO product_categories (id, scope, name) VALUES (99021, 'finished', '快照分类'), (99022, 'accessory', '配件分类')");
     String snapshot = "[{\"attributeId\":91,\"name\":\"发布名称\",\"attributeRole\":\"sales\",\"skuFlag\":true,\"requiredFlag\":true,\"sortOrder\":1,\"valueType\":\"select\",\"options\":[{\"id\":92,\"value\":\"发布值\"}]}]";
-    jdbc.update("INSERT INTO category_template_versions (category_id, version_no, state, content, created_by_name) VALUES (99021, 1, 'published', '[]', '测试'), (99021, 2, 'published', ?, '测试'), (99021, NULL, 'draft', '[]', '测试'), (99022, 1, 'published', '[]', '测试')", snapshot);
+    jdbc.update("INSERT INTO category_template_versions (category_id, version_no, state, content, created_by_account_id) VALUES (99021, 1, 'published', '[]', (SELECT MIN(id) FROM accounts WHERE display_name='测试')), (99021, 2, 'published', ?, (SELECT MIN(id) FROM accounts WHERE display_name='测试')), (99021, NULL, 'draft', '[]', (SELECT MIN(id) FROM accounts WHERE display_name='测试')), (99022, 1, 'published', '[]', (SELECT MIN(id) FROM accounts WHERE display_name='测试'))", snapshot);
     JsonNode result = data(mvc.perform(get("/api/admin/finished-products/attribute-template-options").header("Authorization", token)));
     List<JsonNode> matching = new ArrayList<>();
     result.forEach(row -> {

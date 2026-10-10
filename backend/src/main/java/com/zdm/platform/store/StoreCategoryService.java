@@ -1,7 +1,7 @@
 package com.zdm.platform.store;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.HashSet;
 import java.util.List;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, StoreCategory> {
+public class StoreCategoryService extends CreatorAwareService<StoreCategoryMapper, StoreCategory> {
   private static final String DUPLICATE_NAME_MESSAGE = "同级分类名称不能重复";
   private final CurrentIdentityProvider identityProvider;
   private final JdbcTemplate jdbc;
@@ -100,7 +100,6 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     category.setStatus(request.status());
     category.setProductCount(0);
     category.setSortOrder(1);
-    category.setCreatedByName(identityProvider.require().displayName());
     category.setCreatedByAccountId(identityProvider.require().accountId());
     try {
       save(category);

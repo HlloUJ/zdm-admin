@@ -8,23 +8,28 @@ import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 
 @TableName("tenants")
-public class Tenant implements com.zdm.platform.security.CreatorOwned {
+public class Tenant implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  private Long accountId;
+  public Long getAccountId() { return accountId; }
+  public void setAccountId(Long value) { accountId = value; }
+
   @NotBlank
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String name;
 
   @NotBlank
-  private String contactName;
-
-  @NotBlank
   @Pattern(regexp = "^1[3-9]\\d{9}$")
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String contactPhone;
 
   @NotBlank
   private String status;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private String businessTypes;
@@ -46,14 +51,6 @@ public class Tenant implements com.zdm.platform.security.CreatorOwned {
 
   public void setName(String name) {
     this.name = name;
-  }
-
-  public String getContactName() {
-    return contactName;
-  }
-
-  public void setContactName(String contactName) {
-    this.contactName = contactName;
   }
 
   public String getContactPhone() {

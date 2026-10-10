@@ -36,14 +36,21 @@ public class EmployeeInviteAccess {
         || !sameOrganization(account, invite)) {
       return false;
     }
-    List<String> roles = "platform_admin".equals(account.getIdentityType())
-        ? List.of("SUPER_ADMIN") : accounts.findAdminRoleCodes(account.getId(), account.getIdentityId());
+    List<String> roles = switch (account.getIdentityType()) {
+      case "platform_admin" -> List.of("SUPER_ADMIN");
+      case "supply_chain_admin" -> List.of("SUPPLY_CHAIN_ADMIN");
+      default -> accounts.findAdminRoleCodes(account.getId(), account.getIdentityId());
+    };
     CurrentIdentity identity = new CurrentIdentity(null, account.getId(), account.getIdentityId(),
         account.getEmployeeId(), account.getClientCode(), account.getTenantId(), account.getStoreId(),
         account.getDisplayName(), account.getDataPermission(), roles, permissions.resolve(account));
     try {
       ManagedClientScope.resolve(identity, invite.getClientCode());
     } catch (AccessDeniedException exception) {
+      return false;
+    }
+    boolean adminInvitation = "admin".equals(identity.clientCode()) && "supply-chain".equals(invite.getClientCode());
+    if (adminInvitation != "supply_chain_admin".equals(invite.getTargetIdentityType())) {
       return false;
     }
     String permission = EmployeeService.permissionPrefix(invite.getClientCode()) + ".create";
@@ -57,7 +64,7 @@ public class EmployeeInviteAccess {
         .filter(account -> Objects.equals(account.getClientCode(), invite.getClientCode()))
         .filter(account -> sameOrganization(account, invite))
         .anyMatch(account -> switch (account.getIdentityType()) {
-          case "platform_admin", "tenant_admin", "store_admin" -> true;
+          case "platform_admin", "tenant_admin", "store_admin", "supply_chain_admin" -> true;
           default -> StringUtils.hasText(account.getDataPermission())
               && !accounts.findAdminRoleCodes(account.getId(), account.getIdentityId()).isEmpty();
         });

@@ -31,6 +31,13 @@ class MarkupConfigurationServiceTest {
         List.of("admin.product-data-center.markup-configuration.finished.view"));
   }
 
+  private com.zdm.platform.account.CreatorNames creatorNameReader() {
+    var names = Mockito.mock(com.zdm.platform.account.CreatorNames.class);
+    when(names.attach(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(names.attachAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    return names;
+  }
+
   @Test
   void storeIdentityCannotReadPlatformMarkupConfiguration() {
     SlabMarkupConfigurationMapper mapper = Mockito.mock(SlabMarkupConfigurationMapper.class);
@@ -43,7 +50,7 @@ class MarkupConfigurationServiceTest {
         "store",
         2L,
         3L,
-        "门店管理员",
+        "管理员",
         "all",
         List.of("STORE_ADMIN"),
         List.of("all")));
@@ -52,6 +59,7 @@ class MarkupConfigurationServiceTest {
         identityProvider,
         Mockito.mock(StoreLevelPricingDirectory.class),
         Mockito.mock(SlabPriceConfigurationSyncService.class));
+    org.springframework.test.util.ReflectionTestUtils.setField(service, "creatorNames", creatorNameReader());
 
     assertThatThrownBy(() -> service.listConfigurations(false))
         .isInstanceOf(AccessDeniedException.class)
@@ -78,6 +86,7 @@ class MarkupConfigurationServiceTest {
         identityProvider,
         storeLevelDirectory,
         Mockito.mock(SlabPriceConfigurationSyncService.class));
+    org.springframework.test.util.ReflectionTestUtils.setField(service, "creatorNames", creatorNameReader());
 
     assertThat(service.listConfigurations(false))
         .isEmpty();
@@ -103,6 +112,7 @@ class MarkupConfigurationServiceTest {
         identityProvider,
         storeLevelDirectory,
         Mockito.mock(SlabPriceConfigurationSyncService.class));
+    org.springframework.test.util.ReflectionTestUtils.setField(service, "creatorNames", creatorNameReader());
 
     assertThatThrownBy(() -> service.deleteConfiguration(21L)).isInstanceOf(AccessDeniedException.class);
     verify(mapper, Mockito.never()).deleteById(21L);
@@ -122,6 +132,7 @@ class MarkupConfigurationServiceTest {
     when(syncService.countAutoReferences(21L)).thenReturn(3L);
     SlabMarkupConfigurationService service = new SlabMarkupConfigurationService(
         mapper, identityProvider, storeLevelDirectory, syncService);
+    org.springframework.test.util.ReflectionTestUtils.setField(service, "creatorNames", creatorNameReader());
 
     assertThatThrownBy(() -> service.deleteConfiguration(21L))
         .isInstanceOf(IllegalArgumentException.class)
@@ -142,6 +153,7 @@ class MarkupConfigurationServiceTest {
     when(storeLevelDirectory.findLevel(2L)).thenReturn(new StoreLevelPricingDirectory.Level(2L, "二级店", 20));
     FinishedMarkupConfigurationService service = new FinishedMarkupConfigurationService(
         mapper, identityProvider, storeLevelDirectory, Mockito.mock(FinishedPriceConfigurationSyncService.class));
+    org.springframework.test.util.ReflectionTestUtils.setField(service, "creatorNames", creatorNameReader());
 
     service.reorderConfigurations(List.of(32L, 31L));
 
@@ -167,6 +179,7 @@ class MarkupConfigurationServiceTest {
         identityProvider,
         storeLevelDirectory,
         Mockito.mock(SlabPriceConfigurationSyncService.class));
+    org.springframework.test.util.ReflectionTestUtils.setField(service, "creatorNames", creatorNameReader());
 
     service.reorderConfigurations(List.of(42L, 41L));
 

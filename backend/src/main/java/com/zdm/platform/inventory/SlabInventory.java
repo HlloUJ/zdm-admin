@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @TableName("slab_inventory")
-public class SlabInventory extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class SlabInventory extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   private Long supplierId;
   private Long varietyId;
   private Long originId;
@@ -79,6 +79,7 @@ public class SlabInventory extends BaseEntity implements com.zdm.platform.securi
 
   @TableField(exist = false)
   private String videoCoverUrl;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
 
@@ -278,7 +279,7 @@ public class SlabInventory extends BaseEntity implements com.zdm.platform.securi
   }
 
   public String getCreatedByName() {
-    return createdByName;
+    return "接口获取".equals(publisherType) ? "外部系统" : createdByName;
   }
 
   public void setCreatedByName(String createdByName) {

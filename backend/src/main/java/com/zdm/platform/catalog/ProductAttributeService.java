@@ -1,6 +1,6 @@
 package com.zdm.platform.catalog;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.time.LocalDateTime;
@@ -12,11 +12,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper, ProductAttribute> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class ProductAttributeService extends CreatorAwareService<ProductAttributeMapper, ProductAttribute> {
   private static final String TEMPLATE_REFERENCED_MESSAGE = "该属性已被分类属性模板使用，不能删除";
   private static final String PRODUCT_REFERENCED_MESSAGE =
       "该属性仍被未售完商品使用，不能删除，请先处理关联商品。";
@@ -36,9 +34,9 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
       return List.of();
     }
     Set<String> visibleScopes = Set.copyOf(scopes);
-    return baseMapper.selectWithTemplateCounts().stream()
+    return creatorNames.attachAll(baseMapper.selectWithTemplateCounts().stream()
         .filter(attribute -> visibleScopes.contains(attribute.getScope()))
-        .toList();
+        .toList());
   }
 
   @Transactional
@@ -47,7 +45,6 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
     attribute.setDeletedAt(null);
     attribute.setDeletedByName(null);
     attribute.setDeletedByAccountId(null);
-    attribute.setCreatedByName(resolveCreatedByName());
     attribute.setCreatedByAccountId(identityProvider.require().accountId());
     try {
       save(attribute);
@@ -202,12 +199,6 @@ public class ProductAttributeService extends ServiceImpl<ProductAttributeMapper,
     return attribute;
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName()
-        : DEFAULT_CREATED_BY_NAME;
-  }
   @Override
   public ProductAttribute getById(java.io.Serializable id) {
     ProductAttribute entity = super.getById(id);

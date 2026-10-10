@@ -1,7 +1,7 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.media.MediaAssetService;
 import com.zdm.platform.media.MediaCleanupService;
 import com.zdm.platform.media.MediaReferenceService;
@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class FinishedProductService extends ServiceImpl<FinishedProductMapper, FinishedProduct> {
+public class FinishedProductService extends CreatorAwareService<FinishedProductMapper, FinishedProduct> {
   private static final String MEDIA_DOMAIN = "FINISHED_PRODUCT";
   private static final String PLATFORM_PUBLISHER = "平台发布";
 
@@ -130,16 +130,17 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
       var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(product.getOperationsInvalidatedSnapshot());
       invalidationMedia.render(snapshot, false);
       FinishedProduct frozen = objectMapper.treeToValue(snapshot, FinishedProduct.class);
+      frozen.setCreatedByAccountId(product.getCreatedByAccountId());
       frozen.setOperationsInvalidatedReason(product.getOperationsInvalidatedReason());
       frozen.setOperationsInvalidatedAt(product.getOperationsInvalidatedAt());
       frozen.setSourceStatus(product.getSourceStatus());
       frozen.setOperationsDeleted(product.getOperationsDeleted());
-      return frozen;
+      return creatorNames.attach(frozen);
     } catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("运营失效快照读取失败", error); }
   }
 
   List<FinishedProduct> withListDetails(List<FinishedProduct> products) {
-    return listDetails.attach(products);
+    return creatorNames.attachAll(listDetails.attach(products));
   }
 
   @Transactional
@@ -159,7 +160,6 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     product.setId(null);
     product.setOffShelfAt("offShelf".equals(product.getStatus()) ? LocalDateTime.now() : null);
     product.setPublisherType(publisher);
-    product.setCreatedByName(identity.displayName());
     product.setCreatedByAccountId(identity.accountId());
     product.setCreatedAt(LocalDateTime.now());
     try {
@@ -213,7 +213,6 @@ public class FinishedProductService extends ServiceImpl<FinishedProductMapper, F
     product.setOffShelfDetail(existing.getOffShelfDetail());
     product.setId(id);
     product.setPublisherType(existing.getPublisherType());
-    product.setCreatedByName(existing.getCreatedByName());
     product.setCreatedByAccountId(existing.getCreatedByAccountId());
     product.setCreatedAt(existing.getCreatedAt());
     product.setOffShelfAt("offShelf".equals(product.getStatus()) && !"offShelf".equals(existing.getStatus())

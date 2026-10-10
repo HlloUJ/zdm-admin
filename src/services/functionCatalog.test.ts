@@ -196,15 +196,34 @@ describe('full function catalog', () => {
     })) {
       const prefix = `admin.permission-management.${key}`;
       const page = pages.find((p) => p.value === prefix)!;
-      expect(page.tabs).toHaveLength(1);
-      expect(page.tabs[0].label).toBe('');
-      expect(page.tabs[0].actions.map((a) => a.label)).toEqual(labels);
-      expect(page.tabs[0].actions.every((a) => a.value.startsWith(`${prefix}.supply-chain.`))).toBe(true);
+      const actions = key === 'role-management' ? page.actions : page.tabs[0].actions;
+      expect(page.tabs).toHaveLength(key === 'role-management' ? 0 : 1);
+      expect(actions.map((a) => a.label)).toEqual(labels);
+      expect(actions.every((a) => a.value.startsWith(`${prefix}.supply-chain.`))).toBe(true);
       expect(normalizeTerminalPermissions('supply-chain', [`${prefix}.view`])).toEqual([]);
       for (const terminal of ['store', 'supplier'] as const) {
         expect(normalizeTerminalPermissions(terminal, [`${prefix}.supply-chain.view`])).toEqual([]);
       }
     }
+  });
+
+  it('limits platform supply-chain administration to administrator account management', () => {
+    const pages = filterFunctionCatalogByAudience('admin')
+      .flatMap((m) => m.menus)
+      .flatMap((m) => m.pages);
+    const roles = pages.find((p) => p.value === 'admin.permission-management.role-management')!;
+    expect(roles.tabs).toEqual([]);
+    expect(roles.actions.map((a) => a.label)).toEqual(['查看', '新增', '编辑', '权限', '删除']);
+    expect(roles.actions.every((a) => !a.value.includes('.supply-chain'))).toBe(true);
+    const employees = pages.find((p) => p.value === 'admin.permission-management.employee-management')!;
+    const supplyTab = employees.tabs.find((t) => t.value.endsWith('.supply-chain'))!;
+    expect(supplyTab.actions.map((a) => a.label)).toEqual(['查看', '邀请员工', '编辑', '停用/启用', '删除']);
+    expect(
+      normalizeFunctionCatalogPermissions(filterFunctionCatalogByAudience('admin'), [
+        'admin.permission-management.role-management.supply-chain.view',
+        'admin.permission-management.employee-management.supply-chain.permission',
+      ]),
+    ).toEqual([]);
   });
 
   it('keeps the shared supply type dictionary configuration on the platform only', () => {

@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SlabMarkupConfigurationService {
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.account.CreatorNames creatorNames;
   private static final String DUPLICATE_LEVEL_MESSAGE = "该门店级别已配置大板价格";
 
   private final SlabMarkupConfigurationMapper mapper;
@@ -47,6 +49,7 @@ public class SlabMarkupConfigurationService {
         .orderByDesc(SlabMarkupConfiguration::getCreatedAt)
         .orderByDesc(SlabMarkupConfiguration::getId));
     configurations = com.zdm.platform.security.DataScope.filter(identityProvider.require(), configurations);
+    creatorNames.attachAll(configurations);
     configurations.forEach(this::enrich);
     return configurations;
   }
@@ -59,7 +62,6 @@ public class SlabMarkupConfigurationService {
     payload.setName(level.name());
     payload.setStatus("enabled");
     payload.setSortOrder(nextSortOrder());
-    payload.setCreatedByName(identity.displayName());
     payload.setCreatedByAccountId(identity.accountId());
     validateUniqueStoreLevel(payload.getStoreLevelId(), null);
     try {
@@ -84,7 +86,6 @@ public class SlabMarkupConfigurationService {
     payload.setName(existing.getName());
     payload.setStatus(existing.getStatus());
     payload.setSortOrder(existing.getSortOrder());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     validateUniqueStoreLevel(payload.getStoreLevelId(), id);
     try {
@@ -161,7 +162,7 @@ public class SlabMarkupConfigurationService {
     }
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), configuration.getCreatedByAccountId());
     enrich(configuration);
-    return configuration;
+    return creatorNames.attach(configuration);
   }
 
   private CurrentIdentity requirePlatformScope() {

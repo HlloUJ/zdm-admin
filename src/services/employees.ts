@@ -1,6 +1,7 @@
 import { request } from './http';
 
 export interface EmployeeRecord {
+  identityType?: string;
   clientCode?: 'admin' | 'supply-chain';
   id: number;
   tenantId?: number;
@@ -65,4 +66,22 @@ export function deleteEmployee(id: number) {
   return request<boolean>(`/admin/employees/${id}`, {
     method: 'DELETE',
   });
+}
+
+export function updateSupplyChainAdministrator(id: number, payload: EmployeePayload) {
+  return request<EmployeeRecord>(`/admin/supply-chain-administrators/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name: payload.name, gender: payload.gender, remark: payload.remark }),
+  });
+}
+
+export function setSupplyChainAdministratorStatus(id: number, status: 'enabled' | 'disabled') {
+  return request<EmployeeRecord>(`/admin/supply-chain-administrators/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function deleteSupplyChainAdministrator(id: number) {
+  return request<boolean>(`/admin/supply-chain-administrators/${id}`, { method: 'DELETE' });
 }

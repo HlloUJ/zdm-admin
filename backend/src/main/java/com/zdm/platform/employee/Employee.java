@@ -8,9 +8,14 @@ import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 
 @TableName("employees")
-public class Employee implements com.zdm.platform.security.CreatorOwned {
+public class Employee implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
+
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+  private String identityType;
+  public String getIdentityType() { return identityType; }
+  public void setIdentityType(String value) { identityType = value; }
 
   private Long accountId;
   private String clientCode = "admin";
@@ -21,12 +26,15 @@ public class Employee implements com.zdm.platform.security.CreatorOwned {
   private Long storeId;
 
   @NotBlank
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String name;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String gender;
 
   @NotBlank
   @Pattern(regexp = "^1[3-9]\\d{9}$")
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String phone;
 
   @NotBlank
@@ -35,6 +43,7 @@ public class Employee implements com.zdm.platform.security.CreatorOwned {
   private String roleIds;
   private String dataPermission;
   private String remark;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private LocalDateTime createdAt;
