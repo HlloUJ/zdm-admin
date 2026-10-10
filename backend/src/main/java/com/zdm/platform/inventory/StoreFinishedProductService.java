@@ -274,11 +274,9 @@ public class StoreFinishedProductService {
   public List<ProductView> list() {
     var store = scopes.require();
     List<Map<String, Object>> listings = jdbc.queryForList("""
-        SELECT listing.*, (SELECT history.operator_name FROM store_finished_operation_logs history
-          WHERE history.listing_id = listing.id AND history.tenant_id = listing.tenant_id
-            AND history.store_id = listing.store_id AND history.operation_type = 'SELECT'
-          ORDER BY history.id LIMIT 1) AS created_by_name
+        SELECT listing.*, creator.display_name AS created_by_name
         FROM store_finished_products listing
+        LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
         JOIN finished_products product ON product.id = listing.finished_product_id
         WHERE listing.tenant_id = ? AND listing.store_id = ?
         ORDER BY listing.created_at DESC, listing.id DESC
@@ -863,11 +861,9 @@ public class StoreFinishedProductService {
 
   private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
     List<Map<String, Object>> rows = jdbc.queryForList("""
-        SELECT listing.*, (SELECT history.operator_name FROM store_finished_operation_logs history
-          WHERE history.listing_id = listing.id AND history.tenant_id = listing.tenant_id
-            AND history.store_id = listing.store_id AND history.operation_type = 'SELECT'
-          ORDER BY history.id LIMIT 1) AS created_by_name
+        SELECT listing.*, creator.display_name AS created_by_name
         FROM store_finished_products listing
+        LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
         JOIN finished_products product ON product.id = listing.finished_product_id
         WHERE listing.id = ? AND listing.tenant_id = ? AND listing.store_id = ?
         """ + (lock ? " FOR UPDATE" : ""), id, store.tenantId(), store.storeId());

@@ -6,12 +6,13 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("supplier_supply_types")
-public class SupplierSupplyType extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class SupplierSupplyType extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   private String code;
 
   @NotBlank
   private String name;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
 

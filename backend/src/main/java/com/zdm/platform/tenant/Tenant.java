@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 
 @TableName("tenants")
-public class Tenant implements com.zdm.platform.security.CreatorOwned {
+public class Tenant implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 
@@ -29,6 +29,7 @@ public class Tenant implements com.zdm.platform.security.CreatorOwned {
   @NotBlank
   private String status;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private String businessTypes;

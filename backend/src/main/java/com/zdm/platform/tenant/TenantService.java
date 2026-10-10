@@ -1,7 +1,6 @@
 package com.zdm.platform.tenant;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -19,8 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
   private static final Set<String> BUSINESS_TYPES =
       Set.of("cityPartner", "slabSupplier", "finishedSupplier", "factory");
 
@@ -48,7 +46,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   public Tenant createTenant(Tenant tenant) {
     List<String> businesses = List.of();
     tenant.setBusinessTypes("");
-    tenant.setCreatedByName(resolveCreatedByName());
     tenant.setCreatedByAccountId(identityProvider.require().accountId());
     requireAvailableTenantPhone(tenant.getContactPhone(), null);
     Long accountId;
@@ -79,7 +76,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     payload.setAccountId(ownerAccountId);
     payload.setStatus(existing.getStatus());
     payload.setBusinessTypes(existing.getBusinessTypes());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     try {
       updateById(payload);
@@ -282,12 +278,6 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     }
   }
 
-  private String resolveCreatedByName() {
-    return identityProvider.current()
-        .map(CurrentIdentity::displayName)
-        .filter(StringUtils::hasText)
-        .orElse(DEFAULT_CREATED_BY_NAME);
-  }
 
   private Long requireOwnerAccountId(Long tenantId) {
     return jdbcTemplate.query(
@@ -320,13 +310,12 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
           tenant.setBusinessTypes(rs.getString("business_types"));
           tenant.setRemark(rs.getString("remark"));
           tenant.setStatus(rs.getString("status"));
-          tenant.setCreatedByName(rs.getString("created_by_name"));
           tenant.setCreatedByAccountId(rs.getObject("created_by_account_id", Long.class));
           return tenant;
         },
         id).stream().findFirst().orElseThrow(() -> new IllegalArgumentException("租户不存在或已删除"));
     withPersonalProfiles(List.of(locked));
-    return locked;
+    return creatorNames.attach(locked);
   }
 
   private TenantPurgePreview buildPurgePreview(Tenant tenant) {

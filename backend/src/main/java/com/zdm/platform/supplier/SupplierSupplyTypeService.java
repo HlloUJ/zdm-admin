@@ -13,6 +13,8 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class SupplierSupplyTypeService {
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.account.CreatorNames creatorNames;
   private static final String DUPLICATE_NAME_MESSAGE = "供货类型名称已存在";
 
   private final SupplierSupplyTypeMapper mapper;
@@ -31,7 +33,7 @@ public class SupplierSupplyTypeService {
         .orderByDesc(SupplierSupplyType::getCreatedAt)
         .orderByDesc(SupplierSupplyType::getId));
     types.forEach(type -> type.setReferenced(mapper.countSupplierReferences(type.getId()) > 0));
-    return types;
+    return creatorNames.attachAll(types);
   }
 
   @Transactional
@@ -41,7 +43,6 @@ public class SupplierSupplyTypeService {
     type.setCode("custom_" + UUID.randomUUID().toString().replace("-", ""));
     type.setName(normalizedName(type.getName()));
     type.setStatus("enabled");
-    type.setCreatedByName(identity.displayName());
     type.setCreatedByAccountId(identity.accountId());
     validateUniqueName(type.getName(), null);
     try {
@@ -60,7 +61,6 @@ public class SupplierSupplyTypeService {
     payload.setCode(existing.getCode());
     payload.setName(normalizedName(payload.getName()));
     payload.setStatus(existing.getStatus());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     validateUniqueName(payload.getName(), id);
     try {
@@ -97,7 +97,7 @@ public class SupplierSupplyTypeService {
     }
     type.setReferenced(mapper.countSupplierReferences(id) > 0);
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), type.getCreatedByAccountId());
-    return type;
+    return creatorNames.attach(type);
   }
 
   private CurrentIdentity requirePlatformScope() {

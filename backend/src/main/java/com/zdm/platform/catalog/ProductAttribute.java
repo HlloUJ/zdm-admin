@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
 @TableName("product_attributes")
-public class ProductAttribute extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class ProductAttribute extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotBlank
   private String scope;
 
@@ -19,6 +19,7 @@ public class ProductAttribute extends BaseEntity implements com.zdm.platform.sec
 
   private String attributeRole;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private LocalDateTime deletedAt;

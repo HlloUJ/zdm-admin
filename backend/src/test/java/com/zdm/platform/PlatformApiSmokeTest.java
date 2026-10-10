@@ -76,8 +76,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO finished_markup_configurations
-          (store_level_id, name, price_coefficient, sort_order, status, created_by_name, created_by_account_id)
-        SELECT level.id, level.name, 1.1000, level.sort_order, 'enabled', '集成测试', 1
+          (store_level_id, name, price_coefficient, sort_order, status, created_by_account_id)
+        SELECT level.id, level.name, 1.1000, level.sort_order, 'enabled', 1
         FROM store_levels level
         WHERE level.status = 'enabled'
           AND NOT EXISTS (
@@ -88,8 +88,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO slab_markup_configurations
-          (store_level_id, name, price_coefficient, sort_order, status, created_by_name, created_by_account_id)
-        SELECT level.id, level.name, 1.1000, level.sort_order, 'enabled', '集成测试', 1
+          (store_level_id, name, price_coefficient, sort_order, status, created_by_account_id)
+        SELECT level.id, level.name, 1.1000, level.sort_order, 'enabled', 1
         FROM store_levels level
         WHERE level.status = 'enabled'
           AND NOT EXISTS (
@@ -441,13 +441,13 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "SELECT function_permissions FROM roles WHERE code = 'ADMIN_MANAGER'",
         String.class);
     Integer craftWithoutCreatorCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM crafts WHERE created_by_name IS NULL OR created_by_name = ''",
+        "SELECT COUNT(*) FROM crafts WHERE created_by_account_id IS NULL",
         Integer.class);
     Integer categoryWithoutCreatorCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM product_categories WHERE created_by_name IS NULL OR created_by_name = ''",
+        "SELECT COUNT(*) FROM product_categories WHERE created_by_account_id IS NULL",
         Integer.class);
     Integer slabVarietyWithoutCreatorCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM slab_varieties WHERE created_by_name IS NULL OR created_by_name = ''",
+        "SELECT COUNT(*) FROM slab_varieties WHERE created_by_account_id IS NULL",
         Integer.class);
     Integer sampleSupplierCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM suppliers WHERE id IN (1, 2) AND remark = '系统内置供应商'",
@@ -497,7 +497,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "SELECT COUNT(*) FROM tenant_businesses WHERE tenant_id = 1 AND business_type = 'cityPartner'",
         Integer.class);
     Integer tenantWithoutCreatorCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM tenants WHERE created_by_name IS NULL OR created_by_name = ''",
+        "SELECT COUNT(*) FROM tenants WHERE created_by_account_id IS NULL",
         Integer.class);
 
     assertThat(migrationCount).isGreaterThanOrEqualTo(58);
@@ -535,9 +535,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "属性值操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'self', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'self', 1)
         """,
         employeeId,
         accountId);
@@ -551,13 +549,10 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '属性值全局操作测试角色', 'ATTRIBUTE_VALUE_GLOBAL_OPERATOR_TEST', 'all', 'enabled',
-          'admin.product-data-center.attribute-value.shared.view,'
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '属性值全局操作测试角色', 'ATTRIBUTE_VALUE_GLOBAL_OPERATOR_TEST', 'all', 'enabled', 'admin.product-data-center.attribute-value.shared.view,'
           'admin.product-data-center.attribute-value.shared.create,'
           'admin.product-data-center.attribute-value.shared.toggle-status,'
-          'admin.product-data-center.attribute-value.shared.delete', '集成测试')
+          'admin.product-data-center.attribute-value.shared.delete', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -569,16 +564,12 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO product_attributes
-          (id, scope, name, value_type, attribute_role, status, created_by_name)
-        VALUES (?, 'shared', '属性值全量查询测试属性', 'select', 'basic', 'enabled', '其他管理员')
+        INSERT INTO product_attributes (id, scope, name, value_type, attribute_role, status, created_by_account_id) VALUES (?, 'shared', '属性值全量查询测试属性', 'select', 'basic', 'enabled', 1)
         """,
         attributeId);
     jdbcTemplate.update(
         """
-        INSERT INTO product_attribute_values
-          (id, attribute_id, scope, value, code, status, created_by_name)
-        VALUES (?, ?, 'shared', '其他管理员维护的属性值', 'other-admin-value', 'enabled', '其他管理员')
+        INSERT INTO product_attribute_values (id, attribute_id, scope, value, code, status, created_by_account_id) VALUES (?, ?, 'shared', '其他管理员维护的属性值', 'other-admin-value', 'enabled', 1)
         """,
         otherValueId,
         attributeId);
@@ -601,7 +592,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(status().isOk())
         .andExpect(jsonPath(
             "$.data[?(@.id == %d)].createdByName".formatted(otherValueId),
-            hasItem("其他管理员")));
+            hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))));
 
     mockMvc.perform(get("/api/admin/product-attribute-values/attribute-options")
             .header("Authorization", "Bearer " + token))
@@ -630,7 +621,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         createdResult.getResponse().getContentAsString(),
         "$.data.id");
     String persistedCreatorName = jdbcTemplate.queryForObject(
-        "SELECT created_by_name FROM product_attribute_values WHERE id = ?",
+        "SELECT (SELECT display_name FROM accounts WHERE accounts.id=product_attribute_values.created_by_account_id) FROM product_attribute_values WHERE id = ?",
         String.class,
         createdValueId);
     assertThat(persistedCreatorName).isEqualTo("属性值操作员");
@@ -667,9 +658,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "属性库操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'self', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'self', 1)
         """,
         employeeId,
         accountId);
@@ -683,14 +672,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '属性库全局操作测试角色', 'ATTRIBUTE_GLOBAL_OPERATOR_TEST', 'all', 'enabled',
-          'admin.product-data-center.attribute.shared.view,'
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '属性库全局操作测试角色', 'ATTRIBUTE_GLOBAL_OPERATOR_TEST', 'all', 'enabled', 'admin.product-data-center.attribute.shared.view,'
           'admin.product-data-center.attribute.shared.create,'
           'admin.product-data-center.attribute.shared.toggle-status,'
           'admin.product-data-center.attribute.shared.delete,'
-          'admin.product-data-center.attribute.accessory.view', '集成测试')
+          'admin.product-data-center.attribute.accessory.view', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -702,16 +688,12 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO product_attributes
-          (id, scope, name, value_type, attribute_role, status, created_by_name)
-        VALUES (?, 'accessory', '其他管理员创建的配件属性', 'text', 'basic', 'enabled', '其他管理员')
+        INSERT INTO product_attributes (id, scope, name, value_type, attribute_role, status, created_by_account_id) VALUES (?, 'accessory', '其他管理员创建的配件属性', 'text', 'basic', 'enabled', 1)
         """,
         accessoryAttributeId);
     jdbcTemplate.update(
         """
-        INSERT INTO product_attributes
-          (id, scope, name, value_type, attribute_role, status, created_by_name)
-        VALUES (?, 'shared', '其他管理员创建的共享属性', 'text', 'basic', 'enabled', '其他管理员')
+        INSERT INTO product_attributes (id, scope, name, value_type, attribute_role, status, created_by_account_id) VALUES (?, 'shared', '其他管理员创建的共享属性', 'text', 'basic', 'enabled', 1)
         """,
         sharedAttributeId);
 
@@ -733,10 +715,10 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(status().isOk())
         .andExpect(jsonPath(
             "$.data[?(@.id == %d)].createdByName".formatted(accessoryAttributeId),
-            hasItem("其他管理员")))
+            hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))))
         .andExpect(jsonPath(
             "$.data[?(@.id == %d)].createdByName".formatted(sharedAttributeId),
-            hasItem("其他管理员")));
+            hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))));
 
     MvcResult createdResult = mockMvc.perform(post("/api/admin/product-attributes")
             .header("Authorization", "Bearer " + token)
@@ -1025,9 +1007,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "供应商权限测试员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -1041,10 +1021,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '供应商编辑测试角色', 'SUPPLIER_EDIT_TEST', 'all', 'enabled',
-          'admin.supplier-management.view,admin.supplier-management.edit', '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '供应商编辑测试角色', 'SUPPLIER_EDIT_TEST', 'all', 'enabled', 'admin.supplier-management.view,admin.supplier-management.edit', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -1056,12 +1033,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO suppliers
-          (id, owner_scope, owner_id, tenant_id, store_id, name, status,
-           created_by_name, created_by_account_id, created_at)
-        VALUES
-          (?, 'store', 1, 1, 1, '供应商权限集成测试', 'enabled', '供应商权限测试员', ?, '2098-01-01 00:00:00'),
-          (9261, 'store', 1, 1, 1, '供应商排序集成测试', 'enabled', '集成测试', NULL, '2099-01-01 00:00:00')
+        INSERT INTO suppliers (id, owner_scope, owner_id, tenant_id, store_id, name, status, created_by_account_id, created_at) VALUES (?, 'store', 1, 1, 1, '供应商权限集成测试', 'enabled', ?, '2098-01-01 00:00:00'), (9261, 'store', 1, 1, 1, '供应商排序集成测试', 'enabled', NULL, '2099-01-01 00:00:00')
         """,
         supplierId,
         accountId);
@@ -1442,7 +1414,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     assertThat(categoryIds.indexOf(Math.toIntExact(secondRootId)))
         .isLessThan(categoryIds.indexOf(Math.toIntExact(firstRootId)));
     assertThat(jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM store_categories WHERE created_by_name IS NOT NULL AND created_at IS NOT NULL",
+        "SELECT COUNT(*) FROM store_categories WHERE created_by_account_id IS NOT NULL AND created_at IS NOT NULL",
         Integer.class)).isEqualTo(3);
 
     MvcResult grandchildResult = mockMvc.perform(post("/api/admin/store-categories")
@@ -1586,9 +1558,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "门店分类查看员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, ?, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, ?, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId,
@@ -1604,11 +1574,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         storeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status,
-           function_permissions, created_by_name)
-        VALUES (?, 1, ?, '门店分类查看角色', 'STORE_CATEGORY_VIEWER_TEST', 'store', 'enabled',
-          'admin.tenant.store-category-management.finished.view,admin.tenant.store-category-management.finished.edit', '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, ?, '门店分类查看角色', 'STORE_CATEGORY_VIEWER_TEST', 'store', 'enabled', 'admin.tenant.store-category-management.finished.view,admin.tenant.store-category-management.finished.edit', 1)
         """,
         roleId,
         storeId);
@@ -1622,11 +1588,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         storeId);
     jdbcTemplate.update(
         """
-        INSERT INTO store_categories
-          (id, store_id, scope, name, sort_order, product_count, status, created_by_name)
-        VALUES
-          (9301, 1, 'finished', '同名门店分类', 1, 0, 'enabled', '韩健'),
-          (9302, ?, 'finished', '同名门店分类', 1, 0, 'enabled', '张飞')
+        INSERT INTO store_categories (id, store_id, scope, name, sort_order, product_count, status, created_by_account_id) VALUES (9301, 1, 'finished', '同名门店分类', 1, 0, 'enabled', 1), (9302, ?, 'finished', '同名门店分类', 1, 0, 'enabled', (SELECT MIN(id) FROM accounts WHERE display_name='张飞'))
         """,
         storeId);
 
@@ -1720,11 +1682,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         String.class);
     jdbcTemplate.update(
         """
-        INSERT INTO product_categories
-          (id, scope, name, sort_order, product_count, status, created_by_name, created_at)
-        VALUES
-          (9201, 'accessory', '排序测试旧分类', 1, 0, 'enabled', '韩健', '2026-01-01 09:00:00'),
-          (9202, 'accessory', '排序测试新分类', 2, 0, 'enabled', '韩健', '2026-01-02 09:00:00')
+        INSERT INTO product_categories (id, scope, name, sort_order, product_count, status, created_by_account_id, created_at) VALUES (9201, 'accessory', '排序测试旧分类', 1, 0, 'enabled', 1, '2026-01-01 09:00:00'), (9202, 'accessory', '排序测试新分类', 2, 0, 'enabled', 1, '2026-01-02 09:00:00')
         """);
 
     MvcResult listResult = mockMvc.perform(get("/api/admin/product-categories")
@@ -1783,10 +1741,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   void finishedProductCategoryCountAlwaysUsesActualProducts() throws Exception {
     jdbcTemplate.update(
         """
-        INSERT INTO product_categories
-          (id, scope, name, sort_order, product_count, status, created_by_name,
-           created_by_account_id)
-        VALUES (9205, 'finished', '动态商品数量测试分类', 1, 99, 'enabled', '超级管理员', 1)
+        INSERT INTO product_categories (id, scope, name, sort_order, product_count, status, created_by_account_id) VALUES (9205, 'finished', '动态商品数量测试分类', 1, 99, 'enabled', 1)
         """);
     try {
       mockMvc.perform(get("/api/admin/product-categories")
@@ -1830,9 +1785,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "成品分类操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -1846,14 +1799,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '成品分类操作角色', 'FINISHED_CATEGORY_OPERATOR_TEST', 'all', 'enabled',
-          'admin.product-data-center.category.finished.view,'
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '成品分类操作角色', 'FINISHED_CATEGORY_OPERATOR_TEST', 'all', 'enabled', 'admin.product-data-center.category.finished.view,'
           'admin.product-data-center.category.finished.create-root,'
           'admin.product-data-center.category.finished.disable,'
           'admin.product-data-center.category.finished.enable,'
-          'admin.product-data-center.category.finished.delete', '集成测试')
+          'admin.product-data-center.category.finished.delete', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -1869,7 +1819,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(get("/api/admin/product-categories").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[*].scope", not(hasItem("accessory"))))
-        .andExpect(jsonPath("$.data[*].createdByName", hasItem("韩健")));
+        .andExpect(jsonPath("$.data[*].createdByName", hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))));
 
     MvcResult createdResult = mockMvc.perform(post("/api/admin/product-categories")
             .header("Authorization", "Bearer " + token)
@@ -1998,21 +1948,15 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
 
     jdbcTemplate.update(
         """
-        INSERT INTO product_categories
-          (id, scope, name, sort_order, product_count, status, created_by_name,
-           created_by_account_id)
-        VALUES (9203, 'finished', '模板引用删除测试分类', 1, 0, 'enabled', '超级管理员', 1)
+        INSERT INTO product_categories (id, scope, name, sort_order, product_count, status, created_by_account_id) VALUES (9203, 'finished', '模板引用删除测试分类', 1, 0, 'enabled', 1)
         """);
     jdbcTemplate.update(
         """
-        INSERT INTO product_attributes
-          (id, scope, name, value_type, attribute_role, status, created_by_name)
-        VALUES (9204, 'finished', '模板引用删除测试属性', 'select', 'basic', 'enabled', '韩健')
+        INSERT INTO product_attributes (id, scope, name, value_type, attribute_role, status, created_by_account_id) VALUES (9204, 'finished', '模板引用删除测试属性', 'select', 'basic', 'enabled', 1)
         """);
     jdbcTemplate.update(
         """
-        INSERT INTO category_template_versions (category_id, content, created_by_name)
-        VALUES (9203, JSON_ARRAY(JSON_OBJECT('attributeId', 9204, 'options', JSON_ARRAY())), '测试人员')
+        INSERT INTO category_template_versions (category_id, content, created_by_account_id) VALUES (9203, JSON_ARRAY(JSON_OBJECT('attributeId', 9204, 'options', JSON_ARRAY())), (SELECT MIN(id) FROM accounts WHERE display_name='测试人员'))
         """);
 
     mockMvc.perform(delete("/api/admin/product-categories/9203")
@@ -2169,9 +2113,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "色系只读操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -2497,13 +2439,13 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
         accountId, "15926629086", "店铺级别只读操作员");
-    jdbcTemplate.update("INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')",
+    jdbcTemplate.update("INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)",
         employeeId, accountId);
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
         accountId, employeeId);
     jdbcTemplate.update(
-        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, 1, 1, '店铺级别只读角色', 'STORE_LEVEL_VIEW_TEST', 'all', 'enabled', 'admin.tenant.store-level-management.view', '集成测试')",
+        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '店铺级别只读角色', 'STORE_LEVEL_VIEW_TEST', 'all', 'enabled', 'admin.tenant.store-level-management.view', 1)",
         roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
@@ -2544,7 +2486,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
               .content("{\"name\":\"本人创建的店铺级别-已编辑\",\"status\":\"enabled\"}"))
           .andExpect(status().isOk());
       jdbcTemplate.update(
-          "UPDATE store_levels SET created_by_account_id = 1, created_by_name = '其他创建人' WHERE id = ?",
+          "UPDATE store_levels SET created_by_account_id = 1 WHERE id = ?",
           Long.valueOf(createdLevelId));
       mockMvc.perform(put("/api/admin/store-levels/{id}", createdLevelId)
               .header("Authorization", "Bearer " + token)
@@ -2568,7 +2510,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   @Test
   void superAdminCanOperateStoreLevelCreatedByAnotherAccount() throws Exception {
     jdbcTemplate.update(
-        "INSERT INTO store_levels (name, sort_order, status, created_by_name, created_by_account_id) VALUES (?, 999, 'enabled', ?, ?)",
+        "INSERT INTO store_levels (name, sort_order, status, created_by_account_id) VALUES (?, 999, 'enabled', (SELECT creator_id FROM (SELECT ? AS fixture_label, ? AS creator_id) fixture_creator))",
         "超级管理员跨创建人操作测试",
         "其他管理员",
         99087L);
@@ -2681,13 +2623,13 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
         accountId, "15926629088", "门店权限测试操作员");
-    jdbcTemplate.update("INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')",
+    jdbcTemplate.update("INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)",
         employeeId, accountId);
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
         accountId, employeeId);
     jdbcTemplate.update(
-        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name) VALUES (?, 1, 1, '门店编辑测试角色', 'STORE_EDIT_TEST', 'all', 'enabled', 'admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit', '集成测试')",
+        "INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '门店编辑测试角色', 'STORE_EDIT_TEST', 'all', 'enabled', 'admin.tenant.tenant-store-management.view,admin.tenant.tenant-store-management.edit', 1)",
         roleId);
     jdbcTemplate.update(
         "INSERT INTO account_roles (account_id, role_id, client_code, tenant_id, store_id) VALUES (?, ?, 'admin', 1, 1)",
@@ -2886,20 +2828,20 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "INSERT INTO stores (id, tenant_id, name, type, status, created_by) VALUES (?, 1, '已归档删除测试门店', 'cityPartner', 'disabled', '韩健')",
         storeId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, scope, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', '门店删除级联分类', 1, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, name, sort_order, product_count, status, created_by_account_id) VALUES (?, ?, 'finished', '门店删除级联分类', 1, 0, 'enabled', 1)",
         categoryId,
         storeId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, scope, parent_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', ?, '门店删除级联子分类', 2, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, parent_id, name, sort_order, product_count, status, created_by_account_id) VALUES (?, ?, 'finished', ?, '门店删除级联子分类', 2, 0, 'enabled', 1)",
         childCategoryId,
         storeId,
         categoryId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, scope, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', '门店删除级联分类二', 3, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, name, sort_order, product_count, status, created_by_account_id) VALUES (?, ?, 'finished', '门店删除级联分类二', 3, 0, 'enabled', 1)",
         secondCategoryId,
         storeId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, scope, parent_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', ?, '门店删除级联子分类', 4, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, parent_id, name, sort_order, product_count, status, created_by_account_id) VALUES (?, ?, 'finished', ?, '门店删除级联子分类', 4, 0, 'enabled', 1)",
         sameNameChildCategoryId,
         storeId,
         secondCategoryId);
@@ -3103,9 +3045,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "等级只读操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -3119,9 +3059,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '等级只读角色', 'SLAB_GRADE_VIEW_TEST', 'all', 'enabled', 'admin.product-data-center.slab-grade.view', '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '等级只读角色', 'SLAB_GRADE_VIEW_TEST', 'all', 'enabled', 'admin.product-data-center.slab-grade.view', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -3248,9 +3186,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "大板产地自有操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -3264,14 +3200,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '大板产地自有操作角色', 'SLAB_ORIGIN_SELF_TEST', 'all', 'enabled',
-          'admin.product-data-center.slab-origin.view,'
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '大板产地自有操作角色', 'SLAB_ORIGIN_SELF_TEST', 'all', 'enabled', 'admin.product-data-center.slab-origin.view,'
           'admin.product-data-center.slab-origin.create,'
           'admin.product-data-center.slab-origin.edit,'
           'admin.product-data-center.slab-origin.toggle-status,'
-          'admin.product-data-center.slab-origin.delete', '集成测试')
+          'admin.product-data-center.slab-origin.delete', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -3283,10 +3216,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO slab_origins (id, name, status, created_by_name)
-        VALUES
-          (9081, '本人创建的大板产地', 'enabled', '大板产地自有操作员'),
-          (9082, '他人创建的大板产地', 'enabled', '韩健')
+        INSERT INTO slab_origins (id, name, status, created_by_account_id) VALUES (9081, '本人创建的大板产地', 'enabled', (SELECT MIN(id) FROM accounts WHERE display_name='大板产地自有操作员')), (9082, '他人创建的大板产地', 'enabled', 1)
         """);
 
     try {
@@ -3364,9 +3294,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "无产地权限操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -3530,9 +3458,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "大板品种自有操作员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -3546,14 +3472,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'all', 'enabled',
-          'admin.product-data-center.slab-variety.view,'
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '大板品种自有操作角色', 'SLAB_VARIETY_SELF_TEST', 'all', 'enabled', 'admin.product-data-center.slab-variety.view,'
           'admin.product-data-center.slab-variety.create,'
           'admin.product-data-center.slab-variety.edit,'
           'admin.product-data-center.slab-variety.toggle-status,'
-          'admin.product-data-center.slab-variety.delete', '集成测试')
+          'admin.product-data-center.slab-variety.delete', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -3565,10 +3488,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO slab_varieties (id, name, status, created_by_name)
-        VALUES
-          (9031, '本人创建的大板品种', 'enabled', '大板品种自有操作员'),
-          (9032, '他人创建的大板品种', 'enabled', '韩健')
+        INSERT INTO slab_varieties (id, name, status, created_by_account_id) VALUES (9031, '本人创建的大板品种', 'enabled', (SELECT MIN(id) FROM accounts WHERE display_name='大板品种自有操作员')), (9032, '他人创建的大板品种', 'enabled', 1)
         """);
 
     String token = TokenAuthenticationFilter.createAccountToken(accountId);
@@ -3634,9 +3554,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "品种查看员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -3650,10 +3568,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '品种编辑角色', 'SLAB_VARIETY_EDITOR_TEST', 'all', 'enabled',
-          'admin.product-data-center.slab-variety.view,admin.product-data-center.slab-variety.edit', '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '品种编辑角色', 'SLAB_VARIETY_EDITOR_TEST', 'all', 'enabled', 'admin.product-data-center.slab-variety.view,admin.product-data-center.slab-variety.edit', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -3665,8 +3580,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         roleId);
     jdbcTemplate.update(
         """
-        INSERT INTO slab_varieties (id, name, status, created_by_name, created_by_account_id)
-        VALUES (9011, '权限集成测试品种', 'enabled', '品种查看员', ?)
+        INSERT INTO slab_varieties (id, name, status, created_by_account_id) VALUES (9011, '权限集成测试品种', 'enabled', ?)
         """,
         accountId);
 
@@ -3860,9 +3774,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         accountId);
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -3876,10 +3788,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (1, 1, '无租户权限角色', 'NO_TENANT_PERMISSION_ROLE', 'all', 'enabled',
-          'admin.permission-management.employee-management.view', '韩健')
+        INSERT INTO roles (tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (1, 1, '无租户权限角色', 'NO_TENANT_PERMISSION_ROLE', 'all', 'enabled', 'admin.permission-management.employee-management.view', 1)
         """);
     Long roleId = jdbcTemplate.queryForObject(
         "SELECT id FROM roles WHERE code = 'NO_TENANT_PERMISSION_ROLE'",
@@ -3910,9 +3819,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         accountId);
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -3926,12 +3833,9 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (1, 1, '租户全部查看角色', 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE', 'all', 'enabled',
-          'admin.tenant.tenant-management.view,admin.tenant.tenant-management.edit,
+        INSERT INTO roles (tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (1, 1, '租户全部查看角色', 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE', 'all', 'enabled', 'admin.tenant.tenant-management.view,admin.tenant.tenant-management.edit,
            admin.tenant.tenant-management.open-business,admin.tenant.tenant-management.toggle-status,
-           admin.tenant.tenant-management.delete', '韩健')
+           admin.tenant.tenant-management.delete', 1)
         """);
     Long roleId = jdbcTemplate.queryForObject(
         "SELECT id FROM roles WHERE code = 'TENANT_ALL_VIEW_SELF_SCOPE_ROLE'",
@@ -3954,7 +3858,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, account_type, status) VALUES (9013, '15926629012', '测试租户管理员', 'person', 'enabled')");
     jdbcTemplate.update(
-        "INSERT INTO tenants (id, account_id, status, business_types, created_by_name, created_by_account_id) VALUES (9012, 9013, 'enabled', '', '其他创建人', 1)");
+        "INSERT INTO tenants (id, account_id, status, business_types, created_by_account_id) VALUES (9012, 9013, 'enabled', '', 1)");
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (9013, 'admin', 'tenant_admin', 9012, 9012, NULL, 'enabled')");
     mockMvc.perform(put("/api/admin/tenants/9012")
@@ -4136,9 +4040,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "工艺查看员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         accountId,
         accountId);
@@ -4152,9 +4054,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         accountId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '工艺查看角色', 'CRAFT_VIEWER_TEST', 'all', 'enabled', ?, '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '工艺查看角色', 'CRAFT_VIEWER_TEST', 'all', 'enabled', ?, 1)
         """,
         roleId,
         "admin.product-data-center.finished-stock-craft.view");
@@ -4220,9 +4120,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeName);
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', 'all', 1)
         """,
         employeeId,
         accountId);
@@ -4236,9 +4134,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'all', 'enabled', ?, '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '工艺范围测试角色', 'CRAFT_SCOPE_TEST', 'all', 'enabled', ?, 1)
         """,
         roleId,
         "admin.product-data-center.finished-stock-craft.view");
@@ -4250,11 +4146,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         accountId,
         roleId);
     jdbcTemplate.update(
-        "INSERT INTO crafts (name, type, status, created_by_name) VALUES (?, '边工艺', 'enabled', ?)",
+        "INSERT INTO crafts (name, type, status, created_by_account_id) VALUES (?, '边工艺', 'enabled', (SELECT MIN(id) FROM accounts WHERE display_name=?))",
         ownCraftName,
         employeeName);
     jdbcTemplate.update(
-        "INSERT INTO crafts (name, type, status, created_by_name) VALUES (?, '边工艺', 'enabled', '韩健')",
+        "INSERT INTO crafts (name, type, status, created_by_account_id) VALUES (?, '边工艺', 'enabled', 1)",
         otherCraftName);
 
     usePlatformTestIdentity(accountId);
@@ -4264,7 +4160,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(ownCraftName))
             .value(hasItem(employeeName)))
         .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(otherCraftName))
-            .value(hasItem("韩健")));
+            .value(hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))));
 
     mockMvc.perform(get("/api/admin/crafts")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(1L)))
@@ -4272,7 +4168,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(ownCraftName))
             .value(hasItem(employeeName)))
         .andExpect(jsonPath("$.data[?(@.name == '%s')].createdByName".formatted(otherCraftName))
-            .value(hasItem("韩健")));
+            .value(hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))));
   }
 
   @Test
@@ -4280,9 +4176,9 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(get("/api/admin/roles")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.code == 'SUPER_ADMIN')].createdByName").value(hasItem("韩健")))
-        .andExpect(jsonPath("$.data[?(@.code == 'ADMIN_MANAGER')].createdByName").value(hasItem("韩健")))
-        .andExpect(jsonPath("$.data[?(@.code == 'OPERATOR')].createdByName").value(hasItem("韩健")))
+        .andExpect(jsonPath("$.data[?(@.code == 'SUPER_ADMIN')].createdByName").value(hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))))
+        .andExpect(jsonPath("$.data[?(@.code == 'ADMIN_MANAGER')].createdByName").value(hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))))
+        .andExpect(jsonPath("$.data[?(@.code == 'OPERATOR')].createdByName").value(hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))))
         .andExpect(jsonPath("$.data[?(@.status == 'enabled')].code").value(not(hasItem("CUSTOMER_SERVICE"))))
         .andExpect(jsonPath("$.data[0].category").doesNotExist())
         .andExpect(jsonPath("$.data[0].clientCode").value("admin"))
@@ -4351,9 +4247,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         affectedAccountId);
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', ?, 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', ?, 'all', 1)
         """,
         affectedEmployeeId,
         affectedAccountId,
@@ -4569,13 +4463,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             + "admin.permission-management.role-management.delete");
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (tenant_id, store_id, name, code, data_scope, status,
-           function_permissions, created_by_name, created_by_account_id)
-        VALUES
-          (1, 1, '本门店本人角色', 'CURRENT_STORE_ROLE', 'all', 'enabled', '', '角色范围测试管理员', ?),
-          (1, 1, '本门店他人角色', 'SAME_STORE_OTHER_ROLE', 'all', 'enabled', '', '韩健', 1),
-          (1, ?, '其他门店角色', 'OTHER_STORE_ROLE', 'all', 'enabled', '', '韩健', 1)
+        INSERT INTO roles (tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (1, 1, '本门店本人角色', 'CURRENT_STORE_ROLE', 'all', 'enabled', '', ?), (1, 1, '本门店他人角色', 'SAME_STORE_OTHER_ROLE', 'all', 'enabled', '', 1), (1, ?, '其他门店角色', 'OTHER_STORE_ROLE', 'all', 'enabled', '', 1)
         """,
         accountId,
         otherStoreId);
@@ -4748,11 +4636,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "其他门店员工");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
-        VALUES
-          (?, ?, 1, 1, 'enabled', ?, 'all', '韩健'),
-          (?, ?, 1, 1, 'enabled', '2', 'all', '权限配置员')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', ?, 'all', 1), (?, ?, 1, 1, 'enabled', '2', 'all', (SELECT MIN(id) FROM accounts WHERE display_name='权限配置员'))
         """,
         managerEmployeeId,
         managerAccountId,
@@ -4761,9 +4645,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         targetAccountId);
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
-        VALUES (?, ?, 1, ?, 'enabled', '2', 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_account_id) VALUES (?, ?, 1, ?, 'enabled', '2', 'all', 1)
         """,
         otherStoreEmployeeId,
         otherStoreAccountId,
@@ -4782,15 +4664,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         targetEmployeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status,
-           function_permissions, created_by_name)
-        VALUES (?, 1, 1, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'all', 'enabled',
-          'admin.permission-management.employee-management.view,'
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '员工权限配置测试角色', 'EMPLOYEE_PERMISSION_MANAGER_TEST', 'all', 'enabled', 'admin.permission-management.employee-management.view,'
           'admin.permission-management.employee-management.edit,'
           'admin.permission-management.employee-management.permission,'
           'admin.permission-management.employee-management.toggle-status,'
-          'admin.permission-management.employee-management.delete', '集成测试')
+          'admin.permission-management.employee-management.delete', 1)
         """,
         managerRoleId);
     jdbcTemplate.update(
@@ -4912,9 +4790,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "邀请创建员");
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, 'enabled', ?, 'all', '韩健')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_account_id) VALUES (?, ?, 1, 1, 'enabled', ?, 'all', 1)
         """,
         employeeId,
         accountId,
@@ -4929,10 +4805,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         employeeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_name)
-        VALUES (?, 1, 1, '员工邀请创建测试角色', 'EMPLOYEE_INVITE_CREATOR_TEST', 'all', 'enabled',
-          'admin.permission-management.employee-management.create', '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, 1, '员工邀请创建测试角色', 'EMPLOYEE_INVITE_CREATOR_TEST', 'all', 'enabled', 'admin.permission-management.employee-management.create', 1)
         """,
         roleId);
     jdbcTemplate.update(
@@ -4957,7 +4830,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         Long.class,
         token);
     String createdByName = jdbcTemplate.queryForObject(
-        "SELECT created_by_name FROM employee_invites WHERE token = ?",
+        "SELECT (SELECT display_name FROM accounts WHERE accounts.id=employee_invites.created_by_account_id) FROM employee_invites WHERE token = ?",
         String.class,
         token);
 
@@ -4979,9 +4852,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         accountId);
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
-        VALUES (?, ?, 1, ?, 'enabled', ?, 'all', '集成测试')
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_account_id) VALUES (?, ?, 1, ?, 'enabled', ?, 'all', 1)
         """,
         employeeId,
         accountId,
@@ -4998,11 +4869,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         storeId);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status,
-           function_permissions, created_by_name)
-        VALUES (?, 1, ?, '跨门店邀请测试角色', 'EMPLOYEE_INVITE_SCOPE_TEST', 'all', 'enabled',
-          'admin.permission-management.employee-management.create', '集成测试')
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, ?, '跨门店邀请测试角色', 'EMPLOYEE_INVITE_SCOPE_TEST', 'all', 'enabled', 'admin.permission-management.employee-management.create', 1)
         """,
         roleId,
         storeId);
@@ -5521,7 +5388,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(jsonPath("$.data[?(@.phone == '15926629999')].createdByName").value(hasItem(creatorName)));
 
     String createdByName = jdbcTemplate.queryForObject(
-        "SELECT created_by_name FROM employees WHERE id = ?",
+        "SELECT (SELECT display_name FROM accounts WHERE accounts.id=employees.created_by_account_id) FROM employees WHERE id = ?",
         String.class,
         Long.valueOf(employeeId));
     assertThat(createdByName).isEqualTo(creatorName);
@@ -5981,9 +5848,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
 
     jdbcTemplate.update(
         """
-        INSERT INTO suppliers
-          (owner_scope, owner_id, tenant_id, store_id, name, status, created_by_name, created_by_account_id)
-        VALUES ('platform', 0, NULL, NULL, ?, 'enabled', '超级管理员', 1)
+        INSERT INTO suppliers (owner_scope, owner_id, tenant_id, store_id, name, status, created_by_account_id) VALUES ('platform', 0, NULL, NULL, ?, 'enabled', 1)
         """,
         supplierName);
     Long supplierId = jdbcTemplate.queryForObject(
@@ -6437,7 +6302,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           """
           SELECT COUNT(*) FROM slab_inventory
           WHERE id = ? AND texture_id = ? AND color_id = ? AND grade_id = ?
-            AND origin_id = 1 AND created_by_name = '超级管理员'
+            AND origin_id = 1 AND created_by_account_id = 1
             AND main_image_media_id = ? AND scan_image_media_id = ? AND design_image_media_id = ?
             AND video_media_id = ? AND video_cover_media_id = ?
             AND length_mm = 3200.50 AND width_mm = 1800.25 AND thickness_mm = 18.50
@@ -6586,11 +6451,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     String secondSku = "SLAB-CLEAR-SECOND-" + suffix;
     jdbcTemplate.update(
         """
-        INSERT INTO slab_inventory
-          (name, serial_no, publisher_type, status, created_by_name)
-        VALUES
-          ('清空日志大板一', ?, '平台发布', 'recycle', '超级管理员'),
-          ('清空日志大板二', ?, '平台发布', 'recycle', '超级管理员')
+        INSERT INTO slab_inventory (name, serial_no, publisher_type, status, created_by_account_id) VALUES ('清空日志大板一', ?, '平台发布', 'recycle', (SELECT MIN(id) FROM accounts WHERE display_name='超级管理员')), ('清空日志大板二', ?, '平台发布', 'recycle', (SELECT MIN(id) FROM accounts WHERE display_name='超级管理员'))
         """,
         firstSku,
         secondSku);
@@ -6655,10 +6516,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     try {
       jdbcTemplate.update(
           """
-          INSERT INTO slab_inventory
-            (name, serial_no, publisher_type, main_image_media_id, scan_image_media_id,
-             design_image_media_id, status, created_by_name, created_by_account_id)
-          VALUES (?, ?, '平台发布', ?, ?, ?, 'warehouse', '其他用户', 1)
+          INSERT INTO slab_inventory (name, serial_no, publisher_type, main_image_media_id, scan_image_media_id, design_image_media_id, status, created_by_account_id) VALUES (?, ?, '平台发布', ?, ?, ?, 'warehouse', 1)
           """,
           "共享大板权限测试",
           sku,
@@ -6696,7 +6554,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
       mockMvc.perform(get("/api/admin/slabs")
               .header("Authorization", "Bearer " + token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].createdByName", hasItem("其他用户")));
+          .andExpect(jsonPath("$.data[?(@.id == " + slabId + ")].createdByName", hasItem(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class))));
 
       mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
               .header("Authorization", "Bearer " + token)
@@ -7337,9 +7195,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         name);
     jdbcTemplate.update(
         """
-        INSERT INTO employees
-          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name, created_by_account_id)
-        VALUES (?, ?, 1, ?, 'enabled', ?, 'all', ?, ?)
+        INSERT INTO employees (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_account_id) VALUES (?, ?, 1, ?, 'enabled', ?, 'all', (SELECT creator_id FROM (SELECT ? AS fixture_label, ? AS creator_id) fixture_creator))
         """,
         id,
         id,
@@ -7358,10 +7214,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         id);
     jdbcTemplate.update(
         """
-        INSERT INTO roles
-          (id, tenant_id, store_id, name, code, data_scope, status,
-           function_permissions, created_by_name, created_by_account_id)
-        VALUES (?, 1, ?, ?, ?, 'all', 'enabled', ?, ?, ?)
+        INSERT INTO roles (id, tenant_id, store_id, name, code, data_scope, status, function_permissions, created_by_account_id) VALUES (?, 1, ?, ?, ?, 'all', 'enabled', ?, (SELECT creator_id FROM (SELECT ? AS fixture_label, ? AS creator_id) fixture_creator))
         """,
         id,
         id,

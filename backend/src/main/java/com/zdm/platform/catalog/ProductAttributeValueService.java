@@ -1,19 +1,16 @@
 package com.zdm.platform.catalog;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 public class ProductAttributeValueService
-    extends ServiceImpl<ProductAttributeValueMapper, ProductAttributeValue> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+    extends CreatorAwareService<ProductAttributeValueMapper, ProductAttributeValue> {
 
   private final CurrentIdentityProvider identityProvider;
   public ProductAttributeValueService(CurrentIdentityProvider identityProvider) {
@@ -25,15 +22,14 @@ public class ProductAttributeValueService
       return List.of();
     }
     Set<String> visibleScopes = Set.copyOf(scopes);
-    return baseMapper.selectWithUseCounts().stream()
+    return creatorNames.attachAll(baseMapper.selectWithUseCounts().stream()
         .filter(value -> visibleScopes.contains(value.getScope()))
-        .toList();
+        .toList());
   }
 
   @Transactional
   public ProductAttributeValue createValue(ProductAttributeValue value) {
     value.setId(null);
-    value.setCreatedByName(resolveCreatedByName());
     value.setCreatedByAccountId(identityProvider.require().accountId());
     save(value);
     return getById(value.getId());
@@ -61,12 +57,6 @@ public class ProductAttributeValueService
     return value;
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName()
-        : DEFAULT_CREATED_BY_NAME;
-  }
   @Override
   public ProductAttributeValue getById(java.io.Serializable id) {
     ProductAttributeValue entity = super.getById(id);

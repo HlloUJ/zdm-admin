@@ -21,7 +21,8 @@ class TemplateRetirementMigrationTest {
         .target("107").load().migrate();
     try (var connection = DriverManager.getConnection(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
         var statement = connection.createStatement()) {
-      statement.executeUpdate("INSERT INTO product_categories(id, scope, name, status) VALUES(990001, 'finished', '迁移验证', 'enabled')");
+      statement.executeUpdate("INSERT INTO accounts(phone,display_name,status) VALUES ('15926629801','创建人','enabled'),('15926629802','草稿创建人','enabled'),('15926629803','规格创建人','enabled'),('15926629804','规格草稿创建人','enabled')");
+      statement.executeUpdate("INSERT INTO product_categories(id, scope, name, status,created_by_account_id) VALUES(990001, 'finished', '迁移验证', 'enabled',1)");
       statement.executeUpdate("INSERT INTO category_template_versions(id, category_id, kind, version_no, state, content, created_by_name, published_by_name, published_at) VALUES(990001, 990001, 'attributes', 1, 'published', JSON_ARRAY(JSON_OBJECT('attributeId', 123, 'attributeRole', 'sales', 'sortOrder', 1)), '创建人', '发布人', '2026-09-09 10:00:00')");
       statement.executeUpdate("INSERT INTO category_template_versions(id, category_id, kind, state, content, created_by_name) VALUES(990002, 990001, 'attributes', 'draft', JSON_ARRAY(), '草稿创建人')");
       statement.executeUpdate("INSERT INTO category_template_versions(id, category_id, kind, attribute_version_id, version_no, state, content, created_by_name) VALUES(990003, 990001, 'sku', 990001, 1, 'published', JSON_ARRAY(123), '规格创建人')");
@@ -37,7 +38,7 @@ class TemplateRetirementMigrationTest {
         assertThat(rows.getInt(1)).isZero();
       }
 
-      try (var rows = statement.executeQuery("SELECT CAST(JSON_OBJECT('content', content, 'creator', created_by_name, 'publisher', published_by_name, 'publishedAt', published_at, 'version', version_no, 'revision', revision) AS CHAR) FROM category_template_versions WHERE id = 990001")) {
+      try (var rows = statement.executeQuery("SELECT CAST(JSON_OBJECT('content', content, 'creator', (SELECT display_name FROM accounts WHERE accounts.id=category_template_versions.created_by_account_id), 'publisher', published_by_name, 'publishedAt', published_at, 'version', version_no, 'revision', revision) AS CHAR) FROM category_template_versions WHERE id = 990001")) {
         assertThat(rows.next()).isTrue();
         assertThat(rows.getString(1)).isEqualTo(before);
       }

@@ -34,7 +34,6 @@ public interface ProductAttributeMapper extends BaseMapper<ProductAttribute> {
         attribute.value_type,
         attribute.attribute_role,
         attribute.status,
-        attribute.created_by_name,
         attribute.created_by_account_id,
         attribute.created_at,
         attribute.updated_at,
@@ -51,7 +50,6 @@ public interface ProductAttributeMapper extends BaseMapper<ProductAttribute> {
         attribute.value_type,
         attribute.attribute_role,
         attribute.status,
-        attribute.created_by_name,
         attribute.created_by_account_id,
         attribute.created_at,
         attribute.updated_at

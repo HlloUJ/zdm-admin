@@ -1,10 +1,9 @@
 package com.zdm.platform.store;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.common.StoreLevelPricingDirectory;
 import com.zdm.platform.common.StoreLevelPriceSynchronizer;
-import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.HashSet;
 import java.util.List;
@@ -15,12 +14,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
+public class StoreLevelService extends CreatorAwareService<StoreLevelMapper, StoreLevel>
     implements StoreLevelPricingDirectory {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
   private static final String STORE_REFERENCED_MESSAGE = "该门店级别已被门店引用，不能删除";
   private static final String PRICE_REFERENCED_MESSAGE = "该门店级别已被价格配置引用，不能删除";
   private static final String PRODUCT_PRICE_REFERENCED_MESSAGE = "该门店级别已被商品价格引用，不能删除";
@@ -57,7 +54,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     normalizeAndValidate(level, null);
     level.setStatus("enabled");
     level.setSortOrder(nextSortOrder());
-    level.setCreatedByName(resolveCreatedByName());
     level.setCreatedByAccountId(identityProvider.require().accountId());
     save(level);
     return level;
@@ -72,7 +68,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     payload.setId(id);
     payload.setStatus(existing.getStatus());
     payload.setSortOrder(existing.getSortOrder());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidate(payload, id);
     updateById(payload);
@@ -200,12 +195,6 @@ public class StoreLevelService extends ServiceImpl<StoreLevelMapper, StoreLevel>
     return listOperationalPricing().stream().map(this::toPricingLevel).toList();
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName()
-        : DEFAULT_CREATED_BY_NAME;
-  }
 
   private void requireUnreferenced(Long id) {
     Long referenceCount = storeMapper.selectCount(

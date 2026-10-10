@@ -5,9 +5,10 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("slab_textures")
-public class SlabTexture extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class SlabTexture extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotBlank
   private String name;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private String remark;

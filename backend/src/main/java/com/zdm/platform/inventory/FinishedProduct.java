@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @TableName(value = "finished_products", autoResultMap = true)
-public class FinishedProduct extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class FinishedProduct extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
   private List<FinishedSpecDimension> specDimensions;
 
@@ -113,6 +113,7 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
   private String offShelfDetail;
   public String getOffShelfDetail() { return offShelfDetail; }
   public void setOffShelfDetail(String value) { this.offShelfDetail = value; }
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
 

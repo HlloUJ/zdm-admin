@@ -109,11 +109,11 @@ class ProductAttributeLifecycleApiTest extends SpringContainerTestSupport {
         .toString();
 
     assertThat(jdbcTemplate.queryForObject(
-        "SELECT created_by_name FROM product_attributes WHERE id = ?",
+        "SELECT (SELECT display_name FROM accounts WHERE accounts.id=product_attributes.created_by_account_id) FROM product_attributes WHERE id = ?",
         String.class,
         Long.valueOf(attributeId))).isEqualTo(creatorName);
     assertThat(jdbcTemplate.queryForObject(
-        "SELECT created_by_name FROM product_attribute_values WHERE id = ?",
+        "SELECT (SELECT display_name FROM accounts WHERE accounts.id=product_attribute_values.created_by_account_id) FROM product_attribute_values WHERE id = ?",
         String.class,
         Long.valueOf(valueId))).isEqualTo(creatorName);
     assertThat(jdbcTemplate.queryForObject(
@@ -138,9 +138,7 @@ class ProductAttributeLifecycleApiTest extends SpringContainerTestSupport {
   void productAttributeDeletionReturnsBusinessMessagesForExistingReferences() throws Exception {
     jdbcTemplate.update(
         """
-        INSERT INTO product_categories
-          (id, scope, name, sort_order, product_count, status, created_by_name)
-        VALUES (9880, 'finished', '属性删除保护测试分类', 1, 0, 'enabled', '韩健')
+        INSERT INTO product_categories (id, scope, name, sort_order, product_count, status, created_by_account_id) VALUES (9880, 'finished', '属性删除保护测试分类', 1, 0, 'enabled', (SELECT MIN(id) FROM accounts WHERE display_name='韩健'))
         """);
     jdbcTemplate.update(
         """
@@ -155,8 +153,7 @@ class ProductAttributeLifecycleApiTest extends SpringContainerTestSupport {
         """);
     jdbcTemplate.update(
         """
-        INSERT INTO category_template_versions (category_id, content, created_by_name)
-        VALUES (9880, JSON_ARRAY(JSON_OBJECT('attributeId', 9880, 'options', JSON_ARRAY())), '测试人员')
+        INSERT INTO category_template_versions (category_id, content, created_by_account_id) VALUES (9880, JSON_ARRAY(JSON_OBJECT('attributeId', 9880, 'options', JSON_ARRAY())), (SELECT MIN(id) FROM accounts WHERE display_name='测试人员'))
         """);
     jdbcTemplate.update(
         """

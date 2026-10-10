@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 
 @TableName("employees")
-public class Employee implements com.zdm.platform.security.CreatorOwned {
+public class Employee implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 
@@ -43,6 +43,7 @@ public class Employee implements com.zdm.platform.security.CreatorOwned {
   private String roleIds;
   private String dataPermission;
   private String remark;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private LocalDateTime createdAt;

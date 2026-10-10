@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 @TableName("product_attribute_values")
-public class ProductAttributeValue extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class ProductAttributeValue extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotNull
   private Long attributeId;
 
@@ -20,6 +20,7 @@ public class ProductAttributeValue extends BaseEntity implements com.zdm.platfor
   @NotBlank
   private String code;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
 

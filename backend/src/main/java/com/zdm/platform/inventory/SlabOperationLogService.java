@@ -130,7 +130,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
   }
 
   public Map<String, Object> arrivalSnapshot(Long id) {
-    Map<String, Object> row = jdbcTemplate.queryForMap("SELECT * FROM slab_inventory WHERE id=?", id);
+    Map<String, Object> row = jdbcTemplate.queryForMap("SELECT slab.*, CASE WHEN slab.publisher_type='接口获取' THEN '外部系统' ELSE creator.display_name END AS created_by_name FROM slab_inventory slab LEFT JOIN accounts creator ON creator.id=slab.created_by_account_id WHERE slab.id=?", id);
     Map<String, Object> values = new LinkedHashMap<>();
     String[][] fields = {
       {"大板名称","name"},{"大板编号","serial_no"},{"供应商ID","supplier_id"},

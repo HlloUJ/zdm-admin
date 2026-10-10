@@ -1,6 +1,6 @@
 package com.zdm.platform.inventory;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.media.MediaAsset;
 import com.zdm.platform.media.MediaAssetService;
 import com.zdm.platform.media.MediaCleanupService;
@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabInventory> {
+public class SlabInventoryService extends CreatorAwareService<SlabInventoryMapper, SlabInventory> {
   private static final String DUPLICATE_SKU_MESSAGE = "大板编号已存在";
   private static final String PLATFORM_PUBLISHER = "平台发布";
   private static final String API_PUBLISHER = "接口获取";
@@ -67,18 +67,20 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     SlabInventory item = baseMapper.selectVisibleDetail(id, lifecycle.isSupplyChain(),
         com.zdm.platform.security.DataScope.isAll(identity), identity.accountId());
     if (item == null) { return null; }
+    creatorNames.attach(item);
     attachPrices(item);
     item.setOffShelfRecords(offShelfRecordService.listBySlabIds(List.of(id)));
     if (!lifecycle.isSupplyChain()) {
       item.setSourceOffShelfRecords(offShelfRecordService.listSourceBySlabId(id));
     }
-    return lifecycle.isSupplyChain() ? item : invalidationSnapshots.render(item);
+    return creatorNames.attach(lifecycle.isSupplyChain() ? item : invalidationSnapshots.render(item));
   }
 
   public List<SlabInventory> listWithPrices() {
     var identity = identityProvider.require();
     List<SlabInventory> inventory = baseMapper.selectListWithDetails(lifecycle.isSupplyChain(),
         com.zdm.platform.security.DataScope.isAll(identity), identity.accountId());
+    creatorNames.attachAll(inventory);
     Map<Long, List<SlabOffShelfRecord>> recordsBySlabId = offShelfRecordService
         .listBySlabIds(inventory.stream().map(SlabInventory::getId).toList())
         .stream()
@@ -90,7 +92,7 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       item.setMarkupPrices(pricesBySlabId.getOrDefault(item.getId(), List.of()));
       item.setOffShelfRecords(recordsBySlabId.getOrDefault(item.getId(), List.of()));
     });
-    return lifecycle.isSupplyChain() ? inventory : inventory.stream().map(invalidationSnapshots::render).toList();
+    return creatorNames.attachAll(lifecycle.isSupplyChain() ? inventory : inventory.stream().map(invalidationSnapshots::render).toList());
   }
 
   @Transactional
@@ -157,7 +159,6 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
     validateReferencesForUpdate(existing, inventory);
     if (!lifecycle.isSupplyChain()) { validateGuidePrice(inventory); }
     inventory.setId(id);
-    inventory.setCreatedByName(existing.getCreatedByName());
     inventory.setCreatedByAccountId(existing.getCreatedByAccountId());
     inventory.setCreatedAt(existing.getCreatedAt());
     inventory.setPublisherType(existing.getPublisherType());
@@ -490,7 +491,6 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       if (!"selling".equals(inventory.getStatus())) {
         inventory.setStatus("warehouse");
       }
-      inventory.setCreatedByName("外部系统");
       inventory.setCreatedByAccountId(identityProvider.require().accountId());
       return;
     }
@@ -498,7 +498,6 @@ public class SlabInventoryService extends ServiceImpl<SlabInventoryMapper, SlabI
       inventory.setStatus("warehouse");
     }
     CurrentIdentity identity = identityProvider.require();
-    inventory.setCreatedByName(identity.displayName());
     inventory.setCreatedByAccountId(identity.accountId());
   }
 

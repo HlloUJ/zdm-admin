@@ -1,18 +1,15 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTexture> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class SlabTextureService extends CreatorAwareService<SlabTextureMapper, SlabTexture> {
   private final SlabTextureAliasMapper aliasMapper;
   private final CurrentIdentityProvider identityProvider;
 
@@ -27,7 +24,6 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
   public SlabTexture createTexture(SlabTexture texture) {
     texture.setId(null);
     normalizeAndValidateTextureName(texture, null);
-    texture.setCreatedByName(resolveCreatedByName());
     texture.setCreatedByAccountId(identityProvider.require().accountId());
     save(texture);
     return texture;
@@ -38,7 +34,6 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
     SlabTexture existing = requireTexture(id);
     payload.setId(id);
     payload.setStatus(existing.getStatus());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateTextureName(payload, id);
     updateById(payload);
@@ -137,11 +132,6 @@ public class SlabTextureService extends ServiceImpl<SlabTextureMapper, SlabTextu
     }
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName() : DEFAULT_CREATED_BY_NAME;
-  }
 
   @Override
   public SlabTexture getById(java.io.Serializable id) {

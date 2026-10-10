@@ -62,6 +62,42 @@ class DataScopeApiTest extends SpringContainerTestSupport {
         new Catalog("product-attributes", "product_attributes", "admin.product-data-center.attribute.shared", ",scope,value_type", ",'shared','select'")
     );
   }
+  @ParameterizedTest @MethodSource("catalogs")
+  void businessCreatorUsesCurrentAccountNameAndDoesNotStoreNameCopies(Catalog catalog) throws Exception {
+    jdbc.update("INSERT INTO accounts(id,phone,display_name,status) VALUES (990033,'15926629833','创建人改名前','enabled')");
+    jdbc.update("INSERT INTO " + catalog.table() + " (id,name,status,created_by_account_id" + catalog.extraColumns()
+        + ") VALUES (990033,'创建人关联测试','enabled',990033" + catalog.extraValues() + ")");
+    identity("all", true, catalog.prefix()+".view");
+    String url = "/api/admin/" + catalog.route();
+    mvc.perform(get(url)).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == 990033)].createdByName").value(org.hamcrest.Matchers.hasItem("创建人改名前")));
+    jdbc.update("UPDATE accounts SET display_name='创建人改名后' WHERE id=990033");
+    mvc.perform(get(url)).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == 990033)].createdByName").value(org.hamcrest.Matchers.hasItem("创建人改名后")));
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name='created_by_name'",
+        Integer.class, catalog.table())).isZero();
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"admin", "supply-chain", "store"})
+  void employeeCreatorNameTracksAccountAcrossAllClients(String client) throws Exception {
+    boolean store = "store".equals(client);
+    String clientCode = store ? "admin" : client;
+    jdbc.update("INSERT INTO accounts(id,phone,display_name,status) VALUES(990044,'15926629844','被邀请员工','enabled'),(990045,'15926629845','邀请人改名前','enabled')");
+    jdbc.update("INSERT INTO employees(id,account_id,client_code,tenant_id,store_id,status,data_permission,remark,created_by_account_id) VALUES(990044,990044,?,?,?,'disabled','self','独立备注',990045)",
+        clientCode, store ? 1L : null, store ? 1L : null);
+    var current = new CurrentIdentity(1L, 11L, 1L, 1L, clientCode, store ? 1L : null, store ? 1L : null,
+        "当前操作员", "all", List.of(store ? "STORE_ADMIN" : "supply-chain".equals(client) ? "SUPPLY_CHAIN_ADMIN" : "SUPER_ADMIN"), List.of("all"));
+    SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(current, null, List.of()));
+    mvc.perform(get("/api/admin/employees")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == 990044)].createdByName").value(org.hamcrest.Matchers.hasItem("邀请人改名前")));
+    jdbc.update("UPDATE accounts SET display_name='邀请人改名后' WHERE id=990045");
+    mvc.perform(get("/api/admin/employees")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.id == 990044)].createdByName").value(org.hamcrest.Matchers.hasItem("邀请人改名后")))
+        .andExpect(jsonPath("$.data[?(@.id == 990044)].status").value(org.hamcrest.Matchers.hasItem("disabled")))
+        .andExpect(jsonPath("$.data[?(@.id == 990044)].remark").value(org.hamcrest.Matchers.hasItem("独立备注")));
+  }
+
   void identity(String scope, boolean superAdmin, String... permissions) {
     var user = new CurrentIdentity(1L, 11L, 1L, 1L, "admin", null, null, "同名操作员", scope,
         superAdmin ? List.of("SUPER_ADMIN") : List.of("OPERATOR"), List.of(permissions));
@@ -70,11 +106,11 @@ class DataScopeApiTest extends SpringContainerTestSupport {
   @AfterEach void clear() { SecurityContextHolder.clearContext(); }
   void seed(Catalog c) {
     // The table and column names come exclusively from the constant catalog matrix above.
-    jdbc.update("INSERT INTO " + c.table() + " (id,name,status,created_by_name,created_by_account_id" + c.extraColumns()
-        + ") VALUES (990011,'范围本人','enabled','同名操作员',11" + c.extraValues() + ")");
+    jdbc.update("INSERT INTO " + c.table() + " (id,name,status,created_by_account_id" + c.extraColumns()
+        + ") VALUES (990011,'范围本人','enabled',11" + c.extraValues() + ")");
     String otherValues = c.extraValues().replace("ZX", "ZY");
-    jdbc.update("INSERT INTO " + c.table() + " (id,name,status,created_by_name,created_by_account_id" + c.extraColumns()
-        + ") VALUES (990022,'范围他人','enabled','同名操作员',22" + otherValues + ")");
+    jdbc.update("INSERT INTO " + c.table() + " (id,name,status,created_by_account_id" + c.extraColumns()
+        + ") VALUES (990022,'范围他人','enabled',22" + otherValues + ")");
   }
   @ParameterizedTest @MethodSource("catalogs")
   void selfCannotReadOrMutateOtherCreatorsButAllAndSuperAdminCan(Catalog c) throws Exception {
@@ -155,7 +191,7 @@ class DataScopeApiTest extends SpringContainerTestSupport {
 
   @Test void templateListAndDirectVersionReadUseVersionCreatorScope() throws Exception {
     jdbc.update("INSERT INTO product_categories (id,name,scope,status,created_by_account_id) VALUES (990011,'范围分类','finished','enabled',11)");
-    jdbc.update("INSERT INTO category_template_versions (id,category_id,version_no,state,content,created_by_account_id,created_by_name) VALUES (990011,990011,1,'published',JSON_ARRAY(),11,'本人'),(990022,990011,2,'published',JSON_ARRAY(),22,'他人')");
+    jdbc.update("INSERT INTO category_template_versions (id, category_id, version_no, state, content, created_by_account_id) VALUES (990011, 990011, 1, 'published', JSON_ARRAY(), 11), (990022, 990011, 2, 'published', JSON_ARRAY(), 22)");
     String prefix = "admin.product-data-center.category-attribute-template.finished.attributes";
     identity("self", false, prefix+".view",prefix+".history");
     mvc.perform(get("/api/admin/template-versions").param("categoryId","990011")).andExpect(status().isOk())

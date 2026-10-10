@@ -1,6 +1,6 @@
 package com.zdm.platform.employee;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.ManagedClientScope;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, EmployeeInvite> {
+public class EmployeeInviteService extends CreatorAwareService<EmployeeInviteMapper, EmployeeInvite> {
   private static final String ACTIVE = "active";
   private static final String EXPIRED = "expired";
   private static final String USED = "used";
@@ -56,7 +56,6 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     invite.setStoreId(identity.storeId());
     invite.setCreatedByAccountId(identity.accountId());
     invite.setCreatedByIdentityId(identity.identityId());
-    invite.setCreatedByName(identity.displayName());
     invite.setStatus(ACTIVE);
     LocalDateTime createdAt = LocalDateTime.now().withNano(0);
     invite.setCreatedAt(createdAt);

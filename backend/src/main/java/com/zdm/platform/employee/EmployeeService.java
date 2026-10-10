@@ -1,6 +1,6 @@
 package com.zdm.platform.employee;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import com.zdm.platform.security.PermissionGuard;
@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
+public class EmployeeService extends CreatorAwareService<EmployeeMapper, Employee> {
   private static final String PERMISSION_PREFIX = "admin.permission-management.employee-management";
 
   private final JdbcTemplate jdbcTemplate;
@@ -106,7 +106,6 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         .isNull(employee.getStoreId() == null, Employee::getStoreId).count() > 0) {
       throw new IllegalArgumentException("该账号已是当前业务端和组织的员工");
     }
-    employee.setCreatedByName(currentEmployeeName());
     employee.setCreatedByAccountId(identityProvider.require().accountId());
     validateBeforeEnabled(employee);
     save(employee);
@@ -139,7 +138,6 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
     payload.setTenantId(existing.getTenantId());
     payload.setStoreId(existing.getStoreId());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     authorizeUpdate(existing, payload);
 
@@ -235,7 +233,6 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     employee.setGender(account.gender());
     employee.setPhone(request.phone());
     employee.setStatus("disabled");
-    employee.setCreatedByName(invite.getCreatedByName());
     employee.setCreatedByAccountId(invite.getCreatedByAccountId());
     save(employee);
     syncAdminIdentity(employee);
@@ -471,7 +468,4 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     return identity;
   }
 
-  private String currentEmployeeName() {
-    return identityProvider.current().map(CurrentIdentity::displayName).orElse(null);
-  }
 }

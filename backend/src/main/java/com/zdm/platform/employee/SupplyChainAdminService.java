@@ -55,7 +55,7 @@ public class SupplyChainAdminService {
   public List<Employee> openingRecords() {
     return jdbc.query("""
         SELECT ai.id, a.id AS account_id, a.display_name, a.gender, p.remark, a.phone, ai.status,
-               i.created_by_name, i.created_by_account_id, MIN(ac.accepted_at) AS created_at
+               creator.display_name AS created_by_name, i.created_by_account_id, MIN(ac.accepted_at) AS created_at
         FROM account_identities ai
         JOIN accounts a ON a.id=ai.account_id
         LEFT JOIN supply_chain_admin_profiles p ON p.identity_id=ai.id
@@ -64,8 +64,9 @@ public class SupplyChainAdminService {
         AND ac.id=(SELECT MIN(first_ac.id) FROM employee_invite_acceptances first_ac
           JOIN employee_invites first_i ON first_i.id=first_ac.invite_id
           WHERE first_ac.account_id=ai.account_id AND first_i.target_identity_type='supply_chain_admin')
+        LEFT JOIN accounts creator ON creator.id=i.created_by_account_id
         WHERE ai.client_code='supply-chain' AND ai.identity_type='supply_chain_admin'
-        GROUP BY ai.id, a.id, a.display_name, a.gender, p.remark, a.phone, ai.status, i.created_by_name, i.created_by_account_id
+        GROUP BY ai.id, a.id, a.display_name, a.gender, p.remark, a.phone, ai.status, creator.display_name, i.created_by_account_id
         """, (rs, row) -> {
           Employee record = new Employee();
           record.setId(rs.getLong("id"));

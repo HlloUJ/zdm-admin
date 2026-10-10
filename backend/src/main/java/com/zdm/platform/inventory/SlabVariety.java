@@ -5,11 +5,12 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("slab_varieties")
-public class SlabVariety extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class SlabVariety extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotBlank
   private String name;
 
   private String color;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private String remark;
