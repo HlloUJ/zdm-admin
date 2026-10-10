@@ -7,6 +7,7 @@ import {
   hasMenuPermission,
   hasPermission,
   isSuperAdmin,
+  isPlatformSuperAdmin,
 } from './adminPermissions';
 
 function createUser(permissions: string[]): LoginUser {
@@ -142,4 +143,22 @@ describe('function audience boundaries', () => {
       expect(hasMenuPermission(user, 'admin.tenant.store-category-management')).toBe(true);
     },
   );
+});
+
+describe('platform-only terminal allocation', () => {
+  const prefix = 'admin.permission-management.terminal-function-allocation';
+  it('allows only the unscoped platform super administrator', () => {
+    const user: LoginUser = { ...createUser([]), clientCode: 'admin', roles: ['SUPER_ADMIN'] };
+    expect(isPlatformSuperAdmin(user)).toBe(true);
+    expect(hasMenuPermission(user, prefix)).toBe(true);
+    for (const patch of [
+      { roles: ['ADMIN_MANAGER'], permissions: ['all', `${prefix}.view`, `${prefix}.save`] },
+      { clientCode: 'supply-chain' as const },
+      { tenantId: 1 },
+      { storeId: 2 },
+    ]) {
+      expect(isPlatformSuperAdmin({ ...user, ...patch })).toBe(false);
+      expect(hasMenuPermission({ ...user, ...patch }, prefix)).toBe(false);
+    }
+  });
 });

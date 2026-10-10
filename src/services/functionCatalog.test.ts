@@ -537,3 +537,16 @@ describe('slab operations details', () => {
     }
   });
 });
+
+describe('terminal allocation is not assignable', () => {
+  it('omits the exclusive entry and rejects legacy grants', () => {
+    const prefix = 'admin.permission-management.terminal-function-allocation';
+    expect(
+      fullFunctionCatalog
+        .flatMap((m) => m.menus)
+        .flatMap((m) => m.pages)
+        .some((p) => p.value === prefix),
+    ).toBe(false);
+    expect(normalizeFunctionCatalogPermissions(fullFunctionCatalog, [`${prefix}.view`, `${prefix}.save`])).toEqual([]);
+  });
+});

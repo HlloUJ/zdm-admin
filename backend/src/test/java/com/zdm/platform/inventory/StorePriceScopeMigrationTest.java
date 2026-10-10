@@ -63,7 +63,7 @@ class StorePriceScopeMigrationTest {
           insert.executeUpdate();
         }
       }
-      Flyway.configure().dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword()).load().migrate();
+      Flyway.configure().dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword()).target("147").load().migrate();
       try (var rows = statement.executeQuery("SELECT function_permissions FROM roles WHERE id=991001 UNION ALL SELECT function_permissions FROM terminal_function_policies WHERE terminal='store'")) {
         assertThat(rows.next()).isTrue();
         assertThat(rows.getString(1)).isEqualTo(retained);
@@ -91,6 +91,39 @@ class StorePriceScopeMigrationTest {
         rows.next();
         assertThat(rows.getInt(1)).isEqualTo(3);
       }
+      String allocationView = "admin.permission-management.terminal-function-allocation.view";
+      String allocationSave = "admin.permission-management.terminal-function-allocation.save";
+      String oldAllocation = allocationView + "," + allocationSave + "," + allocationView + "," + retained;
+      for (String table : java.util.List.of("roles", "terminal_function_policies")) {
+        String condition = "roles".equals(table) ? "id=991001" : "terminal='store'";
+        try (var update = connection.prepareStatement("UPDATE " + table + " SET function_permissions=? WHERE " + condition)) {
+          update.setString(1, oldAllocation);
+          update.executeUpdate();
+        }
+      }
+      for (String code : java.util.List.of(allocationView, allocationSave)) {
+        try (var insert = connection.prepareStatement("INSERT INTO permissions(code,client_code,name,module) VALUES(?,'admin','旧终端权限','terminal')")) {
+          insert.setString(1, code);
+          insert.executeUpdate();
+        }
+        try (var insert = connection.prepareStatement("INSERT INTO role_permissions(role_id,permission_code) VALUES(991001,?)")) {
+          insert.setString(1, code);
+          insert.executeUpdate();
+        }
+      }
+      Flyway.configure().dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword()).load().migrate();
+      try (var rows = statement.executeQuery("SELECT function_permissions FROM roles WHERE id=991001 UNION ALL SELECT function_permissions FROM terminal_function_policies WHERE terminal='store'")) {
+        while (rows.next()) assertThat(rows.getString(1)).isEqualTo(retained);
+      }
+      try (var rows = statement.executeQuery("SELECT COUNT(*) FROM role_permissions WHERE role_id=991001")) {
+        rows.next();
+        assertThat(rows.getInt(1)).isZero();
+      }
+      try (var rows = statement.executeQuery("SELECT COUNT(*) FROM permissions WHERE code LIKE 'admin.permission-management.terminal-function-allocation.%'")) {
+        rows.next();
+        assertThat(rows.getInt(1)).isZero();
+      }
+
     }
   }
 }
