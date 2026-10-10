@@ -136,8 +136,8 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.warehouse.view' },
                     { label: '批量上架', value: 'admin.finished-stock-management.warehouse.batch-shelf' },
-                    { label: '编辑', value: 'admin.finished-stock-management.warehouse.edit' },
                     { label: '上架', value: 'admin.finished-stock-management.warehouse.shelf' },
+                    { label: '编辑', value: 'admin.finished-stock-management.warehouse.edit' },
                     { label: '删除', value: 'admin.finished-stock-management.warehouse.delete' },
                   ],
                 },
@@ -147,8 +147,8 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.selling.view' },
                     { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },
-                    { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },
                     { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },
+                    { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },
                   ],
                 },
                 {

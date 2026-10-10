@@ -691,14 +691,14 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   void priceBatchesOnlySetExplicitCategoriesAndPreserveLegacyPrices() {
     priceRuleFixture();
     configurations.create(99961L, new BigDecimal("3.00"));
-    priceRules.saveBatch("price", "finished", List.of(99961L), new BigDecimal("2.50"));
+    priceRules.savePriceBatch("finished", List.of(99961L), new BigDecimal("2.50"));
     assertThat(priceRules.list("price", "finished")).singleElement()
         .satisfies(rule -> assertThat(rule.categoryId()).isEqualTo(99961L));
     assertThat(priceRules.categories("finished")).hasSize(5);
-    priceRules.saveBatch("price", "finished", List.of(99962L), new BigDecimal("3.00"));
+    priceRules.savePriceBatch("finished", List.of(99962L), new BigDecimal("3.00"));
     assertThat(priceRules.list("price", "finished")).hasSize(2)
         .noneMatch(rule -> rule.categoryId().equals(99963L));
-    priceRules.saveBatch("price", "finished", List.of(99961L, 99962L), new BigDecimal("2.20"));
+    priceRules.savePriceBatch("finished", List.of(99961L, 99962L), new BigDecimal("2.20"));
     assertThat(priceRules.list("price", "finished")).hasSize(2)
         .allSatisfy(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("2.20"));
     assertThat(configurations.list()).singleElement()
@@ -709,33 +709,33 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Transactional
   void batchWritesIsolateTypesStoresAndRolesAndRejectInvalidTargetsWithoutPartialWrites() {
     priceRuleFixture();
-    priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.90"));
-    priceRules.saveBatch("discount", "finished", List.of(99962L), new BigDecimal("0.10"));
-    priceRules.saveBatch("discount", "accessory", List.of(99961L), new BigDecimal("1.00"));
+    priceRules.createDiscount("finished", 99961L, new BigDecimal("0.90"));
+    priceRules.createDiscount("finished", 99962L, new BigDecimal("0.10"));
+    priceRules.createDiscount("accessory", 99961L, new BigDecimal("1.00"));
     assertThat(priceRules.list("discount", "accessory")).singleElement()
         .satisfies(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("1.00"));
     assertThat(priceRules.list("discount", "finished")).hasSize(2);
-    assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99961L, 99965L), BigDecimal.ONE))
+    assertThatThrownBy(() -> priceRules.savePriceBatch("finished", List.of(99961L, 99965L), BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(priceRules.list("price", "finished")).isEmpty();
-    assertThatThrownBy(() -> priceRules.saveBatch("discount", "finished", List.of(99961L, 99963L), BigDecimal.ONE))
+    assertThatThrownBy(() -> priceRules.createDiscount("finished", 99963L, BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("请选择本门店当前类型的已启用分类或角色");
-    assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99964L), BigDecimal.ONE))
+    assertThatThrownBy(() -> priceRules.savePriceBatch("finished", List.of(99964L), BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99961L), new BigDecimal("1.234")))
+    assertThatThrownBy(() -> priceRules.savePriceBatch("finished", List.of(99961L), new BigDecimal("1.234")))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99961L, 99961L), BigDecimal.ONE))
+    assertThatThrownBy(() -> priceRules.savePriceBatch("finished", List.of(99961L, 99961L), BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class);
     identity(99962L);
     assertThat(priceRules.list("discount", "finished")).isEmpty();
-    assertThatThrownBy(() -> priceRules.saveBatch("discount", "finished", List.of(99961L), BigDecimal.ONE))
+    assertThatThrownBy(() -> priceRules.createDiscount("finished", 99961L, BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   @Transactional
-  void ruleApiUsesOnlyViewAndBatchPermissionsAndReturnsNoDerivedOrStatusFields() throws Exception {
+  void priceBatchRemainsAvailableButDiscountBatchEndpointIsRemoved() throws Exception {
     priceRuleFixture();
     identityWithPermissions(99961L, "store.price-configuration.price.finished.view");
     mvc.perform(get("/api/admin/store-price-rules/price/categories?scope=finished"))
@@ -755,7 +755,10 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
         "/api/admin/store-price-rules/discount/batch?scope=accessory")
         .contentType("application/json").content("{\"targetIds\":[99961],\"coefficient\":0.8}"))
-        .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].coefficient").value(0.8));
+        .andExpect(result -> assertThat(result.getHandler()).isNull())
+        .andExpect(result -> assertThat(result.getResolvedException())
+            .isInstanceOf(org.springframework.web.HttpRequestMethodNotSupportedException.class));
+    assertThat(priceRules.list("discount", "accessory")).isEmpty();
   }
 
   @Test
@@ -784,9 +787,9 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   void clearingPriceCoefficientsIsScopedAtomicAndDoesNotChangeDiscountOrLegacyRules() throws Exception {
     priceRuleFixture();
     configurations.create(99961L, new BigDecimal("3.00"));
-    priceRules.saveBatch("price", "finished", List.of(99961L, 99962L), BigDecimal.ONE);
-    priceRules.saveBatch("price", "accessory", List.of(99965L), BigDecimal.ONE);
-    priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.80"));
+    priceRules.savePriceBatch("finished", List.of(99961L, 99962L), BigDecimal.ONE);
+    priceRules.savePriceBatch("accessory", List.of(99965L), BigDecimal.ONE);
+    priceRules.createDiscount("finished", 99961L, new BigDecimal("0.80"));
     assertThatThrownBy(() -> priceRules.clearPriceBatch("finished", List.of(99961L, 99964L)))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> priceRules.clearPriceBatch("finished", List.of(99961L, 99965L)))
@@ -818,7 +821,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Transactional
   void mixedCategorySaveValidatesEveryChangeBeforeWritingAndRequiresScopedPermission() throws Exception {
     priceRuleFixture();
-    priceRules.saveBatch("price", "finished", List.of(99961L), BigDecimal.ONE);
+    priceRules.savePriceBatch("finished", List.of(99961L), BigDecimal.ONE);
     var clear = new StorePriceRuleService.PriceChange(99961L, null);
     assertThatThrownBy(() -> priceRules.savePrices("finished", List.of(clear,
         new StorePriceRuleService.PriceChange(99962L, new BigDecimal("1.234")))))
@@ -849,10 +852,10 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Transactional
   void priceWritesRejectNonLeafCategoriesAtEveryEndpointWithoutPartialChanges() throws Exception {
     priceRuleFixture();
-    priceRules.saveBatch("price", "finished", List.of(99961L), BigDecimal.ONE);
+    priceRules.savePriceBatch("finished", List.of(99961L), BigDecimal.ONE);
     // A disabled child still makes its parent a non-leaf category.
     jdbc.update("UPDATE store_categories SET status = 'disabled' WHERE id IN (99961,99962)");
-    assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99966L), BigDecimal.ONE))
+    assertThatThrownBy(() -> priceRules.savePriceBatch("finished", List.of(99966L), BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class);
     jdbc.update("UPDATE store_categories SET status = 'enabled' WHERE id IN (99961,99962)");
     identityWithPermissions(99961L, "store.price-configuration.price.finished.batch-set");
@@ -869,8 +872,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
         .andExpect(status().isBadRequest());
     assertThat(priceRules.list("price", "finished")).singleElement()
         .satisfies(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("1.00"));
-    priceRules.saveBatch("price", "finished", List.of(99963L), new BigDecimal("2.00"));
-    priceRules.saveBatch("price", "accessory", List.of(99965L), new BigDecimal("3.00"));
+    priceRules.savePriceBatch("finished", List.of(99963L), new BigDecimal("2.00"));
+    priceRules.savePriceBatch("accessory", List.of(99965L), new BigDecimal("3.00"));
     assertThat(priceRules.list("price", "accessory")).singleElement();
   }
 
@@ -878,9 +881,9 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Transactional
   void addingChildrenRequiresConfirmationAndClearsOnlyParentPriceWithoutRestoration() {
     priceRuleFixture();
-    priceRules.saveBatch("price", "finished", List.of(99963L), new BigDecimal("1.50"));
-    priceRules.saveBatch("price", "accessory", List.of(99965L), new BigDecimal("2.00"));
-    priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.80"));
+    priceRules.savePriceBatch("finished", List.of(99963L), new BigDecimal("1.50"));
+    priceRules.savePriceBatch("accessory", List.of(99965L), new BigDecimal("2.00"));
+    priceRules.createDiscount("finished", 99961L, new BigDecimal("0.80"));
     configurations.create(99961L, new BigDecimal("3.00"));
     assertThat(storeCategories.hasPriceCoefficient(99963L, "finished")).isTrue();
     assertThatThrownBy(() -> storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
@@ -900,7 +903,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     storeCategories.deleteCategory(child.getId(), "finished");
     storeCategories.deleteCategory(sibling.getId(), "finished");
     assertThat(storeCategories.hasPriceCoefficient(99963L, "finished")).isFalse();
-    priceRules.saveBatch("price", "finished", List.of(99963L), BigDecimal.ONE);
+    priceRules.savePriceBatch("finished", List.of(99963L), BigDecimal.ONE);
     storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
         "accessory", 99965L, "新配件下级", "disabled", true));
     assertThat(priceRules.list("price", "accessory")).isEmpty();
@@ -911,7 +914,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Transactional
   void childCreationCheckRequiresCategoryPermissionAndScopeAndFailedCreationPreservesPrice() throws Exception {
     priceRuleFixture();
-    priceRules.saveBatch("price", "finished", List.of(99961L), BigDecimal.ONE);
+    priceRules.savePriceBatch("finished", List.of(99961L), BigDecimal.ONE);
     identityWithPermissions(99961L, "admin.tenant.store-category-management.finished.create-child");
     mvc.perform(get("/api/admin/store-categories/99961/child-creation-check?scope=finished"))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(true));
@@ -979,11 +982,9 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     priceRuleFixture();
     priceRules.createDiscount("finished", 99961L, new BigDecimal("0.80"));
     priceRules.createDiscount("finished", 99962L, new BigDecimal("0.90"));
-    priceRules.saveBatch("price", "finished", List.of(99963L), BigDecimal.ONE);
+    priceRules.savePriceBatch("finished", List.of(99963L), BigDecimal.ONE);
     var discountId = priceRules.list("discount", "finished").getFirst().id();
     assertThatThrownBy(() -> priceRules.updateDiscount(discountId, "finished", 99961L, new BigDecimal("1.01")))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("1.01")))
         .isInstanceOf(IllegalArgumentException.class);
     var initial = priceRules.list("discount", "finished").stream()
         .filter(rule -> rule.roleId().equals(99961L)).findFirst().orElseThrow();
@@ -999,7 +1000,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThatThrownBy(() -> priceRules.updateDiscountStatus(initial.id(), "accessory", "disabled"))
         .isInstanceOf(IllegalArgumentException.class);
     priceRules.updateDiscountStatus(initial.id(), "finished", "disabled");
-    priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.70"));
+    priceRules.updateDiscount(initial.id(), "finished", 99961L, new BigDecimal("0.70"));
     assertThat(priceRules.list("discount", "finished")).anySatisfy(rule -> {
       assertThat(rule.id()).isEqualTo(initial.id());
       assertThat(rule.status()).isEqualTo("disabled");

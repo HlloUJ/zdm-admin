@@ -1025,8 +1025,8 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
-    ['查看', '批量上架', '编辑', '上架', '删除'],
-    ['查看', '批量下架', '编辑', '下架'],
+    ['查看', '批量上架', '上架', '编辑', '删除'],
+    ['查看', '批量下架', '下架', '编辑'],
     ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],
     ['查看', '详情'],
     ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],

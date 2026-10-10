@@ -23,7 +23,6 @@ const permissions = [
   'store.price-configuration.price.finished.view',
   'store.price-configuration.price.finished.batch-set',
   'store.price-configuration.discount.finished.view',
-  'store.price-configuration.discount.finished.batch-set',
 ];
 
 async function storeLogin(page: Page) {
