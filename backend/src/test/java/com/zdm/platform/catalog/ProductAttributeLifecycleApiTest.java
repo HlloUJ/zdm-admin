@@ -54,12 +54,9 @@ class ProductAttributeLifecycleApiTest extends SpringContainerTestSupport {
   void productAttributeAndValueCreationPersistsCreatorAndCreationTime() throws Exception {
     String creatorName = jdbcTemplate.queryForObject(
         """
-        SELECT name
-        FROM employees
-        WHERE account_id = 1
-          AND status = 'enabled'
-        ORDER BY id DESC
-        LIMIT 1
+        SELECT display_name
+        FROM accounts
+        WHERE id = 1
         """,
         String.class);
     String suffix = Long.toString(System.nanoTime());

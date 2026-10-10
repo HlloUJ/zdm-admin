@@ -33,7 +33,7 @@ public class SupplyChainAdminService {
         || !List.of("male", "female").contains(request.gender() == null ? "" : request.gender()))) {
       throw new IllegalArgumentException("请填写姓名并选择性别");
     }
-    var account = existing.orElseGet(() -> accounts.findOrCreate(request.phone(), request.name().trim()));
+    var account = existing.orElseGet(() -> accounts.findOrCreate(request.phone(), request.name().trim(), request.gender()));
     if (!"enabled".equals(account.status())) {
       throw new IllegalArgumentException("该账号已停用，不能建立管理员身份");
     }
@@ -47,15 +47,14 @@ public class SupplyChainAdminService {
         VALUES (?, 'supply-chain', 'supply_chain_admin', ?, NULL, NULL, 'enabled')
         """, account.id(), account.id());
     Long identityId = jdbc.queryForObject("SELECT id FROM account_identities WHERE account_id=? AND client_code='supply-chain' AND identity_type='supply_chain_admin'", Long.class, account.id());
-    jdbc.update("INSERT INTO supply_chain_admin_profiles(identity_id,name,gender,remark) VALUES (?,?,?, '')",
-        identityId, account.name(), request.gender());
+    jdbc.update("INSERT INTO supply_chain_admin_profiles(identity_id,remark) VALUES (?, '')", identityId);
     invite.setAcceptedAccountId(account.id());
     return new EmployeeInviteRegisterResponse(null, "enabled", !account.created(), false, true, "supply_chain_admin");
   }
 
   public List<Employee> openingRecords() {
     return jdbc.query("""
-        SELECT ai.id, a.id AS account_id, COALESCE(p.name,a.display_name) AS display_name, p.gender, p.remark, a.phone, ai.status,
+        SELECT ai.id, a.id AS account_id, a.display_name, a.gender, p.remark, a.phone, ai.status,
                i.created_by_name, i.created_by_account_id, MIN(ac.accepted_at) AS created_at
         FROM account_identities ai
         JOIN accounts a ON a.id=ai.account_id
@@ -66,7 +65,7 @@ public class SupplyChainAdminService {
           JOIN employee_invites first_i ON first_i.id=first_ac.invite_id
           WHERE first_ac.account_id=ai.account_id AND first_i.target_identity_type='supply_chain_admin')
         WHERE ai.client_code='supply-chain' AND ai.identity_type='supply_chain_admin'
-        GROUP BY ai.id, a.id, a.display_name, p.name, p.gender, p.remark, a.phone, ai.status, i.created_by_name, i.created_by_account_id
+        GROUP BY ai.id, a.id, a.display_name, a.gender, p.remark, a.phone, ai.status, i.created_by_name, i.created_by_account_id
         """, (rs, row) -> {
           Employee record = new Employee();
           record.setId(rs.getLong("id"));
@@ -87,11 +86,12 @@ public class SupplyChainAdminService {
   }
   @org.springframework.transaction.annotation.Transactional
   public Employee updateProfile(Long id, SupplyChainAdminController.ProfileRequest request) {
-    requireAdministrator(id, "edit");
+    Employee record = requireAdministrator(id, "edit");
+    accounts.updatePersonalProfile(record.getAccountId(), request.name(), request.gender());
     jdbc.update("""
-        INSERT INTO supply_chain_admin_profiles(identity_id,name,gender,remark) VALUES (?,?,?,?)
-        ON DUPLICATE KEY UPDATE name=VALUES(name),gender=VALUES(gender),remark=VALUES(remark)
-        """, id, request.name().trim(), request.gender(), request.remark() == null ? "" : request.remark().trim());
+        INSERT INTO supply_chain_admin_profiles(identity_id,remark) VALUES (?,?)
+        ON DUPLICATE KEY UPDATE remark=VALUES(remark)
+        """, id, request.remark() == null ? "" : request.remark().trim());
     return openingRecords().stream().filter(row -> row.getId().equals(id)).findFirst().orElseThrow();
   }
 

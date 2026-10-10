@@ -39,6 +39,38 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     this.accountLifecycle = accountLifecycle;
   }
 
+  @Override
+  public Employee getById(java.io.Serializable id) {
+    Employee employee = super.getById(id);
+    if (employee != null) {
+      withPersonalProfiles(List.of(employee));
+    }
+    return employee;
+  }
+
+  private List<Employee> withPersonalProfiles(List<Employee> employees) {
+    var ids = employees.stream().map(Employee::getAccountId).filter(Objects::nonNull).distinct().toList();
+    if (ids.isEmpty()) {
+      return employees;
+    }
+    String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    var profiles = jdbcTemplate.query("SELECT id,display_name,gender,phone FROM accounts WHERE id IN (" + placeholders + ")",
+        (rs, row) -> new PersonalProfile(rs.getLong("id"), rs.getString("display_name"), rs.getString("gender"), rs.getString("phone")),
+        ids.toArray());
+    var byId = profiles.stream().collect(java.util.stream.Collectors.toMap(PersonalProfile::id, value -> value));
+    for (Employee employee : employees) {
+      PersonalProfile profile = byId.get(employee.getAccountId());
+      if (profile != null) {
+        employee.setName(profile.name());
+        employee.setGender(profile.gender());
+        employee.setPhone(profile.phone());
+      }
+    }
+    return employees;
+  }
+
+  private record PersonalProfile(Long id, String name, String gender, String phone) {}
+
   public List<Employee> listForCurrentAdmin() { return listForCurrentAdmin(null); }
 
   public List<Employee> listForCurrentAdmin(String clientCode) {
@@ -49,14 +81,14 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
       return supplyChainAdmins.openingRecords();
     }
     if (identity.storeId() == null) {
-      return lambdaQuery().eq(Employee::getClientCode, com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode)).isNull(Employee::getTenantId).isNull(Employee::getStoreId).list();
+      return withPersonalProfiles(lambdaQuery().eq(Employee::getClientCode, com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode)).isNull(Employee::getTenantId).isNull(Employee::getStoreId).list());
     }
     com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode);
-    return lambdaQuery()
+    return withPersonalProfiles(lambdaQuery()
         .eq(Employee::getClientCode, identity.clientCode())
         .eq(Employee::getTenantId, identity.tenantId())
         .eq(Employee::getStoreId, identity.storeId())
-        .list();
+        .list());
   }
 
   @Transactional
@@ -64,7 +96,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     permissionGuard.requirePermission(permissionPrefix(employee.getClientCode()) + ".create");
     authorizeCreate(employee);
     applyCurrentOrganizationScope(employee);
-    Long accountId = findOrCreateAccount(employee.getPhone(), employee.getName());
+    Long accountId = accountLifecycle.findOrCreate(employee.getPhone(), employee.getName(), employee.getGender()).id();
     employee.setAccountId(accountId);
     if (lambdaQuery().eq(Employee::getAccountId, accountId)
         .eq(Employee::getClientCode, employee.getClientCode())
@@ -80,7 +112,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     save(employee);
     syncAdminIdentity(employee);
     syncAdminRoles(employee);
-    return employee;
+    return getById(employee.getId());
   }
 
   @Transactional
@@ -99,6 +131,9 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     payload.setClientCode(existing.getClientCode());
     payload.setId(id);
     payload.setAccountId(existing.getAccountId());
+    if (payload.getGender() == null) {
+      payload.setGender(existing.getGender());
+    }
     if (!StringUtils.hasText(payload.getPhone())) {
       payload.setPhone(existing.getPhone());
     }
@@ -109,14 +144,14 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     authorizeUpdate(existing, payload);
 
     if (payload.getAccountId() == null) {
-      payload.setAccountId(findOrCreateAccount(payload.getPhone(), payload.getName()));
+      payload.setAccountId(accountLifecycle.findOrCreate(payload.getPhone(), payload.getName(), payload.getGender()).id());
     }
 
     validateBeforeEnabled(payload);
     updateById(payload);
     syncAdminIdentity(payload);
     syncAdminRoles(payload);
-    updateAccountDisplayName(payload);
+    accountLifecycle.updatePersonalProfile(payload.getAccountId(), payload.getName(), payload.getGender());
     return getById(id);
   }
 
@@ -177,7 +212,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
         || !List.of("male", "female").contains(request.gender() == null ? "" : request.gender()))) {
       throw new IllegalArgumentException("请填写姓名并选择性别");
     }
-    var account = existing.orElseGet(() -> accountLifecycle.findOrCreate(request.phone(), request.name().trim()));
+    var account = existing.orElseGet(() -> accountLifecycle.findOrCreate(request.phone(), request.name().trim(), request.gender()));
     boolean existingAccount = !account.created();
     Long accountId = account.id();
     if (!"enabled".equals(account.status())) {
@@ -197,8 +232,7 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     employee.setTenantId(invite.getTenantId());
     employee.setStoreId(invite.getStoreId());
     employee.setName(account.name());
-    // Gender is not an account-level field. Do not guess it from another organization's profile.
-    employee.setGender(existingAccount ? null : request.gender());
+    employee.setGender(account.gender());
     employee.setPhone(request.phone());
     employee.setStatus("disabled");
     employee.setCreatedByName(invite.getCreatedByName());
@@ -268,23 +302,12 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     }
   }
 
-  private Long findOrCreateAccount(String phone, String displayName) {
-    return accountLifecycle.findOrCreate(phone, displayName).id();
-  }
-
   private Optional<Long> findAccountId(String phone) {
     List<Long> ids = jdbcTemplate.query(
         "SELECT id FROM accounts WHERE phone = ? LIMIT 1",
         (rs, rowNum) -> rs.getLong("id"),
         phone);
     return ids.stream().findFirst();
-  }
-
-  private void updateAccountDisplayName(Employee employee) {
-    jdbcTemplate.update(
-        "UPDATE accounts SET display_name = ? WHERE id = ?",
-        employee.getName(),
-        employee.getAccountId());
   }
 
   private void syncAdminIdentity(Employee employee) {

@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AccountLifecycleService {
   public enum Disposition { KEEP, RELEASE_PHONE, DELETE }
-  public record Account(Long id, String name, String status, boolean created) {}
+  public record Account(Long id, String name, String gender, String status, boolean created) {}
   private record Reference(String table, String column) {}
   private static final Set<String> TENANT_PURGED_TABLES = Set.of(
       "employees", "roles", "employee_invites", "product_categories", "stores");
@@ -33,8 +33,8 @@ public class AccountLifecycleService {
     if (candidates.isEmpty()) {
       return Optional.empty();
     }
-    return jdbc.query("SELECT id, display_name, status FROM accounts FORCE INDEX (PRIMARY) WHERE id = ? AND phone = ? FOR UPDATE",
-        (rs, row) -> new Account(rs.getLong("id"), rs.getString("display_name"), rs.getString("status"), false),
+    return jdbc.query("SELECT id, display_name, gender, status FROM accounts FORCE INDEX (PRIMARY) WHERE id = ? AND phone = ? FOR UPDATE",
+        (rs, row) -> new Account(rs.getLong("id"), rs.getString("display_name"), rs.getString("gender"), rs.getString("status"), false),
         candidates.getFirst(), phone).stream().findFirst();
   }
 
@@ -47,13 +47,31 @@ public class AccountLifecycleService {
     try {
       Long id = insert.executeAndReturnKey(Map.of(
           "phone", phone, "display_name", name, "account_type", "person", "status", "enabled")).longValue();
-      return new Account(id, name, "enabled", true);
+      return new Account(id, name, null, "enabled", true);
     } catch (DuplicateKeyException exception) {
       // Duplicate insert establishes a current unique-key conflict. Do not reread an older snapshot.
-      return jdbc.query("SELECT id, display_name, status FROM accounts WHERE phone=? FOR UPDATE",
-          (rs, row) -> new Account(rs.getLong("id"), rs.getString("display_name"), rs.getString("status"), false),
+      return jdbc.query("SELECT id, display_name, gender, status FROM accounts WHERE phone=? FOR UPDATE",
+          (rs, row) -> new Account(rs.getLong("id"), rs.getString("display_name"), rs.getString("gender"), rs.getString("status"), false),
           phone).stream().findFirst().orElseThrow(() -> exception);
     }
+  }
+
+  @Transactional
+  public Account findOrCreate(String phone, String name, String gender) {
+    Account account = findOrCreate(phone, name);
+    if (account.created()) {
+      updatePersonalProfile(account.id(), name, gender);
+      return new Account(account.id(), name, gender, account.status(), true);
+    }
+    return account;
+  }
+
+  public void updatePersonalProfile(Long accountId, String name, String gender) {
+    if (!org.springframework.util.StringUtils.hasText(name)
+        || (gender != null && !List.of("male", "female").contains(gender))) {
+      throw new IllegalArgumentException("请填写姓名并选择有效性别");
+    }
+    jdbc.update("UPDATE accounts SET display_name=?,gender=? WHERE id=?", name.trim(), gender, accountId);
   }
 
   public void lockAccount(Long accountId) {

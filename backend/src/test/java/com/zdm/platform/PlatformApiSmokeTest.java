@@ -536,8 +536,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '属性值操作员', '15926639071', 'enabled', 'self', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'self', '韩健')
         """,
         employeeId,
         accountId);
@@ -668,8 +668,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '属性库操作员', '15926639061', 'enabled', 'self', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'self', '韩健')
         """,
         employeeId,
         accountId);
@@ -821,12 +821,9 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     String token = supplyChainToken();
     String creatorName = jdbcTemplate.queryForObject(
         """
-        SELECT name
-        FROM employees
-        WHERE account_id = 1
-          AND status = 'enabled'
-        ORDER BY id DESC
-        LIMIT 1
+        SELECT display_name
+        FROM accounts
+        WHERE id = 1
         """,
         String.class);
 
@@ -1029,8 +1026,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '供应商权限测试员', '15926629061', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -1590,8 +1587,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, ?, '门店分类查看员', '15926629022', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, ?, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId,
@@ -1834,8 +1831,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '成品分类操作员', '15926629021', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -2173,8 +2170,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '色系只读操作员', '15926629061', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -2500,8 +2497,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
         accountId, "15926629086", "店铺级别只读操作员");
-    jdbcTemplate.update(
-        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '店铺级别只读操作员', '15926629086', 'enabled', 'all', '韩健')",
+    jdbcTemplate.update("INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')",
         employeeId, accountId);
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
@@ -2685,8 +2681,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, ?, ?, 'enabled')",
         accountId, "15926629088", "门店权限测试操作员");
-    jdbcTemplate.update(
-        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, '门店权限测试操作员', '15926629088', 'enabled', 'all', '韩健')",
+    jdbcTemplate.update("INSERT INTO employees (id, account_id, tenant_id, store_id, status, data_permission, created_by_name) VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')",
         employeeId, accountId);
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (?, 'admin', 'employee', ?, 1, 1, 'enabled')",
@@ -2934,8 +2929,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, status) VALUES (?, '15926629087', '归档门店员工', 'enabled')",
         storeId);
-    jdbcTemplate.update(
-        "INSERT INTO employees (id, account_id, tenant_id, store_id, name, phone, status) VALUES (?, ?, 1, ?, '归档门店员工', '15926629087', 'enabled')",
+    jdbcTemplate.update("INSERT INTO employees (id, account_id, tenant_id, store_id, status) VALUES (?, ?, 1, ?, 'enabled')",
         storeId,
         storeId,
         storeId);
@@ -3110,8 +3104,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '等级只读操作员', '15926639085', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3255,8 +3249,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '大板产地自有操作员', '15926629081', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3371,8 +3365,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '无产地权限操作员', '15926629071', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3470,12 +3464,9 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     String varietyName = "创建人集成测试品种-" + System.nanoTime();
     String creatorName = jdbcTemplate.queryForObject(
         """
-        SELECT name
-        FROM employees
-        WHERE account_id = 1
-          AND status = 'enabled'
-        ORDER BY id DESC
-        LIMIT 1
+        SELECT display_name
+        FROM accounts
+        WHERE id = 1
         """,
         String.class);
 
@@ -3540,8 +3531,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '大板品种自有操作员', '15926629031', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3644,8 +3635,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '品种查看员', '15926629011', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3870,8 +3861,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '无租户权限员工', '15900009010', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -3920,8 +3911,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '租户权限操作员', '15900009012', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
         accountId);
@@ -4005,12 +3996,9 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     String craftName = "集成测试工艺-" + System.nanoTime();
     String creatorName = jdbcTemplate.queryForObject(
         """
-        SELECT name
-        FROM employees
-        WHERE account_id = 1
-          AND status = 'enabled'
-        ORDER BY id DESC
-        LIMIT 1
+        SELECT display_name
+        FROM accounts
+        WHERE id = 1
         """,
         String.class);
     MockMultipartFile image = new MockMultipartFile(
@@ -4150,8 +4138,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '工艺查看员', '15926629001', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         accountId,
         accountId);
@@ -4234,12 +4222,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, ?, '15900009003', 'enabled', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', 'all', '韩健')
         """,
         employeeId,
-        accountId,
-        employeeName);
+        accountId);
     jdbcTemplate.update(
         """
         INSERT INTO account_identities
@@ -4305,12 +4292,9 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
 
     String creatorName = jdbcTemplate.queryForObject(
         """
-        SELECT name
-        FROM employees
-        WHERE account_id = 1 AND client_code = 'admin'
-          AND status = 'enabled'
-        ORDER BY id DESC
-        LIMIT 1
+        SELECT display_name
+        FROM accounts
+        WHERE id = 1
         """,
         String.class);
     MvcResult createdResult = mockMvc.perform(post("/api/admin/roles")
@@ -4369,8 +4353,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, role_ids, data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '待停用角色用户', '15900009101', 'enabled', ?, 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', ?, 'all', '韩健')
         """,
         affectedEmployeeId,
         affectedAccountId,
@@ -4766,11 +4750,10 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
-           data_permission, created_by_name)
+          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
         VALUES
-          (?, ?, 1, 1, '权限配置员', '15926629041', 'enabled', ?, 'all', '韩健'),
-          (?, ?, 1, 1, '待配置员工', '15926629042', 'enabled', '2', 'all', '权限配置员')
+          (?, ?, 1, 1, 'enabled', ?, 'all', '韩健'),
+          (?, ?, 1, 1, 'enabled', '2', 'all', '权限配置员')
         """,
         managerEmployeeId,
         managerAccountId,
@@ -4780,9 +4763,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
-           data_permission, created_by_name)
-        VALUES (?, ?, 1, ?, '其他门店员工', '15926629043', 'enabled', '2', 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
+        VALUES (?, ?, 1, ?, 'enabled', '2', 'all', '韩健')
         """,
         otherStoreEmployeeId,
         otherStoreAccountId,
@@ -4932,9 +4914,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
-           data_permission, created_by_name)
-        VALUES (?, ?, 1, 1, '邀请创建员', '15926629051', 'enabled', ?, 'all', '韩健')
+          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
+        VALUES (?, ?, 1, 1, 'enabled', ?, 'all', '韩健')
         """,
         employeeId,
         accountId,
@@ -5000,9 +4981,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
-           data_permission, created_by_name)
-        VALUES (?, ?, 1, ?, '跨门店邀请创建员', '15926629052', 'enabled', ?, 'all', '集成测试')
+          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name)
+        VALUES (?, ?, 1, ?, 'enabled', ?, 'all', '集成测试')
         """,
         employeeId,
         accountId,
@@ -5054,13 +5034,74 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
+  void personalProfileIsSharedWhileOrganizationMetadataRemainsIndependent() throws Exception {
+    String phone = "15926627780";
+    jdbcTemplate.update("INSERT INTO accounts(phone,display_name,gender,account_type,status) VALUES (?,'共享用户','female','person','enabled')", phone);
+    Long accountId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    jdbcTemplate.update("INSERT INTO employees(account_id,client_code,status,remark,created_by_account_id) VALUES (?,'admin','disabled','运营备注',1)", accountId);
+    Long employeeId = jdbcTemplate.queryForObject("SELECT id FROM employees WHERE account_id=?", Long.class, accountId);
+    jdbcTemplate.update("INSERT INTO account_identities(account_id,client_code,identity_type,subject_id,status) VALUES (?,'admin','employee',?,'disabled')", accountId, employeeId);
+    String token = supplyAdminInvite();
+    try {
+      mockMvc.perform(post("/api/open/employee-invites/{token}/verify-code", token)
+          .contentType("application/json").content("{\"phone\":\"" + phone + "\",\"verifyCode\":\"888888\"}"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.requiresProfile").value(false))
+          .andExpect(jsonPath("$.data.registration.existingAccount").value(true));
+      Long identityId = jdbcTemplate.queryForObject("SELECT id FROM account_identities WHERE account_id=? AND client_code='supply-chain'", Long.class, accountId);
+      mockMvc.perform(get("/api/admin/employees").param("clientCode", "supply-chain")
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.accountId == " + accountId + ")].gender").value(org.hamcrest.Matchers.contains("female")));
+      mockMvc.perform(put("/api/admin/supply-chain-administrators/{id}", identityId)
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+          .contentType("application/json").content("{\"name\":\"共享新姓名\",\"gender\":\"male\",\"remark\":\"供应链备注\"}"))
+          .andExpect(status().isOk());
+      mockMvc.perform(get("/api/admin/employees").header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].name").value(org.hamcrest.Matchers.contains("共享新姓名")))
+          .andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].gender").value(org.hamcrest.Matchers.contains("male")))
+          .andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].remark").value(org.hamcrest.Matchers.contains("运营备注")))
+          .andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].status").value(org.hamcrest.Matchers.contains("disabled")));
+      mockMvc.perform(put("/api/admin/employees/{id}", employeeId)
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+          .contentType("application/json").content("""
+              {"name":"运营更新姓名","gender":"female","phone":"%s","status":"disabled","remark":"运营备注更新"}
+              """.formatted(phone)))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.gender").value("female"));
+      mockMvc.perform(get("/api/admin/employees").param("clientCode", "supply-chain")
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.id == " + identityId + ")].name").value(org.hamcrest.Matchers.contains("运营更新姓名")))
+          .andExpect(jsonPath("$.data[?(@.id == " + identityId + ")].gender").value(org.hamcrest.Matchers.contains("female")))
+          .andExpect(jsonPath("$.data[?(@.id == " + identityId + ")].remark").value(org.hamcrest.Matchers.contains("供应链备注")))
+          .andExpect(jsonPath("$.data[?(@.id == " + identityId + ")].status").value(org.hamcrest.Matchers.contains("enabled")));
+      mockMvc.perform(put("/api/admin/employees/{id}", employeeId)
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+          .contentType("application/json").content("""
+              {"name":"运营更新姓名","phone":"%s","status":"disabled","remark":"运营备注更新"}
+              """.formatted(phone)))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.gender").value("female"));
+      assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isEqualTo(1);
+      assertThat(jdbcTemplate.queryForObject("""
+          SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+            AND ((table_name='employees' AND column_name IN ('name','gender','phone'))
+              OR (table_name='supply_chain_admin_profiles' AND column_name IN ('name','gender')))
+          """, Integer.class)).isZero();
+    } finally {
+      jdbcTemplate.update("DELETE FROM auth_sessions WHERE account_id=?", accountId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id=?", accountId);
+      jdbcTemplate.update("DELETE FROM employee_invite_acceptances WHERE account_id=?", accountId);
+      jdbcTemplate.update("DELETE FROM employee_invites WHERE token=?", token);
+      jdbcTemplate.update("DELETE FROM employees WHERE account_id=?", accountId);
+      jdbcTemplate.update("DELETE FROM accounts WHERE id=?", accountId);
+    }
+  }
+
+  @Test
   void platformSupplyChainInvitationCreatesAdministratorIdentities() throws Exception {
     String roleView="admin.permission-management.role-management.supply-chain.view";
     String employeeCreate="admin.permission-management.employee-management.supply-chain.create";
     jdbcTemplate.update("UPDATE terminal_function_policies SET function_permissions=? WHERE terminal='supply-chain'", roleView+","+employeeCreate);
     for (boolean reuse : List.of(false,true)) {
       String phone=reuse ? "15926627772" : "15926627771";
-      if (reuse) jdbcTemplate.update("INSERT INTO accounts(phone,display_name,status,account_type) VALUES (?, '已有统一账号','enabled','person')",phone);
+      if (reuse) jdbcTemplate.update("INSERT INTO accounts(phone,display_name,gender,status,account_type) VALUES (?, '已有统一账号','female','enabled','person')",phone);
       String invite=supplyAdminInvite();
       String body="""
           {"phone":"%s","verifyCode":"888888","name":"初始管理员","gender":"male",
@@ -5074,6 +5115,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .andExpect(jsonPath("$.data.existingAccount").value(reuse));
         accountId=jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?",Long.class,phone);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?",Integer.class,phone)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT gender FROM accounts WHERE id=?",String.class,accountId)).isEqualTo(reuse ? "female" : "male");
+        assertThat(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?",String.class,accountId)).isEqualTo(reuse ? "已有统一账号" : "初始管理员");
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE account_id=?",Integer.class,accountId)).isZero();
         Long identityId=jdbcTemplate.queryForObject("SELECT id FROM account_identities WHERE account_id=? AND client_code='supply-chain' AND identity_type='supply_chain_admin' AND tenant_id IS NULL AND store_id IS NULL",Long.class,accountId);
         var identity=sessionTokens.authenticate(sessionTokens.issue(authAccounts.findByIdentityId(identityId)));
@@ -5202,7 +5245,11 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .andExpect(jsonPath("$.data.gender").value("female")).andExpect(jsonPath("$.data.remark").value("独立资料"))
             .andExpect(jsonPath("$.data.phone").value(phone));
         assertThat(authAccounts.findByIdentityId(id).getDisplayName()).isEqualTo("管理员新名");
-        assertThat(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?",String.class,accountId)).isEqualTo("管理员原名");
+        assertThat(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?",String.class,accountId)).isEqualTo("管理员新名");
+        assertThat(jdbcTemplate.queryForObject("SELECT gender FROM accounts WHERE id=?",String.class,accountId)).isEqualTo("female");
+        if (otherIdentity) {
+          assertThat(authAccounts.findByIdentityId(otherId).getDisplayName()).isEqualTo("管理员新名");
+        }
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_roles WHERE account_id=?",Integer.class,accountId)).isZero();
         mockMvc.perform(patch(base+"/status").header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN).contentType("application/json").content("{\"status\":\"disabled\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("disabled"));
@@ -5349,7 +5396,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
               .contentType("application/json").content(payload))
           .andExpect(status().isOk()).andExpect(jsonPath("$.data.existingEmployee").value(true));
       assertThat(jdbcTemplate.queryForObject(
-          "SELECT COUNT(*) FROM employees WHERE phone=? AND client_code=? AND tenant_id IS NULL AND store_id IS NULL AND status='disabled'",
+          "SELECT COUNT(*) FROM employees WHERE account_id=(SELECT id FROM accounts WHERE phone=?) AND client_code=? AND tenant_id IS NULL AND store_id IS NULL AND status='disabled'",
           Integer.class, phone, client)).isEqualTo(1);
       MvcResult duplicate = mockMvc.perform(post("/api/admin/employee-invites")
               .param("clientCode", client)
@@ -5364,7 +5411,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           .andExpect(status().isOk());
     }
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isEqualTo(1);
-    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(DISTINCT account_id) FROM employees WHERE phone=?", Integer.class, phone)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(DISTINCT account_id) FROM employees WHERE account_id=(SELECT id FROM accounts WHERE phone=?)", Integer.class, phone)).isEqualTo(1);
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM account_identities i JOIN accounts a ON a.id=i.account_id WHERE a.phone=? AND i.status='disabled' AND i.client_code IN ('admin','supply-chain')",
         Integer.class, phone)).isEqualTo(2);
@@ -5543,7 +5590,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   @Test
   void tenantCrudPersistsThroughApi() throws Exception {
     String creatorName = jdbcTemplate.queryForObject(
-        "SELECT name FROM employees WHERE account_id = 1 ORDER BY id DESC LIMIT 1",
+        "SELECT display_name FROM accounts WHERE id = 1",
         String.class);
     MvcResult createResult = mockMvc.perform(post("/api/admin/tenants")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
@@ -6850,7 +6897,8 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   void employeeInviteExistingAccountSkipsProfileAndNeverRestoresOtherIdentities() throws Exception {
     String phone = "15926628931";
     createStoreScopedEmployee(98931L, phone, "张飞原姓名", "admin.permission-management.employee-management.create");
-    jdbcTemplate.update("UPDATE employees SET status='disabled',gender='male' WHERE id=98931");
+    jdbcTemplate.update("UPDATE employees SET status='disabled' WHERE id=98931");
+    jdbcTemplate.update("UPDATE accounts SET gender='male' WHERE id=98931");
     jdbcTemplate.update("UPDATE account_identities SET status='disabled' WHERE account_id=98931");
     String token = createInvitation("supply-chain", supplyChainEmployeeManagerToken());
     verifyInvitation(token, phone).andExpect(status().isOk())
@@ -6861,9 +6909,10 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(jsonPath("$.data.registration.status").value("disabled"));
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone=?", Integer.class, phone)).isEqualTo(1);
     Map<String, Object> employee = jdbcTemplate.queryForMap(
-        "SELECT name,gender,status,role_ids,data_permission,tenant_id,store_id FROM employees WHERE account_id=98931 AND client_code='supply-chain'");
+        "SELECT a.display_name AS name,a.gender,e.status,e.role_ids,e.data_permission,e.tenant_id,e.store_id FROM employees e JOIN accounts a ON a.id=e.account_id WHERE e.account_id=98931 AND e.client_code='supply-chain'");
     assertThat(employee.get("name")).isEqualTo("张飞原姓名");
-    for (String field : List.of("gender", "role_ids", "data_permission", "tenant_id", "store_id")) {
+    assertThat(employee.get("gender")).isEqualTo("male");
+    for (String field : List.of("role_ids", "data_permission", "tenant_id", "store_id")) {
       assertThat(employee.get(field)).isNull();
     }
     assertThat(jdbcTemplate.queryForObject("SELECT status FROM employees WHERE id=98931", String.class)).isEqualTo("disabled");
@@ -6935,7 +6984,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .content("{\"phone\":\"" + phone + "\",\"verifyCode\":\"888888\",\"name\":\"不可覆盖\",\"gender\":\"male\"}"))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data.existingAccount").value(true));
     assertThat(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE phone=?", String.class, phone)).isEqualTo("原有姓名");
-    assertThat(jdbcTemplate.queryForObject("SELECT name FROM employees WHERE phone=?", String.class, phone)).isEqualTo("原有姓名");
+    assertThat(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE phone=?", String.class, phone)).isEqualTo("原有姓名");
   }
 
   @Test
@@ -6955,7 +7004,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
       assertThat(List.of(first.get(20, java.util.concurrent.TimeUnit.SECONDS), second.get(20, java.util.concurrent.TimeUnit.SECONDS)))
           .containsExactlyInAnyOrder(200, 200);
     }
-    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE phone=?", Integer.class, phone)).isEqualTo(1);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE account_id=(SELECT id FROM accounts WHERE phone=?)", Integer.class, phone)).isEqualTo(1);
   }
 
   @Test
@@ -6983,7 +7032,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
       assertThat(jdbcTemplate.queryForMap("SELECT id,expires_at FROM employee_invites WHERE token=?", token)).isEqualTo(initial);
     }
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employee_invite_acceptances WHERE invite_id=?", Integer.class, initial.get("id"))).isEqualTo(10);
-    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE phone LIKE '1592662930%' AND client_code='supply-chain' AND status='disabled' AND role_ids IS NULL AND data_permission IS NULL", Integer.class)).isEqualTo(10);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employees WHERE account_id IN (SELECT id FROM accounts WHERE phone LIKE '1592662930%') AND client_code='supply-chain' AND status='disabled' AND role_ids IS NULL AND data_permission IS NULL", Integer.class)).isEqualTo(10);
     assertThat(jdbcTemplate.queryForObject("SELECT status FROM employee_invites WHERE token=?", String.class, token)).isEqualTo("active");
     jdbcTemplate.update("UPDATE employee_invites SET expires_at=DATE_SUB(NOW(),INTERVAL 1 SECOND) WHERE token=?", token);
     verifyInvitation(token, "15926629300").andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("邀请链接已过期"));
@@ -7232,15 +7281,12 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO employees
-          (id, account_id, tenant_id, store_id, name, phone, status, role_ids,
-           data_permission, created_by_name, created_by_account_id)
-        VALUES (?, ?, 1, ?, ?, ?, 'enabled', ?, 'all', ?, ?)
+          (id, account_id, tenant_id, store_id, status, role_ids, data_permission, created_by_name, created_by_account_id)
+        VALUES (?, ?, 1, ?, 'enabled', ?, 'all', ?, ?)
         """,
         id,
         id,
         id,
-        name,
-        phone,
         String.valueOf(id),
         name,
         id);

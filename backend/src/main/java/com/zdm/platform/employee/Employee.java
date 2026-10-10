@@ -26,12 +26,15 @@ public class Employee implements com.zdm.platform.security.CreatorOwned {
   private Long storeId;
 
   @NotBlank
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String name;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String gender;
 
   @NotBlank
   @Pattern(regexp = "^1[3-9]\\d{9}$")
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String phone;
 
   @NotBlank

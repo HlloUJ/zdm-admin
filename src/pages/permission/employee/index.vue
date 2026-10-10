@@ -548,7 +548,7 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
     id: record.id,
     identityType: record.identityType,
     name: record.name,
-    gender: record.gender ?? (record.identityType === 'supply_chain_admin' ? '' : 'male'),
+    gender: record.gender ?? '',
     phone: record.phone,
     roleIds,
     status: normalizeStatus(record.status),
