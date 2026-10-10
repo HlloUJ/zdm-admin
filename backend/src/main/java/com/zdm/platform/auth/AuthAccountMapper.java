@@ -20,7 +20,7 @@ public interface AuthAccountMapper {
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
         COALESCE(e.data_permission, 'all') AS dataPermission,
-        t.name AS tenantName,
+        tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
       FROM accounts a
@@ -34,6 +34,7 @@ public interface AuthAccountMapper {
        AND e.client_code = ai.client_code AND e.account_id = a.id
        AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
+      LEFT JOIN accounts tenant_owner ON tenant_owner.id=t.account_id
       LEFT JOIN stores s ON s.id = ai.store_id
       WHERE a.phone = #{phone}
         AND a.status = 'enabled'
@@ -89,7 +90,7 @@ public interface AuthAccountMapper {
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
         COALESCE(e.data_permission, 'all') AS dataPermission,
-        t.name AS tenantName,
+        tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
       FROM accounts a
@@ -103,6 +104,7 @@ public interface AuthAccountMapper {
        AND e.client_code = ai.client_code AND e.account_id = a.id
        AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
+      LEFT JOIN accounts tenant_owner ON tenant_owner.id=t.account_id
       LEFT JOIN stores s ON s.id = ai.store_id
       WHERE ai.id = #{identityId}
         AND a.status = 'enabled'
@@ -146,7 +148,7 @@ public interface AuthAccountMapper {
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
         COALESCE(e.data_permission, 'all') AS dataPermission,
-        t.name AS tenantName,
+        tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
       FROM accounts a
@@ -160,6 +162,7 @@ public interface AuthAccountMapper {
        AND e.client_code = ai.client_code AND e.account_id = a.id
        AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
+      LEFT JOIN accounts tenant_owner ON tenant_owner.id=t.account_id
       LEFT JOIN stores s ON s.id = ai.store_id
       WHERE a.id = #{accountId}
         AND a.status = 'enabled'
@@ -190,7 +193,7 @@ public interface AuthAccountMapper {
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
         COALESCE(e.data_permission, 'all') AS dataPermission,
-        t.name AS tenantName,
+        tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
       FROM accounts a
@@ -200,6 +203,7 @@ public interface AuthAccountMapper {
         ON ai.identity_type = 'employee' AND e.id = ai.subject_id
        AND e.client_code = ai.client_code AND e.account_id = a.id AND e.status = 'enabled'
       LEFT JOIN tenants t ON t.id = ai.tenant_id
+      LEFT JOIN accounts tenant_owner ON tenant_owner.id=t.account_id
       LEFT JOIN stores s ON s.id = ai.store_id
       WHERE a.id = #{accountId} AND a.status = 'enabled'
         AND (ai.identity_type <> 'employee' OR e.id IS NOT NULL)

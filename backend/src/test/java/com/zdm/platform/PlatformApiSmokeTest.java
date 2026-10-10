@@ -3954,7 +3954,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         "INSERT INTO accounts (id, phone, display_name, account_type, status) VALUES (9013, '15926629012', '测试租户管理员', 'person', 'enabled')");
     jdbcTemplate.update(
-        "INSERT INTO tenants (id, name, contact_name, contact_phone, status, business_types, created_by_name, created_by_account_id) VALUES (9012, '其他人创建的测试租户', '测试联系人', '15926629012', 'enabled', '', '其他创建人', 1)");
+        "INSERT INTO tenants (id, account_id, status, business_types, created_by_name, created_by_account_id) VALUES (9012, 9013, 'enabled', '', '其他创建人', 1)");
     jdbcTemplate.update(
         "INSERT INTO account_identities (account_id, client_code, identity_type, subject_id, tenant_id, store_id, status) VALUES (9013, 'admin', 'tenant_admin', 9012, 9012, NULL, 'enabled')");
     mockMvc.perform(put("/api/admin/tenants/9012")
@@ -3963,7 +3963,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name":"其他人创建的测试租户-已编辑",
-                  "contactName":"已编辑联系人",
                   "contactPhone":"15926629012",
                   "status":"enabled",
                   "businessTypes":"",
@@ -5588,6 +5587,71 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
+  void tenantProfileUsesUnifiedAccountWithoutChangingOrganizationMetadata() throws Exception {
+    String phone = "15926627790";
+    String changedPhone = "15926627791";
+    jdbcTemplate.update("INSERT INTO accounts(phone,display_name,gender,account_type,status) VALUES (?,'统一原姓名','female','person','enabled')", phone);
+    Long accountId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
+    jdbcTemplate.update("INSERT INTO employees(account_id,client_code,status,remark,created_by_account_id) VALUES (?,'admin','disabled','员工独立备注',1)", accountId);
+    Long employeeId = jdbcTemplate.queryForObject("SELECT id FROM employees WHERE account_id=?", Long.class, accountId);
+    jdbcTemplate.update("INSERT INTO account_identities(account_id,client_code,identity_type,subject_id,status) VALUES (?,'admin','employee',?,'disabled')", accountId, employeeId);
+    Long tenantId = null;
+    try {
+      MvcResult result = mockMvc.perform(post("/api/admin/tenants")
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+          .contentType("application/json").content("""
+              {"name":"租户原有名称","contactPhone":"%s","status":"enabled","remark":"租户独立备注"}
+              """.formatted(phone)))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value("统一原姓名"))
+          .andExpect(jsonPath("$.data.contactName").doesNotExist())
+          .andExpect(jsonPath("$.data.legacyName").doesNotExist()).andReturn();
+      tenantId = Long.valueOf(com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id").toString());
+      mockMvc.perform(put("/api/admin/employees/{id}", employeeId)
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+          .contentType("application/json").content("""
+              {"name":"员工修改姓名","gender":"male","phone":"%s","status":"disabled","remark":"员工独立备注"}
+              """.formatted(phone)))
+          .andExpect(status().isOk());
+      mockMvc.perform(get("/api/admin/tenants").header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.id == " + tenantId + ")].name").value(org.hamcrest.Matchers.contains("员工修改姓名")))
+          .andExpect(jsonPath("$.data[?(@.id == " + tenantId + ")].contactPhone").value(org.hamcrest.Matchers.contains(phone)));
+      mockMvc.perform(put("/api/admin/tenants/{id}", tenantId)
+          .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+          .contentType("application/json").content("""
+              {"name":"租户修改姓名","contactPhone":"%s","status":"disabled","businessTypes":"factory","remark":"租户独立备注更新"}
+              """.formatted(changedPhone)))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value("租户修改姓名"))
+          .andExpect(jsonPath("$.data.contactName").doesNotExist())
+          .andExpect(jsonPath("$.data.status").value("enabled")).andExpect(jsonPath("$.data.businessTypes").value(""));
+      mockMvc.perform(get("/api/admin/employees").header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].name").value(org.hamcrest.Matchers.contains("租户修改姓名")))
+          .andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].gender").value(org.hamcrest.Matchers.contains("male")))
+          .andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].phone").value(org.hamcrest.Matchers.contains(changedPhone)))
+          .andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].status").value(org.hamcrest.Matchers.contains("disabled")))
+          .andExpect(jsonPath("$.data[?(@.id == " + employeeId + ")].remark").value(org.hamcrest.Matchers.contains("员工独立备注")));
+      Long identityId = jdbcTemplate.queryForObject("SELECT id FROM account_identities WHERE tenant_id=? AND identity_type='tenant_admin'", Long.class, tenantId);
+      assertThat(authAccounts.findByIdentityId(identityId).getDisplayName()).isEqualTo("租户修改姓名");
+      assertThat(authAccounts.findByIdentityId(identityId).getTenantName()).isEqualTo("租户修改姓名");
+      assertThat(jdbcTemplate.queryForObject("SELECT account_id FROM tenants WHERE id=?", Long.class, tenantId)).isEqualTo(accountId);
+      assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='tenants' AND column_name IN ('name','contact_name','contact_phone')", Integer.class)).isZero();
+      mockMvc.perform(post("/api/admin/tenants").header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
+          .contentType("application/json").content("""
+              {"name":"重复租户","contactPhone":"%s","status":"enabled"}
+              """.formatted(changedPhone))).andExpect(status().isBadRequest());
+      assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE id=?", Integer.class, accountId)).isEqualTo(1);
+    } finally {
+      jdbcTemplate.update("DELETE FROM auth_sessions WHERE account_id=?", accountId);
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id=?", accountId);
+      jdbcTemplate.update("DELETE FROM employees WHERE account_id=?", accountId);
+      if (tenantId != null) {
+        jdbcTemplate.update("DELETE FROM tenant_businesses WHERE tenant_id=?", tenantId);
+        jdbcTemplate.update("DELETE FROM tenants WHERE id=?", tenantId);
+      }
+      jdbcTemplate.update("DELETE FROM accounts WHERE id=?", accountId);
+    }
+  }
+
+  @Test
   void tenantCrudPersistsThroughApi() throws Exception {
     String creatorName = jdbcTemplate.queryForObject(
         "SELECT display_name FROM accounts WHERE id = 1",
@@ -5598,7 +5662,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name": "集成测试租户",
-                  "contactName": "测试联系人",
                   "contactPhone": "15926626946",
                   "status": "enabled",
                   "businessTypes": "cityPartner",
@@ -5642,7 +5705,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name": "集成测试租户-已更新",
-                  "contactName": "测试联系人",
                   "contactPhone": "15926626946",
                   "status": "enabled",
                   "businessTypes": "cityPartner",
@@ -6700,7 +6762,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name": "",
-                  "contactName": "测试联系人",
                   "contactPhone": "123",
                   "status": "enabled"
                 }
@@ -6719,7 +6780,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name":"%s",
-                  "contactName":"共享账号联系人",
                   "contactPhone":"%s",
                   "status":"enabled"
                 }
@@ -6781,7 +6841,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name":"%s",
-                  "contactName":"跨组织测试联系人",
                   "contactPhone":"%s",
                   "status":"enabled"
                 }
@@ -6837,7 +6896,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name": "装点猫直营租户",
-                  "contactName": "同名租户联系人",
                   "contactPhone": "15926626947",
                   "status": "enabled",
                   "businessTypes": "",
@@ -6858,7 +6916,6 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name": "另一个租户姓名",
-                  "contactName": "重复手机号联系人",
                   "contactPhone": "15926626947",
                   "status": "enabled",
                   "businessTypes": "",
@@ -7071,7 +7128,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     MvcResult result = mockMvc.perform(post("/api/admin/tenants")
         .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
         .contentType("application/json").content("""
-          {"name":"%s","contactPhone":"%s","contactName":"退出规则联系人","status":"enabled"}
+          {"name":"%s","contactPhone":"%s","status":"enabled"}
           """.formatted(name, phone))).andExpect(status().isOk()).andReturn();
     long id = Long.parseLong(com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id").toString());
     mockMvc.perform(patch("/api/admin/tenants/{id}/status", id)
@@ -7158,7 +7215,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(jsonPath("$.data.accountRetainCount").value(1)).andExpect(jsonPath("$.data.phoneReleaseCount").value(1));
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenant)
         .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
-        .contentType("application/json").content("{\"confirmationName\":\"退出规则历史引用租户\"}"))
+        .contentType("application/json").content("{\"confirmationName\":\"%s\"}".formatted(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?", String.class, oldId))))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data.phoneReleaseCount").value(1));
     assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isNull();
     assertThat(jdbcTemplate.queryForObject("SELECT created_by_account_id FROM roles WHERE code='EXIT_HISTORY_99203'", Long.class)).isEqualTo(oldId);
@@ -7174,7 +7231,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     Long oldId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenant)
         .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
-        .contentType("application/json").content("{\"confirmationName\":\"退出规则共享租户\"}"))
+        .contentType("application/json").content("{\"confirmationName\":\"%s\"}".formatted(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?", String.class, oldId))))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data.phoneReleaseCount").value(0));
     assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isEqualTo(phone);
     assertThat(jdbcTemplate.queryForObject("SELECT status FROM employees WHERE id=?", String.class, employee)).isEqualTo("disabled");

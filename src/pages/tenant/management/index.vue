@@ -414,7 +414,6 @@ const toTenantItem = (record: TenantRecord): TenantItem => ({
 
 const toTenantPayload = (status: TenantStatus, businesses: BusinessType[] = []): TenantPayload => ({
   name: formData.tenantName.trim(),
-  contactName: formData.tenantName.trim(),
   contactPhone: formData.phone.trim(),
   status: toBackendStatus(status),
   businessTypes: businesses.join(','),
