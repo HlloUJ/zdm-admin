@@ -43,7 +43,7 @@ class MarkupConfigurationServiceTest {
         "store",
         2L,
         3L,
-        "门店管理员",
+        "管理员",
         "all",
         List.of("STORE_ADMIN"),
         List.of("all")));
