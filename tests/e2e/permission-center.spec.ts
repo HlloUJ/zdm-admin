@@ -975,7 +975,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('二级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('三级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('页面');
-  await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
+  await expect(roleMatrix.locator('thead')).toContainText('tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
   await roleModuleList.getByText('供应商供货类型管理', { exact: true }).click();
   await expect(roleMatrix.locator('tbody .permission-menu-cell').first()).toHaveText('一级菜单直达');
@@ -1213,7 +1213,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   const main = page.getByRole('main');
   const moduleList = main.locator('.permission-module-list');
   const matrix = main.locator('.permission-matrix');
-  await expect(matrix.locator('thead th')).toHaveText(['二级菜单', '三级菜单', '页面', '页面 Tab', '操作权限']);
+  await expect(matrix.locator('thead th')).toHaveText(['二级菜单', '三级菜单', '页面', 'tab', '操作权限']);
   await expect(page.locator('.side-nav').getByText('门店分类管理', { exact: true })).toHaveCount(0);
 
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {

@@ -152,7 +152,7 @@
                     <t-link v-if="can('edit')" theme="primary" @click="editDiscount(row.rule)">编辑</t-link>
                     <t-link
                       v-if="can('toggle-status')"
-                      :theme="row.rule.status === 'disabled' ? 'primary' : 'warning'"
+                      :theme="row.rule.status === 'disabled' ? 'success' : 'warning'"
                       @click="confirmDiscountAction(row.rule, 'status')"
                       >{{ row.rule.status === 'disabled' ? '启用' : '停用' }}</t-link
                     >

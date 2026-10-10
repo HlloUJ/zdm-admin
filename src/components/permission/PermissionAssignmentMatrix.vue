@@ -57,7 +57,7 @@
                 <th class="permission-menu-column">二级菜单</th>
                 <th class="permission-third-menu-column">三级菜单</th>
                 <th class="permission-page-column">页面</th>
-                <th class="permission-tab-column">页面 Tab</th>
+                <th class="permission-tab-column">tab</th>
                 <th class="permission-action-column">操作权限</th>
               </tr>
             </thead>
