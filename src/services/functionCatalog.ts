@@ -310,7 +310,12 @@ const filterCatalogPagesByAudience = (modules: FunctionModule[], audience: Funct
                     })),
                 }))
                 .filter((tab) => tab.actions.length > 0),
-            })),
+            }))
+            .map((page) =>
+              page.value === 'admin.permission-management.role-management' && page.tabs.length > 0
+                ? { ...page, actions: page.tabs.flatMap((tab) => tab.actions), tabs: [] }
+                : page,
+            ),
         }))
         .filter((menu) => menu.pages.length > 0),
     }))

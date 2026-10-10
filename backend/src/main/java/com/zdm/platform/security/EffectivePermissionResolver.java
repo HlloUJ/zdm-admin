@@ -21,7 +21,7 @@ public class EffectivePermissionResolver {
     return switch (identityType(account)) {
       case "platform_admin" -> List.of("all");
       case "tenant_admin" -> List.of();
-      case "store_admin" -> terminalPermissions(account);
+      case "store_admin", "supply_chain_admin" -> terminalPermissions(account);
       default -> employeePermissions(account);
     };
   }

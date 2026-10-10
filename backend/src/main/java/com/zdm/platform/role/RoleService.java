@@ -170,10 +170,6 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
-    if ("supply-chain".equals(identityProvider.require().clientCode())
-        && !"supply-chain".equals(role.getCreatedByClientCode())) {
-      throw new AccessDeniedException("运营平台创建或来源未确认的角色仅可由运营平台维护");
-    }
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), role.getCreatedByAccountId());
     RoleScope scope = requireCurrentScope(role.getClientCode());
     if (!Objects.equals(role.getTenantId(), scope.tenantId())
@@ -202,7 +198,11 @@ public class RoleService extends ServiceImpl<RoleMapper, Role> {
 
   private RoleScope requireCurrentScope(String clientCode) {
     CurrentIdentity identity = identityProvider.require();
-    String client = com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode);
+    String client = clientCode == null ? identity.clientCode() : clientCode;
+    if (!Objects.equals(client, identity.clientCode())) {
+      throw new AccessDeniedException("当前身份只能管理所属业务端的角色");
+    }
+    com.zdm.platform.security.ManagedClientScope.resolve(identity, client);
     if (identity.tenantId() == null && identity.storeId() == null) {
       return new RoleScope(null, null, client, client);
     }

@@ -465,6 +465,9 @@ test('opens employee invitation and edit dialogs', async ({ page }) => {
 });
 
 test('employee invitation follows the selected system tab', async ({ page }) => {
+  await page.route(/\/api\/admin\/employees\?clientCode=supply-chain$/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, data: [] }) }),
+  );
   await page.goto('/employee-management');
   for (const [label, client] of [
     ['运营管理平台', 'admin'],
@@ -494,6 +497,51 @@ test('supply chain invitation displays its server-bound system', async ({ page }
   );
   await page.goto('/employee-invite?token=e2e-invite-token&clientCode=admin');
   await expect(page.getByRole('heading', { name: '供应链协同系统员工注册' })).toBeVisible();
+});
+
+test('platform supply-chain invitation keeps registration steps and enables administrator access', async ({ page }) => {
+  await page.route('**/api/open/employee-invites/e2e-invite-token', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: {
+          token: 'e2e-invite-token',
+          clientCode: 'supply-chain',
+          identityType: 'supply_chain_admin',
+          expiresAt: '2099-01-01',
+        },
+      }),
+    }),
+  );
+  await page.route('**/api/open/employee-invites/e2e-invite-token/register', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: {
+          employeeId: null,
+          identityType: 'supply_chain_admin',
+          status: 'enabled',
+          existingAccount: false,
+          existingEmployee: false,
+          canLogin: true,
+        },
+      }),
+    }),
+  );
+  await page.goto('/employee-invite?token=e2e-invite-token');
+  await expect(page.getByRole('heading', { name: '供应链协同系统员工注册' })).toBeVisible();
+  await page.getByPlaceholder('请输入手机号').fill('15926627771');
+  await page.getByRole('button', { name: '获取验证码' }).click();
+  await expect(page.getByText('验证码已发送')).toBeVisible();
+  await page.getByPlaceholder('请输入验证码').fill('888888');
+  await page.getByRole('button', { name: '下一步' }).click();
+  await page.getByPlaceholder('请输入姓名').fill('初始管理员');
+  await page.locator('.gender-radio').getByText('女').click();
+  await page.getByRole('button', { name: '提交注册' }).click();
+  await expect(page.getByRole('heading', { name: '管理员身份已建立' })).toBeVisible();
+  await expect(page.getByText('您已成为供应链协同系统管理员，可使用该手机号登录供应链协同系统。')).toBeVisible();
 });
 
 test('registers from employee invite link', async ({ page }) => {
@@ -1164,7 +1212,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('权限管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(4);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(3);
   await expect(roleMatrix.getByText('终端功能分配页', { exact: true })).toHaveCount(0);
   await expect(roleMatrix.getByText('员工管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('员工管理页', { exact: true })).toBeVisible();
@@ -1183,7 +1231,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await employeePermissionRow.getByText('查看', { exact: true }).click();
   await expect(employeePermissionRow.locator('.permission-action-grid input[type="checkbox"]:checked')).toHaveCount(0);
   const rolePermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '角色管理页' });
-  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('运营管理平台');
+  await expect(rolePermissionRow.locator('.permission-tab-cell')).toHaveText('—');
   await expect(rolePermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
     '查看',
     '新增',
@@ -1421,7 +1469,7 @@ test('supply chain view-only staff pages use own system and hide actions and pla
   await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
 });
 
-test('supply chain hides mutations on platform roles but retains local role actions', async ({ page }) => {
+test('supply chain manages its own roles independently of creation source', async ({ page }) => {
   await page.addInitScript(() =>
     localStorage.setItem(
       'zdm-admin-user',
@@ -1454,11 +1502,47 @@ test('supply chain hides mutations on platform roles but retains local role acti
   for (const name of ['平台创建角色', '历史来源未确认']) {
     const row = page.locator('tbody tr').filter({ hasText: name });
     await expect(row).toBeVisible();
-    await expect(row.locator('.table-actions .t-link')).toHaveCount(0);
+    await expect(row.locator('.table-actions .t-link')).toHaveText(['编辑', '权限', '删除']);
   }
   await expect(
     page.locator('tbody tr').filter({ hasText: '供应链自建角色' }).locator('.table-actions .t-link'),
   ).toHaveText(['编辑', '权限', '删除']);
+});
+
+test('platform roles stay on its own client and supply-chain opening records are read-only', async ({ page }) => {
+  const roleRequests: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/api/admin/roles?')) roleRequests.push(r.url());
+  });
+  await page.goto('/role-management');
+  await expect(page.getByRole('main').locator('.t-tabs__nav')).toHaveCount(0);
+  expect(roleRequests.every((url) => new URL(url).searchParams.get('clientCode') === 'admin')).toBe(true);
+  await page.route(/\/api\/admin\/employees\?clientCode=supply-chain$/, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: [
+          {
+            id: 901,
+            name: '初始管理员',
+            phone: '15926627771',
+            status: 'enabled',
+            identityType: 'supply_chain_admin',
+          },
+        ],
+      }),
+    }),
+  );
+  await page.goto('/employee-management');
+  await page.getByRole('main').locator('.t-tabs__nav-item').filter({ hasText: '供应链协同系统' }).click();
+  const row = page.locator('tbody tr').filter({ hasText: '初始管理员' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('管理员');
+  await expect(row.locator('.table-actions .t-link')).toHaveCount(0);
+  await expect(page.getByRole('main').getByRole('button', { name: '邀请员工', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('main').locator('.zdm-admin-filter-form')).toHaveCount(0);
+  expect(roleRequests.every((url) => new URL(url).searchParams.get('clientCode') === 'admin')).toBe(true);
 });
 
 test('shows only granted attribute tabs and falls back to the first accessible tab', async ({ page }) => {

@@ -12,6 +12,9 @@ public class EmployeeInvite {
 
   private String token;
   private String clientCode;
+  private String targetIdentityType = "employee";
+  public String getTargetIdentityType() { return targetIdentityType; }
+  public void setTargetIdentityType(String value) { targetIdentityType = value; }
 
   public String getClientCode() { return clientCode; }
   public void setClientCode(String clientCode) { this.clientCode = clientCode; }

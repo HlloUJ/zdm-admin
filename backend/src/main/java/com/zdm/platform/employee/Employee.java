@@ -12,6 +12,11 @@ public class Employee implements com.zdm.platform.security.CreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+  private String identityType;
+  public String getIdentityType() { return identityType; }
+  public void setIdentityType(String value) { identityType = value; }
+
   private Long accountId;
   private String clientCode = "admin";
   public String getClientCode() { return clientCode; }

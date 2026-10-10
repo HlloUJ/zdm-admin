@@ -1,6 +1,7 @@
 import { request } from './http';
 
 export interface EmployeeRecord {
+  identityType?: string;
   clientCode?: 'admin' | 'supply-chain';
   id: number;
   tenantId?: number;

@@ -18,13 +18,6 @@
         <AdminListLayout class="role-list-layout">
           <template #toolbar>
             <div class="list-controls">
-              <t-tabs
-                v-if="isInternalAdministration && managementTabs.length > 1"
-                v-model="managedClient"
-                :list="managementTabs"
-                @change="handleManagedClientChange"
-              />
-
               <div v-if="canCreateRole" class="table-toolbar">
                 <t-button theme="primary" @click="openCreateDialog">
                   <template #icon><t-icon name="add" /></template>
@@ -48,15 +41,9 @@
               </template>
               <template #operation="{ row }">
                 <div class="table-actions">
+                  <t-link v-if="canEditRole" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
                   <t-link
-                    v-if="canEditRole && canMaintainRole(row)"
-                    theme="primary"
-                    hover="color"
-                    @click="openEditDialog(row)"
-                    >编辑</t-link
-                  >
-                  <t-link
-                    v-if="canManageRolePermission && !isSuperAdminRole(row) && canMaintainRole(row)"
+                    v-if="canManageRolePermission && !isSuperAdminRole(row)"
                     theme="primary"
                     hover="color"
                     @click="openPermissionDialog(row)"
@@ -64,7 +51,7 @@
                     权限
                   </t-link>
                   <t-link
-                    v-if="canDeleteRole && !isSuperAdminRole(row) && canMaintainRole(row)"
+                    v-if="canDeleteRole && !isSuperAdminRole(row)"
                     theme="danger"
                     hover="color"
                     @click="openDeleteConfirm(row)"
@@ -73,10 +60,9 @@
                   </t-link>
                   <span
                     v-if="
-                      !canMaintainRole(row) ||
-                      (!canEditRole &&
-                        !(canDeleteRole && !isSuperAdminRole(row)) &&
-                        !(canManageRolePermission && !isSuperAdminRole(row)))
+                      !canEditRole &&
+                      !(canDeleteRole && !isSuperAdminRole(row)) &&
+                      !(canManageRolePermission && !isSuperAdminRole(row))
                     "
                     class="table-action-placeholder"
                   >
@@ -244,20 +230,6 @@ const managedClient = ref<'admin' | 'supply-chain'>(
 const managementPermissionPrefix = computed(
   () => `admin.permission-management.role-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}`,
 );
-const managementTabs = computed(() =>
-  [
-    { label: '运营管理平台', value: 'admin', permission: 'admin.permission-management.role-management.view' },
-    {
-      label: '供应链协同系统',
-      value: 'supply-chain',
-      permission: 'admin.permission-management.role-management.supply-chain.view',
-    },
-  ].filter((tab) => hasPermission(loginUser.value, tab.permission)),
-);
-const isInternalAdministration = computed(
-  () => !loginUser.value.tenantId && !loginUser.value.storeId && loginUser.value.clientCode !== 'supply-chain',
-);
-
 const activePermissionModuleValue = ref(permissionModules.value[0]?.value ?? '');
 const pagination = reactive({
   current: 1,
@@ -336,9 +308,6 @@ const toRolePayload = (role: RoleItem): RolePayload => ({
   remark: role.remark,
   functionPermissions: role.functionPermissions.join(','),
 });
-
-const canMaintainRole = (row: RoleItem) =>
-  loginUser.value.clientCode !== 'supply-chain' || row.createdByClientCode === 'supply-chain';
 
 const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 
@@ -507,17 +476,7 @@ const handlePermissionSave = async () => {
   }
 };
 
-const handleManagedClientChange = () => {
-  roles.value = [];
-  pagination.current = 1;
-  formDialogVisible.value = false;
-  permissionDialogVisible.value = false;
-  deleteDialogVisible.value = false;
-  void loadRoles();
-};
 onMounted(() => {
-  if (isInternalAdministration.value)
-    managedClient.value = managementTabs.value[0]?.value === 'supply-chain' ? 'supply-chain' : 'admin';
   void loadRoles();
 });
 </script>

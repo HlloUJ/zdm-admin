@@ -23,12 +23,15 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
   private final CurrentIdentityProvider identityProvider;
   private final PermissionGuard permissionGuard;
   private final EmployeeInviteAccess inviteAccess;
+  private final SupplyChainAdminService supplyChainAdmins;
 
   public EmployeeService(
       JdbcTemplate jdbcTemplate,
       CurrentIdentityProvider identityProvider,
       PermissionGuard permissionGuard, EmployeeInviteAccess inviteAccess,
-      com.zdm.platform.account.AccountLifecycleService accountLifecycle) {
+      com.zdm.platform.account.AccountLifecycleService accountLifecycle,
+      SupplyChainAdminService supplyChainAdmins) {
+    this.supplyChainAdmins = supplyChainAdmins;
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
     this.permissionGuard = permissionGuard;
@@ -42,6 +45,9 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     CurrentIdentity identity = requireSupportedOrganizationScope();
     String client = com.zdm.platform.security.ManagedClientScope.resolve(identity,clientCode);
     permissionGuard.requirePermission(permissionPrefix(client) + ".view");
+    if (!Objects.equals(client, identity.clientCode())) {
+      return supplyChainAdmins.openingRecords();
+    }
     if (identity.storeId() == null) {
       return lambdaQuery().eq(Employee::getClientCode, com.zdm.platform.security.ManagedClientScope.resolve(identity, clientCode)).isNull(Employee::getTenantId).isNull(Employee::getStoreId).list();
     }
@@ -226,7 +232,8 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
     if (employee.getTenantId() != null && !Objects.equals(employee.getTenantId(), identity.tenantId())) {
       throw new AccessDeniedException("不能为其他租户创建员工");
     }
-    employee.setClientCode(com.zdm.platform.security.ManagedClientScope.resolve(identity, employee.getClientCode()));
+    requireOwnClient(identity, employee.getClientCode());
+    employee.setClientCode(identity.clientCode());
     employee.setTenantId(identity.tenantId());
     employee.setStoreId(identity.storeId());
   }
@@ -416,13 +423,19 @@ public class EmployeeService extends ServiceImpl<EmployeeMapper, Employee> {
 
   private CurrentIdentity requireEmployeeOrganizationScope(Employee employee) {
     CurrentIdentity identity = requireSupportedOrganizationScope();
-    com.zdm.platform.security.ManagedClientScope.resolve(identity, employee.getClientCode());
+    requireOwnClient(identity, employee.getClientCode());
     com.zdm.platform.security.DataScope.requireAccess(identity, employee.getCreatedByAccountId());
     if (!Objects.equals(employee.getTenantId(), identity.tenantId())
         || !Objects.equals(employee.getStoreId(), identity.storeId())) {
       throw new AccessDeniedException("当前组织无权操作该员工");
     }
     return identity;
+  }
+
+  private void requireOwnClient(CurrentIdentity identity, String clientCode) {
+    if (!Objects.equals(identity.clientCode(), clientCode)) {
+      throw new AccessDeniedException("当前身份不能维护其他业务端的员工");
+    }
   }
 
   private CurrentIdentity requireSupportedOrganizationScope() {

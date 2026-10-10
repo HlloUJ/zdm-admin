@@ -25,7 +25,13 @@
                 @change="handleManagedClientChange"
               />
 
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filterDraft" colon>
+              <t-form
+                v-if="!isPlatformSupplyChain"
+                class="zdm-admin-filter-form"
+                label-width="auto"
+                :data="filterDraft"
+                colon
+              >
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="姓名" name="name" class="name-filter">
@@ -83,10 +89,10 @@
                 {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
               </template>
               <template #gender="{ row }">
-                {{ genderLabel(row.gender) }}
+                {{ row.identityType === 'supply_chain_admin' ? '-' : genderLabel(row.gender) }}
               </template>
               <template #roles="{ row }">
-                <span>{{ roleNames(row.roleIds) }}</span>
+                <span>{{ row.identityType === 'supply_chain_admin' ? '管理员' : roleNames(row.roleIds) }}</span>
               </template>
               <template #status="{ row }">
                 <t-tag :theme="row.status === 'normal' ? 'success' : 'danger'" variant="light">
@@ -301,6 +307,7 @@ type DataPermission = 'self' | 'all';
 
 interface EmployeeItem {
   id: number;
+  identityType?: string;
   name: string;
   gender: Exclude<Gender, ''>;
   phone: string;
@@ -355,15 +362,26 @@ const isInternalAdministration = computed(
   () => !loginUser.value.tenantId && !loginUser.value.storeId && loginUser.value.clientCode !== 'supply-chain',
 );
 
-const canCreateEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.create`));
-const canEditEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.edit`));
-const canConfigureEmployeePermission = computed(() =>
-  hasPermission(loginUser.value, `${managementPermissionPrefix.value}.permission`),
+const isPlatformSupplyChain = computed(() => isInternalAdministration.value && managedClient.value === 'supply-chain');
+const canCreateEmployee = computed(
+  () =>
+    hasPermission(loginUser.value, `${managementPermissionPrefix.value}.create`) &&
+    (!isPlatformSupplyChain.value || (!loading.value && employees.value.length === 0)),
 );
-const canToggleEmployeeStatus = computed(() =>
-  hasPermission(loginUser.value, `${managementPermissionPrefix.value}.toggle-status`),
+const canEditEmployee = computed(
+  () => !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.edit`),
 );
-const canDeleteEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.delete`));
+const canConfigureEmployeePermission = computed(
+  () =>
+    !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.permission`),
+);
+const canToggleEmployeeStatus = computed(
+  () =>
+    !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.toggle-status`),
+);
+const canDeleteEmployee = computed(
+  () => !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.delete`),
+);
 const operationRoleOptions = computed(() =>
   operationRoles.value.map((role) => ({
     label: role.name,
@@ -535,6 +553,7 @@ const toEmployeeItem = (record: EmployeeRecord): EmployeeItem => {
   const roleIds = parseRoleIds(record.roleIds);
   return {
     id: record.id,
+    identityType: record.identityType,
     name: record.name,
     gender: record.gender ?? 'male',
     phone: record.phone,
@@ -563,11 +582,12 @@ const loadPermissionCenter = async () => {
   loading.value = true;
   try {
     const [roles, records] = await Promise.all([
-      canConfigureEmployeePermission.value ||
-      hasPermission(
-        loginUser.value,
-        `admin.permission-management.role-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}.view`,
-      )
+      !isPlatformSupplyChain.value &&
+      (canConfigureEmployeePermission.value ||
+        hasPermission(
+          loginUser.value,
+          `admin.permission-management.role-management${managedClient.value === 'supply-chain' ? '.supply-chain' : ''}.view`,
+        ))
         ? listRoles(managedClient.value)
         : Promise.resolve<RoleRecord[]>([]),
       listEmployees(managedClient.value),
