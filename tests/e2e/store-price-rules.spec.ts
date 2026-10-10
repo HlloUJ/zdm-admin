@@ -219,35 +219,27 @@ test('price batch fills selected inputs locally and only Save writes configurati
   });
 });
 
-test('role batch stores discount only for the selected role and product type', async ({ page }) => {
+test('both discount scopes have no batch button or row selection even with legacy batch grants', async ({ page }) => {
   const requests = await setup(page, [
     'discount.finished.view',
     'discount.accessory.view',
+    'discount.finished.batch-set',
     'discount.accessory.batch-set',
   ]);
   await page.goto('/store/price-configuration');
-  await expect(page.getByRole('row').filter({ hasText: '店长' }).getByText('0.80', { exact: true })).toBeVisible();
-  await menu(page).locator('.t-menu-group .t-menu__item').filter({ hasText: '配件' }).click();
-  await expect(page.getByRole('row').filter({ hasText: '店长' }).getByText('0.90', { exact: true })).toBeVisible();
-  await expect(page.locator('thead th')).toHaveText(['', '角色', '折扣系数', '创建人', '创建时间']);
-  await expect(page.getByText('导购', { exact: true })).toHaveCount(0);
-  await page.getByRole('row').filter({ hasText: '店长' }).locator('.t-checkbox').click();
-  await page.getByRole('button', { name: '批量设置' }).click();
-  const dialog = page.locator('.t-dialog:visible');
-  await expect(dialog.getByText(/已选择 1 个角色/)).toBeVisible();
-  await dialog.locator('.t-input-number input').fill('1.2');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(dialog.getByText('请输入0.01至1.00之间的折扣系数，最多两位小数', { exact: true })).toBeVisible();
+  for (const [index, coefficient] of [
+    [0, '0.80'],
+    [1, '0.90'],
+  ] as const) {
+    await menu(page).locator('.t-menu-group .t-menu__item').nth(index).click();
+    await expect(
+      page.getByRole('row').filter({ hasText: '店长' }).getByText(coefficient, { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: '批量设置', exact: true })).toHaveCount(0);
+    await expect(page.locator('thead th')).toHaveText(['角色', '折扣系数', '创建人', '创建时间']);
+    await expect(page.locator('.t-table .t-checkbox')).toHaveCount(0);
+  }
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
-  await dialog.locator('.t-input-number input').click();
-  await dialog.locator('.t-input-number input').fill('1.00');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(dialog).toBeHidden();
-  expect(requests.find((request) => request.method === 'POST')).toMatchObject({
-    path: '/api/admin/store-price-rules/discount/batch',
-    scope: 'accessory',
-    body: { targetIds: [7], coefficient: 1 },
-  });
 });
 
 test('product menus isolate categories and view-only role coefficients', async ({ page }) => {

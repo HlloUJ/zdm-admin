@@ -118,5 +118,13 @@
   {
     "prefix": "admin.permission-management.employee-management.supply-chain",
     "scope": "internal-management"
+  },
+  {
+    "prefix": "store.price-configuration.discount.finished.batch-set",
+    "scope": "removed"
+  },
+  {
+    "prefix": "store.price-configuration.discount.accessory.batch-set",
+    "scope": "removed"
   }
 ]

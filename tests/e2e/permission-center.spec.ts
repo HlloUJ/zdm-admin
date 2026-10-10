@@ -975,7 +975,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('thead')).toContainText('二级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('三级菜单');
   await expect(roleMatrix.locator('thead')).toContainText('页面');
-  await expect(roleMatrix.locator('thead')).toContainText('页面 Tab');
+  await expect(roleMatrix.locator('thead')).toContainText('tab');
   await expect(roleMatrix.locator('thead')).toContainText('操作权限');
   await roleModuleList.getByText('供应商供货类型管理', { exact: true }).click();
   await expect(roleMatrix.locator('tbody .permission-menu-cell').first()).toHaveText('一级菜单直达');
@@ -1025,8 +1025,8 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
-    ['查看', '批量上架', '编辑', '上架', '删除'],
-    ['查看', '批量下架', '编辑', '下架'],
+    ['查看', '批量上架', '上架', '编辑', '删除'],
+    ['查看', '批量下架', '下架', '编辑'],
     ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],
     ['查看', '详情'],
     ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],
@@ -1213,7 +1213,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   const main = page.getByRole('main');
   const moduleList = main.locator('.permission-module-list');
   const matrix = main.locator('.permission-matrix');
-  await expect(matrix.locator('thead th')).toHaveText(['二级菜单', '三级菜单', '页面', '页面 Tab', '操作权限']);
+  await expect(matrix.locator('thead th')).toHaveText(['二级菜单', '三级菜单', '页面', 'tab', '操作权限']);
   await expect(page.locator('.side-nav').getByText('门店分类管理', { exact: true })).toHaveCount(0);
 
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {

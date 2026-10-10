@@ -150,20 +150,19 @@ public class StorePriceRuleService {
   }
 
   @Transactional
-  public List<Rule> saveBatch(String kind, String scope, List<Long> targetIds, BigDecimal coefficient) {
-    requireType(kind, scope);
+  public List<Rule> savePriceBatch(String scope, List<Long> targetIds, BigDecimal coefficient) {
+    requireType("price", scope);
     var store = scopes.require();
-    validateCoefficient(kind, coefficient);
-    boolean price = "price".equals(kind);
-    validateTargets(kind, scope, targetIds);
-    var arguments = targetIds.stream().map(id -> new Object[] {store.tenantId(), store.storeId(), kind,
-        price ? id : null, price ? null : id, coefficient, store.accountId(), id, scope, coefficient}).toList();
+    validateCoefficient("price", coefficient);
+    validateTargets("price", scope, targetIds);
+    var arguments = targetIds.stream().map(id -> new Object[] {store.tenantId(), store.storeId(), "price",
+        id, null, coefficient, store.accountId(), id, scope, coefficient}).toList();
     jdbc.batchUpdate("""
         INSERT INTO store_price_rules (tenant_id,store_id,kind,category_id,role_id,
           coefficient,created_by_account_id,target_key,scope) VALUES (?,?,?,?,?,?,?,?,?)
         ON DUPLICATE KEY UPDATE coefficient = ?
         """, arguments);
-    return list(kind, scope);
+    return list("price", scope);
   }
 
   @Transactional
