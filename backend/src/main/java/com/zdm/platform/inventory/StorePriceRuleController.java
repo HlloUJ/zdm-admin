@@ -112,11 +112,11 @@ public class StorePriceRuleController {
     return ApiResponse.ok(service.roles());
   }
 
-  @PostMapping("/{kind}/batch")
-  public ApiResponse<List<StorePriceRuleService.Rule>> batch(@PathVariable String kind, @RequestParam String scope,
+  @PostMapping("/price/batch")
+  public ApiResponse<List<StorePriceRuleService.Rule>> batch(@RequestParam String scope,
       @Valid @RequestBody BatchRequest request) {
-    require(kind, scope, "batch-set");
-    return ApiResponse.ok(service.saveBatch(kind, scope, request.targetIds(), request.coefficient()));
+    require("price", scope, "batch-set");
+    return ApiResponse.ok(service.savePriceBatch(scope, request.targetIds(), request.coefficient()));
   }
   @PostMapping("/price/batch-clear")
   public ApiResponse<List<StorePriceRuleService.Rule>> clearPriceBatch(@RequestParam String scope,

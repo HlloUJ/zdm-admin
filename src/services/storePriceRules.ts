@@ -33,17 +33,6 @@ export const listStorePriceCategories = (scope: StorePriceScope) =>
   request<StorePriceCategory[]>(scoped('price/categories', scope));
 export const listStoreDiscountRoles = (scope: StorePriceScope) =>
   request<StorePriceRole[]>(scoped('discount/roles', scope));
-export const saveStorePriceBatch = (
-  kind: StorePriceRuleKind,
-  scope: StorePriceScope,
-  targetIds: number[],
-  coefficient: number,
-) =>
-  request<StorePriceRule[]>(scoped(`${kind}/batch`, scope), {
-    method: 'POST',
-    body: JSON.stringify({ targetIds, coefficient }),
-  });
-
 export const clearStorePriceBatch = (scope: StorePriceScope, targetIds: number[]) =>
   request<StorePriceRule[]>(scoped('price/batch-clear', scope), {
     method: 'POST',

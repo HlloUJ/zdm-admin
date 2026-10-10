@@ -49,7 +49,7 @@
                     </t-space>
                   </div>
                 </t-form>
-                <t-space v-if="activeKind === 'discount' && (can('create') || can('batch-set'))" size="small">
+                <t-space v-if="activeKind === 'discount' && can('create')" size="small">
                   <t-button
                     v-if="can('create')"
                     theme="primary"
@@ -58,14 +58,6 @@
                   >
                     <template #icon><t-icon name="add" /></template>新增
                   </t-button>
-                  <t-button
-                    v-if="can('batch-set')"
-                    theme="primary"
-                    variant="outline"
-                    :disabled="saving || loading"
-                    @click="openBatch"
-                    >批量设置</t-button
-                  >
                 </t-space>
                 <div v-if="activeKind === 'price' && can('batch-set')" class="price-actions">
                   <t-button theme="primary" variant="outline" :disabled="saving || loading" @click="openBatch"
@@ -90,7 +82,6 @@
                 :loading="loading"
                 hover
                 :selected-row-keys="selectedIds"
-                @select-change="selectRows"
               >
                 <template #categorySelectTitle>
                   <t-checkbox
@@ -161,7 +152,7 @@
                     <t-link v-if="can('edit')" theme="primary" @click="editDiscount(row.rule)">编辑</t-link>
                     <t-link
                       v-if="can('toggle-status')"
-                      :theme="row.rule.status === 'disabled' ? 'primary' : 'warning'"
+                      :theme="row.rule.status === 'disabled' ? 'success' : 'warning'"
                       @click="confirmDiscountAction(row.rule, 'status')"
                       >{{ row.rule.status === 'disabled' ? '启用' : '停用' }}</t-link
                     >
@@ -241,29 +232,20 @@
     </AdminConfirmDialog>
     <AdminDialog
       v-model:visible="formVisible"
-      :width="activeKind === 'price' ? '320px' : undefined"
-      :header="activeKind === 'price' ? '批量设置' : `批量设置${kindLabel}`"
-      :confirm-btn="{ content: activeKind === 'price' ? '完成' : '提交', loading: saving }"
+      width="320px"
+      header="批量设置"
+      :confirm-btn="{ content: '完成', loading: saving }"
       @confirm="save"
       @cancel="formVisible = false"
       @close="formVisible = false"
     >
-      <t-form
-        :label-align="activeKind === 'price' ? 'right' : 'top'"
-        :label-width="activeKind === 'price' ? 'auto' : undefined"
-        :data="form"
-        colon
-      >
-        <t-form-item v-if="activeKind === 'discount'" label="已选角色">
-          已选择 {{ selectedIds.length }} 个角色
-        </t-form-item>
-        <t-form-item :label="kindLabel" :required="activeKind === 'price'"
+      <t-form label-align="right" label-width="auto" :data="form" colon>
+        <t-form-item :label="kindLabel" required
           ><t-input-number
             v-model="form.coefficient"
             :decimal-places="2"
             :min="0.01"
-            :max="activeKind === 'discount' ? 1 : 999"
-            :allow-input-over-limit="activeKind === 'discount'"
+            :max="999"
             theme="normal"
             :status="batchError ? 'error' : undefined"
             :tips="batchError || undefined"
@@ -296,7 +278,6 @@ import {
   setStoreDiscountStatus,
   deleteStoreDiscount,
   listStoreDiscountRoles,
-  saveStorePriceBatch,
   saveStoreCategoryPrices,
   type StorePriceRuleKind,
   type StorePriceScope,
@@ -411,16 +392,11 @@ const displayRows = computed<DisplayRow[]>(() => {
   return result;
 });
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(can('batch-set')
+  ...(activeKind.value === 'price' && can('batch-set')
     ? [
         {
-          ...(activeKind.value === 'price'
-            ? { colKey: 'categorySelect', title: 'categorySelectTitle' }
-            : {
-                colKey: 'row-select',
-                type: 'multiple' as const,
-                checkProps: ({ row }: { row: TableRowData }) => ({ disabled: row.status !== 'enabled' }),
-              }),
+          colKey: 'categorySelect',
+          title: 'categorySelectTitle',
           width: 48,
         },
       ]
@@ -460,9 +436,6 @@ function selectCategory(checked: boolean, id?: number) {
   selectedIds.value = checked
     ? [...new Set([...selectedIds.value, ...ids])]
     : selectedIds.value.filter((key) => !ids.includes(key));
-}
-function selectRows(keys: (string | number)[]) {
-  if (activeKind.value === 'discount') selectedIds.value = keys.map(Number);
 }
 const selectedEditableLeafIds = computed(() =>
   selectedIds.value.filter(
@@ -697,11 +670,12 @@ async function applyDiscountAction() {
   }
 }
 function openBatch() {
+  if (activeKind.value !== 'price' || !can('batch-set')) return;
   if (!selectedIds.value.length) {
-    adminFeedback.warning(activeKind.value === 'price' ? '请先选择分类' : '请先选择角色');
+    adminFeedback.warning('请先选择分类');
     return;
   }
-  if (activeKind.value === 'price' && !selectedEditableLeafIds.value.length) {
+  if (!selectedEditableLeafIds.value.length) {
     adminFeedback.warning('请选择可设置价格系数的末级分类');
     return;
   }
@@ -709,47 +683,25 @@ function openBatch() {
   batchError.value = '';
   formVisible.value = true;
 }
-async function save() {
-  if (saving.value) return;
-  if (activeKind.value === 'price' && (form.coefficient == null || String(form.coefficient).trim() === '')) {
+function save() {
+  if (saving.value || activeKind.value !== 'price' || !can('batch-set')) return;
+  if (form.coefficient == null || String(form.coefficient).trim() === '') {
     batchError.value = '请输入价格系数';
-    adminFeedback.warning('请输入价格系数');
-    return;
-  }
-  if (
-    (form.coefficient == null && activeKind.value === 'discount') ||
-    (form.coefficient != null &&
-      (form.coefficient <= 0 || form.coefficient > (activeKind.value === 'discount' ? 1 : 999)))
-  ) {
-    batchError.value =
-      activeKind.value === 'discount' ? '请输入0.01至1.00之间的折扣系数，最多两位小数' : '请填写正确的系数';
     adminFeedback.warning(batchError.value);
     return;
   }
-  if (activeKind.value === 'price') {
-    for (const id of selectedEditableLeafIds.value) {
-      coefficientDrafts.value[id] = Number(form.coefficient).toFixed(2);
-      delete coefficientErrors.value[id];
-    }
-    formVisible.value = false;
+  if (form.coefficient <= 0 || form.coefficient > 999) {
+    batchError.value = '请填写正确的系数';
+    adminFeedback.warning(batchError.value);
     return;
   }
-  const key = activeKey.value;
-  saving.value = true;
-  try {
-    await saveStorePriceBatch(activeKind.value, activeScope.value, selectedIds.value, form.coefficient!);
-    if (key === activeKey.value) {
-      formVisible.value = false;
-      selectedIds.value = [];
-      adminFeedback.success('价格配置已保存');
-      await load();
-    }
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '保存失败'));
-  } finally {
-    saving.value = false;
+  for (const id of selectedEditableLeafIds.value) {
+    coefficientDrafts.value[id] = Number(form.coefficient).toFixed(2);
+    delete coefficientErrors.value[id];
   }
+  formVisible.value = false;
 }
+
 watch(
   availableEntries,
   () => {

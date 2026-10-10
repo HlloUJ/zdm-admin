@@ -111,10 +111,10 @@ export const storeFinishedStock: FunctionModule = {
               label: '仓库中',
               value: 'store.finished-stock-management.warehouse',
               actions: [
-                ['select', '挑选商品'],
+                ['select', '商品中心'],
                 ['batch-shelf', '批量上架'],
-                ['edit', '编辑'],
                 ['shelf', '上架'],
+                ['edit', '编辑'],
                 ['delete', '删除'],
               ].map(([code, label]) => ({ label, value: `store.finished-stock-management.warehouse.${code}` })),
             },
@@ -123,8 +123,8 @@ export const storeFinishedStock: FunctionModule = {
               value: 'store.finished-stock-management.selling',
               actions: [
                 ['batch-off-shelf', '批量下架'],
-                ['edit', '编辑'],
                 ['off-shelf', '下架'],
+                ['edit', '编辑'],
               ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),
             },
             {
@@ -187,7 +187,9 @@ export const storePriceConfiguration: FunctionModule = {
                 ...(kind === 'discount'
                   ? [{ label: '新增', value: `store.price-configuration.${kind}.${scope}.create` }]
                   : []),
-                { label: '批量设置', value: `store.price-configuration.${kind}.${scope}.batch-set` },
+                ...(kind === 'price'
+                  ? [{ label: '批量设置', value: `store.price-configuration.${kind}.${scope}.batch-set` }]
+                  : []),
                 ...(kind === 'discount'
                   ? [
                       { label: '编辑', value: `store.price-configuration.${kind}.${scope}.edit` },

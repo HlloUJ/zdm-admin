@@ -23,7 +23,6 @@ const permissions = [
   'store.price-configuration.price.finished.view',
   'store.price-configuration.price.finished.batch-set',
   'store.price-configuration.discount.finished.view',
-  'store.price-configuration.discount.finished.batch-set',
 ];
 
 async function storeLogin(page: Page) {
@@ -553,13 +552,8 @@ test('store price configuration separates category prices from role discounts', 
   await expect(main.locator('th').getByText('折扣系数', { exact: true })).toBeVisible();
   await expect(main.getByText('指导价设置')).toHaveCount(0);
   await expect(main.getByRole('row').filter({ hasText: '导购' })).toHaveCount(0);
-  await main.getByRole('row').filter({ hasText: '店长' }).locator('.t-checkbox').click();
-  await main.getByRole('button', { name: '批量设置', exact: true }).click();
-  await expect(page.locator('.t-dialog:visible').getByText('已选角色', { exact: true })).toBeVisible();
-  const coefficient = page.locator('.t-dialog:visible .t-input-number input');
-  await coefficient.fill('0.75');
-  await coefficient.blur();
-  await expect(coefficient).toHaveValue('0.75');
+  await expect(main.locator('.t-checkbox')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '批量设置', exact: true })).toHaveCount(0);
 });
 
 test('store operation logs show the same filter, pagination, and detail structure', async ({ page }) => {
