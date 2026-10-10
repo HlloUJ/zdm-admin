@@ -87,7 +87,9 @@ onMounted(async () => {
 
 onBeforeUnmount(rememberScroll);
 
-const activeMenu = computed(() => route.path);
+const activeMenu = computed(() =>
+  route.name === 'storeFinishedStockEdit' ? '/store/finished-stock-management' : route.path,
+);
 const loginUser = computed(() => getLoginUser());
 const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
   adminMenuEntries

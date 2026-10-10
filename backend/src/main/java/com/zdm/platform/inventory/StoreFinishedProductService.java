@@ -3,7 +3,6 @@ package com.zdm.platform.inventory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -14,21 +13,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Store-owned selection and prices over the shared finished-product catalog and stock. */
 @Service
 public class StoreFinishedProductService {
-  public record RolePrice(Long roleId, String roleName, BigDecimal coefficient, BigDecimal price,
-      String priceSource) {}
   public record SkuPrice(Long skuId, String label, Integer stock, BigDecimal costPrice,
-      BigDecimal guidePrice, List<RolePrice> rolePrices,
+      BigDecimal guidePrice, BigDecimal salePrice, String priceMode,
       String displayMode, Map<String, String> salesAttributes, String material,
       String lengthValue, String color, String sizeValue) {
     public SkuPrice {
-      rolePrices = List.copyOf(rolePrices);
       salesAttributes = salesAttributes == null ? null
           : Collections.unmodifiableMap(new LinkedHashMap<>(salesAttributes));
     }
@@ -40,7 +35,7 @@ public class StoreFinishedProductService {
       List<FinishedProductAttributeEntry> attributes, List<FinishedSpecDimension> specDimensions,
       List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
       String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
-      String storeLevelName) {
+      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient) {
     public ProductView {
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
@@ -90,7 +85,7 @@ public class StoreFinishedProductService {
       records = List.copyOf(records);
     }
   }
-  public record EffectiveMinimumPrice(BigDecimal price, Long roleId) {}
+  public record SalePriceInput(Long skuId, BigDecimal salePrice, String priceMode) {}
 
   private final FinishedInvalidationMedia invalidationMedia;
   private final JdbcTemplate jdbc;
@@ -100,10 +95,12 @@ public class StoreFinishedProductService {
   private final ObjectMapper json;
   private final StoreFinishedLogReader logReader;
   private final StoreFinishedSelectionSnapshot selectionSnapshots;
+  private final StoreFinishedSalePriceService salePrices;
 
   public StoreFinishedProductService(JdbcTemplate jdbc, CityPartnerStoreScope scopes,
-      FinishedProductService products, FinishedProductMapper productMapper, ObjectMapper json, StoreFinishedSelectionSnapshot selectionSnapshots, FinishedInvalidationMedia invalidationMedia) {
+      FinishedProductService products, FinishedProductMapper productMapper, ObjectMapper json, StoreFinishedSelectionSnapshot selectionSnapshots, FinishedInvalidationMedia invalidationMedia, StoreFinishedSalePriceService salePrices) {
     this.invalidationMedia = invalidationMedia;
+    this.salePrices = salePrices;
     this.jdbc = jdbc;
     this.scopes = scopes;
     this.products = products;
@@ -290,21 +287,6 @@ public class StoreFinishedProductService {
     return view(store, listing(store, id, false));
   }
 
-  public EffectiveMinimumPrice currentEmployeeMinimumPrice(Long id, Long skuId) {
-    var store = scopes.require();
-    ProductView product = detail(id);
-    SkuPrice sku = product.skus().stream().filter(item -> skuId.equals(item.skuId()))
-        .findFirst().orElseThrow(() -> new IllegalArgumentException("商品规格不存在"));
-    List<Long> roleIds = jdbc.queryForList("""
-        SELECT role_id FROM account_roles WHERE account_id = ? AND tenant_id = ? AND store_id = ?
-        """, Long.class, store.accountId(), store.tenantId(), store.storeId());
-    return sku.rolePrices().stream().filter(price -> roleIds.contains(price.roleId())
-        && price.price() != null)
-        .min((left, right) -> left.price().compareTo(right.price()))
-        .map(price -> new EffectiveMinimumPrice(price.price(), price.roleId()))
-        .orElseThrow(() -> new IllegalArgumentException("当前员工的角色尚未配置可售最低价"));
-  }
-
   @Transactional
   public List<ProductView> select(List<Long> productIds) {
     var store = scopes.require();
@@ -347,6 +329,7 @@ public class StoreFinishedProductService {
   @Transactional
   public ProductView changeStatus(Long id, String target, String reason, String detail) {
     var store = scopes.require();
+    if ("selling".equals(target)) { salePrices.lockCategories(store.storeId()); }
     Map<String, Object> listing = listing(store, id, false);
     Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
     listing = listing(store, id, true);
@@ -457,51 +440,61 @@ public class StoreFinishedProductService {
     return null;
   }
 
+  public List<StoreFinishedSalePriceService.Category> editCategories(Long id) {
+    var store = scopes.require(); listing(store, id, false);
+    return List.copyOf(salePrices.context(store.storeId(), List.of()).categories().values());
+  }
+
   @Transactional
-  public ProductView saveRolePrice(Long id, Long skuId, Long roleId, BigDecimal price,
-      boolean followConfiguration) {
+  public ProductView saveEdit(Long id, Long categoryId, List<SalePriceInput> inputs) {
     var store = scopes.require();
+    salePrices.lockCategories(store.storeId());
     Map<String, Object> listing = listing(store, id, false);
     Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
-    listing = listing(store, id, true);
-    requirePriceEditable(listing, source);
-    requireSku(source, skuId);
-    Long configuration = jdbc.queryForObject("""
-        SELECT COUNT(*) FROM store_finished_role_price_configurations config
-        JOIN roles role ON role.id = config.role_id
-        WHERE config.store_id = ? AND config.tenant_id = ? AND config.role_id = ?
-          AND config.status = 'enabled' AND role.status = 'enabled'
-        """, Long.class, store.storeId(), store.tenantId(), roleId);
-    if (configuration == null || configuration == 0) {
-      throw new AccessDeniedException("该角色未启用本门店价格配置");
+    listing = listing(store, id, true); requirePriceEditable(listing, source);
+    var context = salePrices.context(store.storeId(), List.of(id));
+    salePrices.requireCategory(context, categoryId);
+    FinishedProduct product = publicProduct(number(source.get("id")));
+    var variants = product.getVariants() == null ? List.<FinishedProductVariant>of() : product.getVariants();
+    if (inputs == null || inputs.size() != variants.size() || inputs.stream().anyMatch(Objects::isNull)
+        || inputs.stream().map(SalePriceInput::skuId).distinct().count() != inputs.size()
+        || !new java.util.HashSet<>(inputs.stream().map(SalePriceInput::skuId).toList()).equals(new java.util.HashSet<>(variants.stream().map(FinishedProductVariant::getId).toList()))) {
+      throw new IllegalArgumentException("商品规格已变化，请刷新后重试");
     }
-    BigDecimal before = rolePrice(store, id, skuId, roleId,
-        number(listing.get("finished_product_id")));
-    if (followConfiguration) {
-      jdbc.update("""
-          DELETE FROM store_finished_role_price_overrides
-          WHERE listing_id = ? AND sku_id = ? AND role_id = ?
-          """, id, skuId, roleId);
-    } else {
-      requirePrice(price);
-      jdbc.update("""
-          INSERT INTO store_finished_role_price_overrides
-            (listing_id, sku_id, role_id, manual_price, updated_by_account_id)
-          VALUES (?, ?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE manual_price = VALUES(manual_price),
-            updated_by_account_id = VALUES(updated_by_account_id)
-          """, id, skuId, roleId, price, store.accountId());
+    Map<String, Object> changes = new LinkedHashMap<>();
+    Long previousCategory = number(listing.get("store_category_id"));
+    if (!Objects.equals(previousCategory, categoryId)) { changes.put("门店分类", change(context.categoryName(previousCategory), context.categoryName(categoryId))); }
+    Map<Long, StoreFinishedSalePriceService.Price> prepared = new LinkedHashMap<>();
+    for (SalePriceInput input : inputs) {
+      if (!List.of("auto", "manual").contains(Objects.toString(input.priceMode(), ""))) { throw new IllegalArgumentException("商品售价模式不正确"); }
+      FinishedProductVariant variant = variants.stream().filter(item -> item.getId().equals(input.skuId())).findFirst().orElseThrow();
+      BigDecimal partner = partnerPrice(store, product, input.skuId());
+      BigDecimal amount = "auto".equals(input.priceMode()) ? StoreFinishedSalePriceService.calculate(partner, context.coefficient(categoryId)) : input.salePrice();
+      if (amount == null && "auto".equals(input.priceMode())) { throw new IllegalArgumentException("价格配置已变化，请刷新后重新填写商品售价"); }
+      if (amount != null) { requirePrice(amount); }
+      if (amount == null && variant.getStock() != null && variant.getStock() > 0) { throw new IllegalArgumentException("请输入商品售价"); }
+      var before = context.effective(id, input.skuId(), previousCategory, partner);
+      boolean amountChanged = before.amount() == null ? amount != null : amount == null || before.amount().compareTo(amount) != 0;
+      if (!Objects.equals(before.mode(), input.priceMode()) || amountChanged) {
+        Map<String, Object> beforeSku = new LinkedHashMap<>();
+        Map<String, Object> afterSku = new LinkedHashMap<>();
+        if (amountChanged) { beforeSku.put("商品售价", before.amount()); afterSku.put("商品售价", amount); }
+        if (!Objects.equals(before.mode(), input.priceMode())) {
+          beforeSku.put("售价模式", "auto".equals(before.mode()) ? "跟随配置" : "手工价格");
+          afterSku.put("售价模式", "auto".equals(input.priceMode()) ? "跟随配置" : "手工价格");
+        }
+        changes.put("SKU " + input.skuId(), change(beforeSku, afterSku));
+      }
+      prepared.put(input.skuId(), new StoreFinishedSalePriceService.Price(amount, input.priceMode()));
     }
-    BigDecimal after = rolePrice(store, id, skuId, roleId,
-        number(listing.get("finished_product_id")));
-    Map<String, Object> priceChange = new LinkedHashMap<>();
-    priceChange.put("before", before);
-    priceChange.put("after", after);
-    log(store, id, number(listing.get("finished_product_id")), (String) source.get("name"),
-        "UPDATE", "编辑商品", (String) listing.get("status"),
-        (String) listing.get("status"), Map.of("SKU ID", skuId, "角色ID", roleId,
-            "最低价", priceChange, "价格来源", followConfiguration ? "跟随配置" : "手工价格"));
+    prepared.forEach((skuId, price) -> salePrices.save(id, skuId, price, store.accountId()));
+    jdbc.update("UPDATE store_finished_products SET store_category_id=? WHERE id=? AND tenant_id=? AND store_id=?", categoryId, id, store.tenantId(), store.storeId());
+    if (!changes.isEmpty()) { log(store, id, product.getId(), product.getName(), "UPDATE", "编辑商品", (String) listing.get("status"), (String) listing.get("status"), changes); }
     return detail(id);
+  }
+
+  private static Map<String, Object> change(Object before, Object after) {
+    Map<String, Object> result = new LinkedHashMap<>(); result.put("before", before); result.put("after", after); return result;
   }
 
   public List<LogEntry> logs() {
@@ -555,8 +548,6 @@ public class StoreFinishedProductService {
     catch (JsonProcessingException error) { throw new IllegalStateException("门店失效快照读取失败", error); }
   }
 
-  private record RolePriceKey(Long listingId, Long skuId, Long roleId) {}
-
   private List<ProductView> listViews(CityPartnerStoreScope.Store store,
       List<Map<String, Object>> listings) {
     List<Long> productIds = listings.stream()
@@ -575,19 +566,7 @@ public class StoreFinishedProductService {
         .flatMap(variant -> variant.getSalesAttributes().keySet().stream()).toList());
     String storeLevelName = store.storeLevelId() == null ? null
         : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
-    List<Map<String, Object>> configurations = jdbc.queryForList("""
-        SELECT config.role_id, role.name AS role_name, config.price_coefficient
-        FROM store_finished_role_price_configurations config
-        JOIN roles role ON role.id = config.role_id AND role.status = 'enabled'
-        WHERE config.tenant_id = ? AND config.store_id = ? AND config.status = 'enabled'
-        ORDER BY role.created_at DESC, role.id DESC
-        """, store.tenantId(), store.storeId());
-    Map<RolePriceKey, BigDecimal> manualPrices = new LinkedHashMap<>();
-    queryByIds("SELECT listing_id, sku_id, role_id, manual_price "
-        + "FROM store_finished_role_price_overrides WHERE listing_id IN (", listingIds)
-        .forEach(row -> manualPrices.put(new RolePriceKey(number(row.get("listing_id")),
-            number(row.get("sku_id")), number(row.get("role_id"))),
-            (BigDecimal) row.get("manual_price")));
+    var pricing = salePrices.context(store.storeId(), listingIds);
     return listings.stream().map(listing -> {
       ProductView frozen = frozenView(listing);
       if (frozen != null) { return frozen; }
@@ -599,8 +578,7 @@ public class StoreFinishedProductService {
       Long listingId = number(listing.get("id"));
       return renderView(listing, product, source,
           product.getCategoryId() == null ? null : categoryNames.get(product.getCategoryId()),
-          attributeNames, storeLevelName, variant -> skuPriceFromBatch(store, product, variant, listingId,
-              configurations, manualPrices));
+          attributeNames, storeLevelName, pricing, variant -> skuPrice(store, listing, product, variant, pricing));
     }).toList();
   }
 
@@ -629,13 +607,14 @@ public class StoreFinishedProductService {
             .flatMap(variant -> variant.getSalesAttributes().keySet().stream()).toList());
     String storeLevelName = store.storeLevelId() == null ? null
         : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
-    return renderView(listing, product, source, categoryName, attributeNames, storeLevelName,
-        variant -> skuPrice(store, listing, product, variant));
+    var pricing = salePrices.context(store.storeId(), List.of(number(listing.get("id"))));
+    return renderView(listing, product, source, categoryName, attributeNames, storeLevelName, pricing,
+        variant -> skuPrice(store, listing, product, variant, pricing));
   }
 
   private ProductView renderView(Map<String, Object> listing, FinishedProduct product,
       Map<String, Object> source, String categoryName, Map<String, String> attributeNames,
-      String storeLevelName, Function<FinishedProductVariant, SkuPrice> priceForVariant) {
+      String storeLevelName, StoreFinishedSalePriceService.Context pricing, Function<FinishedProductVariant, SkuPrice> priceForVariant) {
     Long productId = number(listing.get("finished_product_id"));
     boolean unavailable = invalidated(listing) || !isUsable(source);
     String status = (String) listing.get("status");
@@ -652,7 +631,8 @@ public class StoreFinishedProductService {
         (String) listing.get("off_shelf_detail"), timestamp(listing.get("off_shelf_at")),
         attributeNames.entrySet().stream().filter(entry -> prices.stream()
             .anyMatch(sku -> sku.salesAttributes() != null && sku.salesAttributes().containsKey(entry.getKey())))
-            .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName);
+            .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
+        pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))));
     return legacyHistoricalView(listing, rendered);
   }
 
@@ -687,7 +667,8 @@ public class StoreFinishedProductService {
         var sku = skus.addObject();
         sku.setAll((com.fasterxml.jackson.databind.node.ObjectNode) archived.deepCopy());
         sku.set("label", sku.remove("variantLabel"));
-        sku.putArray("rolePrices");
+        sku.putNull("salePrice");
+        sku.put("priceMode", "manual");
         for (var guide : snapshot.path("指导价")) {
           if (guide.path("skuId").equals(archived.path("skuId"))) { sku.set("guidePrice", guide.path("price")); }
         }
@@ -711,48 +692,10 @@ public class StoreFinishedProductService {
   }
 
   private SkuPrice skuPrice(CityPartnerStoreScope.Store store, Map<String, Object> listing,
-      FinishedProduct product, FinishedProductVariant variant) {
-    Long listingId = number(listing.get("id"));
-    Long skuId = variant.getId();
-    BigDecimal cost = partnerPrice(store, product, skuId);
-    BigDecimal operationsGuide = guidePrice(product, skuId);
-    List<RolePrice> rolePrices = jdbc.query("""
-        SELECT config.role_id, role.name AS role_name, config.price_coefficient,
-          override_price.manual_price
-        FROM store_finished_role_price_configurations config
-        JOIN roles role ON role.id = config.role_id AND role.status = 'enabled'
-        LEFT JOIN store_finished_role_price_overrides override_price
-          ON override_price.listing_id = ? AND override_price.sku_id = ?
-          AND override_price.role_id = config.role_id
-        WHERE config.tenant_id = ? AND config.store_id = ? AND config.status = 'enabled'
-        ORDER BY role.created_at DESC, role.id DESC
-        """, (row, index) -> {
-          BigDecimal manual = row.getBigDecimal("manual_price");
-          BigDecimal coefficient = row.getBigDecimal("price_coefficient");
-          BigDecimal effective = manual == null && cost != null
-              ? cost.multiply(coefficient).setScale(2, RoundingMode.HALF_UP) : manual;
-          return new RolePrice(row.getLong("role_id"), row.getString("role_name"),
-              coefficient, effective, manual == null ? "auto" : "manual");
-        }, listingId, skuId, store.tenantId(), store.storeId());
-    return skuPriceView(variant, cost, operationsGuide, rolePrices);
-  }
-
-  private SkuPrice skuPriceFromBatch(CityPartnerStoreScope.Store store,
-      FinishedProduct product, FinishedProductVariant variant, Long listingId,
-      List<Map<String, Object>> configurations, Map<RolePriceKey, BigDecimal> manualPrices) {
-    Long skuId = variant.getId();
-    BigDecimal cost = partnerPrice(store, product, skuId);
-    BigDecimal operationsGuide = guidePrice(product, skuId);
-    List<RolePrice> rolePrices = configurations.stream().map(config -> {
-      Long roleId = number(config.get("role_id"));
-      BigDecimal coefficient = (BigDecimal) config.get("price_coefficient");
-      BigDecimal manual = manualPrices.get(new RolePriceKey(listingId, skuId, roleId));
-      BigDecimal effective = manual == null && cost != null
-          ? cost.multiply(coefficient).setScale(2, RoundingMode.HALF_UP) : manual;
-      return new RolePrice(roleId, (String) config.get("role_name"), coefficient,
-          effective, manual == null ? "auto" : "manual");
-    }).toList();
-    return skuPriceView(variant, cost, operationsGuide, rolePrices);
+      FinishedProduct product, FinishedProductVariant variant, StoreFinishedSalePriceService.Context pricing) {
+    BigDecimal partner = partnerPrice(store, product, variant.getId());
+    var price = pricing.effective(number(listing.get("id")), variant.getId(), number(listing.get("store_category_id")), partner);
+    return skuPriceView(variant, partner, guidePrice(product, variant.getId()), price);
   }
 
   private BigDecimal partnerPrice(CityPartnerStoreScope.Store store,
@@ -770,9 +713,9 @@ public class StoreFinishedProductService {
   }
 
   private SkuPrice skuPriceView(FinishedProductVariant variant, BigDecimal cost,
-      BigDecimal operationsGuide, List<RolePrice> rolePrices) {
+      BigDecimal operationsGuide, StoreFinishedSalePriceService.Price price) {
     return new SkuPrice(variant.getId(), variant.getVariantLabel(), variant.getStock(), cost,
-        operationsGuide, rolePrices, variant.getDisplayMode(), variant.getSalesAttributes(),
+        operationsGuide, price.amount(), price.mode(), variant.getDisplayMode(), variant.getSalesAttributes(),
         variant.getMaterial(), variant.getLengthValue(), variant.getColor(), variant.getSizeValue());
   }
 
@@ -794,9 +737,9 @@ public class StoreFinishedProductService {
         sku.costPrice() == null || sku.guidePrice() == null)) {
       throw new IllegalArgumentException("请先完善每条可售规格的成本价和指导价");
     }
-    if (sellableSkus.stream().anyMatch(sku -> sku.rolePrices().isEmpty()
-        || sku.rolePrices().stream().anyMatch(price -> price.price() == null))) {
-      throw new IllegalArgumentException("请先配置角色可售最低价");
+    salePrices.requireCategory(salePrices.context(store.storeId(), List.of(listingId)), view.storeCategoryId());
+    if (sellableSkus.stream().anyMatch(sku -> sku.salePrice() == null)) {
+      throw new IllegalArgumentException("请先完善每条可售规格的商品售价");
     }
   }
 
@@ -827,36 +770,6 @@ public class StoreFinishedProductService {
         || "selling".equals(listing.get("status")) && stock(source) == 0) {
       throw new IllegalArgumentException("当前商品只能查看价格，不能修改");
     }
-  }
-
-  private void requireSku(Map<String, Object> source, Long skuId) {
-    Long count = jdbc.queryForObject("""
-        SELECT COUNT(*) FROM finished_product_variants
-        WHERE id = ? AND finished_product_id = ?
-        """, Long.class, skuId, source.get("id"));
-    if (count == null || count == 0) { throw new IllegalArgumentException("商品规格不存在"); }
-  }
-
-  private BigDecimal rolePrice(CityPartnerStoreScope.Store store, Long listingId,
-      Long skuId, Long roleId, Long productId) {
-    List<BigDecimal> manual = jdbc.queryForList("""
-        SELECT manual_price FROM store_finished_role_price_overrides
-        WHERE listing_id = ? AND sku_id = ? AND role_id = ?
-        """, BigDecimal.class, listingId, skuId, roleId);
-    if (!manual.isEmpty()) { return manual.getFirst(); }
-    List<Map<String, Object>> prices = jdbc.queryForList("""
-        SELECT partner.price AS cost_price, config.price_coefficient
-        FROM store_finished_role_price_configurations config
-        JOIN stores store ON store.id = config.store_id
-        JOIN finished_product_prices partner ON partner.store_level_id = store.store_level_id
-          AND partner.finished_product_id = ? AND partner.sku_id = ?
-        WHERE config.store_id = ? AND config.tenant_id = ? AND config.role_id = ?
-          AND config.status = 'enabled'
-        """, productId, skuId, store.storeId(), store.tenantId(), roleId);
-    if (prices.isEmpty()) { return null; }
-    Map<String, Object> row = prices.getFirst();
-    return ((BigDecimal) row.get("cost_price")).multiply((BigDecimal) row.get("price_coefficient"))
-        .setScale(2, RoundingMode.HALF_UP);
   }
 
   private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
@@ -913,7 +826,7 @@ public class StoreFinishedProductService {
   }
 
   private static void requirePrice(BigDecimal price) {
-    if (price == null || price.scale() > 2 || price.signum() < 0) {
+    if (price == null || price.scale() > 2 || price.signum() < 0 || price.compareTo(new BigDecimal("9999999999.99")) > 0) {
       throw new IllegalArgumentException("请输入正确的价格");
     }
   }

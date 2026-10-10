@@ -5,7 +5,6 @@ import com.zdm.platform.security.PermissionGuard;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +34,9 @@ public class StoreFinishedProductController {
       ids = ids == null ? null : Collections.unmodifiableList(new ArrayList<>(ids));
     }
   }
-  public record RolePriceRequest(BigDecimal price, boolean followConfiguration) {}
+  public record EditRequest(Long storeCategoryId, @NotNull List<StoreFinishedProductService.SalePriceInput> skus) {
+    public EditRequest { skus = skus == null ? null : Collections.unmodifiableList(new ArrayList<>(skus)); }
+  }
 
   private static final String PREFIX = "store.finished-stock-management";
   private final StoreFinishedProductService service;
@@ -104,16 +105,6 @@ public class StoreFinishedProductController {
     return ApiResponse.ok(product);
   }
 
-  @GetMapping("/{id}/skus/{skuId}/minimum-sale-price")
-  public ApiResponse<StoreFinishedProductService.EffectiveMinimumPrice> currentMinimumPrice(
-      @PathVariable Long id, @PathVariable Long skuId) {
-    guard.requireDataPermission();
-    var product = service.detail(id);
-    guard.requirePermission(PREFIX + "." + scope(product.effectiveStatus()) + ".view");
-    guard.requirePermission(PREFIX + "." + scope(product.effectiveStatus()) + ".detail");
-    return ApiResponse.ok(service.currentEmployeeMinimumPrice(id, skuId));
-  }
-
   @PutMapping("/{id}/status")
   public ApiResponse<StoreFinishedProductService.ProductView> status(@PathVariable Long id,
       @Valid @RequestBody TransitionRequest request) {
@@ -170,14 +161,16 @@ public class StoreFinishedProductController {
     return ApiResponse.ok(true);
   }
 
-  @PutMapping("/{id}/skus/{skuId}/roles/{roleId}/price")
-  public ApiResponse<StoreFinishedProductService.ProductView> rolePrice(@PathVariable Long id,
-      @PathVariable Long skuId, @PathVariable Long roleId,
-      @Valid @RequestBody RolePriceRequest request) {
-    guard.requireDataPermission();
-    requireEdit(service.detail(id));
-    return ApiResponse.ok(service.saveRolePrice(id, skuId, roleId, request.price(),
-        request.followConfiguration()));
+  @GetMapping("/{id}/edit-categories")
+  public ApiResponse<List<StoreFinishedSalePriceService.Category>> editCategories(@PathVariable Long id) {
+    guard.requireDataPermission(); requireEdit(service.detail(id));
+    return ApiResponse.ok(service.editCategories(id));
+  }
+
+  @PutMapping("/{id}")
+  public ApiResponse<StoreFinishedProductService.ProductView> edit(@PathVariable Long id, @Valid @RequestBody EditRequest request) {
+    guard.requireDataPermission(); requireEdit(service.detail(id));
+    return ApiResponse.ok(service.saveEdit(id, request.storeCategoryId(), request.skus()));
   }
 
   @GetMapping("/operation-logs")

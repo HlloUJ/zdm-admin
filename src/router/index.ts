@@ -53,6 +53,12 @@ const router = createRouter({
       component: () => import('@/pages/finished-stock/store/index.vue'),
     },
     {
+      path: '/store/finished-stock-management/:id/edit',
+      name: 'storeFinishedStockEdit',
+      component: () => import('@/pages/finished-stock/store/index.vue'),
+      meta: { permissionPrefix: 'store.finished-stock-management' },
+    },
+    {
       path: '/store/price-configuration',
       name: 'storeFinishedPriceConfiguration',
       component: () => import('@/pages/finished-stock/store/price-configuration.vue'),
@@ -181,7 +187,7 @@ router.beforeEach((to) => {
   }
 
   const loginUser = getLoginUser();
-  const permissionPrefix = routePermissionPrefixMap[to.path];
+  const permissionPrefix = routePermissionPrefixMap[to.path] ?? (to.meta.permissionPrefix as string | undefined);
   if (!hasMenuPermission(loginUser, permissionPrefix)) {
     const nextPath = getFirstAccessiblePath(loginUser);
     if (!nextPath && to.path !== '/dashboard') return { path: '/dashboard' };

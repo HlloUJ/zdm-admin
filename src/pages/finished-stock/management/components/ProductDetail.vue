@@ -84,6 +84,14 @@
           <template v-for="key in operations ? ['cost', 'guide', 'partner'] : []" :key="key" #[key]="{ row }">
             <span class="product-detail__price">{{ row[key] }}</span>
           </template>
+          <template v-if="storeMode" #sale="{ row }">
+            <slot name="sale" :row="row">
+              <t-space align="center" size="small">
+                <span>{{ row.salePrice ?? '—' }}</span>
+                <PriceSourceToggle v-if="row.salePrice != null" :source="row.priceMode" :available="false" readonly />
+              </t-space>
+            </slot>
+          </template>
           <template v-for="[id] in operations ? levels : []" :key="id" #[`price_${id}`]="{ row }">
             <t-space align="center" size="small" class="product-detail__price">
               <span>{{ row[`price_${id}`] }}</span>
@@ -105,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, type VNode } from 'vue';
 import { AdminSectionCard } from '@/components/foundation';
 import PriceSourceToggle from './PriceSourceToggle.vue';
 import SalesLogFullscreen from './SalesLogFullscreen.vue';
@@ -146,6 +154,7 @@ interface DetailProduct {
   markupPrices?: FinishedProductPrice[];
   guidePrices?: (Pick<FinishedProductGuidePrice, 'skuId' | 'price'> & Partial<FinishedProductGuidePrice>)[];
   partnerPrices?: { skuId: number; price: number }[];
+  salePrices?: { skuId: number; price: number | null; mode: 'auto' | 'manual' }[];
   specDimensions?: FinishedSpecDimension[];
 }
 const props = withDefaults(
@@ -161,6 +170,7 @@ const props = withDefaults(
   }>(),
   { showSales: true },
 );
+defineSlots<{ sale?: (props: { row: TableRowData }) => VNode[] }>();
 const emit = defineEmits<{ preview: [media: { url: string }, type: 'image' | 'video'] }>();
 const images = computed(() =>
   props.product.mainImageUrls?.length ? props.product.mainImageUrls : props.product.image ? [props.product.image] : [],
@@ -224,6 +234,7 @@ const columns = computed<PrimaryTableCol[]>(() => {
           },
         ]
       : []),
+    ...(props.storeMode ? [{ colKey: 'sale', title: '商品售价', minWidth: 200 }] : []),
     ...(props.poolMode
       ? [{ colKey: 'partner', title: props.storeLevelName ? `${props.storeLevelName}价` : '—', minWidth: 130 }]
       : []),
@@ -266,6 +277,8 @@ const rows = computed(() => {
       skuId: variant.id ?? '—',
       label: variant.variantLabel,
       stock: variant.stock,
+      salePrice: props.product.salePrices?.find((price) => price.skuId === variant.id)?.price,
+      priceMode: props.product.salePrices?.find((price) => price.skuId === variant.id)?.mode ?? 'manual',
       priceSources: Object.fromEntries(
         prices.map((price) => [price.storeLevelId, price.priceSource === 'manual' ? 'manual' : 'auto']),
       ),

@@ -35,7 +35,6 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
       .withDatabaseName("store_finished_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private JdbcTemplate jdbc;
   @Autowired private StoreFinishedProductService products;
-  @Autowired private StoreFinishedPriceConfigurationService configurations;
   @Autowired private StorePriceRuleService priceRules;
   @Autowired private com.zdm.platform.store.StoreCategoryService storeCategories;
   @Autowired private ProductLifecycleService lifecycle;
@@ -270,9 +269,6 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id) "
         + "VALUES (99861,'列表供应商','platform',0)");
     jdbc.update("INSERT INTO product_categories (id,name,scope) VALUES (99861,'列表分类','finished')");
-    jdbc.update("INSERT INTO store_finished_role_price_configurations "
-        + "(tenant_id,store_id,role_id,price_coefficient,status,created_by_account_id) "
-        + "VALUES (1,99861,99861,1.2,'enabled',1)");
     jdbc.update("INSERT INTO product_categories (id,name,scope,parent_id) VALUES (99860,'上级分类','finished',NULL)");
     jdbc.update("UPDATE product_categories SET parent_id=99860 WHERE id=99861");
     jdbc.update("INSERT INTO product_attributes (id,name,scope,value_type,attribute_role) VALUES (99861,'销售纹理','shared','text','sales')");
@@ -292,9 +288,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
     insertListProduct(99862L);
     insertListProduct(99863L);
-    jdbc.update("INSERT INTO store_finished_role_price_overrides "
-        + "(listing_id,sku_id,role_id,manual_price,updated_by_account_id) "
-        + "VALUES (99862,99872,99861,75,1)");
+    jdbc.update("INSERT INTO store_finished_sale_prices (listing_id,sku_id,sale_price,price_mode,updated_by_account_id) VALUES (99862,99872,75,'manual',1)");
     sqlSession.clearCache();
     long beforeThree = selectCount();
     var threeProducts = products.list();
@@ -411,20 +405,18 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     long listingId = products.select(List.of(99801L)).getFirst().id();
     assertThat(products.pool()).isEmpty();
     assertThat(products.detail(listingId).skus().getFirst().costPrice()).isEqualByComparingTo("100");
-    configurations.create(99801L, new BigDecimal("1.2000"));
-    configurations.create(99802L, new BigDecimal("0.8000"));
-    assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).price()).isEqualByComparingTo("80.00");
-    products.saveRolePrice(listingId, 99811L, 99801L, new BigDecimal("50"), false);
-    assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).price()).isEqualByComparingTo("50");
-    assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).roleId()).isEqualTo(99801L);
+    jdbc.update("INSERT INTO store_categories(id,store_id,scope,name) VALUES(99801,99801,'finished','测试分类')");
+    priceRules.savePriceBatch("finished", List.of(99801L), new BigDecimal("1.50"));
+    products.saveEdit(listingId, 99801L, List.of(new StoreFinishedProductService.SalePriceInput(99811L, null, "auto")));
+    assertThat(products.detail(listingId).skus().getFirst().salePrice()).isEqualByComparingTo("150");
     jdbc.update("UPDATE finished_product_prices SET price=200 WHERE finished_product_id=99801");
     jdbc.update("UPDATE finished_product_guide_prices SET price=170 WHERE finished_product_id=99801");
     var repriced = products.detail(listingId).skus().getFirst();
     assertThat(repriced.costPrice()).isEqualByComparingTo("200");
     assertThat(repriced.guidePrice()).isEqualByComparingTo("170");
-    assertThat(repriced.rolePrices().stream().filter(item -> item.roleId() == 99802L).findFirst().orElseThrow().price())
-        .isEqualByComparingTo("160.00");
-    assertThat(products.currentEmployeeMinimumPrice(listingId, 99811L).price()).isEqualByComparingTo("50");
+    assertThat(repriced.salePrice()).isEqualByComparingTo("300");
+    products.saveEdit(listingId, 99801L, List.of(new StoreFinishedProductService.SalePriceInput(99811L, new BigDecimal("50"), "manual")));
+    assertThat(products.detail(listingId).skus().getFirst().salePrice()).isEqualByComparingTo("50");
     products.changeStatus(listingId, "selling", null, null);
     jdbc.update("UPDATE finished_products SET source_status='offShelf' WHERE id=99801");
     assertThat(products.detail(listingId).sourceUnavailable()).isTrue();
@@ -435,7 +427,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
       assertThat(products.detail(listingId).sourceUnavailable()).isTrue();
       assertThatThrownBy(() -> products.changeStatusBatch(List.of(listingId), "offShelf", "其他", null))
           .isInstanceOf(IllegalArgumentException.class);
-      assertThatThrownBy(() -> products.saveRolePrice(listingId, 99811L, 99801L, new BigDecimal("50"), false))
+      assertThatThrownBy(() -> products.saveEdit(listingId, 99801L, List.of(new StoreFinishedProductService.SalePriceInput(99811L, new BigDecimal("50"), "manual"))))
           .isInstanceOf(IllegalArgumentException.class);
     }
     jdbc.update("UPDATE finished_products SET source_status='selling' WHERE id=99801");
@@ -481,10 +473,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
     identity(99831L);
     long historicalId = products.select(List.of(99831L)).getFirst().id();
-    jdbc.update("INSERT INTO store_finished_guide_prices (listing_id,sku_id,manual_price,updated_by_account_id) VALUES (?,?,?,?)",
-        historicalId, 99841L, 25, 1);
-    jdbc.update("INSERT INTO store_finished_role_price_overrides (listing_id,sku_id,role_id,manual_price,updated_by_account_id) VALUES (?,?,?,?,?)",
-        historicalId, 99841L, 99831L, 12, 1);
+    jdbc.update("INSERT INTO store_finished_sale_prices (listing_id,sku_id,sale_price,price_mode,updated_by_account_id) VALUES (?,99841,12,'manual',1)", historicalId);
     jdbc.update("UPDATE finished_products SET source_status='offShelf',status='recycle',operations_deleted=TRUE WHERE id=99831");
     jdbc.update("UPDATE store_finished_products SET invalidated_at=NOW(),invalidated_reason='来源已失效' WHERE id=?", historicalId);
 
@@ -498,10 +487,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(products.detail(historicalId).sourceUnavailable()).isTrue();
     assertThat(products.detail(historicalId).sourceMessage()).contains("首次选入快照");
     assertThat(products.detail(historicalId).skus().getFirst().costPrice()).isEqualByComparingTo("15");
-    assertThat(jdbc.queryForObject("SELECT manual_price FROM store_finished_guide_prices WHERE listing_id=?", BigDecimal.class, historicalId))
-        .isEqualByComparingTo("25");
-    assertThat(jdbc.queryForObject("SELECT manual_price FROM store_finished_role_price_overrides WHERE listing_id=?", BigDecimal.class, historicalId))
-        .isEqualByComparingTo("12");
+    assertThat(jdbc.queryForObject("SELECT sale_price FROM store_finished_sale_prices WHERE listing_id=?", BigDecimal.class, historicalId)).isEqualByComparingTo("12");
     assertThat(products.logs()).extracting(StoreFinishedProductService.LogEntry::operationType)
         .contains("SELECT").doesNotContain("SOURCE_SHELF");
     jdbc.update("UPDATE finished_products SET status='selling' WHERE id=99831");
@@ -514,8 +500,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(freshId).isNotEqualTo(historicalId);
     assertThat(jdbc.queryForList("SELECT selection_generation FROM store_finished_products WHERE finished_product_id=99831 ORDER BY id", Long.class))
         .containsExactly(1L);
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_guide_prices WHERE listing_id=?", Long.class, freshId)).isZero();
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_role_price_overrides WHERE listing_id=?", Long.class, freshId)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_sale_prices WHERE listing_id=?", Long.class, freshId)).isZero();
   }
 
   @Test
@@ -708,9 +693,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
   @Test
   @Transactional
-  void priceBatchesOnlySetExplicitCategoriesAndPreserveLegacyPrices() {
+  void priceBatchesOnlySetExplicitCategories() {
     priceRuleFixture();
-    configurations.create(99961L, new BigDecimal("3.00"));
     priceRules.savePriceBatch("finished", List.of(99961L), new BigDecimal("2.50"));
     assertThat(priceRules.list("price", "finished")).singleElement()
         .satisfies(rule -> assertThat(rule.categoryId()).isEqualTo(99961L));
@@ -721,8 +705,6 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     priceRules.savePriceBatch("finished", List.of(99961L, 99962L), new BigDecimal("2.20"));
     assertThat(priceRules.list("price", "finished")).hasSize(2)
         .allSatisfy(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("2.20"));
-    assertThat(configurations.list()).singleElement()
-        .satisfies(item -> assertThat(item.priceCoefficient()).isEqualByComparingTo("3.00"));
   }
 
   @Test
@@ -804,9 +786,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
   @Test
   @Transactional
-  void clearingPriceCoefficientsIsScopedAtomicAndDoesNotChangeDiscountOrLegacyRules() throws Exception {
+  void clearingPriceCoefficientsIsScopedAtomicAndDoesNotChangeDiscountRules() throws Exception {
     priceRuleFixture();
-    configurations.create(99961L, new BigDecimal("3.00"));
     priceRules.savePriceBatch("finished", List.of(99961L, 99962L), BigDecimal.ONE);
     priceRules.savePriceBatch("accessory", List.of(99965L), BigDecimal.ONE);
     priceRules.createDiscount("finished", 99961L, new BigDecimal("0.80"));
@@ -828,7 +809,6 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(priceRules.list("price", "finished")).singleElement();
     assertThat(priceRules.list("price", "accessory")).singleElement();
     assertThat(priceRules.list("discount", "finished")).singleElement();
-    assertThat(configurations.list()).singleElement();
     mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
         .contentType("application/json").content("{\"targetIds\":[99961]}"))
         .andExpect(status().isOk());
@@ -904,7 +884,6 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     priceRules.savePriceBatch("finished", List.of(99963L), new BigDecimal("1.50"));
     priceRules.savePriceBatch("accessory", List.of(99965L), new BigDecimal("2.00"));
     priceRules.createDiscount("finished", 99961L, new BigDecimal("0.80"));
-    configurations.create(99961L, new BigDecimal("3.00"));
     assertThat(storeCategories.hasPriceCoefficient(99963L, "finished")).isTrue();
     assertThatThrownBy(() -> storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
         "finished", 99963L, "新三级", "enabled"))).isInstanceOf(IllegalArgumentException.class)
@@ -916,7 +895,6 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(priceRules.list("price", "finished")).isEmpty();
     assertThat(priceRules.list("price", "accessory")).hasSize(1);
     assertThat(priceRules.list("discount", "finished")).hasSize(1);
-    assertThat(configurations.list()).hasSize(1);
     assertThat(storeCategories.hasPriceCoefficient(child.getId(), "finished")).isFalse();
     var sibling = storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
         "finished", 99963L, "另一个三级", "enabled"));
@@ -1061,6 +1039,86 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     identityWithPermissions(99961L, "store.price-configuration.discount.finished.delete");
     mvc.perform(delete("/api/admin/store-price-rules/discount/" + id + "?scope=finished"))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+  }
+
+  private Long salePriceFixture() {
+    jdbc.update("INSERT INTO store_levels(id,name,sort_order) VALUES(99601,'售价级别',1)");
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,store_level_id,status) VALUES(99601,1,'售价甲店','cityPartner',99601,'enabled'),(99602,1,'售价乙店','cityPartner',99601,'enabled')");
+    jdbc.update("INSERT INTO store_categories(id,store_id,scope,name,status) VALUES(99601,99601,'finished','有系数','enabled'),(99602,99601,'finished','无系数','enabled'),(99603,99602,'finished','他店分类','enabled'),(99604,99601,'accessory','配件分类','enabled')");
+    jdbc.update("INSERT INTO finished_products(id,name,total_stock,status,source_status,operations_deleted) VALUES(99601,'售价商品',3,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO finished_product_variants(id,finished_product_id,variant_label,stock,cost_price) VALUES(99601,99601,'规格一',2,10),(99602,99601,'规格二',1,20)");
+    jdbc.update("INSERT INTO finished_product_prices(finished_product_id,sku_id,variant_label,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source) VALUES(99601,99601,'规格一',99601,'售价级别',1,10,100,'manual'),(99601,99602,'规格二',99601,'售价级别',1,20,200,'manual')");
+    identity(99601L);
+    priceRules.savePriceBatch("finished", List.of(99601L), new BigDecimal("1.50"));
+    return products.select(List.of(99601L)).getFirst().id();
+  }
+
+  private List<StoreFinishedProductService.SalePriceInput> saleInputs(String mode) {
+    return List.of(new StoreFinishedProductService.SalePriceInput(99601L, new BigDecimal("125"), mode),
+        new StoreFinishedProductService.SalePriceInput(99602L, new BigDecimal("250"), mode));
+  }
+
+  @Test
+  @Transactional
+  void saleModesFollowCurrentPricesAndFreezeBeforeRulesOrCategoriesDisappear() {
+    Long id = salePriceFixture();
+    products.saveEdit(id, 99601L, saleInputs("auto"));
+    assertThat(products.detail(id).skus()).extracting(sku -> sku.salePrice().toPlainString()).containsExactly("150.00", "300.00");
+    jdbc.update("UPDATE finished_product_prices SET price=120 WHERE sku_id=99601");
+    sqlSession.clearCache();
+    priceRules.savePriceBatch("finished", List.of(99601L), new BigDecimal("2.00"));
+    assertThat(products.detail(id).skus().getFirst().salePrice()).isEqualByComparingTo("240");
+    priceRules.clearPriceBatch("finished", List.of(99601L));
+    assertThat(products.detail(id).skus().getFirst().salePrice()).isEqualByComparingTo("240");
+    assertThat(products.detail(id).skus()).allSatisfy(sku -> assertThat(sku.priceMode()).isEqualTo("manual"));
+    priceRules.savePriceBatch("finished", List.of(99601L), new BigDecimal("3.00"));
+    assertThat(products.detail(id).skus().getFirst().salePrice()).isEqualByComparingTo("240");
+    products.saveEdit(id, 99601L, saleInputs("auto"));
+    storeCategories.updateStatus(99601L, "finished", "disabled");
+    assertThat(products.detail(id).skus().getFirst().salePrice()).isEqualByComparingTo("360");
+    storeCategories.updateStatus(99601L, "finished", "enabled");
+    assertThat(products.detail(id).skus().getFirst().priceMode()).isEqualTo("manual");
+    products.saveEdit(id, 99601L, saleInputs("auto"));
+    storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest("finished", 99601L, "新增子分类", "enabled", true));
+    assertThat(products.detail(id).skus().getFirst().salePrice()).isEqualByComparingTo("360");
+    assertThat(products.detail(id).skus().getFirst().priceMode()).isEqualTo("manual");
+    storeCategories.deleteCategory(99602L, "finished");
+  }
+
+  @Test
+  @Transactional
+  void editIsAtomicScopedAndNeverWritesPublicFieldsOrInventsSalePrices() throws Exception {
+    Long id = salePriceFixture();
+    assertThat(products.detail(id).storeCategoryId()).isNull();
+    assertThat(products.detail(id).skus()).allSatisfy(sku -> assertThat(sku.salePrice()).isNull());
+    assertThatThrownBy(() -> products.changeStatus(id, "selling", null, null)).isInstanceOf(IllegalArgumentException.class);
+    for (Long category : List.of(99603L, 99604L)) {
+      assertThatThrownBy(() -> products.saveEdit(id, category, saleInputs("manual"))).isInstanceOf(IllegalArgumentException.class);
+    }
+    assertThatThrownBy(() -> products.saveEdit(id, null, saleInputs("manual"))).hasMessage("请选择门店分类");
+    assertThatThrownBy(() -> products.saveEdit(id, 99602L, saleInputs("auto"))).isInstanceOf(IllegalArgumentException.class);
+    products.saveEdit(id, 99602L, saleInputs("manual"));
+    assertThat(products.detail(id).skus().getFirst().salePrice()).isEqualByComparingTo("125");
+    assertThatThrownBy(() -> products.saveEdit(id, 99601L, List.of(
+        new StoreFinishedProductService.SalePriceInput(99601L, new BigDecimal("999"), "manual"),
+        new StoreFinishedProductService.SalePriceInput(99602L, new BigDecimal("-1"), "manual")))).isInstanceOf(IllegalArgumentException.class);
+    assertThat(products.detail(id).storeCategoryId()).isEqualTo(99602L);
+    assertThat(products.detail(id).skus().getFirst().salePrice()).isEqualByComparingTo("125");
+    assertThatThrownBy(() -> products.saveEdit(id, 99601L, List.of(
+        new StoreFinishedProductService.SalePriceInput(99601L, BigDecimal.ONE, "manual"),
+        new StoreFinishedProductService.SalePriceInput(99601L, BigDecimal.ONE, "manual")))).isInstanceOf(IllegalArgumentException.class);
+    identityWithPermissions(99601L, "store.finished-stock-management.warehouse.view");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/store-finished-products/" + id)
+        .contentType("application/json").content("{\"storeCategoryId\":99602,\"skus\":[]}"))
+        .andExpect(status().isForbidden());
+    identity(99602L);
+    assertThatThrownBy(() -> products.saveEdit(id, 99603L, saleInputs("manual"))).isInstanceOf(IllegalArgumentException.class);
+    identityWithPermissions(99601L, "store.finished-stock-management.warehouse.edit");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/store-finished-products/" + id)
+        .contentType("application/json").content("{\"storeCategoryId\":99602,\"name\":\"伪造名称\",\"storeId\":99602,\"skus\":[{\"skuId\":99601,\"salePrice\":100,\"priceMode\":\"manual\"},{\"skuId\":99602,\"salePrice\":200,\"priceMode\":\"manual\"}]}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value("售价商品"));
+    assertThatThrownBy(() -> storeCategories.deleteCategory(99602L, "finished")).hasMessageContaining("已关联商品");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('store_finished_role_price_overrides','store_finished_role_price_configurations','store_finished_guide_prices')", Long.class)).isZero();
   }
 
   private void upstreamIdentity(String clientCode) {
