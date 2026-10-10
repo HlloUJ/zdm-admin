@@ -72,7 +72,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   void exposeAllTerminalFunctionsWithinEachPermissionTest() {
     jdbcTemplate.update(
         "UPDATE terminal_function_policies SET function_permissions = ? WHERE terminal IN ('store', 'supplier')",
-        "admin.permission-management.employee-management.create,admin.permission-management.employee-management.delete,admin.permission-management.employee-management.edit,admin.permission-management.employee-management.permission,admin.permission-management.employee-management.toggle-status,admin.permission-management.employee-management.view,admin.permission-management.role-management.create,admin.permission-management.role-management.delete,admin.permission-management.role-management.edit,admin.permission-management.role-management.permission,admin.permission-management.role-management.view,admin.supplier-management.create,admin.supplier-management.delete,admin.supplier-management.edit,admin.supplier-management.manage-supply-types,admin.supplier-management.toggle-status,admin.supplier-management.view,admin.tenant.store-category-management.create-child,admin.tenant.store-category-management.create-root,admin.tenant.store-category-management.delete,admin.tenant.store-category-management.edit,admin.tenant.store-category-management.move-down,admin.tenant.store-category-management.move-up,admin.tenant.store-category-management.toggle-status,admin.tenant.store-category-management.view");
+        "admin.permission-management.employee-management.create,admin.permission-management.employee-management.delete,admin.permission-management.employee-management.edit,admin.permission-management.employee-management.permission,admin.permission-management.employee-management.toggle-status,admin.permission-management.employee-management.view,admin.permission-management.role-management.create,admin.permission-management.role-management.delete,admin.permission-management.role-management.edit,admin.permission-management.role-management.permission,admin.permission-management.role-management.view,admin.supplier-management.create,admin.supplier-management.delete,admin.supplier-management.edit,admin.supplier-management.manage-supply-types,admin.supplier-management.toggle-status,admin.supplier-management.view,admin.tenant.store-category-management.finished.view,admin.tenant.store-category-management.finished.create-root,admin.tenant.store-category-management.finished.create-child,admin.tenant.store-category-management.finished.edit,admin.tenant.store-category-management.finished.sort,admin.tenant.store-category-management.finished.toggle-status,admin.tenant.store-category-management.finished.delete,admin.tenant.store-category-management.accessory.view,admin.tenant.store-category-management.accessory.create-root,admin.tenant.store-category-management.accessory.create-child,admin.tenant.store-category-management.accessory.edit,admin.tenant.store-category-management.accessory.sort,admin.tenant.store-category-management.accessory.toggle-status,admin.tenant.store-category-management.accessory.delete");
     jdbcTemplate.update(
         """
         INSERT INTO finished_markup_configurations
@@ -1373,14 +1373,13 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         98001L,
         "15926628001",
         "门店分类测试员",
-        "admin.tenant.store-category-management.view,"
-            + "admin.tenant.store-category-management.create-root,"
-            + "admin.tenant.store-category-management.create-child,"
-            + "admin.tenant.store-category-management.edit,"
-            + "admin.tenant.store-category-management.move-up,"
-            + "admin.tenant.store-category-management.move-down,"
-            + "admin.tenant.store-category-management.toggle-status,"
-            + "admin.tenant.store-category-management.delete");
+        "admin.tenant.store-category-management.finished.view,"
+            + "admin.tenant.store-category-management.finished.create-root,"
+            + "admin.tenant.store-category-management.finished.create-child,"
+            + "admin.tenant.store-category-management.finished.edit,"
+            + "admin.tenant.store-category-management.finished.sort,"
+            + "admin.tenant.store-category-management.finished.toggle-status,"
+            + "admin.tenant.store-category-management.finished.delete");
 
     MvcResult firstRootResult = mockMvc.perform(post("/api/admin/store-categories")
             .header("Authorization", "Bearer " + token)
@@ -1388,7 +1387,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name":"门店一级分类甲-%s",
-                  "status":"enabled"
+                  "scope":"finished", "status":"enabled"
                 }
                 """.formatted(suffix)))
         .andExpect(status().isOk())
@@ -1406,7 +1405,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("""
                 {
                   "name":"门店一级分类乙-%s",
-                  "status":"enabled"
+                  "scope":"finished", "status":"enabled"
                 }
                 """.formatted(suffix)))
         .andExpect(status().isOk())
@@ -1427,7 +1426,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
                 {
                   "parentId":%d,
                   "name":"门店二级分类-%s",
-                  "status":"enabled"
+                  "scope":"finished", "status":"enabled"
                 }
                 """.formatted(firstRootId, suffix)))
         .andExpect(status().isOk())
@@ -1436,7 +1435,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         childResult.getResponse().getContentAsString(),
         "$.data.id").toString());
 
-    MvcResult listResult = mockMvc.perform(get("/api/admin/store-categories")
+    MvcResult listResult = mockMvc.perform(get("/api/admin/store-categories").param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andReturn();
@@ -1456,7 +1455,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
                 {
                   "parentId":%d,
                   "name":"门店三级分类-%s",
-                  "status":"enabled"
+                  "scope":"finished", "status":"enabled"
                 }
                 """.formatted(childId, suffix)))
         .andExpect(status().isOk())
@@ -1472,7 +1471,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
                 {
                   "parentId":%d,
                   "name":"门店四级分类-%s",
-                  "status":"enabled"
+                  "scope":"finished", "status":"enabled"
                 }
                 """.formatted(grandchildId, suffix)))
         .andExpect(status().isBadRequest())
@@ -1485,13 +1484,13 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
                 {
                   "parentId":%d,
                   "name":" 门店二级分类-%s ",
-                  "status":"enabled"
+                  "scope":"finished", "status":"enabled"
                 }
                 """.formatted(firstRootId, suffix)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("同级分类名称不能重复"));
 
-    mockMvc.perform(put("/api/admin/store-categories/{id}", firstRootId)
+    mockMvc.perform(put("/api/admin/store-categories/{id}", firstRootId).param("scope", "finished")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("""
@@ -1500,16 +1499,16 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.name").value("门店一级分类甲-已编辑-" + suffix));
 
-    mockMvc.perform(put("/api/admin/store-categories/{id}/move", secondRootId)
+    mockMvc.perform(put("/api/admin/store-categories/sort")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
-            .content("{\"direction\":\"down\"}"))
+            .content("{\"scope\":\"finished\",\"orderedIds\":[" + firstRootId + "," + secondRootId + "]}"))
         .andExpect(status().isOk());
     assertThat(jdbcTemplate.queryForObject(
         "SELECT sort_order FROM store_categories WHERE id = ?",
         Integer.class,
         secondRootId)).isEqualTo(2);
-    MvcResult movedListResult = mockMvc.perform(get("/api/admin/store-categories")
+    MvcResult movedListResult = mockMvc.perform(get("/api/admin/store-categories").param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andReturn();
@@ -1519,7 +1518,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     assertThat(movedCategoryIds.indexOf(Math.toIntExact(firstRootId)))
         .isLessThan(movedCategoryIds.indexOf(Math.toIntExact(secondRootId)));
 
-    mockMvc.perform(put("/api/admin/store-categories/{id}/status", firstRootId)
+    mockMvc.perform(put("/api/admin/store-categories/{id}/status", firstRootId).param("scope", "finished")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("{\"status\":\"disabled\"}"))
@@ -1533,7 +1532,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         String.class,
         grandchildId)).isEqualTo("disabled");
 
-    mockMvc.perform(put("/api/admin/store-categories/{id}/status", firstRootId)
+    mockMvc.perform(put("/api/admin/store-categories/{id}/status", firstRootId).param("scope", "finished")
             .header("Authorization", "Bearer " + token)
             .contentType("application/json")
             .content("{\"status\":\"enabled\"}"))
@@ -1547,25 +1546,25 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         String.class,
         grandchildId)).isEqualTo("enabled");
 
-    mockMvc.perform(delete("/api/admin/store-categories/{id}", firstRootId)
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", firstRootId).param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("该分类包含下级分类，请先删除或转移下级分类"));
 
-    mockMvc.perform(delete("/api/admin/store-categories/{id}", childId)
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", childId).param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("该分类包含下级分类，请先删除或转移下级分类"));
-    mockMvc.perform(delete("/api/admin/store-categories/{id}", grandchildId)
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", grandchildId).param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
-    mockMvc.perform(delete("/api/admin/store-categories/{id}", childId)
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", childId).param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
-    mockMvc.perform(delete("/api/admin/store-categories/{id}", firstRootId)
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", firstRootId).param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
-    mockMvc.perform(delete("/api/admin/store-categories/{id}", secondRootId)
+    mockMvc.perform(delete("/api/admin/store-categories/{id}", secondRootId).param("scope", "finished")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk());
     assertThat(jdbcTemplate.queryForObject(
@@ -1612,7 +1611,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           (id, tenant_id, store_id, name, code, data_scope, status,
            function_permissions, created_by_name)
         VALUES (?, 1, ?, '门店分类查看角色', 'STORE_CATEGORY_VIEWER_TEST', 'store', 'enabled',
-          'admin.tenant.store-category-management.view,admin.tenant.store-category-management.edit', '集成测试')
+          'admin.tenant.store-category-management.finished.view,admin.tenant.store-category-management.finished.edit', '集成测试')
         """,
         roleId,
         storeId);
@@ -1627,20 +1626,20 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update(
         """
         INSERT INTO store_categories
-          (id, store_id, name, sort_order, product_count, status, created_by_name)
+          (id, store_id, scope, name, sort_order, product_count, status, created_by_name)
         VALUES
-          (9301, 1, '同名门店分类', 1, 0, 'enabled', '韩健'),
-          (9302, ?, '同名门店分类', 1, 0, 'enabled', '张飞')
+          (9301, 1, 'finished', '同名门店分类', 1, 0, 'enabled', '韩健'),
+          (9302, ?, 'finished', '同名门店分类', 1, 0, 'enabled', '张飞')
         """,
         storeId);
 
     try {
-      mockMvc.perform(get("/api/admin/store-categories")
+      mockMvc.perform(get("/api/admin/store-categories").param("scope", "finished")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.length()").value(1))
           .andExpect(jsonPath("$.data[0].id").value(9302));
-      mockMvc.perform(put("/api/admin/store-categories/{id}", 9301)
+      mockMvc.perform(put("/api/admin/store-categories/{id}", 9301).param("scope", "finished")
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.createAccountToken(accountId))
               .contentType("application/json")
               .content("{\"name\":\"跨门店修改\"}"))
@@ -1654,6 +1653,66 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
       jdbcTemplate.update("DELETE FROM employees WHERE id = ?", employeeId);
       jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
       jdbcTemplate.update("DELETE FROM stores WHERE id = ?", storeId);
+    }
+  }
+
+  @Test
+  void storeCategoryTypesShareWithinStoreButRejectCrossTypeParentsAndSorts() throws Exception {
+    long storeId = 98002L;
+    String prefix = "admin.tenant.store-category-management.";
+    String grants = java.util.stream.Stream.of("finished", "accessory")
+        .flatMap(scope -> java.util.stream.Stream.of("view", "create-root", "create-child", "edit", "sort", "toggle-status", "delete")
+            .map(action -> prefix + scope + "." + action)).collect(java.util.stream.Collectors.joining(","));
+    String token = createStoreScopedEmployee(storeId, "15926628002", "分类共同维护测试员", grants);
+    jdbcTemplate.update("UPDATE employees SET data_permission='self' WHERE id=?", storeId);
+    jdbcTemplate.update("UPDATE roles SET data_scope='self' WHERE id=?", storeId);
+    jdbcTemplate.update("INSERT INTO store_categories (id,store_id,scope,name,sort_order,status,created_by_account_id) "
+        + "VALUES (980021,?,'finished','同名分类',1,'enabled',1),(980022,?,'finished','另一个分类',2,'enabled',1),"
+        + "(980023,?,'accessory','同名分类',1,'enabled',1)", storeId, storeId, storeId);
+    try {
+      mockMvc.perform(get("/api/admin/store-categories").param("scope", "finished")
+          .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(2));
+      mockMvc.perform(get("/api/admin/store-categories").param("scope", "accessory")
+          .header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
+      mockMvc.perform(put("/api/admin/store-categories/980021").param("scope", "finished")
+          .header("Authorization", "Bearer " + token).contentType("application/json")
+          .content("{\"name\":\"其他员工创建的分类已编辑\"}"))
+          .andExpect(status().isOk());
+      mockMvc.perform(post("/api/admin/store-categories")
+          .header("Authorization", "Bearer " + token).contentType("application/json")
+          .content("{\"scope\":\"accessory\",\"parentId\":980021,\"name\":\"越界子分类\",\"status\":\"enabled\"}"))
+          .andExpect(status().isBadRequest());
+      mockMvc.perform(put("/api/admin/store-categories/980021/status").param("scope", "accessory")
+          .header("Authorization", "Bearer " + token).contentType("application/json")
+          .content("{\"status\":\"disabled\"}"))
+          .andExpect(status().isBadRequest());
+      mockMvc.perform(delete("/api/admin/store-categories/980021").param("scope", "accessory")
+          .header("Authorization", "Bearer " + token)).andExpect(status().isBadRequest());
+      for (String ids : List.of("980021,980023", "980021,980021", "980021")) {
+        mockMvc.perform(put("/api/admin/store-categories/sort")
+            .header("Authorization", "Bearer " + token).contentType("application/json")
+            .content("{\"scope\":\"finished\",\"orderedIds\":[" + ids + "]}"))
+            .andExpect(status().isBadRequest());
+      }
+      assertThat(jdbcTemplate.queryForObject("SELECT sort_order FROM store_categories WHERE id=980021", Integer.class)).isEqualTo(1);
+      mockMvc.perform(put("/api/admin/store-categories/sort")
+          .header("Authorization", "Bearer " + token).contentType("application/json")
+          .content("{\"scope\":\"finished\",\"orderedIds\":[980022,980021]}"))
+          .andExpect(status().isOk());
+      assertThat(jdbcTemplate.queryForObject("SELECT sort_order FROM store_categories WHERE id=980021", Integer.class)).isEqualTo(2);
+      jdbcTemplate.update("UPDATE roles SET function_permissions=? WHERE id=?", prefix + "finished.edit", storeId);
+      mockMvc.perform(get("/api/admin/store-categories").param("scope", "accessory")
+          .header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+      mockMvc.perform(put("/api/admin/store-categories/980021").param("scope", "finished")
+          .header("Authorization", "Bearer " + token).contentType("application/json")
+          .content("{\"name\":\"不允许改状态\",\"status\":\"disabled\"}"))
+          .andExpect(status().isForbidden());
+      assertThat(jdbcTemplate.queryForObject("SELECT status FROM store_categories WHERE id=980021", String.class)).isEqualTo("enabled");
+    } finally {
+      jdbcTemplate.update("DELETE FROM store_categories WHERE store_id=?", storeId);
+      cleanupStoreScopedEmployee(storeId);
     }
   }
 
@@ -2832,20 +2891,20 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "INSERT INTO stores (id, tenant_id, name, type, status, created_by) VALUES (?, 1, '已归档删除测试门店', 'cityPartner', 'disabled', '韩健')",
         storeId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, '门店删除级联分类', 1, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', '门店删除级联分类', 1, 0, 'enabled', '韩健')",
         categoryId,
         storeId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, parent_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, ?, '门店删除级联子分类', 2, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, parent_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', ?, '门店删除级联子分类', 2, 0, 'enabled', '韩健')",
         childCategoryId,
         storeId,
         categoryId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, '门店删除级联分类二', 3, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', '门店删除级联分类二', 3, 0, 'enabled', '韩健')",
         secondCategoryId,
         storeId);
     jdbcTemplate.update(
-        "INSERT INTO store_categories (id, store_id, parent_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, ?, '门店删除级联子分类', 4, 0, 'enabled', '韩健')",
+        "INSERT INTO store_categories (id, store_id, scope, parent_id, name, sort_order, product_count, status, created_by_name) VALUES (?, ?, 'finished', ?, '门店删除级联子分类', 4, 0, 'enabled', '韩健')",
         sameNameChildCategoryId,
         storeId,
         secondCategoryId);
@@ -4484,7 +4543,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
             .content("{\"name\":\"禁止平台门店分类授权\",\"code\":\"AUDIENCE_DENIED\",\"dataScope\":\"all\",\"status\":\"enabled\","
                 + "\"functionPermissions\":\"admin.tenant.store-category-management.view\"}"))
         .andExpect(status().isForbidden());
-    mockMvc.perform(get("/api/admin/store-categories")
+    mockMvc.perform(get("/api/admin/store-categories").param("scope", "finished")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isForbidden());
   }

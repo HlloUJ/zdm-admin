@@ -48,6 +48,25 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
+  it('registers two independent store category tabs with scoped maintenance actions', () => {
+    const prefix = 'admin.tenant.store-category-management';
+    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;
+    const page = module.menus[0].pages[0];
+    expect(page.actions).toEqual([]);
+    expect(page.tabs.map((tab) => [tab.label, tab.value])).toEqual([
+      ['成品现货分类', `${prefix}.finished`],
+      ['配件分类', `${prefix}.accessory`],
+    ]);
+    for (const tab of page.tabs) {
+      expect(tab.actions.map((action) => action.value)).toEqual(
+        ['view', 'create-root', 'create-child', 'edit', 'sort', 'toggle-status', 'delete'].map(
+          (action) => `${tab.value}.${action}`,
+        ),
+      );
+    }
+    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(14);
+  });
+
   it('keeps platform, supplier and store capabilities in their respective audiences', () => {
     expect(fullFunctionCatalog.map((module) => module.value)).toEqual([
       'admin.tenant',
@@ -124,8 +143,29 @@ describe('full function catalog', () => {
     expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');
     const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
     expect(pricing.menus[0].direct).toBe(true);
-    expect(pricing.menus[0].pages[0].tabs).toEqual([]);
-    expect(storeValues).toContain('store.price-configuration.view');
+    expect(pricing.menus[0].pages[0].actions).toEqual([]);
+    expect(pricing.menus[0].pages[0].tabs.map((tab) => [tab.parentLabel, tab.label, tab.value])).toEqual([
+      ['价格系数', '成品现货', 'store.price-configuration.price.finished'],
+      ['价格系数', '配件', 'store.price-configuration.price.accessory'],
+      ['折扣系数', '成品现货', 'store.price-configuration.discount.finished'],
+      ['折扣系数', '配件', 'store.price-configuration.discount.accessory'],
+    ]);
+    for (const tab of pricing.menus[0].pages[0].tabs) {
+      expect(tab.actions).toEqual([
+        { label: '查看', value: `${tab.value}.view` },
+        ...(tab.value.includes('.discount.') ? [{ label: '新增', value: `${tab.value}.create` }] : []),
+        { label: '批量设置', value: `${tab.value}.batch-set` },
+        ...(tab.value.includes('.discount.')
+          ? [
+              { label: '编辑', value: `${tab.value}.edit` },
+              { label: '停用/启用', value: `${tab.value}.toggle-status` },
+              { label: '删除', value: `${tab.value}.delete` },
+            ]
+          : []),
+      ]);
+    }
+    expect(getFunctionCatalogPermissionValues([pricing])).toHaveLength(16);
+    expect(storeValues).not.toContain('store.price-configuration.view');
     for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {
       const values = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience(audience));
       expect(values.some((value) => value.startsWith('store.'))).toBe(false);
@@ -179,15 +219,15 @@ describe('full function catalog', () => {
     ]);
     expect(
       normalizeTerminalPermissions('store', [
-        'admin.tenant.store-category-management.create-root',
+        'admin.tenant.store-category-management.finished.create-root',
         'store.goods.finished-stock.查询',
         'admin.permission-management.employee-management.query',
         'admin.permission-management.employee-management.reset',
         'admin.permission-management.employee-management.permission',
       ]),
     ).toEqual([
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.create-root',
+      'admin.tenant.store-category-management.finished.view',
+      'admin.tenant.store-category-management.finished.create-root',
       'admin.permission-management.employee-management.view',
       'admin.permission-management.employee-management.permission',
     ]);
@@ -202,7 +242,7 @@ describe('full function catalog', () => {
     expect(operationValues).toContain('admin.tenant.tenant-management.unarchived.view');
     expect(operationValues).toContain('admin.tenant.store-level-management.view');
     expect(operationValues).toContain('admin.product-data-center.markup-configuration.finished.view');
-    expect(operationValues).not.toContain('admin.tenant.store-category-management.view');
+    expect(operationValues).not.toContain('admin.tenant.store-category-management.finished.view');
 
     expect(getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('store'))).not.toContain(
       'admin.product-data-center.markup-configuration.finished.view',
@@ -230,15 +270,15 @@ describe('full function catalog', () => {
       'admin.tenant.store-level-management.view',
     );
     expect(getFunctionCatalogPermissionValues(terminalFunctionTrees.supplier)).toContain(
-      'admin.tenant.store-category-management.view',
+      'admin.tenant.store-category-management.finished.view',
     );
 
     const storeRoleCatalog = filterFunctionCatalogByPermissions(terminalFunctionTrees.store, [
-      'admin.tenant.store-category-management.create-root',
+      'admin.tenant.store-category-management.finished.create-root',
     ]);
     expect(getFunctionCatalogPermissionValues(storeRoleCatalog)).toEqual([
-      'admin.tenant.store-category-management.view',
-      'admin.tenant.store-category-management.create-root',
+      'admin.tenant.store-category-management.finished.view',
+      'admin.tenant.store-category-management.finished.create-root',
     ]);
   });
 
@@ -249,7 +289,7 @@ describe('full function catalog', () => {
         'admin.product-data-center.category.finished.enable',
         'admin.product-data-center.category.accessory.disable',
       ]),
-    ).toEqual(['admin.tenant.store-category-management.view', 'admin.tenant.store-category-management.toggle-status']);
+    ).toEqual([]);
   });
 
   it('maps legacy store grants to both tab views but never grants permanent delete implicitly', () => {
@@ -449,8 +489,10 @@ describe('category sorting permissions', () => {
         normalizeFunctionCatalogPermissions(fullFunctionCatalog, [`${prefix}.move-up`, `${prefix}.move-down`]),
       ).toEqual([`${prefix}.view`, `${prefix}.sort`]);
     }
-    expect(values).toContain('admin.tenant.store-category-management.move-up');
-    expect(values).toContain('admin.tenant.store-category-management.move-down');
+    expect(values).not.toContain('admin.tenant.store-category-management.move-up');
+    expect(values).not.toContain('admin.tenant.store-category-management.move-down');
+    for (const scope of ['finished', 'accessory'])
+      expect(values).toContain(`admin.tenant.store-category-management.${scope}.sort`);
   });
 });
 

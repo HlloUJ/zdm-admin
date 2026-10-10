@@ -177,13 +177,27 @@ export const storePriceConfiguration: FunctionModule = {
         {
           label: '价格配置页',
           value: 'store.price-configuration',
-          actions: [
-            ['create', '新增'],
-            ['edit', '编辑'],
-            ['toggle-status', '停用/启用'],
-            ['delete', '删除'],
-          ].map(([code, label]) => ({ label, value: `store.price-configuration.${code}` })),
-          tabs: [],
+          actions: [],
+          tabs: (['price', 'discount'] as const).flatMap((kind) =>
+            (['finished', 'accessory'] as const).map((scope) => ({
+              parentLabel: kind === 'price' ? '价格系数' : '折扣系数',
+              label: scope === 'finished' ? '成品现货' : '配件',
+              value: `store.price-configuration.${kind}.${scope}`,
+              actions: [
+                ...(kind === 'discount'
+                  ? [{ label: '新增', value: `store.price-configuration.${kind}.${scope}.create` }]
+                  : []),
+                { label: '批量设置', value: `store.price-configuration.${kind}.${scope}.batch-set` },
+                ...(kind === 'discount'
+                  ? [
+                      { label: '编辑', value: `store.price-configuration.${kind}.${scope}.edit` },
+                      { label: '停用/启用', value: `store.price-configuration.${kind}.${scope}.toggle-status` },
+                      { label: '删除', value: `store.price-configuration.${kind}.${scope}.delete` },
+                    ]
+                  : []),
+              ],
+            })),
+          ),
         },
       ],
     },
