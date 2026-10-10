@@ -25,13 +25,7 @@
                 @change="handleManagedClientChange"
               />
 
-              <t-form
-                v-if="!isPlatformSupplyChain"
-                class="zdm-admin-filter-form"
-                label-width="auto"
-                :data="filterDraft"
-                colon
-              >
+              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filterDraft" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="姓名" name="name" class="name-filter">
@@ -363,11 +357,7 @@ const isInternalAdministration = computed(
 );
 
 const isPlatformSupplyChain = computed(() => isInternalAdministration.value && managedClient.value === 'supply-chain');
-const canCreateEmployee = computed(
-  () =>
-    hasPermission(loginUser.value, `${managementPermissionPrefix.value}.create`) &&
-    (!isPlatformSupplyChain.value || (!loading.value && employees.value.length === 0)),
-);
+const canCreateEmployee = computed(() => hasPermission(loginUser.value, `${managementPermissionPrefix.value}.create`));
 const canEditEmployee = computed(
   () => !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.edit`),
 );
@@ -383,10 +373,12 @@ const canDeleteEmployee = computed(
   () => !isPlatformSupplyChain.value && hasPermission(loginUser.value, `${managementPermissionPrefix.value}.delete`),
 );
 const operationRoleOptions = computed(() =>
-  operationRoles.value.map((role) => ({
-    label: role.name,
-    value: String(role.id),
-  })),
+  isPlatformSupplyChain.value
+    ? [{ label: '管理员', value: 'supply_chain_admin' }]
+    : operationRoles.value.map((role) => ({
+        label: role.name,
+        value: String(role.id),
+      })),
 );
 const configurableOperationRoleOptions = computed(() =>
   operationRoles.value
@@ -459,7 +451,11 @@ const filteredEmployees = computed(() => {
   return employees.value.filter((employee) => {
     const nameMatched = !name || employee.name.includes(name);
     const phoneMatched = !phone || employee.phone.includes(phone);
-    const roleMatched = !activeFilter.role || employee.roleIds.includes(activeFilter.role);
+    const roleMatched =
+      !activeFilter.role ||
+      (isPlatformSupplyChain.value
+        ? employee.identityType === activeFilter.role
+        : employee.roleIds.includes(activeFilter.role));
     const statusMatched = !activeFilter.status || employee.status === activeFilter.status;
     return nameMatched && phoneMatched && roleMatched && statusMatched;
   });

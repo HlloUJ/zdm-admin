@@ -5054,14 +5054,14 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
-  void platformSupplyChainInvitationCreatesOnlyTheInitialAdministratorIdentity() throws Exception {
+  void platformSupplyChainInvitationCreatesAdministratorIdentities() throws Exception {
     String roleView="admin.permission-management.role-management.supply-chain.view";
     String employeeCreate="admin.permission-management.employee-management.supply-chain.create";
     jdbcTemplate.update("UPDATE terminal_function_policies SET function_permissions=? WHERE terminal='supply-chain'", roleView+","+employeeCreate);
     for (boolean reuse : List.of(false,true)) {
       String phone=reuse ? "15926627772" : "15926627771";
       if (reuse) jdbcTemplate.update("INSERT INTO accounts(phone,display_name,status,account_type) VALUES (?, '已有统一账号','enabled','person')",phone);
-      String invite=initialSupplyAdminInvite();
+      String invite=supplyAdminInvite();
       String body="""
           {"phone":"%s","verifyCode":"888888","name":"初始管理员","gender":"male",
            "identityType":"platform_admin","clientCode":"admin","roleIds":"1","tenantId":1,"storeId":1}
@@ -5092,7 +5092,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM employee_invites WHERE token=?",String.class,invite)).isEqualTo("used");
         assertThat(jdbcTemplate.queryForObject("SELECT used_at FROM employee_invites WHERE token=?",java.sql.Timestamp.class,invite)).isNotNull();
         mockMvc.perform(post("/api/admin/employee-invites").param("clientCode","supply-chain")
-            .header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isBadRequest());
+            .header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
         // Administrator's own invitations always create ordinary employees, regardless of forged fields.
         MvcResult local=mockMvc.perform(post("/api/admin/employee-invites").header("Authorization","Bearer "+adminSession))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.identityType").value("employee")).andReturn();
@@ -5118,10 +5118,10 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
-  void initialAdministratorInvitationCannotPromoteAnExistingSupplyChainEmployee() throws Exception {
+  void administratorInvitationCannotPromoteAnExistingSupplyChainEmployee() throws Exception {
     supplyChainToken();
     String phone=jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=1",String.class);
-    String invite=initialSupplyAdminInvite();
+    String invite=supplyAdminInvite();
     mockMvc.perform(post("/api/open/employee-invites/{token}/register",invite).contentType("application/json").content("""
         {"phone":"%s","verifyCode":"888888","name":"禁止升级","gender":"male"}
         """.formatted(phone)))
@@ -5132,40 +5132,49 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
-  void concurrentInitialAdministratorAcceptancesCreateOnlyOneAdministrator() throws Exception {
-    String first=initialSupplyAdminInvite();
-    String second=initialSupplyAdminInvite();
-    var executor=java.util.concurrent.Executors.newFixedThreadPool(2);
-    var start=new java.util.concurrent.CountDownLatch(1);
-    java.util.List<java.util.concurrent.Future<Integer>> results=new java.util.ArrayList<>();
-    try {
-      for (int index=0;index<2;index++) {
-        final String token=index==0 ? first : second;
-        final String phone=index==0 ? "15926627775" : "15926627776";
-        results.add(executor.submit(() -> {
-          start.await();
-          return mockMvc.perform(post("/api/open/employee-invites/{token}/register",token)
-              .contentType("application/json").content("""
-                  {"phone":"%s","verifyCode":"888888","name":"并发管理员","gender":"female"}
-                  """.formatted(phone))).andReturn().getResponse().getStatus();
-        }));
-      }
-      start.countDown();
-      assertThat(List.of(results.get(0).get(30,java.util.concurrent.TimeUnit.SECONDS),
-          results.get(1).get(30,java.util.concurrent.TimeUnit.SECONDS))).containsExactlyInAnyOrder(200,400);
-      assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_identities WHERE identity_type='supply_chain_admin'",Integer.class)).isEqualTo(1);
-    } finally {
-      executor.shutdownNow();
-      for (Long id:jdbcTemplate.queryForList("SELECT id FROM accounts WHERE phone IN ('15926627775','15926627776')",Long.class)) {
-        jdbcTemplate.update("DELETE FROM account_identities WHERE account_id=?",id);
-        jdbcTemplate.update("DELETE FROM employee_invite_acceptances WHERE account_id=?",id);
+  void concurrentAdministratorInvitationsAreIndependentAndEachSingleUse() throws Exception {
+    for (boolean sameLink : List.of(false, true)) {
+      String first=supplyAdminInvite();
+      String second=sameLink ? first : supplyAdminInvite();
+      var executor=java.util.concurrent.Executors.newFixedThreadPool(2);
+      var start=new java.util.concurrent.CountDownLatch(1);
+      java.util.List<java.util.concurrent.Future<Integer>> results=new java.util.ArrayList<>();
+      try {
+        for (int index=0;index<2;index++) {
+          final String token=index==0 ? first : second;
+          final String phone=index==0 ? "15926627775" : "15926627776";
+          results.add(executor.submit(() -> {
+            start.await();
+            return mockMvc.perform(post("/api/open/employee-invites/{token}/register",token)
+                .contentType("application/json").content("""
+                    {"phone":"%s","verifyCode":"888888","name":"并发管理员","gender":"female"}
+                    """.formatted(phone))).andReturn().getResponse().getStatus();
+          }));
+        }
+        start.countDown();
+        assertThat(List.of(results.get(0).get(30,java.util.concurrent.TimeUnit.SECONDS),
+            results.get(1).get(30,java.util.concurrent.TimeUnit.SECONDS)))
+            .containsExactlyInAnyOrder(200,sameLink ? 400 : 200);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM account_identities WHERE identity_type='supply_chain_admin'",Integer.class)).isEqualTo(sameLink ? 1 : 2);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM employee_invites WHERE token IN (?,?) AND status='used'",Integer.class,first,second)).isEqualTo(sameLink ? 1 : 2);
+        mockMvc.perform(post("/api/admin/employee-invites").param("clientCode","supply-chain")
+            .header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/admin/employees").param("clientCode","supply-chain")
+            .header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(sameLink ? 1 : 2));
+      } finally {
+        executor.shutdownNow();
+        for (Long id:jdbcTemplate.queryForList("SELECT id FROM accounts WHERE phone IN ('15926627775','15926627776')",Long.class)) {
+          jdbcTemplate.update("DELETE FROM account_identities WHERE account_id=?",id);
+          jdbcTemplate.update("DELETE FROM employee_invite_acceptances WHERE account_id=?",id);
+          jdbcTemplate.update("DELETE FROM accounts WHERE id=?",id);
+        }
         jdbcTemplate.update("DELETE FROM employee_invites WHERE token IN (?,?)",first,second);
-        jdbcTemplate.update("DELETE FROM accounts WHERE id=?",id);
       }
     }
   }
 
-  private String initialSupplyAdminInvite() throws Exception {
+  private String supplyAdminInvite() throws Exception {
     MvcResult result=mockMvc.perform(post("/api/admin/employee-invites").param("clientCode","supply-chain")
         .header("Authorization","Bearer "+TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data.identityType").value("supply_chain_admin")).andReturn();

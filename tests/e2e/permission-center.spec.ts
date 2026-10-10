@@ -1540,8 +1540,13 @@ test('platform roles stay on its own client and supply-chain opening records are
   await expect(row).toBeVisible();
   await expect(row).toContainText('管理员');
   await expect(row.locator('.table-actions .t-link')).toHaveCount(0);
-  await expect(page.getByRole('main').getByRole('button', { name: '邀请员工', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('main').locator('.zdm-admin-filter-form')).toHaveCount(0);
+  await expect(page.getByRole('main').getByRole('button', { name: '邀请员工', exact: true })).toBeVisible();
+  await expect(page.getByRole('main').locator('.zdm-admin-filter-form')).toBeVisible();
+  await page.locator('.name-filter input').fill('不匹配的姓名');
+  await page.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(row).toHaveCount(0);
+  await page.getByRole('button', { name: '重置', exact: true }).click();
+  await expect(row).toBeVisible();
   expect(roleRequests.every((url) => new URL(url).searchParams.get('clientCode') === 'admin')).toBe(true);
 });
 

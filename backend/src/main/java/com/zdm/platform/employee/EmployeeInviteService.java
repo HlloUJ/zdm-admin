@@ -50,7 +50,6 @@ public class EmployeeInviteService extends ServiceImpl<EmployeeInviteMapper, Emp
     invite.setToken(generateToken());
     invite.setClientCode(client);
     if ("admin".equals(identity.clientCode()) && "supply-chain".equals(client)) {
-      supplyChainAdmins.requireNotOpened();
       invite.setTargetIdentityType("supply_chain_admin");
     }
     invite.setTenantId(identity.tenantId());

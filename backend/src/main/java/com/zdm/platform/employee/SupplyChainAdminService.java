@@ -18,39 +18,20 @@ public class SupplyChainAdminService {
   }
 
   @org.springframework.transaction.annotation.Transactional
-  public void requireNotOpened() {
-    lockClient();
-    if (!administratorAccounts().isEmpty()) {
-      throw new IllegalArgumentException("供应链协同系统已建立管理员身份，无需重复邀请");
-    }
-  }
-
-  @org.springframework.transaction.annotation.Transactional
   public EmployeeInviteRegisterResponse accept(EmployeeInvite invite, EmployeeInviteRegisterRequest request) {
-    lockClient();
+    // Serialize administrator enrollment to avoid concurrent account/identity insert gap locks.
+    // This lock does not limit how many administrators can be invited or created.
+    jdbc.queryForObject("SELECT code FROM platform_clients WHERE code='supply-chain' FOR UPDATE", String.class);
     var existing = accounts.findByPhoneForUpdate(request.phone());
     if (existing.isEmpty() && (!StringUtils.hasText(request.name())
         || !List.of("male", "female").contains(request.gender() == null ? "" : request.gender()))) {
       throw new IllegalArgumentException("请填写姓名并选择性别");
     }
-    List<Long> administrators = administratorAccounts();
-    if (!administrators.isEmpty()) {
-      if (existing.isPresent() && administrators.contains(existing.get().id())) {
-        invite.setAcceptedAccountId(existing.get().id());
-        boolean enabled = Boolean.TRUE.equals(jdbc.queryForObject("""
-            SELECT COUNT(*) > 0 FROM account_identities
-            WHERE account_id=? AND client_code='supply-chain'
-              AND identity_type='supply_chain_admin' AND status='enabled'
-            """, Boolean.class, existing.get().id())) && "enabled".equals(existing.get().status());
-        return new EmployeeInviteRegisterResponse(null, enabled ? "enabled" : "disabled", true, true, enabled, "supply_chain_admin");
-      }
-      throw new IllegalArgumentException("供应链协同系统已建立管理员身份，无需重复注册");
-    }
     var account = existing.orElseGet(() -> accounts.findOrCreate(request.phone(), request.name().trim()));
     if (!"enabled".equals(account.status())) {
       throw new IllegalArgumentException("该账号已停用，不能建立管理员身份");
     }
-    if (!jdbc.queryForList("SELECT id FROM account_identities WHERE account_id=? AND client_code='supply-chain'",
+    if (!jdbc.queryForList("SELECT id FROM account_identities WHERE account_id=? AND client_code='supply-chain' FOR UPDATE",
         Long.class, account.id()).isEmpty()) {
       throw new IllegalArgumentException("该账号已有供应链身份，不能通过邀请升级或重新启用");
     }
@@ -90,16 +71,5 @@ public class SupplyChainAdminService {
           record.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
           return record;
         });
-  }
-
-  private List<Long> administratorAccounts() {
-    return jdbc.queryForList("""
-        SELECT account_id FROM account_identities
-        WHERE client_code='supply-chain' AND identity_type='supply_chain_admin' FOR UPDATE
-        """, Long.class);
-  }
-
-  private void lockClient() {
-    jdbc.queryForObject("SELECT code FROM platform_clients WHERE code='supply-chain' FOR UPDATE", String.class);
   }
 }
