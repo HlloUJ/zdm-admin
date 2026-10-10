@@ -59,6 +59,26 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
   @Test
   @Transactional
+  void businessCreatorFollowsAccountRenameWhileSelectionLogKeepsHistoricalName() throws Exception {
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES(99931,1,'创建人测试店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO finished_products(id,name,sku,total_stock,status,source_status,operations_deleted) VALUES(99931,'创建人测试商品','creator-test-product',2,'selling','selling',FALSE)");
+    identity(99931L);
+    var selected = products.select(List.of(99931L)).getFirst();
+    assertThat(jdbc.queryForObject("SELECT selected_by_account_id FROM store_finished_products WHERE id=?", Long.class, selected.id())).isEqualTo(1L);
+    String historicalName = jdbc.queryForObject("SELECT operator_name FROM store_finished_operation_logs WHERE listing_id=? AND operation_type='SELECT'", String.class, selected.id());
+    assertThat(historicalName).isEqualTo("门店测试员工");
+    jdbc.update("UPDATE accounts SET display_name='创建人改名后' WHERE id=1");
+    assertThat(products.detail(selected.id()).createdByName()).isEqualTo("创建人改名后");
+    assertThat(products.list()).filteredOn(item -> item.id().equals(selected.id()))
+        .allSatisfy(item -> assertThat(item.createdByName()).isEqualTo("创建人改名后"));
+    assertThat(jdbc.queryForObject("SELECT operator_name FROM store_finished_operation_logs WHERE listing_id=? AND operation_type='SELECT'", String.class, selected.id())).isEqualTo(historicalName);
+    // Creator ownership belongs to the business record even when the SELECT log is absent.
+    jdbc.update("DELETE FROM store_finished_operation_logs WHERE listing_id=?", selected.id());
+    assertThat(products.detail(selected.id()).createdByName()).isEqualTo("创建人改名后");
+  }
+
+  @Test
+  @Transactional
   void poolPricesAndReadOnlyDetailsUseOnlyCurrentStoreLevel() throws Exception {
     jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99751,'商品中心甲级',1),(99752,'商品中心乙级',2)");
     jdbc.update("INSERT INTO stores (id,tenant_id,name,type,store_level_id,status) "
@@ -160,11 +180,11 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(json.writeValueAsString(products.pool())).doesNotContain("supplier");
     assertThat(json.writeValueAsString(products.poolDetail(99751L))).doesNotContain("supplier");
     var selectedProduct = products.select(List.of(99751L)).getFirst();
-    assertThat(selectedProduct.createdByName()).isEqualTo("门店测试员工");
+    assertThat(selectedProduct.createdByName()).isEqualTo(jdbc.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class));
     assertThat(selectedProduct.createdAt()).isNotNull().isEqualTo(jdbc.queryForObject(
         "SELECT created_at FROM store_finished_products WHERE id=?", java.time.LocalDateTime.class, selectedProduct.id()));
     var listedProduct = products.list().stream().filter(item -> item.id().equals(selectedProduct.id())).findFirst().orElseThrow();
-    assertThat(listedProduct.createdByName()).isEqualTo("门店测试员工");
+    assertThat(listedProduct.createdByName()).isEqualTo(jdbc.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class));
     assertThat(listedProduct.createdAt()).isEqualTo(selectedProduct.createdAt());
     var viewJson = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
     assertThat(viewJson.writeValueAsString(selectedProduct)).doesNotContain("supplier");

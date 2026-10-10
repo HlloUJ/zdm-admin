@@ -1,17 +1,14 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class SlabOriginService extends CreatorAwareService<SlabOriginMapper, SlabOrigin> {
   private static final String DUPLICATE_NAME_MESSAGE = "产地名称已存在";
   private static final String REFERENCED_MESSAGE =
       "该产地已被大板库存引用，不能删除，请先停用该产地";
@@ -30,7 +27,6 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
   public SlabOrigin createOrigin(SlabOrigin origin) {
     origin.setId(null);
     normalizeAndValidateName(origin, null);
-    origin.setCreatedByName(resolveCreatedByName());
     origin.setCreatedByAccountId(identityProvider.require().accountId());
     save(origin);
     return origin;
@@ -44,7 +40,6 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     }
     payload.setId(id);
     payload.setStatus(existing.getStatus());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateName(payload, id);
     updateById(payload);
@@ -80,12 +75,6 @@ public class SlabOriginService extends ServiceImpl<SlabOriginMapper, SlabOrigin>
     }
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName()
-        : DEFAULT_CREATED_BY_NAME;
-  }
 
   private void normalizeAndValidateName(SlabOrigin origin, Long excludedOriginId) {
     String originName = origin.getName().trim();

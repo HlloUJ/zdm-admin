@@ -1,21 +1,18 @@
 package com.zdm.platform.craft;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.media.MediaAsset;
 import com.zdm.platform.media.MediaAssetService;
 import com.zdm.platform.media.MediaCleanupService;
 import com.zdm.platform.media.MediaReferenceService;
-import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.Map;
 
 @Service
-public class CraftService extends ServiceImpl<CraftMapper, Craft> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class CraftService extends CreatorAwareService<CraftMapper, Craft> {
 
   private final CurrentIdentityProvider identityProvider;
   private final MediaAssetService mediaAssetService;
@@ -41,7 +38,6 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
   public Craft createCraft(Craft craft) {
     validateImage(craft.getImageMediaId());
     craft.setId(null);
-    craft.setCreatedByName(resolveCreatedByName());
     craft.setCreatedByAccountId(identityProvider.require().accountId());
     save(craft);
     mediaReferenceService.replace(
@@ -58,7 +54,6 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
     validateImage(payload.getImageMediaId());
 
     payload.setId(id);
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     updateById(payload);
     mediaReferenceService.replace(
@@ -113,12 +108,6 @@ public class CraftService extends ServiceImpl<CraftMapper, Craft> {
     return craft;
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName()
-        : DEFAULT_CREATED_BY_NAME;
-  }
   @Override
   public Craft getById(java.io.Serializable id) {
     Craft entity = super.getById(id);

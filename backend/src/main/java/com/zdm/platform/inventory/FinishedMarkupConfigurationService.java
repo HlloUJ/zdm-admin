@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FinishedMarkupConfigurationService {
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.account.CreatorNames creatorNames;
   private static final String DUPLICATE_LEVEL_MESSAGE = "该门店级别已配置成品价格";
   private final FinishedMarkupConfigurationMapper mapper;
   private final FinishedPriceConfigurationSyncService priceSyncService;
@@ -44,6 +46,7 @@ public class FinishedMarkupConfigurationService {
         .orderByDesc(FinishedMarkupConfiguration::getCreatedAt)
         .orderByDesc(FinishedMarkupConfiguration::getId));
     result = com.zdm.platform.security.DataScope.filter(identityProvider.require(), result);
+    creatorNames.attachAll(result);
     result.forEach(this::enrich);
     return result;
   }
@@ -56,7 +59,6 @@ public class FinishedMarkupConfigurationService {
     payload.setName(level.name());
     payload.setStatus("enabled");
     payload.setSortOrder(nextSortOrder());
-    payload.setCreatedByName(identity.displayName());
     payload.setCreatedByAccountId(identity.accountId());
     validateUniqueStoreLevel(payload.getStoreLevelId(), null);
     try {
@@ -78,7 +80,6 @@ public class FinishedMarkupConfigurationService {
     payload.setName(existing.getName());
     payload.setStatus(existing.getStatus());
     payload.setSortOrder(existing.getSortOrder());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     validateUniqueStoreLevel(payload.getStoreLevelId(), id);
     try { mapper.updateById(payload); } catch (DuplicateKeyException exception) {
@@ -144,7 +145,7 @@ public class FinishedMarkupConfigurationService {
     }
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), configuration.getCreatedByAccountId());
     enrich(configuration);
-    return configuration;
+    return creatorNames.attach(configuration);
   }
 
   private CurrentIdentity requirePlatformScope() {

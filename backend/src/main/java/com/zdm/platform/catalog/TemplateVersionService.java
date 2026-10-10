@@ -90,7 +90,7 @@ public class TemplateVersionService {
 
   public List<TemplateVersion> list(long categoryId) {
     ProductCategory category = authorize(categoryId, "view");
-    List<TemplateVersion> versions = jdbc.query("SELECT * FROM category_template_versions WHERE category_id = ? ORDER BY state ASC, version_no DESC",
+    List<TemplateVersion> versions = jdbc.query("SELECT version.*, (SELECT display_name FROM accounts WHERE accounts.id=version.created_by_account_id) AS current_creator_name FROM category_template_versions version WHERE category_id = ? ORDER BY state ASC, version_no DESC",
         this::map, categoryId);
     String prefix = PREFIX + category.getScope() + ".attributes.";
     int latest = versions.stream().filter(v -> "published".equals(v.state()))
@@ -131,9 +131,9 @@ public class TemplateVersionService {
       throw new IllegalArgumentException("请选择末级分类维护模板");
     }
     JsonNode content = json.createArrayNode();
-    jdbc.update("INSERT INTO category_template_versions(category_id, content, created_by_name, created_by_account_id) VALUES(?, ?, ?, ?)",
-        categoryId, content.toString(), guard.identity().displayName(), guard.identity().accountId());
-    return jdbc.queryForObject("SELECT * FROM category_template_versions WHERE category_id = ? AND state = 'draft'",
+    jdbc.update("INSERT INTO category_template_versions(category_id, content, created_by_account_id) VALUES(?, ?, ?)",
+        categoryId, content.toString(), guard.identity().accountId());
+    return jdbc.queryForObject("SELECT version.*, (SELECT display_name FROM accounts WHERE accounts.id=version.created_by_account_id) AS current_creator_name FROM category_template_versions version WHERE category_id = ? AND state = 'draft'",
         this::map, categoryId);
   }
 
@@ -149,7 +149,7 @@ public class TemplateVersionService {
       throw new IllegalArgumentException("分类已停用，不能复制草稿");
     }
     jdbc.queryForObject("SELECT id FROM product_categories WHERE id = ? FOR UPDATE", Long.class, source.categoryId());
-    List<TemplateVersion> drafts = jdbc.query("SELECT * FROM category_template_versions WHERE category_id = ? AND state = 'draft' FOR UPDATE",
+    List<TemplateVersion> drafts = jdbc.query("SELECT version.*, (SELECT display_name FROM accounts WHERE accounts.id=version.created_by_account_id) AS current_creator_name FROM category_template_versions version WHERE category_id = ? AND state = 'draft' FOR UPDATE",
         this::map, source.categoryId());
     TemplateVersion target;
     if (drafts.isEmpty()) {
@@ -187,7 +187,7 @@ public class TemplateVersionService {
     }
     ArrayNode content = normalizeAttributes(version, version.content(), true);
     jdbc.queryForObject("SELECT id FROM product_categories WHERE id = ? FOR UPDATE", Long.class, version.categoryId());
-    List<TemplateVersion> published = jdbc.query("SELECT * FROM category_template_versions WHERE category_id = ? AND state = 'published' ORDER BY version_no DESC LIMIT 1",
+    List<TemplateVersion> published = jdbc.query("SELECT version.*, (SELECT display_name FROM accounts WHERE accounts.id=version.created_by_account_id) AS current_creator_name FROM category_template_versions version WHERE category_id = ? AND state = 'published' ORDER BY version_no DESC LIMIT 1",
         this::map, version.categoryId());
     if (!published.isEmpty() && published.get(0).content().equals(content)) {
       throw new IllegalArgumentException("配置未变化，无需发布新版本");
@@ -308,7 +308,7 @@ public class TemplateVersionService {
   }
 
   private TemplateVersion require(long id, boolean lock) {
-    List<TemplateVersion> rows = jdbc.query("SELECT * FROM category_template_versions WHERE id = ?" + (lock ? " FOR UPDATE" : ""), this::map, id);
+    List<TemplateVersion> rows = jdbc.query("SELECT version.*, (SELECT display_name FROM accounts WHERE accounts.id=version.created_by_account_id) AS current_creator_name FROM category_template_versions version WHERE id = ?" + (lock ? " FOR UPDATE" : ""), this::map, id);
     if (rows.isEmpty()) {
       throw new IllegalArgumentException("模板版本不存在");
     }
@@ -323,7 +323,7 @@ public class TemplateVersionService {
       var published = row.getObject("published_at", LocalDateTime.class);
       return new TemplateVersion(id, row.getLong("category_id"),
           row.getObject("version_no", Integer.class), row.getString("state"), row.getInt("revision"), sortedContent( json.readTree(row.getString("content"))),
-          row.getString("created_by_name"), row.getString("published_by_name"), row.getString("change_note"), row.getObject("created_at", LocalDateTime.class).atOffset(ZoneOffset.ofHours(8)),
+          row.getString("current_creator_name"), row.getString("published_by_name"), row.getString("change_note"), row.getObject("created_at", LocalDateTime.class).atOffset(ZoneOffset.ofHours(8)),
           published == null ? null : published.atOffset(ZoneOffset.ofHours(8)), row.getObject("created_by_account_id", Long.class));
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("模板快照格式错误", e);

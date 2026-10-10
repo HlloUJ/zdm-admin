@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.zdm.platform.common.BaseEntity;
 
 @TableName("store_categories")
-public class StoreCategory extends BaseEntity {
+public class StoreCategory extends BaseEntity implements com.zdm.platform.account.NamedCreatorOwned {
   private String scope;
 
   public String getScope() { return scope; }
@@ -15,6 +15,7 @@ public class StoreCategory extends BaseEntity {
   private String name;
   private Integer sortOrder;
   private Integer productCount;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
 
   public Long getStoreId() {

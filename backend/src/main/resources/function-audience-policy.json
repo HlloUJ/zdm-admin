@@ -113,11 +113,11 @@
   },
   {
     "prefix": "admin.permission-management.role-management.supply-chain",
-    "scope": "internal-management"
+    "scope": "supply-chain-only"
   },
   {
     "prefix": "admin.permission-management.employee-management.supply-chain",
-    "scope": "internal-management"
+    "scope": "supply-chain-only"
   },
   {
     "prefix": "store.price-configuration.discount.finished.batch-set",
@@ -126,5 +126,25 @@
   {
     "prefix": "store.price-configuration.discount.accessory.batch-set",
     "scope": "removed"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.view",
+    "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.create",
+    "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.edit",
+    "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.toggle-status",
+    "scope": "internal-management"
+  },
+  {
+    "prefix": "admin.permission-management.employee-management.supply-chain.delete",
+    "scope": "internal-management"
   }
 ]

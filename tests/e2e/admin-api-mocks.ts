@@ -17,7 +17,6 @@ const tenants = [
   {
     id: 1,
     name: '装点猫直营租户',
-    contactName: '超级管理员',
     contactPhone: '15926626945',
     status: 'enabled',
     businessTypes: 'cityPartner,slabSupplier,finishedSupplier,factory',
@@ -29,7 +28,6 @@ const tenants = [
   {
     id: 2,
     name: '临时归档租户',
-    contactName: '归档联系人',
     contactPhone: '15926626949',
     status: 'disabled',
     businessTypes: 'cityPartner',

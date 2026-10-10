@@ -1,6 +1,7 @@
 import { request } from './http';
 
 export interface EmployeeInviteResponse {
+  identityType?: string;
   token: string;
   expiresAt: string;
   clientCode: 'admin' | 'supply-chain';
@@ -21,6 +22,7 @@ export interface EmployeeInviteRegisterPayload extends VerifyInviteCodePayload {
 }
 
 export interface EmployeeInviteRegisterResponse {
+  identityType?: string;
   employeeId: number | null;
   status: 'enabled' | 'disabled';
   existingAccount: boolean;

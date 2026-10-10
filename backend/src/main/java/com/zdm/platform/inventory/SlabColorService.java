@@ -1,8 +1,7 @@
 package com.zdm.platform.inventory;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.List;
 import java.util.Map;
@@ -10,11 +9,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class SlabColorService extends CreatorAwareService<SlabColorMapper, SlabColor> {
   private final SlabColorCategoryMapper categoryMapper;
   private final CurrentIdentityProvider identityProvider;
 
@@ -45,7 +42,6 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     color.setId(null);
     requireCategory(color.getCategoryId());
     normalizeAndValidateColorName(color, null);
-    color.setCreatedByName(resolveCreatedByName());
     color.setCreatedByAccountId(identityProvider.require().accountId());
     save(color);
     return enrich(color);
@@ -57,7 +53,6 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     requireCategory(payload.getCategoryId());
     payload.setId(id);
     payload.setStatus(existing.getStatus());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateColorName(payload, id);
     updateById(payload);
@@ -79,25 +74,23 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
   }
 
   public List<SlabColorCategory> listCategories() {
-    return categoryMapper.selectList(Wrappers.<SlabColorCategory>lambdaQuery()
-        .orderByDesc(SlabColorCategory::getCreatedAt));
+    return creatorNames.attachAll(categoryMapper.selectList(Wrappers.<SlabColorCategory>lambdaQuery()
+        .orderByDesc(SlabColorCategory::getCreatedAt)));
   }
 
   @Transactional
   public SlabColorCategory createCategory(SlabColorCategory category) {
     category.setId(null);
     normalizeAndValidateCategoryName(category, null);
-    category.setCreatedByName(resolveCreatedByName());
     category.setCreatedByAccountId(identityProvider.require().accountId());
     categoryMapper.insert(category);
-    return category;
+    return creatorNames.attach(category);
   }
 
   @Transactional
   public SlabColorCategory updateCategory(Long id, SlabColorCategory payload) {
     SlabColorCategory existing = requireCategory(id);
     payload.setId(id);
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     normalizeAndValidateCategoryName(payload, id);
     categoryMapper.updateById(payload);
@@ -127,7 +120,7 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
       throw new IllegalArgumentException("色系分类不存在");
     }
     com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), category.getCreatedByAccountId());
-    return category;
+    return creatorNames.attach(category);
   }
 
   private SlabColor enrich(SlabColor color) {
@@ -159,11 +152,6 @@ public class SlabColorService extends ServiceImpl<SlabColorMapper, SlabColor> {
     }
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName() : DEFAULT_CREATED_BY_NAME;
-  }
 
   @Override
   public SlabColor getById(java.io.Serializable id) {

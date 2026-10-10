@@ -1,6 +1,6 @@
 package com.zdm.platform.supplier;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.common.SlabSupplierOptionProvider;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class SupplierService extends ServiceImpl<SupplierMapper, Supplier>
+public class SupplierService extends CreatorAwareService<SupplierMapper, Supplier>
     implements SlabSupplierOptionProvider {
   private static final String DUPLICATE_NAME_MESSAGE = "供应商名称已存在";
   private static final String SLAB_REFERENCED_MESSAGE =
@@ -101,7 +101,6 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier>
     applyScope(supplier, scope);
     List<SupplierSupplyType> types = requireSelectableTypes(supplier.getSupplyTypeIds(), List.of());
     normalizeAndValidateName(supplier, scope, null);
-    supplier.setCreatedByName(identity.displayName());
     supplier.setCreatedByAccountId(identity.accountId());
     try {
       save(supplier);
@@ -122,7 +121,6 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier>
     applyScope(payload, scope);
     normalizeAndValidateName(payload, scope, id);
     payload.setStatus(existing.getStatus());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     try {
       updateById(payload);
@@ -283,9 +281,10 @@ public class SupplierService extends ServiceImpl<SupplierMapper, Supplier>
     Object[] ids = suppliers.stream().map(Supplier::getId).toArray();
     String supplyTypeSql = """
         SELECT link.supplier_id, type.id, type.code, type.name, type.status,
-               type.created_by_name, type.created_by_account_id, type.created_at, type.updated_at
+               creator.display_name AS created_by_name, type.created_by_account_id, type.created_at, type.updated_at
         FROM supplier_supply_type_links link
         JOIN supplier_supply_types type ON type.id = link.supply_type_id
+        LEFT JOIN accounts creator ON creator.id=type.created_by_account_id
         WHERE link.supplier_id IN (__PLACEHOLDERS__)
         ORDER BY type.id
         """.replace("__PLACEHOLDERS__", placeholders);

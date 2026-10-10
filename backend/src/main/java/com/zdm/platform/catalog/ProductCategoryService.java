@@ -1,7 +1,6 @@
 package com.zdm.platform.catalog;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Collection;
 import java.util.HashMap;
@@ -11,11 +10,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
-public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, ProductCategory> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class ProductCategoryService extends CreatorAwareService<ProductCategoryMapper, ProductCategory> {
   private static final String DUPLICATE_NAME_MESSAGE = "同级分类名称不能重复";
 
   private final CurrentIdentityProvider identityProvider;
@@ -53,7 +50,6 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     category.setId(null);
     category.setProductCount(0);
     normalizeAndValidateCategory(category, null);
-    category.setCreatedByName(resolveCreatedByName());
     category.setCreatedByAccountId(identityProvider.require().accountId());
     try {
       save(category);
@@ -70,7 +66,6 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
       throw new IllegalArgumentException("分类不存在");
     }
     payload.setId(id);
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     payload.setCreatedAt(existing.getCreatedAt());
     payload.setProductCount(resolveActualProductCount(existing));
@@ -108,12 +103,6 @@ public class ProductCategoryService extends ServiceImpl<ProductCategoryMapper, P
     }
   }
 
-  private String resolveCreatedByName() {
-    CurrentIdentity identity = identityProvider.current().orElse(null);
-    return identity != null && StringUtils.hasText(identity.displayName())
-        ? identity.displayName()
-        : DEFAULT_CREATED_BY_NAME;
-  }
 
   private List<ProductCategory> attachActualFinishedProductCounts(
       List<ProductCategory> categories) {

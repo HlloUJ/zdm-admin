@@ -3,7 +3,6 @@ import { request } from './http';
 export interface TenantRecord {
   id: number;
   name: string;
-  contactName: string;
   contactPhone: string;
   status: 'enabled' | 'disabled';
   createdByName?: string;
@@ -16,7 +15,6 @@ export interface TenantRecord {
 
 export interface TenantPayload {
   name: string;
-  contactName: string;
   contactPhone: string;
   status: 'enabled' | 'disabled';
   businessTypes?: string;

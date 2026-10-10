@@ -5,7 +5,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("product_categories")
-public class ProductCategory extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class ProductCategory extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   private Long tenantId;
   private Long parentId;
 
@@ -17,6 +17,7 @@ public class ProductCategory extends BaseEntity implements com.zdm.platform.secu
 
   private Integer sortOrder;
   private Integer productCount;
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
 

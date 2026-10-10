@@ -105,6 +105,7 @@ public class AuthService {
       case "platform_admin" -> List.of("SUPER_ADMIN");
       case "tenant_admin" -> List.of("TENANT_ADMIN");
       case "store_admin" -> List.of("STORE_ADMIN");
+      case "supply_chain_admin" -> List.of("SUPPLY_CHAIN_ADMIN");
       default -> authAccountMapper.findAdminRoleCodes(account.getId(), account.getIdentityId());
     };
   }
@@ -113,7 +114,7 @@ public class AuthService {
     return switch (identityType(account)) {
       case "platform_admin" -> List.of("平台超级管理员");
       case "tenant_admin" -> List.of("租户管理员");
-      case "store_admin" -> List.of("门店管理员");
+      case "store_admin", "supply_chain_admin" -> List.of("管理员");
       default -> authAccountMapper.findAdminRoleNames(account.getId(), account.getIdentityId());
     };
   }

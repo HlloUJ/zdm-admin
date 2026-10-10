@@ -5,7 +5,7 @@ import com.zdm.platform.common.BaseEntity;
 import jakarta.validation.constraints.NotBlank;
 
 @TableName("slab_grades")
-public class SlabGrade extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class SlabGrade extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotBlank
   private String code;
 
@@ -13,6 +13,7 @@ public class SlabGrade extends BaseEntity implements com.zdm.platform.security.C
   private String name;
   private Integer sortOrder;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private String remark;

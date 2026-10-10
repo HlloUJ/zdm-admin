@@ -1,7 +1,6 @@
 package com.zdm.platform.tenant;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.account.CreatorAwareService;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -19,8 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
-  private static final String DEFAULT_CREATED_BY_NAME = "韩健";
+public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
   private static final Set<String> BUSINESS_TYPES =
       Set.of("cityPartner", "slabSupplier", "finishedSupplier", "factory");
 
@@ -38,29 +36,29 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   }
 
   public List<Tenant> listTenants() {
-    return lambdaQuery()
+    return withPersonalProfiles(lambdaQuery()
         .orderByDesc(Tenant::getCreatedAt)
         .orderByDesc(Tenant::getId)
-        .list();
+        .list());
   }
 
   @Transactional
   public Tenant createTenant(Tenant tenant) {
     List<String> businesses = List.of();
     tenant.setBusinessTypes("");
-    tenant.setCreatedByName(resolveCreatedByName());
     tenant.setCreatedByAccountId(identityProvider.require().accountId());
     requireAvailableTenantPhone(tenant.getContactPhone(), null);
     Long accountId;
     try {
-      accountId = findOrCreateAccount(tenant.getContactPhone(), tenant.getContactName());
+      accountId = findOrCreateAccount(tenant.getContactPhone(), tenant.getName());
+      tenant.setAccountId(accountId);
       save(tenant);
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException("该手机号已存在", exception);
     }
     syncBusinesses(tenant.getId(), businesses);
     syncTenantAdminIdentity(tenant, accountId);
-    return tenant;
+    return getById(tenant.getId());
   }
 
   @Transactional
@@ -75,16 +73,16 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     requireAvailableTenantPhone(payload.getContactPhone(), id);
     requireAvailablePhone(payload.getContactPhone(), ownerAccountId);
     payload.setId(id);
+    payload.setAccountId(ownerAccountId);
     payload.setStatus(existing.getStatus());
     payload.setBusinessTypes(existing.getBusinessTypes());
-    payload.setCreatedByName(existing.getCreatedByName());
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     try {
       updateById(payload);
       jdbcTemplate.update(
           "UPDATE accounts SET phone = ?, display_name = ? WHERE id = ?",
           payload.getContactPhone(),
-          payload.getContactName(),
+          payload.getName(),
           ownerAccountId);
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException("该手机号已存在", exception);
@@ -272,28 +270,18 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   private void requireAvailableTenantPhone(String phone, Long tenantId) {
     Integer count = tenantId == null
         ? jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM tenants WHERE contact_phone = ?", Integer.class, phone)
+            "SELECT COUNT(*) FROM tenants t JOIN accounts a ON a.id=t.account_id WHERE a.phone = ?", Integer.class, phone)
         : jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM tenants WHERE contact_phone = ? AND id <> ?", Integer.class, phone, tenantId);
+            "SELECT COUNT(*) FROM tenants t JOIN accounts a ON a.id=t.account_id WHERE a.phone = ? AND t.id <> ?", Integer.class, phone, tenantId);
     if (count != null && count > 0) {
       throw new IllegalArgumentException("该手机号已存在");
     }
   }
 
-  private String resolveCreatedByName() {
-    return identityProvider.current()
-        .map(CurrentIdentity::displayName)
-        .filter(StringUtils::hasText)
-        .orElse(DEFAULT_CREATED_BY_NAME);
-  }
 
   private Long requireOwnerAccountId(Long tenantId) {
     return jdbcTemplate.query(
-        """
-        SELECT account_id FROM account_identities
-        WHERE identity_type = 'tenant_admin' AND tenant_id = ?
-        ORDER BY id LIMIT 1
-        """,
+        "SELECT account_id FROM tenants WHERE id = ?",
         (rs, rowNum) -> rs.getLong("account_id"),
         tenantId).stream().findFirst().orElseThrow(() -> new IllegalArgumentException("租户管理员身份不存在"));
   }
@@ -313,20 +301,21 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
   }
 
   private Tenant lockTenant(Long id) {
-    return jdbcTemplate.query(
+    Tenant locked = jdbcTemplate.query(
         "SELECT * FROM tenants WHERE id = ? FOR UPDATE",
         (rs, rowNum) -> {
           Tenant tenant = new Tenant();
           tenant.setId(rs.getLong("id"));
-          tenant.setName(rs.getString("name"));
-          tenant.setContactName(rs.getString("contact_name"));
-          tenant.setContactPhone(rs.getString("contact_phone"));
+          tenant.setAccountId(rs.getLong("account_id"));
+          tenant.setBusinessTypes(rs.getString("business_types"));
+          tenant.setRemark(rs.getString("remark"));
           tenant.setStatus(rs.getString("status"));
-          tenant.setCreatedByName(rs.getString("created_by_name"));
           tenant.setCreatedByAccountId(rs.getObject("created_by_account_id", Long.class));
           return tenant;
         },
         id).stream().findFirst().orElseThrow(() -> new IllegalArgumentException("租户不存在或已删除"));
+    withPersonalProfiles(List.of(locked));
+    return creatorNames.attach(locked);
   }
 
   private TenantPurgePreview buildPurgePreview(Tenant tenant) {
@@ -451,12 +440,35 @@ public class TenantService extends ServiceImpl<TenantMapper, Tenant> {
     Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
     return value == null ? 0 : value;
   }
+  private List<Tenant> withPersonalProfiles(List<Tenant> tenants) {
+    var ids = tenants.stream().map(Tenant::getAccountId).distinct().toList();
+    if (ids.isEmpty()) {
+      return tenants;
+    }
+    String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    var profiles = jdbcTemplate.query("SELECT id,display_name,phone FROM accounts WHERE id IN (" + placeholders + ")",
+        (rs, row) -> new PersonalProfile(rs.getLong("id"), rs.getString("display_name"), rs.getString("phone")), ids.toArray());
+    var byId = profiles.stream().collect(java.util.stream.Collectors.toMap(PersonalProfile::accountId, value -> value));
+    for (Tenant tenant : tenants) {
+      PersonalProfile profile = byId.get(tenant.getAccountId());
+      if (profile == null) {
+        throw new IllegalArgumentException("租户管理员账号不存在");
+      }
+      tenant.setName(profile.name());
+      tenant.setContactPhone(profile.phone());
+    }
+    return tenants;
+  }
+
+  private record PersonalProfile(Long accountId, String name, String phone) {}
+
   @Override
   public Tenant getById(java.io.Serializable id) {
     Tenant entity = super.getById(id);
     if (entity != null) {
       com.zdm.platform.security.DataScope.requireAccess(
           identityProvider.require(), entity.getCreatedByAccountId());
+      withPersonalProfiles(List.of(entity));
     }
     return entity;
   }

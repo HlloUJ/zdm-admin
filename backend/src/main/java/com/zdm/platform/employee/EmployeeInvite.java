@@ -6,12 +6,15 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
 @TableName("employee_invites")
-public class EmployeeInvite {
+public class EmployeeInvite implements com.zdm.platform.account.NamedCreatorOwned {
   @TableId(type = IdType.AUTO)
   private Long id;
 
   private String token;
   private String clientCode;
+  private String targetIdentityType = "employee";
+  public String getTargetIdentityType() { return targetIdentityType; }
+  public void setTargetIdentityType(String value) { targetIdentityType = value; }
 
   public String getClientCode() { return clientCode; }
   public void setClientCode(String clientCode) { this.clientCode = clientCode; }
@@ -25,6 +28,7 @@ public class EmployeeInvite {
   public void setCreatedByIdentityId(Long value) { createdByIdentityId = value; }
   public Long getAcceptedAccountId() { return acceptedAccountId; }
   public void setAcceptedAccountId(Long value) { acceptedAccountId = value; }
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private String status;
   private LocalDateTime expiresAt;

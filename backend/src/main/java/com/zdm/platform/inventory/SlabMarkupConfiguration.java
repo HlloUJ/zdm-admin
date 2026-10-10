@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 @TableName("slab_markup_configurations")
-public class SlabMarkupConfiguration extends BaseEntity implements com.zdm.platform.security.CreatorOwned {
+public class SlabMarkupConfiguration extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
   @NotNull
   private Long storeLevelId;
 
@@ -22,6 +22,7 @@ public class SlabMarkupConfiguration extends BaseEntity implements com.zdm.platf
 
   private Integer sortOrder;
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String createdByName;
   private Long createdByAccountId;
   private Boolean legacySeeded;
