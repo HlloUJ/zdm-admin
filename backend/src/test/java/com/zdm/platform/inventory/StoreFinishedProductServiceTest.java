@@ -37,6 +37,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Autowired private StoreFinishedProductService products;
   @Autowired private StoreFinishedPriceConfigurationService configurations;
   @Autowired private StorePriceRuleService priceRules;
+  @Autowired private com.zdm.platform.store.StoreCategoryService storeCategories;
   @Autowired private ProductLifecycleService lifecycle;
   @Autowired private StoreFinishedUpstreamLogService upstreamLogs;
   @Autowired private FinishedProductService finishedProducts;
@@ -674,8 +675,9 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES "
         + "(99961,1,'新定价甲店','cityPartner','enabled'),(99962,1,'新定价乙店','cityPartner','enabled')");
     jdbc.update("INSERT INTO store_categories(id,store_id,scope,parent_id,name) VALUES "
-        + "(99961,99961,'finished',NULL,'餐桌'),(99962,99961,'finished',99961,'石材餐桌'),"
-        + "(99963,99961,'finished',99962,'奢石餐桌'),(99964,99962,'finished',NULL,'他店分类'),"
+        + "(99960,99961,'finished',NULL,'家具'),(99966,99961,'finished',99960,'桌类'),"
+        + "(99961,99961,'finished',99966,'餐桌'),(99962,99961,'finished',99966,'石材餐桌'),"
+        + "(99963,99961,'finished',99960,'奢石餐桌'),(99964,99962,'finished',NULL,'他店分类'),"
         + "(99965,99961,'accessory',NULL,'配件')");
     jdbc.update("INSERT INTO roles(id,name,code,client_code,tenant_id,store_id,status) VALUES "
         + "(99961,'店长','rule-manager','admin',1,99961,'enabled'),"
@@ -692,7 +694,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     priceRules.saveBatch("price", "finished", List.of(99961L), new BigDecimal("2.50"));
     assertThat(priceRules.list("price", "finished")).singleElement()
         .satisfies(rule -> assertThat(rule.categoryId()).isEqualTo(99961L));
-    assertThat(priceRules.categories("finished")).hasSize(3);
+    assertThat(priceRules.categories("finished")).hasSize(5);
     priceRules.saveBatch("price", "finished", List.of(99962L), new BigDecimal("3.00"));
     assertThat(priceRules.list("price", "finished")).hasSize(2)
         .noneMatch(rule -> rule.categoryId().equals(99963L));
@@ -709,15 +711,16 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     priceRuleFixture();
     priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.90"));
     priceRules.saveBatch("discount", "finished", List.of(99962L), new BigDecimal("0.10"));
-    priceRules.saveBatch("discount", "accessory", List.of(99961L), new BigDecimal("1.20"));
+    priceRules.saveBatch("discount", "accessory", List.of(99961L), new BigDecimal("1.00"));
     assertThat(priceRules.list("discount", "accessory")).singleElement()
-        .satisfies(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("1.20"));
+        .satisfies(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("1.00"));
     assertThat(priceRules.list("discount", "finished")).hasSize(2);
     assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99961L, 99965L), BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(priceRules.list("price", "finished")).isEmpty();
     assertThatThrownBy(() -> priceRules.saveBatch("discount", "finished", List.of(99961L, 99963L), BigDecimal.ONE))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("请选择本门店当前类型的已启用分类或角色");
     assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99964L), BigDecimal.ONE))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99961L), new BigDecimal("1.234")))
@@ -757,7 +760,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
   @Test
   @Transactional
-  void removedMaintenancePermissionsCannotWriteAndControllerHasNoSingleRecordMappings() throws Exception {
+  void removedPriceMaintenancePermissionsCannotWriteAndDiscountActionsAreExplicit() throws Exception {
     priceRuleFixture();
     identityWithPermissions(99961L, "store.price-configuration.price.finished.create",
         "store.price-configuration.price.finished.edit", "store.price-configuration.price.finished.delete",
@@ -772,7 +775,271 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
             || method.isAnnotationPresent(org.springframework.web.bind.annotation.PutMapping.class)
             || method.isAnnotationPresent(org.springframework.web.bind.annotation.DeleteMapping.class))
         .map(java.lang.reflect.Method::getName).toList();
-    assertThat(routeNames).containsExactlyInAnyOrder("list", "categories", "roles", "batch");
+    assertThat(routeNames).containsExactlyInAnyOrder("list", "categories", "roles", "batch", "clearPriceBatch", "savePrices",
+        "createDiscount", "editDiscount", "discountStatus", "deleteDiscount");
+  }
+
+  @Test
+  @Transactional
+  void clearingPriceCoefficientsIsScopedAtomicAndDoesNotChangeDiscountOrLegacyRules() throws Exception {
+    priceRuleFixture();
+    configurations.create(99961L, new BigDecimal("3.00"));
+    priceRules.saveBatch("price", "finished", List.of(99961L, 99962L), BigDecimal.ONE);
+    priceRules.saveBatch("price", "accessory", List.of(99965L), BigDecimal.ONE);
+    priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.80"));
+    assertThatThrownBy(() -> priceRules.clearPriceBatch("finished", List.of(99961L, 99964L)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.clearPriceBatch("finished", List.of(99961L, 99965L)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(priceRules.list("price", "finished")).hasSize(2);
+    String endpoint = "/api/admin/store-price-rules/price/batch-clear?scope=finished";
+    identityWithPermissions(99961L, "store.price-configuration.price.finished.view");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+        .contentType("application/json").content("{\"targetIds\":[99961]}"))
+        .andExpect(status().isForbidden());
+    identityWithPermissions(99961L, "store.price-configuration.price.finished.batch-set");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+        .contentType("application/json").content("{\"targetIds\":[99961]}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].categoryId").value(99962));
+    assertThat(priceRules.list("price", "finished")).singleElement();
+    assertThat(priceRules.list("price", "accessory")).singleElement();
+    assertThat(priceRules.list("discount", "finished")).singleElement();
+    assertThat(configurations.list()).singleElement();
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+        .contentType("application/json").content("{\"targetIds\":[99961]}"))
+        .andExpect(status().isOk());
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+        .contentType("application/json").content("{\"targetIds\":[]}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @Transactional
+  void mixedCategorySaveValidatesEveryChangeBeforeWritingAndRequiresScopedPermission() throws Exception {
+    priceRuleFixture();
+    priceRules.saveBatch("price", "finished", List.of(99961L), BigDecimal.ONE);
+    var clear = new StorePriceRuleService.PriceChange(99961L, null);
+    assertThatThrownBy(() -> priceRules.savePrices("finished", List.of(clear,
+        new StorePriceRuleService.PriceChange(99962L, new BigDecimal("1.234")))))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.savePrices("finished", List.of(clear,
+        new StorePriceRuleService.PriceChange(99964L, BigDecimal.ONE))))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(priceRules.list("price", "finished")).singleElement();
+    String endpoint = "/api/admin/store-price-rules/price/save?scope=finished";
+    String payload = "{\"changes\":[{\"categoryId\":99961,\"coefficient\":null},"
+        + "{\"categoryId\":99962,\"coefficient\":2.50},{\"categoryId\":99963,\"coefficient\":3.00}]}";
+    identityWithPermissions(99961L, "store.price-configuration.price.finished.view");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+        .contentType("application/json").content(payload)).andExpect(status().isForbidden());
+    identityWithPermissions(99961L, "store.price-configuration.price.finished.batch-set");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+        .contentType("application/json").content(payload)).andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2));
+    assertThat(priceRules.list("price", "finished")).noneMatch(rule -> rule.categoryId().equals(99961L))
+        .anySatisfy(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("2.50"))
+        .anySatisfy(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("3.00"));
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+        .contentType("application/json").content("{\"changes\":[null]}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @Transactional
+  void priceWritesRejectNonLeafCategoriesAtEveryEndpointWithoutPartialChanges() throws Exception {
+    priceRuleFixture();
+    priceRules.saveBatch("price", "finished", List.of(99961L), BigDecimal.ONE);
+    // A disabled child still makes its parent a non-leaf category.
+    jdbc.update("UPDATE store_categories SET status = 'disabled' WHERE id IN (99961,99962)");
+    assertThatThrownBy(() -> priceRules.saveBatch("price", "finished", List.of(99966L), BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    jdbc.update("UPDATE store_categories SET status = 'enabled' WHERE id IN (99961,99962)");
+    identityWithPermissions(99961L, "store.price-configuration.price.finished.batch-set");
+    for (String path : List.of("batch", "batch-clear")) {
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+          "/api/admin/store-price-rules/price/" + path + "?scope=finished")
+          .contentType("application/json").content("{\"targetIds\":[99961,99960],\"coefficient\":2.0}"))
+          .andExpect(status().isBadRequest());
+    }
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+        "/api/admin/store-price-rules/price/save?scope=finished")
+        .contentType("application/json").content("{\"changes\":[{\"categoryId\":99961,\"coefficient\":null},"
+            + "{\"categoryId\":99966,\"coefficient\":2.0}]}"))
+        .andExpect(status().isBadRequest());
+    assertThat(priceRules.list("price", "finished")).singleElement()
+        .satisfies(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("1.00"));
+    priceRules.saveBatch("price", "finished", List.of(99963L), new BigDecimal("2.00"));
+    priceRules.saveBatch("price", "accessory", List.of(99965L), new BigDecimal("3.00"));
+    assertThat(priceRules.list("price", "accessory")).singleElement();
+  }
+
+  @Test
+  @Transactional
+  void addingChildrenRequiresConfirmationAndClearsOnlyParentPriceWithoutRestoration() {
+    priceRuleFixture();
+    priceRules.saveBatch("price", "finished", List.of(99963L), new BigDecimal("1.50"));
+    priceRules.saveBatch("price", "accessory", List.of(99965L), new BigDecimal("2.00"));
+    priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.80"));
+    configurations.create(99961L, new BigDecimal("3.00"));
+    assertThat(storeCategories.hasPriceCoefficient(99963L, "finished")).isTrue();
+    assertThatThrownBy(() -> storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
+        "finished", 99963L, "新三级", "enabled"))).isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("请确认");
+    assertThat(storeCategories.listOrdered("finished")).noneMatch(item -> "新三级".equals(item.getName()));
+    assertThat(priceRules.list("price", "finished")).hasSize(1);
+    var child = storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
+        "finished", 99963L, "新三级", "enabled", true));
+    assertThat(priceRules.list("price", "finished")).isEmpty();
+    assertThat(priceRules.list("price", "accessory")).hasSize(1);
+    assertThat(priceRules.list("discount", "finished")).hasSize(1);
+    assertThat(configurations.list()).hasSize(1);
+    assertThat(storeCategories.hasPriceCoefficient(child.getId(), "finished")).isFalse();
+    var sibling = storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
+        "finished", 99963L, "另一个三级", "enabled"));
+    storeCategories.deleteCategory(child.getId(), "finished");
+    storeCategories.deleteCategory(sibling.getId(), "finished");
+    assertThat(storeCategories.hasPriceCoefficient(99963L, "finished")).isFalse();
+    priceRules.saveBatch("price", "finished", List.of(99963L), BigDecimal.ONE);
+    storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
+        "accessory", 99965L, "新配件下级", "disabled", true));
+    assertThat(priceRules.list("price", "accessory")).isEmpty();
+    assertThat(priceRules.list("price", "finished")).hasSize(1);
+  }
+
+  @Test
+  @Transactional
+  void childCreationCheckRequiresCategoryPermissionAndScopeAndFailedCreationPreservesPrice() throws Exception {
+    priceRuleFixture();
+    priceRules.saveBatch("price", "finished", List.of(99961L), BigDecimal.ONE);
+    identityWithPermissions(99961L, "admin.tenant.store-category-management.finished.create-child");
+    mvc.perform(get("/api/admin/store-categories/99961/child-creation-check?scope=finished"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(true));
+    mvc.perform(get("/api/admin/store-categories/99964/child-creation-check?scope=finished"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/admin/store-categories/99965/child-creation-check?scope=accessory"))
+        .andExpect(status().isForbidden());
+    assertThatThrownBy(() -> storeCategories.createCategory(new com.zdm.platform.store.StoreCategoryCreateRequest(
+        "finished", 99961L, "第四级", "enabled", true))).isInstanceOf(IllegalArgumentException.class);
+    assertThat(priceRules.list("price", "finished")).hasSize(1);
+    identityWithPermissions(99961L, "admin.tenant.store-category-management.finished.view");
+    mvc.perform(get("/api/admin/store-categories/99961/child-creation-check?scope=finished"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @Transactional
+  void explicitDiscountCreationRejectsDuplicatesInvalidRolesAndCoefficientsWithoutOverwriting() {
+    priceRuleFixture();
+    priceRules.createDiscount("finished", 99961L, new BigDecimal("0.80"));
+    assertThatThrownBy(() -> priceRules.createDiscount("finished", 99961L, new BigDecimal("0.70")))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("请勿重复新增");
+    assertThat(priceRules.list("discount", "finished")).singleElement()
+        .satisfies(rule -> assertThat(rule.coefficient()).isEqualByComparingTo("0.80"));
+    priceRules.createDiscount("accessory", 99961L, new BigDecimal("1.00"));
+    assertThat(priceRules.list("discount", "accessory")).singleElement();
+    assertThatThrownBy(() -> priceRules.createDiscount("finished", 99963L, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    jdbc.update("UPDATE roles SET status = 'disabled' WHERE id = 99962");
+    assertThatThrownBy(() -> priceRules.createDiscount("finished", 99962L, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    jdbc.update("UPDATE roles SET status = 'enabled' WHERE id = 99962");
+    for (BigDecimal invalid : List.of(BigDecimal.ZERO, new BigDecimal("1.01"), new BigDecimal("1000"), new BigDecimal("0.123"))) {
+      assertThatThrownBy(() -> priceRules.createDiscount("finished", 99962L, invalid))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+    assertThat(priceRules.list("discount", "finished")).hasSize(1);
+  }
+
+  @Test
+  @Transactional
+  void discountCreateEndpointRequiresItsOwnScopedPermissionAndRequiredFields() throws Exception {
+    priceRuleFixture();
+    String path = "/api/admin/store-price-rules/discount?scope=finished";
+    var post = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path);
+    identityWithPermissions(99961L, "store.price-configuration.discount.finished.batch-set");
+    mvc.perform(post.contentType("application/json").content("{\"roleId\":99961,\"coefficient\":0.8}"))
+        .andExpect(status().isForbidden());
+    identityWithPermissions(99961L, "store.price-configuration.discount.finished.create");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+        .contentType("application/json").content("{\"roleId\":99961}"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+        .contentType("application/json").content("{\"roleId\":99961,\"coefficient\":0.8}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+        "/api/admin/store-price-rules/discount?scope=accessory")
+        .contentType("application/json").content("{\"roleId\":99961,\"coefficient\":0.8}"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @Transactional
+  void discountMaintenancePreservesCreationAuditAndIsolatesStoreScopeAndPriceRules() {
+    priceRuleFixture();
+    priceRules.createDiscount("finished", 99961L, new BigDecimal("0.80"));
+    priceRules.createDiscount("finished", 99962L, new BigDecimal("0.90"));
+    priceRules.saveBatch("price", "finished", List.of(99963L), BigDecimal.ONE);
+    var discountId = priceRules.list("discount", "finished").getFirst().id();
+    assertThatThrownBy(() -> priceRules.updateDiscount(discountId, "finished", 99961L, new BigDecimal("1.01")))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("1.01")))
+        .isInstanceOf(IllegalArgumentException.class);
+    var initial = priceRules.list("discount", "finished").stream()
+        .filter(rule -> rule.roleId().equals(99961L)).findFirst().orElseThrow();
+    assertThat(initial.status()).isEqualTo("enabled");
+    priceRules.updateDiscount(initial.id(), "finished", 99961L, new BigDecimal("0.75"));
+    var edited = priceRules.list("discount", "finished").stream()
+        .filter(rule -> rule.id().equals(initial.id())).findFirst().orElseThrow();
+    assertThat(edited.coefficient()).isEqualByComparingTo("0.75");
+    assertThat(edited.createdAt()).isEqualTo(initial.createdAt());
+    assertThat(edited.createdByName()).isEqualTo(initial.createdByName());
+    assertThatThrownBy(() -> priceRules.updateDiscount(initial.id(), "finished", 99962L, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> priceRules.updateDiscountStatus(initial.id(), "accessory", "disabled"))
+        .isInstanceOf(IllegalArgumentException.class);
+    priceRules.updateDiscountStatus(initial.id(), "finished", "disabled");
+    priceRules.saveBatch("discount", "finished", List.of(99961L), new BigDecimal("0.70"));
+    assertThat(priceRules.list("discount", "finished")).anySatisfy(rule -> {
+      assertThat(rule.id()).isEqualTo(initial.id());
+      assertThat(rule.status()).isEqualTo("disabled");
+    });
+    priceRules.updateDiscountStatus(initial.id(), "finished", "enabled");
+    identity(99962L);
+    assertThatThrownBy(() -> priceRules.deleteDiscount(initial.id(), "finished"))
+        .isInstanceOf(IllegalArgumentException.class);
+    identity(99961L);
+    priceRules.deleteDiscount(initial.id(), "finished");
+    assertThat(priceRules.list("discount", "finished")).hasSize(1);
+    assertThat(priceRules.list("price", "finished")).hasSize(1);
+    priceRules.createDiscount("finished", 99961L, BigDecimal.ONE);
+  }
+
+  @Test
+  @Transactional
+  void discountMaintenanceEndpointsRequireIndependentPermissions() throws Exception {
+    priceRuleFixture();
+    priceRules.createDiscount("finished", 99961L, BigDecimal.ONE);
+    Long id = priceRules.list("discount", "finished").getFirst().id();
+    identityWithPermissions(99961L, "store.price-configuration.discount.finished.view");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+        "/api/admin/store-price-rules/discount/" + id + "?scope=finished")
+        .contentType("application/json").content("{\"roleId\":99961,\"coefficient\":0.8}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+        "/api/admin/store-price-rules/discount/" + id + "/status?scope=finished")
+        .contentType("application/json").content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(delete("/api/admin/store-price-rules/discount/" + id + "?scope=finished"))
+        .andExpect(status().isForbidden());
+    identityWithPermissions(99961L, "store.price-configuration.discount.finished.toggle-status");
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+        "/api/admin/store-price-rules/discount/" + id + "/status?scope=finished")
+        .contentType("application/json").content("{\"status\":\"disabled\"}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].status").value("disabled"));
+    identityWithPermissions(99961L, "store.price-configuration.discount.finished.delete");
+    mvc.perform(delete("/api/admin/store-price-rules/discount/" + id + "?scope=finished"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
   }
 
   private void upstreamIdentity(String clientCode) {

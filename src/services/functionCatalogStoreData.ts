@@ -183,7 +183,19 @@ export const storePriceConfiguration: FunctionModule = {
               parentLabel: kind === 'price' ? '价格系数' : '折扣系数',
               label: scope === 'finished' ? '成品现货' : '配件',
               value: `store.price-configuration.${kind}.${scope}`,
-              actions: [{ label: '批量设置', value: `store.price-configuration.${kind}.${scope}.batch-set` }],
+              actions: [
+                ...(kind === 'discount'
+                  ? [{ label: '新增', value: `store.price-configuration.${kind}.${scope}.create` }]
+                  : []),
+                { label: '批量设置', value: `store.price-configuration.${kind}.${scope}.batch-set` },
+                ...(kind === 'discount'
+                  ? [
+                      { label: '编辑', value: `store.price-configuration.${kind}.${scope}.edit` },
+                      { label: '停用/启用', value: `store.price-configuration.${kind}.${scope}.toggle-status` },
+                      { label: '删除', value: `store.price-configuration.${kind}.${scope}.delete` },
+                    ]
+                  : []),
+              ],
             })),
           ),
         },

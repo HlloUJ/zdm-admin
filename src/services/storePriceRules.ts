@@ -11,6 +11,7 @@ export interface StorePriceRule {
   coefficient: number;
   createdByName?: string;
   createdAt?: string;
+  status?: 'enabled' | 'disabled';
 }
 export interface StorePriceCategory {
   id: number;
@@ -42,3 +43,33 @@ export const saveStorePriceBatch = (
     method: 'POST',
     body: JSON.stringify({ targetIds, coefficient }),
   });
+
+export const clearStorePriceBatch = (scope: StorePriceScope, targetIds: number[]) =>
+  request<StorePriceRule[]>(scoped('price/batch-clear', scope), {
+    method: 'POST',
+    body: JSON.stringify({ targetIds }),
+  });
+
+export const saveStoreCategoryPrices = (
+  scope: StorePriceScope,
+  changes: { categoryId: number; coefficient: number | null }[],
+) => request<StorePriceRule[]>(scoped('price/save', scope), { method: 'POST', body: JSON.stringify({ changes }) });
+
+export const createStoreDiscount = (scope: StorePriceScope, roleId: number, coefficient: number) =>
+  request<StorePriceRule[]>(scoped('discount', scope), {
+    method: 'POST',
+    body: JSON.stringify({ roleId, coefficient }),
+  });
+
+export const updateStoreDiscount = (scope: StorePriceScope, id: number, roleId: number, coefficient: number) =>
+  request<StorePriceRule[]>(scoped(`discount/${id}`, scope), {
+    method: 'PUT',
+    body: JSON.stringify({ roleId, coefficient }),
+  });
+export const setStoreDiscountStatus = (scope: StorePriceScope, id: number, status: 'enabled' | 'disabled') =>
+  request<StorePriceRule[]>(scoped(`discount/${id}/status`, scope), {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
+export const deleteStoreDiscount = (scope: StorePriceScope, id: number) =>
+  request<StorePriceRule[]>(scoped(`discount/${id}`, scope), { method: 'DELETE' });

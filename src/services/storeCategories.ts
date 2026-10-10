@@ -17,6 +17,7 @@ export interface StoreCategoryRecord {
 }
 
 export interface StoreCategoryCreatePayload {
+  confirmPriceRemoval?: boolean;
   scope: StoreCategoryScope;
   parentId?: number | null;
   name: string;
@@ -26,6 +27,8 @@ export interface StoreCategoryCreatePayload {
 const base = '/admin/store-categories';
 export const listStoreCategories = (scope: StoreCategoryScope) =>
   request<StoreCategoryRecord[]>(`${base}?scope=${scope}`);
+export const checkStoreCategoryChildCreation = (id: number, scope: StoreCategoryScope) =>
+  request<boolean>(`${base}/${id}/child-creation-check?scope=${scope}`);
 export const createStoreCategory = (payload: StoreCategoryCreatePayload) =>
   request<StoreCategoryRecord>(base, { method: 'POST', body: JSON.stringify(payload) });
 export const updateStoreCategory = (

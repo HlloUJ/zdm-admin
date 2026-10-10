@@ -150,6 +150,17 @@
     </AdminDialog>
 
     <AdminConfirmDialog
+      v-model:visible="priceRemovalVisible"
+      action="新增"
+      title="新增下级分类"
+      @confirm="handleSubmit(true)"
+    >
+      新增后，“{{
+        parentName
+      }}”将不再是末级分类，其价格系数将被清除。已有商品价格不受影响，新子分类需单独设置价格系数。是否继续？
+    </AdminConfirmDialog>
+
+    <AdminConfirmDialog
       v-model:visible="deleteVisible"
       action="删除"
       object-type="分类"
@@ -197,6 +208,7 @@ import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import {
+  checkStoreCategoryChildCreation,
   createStoreCategory,
   deleteStoreCategory,
   listStoreCategories,
@@ -500,7 +512,10 @@ const categoryNameExists = () => {
   return siblings.some((node) => node.name === formData.name.trim() && node.id !== formData.id);
 };
 
-const handleSubmit = async () => {
+const priceRemovalVisible = ref(false);
+const formSubmitting = ref(false);
+const handleSubmit = async (confirmPriceRemoval = false) => {
+  if (formSubmitting.value) return;
   const result = await formRef.value?.validate();
   if (result !== true) return;
   const name = formData.name.trim();
@@ -508,9 +523,19 @@ const handleSubmit = async () => {
     adminFeedback.warning('同级分类名称不能重复');
     return;
   }
+  formSubmitting.value = true;
   try {
     if (formMode.value === 'create') {
+      if (
+        formData.parentId &&
+        !confirmPriceRemoval &&
+        (await checkStoreCategoryChildCreation(formData.parentId, activeScope.value))
+      ) {
+        priceRemovalVisible.value = true;
+        return;
+      }
       await createStoreCategory({
+        confirmPriceRemoval,
         scope: activeScope.value,
         parentId: formData.parentId,
         name,
@@ -524,6 +549,7 @@ const handleSubmit = async () => {
         canToggleCategoryStatus.value ? formData.status : undefined,
       );
     }
+    priceRemovalVisible.value = false;
     closeFormDialog();
     await loadCategories();
     if (formMode.value === 'create') {
@@ -533,6 +559,8 @@ const handleSubmit = async () => {
     }
   } catch (error) {
     showError(error, '分类保存失败');
+  } finally {
+    formSubmitting.value = false;
   }
 };
 

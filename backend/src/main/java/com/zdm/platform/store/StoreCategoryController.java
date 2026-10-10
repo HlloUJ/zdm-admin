@@ -39,6 +39,12 @@ public class StoreCategoryController {
     return ApiResponse.ok(service.listOrdered(scope));
   }
 
+  @GetMapping("/{id}/child-creation-check")
+  public ApiResponse<Boolean> childCreationCheck(@PathVariable Long id, @RequestParam String scope) {
+    permissionGuard.requirePermission(prefix(scope) + ".create-child");
+    return ApiResponse.ok(service.hasPriceCoefficient(id, scope));
+  }
+
   @PostMapping
   public ApiResponse<StoreCategory> create(@Valid @RequestBody StoreCategoryCreateRequest request) {
     String action = request.parentId() == null ? "create-root" : "create-child";

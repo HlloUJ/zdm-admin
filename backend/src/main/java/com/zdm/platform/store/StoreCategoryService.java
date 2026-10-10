@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, StoreCategory> {
   private static final String DUPLICATE_NAME_MESSAGE = "同级分类名称不能重复";
   private final CurrentIdentityProvider identityProvider;
+  private final JdbcTemplate jdbc;
 
-  public StoreCategoryService(CurrentIdentityProvider identityProvider) {
+  public StoreCategoryService(CurrentIdentityProvider identityProvider, JdbcTemplate jdbc) {
     this.identityProvider = identityProvider;
+    this.jdbc = jdbc;
   }
 
   private Long requireStoreId() {
@@ -54,12 +57,31 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
     return category;
   }
 
+  public boolean hasPriceCoefficient(Long id, String scope) {
+    StoreCategory category = requireCategory(id, scope);
+    Integer count = jdbc.queryForObject("""
+        SELECT COUNT(*) FROM store_price_rules
+        WHERE tenant_id = ? AND store_id = ? AND kind = 'price' AND scope = ? AND category_id = ?
+        """, Integer.class, identityProvider.require().tenantId(), category.getStoreId(), scope, id);
+    return count != null && count > 0;
+  }
+
   @Transactional
   public StoreCategory createCategory(StoreCategoryCreateRequest request) {
     requireScope(request.scope());
     Long storeId = requireStoreId();
     if (request.parentId() != null) {
+      jdbc.queryForList("SELECT id FROM store_categories WHERE store_id = ? AND scope = ? AND id = ? FOR UPDATE",
+          storeId, request.scope(), request.parentId());
       StoreCategory parent = requireCategory(request.parentId(), request.scope());
+      // Read the current rule after acquiring the category lock, not an earlier MySQL snapshot.
+      boolean hasPrice = !jdbc.queryForList("""
+          SELECT id FROM store_price_rules
+          WHERE tenant_id = ? AND store_id = ? AND kind = 'price' AND scope = ? AND category_id = ? FOR UPDATE
+          """, Long.class, identityProvider.require().tenantId(), storeId, request.scope(), parent.getId()).isEmpty();
+      if (hasPrice && !request.confirmPriceRemoval()) {
+        throw new IllegalArgumentException("该分类已设置价格系数，请确认新增下级分类并清除原价格系数");
+      }
       if (parent.getParentId() != null
           && requireCategory(parent.getParentId(), request.scope()).getParentId() != null) {
         throw new IllegalArgumentException("门店分类最多支持三级");
@@ -84,6 +106,12 @@ public class StoreCategoryService extends ServiceImpl<StoreCategoryMapper, Store
       save(category);
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
+    }
+    if (request.parentId() != null) {
+      jdbc.update("""
+          DELETE FROM store_price_rules
+          WHERE tenant_id = ? AND store_id = ? AND kind = 'price' AND scope = ? AND category_id = ?
+          """, identityProvider.require().tenantId(), storeId, request.scope(), request.parentId());
     }
     return requireCategory(category.getId(), request.scope());
   }

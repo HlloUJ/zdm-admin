@@ -153,10 +153,18 @@ describe('full function catalog', () => {
     for (const tab of pricing.menus[0].pages[0].tabs) {
       expect(tab.actions).toEqual([
         { label: '查看', value: `${tab.value}.view` },
+        ...(tab.value.includes('.discount.') ? [{ label: '新增', value: `${tab.value}.create` }] : []),
         { label: '批量设置', value: `${tab.value}.batch-set` },
+        ...(tab.value.includes('.discount.')
+          ? [
+              { label: '编辑', value: `${tab.value}.edit` },
+              { label: '停用/启用', value: `${tab.value}.toggle-status` },
+              { label: '删除', value: `${tab.value}.delete` },
+            ]
+          : []),
       ]);
     }
-    expect(getFunctionCatalogPermissionValues([pricing])).toHaveLength(8);
+    expect(getFunctionCatalogPermissionValues([pricing])).toHaveLength(16);
     expect(storeValues).not.toContain('store.price-configuration.view');
     for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {
       const values = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience(audience));
