@@ -132,3 +132,8 @@
 .preview-trigger img {
   transition: transform 0.2s ease;
 }
+
+/* Reuse the finished-stock form page layout for the sticky submit bar. */
+.admin-layout > .admin-shell > .page.page--form {
+  padding-bottom: 0 !important;
+}

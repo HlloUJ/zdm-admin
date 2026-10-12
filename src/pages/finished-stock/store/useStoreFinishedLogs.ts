@@ -44,7 +44,7 @@ export function useStoreFinishedLogs(stateLabel: (value?: string | null) => stri
   const logFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
   const appliedLogFilter = reactive({ keyword: '', operationType: '', operatorName: '', dateRange: [] as string[] });
   const logPagination = reactive({ current: 1, pageSize: 10 });
-  const logTypeOptions = productLogFilterOptions('store');
+  const logTypeOptions = productLogFilterOptions('store', true);
   const logRows = computed(() => logs.value.map(toLogRow));
 
   async function openLogDetail(id: number) {

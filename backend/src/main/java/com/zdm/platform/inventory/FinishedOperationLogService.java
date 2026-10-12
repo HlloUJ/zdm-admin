@@ -43,6 +43,17 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     this(jdbc, json, identities, history, null);
   }
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private FinishedSupplyEditAuditService supplyEditAudit;
+
+  FinishedSupplyEditAuditService.EditContext prepareSupplyEdit(FinishedProduct product) {
+    return supplyEditAudit.prepare(product, snapshot(product, false));
+  }
+
+  void recordSupplyEdit(FinishedProduct product, FinishedSupplyEditAuditService.EditContext context) {
+    supplyEditAudit.record(product, context, snapshot(product, false));
+  }
+
   public Map<String, Object> snapshot(FinishedProduct product) {
     return snapshot(product, "supply-chain".equals(identities.require().clientCode()));
   }

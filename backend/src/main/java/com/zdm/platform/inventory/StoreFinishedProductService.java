@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StoreFinishedProductService {
   public record SkuPrice(Long skuId, String label, Integer stock, BigDecimal costPrice,
-      BigDecimal guidePrice, BigDecimal salePrice, String priceMode,
+      BigDecimal guidePrice, BigDecimal salePrice, String priceMode, BigDecimal saleCoefficient,
       String displayMode, Map<String, String> salesAttributes, String material,
       String lengthValue, String color, String sizeValue) {
     public SkuPrice {
@@ -35,7 +35,7 @@ public class StoreFinishedProductService {
       List<FinishedProductAttributeEntry> attributes, List<FinishedSpecDimension> specDimensions,
       List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
       String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
-      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient) {
+      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention) {
     public ProductView {
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
@@ -85,7 +85,7 @@ public class StoreFinishedProductService {
       records = List.copyOf(records);
     }
   }
-  public record SalePriceInput(Long skuId, BigDecimal salePrice, String priceMode) {}
+  public record SalePriceInput(Long skuId, BigDecimal salePrice, String priceMode, BigDecimal saleCoefficient) {}
 
   private final FinishedInvalidationMedia invalidationMedia;
   private final JdbcTemplate jdbc;
@@ -96,11 +96,13 @@ public class StoreFinishedProductService {
   private final StoreFinishedLogReader logReader;
   private final StoreFinishedSelectionSnapshot selectionSnapshots;
   private final StoreFinishedSalePriceService salePrices;
+  private final FinishedOperationLogService operationLogs;
 
   public StoreFinishedProductService(JdbcTemplate jdbc, CityPartnerStoreScope scopes,
-      FinishedProductService products, FinishedProductMapper productMapper, ObjectMapper json, StoreFinishedSelectionSnapshot selectionSnapshots, FinishedInvalidationMedia invalidationMedia, StoreFinishedSalePriceService salePrices) {
+      FinishedProductService products, FinishedProductMapper productMapper, ObjectMapper json, StoreFinishedSelectionSnapshot selectionSnapshots, FinishedInvalidationMedia invalidationMedia, StoreFinishedSalePriceService salePrices, FinishedOperationLogService operationLogs) {
     this.invalidationMedia = invalidationMedia;
     this.salePrices = salePrices;
+    this.operationLogs = operationLogs;
     this.jdbc = jdbc;
     this.scopes = scopes;
     this.products = products;
@@ -329,9 +331,9 @@ public class StoreFinishedProductService {
   @Transactional
   public ProductView changeStatus(Long id, String target, String reason, String detail) {
     var store = scopes.require();
-    if ("selling".equals(target)) { salePrices.lockCategories(store.storeId()); }
     Map<String, Object> listing = listing(store, id, false);
     Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
+    if ("selling".equals(target)) { salePrices.lockCategories(store.storeId()); }
     listing = listing(store, id, true);
     String current = (String) listing.get("status");
     if ("purged".equals(target)) {
@@ -448,9 +450,9 @@ public class StoreFinishedProductService {
   @Transactional
   public ProductView saveEdit(Long id, Long categoryId, List<SalePriceInput> inputs) {
     var store = scopes.require();
-    salePrices.lockCategories(store.storeId());
     Map<String, Object> listing = listing(store, id, false);
     Map<String, Object> source = source(number(listing.get("finished_product_id")), true);
+    salePrices.lockCategories(store.storeId());
     listing = listing(store, id, true); requirePriceEditable(listing, source);
     var context = salePrices.context(store.storeId(), List.of(id));
     salePrices.requireCategory(context, categoryId);
@@ -464,33 +466,69 @@ public class StoreFinishedProductService {
     Map<String, Object> changes = new LinkedHashMap<>();
     Long previousCategory = number(listing.get("store_category_id"));
     if (!Objects.equals(previousCategory, categoryId)) { changes.put("门店分类", change(context.categoryName(previousCategory), context.categoryName(categoryId))); }
+    Map<String, Object> beforeSales = salesEditSnapshot(detail(id), store.storeLevelId());
+    if (product.getAttributeDisplayOrder() != null) { beforeSales.put("字段顺序", product.getAttributeDisplayOrder()); }
+    boolean salesChanged = false;
     Map<Long, StoreFinishedSalePriceService.Price> prepared = new LinkedHashMap<>();
     for (SalePriceInput input : inputs) {
       if (!List.of("auto", "manual").contains(Objects.toString(input.priceMode(), ""))) { throw new IllegalArgumentException("商品售价模式不正确"); }
-      FinishedProductVariant variant = variants.stream().filter(item -> item.getId().equals(input.skuId())).findFirst().orElseThrow();
       BigDecimal partner = partnerPrice(store, product, input.skuId());
       BigDecimal amount = "auto".equals(input.priceMode()) ? StoreFinishedSalePriceService.calculate(partner, context.coefficient(categoryId)) : input.salePrice();
       if (amount == null && "auto".equals(input.priceMode())) { throw new IllegalArgumentException("价格配置已变化，请刷新后重新填写商品售价"); }
-      if (amount != null) { requirePrice(amount); }
-      if (amount == null && variant.getStock() != null && variant.getStock() > 0) { throw new IllegalArgumentException("请输入商品售价"); }
+      if (amount == null) { throw new IllegalArgumentException("请输入商品售价"); }
+      requirePrice(amount);
+      BigDecimal coefficient = "auto".equals(input.priceMode()) ? context.coefficient(categoryId) : input.saleCoefficient();
+      if (coefficient == null) { throw new IllegalArgumentException("请输入系数"); }
+      requirePrice(coefficient);
       var before = context.effective(id, input.skuId(), previousCategory, partner);
-      boolean amountChanged = before.amount() == null ? amount != null : amount == null || before.amount().compareTo(amount) != 0;
-      if (!Objects.equals(before.mode(), input.priceMode()) || amountChanged) {
-        Map<String, Object> beforeSku = new LinkedHashMap<>();
-        Map<String, Object> afterSku = new LinkedHashMap<>();
-        if (amountChanged) { beforeSku.put("商品售价", before.amount()); afterSku.put("商品售价", amount); }
-        if (!Objects.equals(before.mode(), input.priceMode())) {
-          beforeSku.put("售价模式", "auto".equals(before.mode()) ? "跟随配置" : "手工价格");
-          afterSku.put("售价模式", "auto".equals(input.priceMode()) ? "跟随配置" : "手工价格");
-        }
-        changes.put("SKU " + input.skuId(), change(beforeSku, afterSku));
+      boolean coefficientChanged = before.coefficient() == null || before.coefficient().compareTo(coefficient) != 0;
+      boolean amountChanged = before.amount() == null || before.amount().compareTo(amount) != 0;
+      if (!Objects.equals(before.mode(), input.priceMode()) || amountChanged || coefficientChanged) {
+        salesChanged = true;
       }
-      prepared.put(input.skuId(), new StoreFinishedSalePriceService.Price(amount, input.priceMode()));
+      prepared.put(input.skuId(), new StoreFinishedSalePriceService.Price(amount, input.priceMode(), coefficient));
     }
     prepared.forEach((skuId, price) -> salePrices.save(id, skuId, price, store.accountId()));
-    jdbc.update("UPDATE store_finished_products SET store_category_id=? WHERE id=? AND tenant_id=? AND store_id=?", categoryId, id, store.tenantId(), store.storeId());
+    jdbc.update("UPDATE store_finished_products SET store_category_id=?, sale_price_attention=FALSE WHERE id=? AND tenant_id=? AND store_id=?", categoryId, id, store.tenantId(), store.storeId());
+    ProductView updated = detail(id);
+    if (salesChanged) {
+      Map<String, Object> afterSales = salesEditSnapshot(updated, store.storeLevelId());
+      if (product.getAttributeDisplayOrder() != null) { afterSales.put("字段顺序", product.getAttributeDisplayOrder()); }
+      beforeSales.forEach((field, beforeValue) -> {
+        if (!Objects.equals(json.valueToTree(beforeValue), json.valueToTree(afterSales.get(field)))) {
+          changes.put(field, change(beforeValue, afterSales.get(field)));
+        }
+      });
+      operationLogs.retainChangedVariants(beforeSales, afterSales, changes);
+      if (product.getAttributeDisplayOrder() != null) { changes.put("字段顺序", change(beforeSales.get("字段顺序"), afterSales.get("字段顺序"))); }
+    }
     if (!changes.isEmpty()) { log(store, id, product.getId(), product.getName(), "UPDATE", "编辑商品", (String) listing.get("status"), (String) listing.get("status"), changes); }
-    return detail(id);
+    return updated;
+  }
+
+  private static Map<String, Object> salesEditSnapshot(ProductView product, Long levelId) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("规格维度", product.specDimensions());
+    snapshot.put("销售属性名称", product.attributeNames());
+    snapshot.put("销售规格", product.skus().stream().map(sku -> {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("skuId", sku.skuId()); row.put("variantLabel", sku.label());
+      row.put("stock", sku.stock()); row.put("displayMode", sku.displayMode());
+      row.put("salesAttributes", sku.salesAttributes());
+      row.put("salePrice", sku.salePrice()); row.put("saleCoefficient", sku.saleCoefficient());
+      row.put("priceMode", sku.priceMode());
+      return row;
+    }).toList());
+    snapshot.put("指导价", product.skus().stream().map(sku -> {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("skuId", sku.skuId()); row.put("price", sku.guidePrice()); return row;
+    }).toList());
+    snapshot.put("层级价格", levelId == null ? List.of() : product.skus().stream().map(sku -> {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("skuId", sku.skuId()); row.put("price", sku.costPrice());
+      row.put("storeLevelId", levelId); row.put("storeLevelName", product.storeLevelName()); return row;
+    }).toList());
+    return snapshot;
   }
 
   private static Map<String, Object> change(Object before, Object after) {
@@ -632,7 +670,7 @@ public class StoreFinishedProductService {
         attributeNames.entrySet().stream().filter(entry -> prices.stream()
             .anyMatch(sku -> sku.salesAttributes() != null && sku.salesAttributes().containsKey(entry.getKey())))
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
-        pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))));
+        pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")));
     return legacyHistoricalView(listing, rendered);
   }
 
@@ -668,6 +706,7 @@ public class StoreFinishedProductService {
         sku.setAll((com.fasterxml.jackson.databind.node.ObjectNode) archived.deepCopy());
         sku.set("label", sku.remove("variantLabel"));
         sku.putNull("salePrice");
+        sku.putNull("saleCoefficient");
         sku.put("priceMode", "manual");
         for (var guide : snapshot.path("指导价")) {
           if (guide.path("skuId").equals(archived.path("skuId"))) { sku.set("guidePrice", guide.path("price")); }
@@ -715,7 +754,7 @@ public class StoreFinishedProductService {
   private SkuPrice skuPriceView(FinishedProductVariant variant, BigDecimal cost,
       BigDecimal operationsGuide, StoreFinishedSalePriceService.Price price) {
     return new SkuPrice(variant.getId(), variant.getVariantLabel(), variant.getStock(), cost,
-        operationsGuide, price.amount(), price.mode(), variant.getDisplayMode(), variant.getSalesAttributes(),
+        operationsGuide, price.amount(), price.mode(), price.coefficient(), variant.getDisplayMode(), variant.getSalesAttributes(),
         variant.getMaterial(), variant.getLengthValue(), variant.getColor(), variant.getSizeValue());
   }
 
@@ -738,7 +777,7 @@ public class StoreFinishedProductService {
       throw new IllegalArgumentException("请先完善每条可售规格的成本价和指导价");
     }
     salePrices.requireCategory(salePrices.context(store.storeId(), List.of(listingId)), view.storeCategoryId());
-    if (sellableSkus.stream().anyMatch(sku -> sku.salePrice() == null)) {
+    if (view.skus().stream().anyMatch(sku -> sku.salePrice() == null || sku.saleCoefficient() == null)) {
       throw new IllegalArgumentException("请先完善每条可售规格的商品售价");
     }
   }

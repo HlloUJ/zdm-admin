@@ -3,8 +3,8 @@
     <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
-      <main class="page">
-        <header class="page-header">
+      <main class="page" :class="{ 'page--form': editingId }">
+        <header v-if="!editingId" class="page-header">
           <t-breadcrumb
             ><t-breadcrumb-item @click="closeEdit">成品现货管理</t-breadcrumb-item
             ><t-breadcrumb-item v-if="editingId">编辑商品</t-breadcrumb-item></t-breadcrumb
@@ -103,7 +103,7 @@
           </template>
           <template #table
             ><SourceUnavailableOverlay :rows="pageRows.filter((item) => item.sourceUnavailable)">
-              <FinishedRowWarnings :rows="pageRows" :errors="shelfErrors" @close="(id) => delete shelfErrors[id]">
+              <FinishedRowWarnings :rows="pageRows" :errors="rowWarnings" @close="closeRowWarning">
                 <t-table
                   :key="activeTab"
                   class="finished-stock-table"
@@ -115,7 +115,7 @@
                     ({ row }: { row: StoreFinishedProduct }) =>
                       row.sourceUnavailable
                         ? { 'data-source-id': row.id, inert: true }
-                        : shelfErrors[row.id]
+                        : rowWarnings[row.id]
                           ? { 'data-shelf-error-id': row.id }
                           : {}
                   "
@@ -545,6 +545,21 @@ function matchesListCategory(categoryId?: number | null) {
 }
 const selected = ref<number[]>([]);
 const shelfErrors = reactive<Record<number, string>>({});
+const dismissedPriceWarnings = reactive<Record<number, boolean>>({});
+const rowWarnings = computed(() => {
+  const warnings = { ...shelfErrors };
+  for (const row of pageRows.value) {
+    if (row.salePriceAttention && !dismissedPriceWarnings[row.id]) {
+      warnings[row.id] = [warnings[row.id], '供应链修改销售规格，商品售价待补齐'].filter(Boolean).join('；');
+    }
+  }
+  return warnings;
+});
+function closeRowWarning(id: number) {
+  delete shelfErrors[id];
+  dismissedPriceWarnings[id] = true;
+}
+
 const confirming = ref(false);
 const batchConfirmDescriptions: Partial<Record<ActionKind, string>> = {
   'batch-shelf': '是否批量上架所选成品现货？',
@@ -801,6 +816,7 @@ function stateLabel(value?: string | null) {
   return value ? statusLabels[value] || value : '—';
 }
 async function load() {
+  Object.keys(dismissedPriceWarnings).forEach((id) => delete dismissedPriceWarnings[Number(id)]);
   loading.value = true;
   try {
     const [products, categories] = await Promise.all([listStoreFinishedProducts(), listStoreFinishedCategories()]);
@@ -921,17 +937,25 @@ async function finishEdit(product: StoreFinishedProduct) {
 }
 watch(
   editingId,
-  async (id) => {
+  async (id, _previous, onCleanup) => {
     if (!id) return;
+    let active = true;
+    onCleanup(() => {
+      active = false;
+    });
+    current.value = null;
     loading.value = true;
     try {
-      current.value = await getStoreFinishedProduct(id);
+      const product = await getStoreFinishedProduct(id);
+      if (!active) return;
+      current.value = product;
       if (!priceEditable.value) await closeEdit();
     } catch (error) {
+      if (!active) return;
       adminFeedback.error(getSafeErrorMessage(error, '商品详情加载失败'));
       await closeEdit();
     } finally {
-      loading.value = false;
+      if (active) loading.value = false;
     }
   },
   { immediate: true },
@@ -1100,4 +1124,6 @@ async function runConfirmed() {
 }
 onMounted(load);
 </script>
-<style scoped src="./index.css"></style>
+<style scoped>
+@import url('./index.css');
+</style>

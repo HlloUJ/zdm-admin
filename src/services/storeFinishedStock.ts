@@ -11,6 +11,7 @@ export interface StoreSkuPrice {
   guidePrice: number | null;
   salePrice: number | null;
   priceMode: 'auto' | 'manual';
+  saleCoefficient: number | null;
   displayMode?: 'single' | 'layered';
   salesAttributes?: Record<string, string>;
   material?: string;
@@ -32,6 +33,7 @@ export interface StoreFinishedProduct {
   status: Exclude<StoreFinishedStatus, 'soldOut'>;
   effectiveStatus: StoreFinishedStatus;
   sourceUnavailable: boolean;
+  salePriceAttention?: boolean;
   sourceMessage?: string;
   totalStock: number;
   imageUrl?: string;
@@ -50,7 +52,7 @@ export interface StoreFinishedProduct {
   offShelfAt?: string;
 }
 
-export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode'> {
+export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode' | 'saleCoefficient'> {
   partnerPrice: number | null;
 }
 
@@ -141,7 +143,7 @@ export const saveStoreFinishedEdit = (
   id: number,
   payload: {
     storeCategoryId: number;
-    skus: { skuId: number; salePrice: number | null; priceMode: 'auto' | 'manual' }[];
+    skus: { skuId: number; salePrice: number | null; priceMode: 'auto' | 'manual'; saleCoefficient: number | null }[];
   },
 ) => request<StoreFinishedProduct>(`${base}/${id}`, { method: 'PUT', body: json(payload) });
 export interface StoreFinishedLogFilter {

@@ -98,6 +98,10 @@ final class StoreFinishedLogReader {
         """, (row, index) -> logEntry(row), id, store.tenantId(), store.storeId())
         .stream().findFirst()
         .orElseThrow(() -> new IllegalArgumentException("本门店操作日志不存在"));
+    if ("SOURCE_UPDATE".equals(log.operationType())) {
+      return new LogEntry(log.id(), log.listingId(), log.productId(), log.productName(), log.operationType(),
+          log.operationSummary(), log.beforeStatus(), log.afterStatus(), snapshots.resolveEdit(log.changeDetails()), log.operatorName(), log.operatedAt());
+    }
     if (!"SELECT".equals(log.operationType())) { return log; }
     return new LogEntry(log.id(), log.listingId(), log.productId(), log.productName(),
         log.operationType(), log.operationSummary(), log.beforeStatus(), log.afterStatus(),

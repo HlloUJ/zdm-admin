@@ -1,12 +1,15 @@
 <template>
   <ProductDetail
     :product="detail"
+    :editor-layout="editorLayout"
     :attribute-names="attributeNames"
     :store-level-name="product.storeLevelName || undefined"
     operations
     store-mode
     @preview="(media, type) => (preview = { url: media.url, kind: type })"
   >
+    <template v-if="$slots['basic-extra']" #basic-extra><slot name="basic-extra" /></template>
+    <template v-if="$slots.sales" #sales="slotProps"><slot name="sales" v-bind="slotProps" /></template>
     <template v-if="$slots.sale" #sale="slotProps"><slot name="sale" v-bind="slotProps" /></template>
   </ProductDetail>
   <AdminDialog
@@ -38,7 +41,7 @@ import ProductDetail from '../management/components/ProductDetail.vue';
 import type { StoreFinishedProduct } from '@/services/storeFinishedStock';
 import type { FinishedProductGuidePrice } from '@/services/finishedProducts';
 
-const props = defineProps<{ product: StoreFinishedProduct }>();
+const props = defineProps<{ product: StoreFinishedProduct; editorLayout?: boolean }>();
 const preview = ref<{ url: string; kind: 'image' | 'video' } | null>(null);
 const attributeNames = computed(() => ({
   ...Object.fromEntries([
