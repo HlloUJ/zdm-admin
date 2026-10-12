@@ -10,7 +10,23 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @TableName(value = "finished_products", autoResultMap = true)
-public class FinishedProduct extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned {
+public class FinishedProduct extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned, StateActivityAware {
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private java.time.LocalDateTime stateOperatedAt;
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String stateOperatorName;
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String stateOperatorClientCode;
+  public java.time.LocalDateTime getStateOperatedAt() { return stateOperatedAt; }
+  public void setStateOperatedAt(java.time.LocalDateTime value) { stateOperatedAt=value; }
+  public String getStateOperatorName() { return stateOperatorName; }
+  public void setStateOperatorName(String value) { stateOperatorName=value; }
+  public String getStateOperatorClientCode() { return stateOperatorClientCode; }
+  public void setStateOperatorClientCode(String value) { stateOperatorClientCode=value; }
   @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
   private List<FinishedSpecDimension> specDimensions;
 

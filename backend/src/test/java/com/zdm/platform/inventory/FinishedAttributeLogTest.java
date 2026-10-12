@@ -23,6 +23,7 @@ class FinishedAttributeLogTest {
     when(identities.require()).thenReturn(new CurrentIdentity(1L, 1L, 1L, 1L,
         "supply-chain", null, null, "测试人员", "all", List.of(), List.of()));
     return new FinishedOperationLogService(null, json, identities, mock(MediaHistoryService.class)) {
+      { org.springframework.test.util.ReflectionTestUtils.setField(this,"stateActivities",mock(ProductStateActivityService.class)); }
       @Override public boolean save(FinishedOperationLog log) {
         saved = log;
         log.setId(1L);

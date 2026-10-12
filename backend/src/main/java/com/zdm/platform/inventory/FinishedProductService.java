@@ -98,6 +98,9 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
         }, com.zdm.platform.security.DataScope.isAll(identityProvider.require()), identityProvider.require().accountId());
   }
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private ProductStateActivityService stateActivities;
+
   public List<FinishedProduct> listWithDetails() {
     List<FinishedProduct> products = lambdaQuery()
         .ne(lifecycle.isSupplyChain(), FinishedProduct::getSourceStatus, "purged")
@@ -106,7 +109,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
         .orderByDesc(FinishedProduct::getCreatedAt)
         .orderByDesc(FinishedProduct::getId)
         .list();
-    return listDetails.attach(products).stream().map(this::operationalSnapshot).toList();
+    return stateActivities.attach("finished",lifecycle.isSupplyChain()?"supply-chain":"admin",listDetails.attach(products).stream().map(this::operationalSnapshot).toList());
   }
 
   public FinishedProduct visibleDetail(Long id) {
@@ -120,7 +123,9 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
   }
 
   public FinishedProduct withDetails(FinishedProduct product) {
-    return operationalSnapshot(attachDetails(product));
+    var rendered = operationalSnapshot(attachDetails(product));
+    if (rendered == null) { return null; }
+    return stateActivities.attach("finished",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(rendered)).getFirst();
   }
 
   private FinishedProduct operationalSnapshot(FinishedProduct product) {
@@ -172,7 +177,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     if(publishNow) { lifecycle.shelfDuringCreation(ProductLifecycleService.Kind.FINISHED,product.getId()); }
     FinishedProduct created = attachDetails(getById(product.getId()));
     operationLogs.record(created, null, operationLogs.snapshot(created));
-    return created;
+    return stateActivities.attach("finished",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(created)).getFirst();
   }
 
   @Transactional
@@ -224,6 +229,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
       throw new IllegalArgumentException("商品编码已存在", exception);
     }
     replaceDetails(product);
+    stateActivities.storeStockChanged(id,existing.getTotalStock(),product.getTotalStock());
     if (costChanged) { lifecycle.reprice(ProductLifecycleService.Kind.FINISHED, id, true); }
     syncMediaReferences(product);
     FinishedProduct updated = attachDetails(getById(id));
@@ -238,7 +244,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
       lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,id,requestedStatus);
       updated=attachDetails(getById(id));
     }
-    return updated;
+    return stateActivities.attach("finished",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(updated)).getFirst();
   }
 
   @Transactional
@@ -272,7 +278,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     lifecycle.reprice(ProductLifecycleService.Kind.FINISHED, id, true);
     FinishedProduct updated = attachDetails(getById(id));
     operationLogs.record(updated, before, operationLogs.snapshot(updated));
-    return updated;
+    return stateActivities.attach("finished",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(updated)).getFirst();
   }
 
   @Transactional
@@ -355,7 +361,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     }
     FinishedProduct updated = attachDetails(getById(id));
     operationLogs.record(updated, before, operationLogs.snapshot(updated));
-    return updated;
+    return stateActivities.attach("finished",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(updated)).getFirst();
   }
 
   private Map<Long,java.math.BigDecimal> sourceCosts(FinishedProduct product) {

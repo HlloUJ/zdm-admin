@@ -149,8 +149,20 @@
                     </button>
                   </template>
                   <template #totalStock="{ row }">{{ row.totalStock ?? 0 }}</template>
-                  <template #createdByName="{ row }">{{ row.createdByName || '—' }}</template>
-                  <template #createdAt="{ row }">{{ time(row.createdAt) }}</template>
+                  <template #stateOperatorName="{ row }">
+                    <t-space size="small">
+                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>
+                      <t-tag
+                        v-if="stateSourceLabel(row.stateOperatorClientCode, 'store')"
+                        size="small"
+                        variant="light"
+                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'store') }}</t-tag
+                      >
+                    </t-space>
+                  </template>
+                  <template #stateOperatedAt="{ row }">{{
+                    row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'
+                  }}</template>
                   <template #offShelfReason="{ row }">
                     <t-tooltip :content="row.offShelfDetail || '—'">{{ row.offShelfReason || '—' }}</t-tooltip>
                   </template>
@@ -434,6 +446,8 @@
 </template>
 
 <script setup lang="ts">
+import { formatProductDateTime } from '@/utils/formatProductDateTime';
+import { stateActivityColumns, stateSourceLabel, sortByStateActivity } from '@/services/productStateActivity';
 import FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';
@@ -484,7 +498,7 @@ const can = (tab: string, action: string) => hasPermission(user, `${prefix}.${ta
 const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);
 const statusLabels: Record<string, string> = {
   warehouse: '仓库中',
-  selling: '出售中',
+  selling: '已上架',
   offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',
@@ -569,7 +583,7 @@ const batchConfirmDescriptions: Partial<Record<ActionKind, string>> = {
 };
 const submittingOffShelf = ref(false);
 const filteredRows = computed(() =>
-  rows.value.filter(
+  sortByStateActivity(rows.value).filter(
     (row) =>
       row.effectiveStatus === activeTab.value &&
       (!appliedFilter.keyword || `${row.name} ${row.productId}`.includes(appliedFilter.keyword)) &&
@@ -784,14 +798,8 @@ const operationWidths: Record<StoreFinishedStatus, number> = {
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...baseColumns,
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
-  ...(activeTab.value === 'offShelf'
-    ? [
-        { colKey: 'offShelfReason', title: '下架原因', minWidth: 140 },
-        { colKey: 'offShelfAt', title: '下架时间', width: 180 },
-      ]
-    : []),
+  ...stateActivityColumns(activeTab.value),
+  ...(activeTab.value === 'offShelf' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),
   { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },
 ]);
 const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [

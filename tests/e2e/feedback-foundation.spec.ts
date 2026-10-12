@@ -721,6 +721,9 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             costPrice: 6800,
             guidePrice: 9800,
             status: slabStatus,
+            stateOperatorName: offShelfRecords[0]!.offShelvedByName,
+            stateOperatedAt: `${offShelfRecords[0]!.offShelvedAt}Z`,
+            stateOperatorClientCode: 'admin',
             offShelfRecords,
             createdAt: '2026-07-27T09:00:00',
           },
@@ -737,6 +740,9 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             thicknessMm: 18,
             areaSquareMeter: 4.8,
             status: 'offShelf',
+            stateOperatorName: '王芳',
+            stateOperatedAt: '2026-08-22T10:00:00Z',
+            stateOperatorClientCode: 'admin',
             offShelfRecords: [
               {
                 id: 3,

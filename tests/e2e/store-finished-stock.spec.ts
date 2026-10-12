@@ -60,6 +60,9 @@ function product(overrides: Record<string, unknown> = {}) {
     imageUrls: [],
     createdByName: '门店创建员工',
     createdAt: '2026-10-08T12:34:56',
+    stateOperatorName: '门店创建员工',
+    stateOperatedAt: '2026-10-08T04:34:56Z',
+    stateOperatorClientCode: 'store',
     detail: '<p>门店商品详情</p>',
     categoryName: '平台分类',
     storeLevelName: '区域合作门店',
@@ -327,8 +330,8 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await dialog.locator('tbody .t-checkbox').click();
   await dialog.getByRole('button', { name: '批量选择', exact: true }).click();
   await expect(main.getByText('门店测试商品')).toBeVisible();
-  await expect(main.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
-  await expect(main.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '入库人', exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '入库时间', exact: true })).toBeVisible();
   await expect(main.getByRole('columnheader', { name: '挑选时间', exact: true })).toHaveCount(0);
   await expect(main.getByRole('columnheader', { name: '商品主图', exact: true })).toBeVisible();
   await expect(main.getByRole('columnheader', { name: '供应商', exact: true })).toHaveCount(0);
@@ -336,10 +339,10 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await expect(main.getByRole('cell', { name: '门店创建员工', exact: true })).toBeVisible();
   await expect(main.getByRole('cell', { name: '2026/10/08 12:34', exact: true })).toBeVisible();
   const columns = await main.locator('thead th').allTextContents();
-  expect(columns.indexOf('创建人')).toBeLessThan(columns.indexOf('创建时间'));
+  expect(columns.indexOf('入库人')).toBeLessThan(columns.indexOf('入库时间'));
   await expect(main.locator('.product-code')).toHaveCSS('font-size', '12px');
   await expect(main.locator('th.t-table__th-operation')).toHaveCSS('width', '190px');
-  await main.getByText(/出售中（0）/).click();
+  await main.getByText(/已上架（0）/).click();
   await expect(main.getByText('暂无商品')).toBeVisible();
   await main.getByText(/仓库中（1）/).click();
   await expect(main.getByText('门店测试商品')).toBeVisible();
@@ -408,7 +411,7 @@ test('upstream unavailable row is masked, with detail and purge only', async ({ 
   await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok([blocked]) }));
   await page.route('**/api/admin/store-finished-products/41', (route) => route.fulfill({ json: ok(blocked) }));
   await page.goto('/store/finished-stock-management');
-  await page.getByText(/出售中（1）/).click();
+  await page.getByText(/已上架（1）/).click();
   const overlay = page.locator('.source-unavailable-overlay');
   await expect(overlay).toContainText('供应链下架');
   await expect(overlay.getByRole('button', { name: '详情' })).toBeVisible();
@@ -727,7 +730,7 @@ for (const operationType of ['SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
     await page.locator('.t-drawer--open').getByText('详情', { exact: true }).click();
     const detail = page.locator('.t-dialog:visible');
-    await expect(detail.getByText('仓库中 → 出售中', { exact: true })).toBeVisible();
+    await expect(detail.getByText('仓库中 → 已上架', { exact: true })).toBeVisible();
     await expect(detail.getByText('变更对比', { exact: true })).toHaveCount(0);
     if (operationType === 'OFF_SHELF') {
       await expect(detail.getByText('操作说明', { exact: true })).toBeVisible();
@@ -827,14 +830,14 @@ test('store batch shelf matches shared confirmation and partial failure feedback
   await expect(page.getByText('已上架 1 个商品，未上架 1 个商品', { exact: true })).toBeVisible();
   await expect(main.locator('.finished-row-warning')).toContainText('请先配置门店销售价格');
   await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(1);
-  expect(requests).toEqual([[41], [42]]);
+  expect(requests).toEqual([[42], [41]]);
   failSecond = false;
   await button.click();
   await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
   await expect(page.getByText('已上架 1 个商品，未上架 0 个商品', { exact: true })).toBeVisible();
   await expect(main.locator('.finished-row-warning')).toHaveCount(0);
   await expect(main.getByText('暂无商品', { exact: true })).toBeVisible();
-  expect(requests).toEqual([[41], [42], [42]]);
+  expect(requests).toEqual([[42], [41], [42]]);
 });
 
 for (const scenario of [
@@ -946,7 +949,7 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
   });
   await page.goto('/store/finished-stock-management');
   const main = page.getByRole('main');
-  await main.getByText('出售中（1）', { exact: true }).click();
+  await main.getByText('已上架（1）', { exact: true }).click();
   const button = main.getByRole('button', { name: '批量下架', exact: true });
   await expect(button).toHaveClass(/brown-button/);
   await expect(button.locator('.t-icon-download')).toBeVisible();

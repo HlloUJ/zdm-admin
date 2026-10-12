@@ -239,6 +239,20 @@
                   <template #offShelvedAt="{ row }">
                     {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
                   </template>
+                  <template #stateOperatorName="{ row }">
+                    <t-space size="small">
+                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>
+                      <t-tag
+                        v-if="stateSourceLabel(row.stateOperatorClientCode, 'supply-chain')"
+                        size="small"
+                        variant="light"
+                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'supply-chain') }}</t-tag
+                      >
+                    </t-space>
+                  </template>
+                  <template #stateOperatedAt="{ row }">{{
+                    row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'
+                  }}</template>
                   <template #operation="{ row }">
                     <div class="table-actions">
                       <t-link
@@ -939,6 +953,7 @@
 </template>
 
 <script setup lang="ts">
+import { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';
 import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
@@ -1015,7 +1030,7 @@ import {
   type SlabStatus,
   type SlabPrice,
 } from '@/services/slabs';
-import { computed, nextTick, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 type PublisherType = SlabPublisherType;
 type SlabTab = SlabStatus;
 type ProductMode = 'create' | 'edit' | 'view';
@@ -1339,8 +1354,11 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     tenant: record.supplierName || supplier?.label || (record.supplierId ? `供应商 #${record.supplierId}` : '平台自营'),
     store: record.warehouse || '-',
     publisherType: normalizePublisherType(record.publisherType),
+    stateOperatorName: record.stateOperatorName,
+    stateOperatedAt: record.stateOperatedAt,
+    stateOperatorClientCode: record.stateOperatorClientCode,
     createdByName: record.createdByName?.trim() || '-',
-    createdAt: formatDateTime(record.createdAt),
+    createdAt: record.createdAt || '',
     price: {
       cost: record.costPrice == null ? '' : String(record.costPrice),
       guide: record.guidePrice == null ? '' : String(record.guidePrice),
@@ -1508,8 +1526,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
       { colKey: 'variety', title: '品种', width: 140 },
       { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },
-      { colKey: 'offShelvedByName', title: '下架人', width: 120, align: 'center' },
-      { colKey: 'offShelvedAt', title: '下架时间', width: 180, align: 'center' },
+      ...stateActivityColumns(activeTab.value),
       {
         colKey: 'operation',
         title: '操作',
@@ -1530,8 +1547,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'grade', title: '等级', width: 160, align: 'center' },
     { colKey: 'size', title: '尺寸', width: 170 },
     { colKey: 'tenant', title: '供应商', width: 180 },
-    { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-    { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+    ...stateActivityColumns(activeTab.value),
   ];
   baseColumns.push({
     colKey: 'operation',
@@ -1545,6 +1561,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
 const currentFilter = computed(() => filters[activeTab.value]);
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
 const currentPagination = computed(() => paginations[activeTab.value]);
+watch(activeTab, (tab) => {
+  paginations[tab].current = 1;
+});
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
 const currentPageIds = computed(() => pageData.value.filter((item) => !sourceBlocked(item)).map((item) => item.id));
 const pageAllSelected = computed(

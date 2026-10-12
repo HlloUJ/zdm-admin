@@ -35,7 +35,7 @@ public class StoreFinishedProductService {
       List<FinishedProductAttributeEntry> attributes, List<FinishedSpecDimension> specDimensions,
       List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
       String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
-      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention) {
+      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt, String stateOperatorClientCode) {
     public ProductView {
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
@@ -87,6 +87,8 @@ public class StoreFinishedProductService {
   }
   public record SalePriceInput(Long skuId, BigDecimal salePrice, String priceMode, BigDecimal saleCoefficient) {}
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private ProductStateActivityService stateActivities;
   private final FinishedInvalidationMedia invalidationMedia;
   private final JdbcTemplate jdbc;
   private final CityPartnerStoreScope scopes;
@@ -273,9 +275,11 @@ public class StoreFinishedProductService {
   public List<ProductView> list() {
     var store = scopes.require();
     List<Map<String, Object>> listings = jdbc.queryForList("""
-        SELECT listing.*, creator.display_name AS created_by_name
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, activity.operator_client_code AS state_operator_client_code, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
         FROM store_finished_products listing
         LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
+        LEFT JOIN product_state_activity activity ON activity.kind='store-finished' AND activity.business_client_code='store' AND activity.record_id=listing.id
+        LEFT JOIN accounts state_actor ON state_actor.id=activity.operator_account_id
         JOIN finished_products product ON product.id = listing.finished_product_id
         WHERE listing.tenant_id = ? AND listing.store_id = ?
         ORDER BY listing.created_at DESC, listing.id DESC
@@ -670,7 +674,10 @@ public class StoreFinishedProductService {
         attributeNames.entrySet().stream().filter(entry -> prices.stream()
             .anyMatch(sku -> sku.salesAttributes() != null && sku.salesAttributes().containsKey(entry.getKey())))
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
-        pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")));
+        pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")),
+        effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_name") : null,
+        effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null,
+        effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_client_code") : null);
     return legacyHistoricalView(listing, rendered);
   }
 
@@ -813,9 +820,11 @@ public class StoreFinishedProductService {
 
   private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
     List<Map<String, Object>> rows = jdbc.queryForList("""
-        SELECT listing.*, creator.display_name AS created_by_name
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, activity.operator_client_code AS state_operator_client_code, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
         FROM store_finished_products listing
         LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
+        LEFT JOIN product_state_activity activity ON activity.kind='store-finished' AND activity.business_client_code='store' AND activity.record_id=listing.id
+        LEFT JOIN accounts state_actor ON state_actor.id=activity.operator_account_id
         JOIN finished_products product ON product.id = listing.finished_product_id
         WHERE listing.id = ? AND listing.tenant_id = ? AND listing.store_id = ?
         """ + (lock ? " FOR UPDATE" : ""), id, store.tenantId(), store.storeId());
@@ -887,6 +896,8 @@ public class StoreFinishedProductService {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, store.tenantId(), store.storeId(), listingId, productId, name, type, summary,
         before, after, serialized, store.accountId(), store.operatorName());
-    return jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    Long logId=jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    stateActivities.record("store-finished","store",listingId,before,after,store.accountId(),"store");
+    return logId;
   }
 }

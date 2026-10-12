@@ -36,7 +36,7 @@ describe('store finished-stock operation log', () => {
   });
 
   it('presents both upstream status fields as source status while preserving local status wording', () => {
-    const label = (value?: string | null) => (value === 'selling' ? '出售中' : '已下架');
+    const label = (value?: string | null) => (value === 'selling' ? '已上架' : '已下架');
     for (const field of ['来源状态', '运营状态']) {
       expect(
         parseStoreOperationLogChanges(
@@ -48,7 +48,7 @@ describe('store finished-stock operation log', () => {
         ),
       ).toEqual({
         来源状态: { before: '已上架', after: '已下架' },
-        状态: { before: '出售中', after: '已下架' },
+        状态: { before: '已上架', after: '已下架' },
       });
     }
   });
@@ -80,14 +80,14 @@ describe('store finished-stock operation log', () => {
   });
 
   it('formats only status fields and tolerates invalid detail JSON', () => {
-    const labels: Record<string, string> = { warehouse: '仓库中', selling: '出售中' };
+    const labels: Record<string, string> = { warehouse: '仓库中', selling: '已上架' };
     const label = (value?: string | null) => labels[value || ''] || '—';
     expect(
       parseStoreOperationLogChanges(
         JSON.stringify({ 状态: { before: 'warehouse', after: 'selling' }, 备注: '已更新' }),
         label,
       ),
-    ).toEqual({ 状态: { before: '仓库中', after: '出售中' }, 备注: { before: null, after: '已更新' } });
+    ).toEqual({ 状态: { before: '仓库中', after: '已上架' }, 备注: { before: null, after: '已更新' } });
     expect(parseStoreOperationLogChanges('{', label)).toEqual({});
   });
 });

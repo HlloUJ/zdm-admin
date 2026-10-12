@@ -119,7 +119,7 @@ export const storeFinishedStock: FunctionModule = {
               ].map(([code, label]) => ({ label, value: `store.finished-stock-management.warehouse.${code}` })),
             },
             {
-              label: '出售中',
+              label: '已上架',
               value: 'store.finished-stock-management.selling',
               actions: [
                 ['batch-off-shelf', '批量下架'],
