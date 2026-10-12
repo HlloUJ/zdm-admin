@@ -563,6 +563,7 @@ test('history view closes the drawer and shows the chosen version metadata and a
   versions.unshift(latest);
   await page.goto('/category-attribute-template');
   await expect(page.locator('.template-metadata')).toContainText('当前版本 V2');
+  await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '版本记录', exact: true }).click();
   const drawer = page.locator('.t-drawer:visible');
   await drawer
@@ -572,6 +573,7 @@ test('history view closes the drawer and shows the chosen version metadata and a
     .click();
   await expect(drawer).not.toHaveClass(/t-drawer--open/);
   await expect(page.locator('.template-metadata')).toContainText('历史版本 V1');
+  await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toHaveCount(0);
   await expect(page.locator('.template-metadata')).toContainText('2026/09/08 09:00');
   await expect(page.locator('.template-metadata')).not.toContainText('新版创建人');
   await expect(page.locator('.attribute-table').getByText('颜色', { exact: true })).toBeVisible();

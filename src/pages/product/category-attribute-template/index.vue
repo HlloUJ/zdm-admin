@@ -99,7 +99,7 @@
                             >创建新版本草稿</t-button
                           >
                           <t-button
-                            v-if="draft && selectedId !== draft.id && can('create')"
+                            v-if="draft && isCurrentDisplayedVersion && selectedId !== draft.id && can('create')"
                             theme="default"
                             @click="navigate(() => choose(draft!))"
                             >继续编辑草稿</t-button
