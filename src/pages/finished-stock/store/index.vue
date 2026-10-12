@@ -484,7 +484,7 @@ const can = (tab: string, action: string) => hasPermission(user, `${prefix}.${ta
 const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);
 const statusLabels: Record<string, string> = {
   warehouse: '仓库中',
-  selling: '出售中',
+  selling: '已上架',
   offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',

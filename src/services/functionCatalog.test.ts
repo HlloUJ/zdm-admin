@@ -137,7 +137,7 @@ describe('full function catalog', () => {
     expect(stock.menus[0].direct).toBe(true);
     expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual([
       '仓库中',
-      '出售中',
+      '已上架',
       '已下架',
       '已售完',
       '回收站',

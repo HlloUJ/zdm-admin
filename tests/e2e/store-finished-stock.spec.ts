@@ -339,7 +339,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
   expect(columns.indexOf('创建人')).toBeLessThan(columns.indexOf('创建时间'));
   await expect(main.locator('.product-code')).toHaveCSS('font-size', '12px');
   await expect(main.locator('th.t-table__th-operation')).toHaveCSS('width', '190px');
-  await main.getByText(/出售中（0）/).click();
+  await main.getByText(/已上架（0）/).click();
   await expect(main.getByText('暂无商品')).toBeVisible();
   await main.getByText(/仓库中（1）/).click();
   await expect(main.getByText('门店测试商品')).toBeVisible();
@@ -408,7 +408,7 @@ test('upstream unavailable row is masked, with detail and purge only', async ({ 
   await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok([blocked]) }));
   await page.route('**/api/admin/store-finished-products/41', (route) => route.fulfill({ json: ok(blocked) }));
   await page.goto('/store/finished-stock-management');
-  await page.getByText(/出售中（1）/).click();
+  await page.getByText(/已上架（1）/).click();
   const overlay = page.locator('.source-unavailable-overlay');
   await expect(overlay).toContainText('供应链下架');
   await expect(overlay.getByRole('button', { name: '详情' })).toBeVisible();
@@ -727,7 +727,7 @@ for (const operationType of ['SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
     await page.locator('.t-drawer--open').getByText('详情', { exact: true }).click();
     const detail = page.locator('.t-dialog:visible');
-    await expect(detail.getByText('仓库中 → 出售中', { exact: true })).toBeVisible();
+    await expect(detail.getByText('仓库中 → 已上架', { exact: true })).toBeVisible();
     await expect(detail.getByText('变更对比', { exact: true })).toHaveCount(0);
     if (operationType === 'OFF_SHELF') {
       await expect(detail.getByText('操作说明', { exact: true })).toBeVisible();
@@ -946,7 +946,7 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
   });
   await page.goto('/store/finished-stock-management');
   const main = page.getByRole('main');
-  await main.getByText('出售中（1）', { exact: true }).click();
+  await main.getByText('已上架（1）', { exact: true }).click();
   const button = main.getByRole('button', { name: '批量下架', exact: true });
   await expect(button).toHaveClass(/brown-button/);
   await expect(button.locator('.t-icon-download')).toBeVisible();
