@@ -4552,6 +4552,61 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
+  void employeeRoleAssignmentRejectsSuperAdminAcrossWriteEndpoints() throws Exception {
+    String authorization = "Bearer " + TokenAuthenticationFilter.DEV_TOKEN;
+    Long superRoleId = jdbcTemplate.queryForObject(
+        "SELECT id FROM roles WHERE code='SUPER_ADMIN' AND client_code='admin' AND tenant_id IS NULL AND store_id IS NULL",
+        Long.class);
+    jdbcTemplate.update("""
+        INSERT INTO roles (id,name,code,data_scope,status,function_permissions,created_by_account_id)
+        VALUES (99351,'可分配测试角色','ASSIGNMENT_TEST','all','enabled',
+          'admin.permission-management.employee-management.view',1)
+        """);
+    String profile = "\"name\":\"角色分配测试\",\"gender\":\"male\",\"phone\":\"15926629351\",\"status\":\"disabled\"";
+    try {
+      mockMvc.perform(post("/api/admin/employees").header("Authorization", authorization)
+              .contentType("application/json")
+              .content("{" + profile + ",\"roleIds\":\"" + superRoleId + "\",\"dataPermission\":\"all\"}"))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.message").value("不能为员工分配超级管理员角色"));
+      assertThat(jdbcTemplate.queryForObject(
+          "SELECT COUNT(*) FROM accounts WHERE phone='15926629351'", Integer.class)).isZero();
+      MvcResult result = mockMvc.perform(post("/api/admin/employees").header("Authorization", authorization)
+              .contentType("application/json").content("{" + profile + "}"))
+          .andExpect(status().isOk()).andReturn();
+      Number employeeId = com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id");
+      for (String roleIds : List.of(superRoleId.toString(), "99351," + superRoleId)) {
+        mockMvc.perform(patch("/api/admin/employees/{id}/permissions", employeeId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"roleIds\":\"" + roleIds + "\",\"dataPermission\":\"all\"}"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("不能为员工分配超级管理员角色"));
+      }
+      mockMvc.perform(put("/api/admin/employees/{id}", employeeId)
+              .header("Authorization", authorization).contentType("application/json")
+              .content("{" + profile + ",\"roleIds\":\"" + superRoleId + "\",\"dataPermission\":\"all\"}"))
+          .andExpect(status().isForbidden());
+      assertThat(jdbcTemplate.queryForObject("SELECT role_ids FROM employees WHERE id=?", String.class, employeeId))
+          .isNull();
+      mockMvc.perform(patch("/api/admin/employees/{id}/permissions", employeeId)
+              .header("Authorization", authorization).contentType("application/json")
+              .content("{\"roleIds\":\"99351\",\"dataPermission\":\"self\"}"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.roleIds").value("99351"));
+      // Existing super-admin profile edits must remain possible without reassigning roles.
+      jdbcTemplate.update("UPDATE employees SET role_ids=? WHERE id=?", superRoleId.toString(), employeeId);
+      mockMvc.perform(put("/api/admin/employees/{id}", employeeId)
+              .header("Authorization", authorization).contentType("application/json")
+              .content("{" + profile + ",\"roleIds\":\"" + superRoleId + "\",\"dataPermission\":\"self\",\"remark\":\"资料修改\"}"))
+          .andExpect(status().isOk());
+    } finally {
+      jdbcTemplate.update("DELETE FROM account_identities WHERE account_id IN (SELECT id FROM accounts WHERE phone='15926629351')");
+      jdbcTemplate.update("DELETE FROM employees WHERE account_id IN (SELECT id FROM accounts WHERE phone='15926629351')");
+      jdbcTemplate.update("DELETE FROM accounts WHERE phone='15926629351'");
+      jdbcTemplate.update("DELETE FROM roles WHERE id=99351");
+    }
+  }
+
+  @Test
   void roleNameMustBeUniqueWithinPlatform() throws Exception {
     jdbcTemplate.update(
         """
