@@ -61,6 +61,11 @@ function product(overrides: Record<string, unknown> = {}) {
     createdByName: '门店创建员工',
     createdAt: '2026-10-08T12:34:56',
     detail: '<p>门店商品详情</p>',
+    categoryName: '平台分类',
+    storeLevelName: '区域合作门店',
+    storeCategoryId: 7,
+    storeCategoryName: '门店餐桌',
+    categoryCoefficient: 1.5,
     attributes: [{ attributeId: 1, attributeName: '材质', value: '天然石' }],
     specDimensions: [],
     skus: [
@@ -70,8 +75,8 @@ function product(overrides: Record<string, unknown> = {}) {
         stock: 3,
         costPrice: 100,
         guidePrice: 150,
-        guideSource: 'auto',
-        rolePrices: [{ roleId: 8, roleName: '店长', coefficient: 0.8, price: 80, priceSource: 'auto' }],
+        salePrice: 150,
+        priceMode: 'auto',
       },
     ],
     ...overrides,
@@ -260,7 +265,7 @@ for (const displayMode of ['single', 'layered'] as const) {
 test('store uses a direct menu, selects an operations product, and edits only its own price', async ({ page }) => {
   await storeLogin(page);
   let records: ReturnType<typeof product>[] = [];
-  let roleWrites = 0;
+  let saleWrites = 0;
   await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok(records) }));
   await page.route('**/api/admin/store-finished-products/pool-categories', (route) => route.fulfill({ json: ok([]) }));
   await page.route('**/api/admin/store-finished-products/pool', (route) =>
@@ -272,17 +277,37 @@ test('store uses a direct menu, selects an operations product, and edits only it
     records = [product()];
     return route.fulfill({ json: ok(records) });
   });
-  await page.route('**/api/admin/store-finished-products/41', (route) => route.fulfill({ json: ok(records[0]) }));
-  await page.route('**/api/admin/store-finished-products/41/skus/101/roles/8/price', (route) => {
-    roleWrites++;
-    records[0] = product({
-      skus: [
-        {
-          ...product().skus[0],
-          rolePrices: [{ roleId: 8, roleName: '店长', coefficient: 0.8, price: 140, priceSource: 'manual' }],
-        },
-      ],
-    });
+  await page.route('**/api/admin/store-finished-products/41/edit-categories', (route) =>
+    route.fulfill({ json: ok([{ id: 7, parentId: null, name: '门店餐桌', status: 'enabled', coefficient: 1.5 }]) }),
+  );
+  await page.route('**/api/admin/store-finished-products/41', async (route) => {
+    if (route.request().method() === 'PUT') {
+      saleWrites++;
+      const body = route.request().postDataJSON();
+      expect(body).toEqual({
+        storeCategoryId: 7,
+        skus: [
+          {
+            skuId: 101,
+            salePrice: saleWrites === 1 ? 140 : 200,
+            priceMode: 'manual',
+            saleCoefficient: saleWrites === 1 ? 1.4 : 2,
+          },
+        ],
+      });
+      records[0] = product({
+        skus: [
+          {
+            ...product().skus[0],
+            salePrice: body.skus[0].salePrice,
+            priceMode: 'manual',
+            saleCoefficient: body.skus[0].saleCoefficient,
+          },
+        ],
+      });
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     return route.fulfill({ json: ok(records[0]) });
   });
 
@@ -319,16 +344,53 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await main.getByText(/仓库中（1）/).click();
   await expect(main.getByText('门店测试商品')).toBeVisible();
   await main.getByText('编辑', { exact: true }).click();
-  const drawer = page.locator('.t-drawer:visible');
-  await expect(drawer.getByText('100.00').last()).toBeVisible();
-  await expect(drawer.getByRole('cell', { name: '运营端指导价' })).toBeVisible();
-  await expect(drawer.getByText('0.8')).toBeVisible();
-  await expect(drawer.getByText('指导价（系数')).toHaveCount(0);
-  await drawer.getByText('手工价格', { exact: true }).click();
-  await drawer.locator('.t-input-number input').first().fill('140');
-  await drawer.getByRole('button', { name: '保存', exact: true }).click();
-  await expect.poll(() => roleWrites).toBe(1);
-  await expect(drawer.getByRole('cell', { name: '运营端指导价' })).toBeVisible();
+  await expect(page).toHaveURL(/\/store\/finished-stock-management\/41\/edit$/);
+  await expect(page.locator('.t-drawer--open')).toHaveCount(0);
+  await expect(main.getByRole('heading', { name: '编辑商品', exact: true })).toBeVisible();
+  await expect(main.locator('.form-anchor-nav')).toHaveText('图文描述基础信息销售信息');
+  await expect(main.locator('.form-anchor-card')).toHaveCSS('position', 'fixed');
+  await expect(main.locator('.form-heading-card h1')).toHaveCSS('font-size', '20px');
+  await expect(main.locator('.page-header')).toHaveCount(0);
+  await expect(
+    main.locator('.readonly-product-fields .zdm-admin-section-card').nth(1).locator('.t-cascader'),
+  ).toBeVisible();
+  await expect(main.locator('#store-finished-product-sales .spec-table-block')).toBeVisible();
+  await expect(main.locator('.form-submit-bar')).toHaveCSS('position', 'sticky');
+  await main.getByRole('link', { name: '销售信息', exact: true }).click();
+  await expect(main.getByRole('link', { name: '销售信息', exact: true })).toHaveAttribute('aria-current', 'location');
+  await expect(main.getByText('门店商品详情', { exact: true })).toBeVisible();
+  await expect(main.getByText('天然石', { exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '指导价', exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '区域合作门店价', exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '商品售价*', exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '数量', exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '库存', exact: true })).toHaveCount(0);
+  await expect(main.locator('.spec-table-block input:disabled')).toHaveCount(0);
+  await expect(main.locator('.quantity-editor input')).toHaveCount(0);
+  await expect(main.locator('.price-pair input[placeholder="系数"]')).toBeEnabled();
+  await expect(main.getByText('最低可售价', { exact: true })).toHaveCount(0);
+  const priceInput = main.locator('.store-sale-price-input input');
+  await expect(priceInput).toHaveValue('150.00');
+  await priceInput.fill('140');
+  await priceInput.blur();
+  await expect(main.getByRole('button', { name: '手工价格，点击切换跟随配置' })).toBeVisible();
+  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect.poll(() => saleWrites).toBe(1);
+  await expect(page).toHaveURL('/store/finished-stock-management');
+  await expect(main.getByText('门店测试商品', { exact: true })).toBeVisible();
+  await main.getByText('编辑', { exact: true }).click();
+  await expect(priceInput).toHaveValue('140.00');
+  const coefficientInput = main.locator('.store-sale-coefficient-input input');
+  await expect(coefficientInput).toHaveValue('1.40');
+  await coefficientInput.fill('2');
+  await coefficientInput.blur();
+  await expect(priceInput).toHaveValue('200.00');
+  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect.poll(() => saleWrites).toBe(2);
+  await expect(page).toHaveURL('/store/finished-stock-management');
+  await main.getByText('编辑', { exact: true }).click();
+  await expect(coefficientInput).toHaveValue('2.00');
+  await expect(priceInput).toHaveValue('200.00');
 });
 
 test('upstream unavailable row is masked, with detail and purge only', async ({ page }) => {
@@ -569,7 +631,7 @@ test('store operation logs show the same filter, pagination, and detail structur
     operatedAt: '2026-09-24T10:00:00',
     beforeStatus: 'warehouse',
     afterStatus: 'warehouse',
-    changeDetails: '{"最低价":{"before":150,"after":140}}',
+    changeDetails: '{"商品售价":{"before":150,"after":140}}',
   };
   await page.route('**/api/admin/store-finished-products/operation-logs?**', (route) =>
     route.fulfill({ json: ok({ records: [log], total: 1 }) }),
@@ -589,7 +651,7 @@ test('store operation logs show the same filter, pagination, and detail structur
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.getByText('状态变化')).toBeVisible();
   await expect(dialog.getByText('变更对比')).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: '最低价' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: '商品售价' })).toBeVisible();
 });
 
 for (const operationType of ['SOURCE_OFF_SHELF', 'OPERATIONS_OFF_SHELF']) {
@@ -1078,3 +1140,171 @@ test('invalid warehouse overlay excludes selection and shows only the source rea
   const detail = page.locator('.t-drawer').filter({ has: page.getByText('商品详情', { exact: true }) });
   await expect(detail.locator('.t-alert')).toHaveText('该商品已被运营管理平台下架');
 });
+
+test('store editor requires category, leaves missing prices empty, and follows only configured categories', async ({
+  page,
+}) => {
+  await storeLogin(page);
+  const record = product({
+    storeCategoryId: null,
+    storeCategoryName: '',
+    categoryCoefficient: null,
+    skus: [{ ...product().skus[0], salePrice: null, priceMode: 'manual' }],
+  });
+  await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok([record]) }));
+  await page.route('**/api/admin/store-finished-products/41', (route) => route.fulfill({ json: ok(record) }));
+  await page.route('**/api/admin/store-finished-products/41/edit-categories', (route) =>
+    route.fulfill({
+      json: ok([
+        { id: 5, parentId: null, name: '一级分类', status: 'enabled', coefficient: null },
+        { id: 6, parentId: 5, name: '二级分类', status: 'enabled', coefficient: null },
+        { id: 7, parentId: 6, name: '有系数分类', status: 'enabled', coefficient: 1.5 },
+        { id: 9, parentId: null, name: '无系数分类', status: 'enabled', coefficient: null },
+      ]),
+    }),
+  );
+  await page.goto('/store/finished-stock-management/41/edit');
+  const main = page.getByRole('main');
+  const input = main.locator('.store-sale-price-input input');
+  await expect(input).toHaveValue('');
+  await expect(main.getByText(/无法自动计算|缺失原因/)).toHaveCount(0);
+  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect(main.getByText('请选择门店分类', { exact: true })).toBeVisible();
+  await main.locator('.t-cascader input').click();
+  await page.locator('.t-cascader__item').filter({ hasText: '一级分类' }).hover();
+  await page.locator('.t-cascader__item').filter({ hasText: '二级分类' }).hover();
+  const leaf = page.locator('.t-cascader__item').filter({ hasText: '有系数分类' });
+  await expect(leaf).toBeVisible();
+  await leaf.hover();
+  await expect(input).toHaveValue('');
+  await leaf.click();
+  await expect(input).toHaveValue('150.00');
+  const coefficientInput = main.locator('.store-sale-coefficient-input input');
+  await coefficientInput.fill('2');
+  await coefficientInput.blur();
+  await expect(input).toHaveValue('200.00');
+  await input.fill('160');
+  await expect(coefficientInput).toHaveValue('1.60');
+  await input.blur();
+  await main.getByRole('button', { name: '手工价格，点击切换跟随配置' }).click();
+  const confirm = page.locator('.t-dialog:visible');
+  await confirm.getByRole('button', { name: '确认', exact: true }).click();
+  await expect(input).toHaveValue('150.00');
+  await main.locator('.t-cascader input').click();
+  await page.locator('.t-cascader__item').filter({ hasText: '无系数分类' }).click();
+  await expect(input).toHaveValue('150.00');
+  await expect(main.getByRole('button', { name: '手工价格', exact: true })).toBeDisabled();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  await coefficientInput.fill('');
+  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect(main.locator('.store-sale-coefficient-input .t-input')).toHaveClass(/t-is-error/);
+  await expect(main.getByText('请输入系数', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/41\/edit$/);
+  await input.fill('');
+  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect(main.locator('.store-sale-price-input .t-input')).toHaveClass(/t-is-error/);
+  await expect(main.getByText('请输入商品售价', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/41\/edit$/);
+});
+
+test('store editor keeps wide sales specifications inside the content area', async ({ page }) => {
+  await page.setViewportSize({ width: 1368, height: 858 });
+  await storeLogin(page);
+  const dimensions = Array.from({ length: 8 }, (_, index) => ({
+    key: `dimension_${index}`,
+    name: `销售属性${index + 1}`,
+  }));
+  const record = product({
+    specDimensions: dimensions,
+    skus: [
+      {
+        ...product().skus[0],
+        salesAttributes: Object.fromEntries(dimensions.map((item) => [item.key, '天然石规格长内容'])),
+      },
+    ],
+  });
+  await page.route('**/api/admin/store-finished-products/41', (route) => route.fulfill({ json: ok(record) }));
+  await page.route('**/api/admin/store-finished-products/41/edit-categories', (route) =>
+    route.fulfill({ json: ok([{ id: 7, parentId: null, name: '门店餐桌', status: 'enabled', coefficient: 1.5 }]) }),
+  );
+  await page.goto('/store/finished-stock-management/41/edit');
+  const main = page.getByRole('main');
+  await expect(main.getByRole('heading', { name: '编辑商品', exact: true })).toBeVisible();
+  const noPageOverflow = () =>
+    page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
+  await expect.poll(noPageOverflow).toBe(true);
+  await main.getByRole('link', { name: '销售信息', exact: true }).click();
+  await main.locator('.store-sale-price-input input').fill('180');
+  await expect.poll(noPageOverflow).toBe(true);
+  const bounds = await page.evaluate(() => {
+    const content = document.querySelector('main')!.getBoundingClientRect();
+    return ['.form-heading-card', '.form-anchor-card', '.form-submit-bar'].map((selector) => {
+      const rect = document.querySelector(selector)!.getBoundingClientRect();
+      return rect.left >= content.left - 1 && rect.right <= content.right + 1;
+    });
+  });
+  expect(bounds).toEqual([true, true, true]);
+});
+
+test('supply price attention stays on its product row, can be dismissed and returns after reload', async ({ page }) => {
+  await storeLogin(page);
+  await page.route('**/api/admin/store-finished-products', (route) =>
+    route.fulfill({
+      json: ok([product({ salePriceAttention: true }), product({ id: 42, productId: 92, name: '正常价格商品' })]),
+    }),
+  );
+  await page.goto('/store/finished-stock-management');
+  const main = page.locator('main.page');
+  const warning = main.locator('.finished-row-warning');
+  await expect(warning).toHaveCount(1);
+  await expect(warning).toContainText('供应链修改销售规格，商品售价待补齐');
+  await expect(main.locator('tr[data-shelf-error-id="41"]')).toContainText('门店测试商品');
+  await expect(main.locator('tr[data-shelf-error-id="42"]')).toHaveCount(0);
+  await warning.locator('.t-alert__close').click();
+  await expect(warning).toHaveCount(0);
+  await page.reload();
+  await expect(warning).toHaveCount(1);
+  await expect(main.getByText('编辑', { exact: true }).first()).toBeEnabled();
+});
+
+for (const [status, tab] of [
+  ['offShelf', '已下架'],
+  ['recycle', '回收站'],
+] as const) {
+  test(`${status} read-only detail shows latest supply SKUs without an edit action`, async ({ page }) => {
+    await storeLogin(page);
+    await page.addInitScript((state) => {
+      const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+      user.permissions.push(`store.finished-stock-management.${state === 'offShelf' ? 'off-shelf' : state}.detail`);
+      localStorage.setItem('zdm-admin-user', JSON.stringify(user));
+    }, status);
+    const old = product({ status, effectiveStatus: status, salePriceAttention: true });
+    const latest = {
+      ...old,
+      skus: [
+        ...old.skus,
+        {
+          skuId: 102,
+          label: '供应链新增规格',
+          stock: 0,
+          costPrice: 200,
+          guidePrice: 300,
+          salePrice: 400,
+          saleCoefficient: 2,
+          priceMode: 'auto',
+        },
+      ],
+    };
+    await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok([old]) }));
+    await page.route('**/api/admin/store-finished-products/41', (route) => route.fulfill({ json: ok(latest) }));
+    await page.goto('/store/finished-stock-management');
+    const main = page.locator('main.page');
+    await main.getByText(`${tab}（1）`, { exact: true }).click();
+    await expect(main.getByText('编辑', { exact: true })).toHaveCount(0);
+    await main.getByText('详情', { exact: true }).click();
+    const drawer = page.locator('.t-drawer--open');
+    await expect(drawer.getByText('供应链新增规格', { exact: true })).toBeVisible();
+    await expect(drawer.locator('input')).toHaveCount(0);
+    await expect(drawer.getByText('400', { exact: true })).toBeVisible();
+  });
+}

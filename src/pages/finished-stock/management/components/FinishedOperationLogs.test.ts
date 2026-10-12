@@ -89,6 +89,7 @@ describe('finished operation logs', () => {
     await vm.showDetail(1);
     expect(getFinishedOperationLog).toHaveBeenCalledWith(1);
     expect(vm.time('2026-09-10T09:48:20')).toBe('2026/09/10 17:48');
+    expect(vm.time('2026-10-12T06:10:11')).toBe('2026/10/12 14:10');
     expect(vm.richText('after')).toContain('历史详情');
     expect(vm.richText('after')).not.toContain('<script');
     expect(vm.richText('after')).toContain('/api/open/media/detail-image');

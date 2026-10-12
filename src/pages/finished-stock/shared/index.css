@@ -970,11 +970,6 @@
     grid-template-columns: 1fr;
   }
 }
-.readonly-product-fields :deep(.t-descriptions__content) {
-  background: var(--td-bg-color-component-disabled);
-}
 .readonly-spec-value {
   display: block;
-  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-s);
-  background: var(--td-bg-color-component-disabled);
 }

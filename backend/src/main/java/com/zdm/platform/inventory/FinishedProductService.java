@@ -195,6 +195,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
       throw new IllegalArgumentException("编辑商品不能切换分类");
     }
     Map<String, Object> before = operationLogs.snapshot(attachDetails(existing));
+    var editAudit = editForm ? operationLogs.prepareSupplyEdit(existing) : null;
     if (product.getSpecDimensions() == null) {
       product.setSpecDimensions(existing.getSpecDimensions());
     }
@@ -231,7 +232,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
       lifecycle.sourceTransitionDuringEdit(ProductLifecycleService.Kind.FINISHED, id, requestedStatus);
       updated = attachDetails(getById(id));
     }
-    if (editForm) { operationLogs.recordEdit(updated, before, operationLogs.snapshot(updated)); }
+    if (editForm) { operationLogs.recordSupplyEdit(updated, editAudit); }
     else { operationLogs.record(updated, before, operationLogs.snapshot(updated)); }
     if (!editForm && statusChanged) {
       lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,id,requestedStatus);
@@ -428,7 +429,11 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
       }
       retained.add(variant.getId());
     });
-    existing.keySet().stream().filter(id -> !retained.contains(id)).forEach(variantMapper::deleteById);
+    existing.keySet().stream().filter(id -> !retained.contains(id)).forEach(id -> {
+      // Store sale prices belong to the live SKU; historical logs keep their own snapshots.
+      jdbcTemplate.update("DELETE FROM store_finished_sale_prices WHERE sku_id=?", id);
+      variantMapper.deleteById(id);
+    });
     // Labels are snapshots in price rows; keep them aligned when a SKU is renamed.
     product.getVariants().forEach(variant -> {
       jdbcTemplate.update("UPDATE finished_product_guide_prices SET variant_label=? WHERE finished_product_id=? AND sku_id=?",

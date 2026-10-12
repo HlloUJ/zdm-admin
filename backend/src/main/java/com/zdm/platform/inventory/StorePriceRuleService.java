@@ -18,10 +18,12 @@ public class StorePriceRuleService {
 
   private final JdbcTemplate jdbc;
   private final CityPartnerStoreScope scopes;
+  private final StoreFinishedSalePriceService salePrices;
 
-  public StorePriceRuleService(JdbcTemplate jdbc, CityPartnerStoreScope scopes) {
+  public StorePriceRuleService(JdbcTemplate jdbc, CityPartnerStoreScope scopes, StoreFinishedSalePriceService salePrices) {
     this.jdbc = jdbc;
     this.scopes = scopes;
+    this.salePrices = salePrices;
   }
 
   public List<Rule> list(String kind, String scope) {
@@ -153,6 +155,7 @@ public class StorePriceRuleService {
   public List<Rule> savePriceBatch(String scope, List<Long> targetIds, BigDecimal coefficient) {
     requireType("price", scope);
     var store = scopes.require();
+    if ("finished".equals(scope)) { salePrices.lockCategories(store.storeId()); }
     validateCoefficient("price", coefficient);
     validateTargets("price", scope, targetIds);
     var arguments = targetIds.stream().map(id -> new Object[] {store.tenantId(), store.storeId(), "price",
@@ -169,7 +172,9 @@ public class StorePriceRuleService {
   public List<Rule> clearPriceBatch(String scope, List<Long> targetIds) {
     requireType("price", scope);
     var store = scopes.require();
+    if ("finished".equals(scope)) { salePrices.lockCategories(store.storeId()); }
     validateTargets("price", scope, targetIds);
+    if ("finished".equals(scope)) { salePrices.freezeCategories(store.storeId(), targetIds); }
     var arguments = targetIds.stream()
         .map(id -> new Object[] {store.tenantId(), store.storeId(), scope, id}).toList();
     jdbc.batchUpdate("""
@@ -185,6 +190,7 @@ public class StorePriceRuleService {
   public List<Rule> savePrices(String scope, List<PriceChange> changes) {
     requireType("price", scope);
     var store = scopes.require();
+    if ("finished".equals(scope)) { salePrices.lockCategories(store.storeId()); }
     if (changes == null || changes.stream().anyMatch(Objects::isNull)) {
       throw new IllegalArgumentException("请选择需要保存的分类");
     }
@@ -205,6 +211,9 @@ public class StorePriceRuleService {
             coefficient,created_by_account_id,target_key,scope) VALUES (?,?,?,?,?,?,?,?,?)
           ON DUPLICATE KEY UPDATE coefficient = ?
           """, writes);
+    }
+    if ("finished".equals(scope)) {
+      salePrices.freezeCategories(store.storeId(), changes.stream().filter(change -> change.coefficient() == null).map(PriceChange::categoryId).toList());
     }
     var clears = changes.stream().filter(change -> change.coefficient() == null)
         .map(change -> new Object[] {store.tenantId(), store.storeId(), scope, change.categoryId()}).toList();

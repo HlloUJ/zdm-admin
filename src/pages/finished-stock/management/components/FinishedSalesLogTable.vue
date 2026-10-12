@@ -1,15 +1,22 @@
 <template>
-  <t-table
-    class="sales-log-table"
-    row-key="rowKey"
-    size="small"
-    :data="rows"
-    :columns="columns"
-    :rowspan-and-colspan="span"
-    bordered
-    table-layout="auto"
-    table-content-width="100%"
-  />
+  <div>
+    <t-table
+      class="sales-log-table"
+      row-key="rowKey"
+      size="small"
+      :data="rows"
+      :columns="columns"
+      :rowspan-and-colspan="span"
+      :row-class-name="rowClass"
+      bordered
+      table-layout="auto"
+      table-content-width="100%"
+    />
+    <template v-if="separateDeleted.length">
+      <h4>已删除销售规格</h4>
+      <FinishedSalesLogTable :snapshot="deletedSnapshot" :other="{}" :store-mode="storeMode" deleted-rows />
+    </template>
+  </div>
 </template>
 <script setup lang="ts">
 import { computed, h } from 'vue';
@@ -30,8 +37,17 @@ const props = defineProps<{
   highlightChanges?: boolean;
   priceOnly?: boolean;
   storeMode?: boolean;
+  supplyEdit?: boolean;
+  side?: 'before' | 'after';
+  deletedRows?: boolean;
 }>();
-type LoggedVariant = Partial<FinishedProductVariant> & { skuId?: number; variantKey?: string };
+type LoggedVariant = Partial<FinishedProductVariant> & {
+  skuId?: number;
+  variantKey?: string;
+  saleCoefficient?: number;
+  salePrice?: number;
+  priceMode?: string;
+};
 const variantIdentity = (row: { skuId?: number; id?: number; variantKey?: string }) =>
   row.skuId ?? row.variantKey ?? row.id;
 const isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');
@@ -42,7 +58,7 @@ function otherList<T>(field: string): T[] {
   return Array.isArray(props.other[field]) ? (props.other[field] as T[]) : [];
 }
 const attributes = computed(() => list<FinishedProductAttributeEntry>('商品属性'));
-const variants = computed(() => {
+const ownVariants = computed(() => {
   if (Array.isArray(props.snapshot['销售规格'])) return list<LoggedVariant>('销售规格');
   const source = [...list<FinishedProductGuidePrice>('指导价'), ...list<FinishedProductPrice>('层级价格')];
   return [
@@ -58,6 +74,46 @@ const variants = computed(() => {
     ).values(),
   ];
 });
+const removed = computed(() =>
+  otherList<LoggedVariant>('销售规格').filter(
+    (row) => !ownVariants.value.some((next) => variantIdentity(next) === variantIdentity(row)),
+  ),
+);
+const structureChanged = computed(
+  () =>
+    JSON.stringify(props.snapshot['规格维度']) !== JSON.stringify(props.other['规格维度']) ||
+    ownVariants.value[0]?.displayMode !== otherList<LoggedVariant>('销售规格')[0]?.displayMode ||
+    JSON.stringify(Object.keys(ownVariants.value[0]?.salesAttributes || {}).sort()) !==
+      JSON.stringify(Object.keys(otherList<LoggedVariant>('销售规格')[0]?.salesAttributes || {}).sort()),
+);
+const separateDeleted = computed(() =>
+  props.supplyEdit && props.side === 'after' && structureChanged.value ? removed.value : [],
+);
+const deletedSnapshot = computed(() => ({ ...props.other, 销售规格: separateDeleted.value }));
+const variants = computed(() =>
+  props.supplyEdit && props.side === 'after' && !structureChanged.value
+    ? [
+        ...otherList<LoggedVariant>('销售规格').map(
+          (old) => ownVariants.value.find((next) => variantIdentity(next) === variantIdentity(old)) || old,
+        ),
+        ...ownVariants.value.filter(
+          (next) => !otherList<LoggedVariant>('销售规格').some((old) => variantIdentity(old) === variantIdentity(next)),
+        ),
+      ]
+    : ownVariants.value,
+);
+function rowClass({ row }: { row: TableRowData }) {
+  return rowState(row) === 'deleted' ? 'sales-log-row-deleted' : '';
+}
+function rowState(row: TableRowData) {
+  if (props.deletedRows) return 'deleted';
+  if (!props.supplyEdit) return '';
+  if (props.side === 'after' && !ownVariants.value.some((value) => variantIdentity(value) === row.skuId))
+    return 'deleted';
+  if (!otherList<LoggedVariant>('销售规格').some((value) => variantIdentity(value) === row.skuId))
+    return props.side === 'after' ? 'added' : 'removed';
+  return '';
+}
 const dimensions = computed(() =>
   variants.value[0]?.displayMode === 'layered' ? list<FinishedSpecDimension>('规格维度') : [],
 );
@@ -65,7 +121,7 @@ const guidePrices = computed(() => list<FinishedProductGuidePrice>('指导价'))
 const prices = computed(() => list<FinishedProductPrice>('层级价格'));
 const levels = computed(() => [
   ...new Map(
-    [...prices.value, ...otherList<FinishedProductPrice>('层级价格')].map((price) => [
+    [...prices.value, ...(props.supplyEdit ? [] : otherList<FinishedProductPrice>('层级价格'))].map((price) => [
       price.storeLevelId,
       price.storeLevelName || `价格层级${price.storeLevelId}`,
     ]),
@@ -74,7 +130,7 @@ const levels = computed(() => [
 const extraFields = computed(() =>
   [
     ...new Set(
-      [...variants.value, ...otherList<LoggedVariant>('销售规格')].flatMap((row) =>
+      [...variants.value, ...(props.supplyEdit ? [] : otherList<LoggedVariant>('销售规格'))].flatMap((row) =>
         Object.keys(row.salesAttributes || {}),
       ),
     ),
@@ -95,8 +151,9 @@ const attributeName = (key: string) =>
   dimensions.value.find((item) => item.key === key)?.name ||
   attributes.value.find((item) => key === `attribute_${item.attributeId}`)?.attributeName ||
   '历史属性（名称未记录）';
-const text = (value: unknown) => (value == null || value === '' ? '未记录' : String(value));
-const money = (value: number | undefined) => (value == null ? '未记录' : Number(value).toFixed(2));
+const text = (value: unknown) => (value == null || value === '' ? '-' : String(value));
+const money = (value: number | string | null | undefined) =>
+  value == null || value === '' ? '-' : Number(value).toFixed(2);
 const priceCell = (coefficient?: number, price?: number, source?: string) =>
   props.storeMode
     ? money(price)
@@ -118,20 +175,28 @@ const priceCell = (coefficient?: number, price?: number, source?: string) =>
 const rows = computed(() =>
   orderLayeredRows(
     variants.value.map((variant, index) => {
-      const guide = guidePrices.value.find((price) => variantIdentity(price) === variantIdentity(variant));
+      const ghost =
+        props.supplyEdit &&
+        props.side === 'after' &&
+        !ownVariants.value.some((row) => variantIdentity(row) === variantIdentity(variant));
+      const view = ghost ? props.other : props.snapshot;
+      const historicalGuides = ghost ? otherList<FinishedProductGuidePrice>('指导价') : guidePrices.value;
+      const historicalPrices = ghost ? otherList<FinishedProductPrice>('层级价格') : prices.value;
+      const guide = historicalGuides.find((price) => variantIdentity(price) === variantIdentity(variant));
       return {
         ...variant.salesAttributes,
         rowKey: index,
         specText: variant.variantLabel,
         recordedSkuId: variant.skuId ?? variant.id,
-        cost: comparableCell(props.snapshot, variant, 'cost'),
+        cost: comparableCell(view, variant, 'cost'),
         guide,
         quantity: variant.stock,
+        sale: variant,
         skuId: variantIdentity(variant),
         ...Object.fromEntries(
           levels.value.map(([id]) => [
             `level_${id}`,
-            prices.value.find(
+            historicalPrices.find(
               (price) => variantIdentity(price) === variantIdentity(variant) && price.storeLevelId === id,
             ),
           ]),
@@ -173,6 +238,34 @@ const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
     cell: (_h: unknown, { row }: { row: TableRowData }) =>
       priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),
   })),
+  ...(props.storeMode &&
+  [...variants.value, ...(props.supplyEdit ? [] : otherList<LoggedVariant>('销售规格'))].some(
+    (variant) => 'salePrice' in variant || 'saleCoefficient' in variant || 'priceMode' in variant,
+  )
+    ? [
+        {
+          colKey: 'sale',
+          title: '商品售价',
+          minWidth: 170,
+          cell: (_h: unknown, { row }: { row: TableRowData }) =>
+            h('div', [
+              h('div', `系数：${money(row.sale?.saleCoefficient)}`),
+              h('div', { class: 'historical-price-line' }, [
+                h('span', `价格：${money(row.sale?.salePrice)}`),
+                ...(row.sale?.priceMode
+                  ? [
+                      h(PriceSourceToggle, {
+                        source: row.sale.priceMode === 'auto' ? 'auto' : 'manual',
+                        available: false,
+                        readonly: true,
+                      }),
+                    ]
+                  : []),
+              ]),
+            ]),
+        },
+      ]
+    : []),
   ...(!props.priceOnly
     ? [
         {
@@ -191,6 +284,7 @@ function comparableCell(snapshot: Record<string, unknown>, variant: LoggedVarian
   const guide = guides.find((item) => variantIdentity(item) === variantIdentity(variant));
   if (key === 'specText') return variant.variantLabel;
   if (key === 'quantity') return variant.stock;
+  if (key === 'sale') return [variant.saleCoefficient, variant.salePrice, variant.priceMode];
   if (key === 'cost') {
     if (isSupplyChain.value) return variant.costPrice;
     return (
@@ -228,19 +322,38 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() =>
     .filter(
       (column) =>
         (!props.storeMode || column.colKey !== 'cost') &&
+        (!props.storeMode || column.colKey !== 'guide' || guidePrices.value.length > 0) &&
+        (!props.storeMode || column.colKey !== 'quantity' || variants.value.some((variant) => variant.stock != null)) &&
         (!isSupplyChain.value || (column.colKey !== 'guide' && !String(column.colKey).startsWith('level_'))),
     )
     .map((column) => ({
       ...column,
       cell: (render, context) => {
-        const content = typeof column.cell === 'function' ? column.cell(render, context) : context.row[column.colKey!];
-        return h('div', { class: { 'sales-value-changed': changedCell(context.row, column.colKey!) } }, [content]);
+        const content =
+          typeof column.cell === 'function' ? column.cell(render, context) : text(context.row[column.colKey!]);
+        return h(
+          'div',
+          {
+            class: {
+              'sales-value-changed':
+                rowState(context.row) === 'removed' ||
+                (!rowState(context.row) && changedCell(context.row, column.colKey!)),
+              'sales-value-added': rowState(context.row) === 'added',
+              'sales-value-deleted': rowState(context.row) === 'deleted',
+            },
+          },
+          [content],
+        );
       },
     })),
 );
 const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol<TableRowData> }) =>
   layeredCellSpan(
-    rows.value.map((row) => dimensions.value.map((d) => String((row as TableRowData)[d.key] ?? ''))),
+    rows.value.map((row) =>
+      dimensions.value.map(
+        (d) => `${props.supplyEdit ? rowState(row) : ''}:${String((row as TableRowData)[d.key] ?? '')}`,
+      ),
+    ),
     rowIndex,
     dimensions.value.findIndex((d) => d.key === col.colKey),
   );
@@ -258,6 +371,22 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol<TableR
   font-size: var(--td-font-size-body-small);
 }
 
+.sales-log-table :deep(.sales-value-added) {
+  color: var(--td-brand-color-active);
+}
+.sales-log-table :deep(.sales-log-row-deleted > td) {
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(50% - 0.5px),
+    var(--td-text-color-disabled) calc(50% - 0.5px),
+    var(--td-text-color-disabled) calc(50% + 0.5px),
+    transparent calc(50% + 0.5px)
+  );
+}
+.sales-log-table :deep(.sales-value-deleted) {
+  color: var(--td-text-color-disabled);
+  text-decoration: line-through;
+}
 .sales-log-table :deep(.sales-value-changed) {
   color: var(--td-error-color);
 }

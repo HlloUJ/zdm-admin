@@ -2,6 +2,7 @@ package com.zdm.platform.inventory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zdm.platform.media.MediaHistoryService;
 import java.util.LinkedHashMap;
@@ -89,6 +90,21 @@ public class StoreFinishedSelectionSnapshot {
     } catch (JsonProcessingException error) {
       throw new IllegalStateException("门店日志读取失败", error);
     }
+  }
+
+  public String resolveEdit(String details) {
+    if (details == null) { return null; }
+    try {
+      ObjectNode changes = (ObjectNode) json.readTree(withoutSupplier(details));
+      for (String side : List.of("before", "after")) {
+        for (JsonNode item : changes.path("媒体").path(side)) {
+          long id = item.path("mediaId").asLong();
+          List<String> types = jdbc.queryForList("SELECT media_type FROM media_assets WHERE id=?", String.class, id);
+          ((ObjectNode) item).set("resource", json.valueToTree(history.view(id, types.isEmpty() ? "image" : types.getFirst())));
+        }
+      }
+      return changes.toString();
+    } catch (JsonProcessingException error) { throw new IllegalStateException("门店编辑日志读取失败", error); }
   }
 
   public String resolve(String details) {

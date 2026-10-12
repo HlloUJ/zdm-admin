@@ -3,12 +3,25 @@
     <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
-      <main class="page">
-        <header class="page-header">
-          <t-breadcrumb><t-breadcrumb-item>成品现货管理</t-breadcrumb-item></t-breadcrumb>
-          <t-link v-if="canGlobal('operation-log.view')" theme="primary" @click="openLogs">操作日志</t-link>
+      <main class="page" :class="{ 'page--form': editingId }">
+        <header v-if="!editingId" class="page-header">
+          <t-breadcrumb
+            ><t-breadcrumb-item @click="closeEdit">成品现货管理</t-breadcrumb-item
+            ><t-breadcrumb-item v-if="editingId">编辑商品</t-breadcrumb-item></t-breadcrumb
+          >
+          <t-link v-if="!editingId && canGlobal('operation-log.view')" theme="primary" @click="openLogs"
+            >操作日志</t-link
+          >
         </header>
-        <AdminListLayout v-if="tabs.length" class="finished-list-layout">
+        <StoreFinishedEditor
+          v-if="editingId && current && current.id === editingId && priceEditable"
+          :key="editingId"
+          :product="current"
+          @cancel="closeEdit"
+          @saved="finishEdit"
+        />
+        <t-loading v-else-if="editingId" :loading="loading" />
+        <AdminListLayout v-else-if="tabs.length" class="finished-list-layout">
           <template #toolbar>
             <div class="list-controls">
               <t-tabs
@@ -90,7 +103,7 @@
           </template>
           <template #table
             ><SourceUnavailableOverlay :rows="pageRows.filter((item) => item.sourceUnavailable)">
-              <FinishedRowWarnings :rows="pageRows" :errors="shelfErrors" @close="(id) => delete shelfErrors[id]">
+              <FinishedRowWarnings :rows="pageRows" :errors="rowWarnings" @close="closeRowWarning">
                 <t-table
                   :key="activeTab"
                   class="finished-stock-table"
@@ -102,7 +115,7 @@
                     ({ row }: { row: StoreFinishedProduct }) =>
                       row.sourceUnavailable
                         ? { 'data-source-id': row.id, inert: true }
-                        : shelfErrors[row.id]
+                        : rowWarnings[row.id]
                           ? { 'data-shelf-error-id': row.id }
                           : {}
                   "
@@ -301,11 +314,11 @@
 
     <t-drawer
       v-model:visible="poolDetailVisible"
-      @close="poolVisible = true"
       header="商品详情"
       size="min(1200px, 100vw)"
       :footer="false"
       :close-btn="true"
+      @close="poolVisible = true"
     >
       <StorePoolProductDetail v-if="poolDetail" :product="poolDetail" />
     </t-drawer>
@@ -336,47 +349,6 @@
     >
       <img v-if="imagePreview" :src="imagePreview" alt="商品主图" style="max-width: 100%" />
     </AdminDialog>
-
-    <t-drawer v-model:visible="priceVisible" header="商品价格" size="min(1050px, 100vw)" :footer="false">
-      <t-space v-if="current" direction="vertical" size="large" style="width: 100%">
-        <t-alert v-if="current.sourceUnavailable" theme="warning" :message="current.sourceMessage" />
-        <t-alert
-          theme="info"
-          message="成本价为本店级别的合伙人价格，只能查看。角色最低可售价以成本价乘角色系数计算，可按 SKU 手工覆盖；允许低于成本价。"
-        />
-        <AdminSectionCard v-for="sku in current.skus" :key="sku.skuId">
-          <h3>{{ sku.label }} · SKU ID {{ sku.skuId }}</h3>
-          <t-descriptions bordered :column="3">
-            <t-descriptions-item label="统一库存">{{ sku.stock }}</t-descriptions-item>
-            <t-descriptions-item label="本店成本价">{{ money(sku.costPrice) }}</t-descriptions-item>
-            <t-descriptions-item label="运营端指导价">{{ money(sku.guidePrice) }}</t-descriptions-item>
-          </t-descriptions>
-          <t-table row-key="roleId" :data="sku.rolePrices" :columns="roleColumns" style="margin-top: 16px">
-            <template #price="{ row }"
-              ><t-input-number
-                v-model="roleDrafts[`${sku.skuId}:${row.roleId}`]"
-                :min="0"
-                :decimal-places="2"
-                :disabled="!priceEditable || roleSources[`${sku.skuId}:${row.roleId}`] === 'auto'"
-                theme="normal"
-            /></template>
-            <template #priceSource="{ row }"
-              ><t-radio-group
-                v-model="roleSources[`${sku.skuId}:${row.roleId}`]"
-                :disabled="!priceEditable"
-                @change="syncRoleDraft(sku.skuId, row)"
-                ><t-radio value="auto">跟随配置</t-radio><t-radio value="manual">手工价格</t-radio></t-radio-group
-              ></template
-            >
-            <template #operation="{ row }"
-              ><t-button v-if="priceEditable" size="small" theme="primary" @click="saveRole(sku.skuId, row.roleId)"
-                >保存</t-button
-              ></template
-            >
-          </t-table>
-        </AdminSectionCard>
-      </t-space>
-    </t-drawer>
 
     <AdminDialog
       v-model:visible="offShelfVisible"
@@ -465,20 +437,14 @@
 import FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useStoreFinishedLogs } from './useStoreFinishedLogs';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { finishedStockActions } from '../shared/finishedStockActions';
 import { storeOperationLogSourceLabel as logSourceLabel } from './storeOperationLog';
-import {
-  AdminConfirmDialog,
-  AdminDialog,
-  AdminSectionCard,
-  adminFeedback,
-  getSafeErrorMessage,
-} from '@/components/foundation';
+import { AdminConfirmDialog, AdminDialog, adminFeedback, getSafeErrorMessage } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
@@ -497,18 +463,21 @@ import {
   listStoreFinishedProducts,
   purgeStoreFinishedProduct,
   purgeStoreFinishedProducts,
-  saveStoreFinishedRolePrice,
   selectStoreFinishedProducts,
   type StoreFinishedProduct,
   type StoreFinishedStatus,
   type StorePoolProduct,
-  type StoreRolePrice,
 } from '@/services/storeFinishedStock';
+import { useRoute, useRouter } from 'vue-router';
+import StoreFinishedEditor from './StoreFinishedEditor.vue';
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
 import FinishedEditChanges from '../management/components/FinishedEditChanges.vue';
 import StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';
 import StorePoolProductDetail from '../shared/StoreFinishedStockPoolDetailAdapter.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
+const route = useRoute();
+const router = useRouter();
+const editingId = computed(() => (route.name === 'storeFinishedStockEdit' ? Number(route.params.id) : null));
 const user = getLoginUser();
 const prefix = 'store.finished-stock-management';
 const can = (tab: string, action: string) => hasPermission(user, `${prefix}.${tab}.${action}`);
@@ -576,6 +545,21 @@ function matchesListCategory(categoryId?: number | null) {
 }
 const selected = ref<number[]>([]);
 const shelfErrors = reactive<Record<number, string>>({});
+const dismissedPriceWarnings = reactive<Record<number, boolean>>({});
+const rowWarnings = computed(() => {
+  const warnings = { ...shelfErrors };
+  for (const row of pageRows.value) {
+    if (row.salePriceAttention && !dismissedPriceWarnings[row.id]) {
+      warnings[row.id] = [warnings[row.id], '供应链修改销售规格，商品售价待补齐'].filter(Boolean).join('；');
+    }
+  }
+  return warnings;
+});
+function closeRowWarning(id: number) {
+  delete shelfErrors[id];
+  dismissedPriceWarnings[id] = true;
+}
+
 const confirming = ref(false);
 const batchConfirmDescriptions: Partial<Record<ActionKind, string>> = {
   'batch-shelf': '是否批量上架所选成品现货？',
@@ -611,15 +595,12 @@ function previewLogMedia(resource: { available: boolean; url?: string; mediaType
   if (resource.mediaType === 'video') logVideoPreview.value = resource.url;
   else imagePreview.value = resource.url;
 }
-const priceVisible = ref(false);
-const roleDrafts = reactive<Record<string, number | null>>({});
-const roleSources = reactive<Record<string, 'auto' | 'manual'>>({});
 const priceEditable = computed(() =>
   Boolean(
     current.value &&
     !current.value.sourceUnavailable &&
     ['warehouse', 'selling'].includes(current.value.effectiveStatus) &&
-    can(activeScope.value, 'edit'),
+    can(current.value.effectiveStatus, 'edit'),
   ),
 );
 const poolVisible = ref(false);
@@ -786,7 +767,7 @@ const handleStoreToolbarAction = (action: string) => {
 const handleStoreRowButton = async (action: string, row: StoreFinishedProduct) => {
   if (!['detail', 'purge'].includes(action) && !(await refreshAvailability([row.id]))) return;
   if (action === 'detail') void openDetail(row);
-  else if (action === 'edit') void openPrice(row);
+  else if (action === 'edit') void router.push({ name: 'storeFinishedStockEdit', params: { id: row.id } });
   else prepareAction(action === 'offShelf' ? 'off-shelf' : (action as ActionKind), row);
 };
 const baseColumns: PrimaryTableCol<TableRowData>[] = [
@@ -825,13 +806,6 @@ const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   },
   { colKey: 'operation', title: '操作', width: 80 },
 ]);
-const roleColumns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'roleName', title: '角色', minWidth: 140 },
-  { colKey: 'coefficient', title: '系数', width: 90 },
-  { colKey: 'price', title: '最低可售价', minWidth: 150 },
-  { colKey: 'priceSource', title: '价格来源', minWidth: 230 },
-  { colKey: 'operation', title: '操作', width: 90 },
-];
 function time(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 16).replaceAll('-', '/') : '—';
 }
@@ -842,6 +816,7 @@ function stateLabel(value?: string | null) {
   return value ? statusLabels[value] || value : '—';
 }
 async function load() {
+  Object.keys(dismissedPriceWarnings).forEach((id) => delete dismissedPriceWarnings[Number(id)]);
   loading.value = true;
   try {
     const [products, categories] = await Promise.all([listStoreFinishedProducts(), listStoreFinishedCategories()]);
@@ -871,7 +846,7 @@ async function refreshAvailability(ids: number[], allowBlocked = false) {
     const missing = ids.some((id) => !latest.some((item) => item.id === id));
     if (missing) adminFeedback.warning('商品不存在或不可访问');
     const blocked = ids.some((id) => latest.some((item) => item.id === id && item.sourceUnavailable));
-    if (blocked && current.value && ids.includes(current.value.id)) priceVisible.value = false;
+    if (blocked && current.value && ids.includes(current.value.id) && editingId.value) void closeEdit();
     return !missing && (!blocked || allowBlocked);
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '商品状态核验失败，请重试'));
@@ -952,47 +927,39 @@ async function loadCurrent(row: StoreFinishedProduct) {
 async function openDetail(row: StoreFinishedProduct) {
   if (await loadCurrent(row)) detailVisible.value = true;
 }
-function fillPriceDrafts(product: StoreFinishedProduct) {
-  for (const sku of product.skus) {
-    for (const role of sku.rolePrices) {
-      const key = `${sku.skuId}:${role.roleId}`;
-      roleDrafts[key] = role.price;
-      roleSources[key] = role.priceSource;
+function closeEdit() {
+  return router.push({ name: 'storeFinishedStockManagement' });
+}
+async function finishEdit(product: StoreFinishedProduct) {
+  rows.value = rows.value.map((item) => (item.id === product.id ? product : item));
+  await closeEdit();
+  await load();
+}
+watch(
+  editingId,
+  async (id, _previous, onCleanup) => {
+    if (!id) return;
+    let active = true;
+    onCleanup(() => {
+      active = false;
+    });
+    current.value = null;
+    loading.value = true;
+    try {
+      const product = await getStoreFinishedProduct(id);
+      if (!active) return;
+      current.value = product;
+      if (!priceEditable.value) await closeEdit();
+    } catch (error) {
+      if (!active) return;
+      adminFeedback.error(getSafeErrorMessage(error, '商品详情加载失败'));
+      await closeEdit();
+    } finally {
+      if (active) loading.value = false;
     }
-  }
-}
-async function openPrice(row: StoreFinishedProduct) {
-  if ((await loadCurrent(row)) && current.value) {
-    if (current.value.sourceUnavailable) {
-      await refreshAvailability([row.id]);
-      return;
-    }
-    fillPriceDrafts(current.value);
-    priceVisible.value = true;
-  }
-}
-function syncRoleDraft(skuId: number, role: StoreRolePrice) {
-  if (roleSources[`${skuId}:${role.roleId}`] === 'auto') roleDrafts[`${skuId}:${role.roleId}`] = role.price;
-}
-async function saveRole(skuId: number, roleId: number) {
-  if (!current.value || !(await refreshAvailability([current.value.id]))) return;
-  const key = `${skuId}:${roleId}`;
-  const follow = roleSources[key] === 'auto';
-  const price = roleDrafts[key];
-  if (!follow && (price == null || price < 0)) {
-    adminFeedback.warning('请输入角色最低可售价');
-    return;
-  }
-  try {
-    current.value = await saveStoreFinishedRolePrice(current.value.id, skuId, roleId, price, follow);
-    fillPriceDrafts(current.value);
-    adminFeedback.success('角色最低可售价已保存');
-    await load();
-  } catch (error) {
-    if (current.value && (await refreshAvailability([current.value.id])))
-      adminFeedback.error(getSafeErrorMessage(error, '保存价格失败'));
-  }
-}
+  },
+  { immediate: true },
+);
 function prepareAction(kind: ActionKind | 'off-shelf', product: StoreFinishedProduct) {
   if (kind === 'off-shelf') {
     pendingOffShelf.value = { ids: [product.id], batch: false };
@@ -1157,4 +1124,6 @@ async function runConfirmed() {
 }
 onMounted(load);
 </script>
-<style scoped src="./index.css"></style>
+<style scoped>
+@import url('./index.css');
+</style>

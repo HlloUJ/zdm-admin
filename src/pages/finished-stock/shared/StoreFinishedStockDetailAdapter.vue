@@ -1,13 +1,17 @@
 <template>
   <ProductDetail
     :product="detail"
+    :editor-layout="editorLayout"
     :attribute-names="attributeNames"
-    :enabled-level-ids="roleIds"
     :store-level-name="product.storeLevelName || undefined"
     operations
     store-mode
     @preview="(media, type) => (preview = { url: media.url, kind: type })"
-  />
+  >
+    <template v-if="$slots['basic-extra']" #basic-extra><slot name="basic-extra" /></template>
+    <template v-if="$slots.sales" #sales="slotProps"><slot name="sales" v-bind="slotProps" /></template>
+    <template v-if="$slots.sale" #sale="slotProps"><slot name="sale" v-bind="slotProps" /></template>
+  </ProductDetail>
   <AdminDialog
     :visible="Boolean(preview)"
     header="商品媒体"
@@ -35,9 +39,9 @@ import { computed, ref } from 'vue';
 import { AdminDialog } from '@/components/foundation';
 import ProductDetail from '../management/components/ProductDetail.vue';
 import type { StoreFinishedProduct } from '@/services/storeFinishedStock';
-import type { FinishedProductPrice, FinishedProductGuidePrice } from '@/services/finishedProducts';
+import type { FinishedProductGuidePrice } from '@/services/finishedProducts';
 
-const props = defineProps<{ product: StoreFinishedProduct }>();
+const props = defineProps<{ product: StoreFinishedProduct; editorLayout?: boolean }>();
 const preview = ref<{ url: string; kind: 'image' | 'video' } | null>(null);
 const attributeNames = computed(() => ({
   ...Object.fromEntries([
@@ -46,9 +50,6 @@ const attributeNames = computed(() => ({
   ]),
   ...props.product.attributeNames,
 }));
-const roleIds = computed(() => [
-  ...new Set(props.product.skus.flatMap((sku) => sku.rolePrices.map((role) => role.roleId))),
-]);
 const detail = computed(() => ({
   id: props.product.productId,
   name: props.product.name,
@@ -93,23 +94,7 @@ const detail = computed(() => ({
           },
         ],
   ),
-  markupPrices: props.product.skus.flatMap((sku): FinishedProductPrice[] =>
-    sku.rolePrices.flatMap((role) =>
-      role.price == null
-        ? []
-        : [
-            {
-              skuId: sku.skuId,
-              storeLevelId: role.roleId,
-              storeLevelName: role.roleName,
-              priceCoefficient: role.coefficient,
-              costPrice: sku.costPrice ?? 0,
-              price: role.price,
-              priceSource: role.priceSource,
-            },
-          ],
-    ),
-  ),
+  salePrices: props.product.skus.map((sku) => ({ skuId: sku.skuId, price: sku.salePrice, mode: sku.priceMode })),
 }));
 </script>
 

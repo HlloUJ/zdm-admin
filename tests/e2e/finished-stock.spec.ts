@@ -739,8 +739,8 @@ test('edits prices in a specification table and preserves product details on sav
   ]);
   await expect(editor.locator('.t-select')).toHaveCount(0);
   await expect(editor.locator('.spec-table-block tbody tr').nth(1)).toContainText('规格B');
-  await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toHaveValue('10.00');
-  await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toBeDisabled();
+  await expect(visibleRows.nth(1)).toHaveText('10.00');
+  await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toHaveCount(0);
   await visibleRows.nth(2).getByPlaceholder('系数', { exact: true }).fill('3');
   await expect(visibleRows.nth(2).getByPlaceholder('价格', { exact: true })).toHaveValue('30.00');
   await expect(visibleRows.nth(3).getByPlaceholder('价格', { exact: true })).toHaveValue('30.00');
@@ -781,7 +781,7 @@ test('edits prices in a specification table and preserves product details on sav
   expect(saves).toBe(1);
   expect(product.guidePrices[1].price).toBe(20);
   await page.getByText('编辑', { exact: true }).click();
-  await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toHaveValue('10.00');
+  await expect(visibleRows.nth(1)).toHaveText('10.00');
   await visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }).click();
   await page.getByRole('button', { name: '确认', exact: true }).click();
   await expect(
