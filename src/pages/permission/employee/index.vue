@@ -374,7 +374,10 @@ const operationRoleOptions = computed(() =>
 );
 const configurableOperationRoleOptions = computed(() =>
   operationRoles.value
-    .filter((role) => role.functionPermissions?.split(',').some((permission) => permission.trim()))
+    .filter(
+      (role) =>
+        role.code !== 'SUPER_ADMIN' && role.functionPermissions?.split(',').some((permission) => permission.trim()),
+    )
     .map((role) => ({
       label: role.name,
       value: String(role.id),

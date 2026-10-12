@@ -459,6 +459,7 @@ test('opens employee invitation and edit dialogs', async ({ page }) => {
   await expect(employeePermissionDialog.locator('label').filter({ hasText: '性别' })).toHaveCount(0);
   await expect(employeePermissionDialog.locator('label').filter({ hasText: '备注' })).toHaveCount(0);
   await employeePermissionDialog.locator('.t-select').click();
+  await expect(page.getByRole('listitem', { name: '超级管理员', exact: true })).toHaveCount(0);
   await expect(page.getByRole('listitem', { name: '运营管理平台角色' })).toBeVisible();
   await expect(page.getByRole('listitem', { name: '未配置权限角色' })).toHaveCount(0);
   await employeePermissionDialog.getByRole('button', { name: '取消' }).click();
@@ -669,6 +670,7 @@ test('opens enable confirmation after employee permissions are configured', asyn
   await expect(employeePermissionDialog).toBeVisible();
   await employeePermissionDialog.getByText('查看自己').click();
   await employeePermissionDialog.locator('.t-select').click();
+  await expect(page.getByRole('listitem', { name: '超级管理员', exact: true })).toHaveCount(0);
   await page.getByRole('listitem', { name: '运营管理平台角色' }).click();
   await employeePermissionDialog.locator('.t-dialog__header').click();
   const permissionUpdateRequest = page.waitForRequest(

@@ -107,7 +107,7 @@ public class EmployeeService extends CreatorAwareService<EmployeeMapper, Employe
       throw new IllegalArgumentException("该账号已是当前业务端和组织的员工");
     }
     employee.setCreatedByAccountId(identityProvider.require().accountId());
-    validateBeforeEnabled(employee);
+    validateBeforeEnabled(employee, true);
     save(employee);
     syncAdminIdentity(employee);
     syncAdminRoles(employee);
@@ -145,7 +145,7 @@ public class EmployeeService extends CreatorAwareService<EmployeeMapper, Employe
       payload.setAccountId(accountLifecycle.findOrCreate(payload.getPhone(), payload.getName(), payload.getGender()).id());
     }
 
-    validateBeforeEnabled(payload);
+    validateBeforeEnabled(payload, !Objects.equals(existing.getRoleIds(), payload.getRoleIds()));
     updateById(payload);
     syncAdminIdentity(payload);
     syncAdminRoles(payload);
@@ -168,7 +168,7 @@ public class EmployeeService extends CreatorAwareService<EmployeeMapper, Employe
     lockExistingEmployee(existing);
     existing.setRoleIds(request.roleIds());
     existing.setDataPermission(request.dataPermission());
-    validateBeforeEnabled(existing);
+    validateBeforeEnabled(existing, true);
     updateById(existing);
     syncAdminRoles(existing);
     return getById(id);
@@ -269,7 +269,7 @@ public class EmployeeService extends CreatorAwareService<EmployeeMapper, Employe
     employee.setStoreId(identity.storeId());
   }
 
-  private void validateBeforeEnabled(Employee employee) {
+  private void validateBeforeEnabled(Employee employee, boolean assigningRoles) {
     boolean enabled = "enabled".equals(employee.getStatus());
     if (enabled && !StringUtils.hasText(employee.getRoleIds())) {
       throw new IllegalArgumentException("请先为员工配置角色后再启用");
@@ -279,22 +279,25 @@ public class EmployeeService extends CreatorAwareService<EmployeeMapper, Employe
     }
     if (!StringUtils.hasText(employee.getRoleIds())) { return; }
     for (Long roleId : parseRoleIds(employee.getRoleIds())) {
-      Integer roleCount = jdbcTemplate.queryForObject(
+      List<String> roleCodes = jdbcTemplate.queryForList(
           """
-          SELECT COUNT(*)
+          SELECT code
           FROM roles
           WHERE id = ?
             AND client_code = ?
             AND tenant_id <=> ?
             AND store_id <=> ?
           """,
-          Integer.class,
+          String.class,
           roleId,
           employee.getClientCode(),
           employee.getTenantId(),
           employee.getStoreId());
-      if (roleCount == null || roleCount == 0) {
+      if (roleCodes.isEmpty()) {
         throw new AccessDeniedException("只能配置当前组织的角色");
+      }
+      if (assigningRoles && roleCodes.contains("SUPER_ADMIN")) {
+        throw new AccessDeniedException("不能为员工分配超级管理员角色");
       }
     }
   }
