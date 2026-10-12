@@ -73,8 +73,11 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
     if (!lifecycle.isSupplyChain()) {
       item.setSourceOffShelfRecords(offShelfRecordService.listSourceBySlabId(id));
     }
-    return creatorNames.attach(lifecycle.isSupplyChain() ? item : invalidationSnapshots.render(item));
+    return stateActivities.attach("slab",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(creatorNames.attach(lifecycle.isSupplyChain() ? item : invalidationSnapshots.render(item)))).getFirst();
   }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private ProductStateActivityService stateActivities;
 
   public List<SlabInventory> listWithPrices() {
     var identity = identityProvider.require();
@@ -92,7 +95,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
       item.setMarkupPrices(pricesBySlabId.getOrDefault(item.getId(), List.of()));
       item.setOffShelfRecords(recordsBySlabId.getOrDefault(item.getId(), List.of()));
     });
-    return creatorNames.attachAll(lifecycle.isSupplyChain() ? inventory : inventory.stream().map(invalidationSnapshots::render).toList());
+    return stateActivities.attach("slab",lifecycle.isSupplyChain()?"supply-chain":"admin",creatorNames.attachAll(lifecycle.isSupplyChain() ? inventory : inventory.stream().map(invalidationSnapshots::render).toList()));
   }
 
   @Transactional
@@ -134,7 +137,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
         null,
         API_PUBLISHER.equals(created.getPublisherType()) ? "EXTERNAL_API" : "MANUAL",
         creationDetails(created));
-    return created;
+    return stateActivities.attach("slab",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(created)).getFirst();
   }
 
   @Transactional
@@ -188,7 +191,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
       lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB,id,requestedStatus);
       updated=attachPrices(getById(id));
     }
-    return updated;
+    return stateActivities.attach("slab",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(updated)).getFirst();
   }
 
   @Transactional
@@ -218,7 +221,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
       operationLogService.record(updated, "UPDATE", existing.getSourceStatus(), updated.getSourceStatus(),
           null, null, "MANUAL", changes);
     }
-    return updated;
+    return stateActivities.attach("slab",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(updated)).getFirst();
   }
 
   public boolean cleanupTemporaryMedia(Long mediaId) {
@@ -262,7 +265,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
     updated=attachPrices(getById(existing.getId()));
     var changes=collectChanges(existing,before,updated);
     if(!changes.isEmpty()) { operationLogService.record(updated,"UPDATE",existing.getStatus(),updated.getStatus(),null,null,"MANUAL",changes); }
-    return updated;
+    return stateActivities.attach("slab",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(updated)).getFirst();
   }
 
   @Transactional
@@ -618,7 +621,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
   private SlabInventory attachPrices(SlabInventory inventory) {
     attachMediaUrls(inventory);
     inventory.setMarkupPrices(priceService.listPrices(inventory.getId()));
-    return inventory;
+    return stateActivities.attach("slab",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(inventory)).getFirst();
   }
 
   private void validateMedia(SlabInventory inventory, SlabInventory existing) {

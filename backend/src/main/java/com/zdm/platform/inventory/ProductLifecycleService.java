@@ -28,6 +28,8 @@ public class ProductLifecycleService {
       this.logKey=logKey; this.logName=logName; this.logCode=logCode; this.code=code; this.config=config;
     }
   }
+  @org.springframework.beans.factory.annotation.Autowired
+  private ProductStateActivityService stateActivities;
   private final org.springframework.beans.factory.ObjectProvider<FinishedProductService> finishedProducts;
   private final FinishedInvalidationMedia invalidationMedia;
   private final org.springframework.beans.factory.ObjectProvider<SlabInventoryService> slabProducts;
@@ -358,6 +360,7 @@ public class ProductLifecycleService {
     log.put("before_status",before);log.put("after_status",after);
     log.put("operation_source",business.equals(actor.clientCode())?"MANUAL":"SUPPLY_CHAIN");log.put("operated_at",java.time.LocalDateTime.now());
     try { log.put("change_details",json.writeValueAsString(changes)); } catch(JsonProcessingException error) { throw new IllegalStateException("日志序列化失败",error); }
+    stateActivities.record(kind==Kind.FINISHED?"finished":"slab",business,((Number)row.get("id")).longValue(),before,after,actor.accountId(),actor.clientCode());
     Number logId = new SimpleJdbcInsert(jdbc).withTableName(kind.logs).usingColumns(log.keySet().toArray(String[]::new)).usingGeneratedKeyColumns("id").executeAndReturnKey(log);
     if(kind==Kind.SLAB) { slabLogs.retainSnapshot(logId.longValue(), changes); }
   }

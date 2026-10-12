@@ -61,6 +61,10 @@ export interface FinishedProductVariant {
 }
 
 export interface FinishedProductRecord {
+  stateOperatorName?: string;
+  stateOperatedAt?: string;
+  stateOperatorClientCode?: string;
+
   sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
   sourceMessage?: string;

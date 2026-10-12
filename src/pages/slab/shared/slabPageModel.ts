@@ -59,6 +59,10 @@ export interface DetailMediaItem {
   type: 'image' | 'video';
 }
 export interface SlabItem {
+  stateOperatorName?: string;
+  stateOperatedAt?: string;
+  stateOperatorClientCode?: string;
+
   sourceUnavailable?: boolean;
   sourceStatus?: string;
   sourceMessage?: string;

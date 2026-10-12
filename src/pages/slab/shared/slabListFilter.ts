@@ -1,3 +1,4 @@
+import { sortByStateActivity } from '@/services/productStateActivity';
 import type { SlabOffShelfRecord, SlabStatus } from '@/services/slabs';
 import type { FilterState, SlabItem } from './slabPageModel';
 
@@ -58,11 +59,5 @@ export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter
       offShelfDateMatched
     );
   });
-  if (activeTab !== 'offShelf') return matchedItems;
-  return matchedItems.sort((left, right) => {
-    const leftRecord = latestOffShelfRecord(left);
-    const rightRecord = latestOffShelfRecord(right);
-    const timeDifference = offShelfTimestamp(rightRecord) - offShelfTimestamp(leftRecord);
-    return timeDifference || (rightRecord?.id ?? 0) - (leftRecord?.id ?? 0) || right.id - left.id;
-  });
+  return sortByStateActivity(matchedItems);
 };

@@ -101,10 +101,9 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await expect(page.getByText('门店', { exact: true })).toHaveCount(0);
   const firstProductRow = page.locator('tbody tr').filter({ hasText: 'ID：' }).first();
   await expect(firstProductRow).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
-  await expect(firstProductRow.getByText('韩健', { exact: true })).toBeVisible();
-  await expect(firstProductRow.getByText('2026/07/27 17:00', { exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '入库人', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '入库时间', exact: true })).toBeVisible();
+  await expect(firstProductRow.getByText('历史记录未记录', { exact: true })).toHaveCount(2);
   await expect(page.getByText('流水', { exact: true })).toHaveCount(0);
   await expect(page.getByText('库存流水', { exact: true })).toHaveCount(0);
   const operationHeader = page.getByRole('columnheader', { name: '操作', exact: true });
