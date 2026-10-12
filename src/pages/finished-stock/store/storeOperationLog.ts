@@ -16,8 +16,9 @@ export const isStoreStatusOperation = (type: string) =>
   ].includes(type);
 
 export const toStoreOperationLogRow = (row: StoreFinishedLog): ProductOperationLogRow => {
-  const reasons =
-    row.operationType === 'OFF_SHELF' ? parseStoreOperationLogChanges(row.changeDetails, (value) => value || '') : {};
+  const reasons = ['OFF_SHELF', 'SOURCE_UPDATE'].includes(row.operationType)
+    ? parseStoreOperationLogChanges(row.changeDetails, (value) => value || '')
+    : {};
   return {
     id: row.id,
     subjectName: row.productName,
@@ -47,7 +48,7 @@ export function parseStoreOperationLogChanges(
   if (!value) return {};
   try {
     const details = JSON.parse(value) as Record<string, unknown>;
-    return Object.fromEntries(
+    const changes = Object.fromEntries(
       Object.entries(details).map(([field, entry]) => {
         const change =
           entry && typeof entry === 'object' && 'before' in entry && 'after' in entry
@@ -64,6 +65,24 @@ export function parseStoreOperationLogChanges(
         ];
       }),
     );
+    const skuFields = Object.keys(changes).filter((field) => /^SKU \d+$/.test(field));
+    if (skuFields.length && !changes['销售规格']) {
+      const rows = (side: 'before' | 'after') =>
+        skuFields.map((field) => {
+          const recorded = changes[field][side] as Record<string, unknown> | null;
+          const row: Record<string, unknown> = { skuId: Number(field.slice(4)), variantLabel: field };
+          if (recorded && '商品售价' in recorded) row.salePrice = recorded['商品售价'];
+          if (recorded && '售价系数' in recorded) row.saleCoefficient = recorded['售价系数'];
+          if (recorded && '售价模式' in recorded)
+            row.priceMode = recorded['售价模式'] === '跟随配置' ? 'auto' : 'manual';
+          return row;
+        });
+      changes['销售规格'] = { before: rows('before'), after: rows('after') };
+      skuFields.forEach((field) => {
+        delete changes[field];
+      });
+    }
+    return changes;
   } catch {
     return {};
   }

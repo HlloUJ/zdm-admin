@@ -1,3 +1,4 @@
+import type { DefineComponent } from 'vue';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import ProductDetail from './ProductDetail.vue';
@@ -20,7 +21,7 @@ const product = {
   variants: [],
 };
 const wrapper = () =>
-  mount(ProductDetail, {
+  mount(ProductDetail as unknown as DefineComponent<InstanceType<typeof ProductDetail>['$props']>, {
     props: { product, attributeNames: {} },
     global: {
       stubs: {

@@ -71,6 +71,8 @@
                 <FinishedSalesLogTable
                   v-else-if="row.field === '销售规格'"
                   :snapshot="salesSnapshot(side)"
+                  :side="side"
+                  :supply-edit="!!changes['销售规格']?.supplyEdit"
                   :store-mode="storeMode"
                   highlight-changes
                   :other="salesSnapshot(side === 'before' ? 'after' : 'before')"
@@ -123,7 +125,7 @@ import FinishedSalesLogTable from './FinishedSalesLogTable.vue';
 import FinishedAttributeChanges from './FinishedAttributeChanges.vue';
 type Resource = { available: boolean; url?: string; mediaType: string; message?: string; previewOnly?: boolean };
 type Media = { field: string; mediaId: number; resource?: Resource };
-type Change = { before: unknown; after: unknown };
+type Change = { before: unknown; after: unknown; supplyEdit?: boolean };
 type Row = { field: string; label: string; before: any; after: any; wide: boolean; media?: boolean };
 const props = defineProps<{
   changes: Record<string, Change>;
@@ -223,7 +225,7 @@ const groups = computed(() => {
           },
         ];
   });
-  const base = ['商品名称', '商品分类', '商品属性', ...(props.storeMode ? [] : ['供应商'])];
+  const base = ['商品名称', '商品分类', '商品属性', ...(props.storeMode ? ['门店分类'] : ['供应商'])];
   const sales = ['销售规格', '总库存', '状态', '下架原因', '详细说明', '下架时间'];
   const displayChanges: Record<string, Change> = { ...props.changes };
   if (['销售规格', '规格维度', '指导价', '层级价格'].some((field) => props.changes[field])) {

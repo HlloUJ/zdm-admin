@@ -20,6 +20,7 @@ export const productOperationTypes: Record<string, string> = {
   CREATE: '发布商品',
   SELECT: '放入仓库',
   UPDATE: '编辑商品',
+  SOURCE_UPDATE: '供应链编辑商品',
   PRICE_UPDATE: '编辑商品',
   SHELF: '上架',
   OFF_SHELF: '下架',
@@ -95,6 +96,7 @@ export function canonicalProductOperationType(type: string): string {
 export function productOperationSummary(
   row: Pick<ProductOperationLogRow, 'operationType' | 'operationSummary'>,
 ): string {
+  if (row.operationType === 'UPDATE' && /^该商品.*已被修改$/.test(row.operationSummary)) return row.operationSummary;
   return fixedSummaries[row.operationType] || row.operationSummary;
 }
 
@@ -114,14 +116,17 @@ const operationsEffects = [
   'OPERATIONS_PURGE',
 ];
 
-export function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'store') {
-  return productOperationTypeOptions(
-    client === 'supply-chain'
+export function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'store', finished = false) {
+  const upstreamActions = supplyEffects.flatMap((type) =>
+    finished && type === 'SOURCE_OFF_SHELF' ? [type, 'SOURCE_UPDATE'] : [type],
+  );
+  return productOperationTypeOptions([
+    ...(client === 'supply-chain'
       ? ['CREATE', 'UPDATE', ...commonActions]
       : client === 'admin'
-        ? [...commonActions, ...supplyEffects]
-        : ['SELECT', ...commonActions, ...supplyEffects, ...operationsEffects],
-  );
+        ? [...commonActions, ...upstreamActions]
+        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),
+  ]);
 }
 
 export function productLogTime(value?: string): string {

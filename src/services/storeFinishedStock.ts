@@ -3,21 +3,15 @@ import type { FinishedProductAttributeEntry, FinishedSpecDimension } from './fin
 
 export type StoreFinishedStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 
-export interface StoreRolePrice {
-  roleId: number;
-  roleName: string;
-  coefficient: number;
-  price: number | null;
-  priceSource: 'auto' | 'manual';
-}
-
 export interface StoreSkuPrice {
   skuId: number;
   label: string;
   stock: number;
   costPrice: number | null;
   guidePrice: number | null;
-  rolePrices: StoreRolePrice[];
+  salePrice: number | null;
+  priceMode: 'auto' | 'manual';
+  saleCoefficient: number | null;
   displayMode?: 'single' | 'layered';
   salesAttributes?: Record<string, string>;
   material?: string;
@@ -29,6 +23,9 @@ export interface StoreSkuPrice {
 export interface StoreFinishedProduct {
   attributeNames?: Record<string, string>;
   storeLevelName?: string | null;
+  storeCategoryId: number | null;
+  storeCategoryName: string;
+  categoryCoefficient: number | null;
   id: number;
   productId: number;
   name: string;
@@ -36,6 +33,7 @@ export interface StoreFinishedProduct {
   status: Exclude<StoreFinishedStatus, 'soldOut'>;
   effectiveStatus: StoreFinishedStatus;
   sourceUnavailable: boolean;
+  salePriceAttention?: boolean;
   sourceMessage?: string;
   totalStock: number;
   imageUrl?: string;
@@ -54,7 +52,7 @@ export interface StoreFinishedProduct {
   offShelfAt?: string;
 }
 
-export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'rolePrices'> {
+export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode' | 'saleCoefficient'> {
   partnerPrice: number | null;
 }
 
@@ -132,19 +130,22 @@ export const purgeStoreFinishedProduct = (id: number) => request<boolean>(`${bas
 export const purgeStoreFinishedProducts = (productIds: number[]) =>
   request<boolean>(`${base}/batch`, { method: 'DELETE', body: json({ productIds }) });
 export const clearStoreFinishedRecycle = () => request<boolean>(`${base}/recycle`, { method: 'DELETE' });
-export const saveStoreFinishedRolePrice = (
+export interface StoreFinishedEditCategory {
+  id: number;
+  parentId: number | null;
+  name: string;
+  status: string;
+  coefficient: number | null;
+}
+export const listStoreFinishedEditCategories = (id: number) =>
+  request<StoreFinishedEditCategory[]>(`${base}/${id}/edit-categories`);
+export const saveStoreFinishedEdit = (
   id: number,
-  skuId: number,
-  roleId: number,
-  price: number | null,
-  followConfiguration: boolean,
-) =>
-  request<StoreFinishedProduct>(`${base}/${id}/skus/${skuId}/roles/${roleId}/price`, {
-    method: 'PUT',
-    body: json({ price, followConfiguration }),
-  });
-export const getCurrentEmployeeMinimumPrice = (id: number, skuId: number) =>
-  request<{ price: number; roleId: number }>(`${base}/${id}/skus/${skuId}/minimum-sale-price`);
+  payload: {
+    storeCategoryId: number;
+    skus: { skuId: number; salePrice: number | null; priceMode: 'auto' | 'manual'; saleCoefficient: number | null }[];
+  },
+) => request<StoreFinishedProduct>(`${base}/${id}`, { method: 'PUT', body: json(payload) });
 export interface StoreFinishedLogFilter {
   keyword: string;
   operationType: string;
@@ -162,30 +163,3 @@ export const listStoreFinishedLogs = (filter: StoreFinishedLogFilter) => {
   return request<{ records: StoreFinishedLog[]; total: number }>(`${base}/operation-logs?${query}`);
 };
 export const getStoreFinishedLog = (id: number) => request<StoreFinishedLog>(`${base}/operation-logs/${id}`);
-
-export interface StorePriceConfiguration {
-  id: number;
-  roleId: number;
-  roleName: string;
-  priceCoefficient: number;
-  status: 'enabled' | 'disabled';
-  createdByName?: string;
-  createdAt: string;
-}
-
-export interface StorePriceRoleOption {
-  id: number;
-  name: string;
-  status: string;
-}
-const configBase = '/admin/store-finished-price-configurations';
-export const listStorePriceConfigurations = () => request<StorePriceConfiguration[]>(configBase);
-export const listStorePriceRoles = () => request<StorePriceRoleOption[]>(`${configBase}/roles`);
-export const createStorePriceConfiguration = (roleId: number, priceCoefficient: number) =>
-  request<StorePriceConfiguration>(configBase, { method: 'POST', body: json({ roleId, priceCoefficient }) });
-export const updateStorePriceConfiguration = (id: number, roleId: number, priceCoefficient: number) =>
-  request<StorePriceConfiguration>(`${configBase}/${id}`, { method: 'PUT', body: json({ roleId, priceCoefficient }) });
-export const toggleStorePriceConfiguration = (id: number, status: 'enabled' | 'disabled') =>
-  request<StorePriceConfiguration>(`${configBase}/${id}/status`, { method: 'PUT', body: json({ status }) });
-export const deleteStorePriceConfiguration = (id: number) =>
-  request<boolean>(`${configBase}/${id}`, { method: 'DELETE' });

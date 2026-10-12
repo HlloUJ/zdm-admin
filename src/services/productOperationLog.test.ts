@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   finishedProductOperationSummary,
   productOperationSummary,
+  productLogFilterOptions,
   productOperationTypeLabel,
   productOperationTypeOptions,
 } from './productOperationLog';
@@ -40,4 +41,14 @@ describe('shared product operation vocabulary', () => {
   it('groups historical manual price changes under product edits', () => {
     expect(productOperationTypeOptions(['UPDATE', 'PRICE_UPDATE'])).toEqual([{ value: 'UPDATE', label: '编辑商品' }]);
   });
+});
+
+it('keeps supply edit summaries and exposes the finished-only upstream edit filter', () => {
+  expect(productOperationTypeLabel('SOURCE_UPDATE')).toBe('供应链编辑商品');
+  expect(productOperationSummary({ operationType: 'UPDATE', operationSummary: '该商品销售规格已被修改' })).toBe(
+    '该商品销售规格已被修改',
+  );
+  expect(productLogFilterOptions('admin', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(true);
+  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);
+  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);
 });

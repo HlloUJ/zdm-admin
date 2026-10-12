@@ -312,6 +312,7 @@
               :attribute-names="detailAttributeNames"
               :operations="true"
               :show-sales="false"
+              editor-layout
               @preview="openProductMediaPreview"
             />
             <AdminSectionCard
@@ -492,13 +493,14 @@
                         />
                       </template>
                       <template #cost="{ row }">
+                        <span v-if="isOperationsEdit">{{ formatReadonlyPrice(row.cost) }}</span>
                         <SpecPriceInput
+                          v-else
                           v-model="row.cost"
                           class="decimal-input"
                           placeholder="价格"
                           label="价格"
                           :submitted="submitAttempted"
-                          :disabled="isOperationsEdit"
                           @change="handleSpecCostChange(row, $event)"
                         />
                       </template>
@@ -602,10 +604,10 @@
                         </div>
                       </template>
                       <template #quantity="{ row }">
-                        <div class="quantity-editor">
+                        <span v-if="isOperationsEdit">{{ row.quantity ?? '-' }}</span>
+                        <div v-else class="quantity-editor">
                           <t-input-number
                             v-model="row.quantity"
-                            :disabled="isOperationsEdit"
                             theme="normal"
                             :min="0"
                             :status="submitAttempted && !isValidSpecQuantity(row.quantity) ? 'error' : undefined"
@@ -1895,6 +1897,8 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   });
   return base;
 });
+const formatReadonlyPrice = (value: unknown) =>
+  value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);
 const requiredColumnTitle = (label: string) => () =>
   h('span', [label, h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*')]);
 const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {

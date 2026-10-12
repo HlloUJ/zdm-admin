@@ -65,6 +65,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
+import { formatProductDateTime } from '@/utils/formatProductDateTime';
 import { getLoginUser } from '@/services/auth';
 import { AdminDialog, adminFeedback } from '@/components/foundation';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
@@ -111,7 +112,7 @@ type Resource = { available: boolean; url?: string; mediaType: string; message?:
 type Media = { field: string; mediaId: number; resource?: Resource };
 const preview = ref<Resource | null>(null);
 const typeOptions = computed(() =>
-  productLogFilterOptions(getLoginUser().clientCode === 'supply-chain' ? 'supply-chain' : 'admin'),
+  productLogFilterOptions(getLoginUser().clientCode === 'supply-chain' ? 'supply-chain' : 'admin', true),
 );
 const toLogRow = (row: FinishedOperationLog): ProductOperationLogRow => ({
   id: row.id,
@@ -250,22 +251,8 @@ const state = (value?: string | null) =>
     : value
       ? finishedLogStates[value] || value
       : '—';
-const time = (value?: string) => {
-  if (!value) return '-';
-  const timestamp = new Date(`${value.replace(' ', 'T').replace(/Z$/, '')}Z`);
-  if (Number.isNaN(timestamp.getTime())) return '-';
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(timestamp);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-  return `${part('year')}/${part('month')}/${part('day')} ${part('hour')}:${part('minute')}`;
-};
+// Finished product log APIs return UTC; store logs have their own wall-time formatter.
+const time = formatProductDateTime;
 </script>
 <style scoped>
 .operation-reason-text {

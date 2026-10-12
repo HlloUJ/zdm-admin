@@ -17,10 +17,12 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
   private static final String DUPLICATE_NAME_MESSAGE = "同级分类名称不能重复";
   private final CurrentIdentityProvider identityProvider;
   private final JdbcTemplate jdbc;
+  private final com.zdm.platform.inventory.StoreFinishedSalePriceService salePrices;
 
-  public StoreCategoryService(CurrentIdentityProvider identityProvider, JdbcTemplate jdbc) {
+  public StoreCategoryService(CurrentIdentityProvider identityProvider, JdbcTemplate jdbc, com.zdm.platform.inventory.StoreFinishedSalePriceService salePrices) {
     this.identityProvider = identityProvider;
     this.jdbc = jdbc;
+    this.salePrices = salePrices;
   }
 
   private Long requireStoreId() {
@@ -42,9 +44,16 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
 
   public List<StoreCategory> listOrdered(String scope) {
     requireScope(scope);
-    return lambdaQuery().eq(StoreCategory::getStoreId, requireStoreId())
+    var categories = lambdaQuery().eq(StoreCategory::getStoreId, requireStoreId())
         .eq(StoreCategory::getScope, scope).orderByAsc(StoreCategory::getSortOrder)
         .orderByDesc(StoreCategory::getCreatedAt).orderByDesc(StoreCategory::getId).list();
+    if ("finished".equals(scope)) {
+      var counts = new java.util.HashMap<Long, Integer>();
+      jdbc.queryForList("SELECT store_category_id,COUNT(*) AS total FROM store_finished_products WHERE store_id=? AND store_category_id IS NOT NULL GROUP BY store_category_id", requireStoreId())
+          .forEach(row -> counts.put(((Number) row.get("store_category_id")).longValue(), ((Number) row.get("total")).intValue()));
+      categories.forEach(category -> category.setProductCount(counts.getOrDefault(category.getId(), 0)));
+    }
+    return categories;
   }
 
   public StoreCategory requireCategory(Long id, String scope) {
@@ -70,6 +79,7 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
   public StoreCategory createCategory(StoreCategoryCreateRequest request) {
     requireScope(request.scope());
     Long storeId = requireStoreId();
+    if ("finished".equals(request.scope())) { salePrices.lockCategories(storeId); }
     if (request.parentId() != null) {
       jdbc.queryForList("SELECT id FROM store_categories WHERE store_id = ? AND scope = ? AND id = ? FOR UPDATE",
           storeId, request.scope(), request.parentId());
@@ -86,6 +96,9 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
           && requireCategory(parent.getParentId(), request.scope()).getParentId() != null) {
         throw new IllegalArgumentException("门店分类最多支持三级");
       }
+    }
+    if ("finished".equals(request.scope()) && request.parentId() != null) {
+      salePrices.freezeCategories(storeId, List.of(request.parentId()));
     }
     requireUniqueName(request.scope(), request.parentId(), request.name().trim(), null);
     for (StoreCategory sibling : listSiblings(request.scope(), request.parentId())) {
@@ -117,6 +130,7 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
 
   @Transactional
   public StoreCategory updateCategory(Long id, String scope, StoreCategoryUpdateRequest request) {
+    if ("finished".equals(scope)) { salePrices.lockCategories(requireStoreId()); }
     StoreCategory category = requireCategory(id, scope);
     requireUniqueName(scope, category.getParentId(), request.name().trim(), id);
     category.setName(request.name().trim());
@@ -133,6 +147,7 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
 
   @Transactional
   public StoreCategory updateStatus(Long id, String scope, String status) {
+    if ("finished".equals(scope)) { salePrices.lockCategories(requireStoreId()); }
     StoreCategory category = requireCategory(id, scope);
     var familyIds = new HashSet<Long>();
     familyIds.add(id);
@@ -146,6 +161,9 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
         }
       }
     } while (changed);
+    if ("finished".equals(scope) && "disabled".equals(status)) {
+      salePrices.freezeCategories(category.getStoreId(), List.copyOf(familyIds));
+    }
     update(Wrappers.<StoreCategory>lambdaUpdate()
         .eq(StoreCategory::getStoreId, category.getStoreId()).eq(StoreCategory::getScope, scope)
         .in(StoreCategory::getId, familyIds).set(StoreCategory::getStatus, status));
@@ -174,11 +192,15 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
 
   @Transactional
   public void deleteCategory(Long id, String scope) {
+    if ("finished".equals(scope)) { salePrices.lockCategories(requireStoreId()); }
     StoreCategory category = requireCategory(id, scope);
     if (!listSiblings(scope, id).isEmpty()) {
       throw new IllegalArgumentException("该分类包含下级分类，请先删除或转移下级分类");
     }
-    if (category.getProductCount() != null && category.getProductCount() > 0) {
+    Long associatedProducts = "finished".equals(scope)
+        ? jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_products WHERE store_id=? AND store_category_id=?", Long.class, category.getStoreId(), id) : 0L;
+    if (category.getProductCount() != null && category.getProductCount() > 0
+        || associatedProducts != null && associatedProducts > 0) {
       throw new IllegalArgumentException("该分类已关联商品，不能删除，请先停用该分类");
     }
     if (!removeById(id)) {

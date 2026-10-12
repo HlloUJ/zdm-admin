@@ -91,3 +91,32 @@ describe('store finished-stock operation log', () => {
     expect(parseStoreOperationLogChanges('{', label)).toEqual({});
   });
 });
+
+it('renders recorded SKU edit fields as sales snapshots without consulting current products', () => {
+  const changes = parseStoreOperationLogChanges(
+    JSON.stringify({
+      'SKU 790': {
+        before: { 售价系数: 0.01, 商品售价: 30, 售价模式: '手工价格' },
+        after: { 售价系数: 8, 商品售价: 16000, 售价模式: '跟随配置' },
+      },
+    }),
+    (value) => value || '',
+  );
+  expect(changes['SKU 790']).toBeUndefined();
+  expect(changes['销售规格']).toEqual({
+    before: [{ skuId: 790, variantLabel: 'SKU 790', saleCoefficient: 0.01, salePrice: 30, priceMode: 'manual' }],
+    after: [{ skuId: 790, variantLabel: 'SKU 790', saleCoefficient: 8, salePrice: 16000, priceMode: 'auto' }],
+  });
+});
+
+it('exposes supply edit automatic off-shelf reason without losing the sales snapshot', () => {
+  const row = toStoreOperationLogRow({
+    ...log('SOURCE_UPDATE'),
+    beforeStatus: 'selling',
+    afterStatus: 'offShelf',
+    changeDetails: JSON.stringify({ 下架原因: { before: null, after: '供应链修改销售规格，商品售价待补齐' } }),
+  });
+  expect(row.beforeStatus).toBe('selling');
+  expect(row.afterStatus).toBe('offShelf');
+  expect(row.standardReason).toBe('供应链修改销售规格，商品售价待补齐');
+});
