@@ -1274,7 +1274,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       await moduleList.getByText('成品现货管理', { exact: true }).click();
       await expect(matrix.getByText('一级菜单直达')).toBeVisible();
       await expect(matrix.locator('tbody .permission-menu-cell').first()).toHaveText('一级菜单直达');
-      for (const tab of ['仓库中', '出售中', '已下架', '已售完', '回收站']) {
+      for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
         await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
       }
       await moduleList.getByText('价格配置', { exact: true }).click();

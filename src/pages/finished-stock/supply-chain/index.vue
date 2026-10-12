@@ -227,6 +227,20 @@
                         </t-tooltip>
                       </div>
                     </template>
+                    <template #stateOperatorName="{ row }">
+                      <t-space size="small">
+                        <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>
+                        <t-tag
+                          v-if="stateSourceLabel(row.stateOperatorClientCode, 'supply-chain')"
+                          size="small"
+                          variant="light"
+                          >{{ stateSourceLabel(row.stateOperatorClientCode, 'supply-chain') }}</t-tag
+                        >
+                      </t-space>
+                    </template>
+                    <template #stateOperatedAt="{ row }">{{
+                      row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'
+                    }}</template>
                     <template #operation="{ row }">
                       <div class="table-actions">
                         <t-link
@@ -1005,6 +1019,7 @@
 </template>
 
 <script setup lang="ts">
+import { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';
 import { filterFinishedStockItems } from '../shared/finishedStockListFilter';
 import { finishedStockFormIssue, isValidSpecQuantity } from '../shared/finishedStockFormValidation';
 import { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';
@@ -1601,6 +1616,9 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     sourceStatus: record.sourceStatus,
     sourceMessage: record.sourceMessage,
     code: record.sku ?? '',
+    stateOperatorName: record.stateOperatorName,
+    stateOperatedAt: record.stateOperatedAt,
+    stateOperatorClientCode: record.stateOperatorClientCode,
     createdByName: record.createdByName?.trim() || '-',
     offShelfByName: record.offShelfByName?.trim() || '未记录',
     createdAt: record.createdAt,
@@ -1689,6 +1707,9 @@ const handleCategoryFilterChange = (value: unknown) => {
 };
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
 const currentPagination = computed(() => paginations[activeTab.value]);
+watch(activeTab, (tab) => {
+  paginations[tab].current = 1;
+});
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
 const formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));
 const hasLegacyEditPermission = () => hasPermission(getLoginUser(), `${productPermissionPrefix.value}.edit`);
@@ -1796,18 +1817,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'product', title: '商品名称/ID', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
-    {
-      colKey: activeTab.value === 'offShelf' ? 'offShelfByName' : 'createdByName',
-      title: activeTab.value === 'offShelf' ? '下架人' : '创建人',
-      width: 120,
-      align: 'center',
-    },
-    {
-      colKey: activeTab.value === 'offShelf' ? 'offShelfAt' : 'createdAt',
-      title: activeTab.value === 'offShelf' ? '下架时间' : '创建时间',
-      width: 180,
-      align: 'center',
-    },
+    ...stateActivityColumns(activeTab.value),
   ];
   if (activeTab.value !== 'soldOut') {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });

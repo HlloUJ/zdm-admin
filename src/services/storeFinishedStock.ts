@@ -21,6 +21,10 @@ export interface StoreSkuPrice {
 }
 
 export interface StoreFinishedProduct {
+  stateOperatorName?: string;
+  stateOperatedAt?: string;
+  stateOperatorClientCode?: string;
+
   attributeNames?: Record<string, string>;
   storeLevelName?: string | null;
   storeCategoryId: number | null;

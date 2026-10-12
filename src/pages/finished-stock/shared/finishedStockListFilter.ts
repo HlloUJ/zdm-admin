@@ -1,10 +1,9 @@
-import { sortByCreatedAtDesc } from '@/services/recordSorting';
-import { sortByOffShelfAtDesc } from '../management/offShelfSorting';
+import { sortByStateActivity } from '@/services/productStateActivity';
 import type { FilterState, StockItem, StockStatus } from './finishedStockPageModel';
 
 export const filterFinishedStockItems = (items: StockItem[], activeTab: StockStatus, filter: FilterState) => {
   const keyword = filter.keyword.trim().toLocaleLowerCase();
-  const sorted = activeTab === 'offShelf' ? sortByOffShelfAtDesc(items) : sortByCreatedAtDesc(items);
+  const sorted = sortByStateActivity(items);
   return sorted.filter((item) => {
     if (item.status !== activeTab) return false;
     if (

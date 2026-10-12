@@ -45,6 +45,8 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       "商品视频", "video",
       "视频封面", "image");
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private ProductStateActivityService stateActivities;
   private final CurrentIdentityProvider identityProvider;
   private final ObjectMapper objectMapper;
   private final JdbcTemplate jdbcTemplate;
@@ -331,6 +333,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     log.setOperatedAt(now);
     log.setCreatedAt(now);
     save(log);
+    stateActivities.record("slab",log.getBusinessClientCode(),slab.getId(),beforeStatus,afterStatus,log.getOperatorAccountId(),externalOperation?"external-api":log.getOperatorClientCode());
     retainSnapshot(log.getId(), changes);
   }
 

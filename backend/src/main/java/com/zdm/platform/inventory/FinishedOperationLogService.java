@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLogMapper, FinishedOperationLog> {
   static final String SOURCE_SHELF_SUMMARY = "供应链已上架，商品进入运营管理平台仓库";
+  @org.springframework.beans.factory.annotation.Autowired
+  private ProductStateActivityService stateActivities;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final CurrentIdentityProvider identities;
@@ -223,6 +225,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品操作日志保存失败", error); }
     save(log);
+    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode());
     if ("admin".equals(identity.clientCode()) && storeUpstreamLogs != null
         && List.of("SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE").contains(type)) {
       storeUpstreamLogs.operationsChange(product.getId(), type, previousStatus, nextStatus);
@@ -266,6 +269,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品入仓日志保存失败", error); }
     save(log);
+    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode());
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(snapshot, "after", references);
     history.retain("FINISHED_PRODUCT_LOG", log.getId(), references);
