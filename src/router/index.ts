@@ -59,6 +59,11 @@ const router = createRouter({
       meta: { permissionPrefix: 'store.finished-stock-management' },
     },
     {
+      path: '/store/customer-management',
+      name: 'storeCustomerManagement',
+      component: () => import('@/pages/customer/index.vue'),
+    },
+    {
       path: '/store/price-configuration',
       name: 'storeFinishedPriceConfiguration',
       component: () => import('@/pages/finished-stock/store/price-configuration.vue'),

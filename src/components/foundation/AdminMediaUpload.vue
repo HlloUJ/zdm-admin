@@ -41,6 +41,16 @@
       @keydown.enter.stop="emit('preview', modelValue)"
     />
     <t-loading v-else-if="loading" size="small" />
+    <t-icon
+      v-else-if="modelValue"
+      name="file"
+      class="admin-media-upload__preview"
+      role="button"
+      tabindex="0"
+      :aria-label="`查看${title}`"
+      @click.stop="emit('preview', modelValue)"
+      @keydown.enter.stop="emit('preview', modelValue)"
+    />
     <t-icon v-else name="add" />
     <span v-if="!modelValue || showFileName">{{ modelValue?.name || label }}</span>
     <span v-if="errorMessage" class="admin-media-upload__error">{{ errorMessage }}</span>
@@ -75,7 +85,7 @@ const props = withDefaults(
     title: string;
     label?: string;
     accept?: string;
-    mediaType?: 'image' | 'video';
+    mediaType?: 'image' | 'video' | 'file';
     required?: boolean;
     showTitle?: boolean;
     showFileName?: boolean;
@@ -106,7 +116,9 @@ const emit = defineEmits<{
 }>();
 
 const loading = ref(false);
-const previewUrl = computed(() => props.modelValue?.coverUrl || props.modelValue?.url);
+const previewUrl = computed(() =>
+  props.mediaType === 'file' ? undefined : props.modelValue?.coverUrl || props.modelValue?.url,
+);
 
 const previewFilled = () => {
   if (props.previewOnFilledClick && props.modelValue && !props.disabled) emit('preview', props.modelValue);

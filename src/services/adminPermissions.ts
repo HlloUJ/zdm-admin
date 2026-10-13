@@ -34,6 +34,12 @@ export const adminMenuEntries: AdminMenuEntry[] = [
     permissionPrefix: 'store.finished-stock-management',
   },
   {
+    label: '客户管理',
+    path: '/store/customer-management',
+    icon: 'usergroup',
+    permissionPrefix: 'store.customer-management',
+  },
+  {
     label: '价格配置',
     path: '/store/price-configuration',
     icon: 'money',

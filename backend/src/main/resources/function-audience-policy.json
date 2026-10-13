@@ -146,5 +146,9 @@
   {
     "prefix": "admin.permission-management.employee-management.supply-chain.delete",
     "scope": "internal-management"
+  },
+  {
+    "prefix": "store.customer-management",
+    "scope": "store-only"
   }
 ]

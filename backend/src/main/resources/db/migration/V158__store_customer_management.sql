@@ -1,0 +1,36 @@
+CREATE TABLE store_customers (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,
+ tenant_id BIGINT NOT NULL,
+ store_id BIGINT NOT NULL,
+ name VARCHAR(80) NOT NULL,
+ phone VARCHAR(80) NOT NULL DEFAULT '',
+ wechat VARCHAR(100) NOT NULL DEFAULT '',
+ requirement TEXT NOT NULL,
+ remark TEXT NOT NULL,
+ owner_account_id BIGINT NOT NULL,
+ created_by_account_id BIGINT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'daily',
+ archived_at DATETIME NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY idx_customer_scope (tenant_id, store_id, status, owner_account_id),
+ CONSTRAINT fk_customer_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+ CONSTRAINT fk_customer_store FOREIGN KEY (store_id) REFERENCES stores(id),
+ CONSTRAINT fk_customer_owner FOREIGN KEY (owner_account_id) REFERENCES accounts(id),
+ CONSTRAINT fk_customer_creator FOREIGN KEY (created_by_account_id) REFERENCES accounts(id) ON DELETE SET NULL,
+ CONSTRAINT chk_customer_status CHECK (status IN ('daily','archived'))
+);
+CREATE TABLE store_customer_followups (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,
+ customer_id BIGINT NOT NULL,
+ followed_at DATETIME NOT NULL,
+ content TEXT NOT NULL,
+ next_follow_at DATETIME NULL,
+ next_follow_task VARCHAR(2000) NOT NULL DEFAULT '',
+ created_by_account_id BIGINT NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY idx_customer_followup (customer_id, followed_at),
+ CONSTRAINT fk_followup_customer FOREIGN KEY (customer_id) REFERENCES store_customers(id),
+ CONSTRAINT fk_followup_creator FOREIGN KEY (created_by_account_id) REFERENCES accounts(id) ON DELETE SET NULL
+);
