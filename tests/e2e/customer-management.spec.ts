@@ -399,6 +399,8 @@ async function nativeDialogVisuals(page: Page, testInfo: TestInfo) {
   await reference.goto('/tests/fixtures/official-ui/reference.html?mode=dialog');
   const native = reference.locator('.t-dialog:visible');
   await native.screenshot({ path: testInfo.outputPath('official-native-dialog.png'), animations: 'disabled' });
+  // Keep the application foreground after capturing the independent native reference.
+  await page.bringToFront();
   const styleOf = async (locator: ReturnType<Page['locator']>) =>
     locator.first().evaluate((element) => {
       const s = getComputedStyle(element);
@@ -418,6 +420,7 @@ async function nativeDialogVisuals(page: Page, testInfo: TestInfo) {
     await expect(dialog).toBeVisible();
     await page.mouse.move(0, 0);
     await reference.mouse.move(0, 0);
+    await page.bringToFront();
     for (const selector of ['.t-dialog__header', '.t-dialog__body', '.t-dialog__footer', '.t-button--variant-base'])
       await expect.poll(() => styleOf(dialog.locator(selector))).toEqual(await styleOf(native.locator(selector)));
     const confirmationContent = dialog.locator('.zdm-admin-confirm-dialog__content');
