@@ -929,14 +929,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .publish-confirm-content {
   color: var(--td-text-color-primary);
-  font-size: 14px;
+  font-size: var(--td-font-size-body-medium);
   line-height: 22px;
   overflow-wrap: anywhere;
 }
 .list-controls {
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .scope-controls {
   min-width: 0;
@@ -969,10 +969,6 @@ onBeforeUnmount(() => {
 }
 .category-content :deep(.t-space-item) {
   width: 100%;
-}
-.category-content :deep(.t-tree__item.t-is-active) {
-  background-color: var(--td-brand-color-light);
-  border-radius: var(--td-radius-default);
 }
 .attribute-table :deep(.attribute-drag-cell:first-child) {
   padding-left: 0;

@@ -71,6 +71,31 @@ public class MediaStorageService {
     return new StoredMedia(publicId, storageKey, mediaType, mimeType, file.getSize());
   }
 
+  public StoredMedia storeAttachment(MultipartFile file, long limit) {
+    if (file.isEmpty()) { throw new IllegalArgumentException("请选择附件"); }
+    if (file.getSize() > limit) { throw new IllegalArgumentException("附件不能超过5MiB"); }
+    String publicId = UUID.randomUUID().toString();
+    String key = "media/" + publicId + ".attachment";
+    String type = ObjectsMime.imageType(file.getContentType());
+    try {
+      Files.createDirectories(storageRoot.resolve("media"));
+      try (InputStream input = file.getInputStream()) { Files.copy(input, resolve(key)); }
+    } catch (IOException exception) {
+      try { Files.deleteIfExists(resolve(key)); }
+      catch (IOException cleanupException) { exception.addSuppressed(cleanupException); }
+      throw new IllegalStateException("附件保存失败", exception);
+    }
+    return new StoredMedia(publicId, key, type == null ? "file" : "image",
+        type == null ? "application/octet-stream" : type, file.getSize());
+  }
+
+  private static final class ObjectsMime {
+    private ObjectsMime() {}
+    static String imageType(String type) {
+      return type != null && List.of("image/jpeg", "image/png", "image/gif", "image/webp").contains(type) ? type : null;
+    }
+  }
+
   public StoredMedia createHistoryPreview(String storageKey) {
     try {
       java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(resolve(storageKey).toFile());
@@ -138,7 +163,7 @@ public class MediaStorageService {
 
   private boolean isManagedFile(Path path) {
     String key = storageRoot.relativize(path).toString().replace('\\', '/');
-    return key.matches("(?:media/|slabs/)?[0-9a-f-]{36}\\.(jpg|png|gif|webp|mp4|webm|mov)");
+    return key.matches("(?:media/|slabs/)?[0-9a-f-]{36}\\.(jpg|png|gif|webp|mp4|webm|mov|attachment)");
   }
 
   private StoredFile toStoredFile(Path path) {

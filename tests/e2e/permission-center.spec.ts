@@ -1267,7 +1267,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {
     await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
     await expect(moduleList.locator('.permission-module-item > span:first-child')).toHaveText([
-      ...(terminal === '城市合伙人门店管理后台' ? ['成品现货管理', '价格配置'] : []),
+      ...(terminal === '城市合伙人门店管理后台' ? ['成品现货管理', '客户管理', '价格配置'] : []),
       '供应商管理',
       '门店分类管理',
       '权限管理',
@@ -1279,6 +1279,28 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
         await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
       }
+      await moduleList.getByText('客户管理', { exact: true }).click();
+      await expect(matrix.getByText('日常客户', { exact: true })).toBeVisible();
+      await expect(matrix.getByText('归档客户', { exact: true })).toBeVisible();
+      await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+        '查看',
+        '新增',
+        '批量调整归属',
+        '批量归档',
+        '详情',
+        '编辑',
+        '调整归属',
+        '归档',
+        '查看',
+        '批量调整归属',
+        '批量取消归档',
+        '批量彻底删除',
+        '详情',
+        '编辑',
+        '调整归属',
+        '取消归档',
+        '彻底删除',
+      ]);
       await moduleList.getByText('价格配置', { exact: true }).click();
       await expect(matrix.getByText('一级菜单直达')).toBeVisible();
       await expect(matrix.getByText('指导价设置')).toHaveCount(0);

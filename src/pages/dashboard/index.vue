@@ -92,22 +92,23 @@ const permissionActions = [
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 
 .metric-card,
 .panel {
   background: var(--td-bg-color-container);
-  border-radius: 6px;
-  box-shadow: var(--td-shadow-1);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 
 .metric-card {
   min-height: 120px;
-  padding: 22px 24px;
   display: grid;
-  gap: 10px;
+  gap: var(--td-comp-margin-s);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 
 .metric-card span,
@@ -122,15 +123,16 @@ const permissionActions = [
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.8fr);
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .panel {
-  padding: 24px;
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 
 .panel-title {
-  margin-bottom: 16px;
+  margin-bottom: var(--td-comp-margin-xxl);
   font: var(--td-font-title-medium);
 }
 

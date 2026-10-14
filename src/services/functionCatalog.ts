@@ -1,6 +1,11 @@
 import { isFunctionAllowedForAudience } from './functionAudience';
 import { verifiedFunctionCatalog } from './functionCatalogAdminData';
-import { storeLevelModule, storeFinishedStock, storePriceConfiguration } from './functionCatalogStoreData';
+import {
+  storeLevelModule,
+  storeFinishedStock,
+  storePriceConfiguration,
+  storeCustomerManagement,
+} from './functionCatalogStoreData';
 import { supplyChainProducts, supplyTypeModule } from './functionCatalogSupplyData';
 import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
 
@@ -211,6 +216,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
 const navigationModuleOrder = [
   'admin.tenant',
   'store.finished-stock-management',
+  'store.customer-management',
   'store.price-configuration',
   'admin.product-data-center',
   'admin.supplier-supply-type-management',
@@ -273,6 +279,7 @@ export const fullFunctionCatalog = applyConfirmedNavigationStructure(
       withAdministrationTabs([
         storeLevelModule,
         storeFinishedStock,
+        storeCustomerManagement,
         storePriceConfiguration,
         ...verifiedFunctionCatalog,
         supplyChainProducts,

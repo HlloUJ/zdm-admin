@@ -12,7 +12,7 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showTenantTabRail" v-model="activeTab" :list="tenantTabs" />
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="租户姓名" name="tenantName">
@@ -110,7 +110,7 @@
       @cancel="closeFormDialog"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="租户姓名" name="tenantName" required-mark>
           <t-input v-model="formData.tenantName" clearable placeholder="请输入" />
         </t-form-item>
@@ -193,7 +193,7 @@
         theme="warning"
         :message="blocker"
       />
-      <t-form class="purge-confirm-form" label-width="96px" colon>
+      <t-form class="purge-confirm-form" label-width="100px" colon>
         <t-form-item label="租户名称" required-mark>
           <t-input v-model="purgeConfirmationName" placeholder="请输入完整租户名称" />
         </t-form-item>
@@ -633,82 +633,6 @@ const toggleBusiness = (business: BusinessType) => {
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-  background: var(--td-bg-color-page);
-}
-
-.brand {
-  width: 224px;
-  height: 100%;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  color: #fff;
-  background: var(--td-brand-color);
-  font: var(--td-font-title-small);
-}
-
-.brand-title {
-  color: var(--td-text-color-primary);
-  font: var(--td-font-title-medium);
-}
-
-.brand-subtitle {
-  margin-top: 2px;
-  color: var(--td-text-color-placeholder);
-  font: var(--td-font-body-small);
-}
-
-.top-actions {
-  margin-left: auto;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.user-entry {
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-  padding: 0 var(--td-comp-paddingLR-s);
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
-}
-
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
-
 .tenant-list-layout {
   min-width: 0;
 }
@@ -721,7 +645,7 @@ const toggleBusiness = (business: BusinessType) => {
 .list-controls {
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 :deep(.zdm-admin-list-layout__toolbar) {
@@ -733,18 +657,17 @@ const toggleBusiness = (business: BusinessType) => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
   margin-bottom: 0;
 }
 
@@ -768,23 +691,23 @@ const toggleBusiness = (business: BusinessType) => {
 }
 
 .business-tag.cityPartner {
-  color: #0052d9;
-  background: #e8f2ff;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
 }
 
 .business-tag.slabSupplier {
-  color: #0c7a43;
-  background: #e8f6ef;
+  color: var(--td-success-color);
+  background: var(--td-success-color-light);
 }
 
 .business-tag.finishedSupplier {
-  color: #ad5a00;
-  background: #fff1df;
+  color: var(--td-warning-color);
+  background: var(--td-warning-color-light);
 }
 
 .business-tag.factory {
-  color: #c9353f;
-  background: #fff0f1;
+  color: var(--td-error-color);
+  background: var(--td-error-color-light);
 }
 
 .empty-business {
@@ -795,7 +718,7 @@ const toggleBusiness = (business: BusinessType) => {
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
   white-space: nowrap;
 }
 
@@ -817,42 +740,9 @@ const toggleBusiness = (business: BusinessType) => {
 }
 
 @media (max-width: 960px) {
-  .top-nav {
-    height: auto;
-    align-items: stretch;
-    flex-direction: column;
-    padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-l);
-    gap: var(--td-comp-margin-s);
-  }
-
-  .brand {
-    width: 100%;
-    height: 40px;
-  }
-
-  .top-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .admin-shell {
-    display: block;
-    min-height: auto;
-  }
-
-  .page {
-    padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
-  }
-
   .filter-row {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .filter-fields,
-  .filter-fields :deep(.t-form__item),
-  .filter-actions {
-    width: 100%;
   }
 
   .filter-actions {

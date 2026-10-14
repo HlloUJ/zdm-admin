@@ -9,7 +9,7 @@
         </AdminPageHeader>
         <AdminListLayout>
           <template #filters>
-            <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon @submit="handleSearch">
+            <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon @submit="handleSearch">
               <div class="supply-type-filter-row">
                 <div class="supply-type-filter-fields">
                   <div class="supply-type-name-filter">
@@ -91,7 +91,7 @@
         ref="form"
         :data="draft"
         :rules="{ name: [{ required: true, message: '请输入供货类型名称', type: 'error' }] }"
-        label-width="84px"
+        label-width="100px"
         colon
         ><t-form-item label="供货类型" name="name"
           ><t-input v-model="draft.name" clearable placeholder="请输入供货类型名称" :maxlength="80" /></t-form-item
@@ -277,13 +277,13 @@ onMounted(load);
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .supply-type-filter-fields {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .supply-type-name-filter {

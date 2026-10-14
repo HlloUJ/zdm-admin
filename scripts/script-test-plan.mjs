@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-export const SOURCE_GUARD_TESTS = ['scripts/feedback-foundation.test.mjs'];
+export const SOURCE_GUARD_TESTS = ['scripts/feedback-foundation.test.mjs', 'scripts/ui-template-policy.test.mjs'];
 const MANIFEST = 'scripts/test-domain-manifest.json';
 const EXTRA_INPUTS = [
   'package.json',

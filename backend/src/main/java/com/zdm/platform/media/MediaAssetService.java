@@ -27,8 +27,18 @@ public class MediaAssetService extends ServiceImpl<MediaAssetMapper, MediaAsset>
 
   @Transactional
   public MediaUploadResponse upload(MultipartFile file, long imageSizeLimit) {
+    identityProvider.require();
+    return saveUpload(file, storageService.store(file, imageSizeLimit), "public");
+  }
+
+  @Transactional
+  public MediaUploadResponse uploadAttachment(MultipartFile file, long limit) {
+    identityProvider.require();
+    return saveUpload(file, storageService.storeAttachment(file, limit), "private");
+  }
+
+  private MediaUploadResponse saveUpload(MultipartFile file, MediaStorageService.StoredMedia stored, String access) {
     CurrentIdentity identity = identityProvider.require();
-    MediaStorageService.StoredMedia stored = storageService.store(file, imageSizeLimit);
     MediaAsset asset = new MediaAsset();
     asset.setPublicId(stored.publicId());
     asset.setStorageKey(stored.storageKey());
@@ -36,7 +46,7 @@ public class MediaAssetService extends ServiceImpl<MediaAssetMapper, MediaAsset>
     asset.setMediaType(stored.mediaType());
     asset.setMimeType(stored.mimeType());
     asset.setFileSize(stored.fileSize());
-    asset.setAccessLevel("public");
+    asset.setAccessLevel(access);
     asset.setOwnerClientCode(identity.clientCode());
     asset.setTenantId(identity.tenantId());
     asset.setStoreId(identity.storeId());

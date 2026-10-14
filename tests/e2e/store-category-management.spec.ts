@@ -79,7 +79,7 @@ test('switches isolated category types and limits maintenance to three levels', 
   });
   expect(dragSpace.required).toBeGreaterThan(0);
   expect(dragSpace.available).toBeGreaterThanOrEqual(dragSpace.required);
-  expect(dragSpace.inset).toBe(0);
+  expect(dragSpace.inset).toBeCloseTo((dragSpace.available - dragSpace.required) / 2, 0);
   expect(dragSpace.nameInset).toBe(0);
   await expect(page.getByText('2026/10/09 14:28', { exact: true })).toBeVisible();
   await page.getByRole('row').filter({ hasText: '成品一级' }).getByRole('button', { name: '展开下级分类' }).click();

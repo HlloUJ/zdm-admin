@@ -44,7 +44,7 @@ const props = withDefaults(
     objectName: '',
     objectType: '',
     title: '',
-    width: '440px',
+    width: '480px',
   },
 );
 
@@ -83,9 +83,8 @@ function handleConfirm() {
 
 <style scoped>
 .zdm-admin-confirm-dialog__content {
-  color: var(--td-text-color-primary);
-  font-size: 14px;
-  line-height: 22px;
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-medium);
   overflow-wrap: anywhere;
 }
 </style>

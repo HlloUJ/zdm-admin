@@ -71,6 +71,7 @@ describe('full function catalog', () => {
     expect(fullFunctionCatalog.map((module) => module.value)).toEqual([
       'admin.tenant',
       'store.finished-stock-management',
+      'store.customer-management',
       'store.price-configuration',
       'admin.product-data-center',
       'admin.supplier-supply-type-management',
@@ -81,6 +82,7 @@ describe('full function catalog', () => {
     ]);
     expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([
       'store.finished-stock-management',
+      'store.customer-management',
       'store.price-configuration',
       'admin.supplier-management',
       'admin.tenant.store-category-management',

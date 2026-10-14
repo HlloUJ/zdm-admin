@@ -67,7 +67,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: var(--td-comp-margin-s);
-  color: #fff;
+  color: var(--td-text-color-anti);
   background: rgb(0 0 0 / 75%);
 }
 </style>

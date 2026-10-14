@@ -320,7 +320,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await expect(menu.getByText('价格配置', { exact: true })).toBeVisible();
   await expect(menu.getByText('商品管理', { exact: true })).toHaveCount(0);
   const main = page.getByRole('main');
-  await expect(main.locator('.filter-row')).toHaveCSS('display', 'flex');
+  await expect(main.locator('.filter-row')).toHaveCSS('display', 'grid');
   await expect(main.locator('.filter-fields')).toHaveCSS('display', 'grid');
   await expect(main.locator('.table-toolbar')).toHaveCSS('display', 'flex');
   await expect(main.getByText('暂无商品')).toBeVisible();
@@ -352,7 +352,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await expect(main.getByRole('heading', { name: '编辑商品', exact: true })).toBeVisible();
   await expect(main.locator('.form-anchor-nav')).toHaveText('图文描述基础信息销售信息');
   await expect(main.locator('.form-anchor-card')).toHaveCSS('position', 'fixed');
-  await expect(main.locator('.form-heading-card h1')).toHaveCSS('font-size', '20px');
+  await expect(main.locator('.form-heading-card h1')).toHaveCSS('font-size', '18px');
   await expect(main.locator('.page-header')).toHaveCount(0);
   await expect(
     main.locator('.readonly-product-fields .zdm-admin-section-card').nth(1).locator('.t-cascader'),

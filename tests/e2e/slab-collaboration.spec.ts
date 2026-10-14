@@ -351,7 +351,8 @@ test('批量上架部分成功，失败横幅可关闭并在页面刷新后清�
   expect(bannerBounds!.x + bannerBounds!.width).toBeLessThanOrEqual(actionBounds!.x + actionBounds!.width);
   const actions = await failedRow.locator('.table-actions').boundingBox();
   expect(bannerBounds!.y + bannerBounds!.height).toBeLessThan(actions!.y);
-  expect(bannerBounds!.height).toBeLessThanOrEqual(28);
+  // Native TDesign Alert: 22px text line + 16px padding above and below.
+  expect(bannerBounds!.height).toBe(54);
   await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toHaveCount(1);
   await expect(page.locator('.selection-info')).toContainText('已选 1 项');
   expect([...requests].sort()).toEqual([99601, 99602, 99603]);

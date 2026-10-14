@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { classifyChangedFiles } from './verification-impact.mjs';
-import { engineeringDomainProof, scriptTestFiles } from './script-test-plan.mjs';
+import { engineeringDomainProof, scriptTestFiles, SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import {
   revisionIdentity,
   testIdentities,
@@ -20,29 +20,27 @@ import {
 } from './ci-quality-evidence.mjs';
 
 function frontendResult(kind) {
-  const file = kind === 'unit' ? 'unit-module-id' : 'scripts/feedback-foundation.test.mjs';
+  const files = kind === 'unit' ? ['unit-module-id'] : SOURCE_GUARD_TESTS;
   return {
     schemaVersion: 1,
     kind,
     runId: kind,
     complete: true,
-    files: [file],
-    completedFiles: [file],
-    collectedTests: ['one'],
+    files,
+    completedFiles: files,
+    collectedTests: files.map((_, index) => (index ? `one-${index}` : 'one')),
     suites: [],
     errors: [],
-    tests: [
-      {
-        id: 'one',
-        file,
-        name: 'test',
-        status: 'passed',
-        retryCount: 0,
-        repeatCount: 0,
-        flaky: false,
-        expectedFailure: false,
-      },
-    ],
+    tests: files.map((file, index) => ({
+      id: index ? `one-${index}` : 'one',
+      file,
+      name: 'test',
+      status: 'passed',
+      retryCount: 0,
+      repeatCount: 0,
+      flaky: false,
+      expectedFailure: false,
+    })),
   };
 }
 

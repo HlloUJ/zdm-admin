@@ -17,8 +17,8 @@ withDefaults(
 .zdm-admin-pagination-bar {
   display: flex;
   align-items: center;
-  min-height: 32px;
-  margin-top: 16px;
+  min-height: var(--td-comp-size-m);
+  margin-top: var(--td-comp-margin-xxl);
 }
 
 .zdm-admin-pagination-bar--end {
@@ -27,6 +27,6 @@ withDefaults(
 
 .zdm-admin-pagination-bar--between {
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--td-comp-margin-xxl);
 }
 </style>

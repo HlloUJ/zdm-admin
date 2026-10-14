@@ -8,3 +8,8 @@ package-lock.json
 backups
 .task-verification/
 .task-runtime/
+
+tests/fixtures/official-ui/upstream/
+
+# Independent official reference template, verified by source-shape guard.
+tests/fixtures/official-ui/UpstreamReference.vue

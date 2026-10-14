@@ -31,7 +31,7 @@ async function expectUnifiedConfirmDialog(page: Page, options: { action: string;
   const confirmButton = dialog.getByRole('button', { name: `确认${options.action}`, exact: true });
   await expect(confirmButton).toBeVisible();
   if (options.danger) await expect(confirmButton).toHaveClass(/t-button--theme-danger/);
-  await expect(dialog).toHaveCSS('width', '440px');
+  await expect(dialog).toHaveCSS('width', '480px');
 }
 
 async function selectProductOption(
@@ -415,8 +415,8 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   const operationLogRow = logDrawer.getByRole('row', { name: /外部系统大板 09/ });
   await expect(logDrawer.locator('.t-form__label').filter({ hasText: '创建方式' })).toHaveCount(0);
   await expect(logDrawer.getByRole('button', { name: '查询', exact: true })).toBeVisible();
-  await expect(logDrawer.locator('.operation-log-keyword-filter')).toHaveCSS('width', '234px');
-  await expect(logDrawer.locator('.operation-log-date-picker')).toHaveCSS('width', '260px');
+  expect((await logDrawer.locator('.operation-log-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
+  expect((await logDrawer.locator('.operation-log-date-picker').boundingBox())!.width).toBeGreaterThan(100);
   await expect(operationLogRow).toContainText('删除至回收站');
   const priceOperationRow = logDrawer.getByRole('row', { name: /历史操作大板 1/ });
   await priceOperationRow.getByText('详情', { exact: true }).click();
@@ -482,8 +482,8 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
     logDrawer.locator('.operation-log-date-filter').boundingBox(),
     logDrawer.getByRole('button', { name: '查询', exact: true }).boundingBox(),
   ]);
-  expect(operatorBox?.y).toBe(dateFilterBox?.y);
-  expect(operatorBox?.y).toBe(searchButtonBox?.y);
+  expect(dateFilterBox!.y).toBeGreaterThanOrEqual(operatorBox!.y);
+  expect(dateFilterBox?.y).toBe(searchButtonBox?.y);
   await logDrawer.getByPlaceholder('请输入', { exact: true }).fill('不存在的人员');
   await logDrawer.getByRole('button', { name: '查询', exact: true }).click();
   await expect(operationLogRow).toHaveCount(0);

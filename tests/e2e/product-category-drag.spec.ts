@@ -38,7 +38,11 @@ test('sorts siblings, retains children and rejects cross-parent or cross-level d
         page.locator('main tbody').evaluate((body) => Object.keys(body).some((key) => key.startsWith('Sortable'))),
       )
       .toBe(true);
-    await row(from).locator('.category-name-cell').dragTo(row(to).locator('.category-name-cell'));
+    const target = row(to).locator('.category-name-cell');
+    // Keep the destination visible before pressing the mouse. Scrolling it into
+    // view mid-drag can reverse the screen-space direction between adjacent rows.
+    await target.scrollIntoViewIfNeeded();
+    await row(from).locator('.category-name-cell').dragTo(target);
   };
   await expect(rows).toHaveCount(2);
   await expect(page.getByText('上移', { exact: true })).toHaveCount(0);
