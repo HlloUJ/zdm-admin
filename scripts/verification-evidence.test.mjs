@@ -675,3 +675,69 @@ test('different backend commands cannot concurrently overwrite the same target a
     [0, 1],
   );
 });
+
+test('a passed scoped command invalidated by candidate drift keeps its record and requires a fresh changed-candidate run', async (t) => {
+  const { root } = fixture(t);
+  const script = `const fs = require('node:fs'); const marker = '.task-verification/drift-done';
+  if (!fs.existsSync(marker)) { fs.writeFileSync('source.js', 'export const value = 2;\\n'); fs.writeFileSync(marker, 'yes'); }`;
+  const step = task(root, script);
+  const options = {
+    ...silent,
+    captureArtifacts: () => [],
+    captureIdentity: () => ({
+      identity: { source: { digest: 'unchanged-scoped-inputs' } },
+      source: captureSource(root),
+      fingerprint: 'fixed-scoped-fingerprint',
+      inputProofComplete: true,
+      reusable: false,
+    }),
+  };
+  const first = await runVerificationTask(step, options);
+  const failed = record(first);
+  assert.equal(first.exitCode, 1);
+  assert.equal(failed.commandExitCode, 0);
+  assert.equal(failed.failureKind, 'candidate-invalidated');
+  assert.notEqual(failed.candidate.digest, failed.candidateAfter.digest);
+  const immutableFile = path.join(attemptsDirectory(first), `${failed.attemptId}.json`);
+  const originalBytes = readFileSync(immutableFile, 'utf8');
+  // Restoring the original bytes (or forcing diagnostics) does not repair the old candidate.
+  writeFileSync(path.join(root, 'source.js'), 'export const value = 1;\n');
+  assert.equal((await runVerificationTask(step, options)).exitCode, 1);
+  assert.equal((await runVerificationTask(step, { ...options, force: true })).exitCode, 1);
+  // A genuinely different candidate must execute; the invalidated success is never reused.
+  writeFileSync(path.join(root, 'source.js'), 'export const value = 3;\n');
+  const repaired = await runVerificationTask(step, options);
+  assert.equal(repaired.exitCode, 0);
+  assert.equal(repaired.reused, false);
+  assert.equal(record(repaired).fingerprint, failed.fingerprint);
+  assert.equal(record(repaired).firstFailure.attemptId, failed.attemptId);
+  assert.equal(record(repaired).retryBasis, 'candidate-changed');
+  assert.equal(readFileSync(immutableFile, 'utf8'), originalBytes);
+});
+
+test('a real scoped command failure stays blocked after an unrelated candidate change', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root, failFirstScript);
+  const options = {
+    ...silent,
+    captureArtifacts: () => [],
+    captureIdentity: () => ({
+      identity: { source: { digest: 'backend-inputs' } },
+      source: captureSource(root),
+      fingerprint: 'fixed-backend-inputs',
+      inputProofComplete: true,
+      reusable: false,
+    }),
+  };
+  const first = await runVerificationTask(step, options);
+  const failed = record(first);
+  assert.equal(failed.commandExitCode, 1);
+  writeFileSync(path.join(root, 'source.js'), 'export const unrelated = 2;\n');
+  const blocked = await runVerificationTask(step, options);
+  assert.equal(blocked.exitCode, 1);
+  assert.equal(record(blocked).executed, false);
+  const forced = await runVerificationTask(step, { ...options, force: true });
+  assert.equal(forced.exitCode, 1);
+  assert.equal(record(forced).commandExitCode, 0);
+  assert.equal(record(forced).firstFailure.attemptId, failed.attemptId);
+});
