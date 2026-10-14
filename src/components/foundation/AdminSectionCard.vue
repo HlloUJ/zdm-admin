@@ -18,7 +18,6 @@ withDefaults(
   padding: var(--zdm-admin-card-padding);
   background: var(--td-bg-color-container);
   border-radius: var(--zdm-admin-card-radius);
-  box-shadow: var(--td-shadow-1);
 }
 
 .zdm-admin-section-card--filter,

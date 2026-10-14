@@ -18,7 +18,7 @@ const customer = (id: number, ownerAccountId: number, status = 'daily') => ({
   createdAt: '2026-10-13T10:00:00',
   status,
 });
-async function setup(page: Page, grants: string[], scope = 'all') {
+async function setup(page: Page, grants: string[], scope = 'all', empty = false) {
   await installAdminApiMocks(page);
   await page.addInitScript(
     ({ grants, scope }) => {
@@ -41,7 +41,7 @@ async function setup(page: Page, grants: string[], scope = 'all') {
     },
     { grants: grants.map((g) => `${prefix}.${g}`), scope },
   );
-  let records = [customer(1, 7), customer(2, 8), customer(3, 7, 'archived')];
+  let records = empty ? [] : [customer(1, 7), customer(2, 8), customer(3, 7, 'archived')];
   let followups = [
     {
       id: 11,
@@ -87,7 +87,11 @@ async function setup(page: Page, grants: string[], scope = 'all') {
     if (path.endsWith('/attachments') && request.method() === 'POST') {
       requests.push({ upload: true });
       return route.fulfill({
-        json: ok({ id: 100 + requests.length, mediaType: 'file', mimeType: 'application/octet-stream' }),
+        json: ok({
+          id: 100 + requests.length,
+          mediaType: request.postDataBuffer()?.toString().includes('Content-Type: image/') ? 'image' : 'file',
+          mimeType: 'application/octet-stream',
+        }),
       });
     }
     if (path.includes('/followups')) {
@@ -146,7 +150,9 @@ test('single authorized tab hides tab bar and self scope hides owner filter', as
   await expect(page.locator('.t-tabs')).toHaveCount(0);
   await expect(page.getByText('王先生2', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '新增', exact: true })).toHaveCount(0);
-  await expect(page.locator('.filter-fields').getByText('归属人', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.zdm-official-list-page__grid-filters').getByText('归属人', { exact: true })).toHaveCount(
+    0,
+  );
 });
 test('all data without manager role sees others but cannot edit or archive them', async ({ page }) => {
   await setup(page, daily);
@@ -166,8 +172,8 @@ test('new customer requires only name and never asks for shipping or source', as
   await page.getByRole('button', { name: '新增', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增客户' });
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(dialog.getByText('请输入姓名', { exact: true })).toBeVisible();
-  await dialog.locator('.t-form__item').filter({ hasText: '姓名' }).locator('input').fill('李女士');
+  await expect(dialog.getByText('请输入客户姓名', { exact: true })).toBeVisible();
+  await dialog.locator('.t-form__item').filter({ hasText: '客户姓名' }).locator('input').fill('李女士');
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
   await expect(page.getByText('李女士', { exact: true })).toBeVisible();
   expect(requests.at(-1)).toMatchObject({ name: '李女士', phone: '' });
@@ -202,12 +208,14 @@ test('archive assignment is independent of role and returns the customer to dail
   await expect(page.getByText('王先生3', { exact: true })).toBeVisible();
 });
 
-test('followup accepts at most three attachments and blocks files above 5MiB before upload', async ({ page }) => {
+test('followup accepts at most three attachments and blocks files above 5MiB before upload', async ({
+  page,
+}, testInfo) => {
   const requests = await setup(page, ['daily.view', 'daily.detail']);
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
   await page.locator('.t-dialog:visible').getByRole('button', { name: '新增跟进', exact: true }).click();
-  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' }).last();
   const inputs = dialog.locator('input[type=file]');
   await expect(inputs).toHaveCount(3);
   await inputs.first().setInputFiles({
@@ -217,6 +225,7 @@ test('followup accepts at most three attachments and blocks files above 5MiB bef
   });
   await expect(page.getByText(/附件不能超过5MiB/)).toBeVisible();
   expect(requests.filter((item) => item.upload)).toHaveLength(0);
+  await dialog.screenshot({ path: testInfo.outputPath('attachment-rejected-size.png'), animations: 'disabled' });
   for (let index = 0; index < 3; index++) {
     await inputs
       .nth(index)
@@ -250,4 +259,321 @@ test('a delayed old detail response never replaces the newly opened customer', a
   await response;
   await expect(dialog.getByText('王先生2', { exact: true })).toBeVisible();
   await expect(dialog.getByText('王先生1', { exact: true })).toHaveCount(0);
+});
+
+test('customer list follows standard spacing without clipped columns at the review viewport', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1366, height: 858 });
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  await expect(page.getByText('王先生1', { exact: true })).toBeVisible();
+  const form = page.locator('.zdm-official-list-page__grid-filters');
+  await expect(page.locator('body')).toHaveCSS('-webkit-font-smoothing', 'antialiased');
+  const reference = await page.context().newPage();
+  await reference.goto('/tests/fixtures/official-ui/reference.html');
+  const hostWidth = (await page.locator('.zdm-official-list-page').boundingBox())!.width;
+  // Compare the original official grid at exactly the same container width.
+  await reference.locator('.list-common-table').evaluate((element, width) => {
+    (element as HTMLElement).style.width = `${width}px`;
+    (element as HTMLElement).style.boxSizing = 'border-box';
+  }, hostWidth);
+  const expected = await reference.locator('.list-common-table .t-form__label').evaluateAll((elements) =>
+    elements.slice(0, 3).map((element) => ({
+      width: element.getBoundingClientRect().width,
+      padding: getComputedStyle(element).paddingRight,
+    })),
+  );
+  const actual = await form.locator('.t-form__label').evaluateAll((elements) =>
+    elements.map((element) => ({
+      width: element.getBoundingClientRect().width,
+      padding: getComputedStyle(element).paddingRight,
+    })),
+  );
+  expect(actual).toEqual(expected);
+  await reference
+    .locator('.list-common-table')
+    .screenshot({ path: testInfo.outputPath('official-grid-form.png'), animations: 'disabled' });
+  const referenceContainer = await reference.locator('.list-common-table').evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      padding: style.padding,
+      radius: style.borderRadius,
+      background: style.backgroundColor,
+      font: style.font,
+      family: style.fontFamily,
+      color: style.color,
+    };
+  });
+  expect(
+    await page.locator('.zdm-official-list-page').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        padding: style.padding,
+        radius: style.borderRadius,
+        background: style.backgroundColor,
+        font: style.font,
+        family: style.fontFamily,
+        color: style.color,
+      };
+    }),
+  ).toEqual(referenceContainer);
+  const sectionGap = await reference
+    .locator('.table-container')
+    .evaluate((element) => parseFloat(getComputedStyle(element).marginTop));
+  const referenceControls = await reference
+    .locator('.list-common-table .t-input')
+    .evaluateAll((elements) => elements.slice(0, 3).map((element) => element.getBoundingClientRect().width));
+  const actualControls = await form
+    .locator('.t-input')
+    .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
+  expect(actualControls).toEqual(referenceControls);
+  const nativeLabelStyles = await reference
+    .locator('.list-common-table .t-form__label')
+    .first()
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { color: style.color, font: style.font, align: style.textAlign, padding: style.paddingRight };
+    });
+  expect(
+    await form
+      .locator('.t-form__label')
+      .first()
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.color, font: style.font, align: style.textAlign, padding: style.paddingRight };
+      }),
+  ).toEqual(nativeLabelStyles);
+  const formBox = (await form.boundingBox())!;
+  const firstLabel = (await form.locator('.t-form__label').first().boundingBox())!;
+  expect(Math.abs(firstLabel.x - formBox.x)).toBeLessThanOrEqual(1);
+  const query = (await form.getByRole('button', { name: '查询', exact: true }).boundingBox())!;
+  const reset = (await form.getByRole('button', { name: '重置', exact: true }).boundingBox())!;
+  expect(Math.abs(query.y - reset.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(formBox.x + formBox.width - reset.x - reset.width)).toBeLessThanOrEqual(1);
+  await reference.close();
+  const operationRow = (await page.locator('.zdm-official-list-page__operations').boundingBox())!;
+  expect(Math.abs(operationRow.y - formBox.y - formBox.height - sectionGap)).toBeLessThanOrEqual(1);
+  const buttons = await page.locator('.zdm-official-list-page__operations .t-button').all();
+  for (let i = 1; i < buttons.length; i++) {
+    const previous = (await buttons[i - 1].boundingBox())!;
+    const next = (await buttons[i].boundingBox())!;
+    expect(Math.abs(next.x - previous.x - previous.width - 8)).toBeLessThanOrEqual(1);
+  }
+  for (const [label, image] of [
+    ['日常客户', 'daily'],
+    ['归档客户', 'archived'],
+  ] as const) {
+    await page.locator('.t-tabs').getByText(label, { exact: true }).click();
+    await expect(page.getByText(image === 'daily' ? '王先生1' : '王先生3', { exact: true })).toBeVisible();
+    const dimensions = await page
+      .locator('.t-table__content')
+      .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width + 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1366);
+    await expect(page.locator('symbol#t-icon-add')).toBeAttached({ timeout: 15000 });
+    await page.screenshot({
+      path: testInfo.outputPath(`customer-list-${image}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  }
+  await setup(page, [...daily, ...archived], 'all', true);
+  await page.reload();
+  await expect(page.getByText('暂无客户', { exact: true })).toBeVisible();
+  const emptyTable = await page
+    .locator('.t-table__content')
+    .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(emptyTable.scroll).toBeLessThanOrEqual(emptyTable.width + 1);
+  await expect(page.locator('symbol#t-icon-add')).toBeAttached({ timeout: 15000 });
+  await page.screenshot({
+    path: testInfo.outputPath('customer-list-empty.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+});
+
+// Native component reference imports no application stylesheet or foundation wrapper.
+test('customer profile, followup, assignment and confirmations retain native component visuals', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60000);
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  const reference = await page.context().newPage();
+  await reference.goto('/tests/fixtures/official-ui/reference.html?mode=dialog');
+  const native = reference.locator('.t-dialog:visible');
+  await native.screenshot({ path: testInfo.outputPath('official-native-dialog.png'), animations: 'disabled' });
+  const styleOf = async (locator: ReturnType<Page['locator']>) =>
+    locator.first().evaluate((element) => {
+      const s = getComputedStyle(element);
+      return {
+        font: s.font,
+        color: s.color,
+        background: s.backgroundColor,
+        padding: s.padding,
+        border: s.border,
+        radius: s.borderRadius,
+        lineHeight: s.lineHeight,
+        smoothing: s.getPropertyValue('-webkit-font-smoothing'),
+      };
+    });
+  const checkDialog = async (title: string, image: string, fields: boolean) => {
+    const dialog = page.locator('.t-dialog:visible').filter({ hasText: title }).last();
+    await expect(dialog).toBeVisible();
+    await page.mouse.move(0, 0);
+    await reference.mouse.move(0, 0);
+    for (const selector of ['.t-dialog__header', '.t-dialog__body', '.t-dialog__footer', '.t-button--variant-base'])
+      await expect.poll(() => styleOf(dialog.locator(selector))).toEqual(await styleOf(native.locator(selector)));
+    if (fields) {
+      expect(await styleOf(dialog.locator('.t-form__label'))).toEqual(await styleOf(native.locator('.t-form__label')));
+      for (const selector of ['.t-input', '.t-textarea__inner', '.t-upload', '.t-date-picker', '.t-select']) {
+        if (await dialog.locator(selector).count())
+          await expect.poll(() => styleOf(dialog.locator(selector))).toEqual(await styleOf(native.locator(selector)));
+      }
+    }
+    await dialog.screenshot({ path: testInfo.outputPath(image + '.png'), animations: 'disabled' });
+    return dialog;
+  };
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  let dialog = await checkDialog('新增客户', 'profile-create', true);
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(dialog.getByText('请输入客户姓名', { exact: true })).toBeVisible();
+  expect(await styleOf(dialog.locator('.t-form-item-tips'))).toEqual(
+    await styleOf(native.locator('.t-form-item-tips')),
+  );
+  await dialog.screenshot({ path: testInfo.outputPath('profile-invalid.png'), animations: 'disabled' });
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  const own = page.locator('tr').filter({ hasText: '王先生1' });
+  await own.getByText('编辑', { exact: true }).click();
+  dialog = await checkDialog('编辑客户', 'profile-edit', true);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await own.getByText('详情', { exact: true }).click();
+  const detail = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
+  await expect(detail.getByText('原导购历史跟进', { exact: true })).toBeVisible();
+  expect(await styleOf(detail.locator('.t-descriptions__label'))).toEqual(
+    await styleOf(reference.locator('.native-descriptions .t-descriptions__label')),
+  );
+  await detail.screenshot({ path: testInfo.outputPath('detail-owned.png'), animations: 'disabled' });
+  await detail.getByRole('button', { name: '新增跟进', exact: true }).click();
+  dialog = await checkDialog('新增跟进', 'followup-create', true);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await detail.getByText('编辑', { exact: true }).click();
+  dialog = await checkDialog('编辑跟进', 'followup-edit', true);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await detail.getByText('删除', { exact: true }).click();
+  dialog = page.locator('.t-dialog:visible').filter({ hasText: '是否删除跟进记录' });
+  await expect(dialog).toBeVisible();
+  await dialog.screenshot({ path: testInfo.outputPath('followup-delete.png'), animations: 'disabled' });
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await detail.getByRole('button', { name: '关闭', exact: true }).click();
+  await own.getByText('调整归属', { exact: true }).click();
+  dialog = await checkDialog('调整归属', 'assign-single', true);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await own.getByText('归档', { exact: true }).click();
+  dialog = await checkDialog('是否归档', 'archive-single', false);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await own.locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
+  dialog = await checkDialog('调整归属', 'assign-batch', true);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByRole('button', { name: '批量归档', exact: true }).click();
+  dialog = await checkDialog('是否归档', 'archive-batch', false);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByText('归档客户', { exact: true }).click();
+  const archivedRow = page.locator('tr').filter({ hasText: '王先生3' });
+  await archivedRow.getByText('调整归属', { exact: true }).click();
+  dialog = await checkDialog('调整归属', 'assign-archived', true);
+  expect(await styleOf(dialog.locator('.t-alert'))).toEqual(await styleOf(native.locator('.t-alert')));
+  const alert = (await dialog.locator('.t-alert').boundingBox())!;
+  const select = (await dialog.locator('.t-select').boundingBox())!;
+  const gap = await reference
+    .locator('.native-section-gap')
+    .evaluate((element) => parseFloat(getComputedStyle(element).gap));
+  expect(Math.abs(alert.y - select.y - select.height - gap)).toBeLessThanOrEqual(1);
+
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  for (const label of ['取消归档', '彻底删除']) {
+    await archivedRow.getByText(label, { exact: true }).click();
+    dialog = page.locator('.t-dialog:visible').filter({ hasText: `是否${label}` });
+    await expect(dialog).toBeVisible();
+    await dialog.screenshot({ path: testInfo.outputPath(`archived-${label}.png`), animations: 'disabled' });
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  }
+  await archivedRow.locator('.t-checkbox').click();
+  for (const label of ['批量取消归档', '批量彻底删除']) {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    dialog = page.locator('.t-dialog:visible').filter({ hasText: `是否${label.slice(2)}` });
+    await expect(dialog).toBeVisible();
+    await dialog.screenshot({ path: testInfo.outputPath(`${label}.png`), animations: 'disabled' });
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  }
+  await reference.close();
+});
+
+test('customer attachments retain native replace, remove and image preview behavior', async ({ page }, testInfo) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  await page.locator('.t-dialog:visible').getByRole('button', { name: '新增跟进', exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' }).last();
+  const input = dialog.locator('input[type=file]').first();
+  await input.setInputFiles({ name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('first') });
+  await expect(dialog.getByText('first.txt', { exact: true })).toBeVisible();
+  await input.setInputFiles({ name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('second') });
+  await expect(dialog.getByText('second.txt', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('first.txt', { exact: true })).toHaveCount(0);
+  const download = page.waitForEvent('download');
+  await dialog.getByText('second.txt', { exact: true }).click();
+  expect((await download).suggestedFilename()).toBe('second.txt');
+  await dialog.locator('.t-upload__single-input-clear').first().click();
+  await expect(dialog.getByText('second.txt', { exact: true })).toHaveCount(0);
+  await input.setInputFiles({
+    name: 'preview.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  });
+  await expect(dialog.getByText('preview.png', { exact: true })).toBeVisible();
+  const names = await dialog
+    .locator('.t-upload__single-input-preview')
+    .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
+  expect(names).toHaveLength(3);
+  for (const width of names) expect(width).toBeGreaterThan(200);
+
+  await dialog.screenshot({ path: testInfo.outputPath('attachment-uploaded.png'), animations: 'disabled' });
+  await dialog.getByText('preview.png', { exact: true }).click();
+  await expect(page.locator('.t-image-viewer')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('attachment-image-preview.png'), animations: 'disabled' });
+});
+
+test('customer detail loading, empty followups and read-only states remain visible and bounded', async ({
+  page,
+}, testInfo) => {
+  await setup(page, [...daily, ...archived]);
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/admin/store-customers/1', async (route) => {
+    await gate;
+    await route.fulfill({ json: ok({ customer: customer(1, 7), followups: [] }) });
+  });
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  const detail = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
+  await expect(detail.locator('.t-skeleton')).toBeVisible();
+  await detail.screenshot({ path: testInfo.outputPath('detail-loading.png'), animations: 'disabled' });
+  release();
+  await expect(detail.getByText('暂无跟进记录', { exact: true })).toBeVisible();
+  await detail.screenshot({ path: testInfo.outputPath('detail-empty-followups.png'), animations: 'disabled' });
+  await detail.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生2' }).getByText('详情', { exact: true }).click();
+  await expect(detail.getByText('王先生2', { exact: true })).toBeVisible();
+  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
+  await expect(detail.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(detail.getByText('删除', { exact: true })).toHaveCount(0);
+  await detail.screenshot({ path: testInfo.outputPath('detail-readonly.png'), animations: 'disabled' });
 });

@@ -15,7 +15,7 @@
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
                 <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="所属属性" name="attribute">
@@ -101,7 +101,7 @@
       @confirm="submit"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="form" :rules="formRules" label-width="96px" colon>
+      <t-form ref="formRef" :data="form" :rules="formRules" label-width="100px" colon>
         <t-form-item label="所属属性" name="attribute" required-mark>
           <t-select v-model="form.attribute">
             <t-option v-for="item in formAttributes" :key="item.code" :label="item.name" :value="item.code" />
@@ -446,56 +446,6 @@ onMounted(loadValues);
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border-bottom: 1px solid var(--td-component-border);
-}
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 4px;
-  background: var(--td-brand-color);
-  color: #fff;
-  font-weight: 700;
-}
-.brand-title {
-  font: var(--td-font-title-medium);
-}
-.brand-subtitle {
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-}
-.top-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--td-text-color-secondary);
-}
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
 .page-tip {
   margin-bottom: 16px;
 }
@@ -506,7 +456,7 @@ onMounted(loadValues);
   min-width: 0;
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .scope-controls {
   min-width: 0;
@@ -514,7 +464,7 @@ onMounted(loadValues);
 .source-caption {
   margin-top: var(--td-comp-margin-s);
   color: var(--td-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--td-font-size-body-medium);
 }
 :deep(.zdm-admin-list-layout__toolbar) {
   display: block;
@@ -524,7 +474,7 @@ onMounted(loadValues);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields {
   min-width: 0;
@@ -532,10 +482,9 @@ onMounted(loadValues);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
   margin-bottom: 0;
 }
 .filter-fields :deep(.t-input),
@@ -561,11 +510,6 @@ onMounted(loadValues);
 .table-action-placeholder {
   color: var(--td-text-color-placeholder);
 }
-:deep(.t-table th),
-:deep(.t-table td) {
-  padding-left: 24px;
-  padding-right: 24px;
-}
 @media (max-width: 1120px) {
   .filter-row {
     align-items: stretch;
@@ -574,11 +518,6 @@ onMounted(loadValues);
 
   .filter-actions {
     flex-wrap: wrap;
-  }
-}
-@media (max-width: 720px) {
-  .filter-fields :deep(.t-form__item) {
-    width: 100%;
   }
 }
 </style>

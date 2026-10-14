@@ -50,7 +50,7 @@
                   </t-form>
                 </div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店级别" name="name">
@@ -138,7 +138,7 @@
       @cancel="closeForm"
       @close="closeForm"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="门店级别" name="storeLevelId">
           <t-select
             v-model="formData.storeLevelId"
@@ -554,20 +554,6 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-  background: var(--td-bg-color-page);
-}
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
 .page-header,
 .filter-row,
 .filter-actions,
@@ -578,10 +564,7 @@ onMounted(loadData);
 .page-header,
 .filter-row {
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-}
-.page-header {
-  margin-bottom: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .guide-card {
   padding-bottom: var(--td-comp-margin-l);
@@ -594,7 +577,7 @@ onMounted(loadData);
   min-width: 0;
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .guide-setting-section,
 .guide-setting-form,
@@ -636,10 +619,9 @@ onMounted(loadData);
   flex: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
   margin-bottom: 0;
 }
 .filter-actions {

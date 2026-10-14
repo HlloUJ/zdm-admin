@@ -201,7 +201,7 @@ const clearAllNodes = () => {
 .permission-section {
   padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
   border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+  border-radius: var(--td-radius-medium);
 }
 
 .permission-section__header {
@@ -229,7 +229,7 @@ const clearAllNodes = () => {
   grid-template-columns: 240px minmax(0, 1fr);
   min-height: 520px;
   border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+  border-radius: var(--td-radius-medium);
   overflow: hidden;
 }
 
@@ -252,7 +252,7 @@ const clearAllNodes = () => {
   min-height: 38px;
   padding: 0 var(--td-comp-paddingLR-s);
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--td-radius-default);
   color: var(--td-text-color-primary);
   font: var(--td-font-body-medium);
   text-align: left;

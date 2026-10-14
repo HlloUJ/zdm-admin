@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "starter": "0.14.0",
+  "referenceComponent": "1.20.2",
+  "projectComponent": "1.20.7",
+  "sources": {
+    "tests/fixtures/official-ui/upstream/src/components/common-table/index.vue": {
+      "upstream": "src/components/common-table/index.vue",
+      "sha256": "3e4793c876ba0902fe8f34a44b54019f5737dedd619cac3a1c4ebafba6a06ff8"
+    },
+    "tests/fixtures/official-ui/upstream/src/pages/list/base/index.vue": {
+      "upstream": "src/pages/list/base/index.vue",
+      "sha256": "f05175f83c6f6c6c08b09570915a2f77e52de921fa4e05896459ea8acc0a2345"
+    },
+    "tests/fixtures/official-ui/upstream/src/pages/detail/base/index.vue": {
+      "upstream": "src/pages/detail/base/index.vue",
+      "sha256": "d756eb80e55894c054ed2c8567d3f103314e9c88ee0430ba285a85d9094c82c2"
+    },
+    "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/es/form/style/index.css": {
+      "upstream": "node_modules/tdesign-vue-next/es/form/style/index.css",
+      "sha256": "e1a064c5ca0f0485b615cc08a5056f0d958b028f5471036a6f8c07f40aa2e7bc"
+    },
+    "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/esm/form/props.js": {
+      "upstream": "node_modules/tdesign-vue-next/esm/form/props.js",
+      "sha256": "5ffc824b2e984a741cef653aed0c72577a6ce53802752036bf74ca45238cafa1"
+    },
+    "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/es/style/index.css": {
+      "upstream": "node_modules/tdesign-vue-next/es/style/index.css",
+      "sha256": "8e5d724794c74f91d34a42a6c65537dd337b6ea91424b7b03b51bf17330c7493"
+    },
+    "tests/fixtures/official-ui/upstream/LICENSE": {
+      "upstream": "LICENSE",
+      "sha256": "2e27dbeffb74403a460f847a19076d88b72f46e714a1e63153a88290bfefb91f"
+    },
+    "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/LICENSE": {
+      "upstream": "node_modules/tdesign-vue-next/LICENSE",
+      "sha256": "b3dbcb89dcf4a11abf1b70d043795a3da0c458af16fefd2ff315d9ff5875312f"
+    },
+    "tests/fixtures/official-ui/upstream/src/style/reset.less": {
+      "upstream": "src/style/reset.less",
+      "sha256": "1c8d988847acabad84c754bd4e7176ac5efb4ea41519de2e06981178d02fa9a3"
+    }
+  },
+  "extension": {
+    "id": "tab-filter-list",
+    "status": "pending-user-acceptance",
+    "scope": "Native Tabs + native inline Form with left-aligned labels + configured actions; list container/spacing from common-table; business cells via slots. No new visual constants."
+  }
+}

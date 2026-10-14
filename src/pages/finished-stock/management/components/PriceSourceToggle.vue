@@ -61,9 +61,9 @@ const confirmToggle = () => {
   margin-top: 5px;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--td-radius-default);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--td-font-size-body-small);
   font-weight: 500;
   line-height: 1;
   cursor: pointer;

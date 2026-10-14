@@ -26,7 +26,7 @@
                 <t-tab-panel v-for="tab in slabTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
               </t-tabs>
 
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="currentFilter" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="currentFilter" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
@@ -899,7 +899,7 @@
       @cancel="closeReasonDialog"
       @close="closeReasonDialog"
     >
-      <t-form ref="reasonFormRef" :data="reasonForm" :rules="reasonFormRules" label-width="96px" colon>
+      <t-form ref="reasonFormRef" :data="reasonForm" :rules="reasonFormRules" label-width="100px" colon>
         <t-alert
           v-if="reasonState.type === 'deleteExternal'"
           class="external-delete-warning"

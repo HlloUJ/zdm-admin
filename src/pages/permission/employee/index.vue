@@ -25,7 +25,7 @@
                 @change="handleManagedClientChange"
               />
 
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filterDraft" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="filterDraft" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="姓名" name="name" class="name-filter">
@@ -196,7 +196,7 @@
       @cancel="closeProfileDialog"
       @close="closeProfileDialog"
     >
-      <t-form ref="profileFormRef" :data="profileFormData" :rules="profileFormRules" label-width="96px" colon>
+      <t-form ref="profileFormRef" :data="profileFormData" :rules="profileFormRules" label-width="100px" colon>
         <t-form-item label="姓名" name="name" required-mark>
           <t-input v-model="profileFormData.name" clearable placeholder="请输入" />
         </t-form-item>
@@ -228,7 +228,7 @@
       @cancel="closePermissionDialog"
       @close="closePermissionDialog"
     >
-      <t-form ref="permissionFormRef" :data="permissionFormData" :rules="permissionFormRules" label-width="96px" colon>
+      <t-form ref="permissionFormRef" :data="permissionFormData" :rules="permissionFormRules" label-width="100px" colon>
         <t-form-item label="角色" name="roleIds" required-mark>
           <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择当前组织角色">
             <t-option
@@ -882,14 +882,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-
 .employee-list-layout {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -898,14 +890,14 @@ onMounted(() => {
   min-width: 0;
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields {
@@ -914,24 +906,11 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields :deep(.t-form__item) {
-  width: 220px;
   margin-bottom: 0;
-}
-
-.filter-fields :deep(.t-form__item.name-filter) {
-  width: 200px;
-}
-
-.filter-fields :deep(.t-form__item.role-filter) {
-  width: 180px;
-}
-
-.filter-fields :deep(.t-form__item.status-filter) {
-  width: 150px;
 }
 
 .filter-actions {
@@ -949,12 +928,6 @@ onMounted(() => {
 
 .employee-list-layout :deep(.t-table) {
   width: 100%;
-}
-
-.employee-list-layout :deep(.t-table__th-cell),
-.employee-list-layout :deep(.t-table__td-cell) {
-  padding-left: 16px;
-  padding-right: 16px;
 }
 
 .table-actions {
@@ -1008,15 +981,6 @@ onMounted(() => {
 
   .filter-actions {
     flex-wrap: wrap;
-  }
-}
-
-@media (max-width: 720px) {
-  .filter-fields :deep(.t-form__item),
-  .filter-fields :deep(.t-form__item.name-filter),
-  .filter-fields :deep(.t-form__item.role-filter),
-  .filter-fields :deep(.t-form__item.status-filter) {
-    width: 100%;
   }
 }
 </style>

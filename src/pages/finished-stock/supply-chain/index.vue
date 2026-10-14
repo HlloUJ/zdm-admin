@@ -75,7 +75,7 @@
                     :label="tab.label"
                   />
                 </t-tabs>
-                <t-form class="zdm-admin-filter-form" label-width="auto" :data="currentFilter" colon>
+                <t-form class="zdm-admin-filter-form" label-width="100px" :data="currentFilter" colon>
                   <div class="filter-row">
                     <div class="filter-fields">
                       <t-form-item label="商品">
@@ -953,7 +953,7 @@
       @cancel="closeReasonDialog"
       @close="closeReasonDialog"
     >
-      <t-form :data="reasonForm" label-width="96px" colon>
+      <t-form :data="reasonForm" label-width="100px" colon>
         <t-form-item label="下架原因" required-mark>
           <t-select v-model="reasonForm.reason" placeholder="请选择">
             <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />

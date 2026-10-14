@@ -929,14 +929,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .publish-confirm-content {
   color: var(--td-text-color-primary);
-  font-size: 14px;
+  font-size: var(--td-font-size-body-medium);
   line-height: 22px;
   overflow-wrap: anywhere;
 }
 .list-controls {
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .scope-controls {
   min-width: 0;

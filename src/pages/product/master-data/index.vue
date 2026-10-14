@@ -12,7 +12,7 @@
         </header>
         <t-alert theme="info" class="page-tip">{{ config.tip }}</t-alert>
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon
+          <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon
             ><div class="filter-row">
               <div class="filter-fields">
                 <t-form-item :label="config.entityName"
@@ -62,7 +62,7 @@
       width="520px"
       confirm-btn="提交"
       @confirm="submit"
-      ><t-form :data="form" label-width="96px" colon
+      ><t-form :data="form" label-width="100px" colon
         ><t-form-item :label="`${config.entityName}名称`"><t-input v-model="form.name" clearable /></t-form-item
         ><t-form-item :label="config.codeLabel"
           ><t-input v-model="form.code" clearable :placeholder="config.codePlaceholder" /></t-form-item
@@ -233,72 +233,15 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border-bottom: 1px solid var(--td-component-border);
-}
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 4px;
-  background: var(--td-brand-color);
-  color: #fff;
-  font-weight: 700;
-}
-.brand-title {
-  font: var(--td-font-title-medium);
-}
-.brand-subtitle {
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
-}
-.top-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--td-text-color-secondary);
-}
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
 .page-tip,
 .filter-card {
-  margin-bottom: 16px;
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 .filter-card,
 .table-card {
-  padding: 24px;
   background: var(--td-bg-color-container);
-  border-radius: 6px;
-  border: 1px solid var(--td-component-border);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 .filter-row,
 .filter-fields,
@@ -307,7 +250,7 @@ onMounted(loadData);
 .table-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-row {
   justify-content: space-between;
@@ -320,11 +263,11 @@ onMounted(loadData);
 }
 .table-toolbar {
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: var(--td-comp-margin-xxl);
   color: var(--td-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--td-font-size-body-medium);
 }
 .table-actions {
-  gap: 12px;
+  gap: var(--td-comp-margin-s);
 }
 </style>

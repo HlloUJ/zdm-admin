@@ -17,7 +17,7 @@
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
                 <div class="source-caption">通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="分类名称" name="keyword">
@@ -139,7 +139,7 @@
       @opened="restorePageScroll"
       @closed="restorePageScroll"
     >
-      <t-form v-if="formVisible" ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form v-if="formVisible" ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item v-if="formData.parentId" label="上级分类"><t-input :value="parentName" disabled /></t-form-item>
         <t-form-item label="分类名称" name="name" required-mark
           ><t-input v-model="formData.name" :maxlength="20" clearable placeholder="请输入，最多20个字符"
@@ -734,61 +734,6 @@ onMounted(loadCategories);
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border-bottom: 1px solid var(--td-component-border);
-}
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 4px;
-  background: var(--td-brand-color);
-  color: #fff;
-  font-weight: 700;
-}
-.brand-title {
-  font: var(--td-font-title-medium);
-}
-.brand-subtitle {
-  color: var(--td-text-color-placeholder);
-  font: var(--td-font-body-small);
-}
-.top-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-.user-entry {
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-  color: var(--td-text-color-secondary);
-}
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
 .page-tip {
   margin-bottom: 16px;
 }
@@ -798,7 +743,7 @@ onMounted(loadCategories);
 .list-controls {
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .scope-controls {
   min-width: 0;
@@ -806,7 +751,7 @@ onMounted(loadCategories);
 .source-caption {
   margin-top: var(--td-comp-margin-s);
   color: var(--td-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--td-font-size-body-medium);
 }
 :deep(.zdm-admin-list-layout__toolbar) {
   display: block;
@@ -816,16 +761,15 @@ onMounted(loadCategories);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
   margin-bottom: 0;
 }
 .filter-fields :deep(.t-input),
@@ -848,11 +792,6 @@ onMounted(loadCategories);
 .category-name-cell {
   display: flex;
   align-items: center;
-}
-:deep(.t-table th),
-:deep(.t-table td) {
-  padding-left: 24px;
-  padding-right: 24px;
 }
 
 /* Keep the drag marker at the row edge without a full data-column gutter. */
@@ -920,11 +859,6 @@ onMounted(loadCategories);
   }
   .filter-actions {
     flex-wrap: wrap;
-  }
-}
-@media (max-width: 720px) {
-  .filter-fields :deep(.t-form__item) {
-    width: 100%;
   }
 }
 </style>

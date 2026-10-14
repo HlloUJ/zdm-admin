@@ -1,0 +1,967 @@
+{
+  "version": 1,
+  "approvedScope": "All current frontend pages and shared visual components; visual changes only. Preserve script, fields, copy, structure, events, permissions and APIs.",
+  "backup": {
+    "name": "重构前版本",
+    "snapshot": "d245b38bfba0f541943e0263428c5646de275a29"
+  },
+  "approvedVisualFiles": [
+    "src/App.vue",
+    "src/components/AdminSideMenu.vue",
+    "src/components/AdminTopNav.vue",
+    "src/components/ProductRichEditor.vue",
+    "src/components/foundation/AdminConfirmDialog.vue",
+    "src/components/foundation/AdminDialog.vue",
+    "src/components/foundation/AdminListLayout.vue",
+    "src/components/foundation/AdminMediaUpload.vue",
+    "src/components/foundation/AdminPageFrame.vue",
+    "src/components/foundation/AdminPageHeader.vue",
+    "src/components/foundation/AdminPagination.vue",
+    "src/components/foundation/AdminPaginationBar.vue",
+    "src/components/foundation/AdminSectionCard.vue",
+    "src/components/foundation/official/AdminDetailPage.vue",
+    "src/components/foundation/official/AdminFormDialog.vue",
+    "src/components/foundation/official/AdminListPage.vue",
+    "src/components/foundation/official/AdminOfficialMediaUpload.vue",
+    "src/components/permission/PermissionAssignmentMatrix.vue",
+    "src/components/product-logs/ProductLogFieldValue.vue",
+    "src/components/product-logs/ProductOperationLogTemplate.vue",
+    "src/pages/accessory/attribute/index.vue",
+    "src/pages/craft/finished-stock/index.vue",
+    "src/pages/customer/index.vue",
+    "src/pages/dashboard/index.vue",
+    "src/pages/employee-invite/index.vue",
+    "src/pages/finished-stock/attribute/index.vue",
+    "src/pages/finished-stock/management/components/FinishedAttributeChanges.vue",
+    "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue",
+    "src/pages/finished-stock/management/components/FinishedEditChanges.vue",
+    "src/pages/finished-stock/management/components/FinishedLogValue.vue",
+    "src/pages/finished-stock/management/components/FinishedOperationLogs.vue",
+    "src/pages/finished-stock/management/components/FinishedRowWarnings.vue",
+    "src/pages/finished-stock/management/components/FinishedSalesLogTable.vue",
+    "src/pages/finished-stock/management/components/HistoricalRichText.vue",
+    "src/pages/finished-stock/management/components/PriceSourceToggle.vue",
+    "src/pages/finished-stock/management/components/ProductDetail.vue",
+    "src/pages/finished-stock/management/components/SalesLogFullscreen.vue",
+    "src/pages/finished-stock/management/components/SourceUnavailableOverlay.vue",
+    "src/pages/finished-stock/management/components/SpecPriceInput.vue",
+    "src/pages/finished-stock/management/index.vue",
+    "src/pages/finished-stock/shared/StoreFinishedStockDetailAdapter.vue",
+    "src/pages/finished-stock/shared/StoreFinishedStockPoolDetailAdapter.vue",
+    "src/pages/finished-stock/shared/index.css",
+    "src/pages/finished-stock/store/StoreFinishedEditor.vue",
+    "src/pages/finished-stock/store/index.css",
+    "src/pages/finished-stock/store/index.vue",
+    "src/pages/finished-stock/store/price-configuration.vue",
+    "src/pages/finished-stock/supply-chain/index.vue",
+    "src/pages/login/index.vue",
+    "src/pages/permission/employee/index.vue",
+    "src/pages/permission/terminal-function/index.vue",
+    "src/pages/product/attribute/index.vue",
+    "src/pages/product/attribute-value/index.vue",
+    "src/pages/product/category/index.vue",
+    "src/pages/product/category-attribute-template/index.vue",
+    "src/pages/product/markup-configuration/index.vue",
+    "src/pages/product/master-data/index.vue",
+    "src/pages/role/management/index.vue",
+    "src/pages/slab/color/index.vue",
+    "src/pages/slab/grade/index.vue",
+    "src/pages/slab/management/components/SlabProductFormLayout.vue",
+    "src/pages/slab/management/components/SlabRowWarnings.vue",
+    "src/pages/slab/management/index.vue",
+    "src/pages/slab/origin/index.vue",
+    "src/pages/slab/shared/index.css",
+    "src/pages/slab/supply-chain/index.vue",
+    "src/pages/slab/texture/index.vue",
+    "src/pages/slab/variety/index.vue",
+    "src/pages/store-category/management/index.vue",
+    "src/pages/store-level/management/index.vue",
+    "src/pages/supplier/management/index.vue",
+    "src/pages/supplier/supply-type/index.vue",
+    "src/pages/tenant/management/index.vue",
+    "src/pages/tenant/store/index.vue",
+    "src/styles/index.css"
+  ],
+  "contracts": {
+    "src/App.vue": {
+      "script": "05dbda4a0b8e8776a452a74a9e253a2c5881c765ea2a4047075361eb4c082548",
+      "template": "4e45079a9aa83f22b1bedde4c74ed4ab46283fd1f42bec45a8664350c330291e"
+    },
+    "src/__tests__/auth.test.ts": {
+      "content": "5932d6391201740f4ff17030da1f89564bc7f2e4fd635f7fd89fec8987cc6d61"
+    },
+    "src/__tests__/http.test.ts": {
+      "content": "c4bf737da018f04a942fd589da8829c676692c36ef445fabd8da2baeafe5869b"
+    },
+    "src/__tests__/sessionExpiry.test.ts": {
+      "content": "04179e021f4142722ebe39a18bb3fd0cd5b3fa40cb979bdb5e5dc73d8423b795"
+    },
+    "src/components/AdminSideMenu.vue": {
+      "script": "f52b00a25f57aa54dec8335839182309ed10324623fc0918cd00cdc5fc9e71be",
+      "template": "3431a9cae80c6bfcbe4ea75e7cda3ad0f4327e022a05e8588eb89688a77850e0"
+    },
+    "src/components/AdminTopNav.vue": {
+      "script": "98b6f6dccb8f55f21788fdac1207ec00fb888d3c10f1ca69062e509c2f2b961c",
+      "template": "33a5309ec0f8a250fcc58653946e626be74ea80c9d96455d9c642c6646dc724f"
+    },
+    "src/components/ProductRichEditor.vue": {
+      "script": "91461d178753da07a603a2bf6bca63fde24723753f6c6b5b7cd55c3b5ef81b7d",
+      "template": "5f80de8c9ab517acb043ea4d06c2884d7fe7bd9551e0f3e48c034b3e6f77b27f"
+    },
+    "src/components/foundation/AdminConfirmDialog.vue": {
+      "script": "d862bb54aaaeea4738bdf7cbed53f72f1d5c346abbcf5c186955139c358b0441",
+      "template": "0151079d2a81f739ad7ea591c6bfeaa170db180fd6aaeec655875f096f52c7fc"
+    },
+    "src/components/foundation/AdminDialog.vue": {
+      "script": "4c08e5d71115198f1ffb0bf2b9c74487e220ba73becc36224f3deafd96c56c2c",
+      "template": "29cef91425fac4697daa7cb8452425e0c92e04267d83efc96d1414a84a821fb5"
+    },
+    "src/components/foundation/AdminListLayout.vue": {
+      "script": "439083f38956ba51ece90631552c6ea23c5c29570d3d5710e408e77e01ba7375",
+      "template": "3d9de74e3b25ff9269dfc01d9ce3bca7e8e95466a08b2cd0f598fb3d16c431cf"
+    },
+    "src/components/foundation/AdminMediaUpload.vue": {
+      "script": "fcea0a09f237e444605264493b0eb6a7f5e6c33c9434472800e2eebd690a2854",
+      "template": "0732b9cae4262adb5eedbd87a8be094ad8366819821a9178524f4783cbfe76a1"
+    },
+    "src/components/foundation/AdminPageFrame.vue": {
+      "script": "439083f38956ba51ece90631552c6ea23c5c29570d3d5710e408e77e01ba7375",
+      "template": "b8ef26c4de0bfaec908d818a7cbac31093dd5a3be702b0b955ded3037fc536c7"
+    },
+    "src/components/foundation/AdminPageHeader.vue": {
+      "script": "1acd8d550330e0b1af2f6f877ddd7dd93caecfaa1deddf690355dc245b14d112",
+      "template": "5bb9dc7fc9f78b4125c539e35164a6a676775aab0675f4ef22383b95f4ed98dd"
+    },
+    "src/components/foundation/AdminPagination.vue": {
+      "script": "e815a92ed8e911cd62d8873835d5a1faf4232b32873c48ec6d857c8e08da59bd",
+      "template": "21ca24ad865c79598b8a1aee932936160bd006d0b1ae8b8e3b605fd6ba92c95a"
+    },
+    "src/components/foundation/AdminPaginationBar.vue": {
+      "script": "63045a5a3430bc17bedebe6585ec9974cdd02b64c2305519b82d903d4d9d7a32",
+      "template": "ae3f070cffb40192164a0c933d9d463cb1a38e2e69e6437a96071815b2938a59"
+    },
+    "src/components/foundation/AdminSectionCard.vue": {
+      "script": "22b85dd9d735c1d93382744983e8ca6a469c2a06cad588d3f8e389dd0153f8ff",
+      "template": "ff9ccae41dafede6771f87bdeb4de41d68b48dbebcdcbff4351fb2f533011dac"
+    },
+    "src/components/foundation/feedback/adminFeedback.test.ts": {
+      "content": "5e09c977ea1a539a869509955fc18d0051f8eb3be93eb74eba910b5ab9258b0c"
+    },
+    "src/components/foundation/feedback/adminFeedback.ts": {
+      "content": "e90267cc81e1b379f9cae38d24448c5521d76ec1cd90f0534f9e5c5a44cc6ac7"
+    },
+    "src/components/foundation/index.ts": {
+      "content": "88946c65a9663770825bfb8daca7035223d69016d20b71da31f54cfc02a693f7"
+    },
+    "src/components/foundation/official/AdminDetailPage.vue": {
+      "script": "475cf799878f5678687b92989335b1382b5fd43f149b835694a51d230d53959c",
+      "template": "bb9e409cb732613b540ed614bf902c5e498ab0fd541f66c4e7645c34be58dc6e"
+    },
+    "src/components/foundation/official/AdminFormDialog.vue": {
+      "script": "9d0582f0f084127114a3d077e6901a45c209be670aad3710b9a8095bd9457217",
+      "template": "029d84f7518d90c391697576490cc9a40f676b4b9f4c5ce699932da13826174d"
+    },
+    "src/components/foundation/official/AdminListPage.vue": {
+      "script": "9afaf73d9fdb05b9d1db2292627f1ed07a4adedd84edd8804698a7b12e3dd738",
+      "template": "e9a01ac55f3d006e202849b94af2e3539e9217e423dcc09c9c4fcda96de3650e"
+    },
+    "src/components/foundation/official/AdminOfficialMediaUpload.vue": {
+      "script": "993729798d17655ae4bfa6a056649522e289824ce4af7f0eae34d2a1c43d76bd",
+      "template": "1a0c4d85759b8fb7d2220fc341754eec4dd3d99f90d895e4563eb0bfbbfd6d8f"
+    },
+    "src/components/foundation/official/types.ts": {
+      "content": "be5f26601cf46831f3c63105560cc443d3510684f34a284a7ec139e6eafad6f0"
+    },
+    "src/components/permission/PermissionAssignmentMatrix.vue": {
+      "script": "9e3ab7e39c2e169a90c4b46a135ddf3f1e349c7d3731dcc2cd579510fc20df35",
+      "template": "1f9beeab636a6f608ca09ae90eb578cd37466e8f7544abbcbc4252e4f0762eb8"
+    },
+    "src/components/product-logs/ProductLogFieldValue.vue": {
+      "script": "a305a831aa704603fafbee01751453c24cefebce279ddfe4d620520e92c88fc8",
+      "template": "991e12b09b99fda7def2bdc03995ff7e48c3fb6dabc4edf21515ae4214eba8a5"
+    },
+    "src/components/product-logs/ProductOperationLogTemplate.vue": {
+      "script": "6e060c460b78e8a651cb5e20f9460fbf68c21b07ac9bae0355810122cd877407",
+      "template": "e047ee1a8bdd954bcb263f650bae7a8d28f0239385ef700f0d76ab8620daa0ad"
+    },
+    "src/composables/usePermissionTabs.test.ts": {
+      "content": "7a61664e131e16820aef1e119c13e06909da8829c42e9d61b30cff304a9ab5ed"
+    },
+    "src/composables/usePermissionTabs.ts": {
+      "content": "d779647933108d50850d1ed3ec768ed5f826fb689d71a8ba745742e6a55271f9"
+    },
+    "src/composables/useSideMenuState.ts": {
+      "content": "cc614fbbe905b037733abf227a18f25b8a37d153076efb07ff2ae202b30a8d89"
+    },
+    "src/env.d.ts": {
+      "content": "e1d9280879abba242cf75ada429b666e833fe7122d07cb2354142a01fddce58b"
+    },
+    "src/main.ts": {
+      "content": "78f494eac5ca559e2eab09afbaa3a9b49d4fa76ad06c6971b3c50cd792103173"
+    },
+    "src/pages/accessory/attribute/index.vue": {
+      "script": "c2dc0b206f50c090b167033dfc72886d866f348cdad2e7d3862ed15024e5bf43",
+      "template": "29556057f41aa1aeccd23b2808dcd292f9cafb55973d48062d0f939c7553dda7"
+    },
+    "src/pages/craft/finished-stock/index.vue": {
+      "script": "b8d16a2c14fe374d9937421d12b4253317eb9d36fb1177ef280d275c16e63aea",
+      "template": "4d75ad5f0400a7831119acf81a43a1232c6326ae2e19a1d9c96131367c443319"
+    },
+    "src/pages/customer/index.vue": {
+      "script": "685e25dc20bf7227c017d93bedfd12e93f7eb95dc6093676eb6f0af1eadb06eb",
+      "template": "9d97ca80e7921fbb1ecc7d9e43b597c5c4d528eb22c2bfd280e9ad8639d78448"
+    },
+    "src/pages/dashboard/index.vue": {
+      "script": "85f040177e18b7a1b63599df6a217bf0b36424b2733fd7c345c6177510f620a7",
+      "template": "e388f2b99cbd0ee5a61728036a9c67fd343a7233b37ce2fd17ac425d866a248c"
+    },
+    "src/pages/employee-invite/index.vue": {
+      "script": "b6132fe407ef9585086b8ef474e12b419ba0e1629d464f30847477aa1828fd0c",
+      "template": "675da1f23638ccf9aa543742ef7d511c2acbf29ec594fbbb389e6d4f4ad82ab4"
+    },
+    "src/pages/finished-stock/attribute/index.vue": {
+      "script": "dd2c66b82411ea4368492a70366b92ffc3cd5a21a8065db05ae6972c45ecd0ef",
+      "template": "c67f2621b79fdd8f468cab03573a8256fd0d84612dd6aba4b34069058ff7ff45"
+    },
+    "src/pages/finished-stock/management/components/FinishedAttributeChanges.test.ts": {
+      "content": "1b3eea4bb0c1cc2bdb646697b432328652a03dd45b8fae7ee02837e77d8b60b3"
+    },
+    "src/pages/finished-stock/management/components/FinishedAttributeChanges.vue": {
+      "script": "655d53e4790bac428925ab59360644fa874573c3fd390fc90336f77a1612b1be",
+      "template": "6b8354b46b0af1b33bc636348b1d4dbf400f69e3f756d92f4c1b42d3f8269d3c"
+    },
+    "src/pages/finished-stock/management/components/FinishedCreationSnapshot.test.ts": {
+      "content": "da8493cd012aa24d843cded88314072a75bbb40fb50cb3a63549f1c00e875ff9"
+    },
+    "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue": {
+      "script": "ac1f8e0c9aa0a588982cd8f19e7f50eca23855f58a6f1f5e644a4636b65b4d00",
+      "template": "0eccd8eaafc1464e1cf2afacb2795a9262de7a9d39eb02c78785813010acb3a2"
+    },
+    "src/pages/finished-stock/management/components/FinishedEditChanges.test.ts": {
+      "content": "66c6fcf1cfb8d2257a1d0545e91657ba70d1600b09e5e56039f220bc9219494e"
+    },
+    "src/pages/finished-stock/management/components/FinishedEditChanges.vue": {
+      "script": "180832978022c035424aa717abe35ca13c47f641b852ed9cd905cbccf599106c",
+      "template": "23cc2d16759bd67aaf5e79abfaad7d20c53a1c49ed8d153342ca9ab6c980ca95"
+    },
+    "src/pages/finished-stock/management/components/FinishedLogValue.test.ts": {
+      "content": "582b0087be4fe823dce4813e45c0c4c31778e5723e4a022ff64549fdac32a3ea"
+    },
+    "src/pages/finished-stock/management/components/FinishedLogValue.vue": {
+      "script": "cf9f9e715feb729ebb16dbbf5cbe2eed47663367d59823bff94ae587140bc12d",
+      "template": "3701f26dfabb9ca6830ba4328f5788a292add8dc7f3f8422efeb8d0e933d5dad"
+    },
+    "src/pages/finished-stock/management/components/FinishedOperationLogs.test.ts": {
+      "content": "e4455e787acbcf4a6a2fe0ae165bc9fc7e741b7beb4243b29fd6d68794f2d507"
+    },
+    "src/pages/finished-stock/management/components/FinishedOperationLogs.vue": {
+      "script": "25b8c58b362e281f05e9d437f4273d903ea75290ab32026111c905df6767bef2",
+      "template": "0226fd57225b2078eec996ce39bc88ffb3d63a4d39fc6975499848203db19073"
+    },
+    "src/pages/finished-stock/management/components/FinishedRowWarnings.vue": {
+      "script": "1552d1f1f7ecd1c3fd828bb6ced3be142b144a84b637e94a2c8448c2b8603f76",
+      "template": "caf775530697a897c7b54d1bcb7ea61d645b2974557033baea6f3bef41e1bfa4"
+    },
+    "src/pages/finished-stock/management/components/FinishedSalesLogTable.test.ts": {
+      "content": "94930854935a81234903837f01de221469958d698abf11f58cba68d9e4e1a314"
+    },
+    "src/pages/finished-stock/management/components/FinishedSalesLogTable.vue": {
+      "script": "8dde40e7e781e74f6b6ef2648e1240870be85b183e2fdaa8925dae6ad0e45eb0",
+      "template": "e1c3c75dd26a35f84d110982fa0f5eab7a7eaaf827f6c2a5ad9af8753399af06"
+    },
+    "src/pages/finished-stock/management/components/HistoricalRichText.test.ts": {
+      "content": "1ff83f4bbf891a5167b328f78ed1581168a6726e383f15a51c5187181321ade8"
+    },
+    "src/pages/finished-stock/management/components/HistoricalRichText.vue": {
+      "script": "80b745502e2a3403b002543d152e2cf352e0b8a54098a1bf34fd6edd8660f673",
+      "template": "afed7fa4729de4c15a49973275352a7e0fbe1957cea819fb6b01863ec8dd1356"
+    },
+    "src/pages/finished-stock/management/components/PriceSourceToggle.vue": {
+      "script": "f910777424dcd9ead92800ea82e34c1e5743cd3a4c4718344495674085da0f58",
+      "template": "494f45e0aaac1d0378c122326bf11f1d5ecd92f6a6a6ffa13e01c19e2065b701"
+    },
+    "src/pages/finished-stock/management/components/ProductDetail.test.ts": {
+      "content": "d0dd1551df0df040612485d5ccb2fa103997f68fa45836121b986e9c7526d496"
+    },
+    "src/pages/finished-stock/management/components/ProductDetail.vue": {
+      "script": "c677aa417ec183af4484919bffb9542dd3ae19cee1eb8ea6b6fe83cf0133b4c5",
+      "template": "1ac38f2553214c0f378bfb29b8714b53ebb6685c63bd0f79c640a44eec79225b"
+    },
+    "src/pages/finished-stock/management/components/SalesLogFullscreen.test.ts": {
+      "content": "29a72af04cfa6dfa95055a0b01f44416fad03bb4ffc1c8c7ac7c2eecbddf09e3"
+    },
+    "src/pages/finished-stock/management/components/SalesLogFullscreen.vue": {
+      "script": "ef1c231aea5b4fff012a3bc65d963913a213a366182098aef761e80e2f739d6b",
+      "template": "eca670f70423ce22447d413768206482579d6f73da08961d5e996593b4c528c7"
+    },
+    "src/pages/finished-stock/management/components/SourceUnavailableOverlay.vue": {
+      "script": "da6e2adff597920b168a0df8ca61a95ed376f06f138edf4de6df8384d14e618e",
+      "template": "68ca9c8800eb86ef4c69f32cd94caabaf27aac7ae05b6eff8b541245438061f1"
+    },
+    "src/pages/finished-stock/management/components/SpecPriceInput.vue": {
+      "script": "6fa2a1e5b09907a636e236694dff0b57da3515c66eba741b6a7923c593ce7f41",
+      "template": "5f94a8feb408b4e66bd8a6715bbe7a023a23092d6e88217f09514f26a4717027"
+    },
+    "src/pages/finished-stock/management/index.vue": {
+      "script": "94b21bac2c10aec59df17259ae9f5922a16fd0a29d84ea78228fe300db5fca5a",
+      "template": "bb99f54b1d202688b357254852f4b439172010438903d7e4878d59a101361c51"
+    },
+    "src/pages/finished-stock/management/layeredSpecs.test.ts": {
+      "content": "2412ee03460ff2409c9736fbc4d14d891763cbc368085fc1a3bdf9ee94ab150f"
+    },
+    "src/pages/finished-stock/management/layeredSpecs.ts": {
+      "content": "05ca5e7829705805c52509a7312925161f6bcc902335e364d04023e3c62715e9"
+    },
+    "src/pages/finished-stock/management/offShelfSorting.test.ts": {
+      "content": "50fa807fb692004d40754821f5e0cc29dea8dd47ed7ead3ce3a9e465470c1077"
+    },
+    "src/pages/finished-stock/management/offShelfSorting.ts": {
+      "content": "633aa531a6d1fa000a451fcf5eb5176cffca2bb7bc12fdb521ec0b7559b9cb65"
+    },
+    "src/pages/finished-stock/management/priceLogSnapshot.ts": {
+      "content": "e5e1215abd2056c90ad16901524a8717e4d0a3c6b1e32d6366832743629a5621"
+    },
+    "src/pages/finished-stock/management/priceValidation.ts": {
+      "content": "3ff27104e558c191a9c740c27f44ea04775c1c55d98b4c2e00b42c92ef79089f"
+    },
+    "src/pages/finished-stock/management/productFormState.test.ts": {
+      "content": "be2795a755de45bc7048043aaea47d7d7ae5b2db1718a1fa8c9d7b3ab11fda2e"
+    },
+    "src/pages/finished-stock/management/productFormState.ts": {
+      "content": "037337c58f8a7f25ea0e60612ce80bda69193d6e06efb551e80dc85b1f623aa0"
+    },
+    "src/pages/finished-stock/management/specModeConversion.test.ts": {
+      "content": "0fdfb032e107a090fccd95bd62c42784b04ae97394edb539bd259175faf1fe24"
+    },
+    "src/pages/finished-stock/management/specModeConversion.ts": {
+      "content": "5b6f9dc5d31c6005e0b3d29f10465297f0c44aa541bb97cd3d501e80c08cf26a"
+    },
+    "src/pages/finished-stock/shared/StoreFinishedStockDetailAdapter.vue": {
+      "script": "da99f71bcc465264b9814d1392394df4c1f186f8585a8767504d613085d4835c",
+      "template": "3bd93506578298ba2743ecabf8df1f531c10adb3974b65716c710498ce58dc4b"
+    },
+    "src/pages/finished-stock/shared/StoreFinishedStockPoolDetailAdapter.vue": {
+      "script": "9b807c50d065952daf3bc95e549af8c4ecc1b3ece472680924d8f91f7dd9eeae",
+      "template": "1929b9d23c12c448f2ad0b5ba772fb61bd8ddafc2f37d5bd4ef5dcf788cb0691"
+    },
+    "src/pages/finished-stock/shared/finishedStockActions.ts": {
+      "content": "d4ba84aac2dc6dad94c7f130b3bad4a21824749f6ee5ceb67eaf1c42c60ffa05"
+    },
+    "src/pages/finished-stock/shared/finishedStockFormValidation.test.ts": {
+      "content": "07bdb6009f46904fa37ab9bfd6e5d5b00d93fa7201bf1932da8cf77c283ca23c"
+    },
+    "src/pages/finished-stock/shared/finishedStockFormValidation.ts": {
+      "content": "e0868b42412fab7c13e8e1c2b584e499b1ade9c59168e04034d7b18b68ea2403"
+    },
+    "src/pages/finished-stock/shared/finishedStockListFilter.ts": {
+      "content": "372881902779d3d5d7047cbf910bdfc12c918867d5e0ef833b0212bfb3480b98"
+    },
+    "src/pages/finished-stock/shared/finishedStockPageModel.ts": {
+      "content": "e2d9082c5cd7a900a4334e332a69b73c7bace01b2fde276467dd8717a577b1c3"
+    },
+    "src/pages/finished-stock/shared/finishedStockPayload.ts": {
+      "content": "d471afb7a54db6a3c79af9b16f1605915b5e5227cd29acbc1c2df6280f38365b"
+    },
+    "src/pages/finished-stock/shared/finishedStockPriceEditor.ts": {
+      "content": "dce2fff3816ce73c57567d7a801090a23a6084991365f9e0766ccba7fe346f60"
+    },
+    "src/pages/finished-stock/shared/finishedStockSpecRows.ts": {
+      "content": "c6fec52618fe8a7f4d090409d3cda0144f11c2e17642a177e50eb29b860efcb3"
+    },
+    "src/pages/finished-stock/shared/finishedStockTemplateFields.ts": {
+      "content": "e3759fce2034d84392e65ad90ccac64525618a0f88ce8e588e213b8f04931be4"
+    },
+    "src/pages/finished-stock/shared/useFinishedStockSpecDialog.ts": {
+      "content": "ca96e9254792eced347b7aaa397858dcc95b260e76e0c4b99435696cdb2797ff"
+    },
+    "src/pages/finished-stock/store/StoreFinishedEditor.vue": {
+      "script": "86cb444193694926412944343d837251411ac192c387e6573b75f0be111e324e",
+      "template": "13e59fbb35dd1cfe4c2803b64684cc35d23a7b852df08ad2b6ecc4b083084580"
+    },
+    "src/pages/finished-stock/store/index.vue": {
+      "script": "9f3128f29756dfab485f8adf3ebaa74e9d05724e2c7d3746dd1920bc55a74dbf",
+      "template": "a62d729be2ab3ea4325042db4d4d1580bb55bdf2cb7afb78e827f86d0f7f4dea"
+    },
+    "src/pages/finished-stock/store/price-configuration.vue": {
+      "script": "75d9397a56222144493f74c7f20438b35f39edbce7d3ff0dd146f92645e4a435",
+      "template": "ebb4878bc7f0fc8b0b22a500a07cfd0d164e2544418482624da67cf5bf2285d3"
+    },
+    "src/pages/finished-stock/store/salePriceDraft.test.ts": {
+      "content": "bdb660f3ac57a71a88dbd7e6d3701d64c67ad89d24278a52e467c7e43f6b0e1b"
+    },
+    "src/pages/finished-stock/store/salePriceDraft.ts": {
+      "content": "a4e40a58b212273cd0ad135c4f3cd7835793e130be60e7968b863f2355c6f41d"
+    },
+    "src/pages/finished-stock/store/storeOperationLog.test.ts": {
+      "content": "4c2672a9ae5695dca2202ccac47eb78018d77b5ed5eb80be1012f0040b5a4ec7"
+    },
+    "src/pages/finished-stock/store/storeOperationLog.ts": {
+      "content": "1e869ae0affc7a9c41401b92b336e0d29e509a4e3c1522374b5d145bf913f97b"
+    },
+    "src/pages/finished-stock/store/useStoreFinishedLogs.ts": {
+      "content": "8d2b64f25022cd737ea9a84ad34a9253571172cabbd6d1c6de3cb9dd229cefd7"
+    },
+    "src/pages/finished-stock/supply-chain/index.vue": {
+      "script": "851647590db2f97118f7c7d89620db0ecd8d9ca380e6595f196a173490e503b4",
+      "template": "35bc188eb018465e9c51cf1bdac516cb6611b062264adc6f777a756da4d8acb4"
+    },
+    "src/pages/login/index.vue": {
+      "script": "cf0abe436abb83c3dd3c74cf1016e7e6c58e1d55b729a0695e2728a7da17329b",
+      "template": "2375aeed4a883a1d91fbb4d52e0e99269c18e553dc2777dbef87beb6b6a1793a"
+    },
+    "src/pages/permission/employee/index.vue": {
+      "script": "a38df14fc9233f16857475d5e8d2b88c554a9c03486b2dd290337e182aea0f98",
+      "template": "7535814f89c83ef06b0bd4fa44ed1a648367b2e16499229a3aaceeeb0474d1eb"
+    },
+    "src/pages/permission/terminal-function/index.vue": {
+      "script": "8693054de77c79257011e181a2e85d353d2fc3eb963f8d04296e35b113d46853",
+      "template": "fe03671e590d88f750f5068f2f1bf7c094525518e9983f7b683b115cb592c1b9"
+    },
+    "src/pages/product/attribute/index.vue": {
+      "script": "355f797454534a0c41a2d31bd2f998c67eb81d230e5b015531f9990677cdc68a",
+      "template": "9b0d76b3f24f49fcc5b348ab99016c4866ea9b9739173848e9763d80fc2570b5"
+    },
+    "src/pages/product/attribute-value/index.vue": {
+      "script": "7bd4961cca17c00466c21580292f955db55efc853dc161a99b59ef24ebc73e79",
+      "template": "3416cefc0ba0b6a3247b830cea7d7b030884f0b34ebd40a3b864b3e71fdc1099"
+    },
+    "src/pages/product/category/index.vue": {
+      "script": "bac9287b6ddcfa54e09d8affafc867fe4c6ce9c8445089dae96a0f1bb7d28646",
+      "template": "40ad6e40199f636558f1be5f927228046d582f595f98da8cb00da1a91c47e2ef"
+    },
+    "src/pages/product/category-attribute-template/index.vue": {
+      "script": "cdc86a6d55dfb8008b852e90af3394a28b40fb20fb7d39163efb07f532808b7f",
+      "template": "241593662ea743b574d5b8aeb46503e8887cbe35db7fd214825581b99ef851ea"
+    },
+    "src/pages/product/markup-configuration/index.vue": {
+      "script": "c6fa58a7218a606353f86b4986997e836fb888e3a23a2fcf70a482e548935fe0",
+      "template": "5e3c0a78337d9dfc5455d79cd1734fbfacea060c58f3b27362c9647869b2bf52"
+    },
+    "src/pages/product/master-data/index.vue": {
+      "script": "45655bd3cde366190e3f4511354ea14a2f2c19233d24678a210b9cd397ee8560",
+      "template": "fbf3827054633241618b519bb4fe1005350a317bb9067278ad3dba35d9f9d68d"
+    },
+    "src/pages/role/management/index.vue": {
+      "script": "9d79e7ab1cb56a195c9d17e6689f7d5548140176405a8da0feda187850846104",
+      "template": "c4580de10d8ff4b5fe0a483b6610cd2b8cfee9a13d51ef04423f4ff6802ff753"
+    },
+    "src/pages/slab/color/index.vue": {
+      "script": "98756baa3e2ddaf0531b4c1d309bb6132d4adb9f4d173668dffab9620d1dac7f",
+      "template": "309a4d64ff0d5e9cfb4d6354ccea3fa556fcd860e9fc7dd19bb1cdb7ff2b4253"
+    },
+    "src/pages/slab/grade/index.vue": {
+      "script": "0f8c4511efc2365446c096c47be97b21dc163b3548fff9eeaea25a6eb00bd425",
+      "template": "acab16f761b05d530dc88691f921215c731003eb28eb094c6c3e438d403b913e"
+    },
+    "src/pages/slab/management/components/SlabProductFormLayout.vue": {
+      "script": "b229b2808f032fe370154d8eadb822baea4a408ccb94e5dc073272eb6fe9ece3",
+      "template": "b56eba6fb84d60f23ce8e84d8107e0bdd013edfc55e441db9cdee072434b85ec"
+    },
+    "src/pages/slab/management/components/SlabRowWarnings.vue": {
+      "script": "1552d1f1f7ecd1c3fd828bb6ced3be142b144a84b637e94a2c8448c2b8603f76",
+      "template": "e27f526463e4e6ed58b36605f68095f372d8306bb5c5a06f55a11d5afb36d0ae"
+    },
+    "src/pages/slab/management/index.vue": {
+      "script": "f71d4f197094e545157d2cf5cce6f02cefc619c424f54891066705bace218f4f",
+      "template": "adf809635676231455289b8467a2f73e1366cf276b9ca18bf6ad36e90432e664"
+    },
+    "src/pages/slab/management/priceInteraction.test.ts": {
+      "content": "8e67c5724f73bcb1fde3407104985a5dba22a000835a46a2766fb10cebd0e250"
+    },
+    "src/pages/slab/origin/index.vue": {
+      "script": "ba25b65f6944114f3abf156f0f0bc09b3d35fae8408e9a8c1ad4085dea060ba0",
+      "template": "129e3681275fe6a2c3cf44c811232031f0380873b6d51a2290df30768fd379c6"
+    },
+    "src/pages/slab/shared/operationLogPriceTiers.test.ts": {
+      "content": "29f5e3d1033d9fb0216a8ef76bf88bdb92a0aaee2ee5a6d0bd189ad17a6c8313"
+    },
+    "src/pages/slab/shared/operationLogPriceTiers.ts": {
+      "content": "9c5639fbf6b671606d37a8b2c8c4887726ceca5e09d43b62f4cf9d74479e3be4"
+    },
+    "src/pages/slab/shared/slabFormRules.ts": {
+      "content": "a3f74dc3041c39125c0181b39f14eb99a39862555e8404aa72b26cbec40624df"
+    },
+    "src/pages/slab/shared/slabListFilter.ts": {
+      "content": "0dd9d8474550747540a59b8d6ca025fb1df41d55c45cf4de371330fe65141330"
+    },
+    "src/pages/slab/shared/slabOperationLogPresentation.ts": {
+      "content": "db1a8e2b42f0d19353e51a3012979f17ef640e1245223a2a145d84b953582ea3"
+    },
+    "src/pages/slab/shared/slabPageActions.ts": {
+      "content": "9b94b48e9410881bdd1bfc20dfab93d75b22de3fc581a72f34f1eefea2579427"
+    },
+    "src/pages/slab/shared/slabPageMapping.test.ts": {
+      "content": "52f2eb9813abac607f8e51c16190209317b3b99fe5be917631e6b67083c3950d"
+    },
+    "src/pages/slab/shared/slabPageMapping.ts": {
+      "content": "3e6b1f9e6c9df7f28df99f0abfe1048c770586cc75e2f362657ddefd6dd1e678"
+    },
+    "src/pages/slab/shared/slabPageModel.ts": {
+      "content": "40b03fb3326340845096248764ed124c1fa4484c81cb75ae49eb1d156eff8d26"
+    },
+    "src/pages/slab/shared/slabPriceRows.ts": {
+      "content": "ece95f662a97d707ac9b0dba64a29993091eeb106b6e2393f6aa0fc564193228"
+    },
+    "src/pages/slab/shared/useSlabOperationLogs.ts": {
+      "content": "e2b2e10542fd88e908f9f9825a2a620f1a303961d3387f1b56a0e1640a417f42"
+    },
+    "src/pages/slab/supply-chain/index.vue": {
+      "script": "251b0c61243b185ecf3fc1f2be8a0ef5977321d7ef9e158b8cd9eec781282290",
+      "template": "35c971b52e8a54de2adae17be567e2f469f79fc14d1787e7e390acfe14583627"
+    },
+    "src/pages/slab/texture/index.vue": {
+      "script": "8bba28675bec70ee93d43597733493354c15db4b63f754a91ff512c88145b11e",
+      "template": "7f4a8ad0cdbfdd450822942ce0b5403240bb01557d6f2a6e7a92c9f280a1527a"
+    },
+    "src/pages/slab/variety/index.vue": {
+      "script": "2a367100e3669376bb62e29ddb4d6836dc1a282069a4f1cee0094e4b3a8b6c52",
+      "template": "77a4a82c992a3047e85bccf0a993f5ed0093013f2d9b002bbefbb3ab81cc50e4"
+    },
+    "src/pages/store-category/management/index.vue": {
+      "script": "36a22b814a251acc0b22ba0960d953dcd5f18117bcd79b19b4dd9bc068ba46da",
+      "template": "f66803e97b2532571112434b2f4d13a69537946f70ec1643bfa5deb90074f549"
+    },
+    "src/pages/store-level/management/index.vue": {
+      "script": "0565c64fc13143ef05a5f3a8b366cc2da1b6e5bf15668dd86d62403bae670bb2",
+      "template": "6ad9f1b2a0d4643ebe490a5559cd2848816d2ca46ee8049ee75faa41e2df9602"
+    },
+    "src/pages/supplier/management/index.vue": {
+      "script": "3e34096dd2610205ae941b4c6d28b6f97b92ad6b4fca65330d776ff5e6ca8ff7",
+      "template": "fe2bfdadaf9cd12e1cbc2b2fc951bea5f71768f9adb06749dcd75de69c764c4c"
+    },
+    "src/pages/supplier/supply-type/index.vue": {
+      "script": "2529fc945d92a19cb30ad05bfe25ac996f73b07a665ed41a4ff9823a194dd0d7",
+      "template": "f205df0b3ad2636b6a29b16d700b3fc9bd46f528a5848af9b576edb409a1dc43"
+    },
+    "src/pages/tenant/management/index.vue": {
+      "script": "a46d8642d4b45f39a2f56b9336f1c651f638133bade64f5b20270cbee96a4a15",
+      "template": "c5684e7914d8d9c19dad7543b79cea529837060f0e79307795023f626db2e116"
+    },
+    "src/pages/tenant/store/index.vue": {
+      "script": "20302974491b6c0457334bde17ee5bd4bc098ef5dc94f3e8bdf0a0856aa39e7d",
+      "template": "b42a4559fe9c3a1b184d7d990de786d70078cacaa80c964a64c73daf9dd4f670"
+    },
+    "src/router/index.ts": {
+      "content": "1af3cbde7b7038e1000e7bc297a032bed92eda925dc17d38d9786b4567c38c77"
+    },
+    "src/services/adminPermissions.test.ts": {
+      "content": "c2b730d19068e429232c04b7cd9ad0cb4db1dfc266254c36739c247b65a19316"
+    },
+    "src/services/adminPermissions.ts": {
+      "content": "7e7603f317a8814cb9c6872c2d0bb220ee7d034c8bdb4a2655e2ffb9f4e48edf"
+    },
+    "src/services/auth.ts": {
+      "content": "134279d1224efab5afba09d5036dd764dca7e8962ccf694c9a74cb736b212263"
+    },
+    "src/services/crafts.ts": {
+      "content": "7d017b0a3f0317c01873352e4f7cf6d7035ef806fa04c882ffa9a8d766c7c0ed"
+    },
+    "src/services/customerCatalog.test.ts": {
+      "content": "48ee44f52cc27d9060a6ccdb7b317f44f665955377777479313a8a32fb66e2eb"
+    },
+    "src/services/customers.ts": {
+      "content": "8740dc7f0a54f7bff04922ce51204ba61049d4a9c1075b694c05638cfd9e081a"
+    },
+    "src/services/employeeInvites.ts": {
+      "content": "5b3a4178aed9bd2d26a15c3ecb5cc5ba79fa7267e2bd57b80791f5264b4d1ee0"
+    },
+    "src/services/employees.ts": {
+      "content": "b3cfabc552a463498634bba7bb276891e43a290f7d91d5db633177fbe7a66423"
+    },
+    "src/services/finishedMarkupConfigurations.ts": {
+      "content": "a45e7307d8e6e752d4549a342685ee37305f33e3f86995a7d375288b9875b461"
+    },
+    "src/services/finishedOperationLogs.ts": {
+      "content": "b0c40e934d0d909989db72ff9111004201bce8bf076e897a12c36263fe5f1db4"
+    },
+    "src/services/finishedProducts.ts": {
+      "content": "26004aaf6c1165b901603b9580615be3795a895f0a75d0606378ae21dcb542df"
+    },
+    "src/services/functionAudience.ts": {
+      "content": "72a32d99048b4e9a37151a2267c98a9803a164c9b11ec80e5df89b2497db3068"
+    },
+    "src/services/functionCatalog.test.ts": {
+      "content": "74ccb48297c3d1c6b680750b1e260a63db93b4fe16c97d1d9001ae759868ac67"
+    },
+    "src/services/functionCatalog.ts": {
+      "content": "1209bc105a9465acd24974c6fd642993f1463bc39659f30d418a2eae55f6f190"
+    },
+    "src/services/functionCatalogAdminData.ts": {
+      "content": "f9b8d99e939bd6e5da1ee6e529b82ad8e6c2d5e1ec028d4277dcc1ec301d057a"
+    },
+    "src/services/functionCatalogStoreData.ts": {
+      "content": "39a9ce84ce5c5bedd35582287c540670fbd8ffb0774b8545fdaa553452199a08"
+    },
+    "src/services/functionCatalogSupplyData.ts": {
+      "content": "e82de3f048c120f818b0f1d4b3344242161bc3dab3e42599d3f14bb364885ee3"
+    },
+    "src/services/functionPermissionCompatibility.ts": {
+      "content": "48a37f5ef5fbd2214e05260e920996778a69a012850ab9d585af9d6fb38d87b9"
+    },
+    "src/services/http.ts": {
+      "content": "22725a6e76f7579d796f8d4cfbd4d72ec0c71c0c4b8916d47c1e1a436262794a"
+    },
+    "src/services/masterData.ts": {
+      "content": "8e5c7348b05749d3ff592cd0238749b1b840e658c8ecffc3bb271e1693df0a88"
+    },
+    "src/services/media.ts": {
+      "content": "c15e9a1ec40e6a970c7108c3fd040763ffe055100f65e4e205d9e51337ed3ac5"
+    },
+    "src/services/productAttributeValues.ts": {
+      "content": "28c40a2650c1ceef50d1074fcd5ffbca3bf2346b04f6cd172e146deb218c6dfc"
+    },
+    "src/services/productAttributes.ts": {
+      "content": "66618aa5084f58fc9660e2f8345d69283e4e29a7377a47d8278394f5bf40a730"
+    },
+    "src/services/productCategories.ts": {
+      "content": "e86ebb39221ab6dbc0a3015d2ad4724e0553c8c564ca413725de913c3925c089"
+    },
+    "src/services/productOperationLog.test.ts": {
+      "content": "b5fad8e0dc4058f72d2bb50bb86e285ca88339755e53175d0e6a93f3e0354692"
+    },
+    "src/services/productOperationLog.ts": {
+      "content": "f5a658e633d771320bfca7429be4eb47de8a58827bf89547a7c717dccec5e2ec"
+    },
+    "src/services/productStateActivity.test.ts": {
+      "content": "1458da4ec7682fdfb518f0536545017cefe3ae2719bece6998435e7f0fa83c7c"
+    },
+    "src/services/productStateActivity.ts": {
+      "content": "7342589e51af41298d3f49d9895b2160e3ae2c77a62e9cde91dfaa86a75be53e"
+    },
+    "src/services/recordSorting.test.ts": {
+      "content": "97c940a5873be96b0a35fba2af8f85d67cf053fc0be455a55fe36886bce244fe"
+    },
+    "src/services/recordSorting.ts": {
+      "content": "c7cea967e0b6c50181db9c6f7d90a9b7b609c5664faa9993f5e34d1a6c797df2"
+    },
+    "src/services/roles.ts": {
+      "content": "3313c3d7abade5d115762a769af60e47b9d8054050dec54aa73d4421fd21f160"
+    },
+    "src/services/slabColors.ts": {
+      "content": "804b693f3ee81016aace1f7c4557e4da0b5db70f17bdb1d97daee8471e90ba62"
+    },
+    "src/services/slabGrades.ts": {
+      "content": "080660c55d6fe3c0ef18dba48496fe0a60eff09611965598afe608ac06fc4de2"
+    },
+    "src/services/slabMarkupConfigurations.ts": {
+      "content": "8d7c5611bda0e98d062be8248afc773370864d08a95c10950bff9762657225b5"
+    },
+    "src/services/slabOrigins.ts": {
+      "content": "967d77162d56d8b25799d0a19e8a6c27c412e22020a081c075ae7f1aed67324a"
+    },
+    "src/services/slabTextures.ts": {
+      "content": "ffd3d0efe77a76c7d4b4cd54154bb5c2e115515f85dca4b3c973b6e9458c20f4"
+    },
+    "src/services/slabVarieties.ts": {
+      "content": "ebb6ba6de2ca5c5a9516712b3bf2d5117c41ee142f9a526c5720ba550c1d339c"
+    },
+    "src/services/slabs.test.ts": {
+      "content": "2c5eaa5f29db9aae618c79df80816706e548286c4fd17741b2864ab1d503a8b4"
+    },
+    "src/services/slabs.ts": {
+      "content": "960012eecb4925652dee40c1c802efe7957160437910e2e5f10914109bc24c96"
+    },
+    "src/services/storeCategories.ts": {
+      "content": "45c1f362e3652fe430d6fed421d7913a31fe69efae955170c4e4d717bbaa2a89"
+    },
+    "src/services/storeFinishedStock.ts": {
+      "content": "65eac08f8d07f400e23212357ee2abf50d5d1e8a13787544e7c0568dc9b0f701"
+    },
+    "src/services/storeLevels.ts": {
+      "content": "2998bb28b818a242040df7f906058c1c0b3d0f47dc88153c025c1dcc8c472657"
+    },
+    "src/services/storePriceRules.ts": {
+      "content": "3afe7111c20c200fbb1984a9f6fd4ca1e39ab56e3ec1c277eb9378f60a830711"
+    },
+    "src/services/stores.ts": {
+      "content": "78b9ecc97e398b27ad5874036939a2ca83f8a7ca094daa28254b10257edb6fdd"
+    },
+    "src/services/suppliers.ts": {
+      "content": "7afd5e5a8f0b47c27d4ba385b0f65ca8ed229da746d0285319ab87772a11da41"
+    },
+    "src/services/templateVersions.ts": {
+      "content": "18af334079ab59d511dd5b199a7892054b0db7be40b1ff1532a9b37e46c0a57a"
+    },
+    "src/services/tenants.ts": {
+      "content": "5af91c99793fa116dcc90b117a6c7c4e6369218df2fdd151593f386a7e281f2a"
+    },
+    "src/services/terminalFunctionPolicies.ts": {
+      "content": "e42d61eb43b47133a2563e89af1722fe21c3db194a8f3cbd34b9896acd8b7303"
+    },
+    "src/utils/chinaRegions.test.ts": {
+      "content": "e802ca4f995a4e01af0ed896134cfca9885ae58319643c5266f78896234cb2b8"
+    },
+    "src/utils/chinaRegions.ts": {
+      "content": "651e4d39745b81df667e0921e0706a1b4fd46e7050dc0f83a9ac8f0a12830c2d"
+    },
+    "src/utils/formatProductDateTime.test.ts": {
+      "content": "e71186f67f29bb66f202beb1b566acea1a28c0ed9e5449f1f20669ed55ab765a"
+    },
+    "src/utils/formatProductDateTime.ts": {
+      "content": "c1a24e938c98f323895353af8ca4ed05f4314d77a29ca79d93aa641daab3ceeb"
+    },
+    "src/utils/formatStoreRuleDateTime.test.ts": {
+      "content": "1ed0e5786f70f53b9afcb9e8f67f413efb6187bd7087100e3f8e385d71e78de2"
+    },
+    "src/utils/formatStoreRuleDateTime.ts": {
+      "content": "8dac5b79c7235361b53d2c97d99b747f85311bec808675b5c741b1b414689188"
+    }
+  },
+  "modules": [
+    {
+      "file": "src/pages/accessory/attribute/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/craft/finished-stock/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/customer/index.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/dashboard/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/employee-invite/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/attribute/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedAttributeChanges.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedEditChanges.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedLogValue.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedOperationLogs.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedRowWarnings.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedSalesLogTable.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/HistoricalRichText.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/PriceSourceToggle.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/ProductDetail.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/SalesLogFullscreen.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/SourceUnavailableOverlay.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/SpecPriceInput.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/management/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/shared/StoreFinishedStockDetailAdapter.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/shared/StoreFinishedStockPoolDetailAdapter.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/store/StoreFinishedEditor.vue",
+      "status": "reviewed-preserved",
+      "visualRoute": "already uses official components/tokens or necessary business-specific layout; inherits migrated foundation/global styles"
+    },
+    {
+      "file": "src/pages/finished-stock/store/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/store/price-configuration.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/finished-stock/supply-chain/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/login/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/permission/employee/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/permission/terminal-function/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/product/attribute/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/product/attribute-value/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/product/category/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/product/category-attribute-template/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/product/markup-configuration/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/product/master-data/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/role/management/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/color/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/grade/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/management/components/SlabProductFormLayout.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/management/components/SlabRowWarnings.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/management/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/origin/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/supply-chain/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/texture/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/slab/variety/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/store-category/management/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/store-level/management/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/supplier/management/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/supplier/supply-type/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/tenant/management/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    },
+    {
+      "file": "src/pages/tenant/store/index.vue",
+      "status": "implemented-pending-final-validation",
+      "visualRoute": "official token/component styles; business script and template contract frozen"
+    }
+  ]
+}

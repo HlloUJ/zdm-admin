@@ -12,7 +12,7 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showStoreTabRail" v-model="activeTab" :list="storeTabs" />
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店名称" name="shopName">
@@ -131,7 +131,7 @@
       @cancel="closeFormDialog"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <template v-if="dialogMode === 'create'">
           <t-form-item label="选择租户" name="tenantName" required-mark>
             <t-select
@@ -201,7 +201,7 @@
       @cancel="closeLevelDialog"
       @close="closeLevelDialog"
     >
-      <t-form ref="levelFormRef" :data="levelFormData" :rules="levelFormRules" label-width="96px" colon>
+      <t-form ref="levelFormRef" :data="levelFormData" :rules="levelFormRules" label-width="100px" colon>
         <t-form-item label="门店级别" name="storeLevelId" required-mark>
           <t-select v-model="levelFormData.storeLevelId" clearable filterable placeholder="请选择">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -745,7 +745,7 @@ onMounted(loadStorePage);
 .list-controls {
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 :deep(.zdm-admin-list-layout__toolbar) {
@@ -757,27 +757,18 @@ onMounted(loadStorePage);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
   margin-bottom: 0;
-}
-
-.filter-fields :deep(.t-form__item.shop-type-filter) {
-  width: 220px;
-}
-
-.filter-fields :deep(.t-form__item.compact-select-filter) {
-  width: 168px;
 }
 
 .filter-actions {
@@ -792,23 +783,23 @@ onMounted(loadStorePage);
 }
 
 .shop-type-tag.cityPartner {
-  color: #0052d9;
-  background: #d9e8ff;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
 }
 
 .shop-type-tag.slabSupplier {
-  color: #07843b;
-  background: #d8f5e3;
+  color: var(--td-success-color);
+  background: var(--td-success-color-light);
 }
 
 .shop-type-tag.finishedSupplier {
-  color: #b65d00;
-  background: #ffe7c2;
+  color: var(--td-warning-color);
+  background: var(--td-warning-color-light);
 }
 
 .shop-type-tag.factory {
-  color: #c9353f;
-  background: #ffe1e2;
+  color: var(--td-error-color);
+  background: var(--td-error-color-light);
 }
 
 .level-cell {

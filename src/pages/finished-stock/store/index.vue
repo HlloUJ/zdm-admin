@@ -35,7 +35,7 @@
               >
                 <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tab.label" />
               </t-tabs>
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="filter" colon>
                 <div class="filter-row">
                   <div class="filter-fields pool-filter-fields">
                     <t-form-item label="商品">
@@ -224,7 +224,7 @@
       <t-space direction="vertical" style="width: 100%">
         <t-form
           class="zdm-admin-filter-form"
-          label-width="auto"
+          label-width="100px"
           :data="{ keyword: poolKeyword, category: poolCategory }"
           colon
         >

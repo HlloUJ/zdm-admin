@@ -36,7 +36,7 @@ export const adminMenuEntries: AdminMenuEntry[] = [
   {
     label: '客户管理',
     path: '/store/customer-management',
-    icon: 'usergroup',
+    icon: 'address-book',
     permissionPrefix: 'store.customer-management',
   },
   {

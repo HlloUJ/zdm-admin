@@ -20,7 +20,7 @@
               <div class="list-controls">
                 <t-form
                   class="zdm-admin-filter-form"
-                  label-width="auto"
+                  label-width="100px"
                   :data="searchForm"
                   colon
                   @submit="queryCategories"
@@ -183,7 +183,7 @@
         class="discount-config-form"
         :data="createForm"
         :rules="createRules"
-        :label-width="96"
+        :label-width="100"
         label-align="right"
         :style="{ width: '272px', maxWidth: '100%', minHeight: '88px', margin: '0 auto' }"
         colon
@@ -753,19 +753,18 @@ watch(
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .list-controls {
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields {
   display: flex;
   align-items: flex-start;
 }
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
   margin-bottom: 0;
 }
 .price-actions {

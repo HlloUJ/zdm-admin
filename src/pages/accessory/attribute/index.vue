@@ -21,7 +21,7 @@
         </t-alert>
 
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="属性" name="name">
@@ -118,7 +118,7 @@
       @cancel="closeFormDialog"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="88px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="属性" name="name" required-mark>
           <t-input v-model="formData.name" clearable placeholder="请输入" />
         </t-form-item>
@@ -556,121 +556,30 @@ const handleConfirm = () => {
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-  background: var(--td-bg-color-page);
-}
-
-.side-nav {
-  width: 248px;
-  flex-shrink: 0;
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-s) 0;
-  background: var(--td-bg-color-container);
-  border-right: 1px solid var(--td-component-border);
-}
-
-.brand {
-  width: 224px;
-  height: 100%;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  background: var(--td-brand-color);
-  color: #fff;
-  font-weight: 700;
-}
-
-.brand-title {
-  font-size: 16px;
-  line-height: 24px;
-  color: var(--td-text-color-primary);
-  font-weight: 600;
-}
-
-.brand-subtitle {
-  font-size: 12px;
-  line-height: 20px;
-  color: var(--td-text-color-secondary);
-}
-
-.top-actions {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-l);
-}
-
-.user-entry {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-  color: var(--td-text-color-secondary);
-  font-size: 14px;
-}
-
-.page {
-  flex: 1;
-  min-width: 0;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-}
-
-.page-header {
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--td-comp-margin-l);
-}
-
 .filter-card,
 .table-card {
   background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
   border-radius: var(--td-radius-medium);
 }
 
 .filter-card {
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl);
-  margin-bottom: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-xxl);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 
 .filter-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields {
   display: flex;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields :deep(.t-form__item) {
@@ -694,6 +603,8 @@ const handleConfirm = () => {
 .table-card {
   padding-bottom: var(--td-comp-paddingTB-l);
   overflow: hidden;
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 
 .table-toolbar {
@@ -710,7 +621,7 @@ const handleConfirm = () => {
 .option-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .option-toolbar {

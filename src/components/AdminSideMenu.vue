@@ -211,42 +211,8 @@ const handleSideNavClick = (event: MouseEvent) => {
 }
 
 .menu {
-  width: 224px;
+  width: 100%;
   margin: 0 auto;
   border-right: 0;
-}
-
-.menu :deep(.t-menu__item),
-.menu :deep(.t-submenu__title) {
-  min-height: 40px;
-  justify-content: flex-start;
-  border-radius: 6px;
-  padding-right: var(--td-comp-paddingLR-m) !important;
-}
-
-.menu :deep(.t-menu__content) {
-  min-width: 0;
-  justify-content: flex-start;
-}
-
-.menu :deep(.menu-level-one > .t-submenu__title),
-.menu :deep(.menu-level-one-item) {
-  padding-left: 16px !important;
-}
-
-.menu :deep(.menu-level-two-item) {
-  padding-left: 40px !important;
-}
-
-.menu :deep(.menu-level-two > .t-submenu__title) {
-  padding-left: 40px !important;
-}
-
-.menu :deep(.menu-level-three-item) {
-  padding-left: 64px !important;
-}
-
-.menu :deep(.t-icon) {
-  flex: 0 0 18px;
 }
 </style>

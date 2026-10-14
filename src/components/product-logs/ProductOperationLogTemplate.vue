@@ -7,7 +7,7 @@
     @update:visible="emit('update:visible', $event)"
   >
     <t-space direction="vertical" size="large" style="width: 100%">
-      <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
+      <t-form class="zdm-admin-filter-form" label-width="100px" :data="filter" colon>
         <div class="operation-log-filters">
           <t-form-item :label="subjectLabel" class="operation-log-keyword-filter">
             <t-input
@@ -189,26 +189,34 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
 <style scoped>
 .operation-log-filters {
   display: grid;
-  grid-template-columns: 234px minmax(150px, 210px) minmax(120px, 150px) 332px auto;
-  align-items: center;
-  gap: var(--td-comp-margin-m);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--td-comp-margin-xxl);
 }
 .operation-log-filters :deep(.t-form__item) {
+  min-width: 0;
+  width: auto;
   margin-bottom: 0;
 }
-.operation-log-keyword-filter {
-  width: 234px;
-}
 .operation-log-date-filter {
-  width: 332px;
+  grid-column: span 2;
 }
 .operation-log-date-picker {
-  flex-shrink: 0;
-  width: 260px;
+  width: 100%;
+  min-width: 0;
 }
 .operation-log-filter-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
+}
+@media (max-width: 860px) {
+  .operation-log-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .operation-log-date-filter {
+    grid-column: auto;
+  }
 }
 </style>

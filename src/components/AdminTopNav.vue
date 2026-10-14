@@ -161,7 +161,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 0;
-  font-size: 9px;
+  font-size: var(--td-font-size-body-small);
   line-height: 12px;
   text-align: center;
 }

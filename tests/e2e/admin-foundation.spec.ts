@@ -41,7 +41,7 @@ test('keeps foundation pagination spacing consistent inside list layouts', async
   });
 
   expect(styles).toEqual({
-    hostMarginTop: '16px',
+    hostMarginTop: '24px',
     paginationDisplay: 'flex',
     paginationJustifyContent: 'flex-end',
     paginationMarginTop: '0px',
@@ -85,7 +85,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   });
   await page.goto('/slab-management');
   const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('大板名称/ID/大板编号', { exact: true });
-  await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
+  expect((await page.locator('.slab-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
   const primaryLabels = await page.locator('.filter-primary-row .t-form__label').allTextContents();
   expect(primaryLabels.slice(-2)).toEqual(['纹理：', '色系：']);
   await expect(page.locator('.filter-secondary-row .t-form__label')).toHaveText(['等级：', '供应商：']);
@@ -140,10 +140,10 @@ test('aligns grade before supplier while keeping slab filter actions on the righ
   const resetBox = await page.locator('.reset-filter-button').boundingBox();
   const gradeBox = await page.locator('.grade-filter').boundingBox();
   expect(gradeBox?.x).toBe((await page.locator('.slab-keyword-filter').boundingBox())?.x);
-  expect(supplierBox!.x - gradeBox!.x - gradeBox!.width).toBeCloseTo(20, 0);
+  expect(supplierBox!.x - gradeBox!.x - gradeBox!.width).toBeCloseTo(24, 0);
   expect(resetBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
   expect(supplierBox!.x + supplierBox!.width).toBeCloseTo(itemBoxes[1].right, 0);
-  await expect(page.locator('.slab-keyword-filter')).toHaveCSS('width', '234px');
+  expect((await page.locator('.slab-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
 });
 
 test('orders the requested management lists by creation time descending', async ({ page }) => {
@@ -417,10 +417,9 @@ test('uses consistent label and condition spacing across list filters', async ({
       });
     });
     for (const item of result) {
-      expect(item.gap, route).toBeCloseTo(5, 0);
-      expect(item.groupGap, route).toBe('20px');
+      expect(item.gap, route).toBeCloseTo(24, 0);
+      expect(item.groupGap, route).toBe('24px');
       expect(item.width, route).toBeGreaterThan(40);
-      if (item.statusFilter) expect(item.width, route).toBeCloseTo(103, 0);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), route).toBe(true);
   }

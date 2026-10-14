@@ -7,164 +7,97 @@
         <header class="page-header">
           <t-breadcrumb><t-breadcrumb-item>客户管理</t-breadcrumb-item></t-breadcrumb>
         </header>
-        <AdminListLayout v-if="tabs.length">
-          <template #toolbar>
-            <div class="list-controls">
-              <t-tabs v-if="tabs.length > 1" :value="status" @change="switchTab">
-                <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tab.label" />
-              </t-tabs>
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filters" colon>
-                <div class="filter-row">
-                  <div class="filter-fields">
-                    <t-form-item label="姓名"
-                      ><t-input v-model="filters.name" clearable placeholder="请输入"
-                    /></t-form-item>
-                    <t-form-item label="联系电话"
-                      ><t-input v-model="filters.phone" clearable placeholder="请输入"
-                    /></t-form-item>
-                    <t-form-item v-if="allData" label="归属人">
-                      <t-select v-model="filters.ownerAccountId" clearable filterable placeholder="请选择">
-                        <t-option
-                          v-for="owner in owners"
-                          :key="owner.accountId"
-                          :value="owner.accountId"
-                          :label="ownerLabel(owner)"
-                        />
-                      </t-select>
-                    </t-form-item>
-                  </div>
-                  <div class="filter-actions">
-                    <t-button theme="primary" @click="search"
-                      ><template #icon><t-icon name="search" /></template>查询</t-button
-                    >
-                    <t-button theme="default" @click="reset"
-                      ><template #icon><t-icon name="refresh" /></template>重置</t-button
-                    >
-                  </div>
-                </div>
-              </t-form>
-              <div class="table-toolbar">
-                <div class="toolbar-buttons">
-                  <t-button v-if="status === 'daily' && can('create')" theme="primary" @click="openProfile()"
-                    ><template #icon><t-icon name="add" /></template>新增</t-button
-                  >
-                  <t-button
-                    v-if="can('batch-assign')"
-                    :disabled="!selected.length"
-                    @click="prepareAction('assign', selected, true)"
-                    >批量调整归属</t-button
-                  >
-                  <t-button
-                    v-if="status === 'daily' && can('batch-archive')"
-                    :disabled="!selectionOwned"
-                    @click="prepareAction('archive', selected, true)"
-                    >批量归档</t-button
-                  >
-                  <t-button
-                    v-if="status === 'archived' && can('batch-restore')"
-                    :disabled="!selectionOwned"
-                    @click="prepareAction('restore', selected, true)"
-                    >批量取消归档</t-button
-                  >
-                  <t-button
-                    v-if="status === 'archived' && can('batch-purge')"
-                    theme="danger"
-                    :disabled="!selectionOwned"
-                    @click="prepareAction('purge', selected, true)"
-                    >批量彻底删除</t-button
-                  >
-                </div>
-                <div class="selection-info">已选 {{ selected.length }} 项</div>
-              </div>
-            </div>
-          </template>
-          <template #table>
-            <t-table
-              row-key="id"
-              :data="pageRows"
-              :columns="columns"
-              :loading="loading"
-              :selected-row-keys="selected"
-              hover
-              table-layout="fixed"
-              @select-change="selectRows"
-            >
-              <template #name="{ row }"
-                ><t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">{{ row.name }}</t-link
-                ><span v-else>{{ row.name }}</span></template
+        <AdminListPage
+          v-if="tabs.length"
+          v-model:filter-values="filters"
+          :tabs="tabs"
+          :active-tab="status"
+          :filters="filterFields"
+          filter-layout="official-grid"
+          :actions="toolbarActions"
+          :selected-count="selected.length"
+          :table-props="{
+            rowKey: 'id',
+            data: rows,
+            columns,
+            loading,
+            selectedRowKeys: selected,
+            hover: true,
+            pagination,
+          }"
+          @tab-change="switchTab"
+          @search="search"
+          @reset="reset"
+          @action="handleToolbarAction"
+          @page-change="changePage"
+          @select-change="selectRows"
+        >
+          <template #name="{ row }"
+            ><t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">{{ row.name }}</t-link
+            ><span v-else>{{ row.name }}</span></template
+          >
+          <template #phone="{ row }">{{ row.phone || '-' }}</template>
+          <template #ownerName="{ row }">{{ row.ownerName || '-' }}</template>
+          <template #lastFollowedAt="{ row }">{{ time(row.lastFollowedAt) }}</template>
+          <template #nextFollowAt="{ row }">{{ time(row.nextFollowAt) }}</template>
+          <template #operation="{ row }">
+            <t-space break-line size="small">
+              <t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">详情</t-link>
+              <t-link v-if="can('edit') && isOwned(row)" theme="primary" @click="openProfile(row)">编辑</t-link>
+              <t-link v-if="can('assign')" theme="primary" @click="prepareAction('assign', [row.id], false)"
+                >调整归属</t-link
               >
-              <template #phone="{ row }">{{ row.phone || '-' }}</template>
-              <template #ownerName="{ row }">{{ row.ownerName || '-' }}</template>
-              <template #lastFollowedAt="{ row }">{{ time(row.lastFollowedAt) }}</template>
-              <template #nextFollowAt="{ row }">{{ time(row.nextFollowAt) }}</template>
-              <template #operation="{ row }">
-                <div class="table-actions">
-                  <t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">详情</t-link>
-                  <t-link v-if="can('edit') && isOwned(row)" theme="primary" @click="openProfile(row)">编辑</t-link>
-                  <t-link v-if="can('assign')" theme="primary" @click="prepareAction('assign', [row.id], false)"
-                    >调整归属</t-link
-                  >
-                  <t-link
-                    v-if="status === 'daily' && can('archive') && isOwned(row)"
-                    theme="warning"
-                    @click="prepareAction('archive', [row.id], false)"
-                    >归档</t-link
-                  >
-                  <t-link
-                    v-if="status === 'archived' && can('restore') && isOwned(row)"
-                    theme="primary"
-                    @click="prepareAction('restore', [row.id], false)"
-                    >取消归档</t-link
-                  >
-                  <t-link
-                    v-if="status === 'archived' && can('purge') && isOwned(row)"
-                    theme="danger"
-                    @click="prepareAction('purge', [row.id], false)"
-                    >彻底删除</t-link
-                  >
-                </div>
-              </template>
-              <template #empty>暂无客户</template>
-            </t-table>
+              <t-link
+                v-if="status === 'daily' && can('archive') && isOwned(row)"
+                theme="warning"
+                @click="prepareAction('archive', [row.id], false)"
+                >归档</t-link
+              >
+              <t-link
+                v-if="status === 'archived' && can('restore') && isOwned(row)"
+                theme="primary"
+                @click="prepareAction('restore', [row.id], false)"
+                >取消归档</t-link
+              >
+              <t-link
+                v-if="status === 'archived' && can('purge') && isOwned(row)"
+                theme="danger"
+                @click="prepareAction('purge', [row.id], false)"
+                >彻底删除</t-link
+              >
+            </t-space>
           </template>
-          <template #pagination
-            ><AdminPagination
-              v-model:current="page"
-              v-model:page-size="pageSize"
-              :total="rows.length"
-              :page-size-options="[10, 20, 50]"
-          /></template>
-        </AdminListLayout>
+          <template #empty>暂无客户</template>
+        </AdminListPage>
         <t-empty v-else description="暂无客户管理权限" />
       </main>
     </div>
-    <AdminDialog
+    <AdminFormDialog
       v-model:visible="profileVisible"
+      :data="profile"
       :header="editingId ? '编辑客户' : '新增客户'"
       :confirm-btn="submitButton"
       @confirm="submitProfile"
     >
-      <t-form :data="profile" label-width="96px" colon>
-        <t-form-item label="姓名" required-mark :status="nameError ? 'error' : undefined" :tips="nameError"
-          ><t-input v-model="profile.name" :maxlength="80" clearable placeholder="请输入"
-        /></t-form-item>
-        <t-form-item label="联系电话"
-          ><t-input v-model="profile.phone" :maxlength="80" clearable placeholder="请输入"
-        /></t-form-item>
-        <t-form-item label="微信号"
-          ><t-input v-model="profile.wechat" :maxlength="100" clearable placeholder="请输入"
-        /></t-form-item>
-        <t-form-item label="客户需求"
-          ><t-textarea v-model="profile.requirement" :maxlength="10000" placeholder="请输入"
-        /></t-form-item>
-        <t-form-item label="客户备注"
-          ><t-textarea v-model="profile.remark" :maxlength="10000" placeholder="请输入"
-        /></t-form-item>
-        <t-form-item label="归属人"
-          ><span>{{ profileOwner }}</span></t-form-item
-        >
-      </t-form>
-    </AdminDialog>
+      <t-form-item label="客户姓名" required-mark :status="nameError ? 'error' : undefined" :tips="nameError"
+        ><t-input v-model="profile.name" :maxlength="80" clearable placeholder="请输入"
+      /></t-form-item>
+      <t-form-item label="联系电话"
+        ><t-input v-model="profile.phone" :maxlength="80" clearable placeholder="请输入"
+      /></t-form-item>
+      <t-form-item label="微信号"
+        ><t-input v-model="profile.wechat" :maxlength="100" clearable placeholder="请输入"
+      /></t-form-item>
+      <t-form-item label="客户需求"
+        ><t-textarea v-model="profile.requirement" :maxlength="10000" placeholder="请输入"
+      /></t-form-item>
+      <t-form-item label="客户备注"
+        ><t-textarea v-model="profile.remark" :maxlength="10000" placeholder="请输入"
+      /></t-form-item>
+      <t-form-item label="归属人"
+        ><span>{{ profileOwner }}</span></t-form-item
+      >
+    </AdminFormDialog>
     <AdminDialog
       v-model:visible="detailVisible"
       header="客户详情"
@@ -174,114 +107,111 @@
       @confirm="detailVisible = false"
     >
       <t-loading :loading="detailLoading">
+        <t-skeleton v-if="detailLoading" theme="paragraph" />
         <template v-if="detail">
-          <t-descriptions title="客户资料" :column="3" bordered>
-            <t-descriptions-item label="姓名">{{ detail.customer.name }}</t-descriptions-item>
-            <t-descriptions-item label="联系电话">{{ detail.customer.phone || '-' }}</t-descriptions-item>
-            <t-descriptions-item label="微信号">{{ detail.customer.wechat || '-' }}</t-descriptions-item>
-            <t-descriptions-item label="归属人">{{ detail.customer.ownerName || '-' }}</t-descriptions-item>
-            <t-descriptions-item label="建档人">{{ detail.customer.createdByName || '-' }}</t-descriptions-item>
-            <t-descriptions-item label="建档时间">{{ time(detail.customer.createdAt) }}</t-descriptions-item>
-            <t-descriptions-item label="客户需求" :span="3">{{
-              detail.customer.requirement || '-'
-            }}</t-descriptions-item>
-            <t-descriptions-item label="客户备注" :span="3">{{ detail.customer.remark || '-' }}</t-descriptions-item>
-          </t-descriptions>
-          <t-divider />
-          <t-space
-            ><strong>跟进记录</strong
-            ><t-button v-if="isOwned(detail.customer)" theme="primary" @click="openFollowup()"
-              >新增跟进</t-button
-            ></t-space
-          >
-          <t-list :split="true">
-            <t-list-item v-for="record in detail.followups" :key="record.id">
-              <t-space direction="vertical">
-                <t-space
-                  ><strong>{{ time(record.followedAt) }}</strong
-                  ><span>{{ record.createdByName || '-' }}</span></t-space
+          <AdminDetailPage embedded title="客户资料" :items="detailItems">
+            <t-space
+              ><span>跟进记录</span
+              ><t-button v-if="isOwned(detail.customer)" theme="primary" @click="openFollowup()"
+                >新增跟进</t-button
+              ></t-space
+            >
+            <t-list :split="true">
+              <t-list-item v-for="record in detail.followups" :key="record.id">
+                <t-space direction="vertical">
+                  <t-space
+                    ><span>{{ time(record.followedAt) }}</span
+                    ><span>{{ record.createdByName || '-' }}</span></t-space
+                  >
+                  <div>{{ record.content }}</div>
+                  <t-space v-if="record.attachments.length" break-line
+                    ><t-link
+                      v-for="attachment in record.attachments"
+                      :key="attachment.mediaId"
+                      theme="primary"
+                      @click="previewAttachment(record, attachment)"
+                      >{{ attachment.name }}</t-link
+                    ></t-space
+                  >
+                  <span v-if="record.nextFollowAt || record.nextFollowTask"
+                    >下次跟进：{{ time(record.nextFollowAt) }} {{ record.nextFollowTask }}</span
+                  >
+                </t-space>
+                <template v-if="isOwned(detail.customer)" #action
+                  ><t-space
+                    ><t-link theme="primary" @click="openFollowup(record)">编辑</t-link
+                    ><t-link theme="danger" @click="prepareFollowupDelete(record.id)">删除</t-link></t-space
+                  ></template
                 >
-                <p>{{ record.content }}</p>
-                <t-space v-if="record.attachments.length"
-                  ><t-link
-                    v-for="attachment in record.attachments"
-                    :key="attachment.mediaId"
-                    theme="primary"
-                    @click="previewAttachment(record, attachment)"
-                    >{{ attachment.name }}</t-link
-                  ></t-space
-                >
-                <span v-if="record.nextFollowAt || record.nextFollowTask"
-                  >下次跟进：{{ time(record.nextFollowAt) }} {{ record.nextFollowTask }}</span
-                >
-              </t-space>
-              <template v-if="isOwned(detail.customer)" #action
-                ><t-space
-                  ><t-link theme="primary" @click="openFollowup(record)">编辑</t-link
-                  ><t-link theme="danger" @click="prepareFollowupDelete(record.id)">删除</t-link></t-space
-                ></template
-              >
-            </t-list-item>
-          </t-list>
-          <t-empty v-if="!detail.followups.length" description="暂无跟进记录" />
+              </t-list-item>
+            </t-list>
+            <t-empty v-if="!detail.followups.length" description="暂无跟进记录" />
+          </AdminDetailPage>
         </template>
       </t-loading>
     </AdminDialog>
-    <AdminDialog
+    <AdminFormDialog
       v-model:visible="followVisible"
+      :data="followForm"
+      label-width="calc(7em + var(--td-comp-paddingLR-xl))"
       :header="followId ? '编辑跟进' : '新增跟进'"
       width="720px"
       :confirm-btn="submitButton"
       @confirm="submitFollowup"
       @closed="cleanupUploads"
     >
-      <t-form :data="followForm" label-width="112px" colon>
-        <t-form-item label="跟进时间" required-mark
-          ><t-date-picker v-model="followForm.followedAt" enable-time-picker format="YYYY-MM-DD HH:mm:ss"
-        /></t-form-item>
-        <t-form-item label="跟进内容" required-mark
-          ><t-textarea v-model="followForm.content" :maxlength="10000" placeholder="请输入"
-        /></t-form-item>
-        <t-form-item label="下次跟进时间"
-          ><t-date-picker v-model="followForm.nextFollowAt" enable-time-picker clearable format="YYYY-MM-DD HH:mm:ss"
-        /></t-form-item>
-        <t-form-item label="下次跟进事项"
-          ><t-textarea v-model="followForm.nextFollowTask" :maxlength="2000" placeholder="请输入"
-        /></t-form-item>
-        <t-form-item label="附件" help="最多3个附件，单个不超过5MiB">
-          <t-row :gutter="16">
-            <t-col v-for="(_, index) in 3" :key="index" :span="4">
-              <AdminMediaUpload
-                :model-value="uploads[index]"
-                :title="`附件${index + 1}`"
-                :show-title="false"
-                :accept="''"
-                :media-type="uploadKinds[index] === 'image' ? 'image' : 'file'"
-                :upload="(file) => upload(file, index)"
-                @update:model-value="(value) => (uploads[index] = value)"
-                @preview="(value) => previewUpload(value, index)"
-              />
-            </t-col>
-          </t-row>
-        </t-form-item>
-      </t-form>
-    </AdminDialog>
-    <AdminDialog v-model:visible="assignVisible" header="调整归属" :confirm-btn="submitButton" @confirm="submitAction">
-      <t-form :data="{ ownerAccountId: newOwner }" label-width="96px" colon>
-        <t-form-item label="选中客户"
-          ><span>{{ pending.ids.length }} 条</span></t-form-item
-        >
-        <t-form-item label="新归属人" required-mark
-          ><t-select v-model="newOwner" filterable clearable placeholder="请选择"
-            ><t-option
-              v-for="owner in owners.filter((item) => item.active)"
-              :key="owner.accountId"
-              :value="owner.accountId"
-              :label="owner.name" /></t-select
-        ></t-form-item>
-      </t-form>
-      <t-alert v-if="pending.status === 'archived'" theme="info" message="调整归属后，客户将自动恢复为日常客户。" />
-    </AdminDialog>
+      <t-form-item label="跟进时间" required-mark
+        ><t-date-picker v-model="followForm.followedAt" enable-time-picker format="YYYY-MM-DD HH:mm:ss"
+      /></t-form-item>
+      <t-form-item label="跟进内容" required-mark
+        ><t-textarea v-model="followForm.content" :maxlength="10000" placeholder="请输入"
+      /></t-form-item>
+      <t-form-item label="下次跟进时间"
+        ><t-date-picker v-model="followForm.nextFollowAt" enable-time-picker clearable format="YYYY-MM-DD HH:mm:ss"
+      /></t-form-item>
+      <t-form-item label="下次跟进事项"
+        ><t-textarea v-model="followForm.nextFollowTask" :maxlength="2000" placeholder="请输入"
+      /></t-form-item>
+      <t-form-item label="附件" help="最多3个附件，单个不超过5MiB">
+        <t-row :gutter="[16, 16]">
+          <t-col v-for="(_, index) in 3" :key="index" :span="12">
+            <AdminOfficialMediaUpload
+              :model-value="uploads[index]"
+              :title="`附件${index + 1}`"
+              :show-title="false"
+              :accept="''"
+              :media-type="uploadKinds[index] === 'image' ? 'image' : 'file'"
+              :upload="(file) => upload(file, index)"
+              @update:model-value="(value) => (uploads[index] = value)"
+              @preview="(value) => previewUpload(value, index)"
+            />
+          </t-col>
+        </t-row>
+      </t-form-item>
+    </AdminFormDialog>
+    <AdminFormDialog
+      v-model:visible="assignVisible"
+      :data="{ ownerAccountId: newOwner }"
+      header="调整归属"
+      :confirm-btn="submitButton"
+      @confirm="submitAction"
+    >
+      <t-form-item label="选中客户"
+        ><span>{{ pending.ids.length }} 条</span></t-form-item
+      >
+      <t-form-item label="新归属人" required-mark
+        ><t-select v-model="newOwner" filterable clearable placeholder="请选择"
+          ><t-option
+            v-for="owner in owners.filter((item) => item.active)"
+            :key="owner.accountId"
+            :value="owner.accountId"
+            :label="owner.name" /></t-select
+      ></t-form-item>
+
+      <template #after
+        ><t-alert v-if="pending.status === 'archived'" theme="info" message="调整归属后，客户将自动恢复为日常客户。"
+      /></template>
+    </AdminFormDialog>
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
       :action="confirmAction"
@@ -295,16 +225,18 @@
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import type { TableProps } from 'tdesign-vue-next';
+import type { PageInfo, TableProps } from 'tdesign-vue-next';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import {
-  AdminListLayout,
-  AdminPagination,
+  AdminListPage,
+  AdminFormDialog,
+  AdminDetailPage,
   AdminDialog,
   AdminConfirmDialog,
-  AdminMediaUpload,
+  AdminOfficialMediaUpload,
 } from '@/components/foundation';
+import type { ListAction, ListFilter } from '@/components/foundation';
 import type { AdminMediaValue } from '@/components/foundation/AdminMediaUpload.vue';
 import { adminFeedback } from '@/components/foundation/feedback/adminFeedback';
 import { getLoginUser } from '@/services/auth';
@@ -350,21 +282,77 @@ const selected = ref<number[]>([]);
 const filters = ref<{ name: string; phone: string; ownerAccountId?: number }>({ name: '', phone: '' });
 const page = ref(1);
 const pageSize = ref(10);
-const pageRows = computed(() => rows.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value));
+const pagination = computed(() => ({
+  current: page.value,
+  pageSize: pageSize.value,
+  total: rows.value.length,
+  pageSizeOptions: [10, 20, 50],
+}));
+function changePage(info: PageInfo) {
+  page.value = info.current;
+  pageSize.value = info.pageSize;
+}
 const selectionOwned = computed(
   () =>
     selected.value.length > 0 && selected.value.every((id) => rows.value.some((row) => row.id === id && isOwned(row))),
 );
+const filterFields = computed<ListFilter[]>(() => [
+  { key: 'name', label: '客户姓名' },
+  { key: 'phone', label: '联系电话' },
+  ...(allData.value
+    ? [
+        {
+          key: 'ownerAccountId',
+          label: '归属人',
+          kind: 'select' as const,
+          filterable: true,
+          options: owners.value.map((owner) => ({ value: owner.accountId, label: ownerLabel(owner) })),
+        },
+      ]
+    : []),
+]);
+const toolbarActions = computed<ListAction[]>(() => [
+  ...(status.value === 'daily' && can('create') ? [{ id: 'create', label: '新增', icon: 'add' }] : []),
+  ...(can('batch-assign') ? [{ id: 'assign', label: '批量调整归属', disabled: !selected.value.length }] : []),
+  ...(status.value === 'daily' && can('batch-archive')
+    ? [{ id: 'archive', label: '批量归档', disabled: !selectionOwned.value }]
+    : []),
+  ...(status.value === 'archived' && can('batch-restore')
+    ? [{ id: 'restore', label: '批量取消归档', disabled: !selectionOwned.value }]
+    : []),
+  ...(status.value === 'archived' && can('batch-purge')
+    ? [{ id: 'purge', label: '批量彻底删除', theme: 'danger' as const, disabled: !selectionOwned.value }]
+    : []),
+]);
+function handleToolbarAction(id: string) {
+  if (id === 'create') openProfile();
+  else if (id === 'assign' || id === 'archive' || id === 'restore' || id === 'purge')
+    prepareAction(id, selected.value, true);
+}
 const columns: TableProps['columns'] = [
   { colKey: 'row-select', type: 'multiple', width: 46 },
-  { colKey: 'name', title: '姓名', width: 110 },
-  { colKey: 'phone', title: '联系电话', width: 140 },
-  { colKey: 'ownerName', title: '归属人', width: 100 },
-  { colKey: 'requirement', title: '客户需求', ellipsis: true },
-  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 170 },
-  { colKey: 'nextFollowAt', title: '下次跟进时间', width: 170 },
-  { colKey: 'operation', title: '操作', width: 290, fixed: 'right' },
+  { colKey: 'name', title: '客户姓名', width: 90, ellipsis: true },
+  { colKey: 'phone', title: '联系电话', width: 120, ellipsis: true },
+  { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },
+  { colKey: 'requirement', title: '客户需求', width: 120, ellipsis: true },
+  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true },
+  { colKey: 'nextFollowAt', title: '下次跟进时间', width: 130, ellipsis: true },
+  { colKey: 'operation', title: '操作', width: 200 },
 ];
+const detailItems = computed(() => {
+  const customer = detail.value?.customer;
+  if (!customer) return [];
+  return [
+    { label: '客户姓名', value: customer.name },
+    { label: '联系电话', value: customer.phone || '-' },
+    { label: '微信号', value: customer.wechat || '-' },
+    { label: '归属人', value: customer.ownerName || '-' },
+    { label: '建档人', value: customer.createdByName || '-' },
+    { label: '建档时间', value: time(customer.createdAt) },
+    { label: '客户需求', value: customer.requirement || '-', span: 3 },
+    { label: '客户备注', value: customer.remark || '-', span: 3 },
+  ];
+});
 const time = (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-');
 const ownerLabel = (owner: Owner) => `${owner.name}${owner.active ? '' : '（已离职或停用）'}`;
 let loadVersion = 0;
@@ -464,7 +452,7 @@ function openProfile(row?: Customer) {
 async function submitProfile() {
   if (submitting.value) return;
   if (!profile.value.name.trim()) {
-    nameError.value = '请输入姓名';
+    nameError.value = '请输入客户姓名';
     return;
   }
   submitting.value = true;

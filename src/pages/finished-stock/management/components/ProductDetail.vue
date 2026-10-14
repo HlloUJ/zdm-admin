@@ -353,7 +353,7 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
 }
 .product-detail__section-title {
   margin: 0 0 var(--td-comp-margin-xxl);
-  font-size: 16px;
+  font-size: var(--td-font-size-body-large);
   font-weight: 600;
   line-height: 24px;
   text-align: left;
@@ -399,8 +399,8 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
   gap: 4px;
 }
 .product-code {
-  color: #6b7280;
-  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  font-size: var(--td-font-size-body-small);
 }
 .product-detail__media {
   display: grid;

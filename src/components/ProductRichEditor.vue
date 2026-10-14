@@ -166,10 +166,10 @@ onBeforeUnmount(() => {
 <style scoped>
 .product-rich-editor {
   width: 100%;
-  border: 1px solid #ccc;
+  border: 1px solid var(--td-component-border);
 }
 .product-rich-editor__toolbar {
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid var(--td-component-border);
 }
 .product-rich-editor__content {
   height: 500px;

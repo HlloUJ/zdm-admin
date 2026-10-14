@@ -18,7 +18,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="产地" name="name">
@@ -353,51 +353,30 @@ onMounted(loadOrigins);
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-  background: var(--td-bg-color-page);
-}
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
 .filter-card,
 .table-card {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
   background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 .table-card {
-  margin-top: var(--td-comp-margin-l);
+  margin-top: var(--td-comp-margin-xxl);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 .filter-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 240px;
   margin-bottom: 0;
 }
 .filter-actions,
@@ -413,19 +392,16 @@ onMounted(loadOrigins);
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  margin-bottom: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 .table-actions {
   justify-content: flex-start;
   gap: var(--td-comp-margin-m);
 }
 .zdm-admin-pagination {
-  margin-top: var(--td-comp-margin-l);
+  margin-top: var(--td-comp-margin-xxl);
 }
 @media (max-width: 960px) {
-  .page {
-    padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
-  }
   .page-header,
   .filter-row {
     align-items: flex-start;
@@ -437,11 +413,6 @@ onMounted(loadOrigins);
   }
   .filter-actions {
     justify-content: flex-start;
-  }
-}
-@media (max-width: 640px) {
-  .filter-fields :deep(.t-form__item) {
-    width: 100%;
   }
 }
 </style>

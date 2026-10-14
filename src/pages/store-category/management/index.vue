@@ -15,7 +15,7 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showTabRail" v-model="activeScope" :list="scopeTabs" :disabled="sorting" />
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="分类名称" name="keyword">
@@ -132,7 +132,7 @@
       @confirm="handleSubmit"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item v-if="formData.parentId" label="上级分类">
           <t-input :value="parentName" disabled />
         </t-form-item>
@@ -700,7 +700,7 @@ watch(
 .list-controls {
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-row,
@@ -716,15 +716,14 @@ watch(
 .filter-row {
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields {
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 260px;
   margin-bottom: 0;
 }
 .filter-actions {
@@ -797,11 +796,6 @@ watch(
   }
   .filter-actions {
     flex-wrap: wrap;
-  }
-}
-@media (max-width: 720px) {
-  .filter-fields :deep(.t-form__item) {
-    width: 100%;
   }
 }
 </style>
