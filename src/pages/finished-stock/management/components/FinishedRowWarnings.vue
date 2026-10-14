@@ -62,32 +62,16 @@ onBeforeUnmount(() => {
   position: relative;
 }
 .finished-row-warnings :deep(tr[data-shelf-error-id] > td) {
-  padding-top: 40px;
+  padding-top: calc(var(--td-line-height-body-medium) + var(--td-comp-paddingTB-l) * 2 + var(--td-comp-margin-l));
 }
 .finished-row-warning {
   position: absolute;
   z-index: 31;
   box-sizing: border-box;
-  align-items: center;
-  padding: 3px 8px;
-  font-size: 11px;
-  line-height: 18px;
 }
 .finished-row-warning :deep(.t-alert__message) {
-  font-size: 11px;
-  line-height: 18px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.finished-row-warning :deep(.t-alert__icon) {
-  font-size: 14px;
-}
-.finished-row-warning :deep(.t-alert__icon),
-.finished-row-warning :deep(.t-alert__close) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 18px;
 }
 </style>

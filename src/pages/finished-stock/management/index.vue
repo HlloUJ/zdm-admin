@@ -76,7 +76,7 @@
                     :label="tab.label"
                   />
                 </t-tabs>
-                <t-form class="zdm-admin-filter-form" label-width="auto" :data="currentFilter" colon>
+                <t-form class="zdm-admin-filter-form" label-width="80px" :data="currentFilter" colon>
                   <div class="filter-row">
                     <div class="filter-fields">
                       <t-form-item label="商品">
@@ -143,7 +143,7 @@
                     <t-button
                       v-for="action in managementToolbarActions"
                       :key="action.id"
-                      :theme="action.theme"
+                      :theme="action.className === 'brown-button' ? 'warning' : action.theme"
                       :variant="action.variant"
                       :class="action.className"
                       :disabled="action.disabled"
@@ -336,7 +336,7 @@
               aria-label="图文描述"
             >
               <h2 class="form-section-title">图文描述</h2>
-              <t-form :data="productForm" label-width="116px" colon>
+              <t-form :data="productForm" label-width="100px" colon>
                 <t-form-item label="商品主图" required-mark help="最多上传5张图片，第一张作为商品封面">
                   <div class="upload-grid main-image-upload-grid">
                     <AdminMediaUpload
@@ -388,7 +388,7 @@
               aria-label="基础信息"
             >
               <h2 class="form-section-title">基础信息</h2>
-              <t-form :data="productForm" label-width="116px" colon>
+              <t-form :data="productForm" label-width="100px" colon>
                 <t-form-item label="商品名称" required-mark>
                   <t-input
                     v-model="productForm.name"
@@ -442,7 +442,7 @@
                   </t-form>
                 </div>
               </section>
-              <t-form class="supplier-form" :data="productForm" label-width="116px" colon>
+              <t-form class="supplier-form" :data="productForm" label-width="100px" colon>
                 <t-form-item label="供应商">
                   <t-select v-model="productForm.supplier" clearable placeholder="请选择">
                     <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
@@ -453,7 +453,7 @@
 
             <AdminSectionCard id="finished-product-sales" class="form-section" aria-label="销售信息">
               <h2 class="form-section-title">销售信息</h2>
-              <t-form :data="productForm" label-width="116px" colon>
+              <t-form :data="productForm" label-width="100px" colon>
                 <t-form-item label="销售规格" required-mark>
                   <t-button
                     v-if="!specRows.length && !isOperationsEdit"
@@ -1027,7 +1027,7 @@
       @cancel="closeReasonDialog"
       @close="closeReasonDialog"
     >
-      <t-form :data="reasonForm" label-width="96px" colon>
+      <t-form :data="reasonForm" label-width="100px" colon>
         <t-form-item label="下架原因" required-mark>
           <t-select v-model="reasonForm.reason" placeholder="请选择">
             <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />

@@ -18,3 +18,7 @@
 - 复杂详情页：`src/pages/detail/advanced`
 - 登录页：`src/pages/login`
 - 结果页 / 异常页：`src/pages/result`
+
+## 项目入口与来源
+
+权威登记见 `docs/ui/official-sources.json`。基础/筛选/Tab 列表用 `AdminListPage`，表单弹窗用 `AdminFormDialog`，普通详情用 `AdminDetailPage`。筛选列表完整实现在官方 `src/components/common-table/index.vue`。Tab + 官方网格查询 + 批量操作为项目组合，不称作原封不动官方整页。2026-10-14已批准全项目仅视觉迁移，存量页面按视觉重构契约保留兼容入口与原业务模板。外部 zdm-admin-ui 是旧版参考，不优先于登记的官方来源。

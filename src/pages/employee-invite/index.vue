@@ -299,7 +299,7 @@ onBeforeUnmount(stopCounter);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: #fff;
+  background-color: var(--td-bg-color-container);
 }
 
 .invite-container {
@@ -341,7 +341,7 @@ onBeforeUnmount(stopCounter);
 .item-container :deep(.t-input),
 .item-container :deep(.t-button),
 .gender-radio :deep(.t-radio-button) {
-  border-radius: 8px;
+  border-radius: var(--td-radius-default);
 }
 
 .verification-code {

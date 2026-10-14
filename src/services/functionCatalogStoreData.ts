@@ -205,3 +205,52 @@ export const storePriceConfiguration: FunctionModule = {
     },
   ],
 };
+
+export const storeCustomerManagement: FunctionModule = {
+  label: '客户管理',
+  value: 'store.customer-management',
+  audiences: ['store'],
+  menus: [
+    {
+      label: '客户管理',
+      value: 'store.customer-management.menu',
+      direct: true,
+      pages: [
+        {
+          label: '客户管理页',
+          value: 'store.customer-management',
+          actions: [],
+          tabs: [
+            {
+              label: '日常客户',
+              value: 'store.customer-management.daily',
+              actions: [
+                ['create', '新增'],
+                ['batch-assign', '批量调整归属'],
+                ['batch-archive', '批量归档'],
+                ['detail', '详情'],
+                ['edit', '编辑'],
+                ['assign', '调整归属'],
+                ['archive', '归档'],
+              ].map(([code, label]) => ({ label, value: `store.customer-management.daily.${code}` })),
+            },
+            {
+              label: '归档客户',
+              value: 'store.customer-management.archived',
+              actions: [
+                ['batch-assign', '批量调整归属'],
+                ['batch-restore', '批量取消归档'],
+                ['batch-purge', '批量彻底删除'],
+                ['detail', '详情'],
+                ['edit', '编辑'],
+                ['assign', '调整归属'],
+                ['restore', '取消归档'],
+                ['purge', '彻底删除'],
+              ].map(([code, label]) => ({ label, value: `store.customer-management.archived.${code}` })),
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};

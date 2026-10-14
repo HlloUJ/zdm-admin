@@ -152,27 +152,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-
 .allocation-card {
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+  border-radius: var(--td-radius-medium);
   padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
 }
 
 .terminal-tabs {
-  margin-bottom: var(--td-comp-margin-l);
-}
-
-.terminal-tabs :deep(.t-tabs__nav-item) {
-  color: var(--td-text-color-secondary);
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 
 .terminal-tabs :deep(.t-is-active) {

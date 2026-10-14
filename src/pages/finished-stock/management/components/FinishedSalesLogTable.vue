@@ -399,11 +399,4 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol<TableR
 .sales-log-table :deep(.historical-price-line .price-source-badge) {
   margin-top: 0;
 }
-.sales-log-table :deep(th),
-.sales-log-table :deep(td) {
-  font-size: var(--td-font-size-body-small);
-}
-.sales-log-table :deep(thead th) {
-  background-color: var(--td-bg-color-secondarycontainer);
-}
 </style>

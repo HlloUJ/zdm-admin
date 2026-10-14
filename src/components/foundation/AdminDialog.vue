@@ -32,7 +32,7 @@ withDefaults(
     cancelBtn?: string | ButtonProps | null;
   }>(),
   {
-    width: '520px',
+    width: '480px',
     dialogClassName: '',
     confirmBtn: '提交',
     cancelBtn: '取消',

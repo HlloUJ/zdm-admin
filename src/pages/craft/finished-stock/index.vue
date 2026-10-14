@@ -18,7 +18,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="工艺名称">
@@ -137,7 +137,7 @@
       @cancel="closeFormDialog"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="工艺图片" name="image">
           <AdminMediaUpload
             v-model="formData.image"
@@ -614,135 +614,35 @@ onMounted(loadCrafts);
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--td-comp-paddingLR-xl);
-  background: var(--td-bg-color-container);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-  background: var(--td-bg-color-page);
-}
-
-.side-nav {
-  width: 248px;
-  flex-shrink: 0;
-  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-s) 0;
-  background: var(--td-bg-color-container);
-  border-right: 1px solid var(--td-component-border);
-}
-
-.brand {
-  width: 224px;
-  height: 100%;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  color: #fff;
-  background: var(--td-brand-color);
-  font: var(--td-font-title-small);
-}
-
-.brand-title {
-  color: var(--td-text-color-primary);
-  font: var(--td-font-title-medium);
-}
-
-.brand-subtitle {
-  margin-top: 2px;
-  color: var(--td-text-color-placeholder);
-  font: var(--td-font-body-small);
-}
-
-.top-actions {
-  margin-left: auto;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-}
-
-.user-entry {
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--td-comp-margin-s);
-  padding: 0 var(--td-comp-paddingLR-s);
-  color: var(--td-text-color-secondary);
-  font: var(--td-font-body-medium);
-}
-
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-
 .filter-card,
 .table-card {
   background: var(--td-bg-color-container);
-  border-radius: 6px;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
-  border: 1px solid var(--td-component-border);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 
 .table-card {
-  margin-top: var(--td-comp-margin-l);
+  margin-top: var(--td-comp-margin-xxl);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 
 .filter-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 
 .filter-fields :deep(.t-form__item) {
-  width: 220px;
   margin-bottom: 0;
-}
-
-.filter-fields :deep(.t-form__item.craft-type-filter) {
-  width: 180px;
-}
-
-.filter-fields :deep(.t-form__item.craft-status-filter) {
-  width: 150px;
 }
 
 .width-range {
@@ -768,7 +668,7 @@ onMounted(loadCrafts);
   justify-content: flex-start;
   align-items: center;
   gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 
 .table-toolbar h2 {
@@ -794,10 +694,10 @@ onMounted(loadCrafts);
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--td-radius-medium);
   color: var(--td-text-color-placeholder);
   background: var(--td-bg-color-secondarycontainer);
-  border: 1px solid #c7d1df;
+  border: 1px solid var(--td-component-border);
 }
 
 .craft-image:hover {
@@ -812,7 +712,7 @@ onMounted(loadCrafts);
 }
 
 .craft-image__empty {
-  font-size: 12px;
+  font-size: var(--td-font-size-body-small);
 }
 
 .craft-media-upload {
@@ -826,7 +726,7 @@ onMounted(loadCrafts);
   align-items: center;
   justify-content: center;
   gap: var(--td-comp-margin-s);
-  border-radius: 6px;
+  border-radius: var(--td-radius-medium);
   color: var(--td-text-color-placeholder);
   background: var(--td-bg-color-secondarycontainer);
   border: 1px dashed var(--td-component-border);
@@ -836,9 +736,9 @@ onMounted(loadCrafts);
   max-width: 100%;
   max-height: 300px;
   display: block;
-  border-radius: 8px;
+  border-radius: var(--td-radius-default);
   object-fit: contain;
-  border: 1px solid #c7d1df;
+  border: 1px solid var(--td-component-border);
 }
 
 .image-preview__empty {
@@ -849,56 +749,15 @@ onMounted(loadCrafts);
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 
 @media (max-width: 960px) {
-  .top-nav {
-    height: auto;
-    align-items: stretch;
-    flex-direction: column;
-    padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-l);
-    gap: var(--td-comp-margin-s);
-  }
-
-  .brand {
-    width: 100%;
-    height: 40px;
-  }
-
-  .top-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .admin-shell {
-    display: block;
-    min-height: auto;
-  }
-
-  .side-nav {
-    width: 100%;
-    border-right: 0;
-    border-bottom: 1px solid var(--td-component-border);
-  }
-
-  .page {
-    padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-l);
-  }
-
   .page-header,
   .filter-row,
   .table-toolbar {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .filter-fields,
-  .filter-fields :deep(.t-form__item),
-  .filter-fields :deep(.t-form__item.craft-type-filter),
-  .filter-fields :deep(.t-form__item.craft-status-filter),
-  .filter-actions {
-    width: 100%;
   }
 
   .filter-actions {

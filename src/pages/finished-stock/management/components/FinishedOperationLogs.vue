@@ -262,7 +262,7 @@ const time = formatProductDateTime;
 .history-media-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--td-comp-margin-xxl);
 }
 .history-media-button {
   display: block;

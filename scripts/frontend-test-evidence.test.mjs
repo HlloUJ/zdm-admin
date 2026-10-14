@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
 
 const runner = fileURLToPath(new URL('./run-frontend-tests.mjs', import.meta.url));
@@ -28,10 +29,9 @@ function executeFixture(t, kind, source, options = {}) {
     args = ['--config', path.join(root, 'vitest.config.mjs')];
   } else {
     mkdirSync(path.join(root, 'scripts'));
-    writeFileSync(
-      path.join(root, 'scripts/feedback-foundation.test.mjs'),
-      `import {test,describe} from 'node:test';\n${source}`,
-    );
+    for (const file of SOURCE_GUARD_TESTS) {
+      writeFileSync(path.join(root, file), `import {test,describe} from 'node:test';\n${source}`);
+    }
   }
   const child = spawnSync(process.execPath, [runner, kind, ...args], { cwd: root, env, encoding: 'utf8' });
   const reportFile = path.join(reportDirectory, `${kind}-results.json`);
@@ -47,8 +47,8 @@ test('real Vitest and Node reporters preserve actual tests and nested suite inve
       kind,
       "describe('outer',()=>{describe('inner',()=>test('pass',()=>{})); test('second',()=>{})});",
     );
-    assert.equal(report.tests.length, 2);
-    assert.equal(report.files.length, 1);
+    assert.equal(report.tests.length, 2 * (kind === 'unit' ? 1 : SOURCE_GUARD_TESTS.length));
+    assert.equal(report.files.length, kind === 'unit' ? 1 : SOURCE_GUARD_TESTS.length);
     assert.equal(report.runId, 'fixture-first-run');
     validateFrontendTestReport(report, { kind, runId: 'fixture-first-run' });
   }

@@ -72,7 +72,8 @@
     "prepare": "husky",
     "test:source-guards": "node scripts/run-frontend-tests.mjs source-guards",
     "test:engineering": "node scripts/run-script-tests.mjs --engineering",
-    "test:scripts:files": "node scripts/run-script-tests.mjs --files"
+    "test:scripts:files": "node scripts/run-script-tests.mjs --files",
+    "check:ui-templates": "node --test scripts/ui-template-policy.test.mjs"
   },
   "lint-staged": {
     "*.{js,ts,vue}": [

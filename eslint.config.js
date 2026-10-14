@@ -14,6 +14,7 @@ export default tseslint.config(
       '.task-runtime/**',
       'playwright-report/**',
       'test-results/**',
+      'tests/fixtures/official-ui/upstream/**',
     ],
   },
   js.configs.recommended,

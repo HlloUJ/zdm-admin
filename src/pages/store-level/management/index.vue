@@ -13,7 +13,7 @@
           <t-tag theme="primary" variant="light">门店统一级别数据源</t-tag>
         </header>
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="auto" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="级别名称" name="name"
@@ -103,7 +103,7 @@
       @cancel="closeForm"
       @close="closeForm"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="88px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="级别名称" name="name"
           ><t-input v-model="formData.name" clearable placeholder="请输入级别名称"
         /></t-form-item>
@@ -327,61 +327,37 @@ onMounted(loadLevels);
 </script>
 
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--td-bg-color-page);
-}
-.admin-shell {
-  min-height: calc(100vh - 64px);
-  display: flex;
-  background: var(--td-bg-color-page);
-}
-.page {
-  min-width: 0;
-  flex: 1;
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xxl);
-}
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
 .filter-card,
 .table-card {
-  padding: var(--td-comp-paddingTB-xl) var(--td-comp-paddingLR-xl);
   background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: 6px;
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 .table-card {
-  margin-top: var(--td-comp-margin-l);
+  margin-top: var(--td-comp-margin-xxl);
+  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
+  border-radius: var(--td-radius-medium);
 }
 .filter-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-xxl);
 }
 .filter-fields :deep(.t-form__item) {
-  width: 240px;
   margin-bottom: 0;
-}
-.filter-fields :deep(.t-form__item.status-filter) {
-  width: 150px;
 }
 .filter-actions,
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 .filter-actions {
   justify-content: flex-end;
@@ -389,9 +365,9 @@ onMounted(loadLevels);
 .table-toolbar {
   display: flex;
   align-items: center;
-  margin-bottom: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 .zdm-admin-pagination {
-  margin-top: var(--td-comp-margin-l);
+  margin-top: var(--td-comp-margin-xxl);
 }
 </style>

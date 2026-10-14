@@ -34,6 +34,37 @@ function failureReference(attempt) {
     : null;
 }
 
+// A command that passed while its candidate moved has no valid result for either
+// candidate. Retain that failure, but match it by the full candidate, not a
+// narrower backend fingerprint. Real command/report/history failures stay strict.
+function invalidatedCandidate(attempt, attempts, seen = new Set()) {
+  if (!attempt || attempt.commandExitCode !== 0 || seen.has(attempt.attemptId)) return null;
+  if (attempt.reason === 'Source or baseline changed during validation') return attempt;
+  // Forced diagnostics retain the original block; they do not manufacture a new
+  // underlying test failure when the diagnostic command itself succeeded.
+  const priorId = attempt.firstFailure?.attemptId;
+  if (
+    !priorId ||
+    attempt.reason !==
+      `Attempt ${priorId} already failed for these inputs; repair relevant source or environment inputs before validation can pass`
+  )
+    return null;
+  seen.add(attempt.attemptId);
+  return invalidatedCandidate(
+    attempts.find((prior) => prior.attemptId === priorId),
+    attempts,
+    seen,
+  );
+}
+function sameCandidate(attempt, candidate) {
+  const fields = ['digest', 'baseline', 'mergeBase'];
+  return (
+    !attempt.candidate ||
+    fields.some((field) => !attempt.candidate[field] || !candidate[field]) ||
+    fields.every((field) => attempt.candidate[field] === candidate[field])
+  );
+}
+
 export async function runVerificationTask(task, options = {}) {
   const { root, name, command, args = [], env = process.env } = task;
   const inspect = options.captureIdentity ?? captureIdentity;
@@ -107,14 +138,15 @@ export async function runVerificationTask(task, options = {}) {
       historyError = `Verification attempt history unavailable: ${error.message}`;
     }
     const failures = attempts.filter((attempt) => attempt.exitCode !== 0);
-    const firstFailure = failures.find(
-      (attempt) =>
+    const firstFailure = failures.find((attempt) => {
+      const invalidation = invalidatedCandidate(attempt, attempts);
+      if (invalidation) return sameCandidate(invalidation, candidate);
+      return (
         attempt.fingerprint === before.fingerprint ||
         ((attempt.inputProofComplete === false || before.inputProofComplete === false) &&
-          (!attempt.candidate ||
-            ['digest', 'baseline', 'mergeBase'].some((field) => !attempt.candidate[field]) ||
-            ['digest', 'baseline', 'mergeBase'].every((field) => attempt.candidate[field] === candidate[field]))),
-    );
+          sameCandidate(attempt, candidate))
+      );
+    });
     const previousFailure =
       firstFailure ?? failures.find((attempt) => attempt.fingerprint === failures.at(-1)?.fingerprint);
     const runtimeCheck = task.kind === 'runtime';
@@ -168,7 +200,9 @@ export async function runVerificationTask(task, options = {}) {
             ? 'fresh-check'
             : firstFailure
               ? 'same-inputs'
-              : 'inputs-changed'
+              : invalidatedCandidate(previousFailure, attempts)
+                ? 'candidate-changed'
+                : 'inputs-changed'
         : 'first-attempt',
       name,
       status: 'running',
@@ -273,6 +307,17 @@ export async function runVerificationTask(task, options = {}) {
       completedAt: new Date().toISOString(),
       exitCode: finalCode,
       commandExitCode: exitCode,
+      candidateAfter: Object.fromEntries(
+        ['digest', 'baseline', 'mergeBase'].map((field) => [field, candidateAfter[field]]),
+      ),
+      failureKind:
+        finalCode !== 0
+          ? !sourceUnchanged && exitCode === 0 && !reportError && !historyError && !retryError
+            ? 'candidate-invalidated'
+            : retryError && exitCode === 0
+              ? 'prior-failure-blocked'
+              : 'execution-or-evidence'
+          : null,
       elapsedMs: Math.round(performance.now() - start),
       artifacts: afterArtifacts,
       tests: reportResult,

@@ -169,15 +169,13 @@ defineExpose({ scrollToSection });
 }
 .form-title-row h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--td-font-size-title-large);
 }
 .form-anchor-card {
   position: fixed;
   z-index: 10;
   box-sizing: border-box;
-  box-shadow:
-    0 6px 18px rgb(0 0 0 / 24%),
-    0 2px 4px rgb(0 0 0 / 16%);
+  box-shadow: var(--td-shadow-1);
 }
 .form-heading-card,
 .form-section {
@@ -188,7 +186,7 @@ defineExpose({ scrollToSection });
 }
 .form-section-title {
   margin: 0 0 var(--td-comp-margin-xxl);
-  font-size: 16px;
+  font-size: var(--td-font-size-body-large);
   font-weight: 600;
   line-height: 24px;
   text-align: left;
@@ -200,9 +198,7 @@ defineExpose({ scrollToSection });
   display: flex;
   justify-content: center;
   gap: var(--td-comp-margin-l);
-  box-shadow:
-    0 -6px 18px rgb(0 0 0 / 24%),
-    0 -2px 4px rgb(0 0 0 / 16%);
+  box-shadow: var(--td-shadow-1);
 }
 .product-tabs {
   min-height: 460px;

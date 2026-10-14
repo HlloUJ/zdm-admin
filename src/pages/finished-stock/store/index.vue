@@ -35,7 +35,7 @@
               >
                 <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tab.label" />
               </t-tabs>
-              <t-form class="zdm-admin-filter-form" label-width="auto" :data="filter" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="filter" colon>
                 <div class="filter-row">
                   <div class="filter-fields pool-filter-fields">
                     <t-form-item label="商品">
@@ -87,7 +87,7 @@
                   <t-button
                     v-for="action in storeToolbarActions"
                     :key="action.id === 'batch' ? batchAction?.kind : action.id"
-                    :theme="action.theme"
+                    :theme="action.className === 'brown-button' ? 'warning' : action.theme"
                     :variant="action.variant"
                     :class="action.className"
                     :disabled="action.disabled"
@@ -224,7 +224,7 @@
       <t-space direction="vertical" style="width: 100%">
         <t-form
           class="zdm-admin-filter-form"
-          label-width="auto"
+          label-width="80px"
           :data="{ keyword: poolKeyword, category: poolCategory }"
           colon
         >
@@ -371,7 +371,7 @@
       @cancel="offShelfVisible = false"
       @close="offShelfVisible = false"
     >
-      <t-form :data="offShelf" :label-width="pendingOffShelf?.batch ? '96px' : '92px'" colon>
+      <t-form :data="offShelf" label-width="100px" colon>
         <t-form-item label="下架原因" :required-mark="Boolean(pendingOffShelf?.batch)"
           ><t-select v-model="offShelf.reason" placeholder="请选择"
             ><t-option value="商品暂停售卖" label="商品暂停售卖" /><t-option

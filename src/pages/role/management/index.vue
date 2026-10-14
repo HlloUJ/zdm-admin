@@ -96,7 +96,7 @@
       @cancel="closeFormDialog"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="96px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="角色名称" name="name" required-mark>
           <t-input v-model="formData.name" clearable placeholder="请输入" />
         </t-form-item>
@@ -482,14 +482,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
-  margin-bottom: var(--td-comp-margin-l);
-}
-
 .role-list-layout {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -498,32 +490,11 @@ onMounted(() => {
   min-width: 0;
   display: grid;
   width: 100%;
-  gap: var(--td-comp-margin-l);
-}
-
-.role-table :deep(th),
-.role-table :deep(td) {
-  padding-right: 32px !important;
-  padding-left: 32px !important;
-  text-align: left;
-}
-
-.role-table :deep(.t-table__th-cell-inner) {
-  justify-content: flex-start;
-  padding-right: 0 !important;
-  padding-left: 0 !important;
-}
-
-.role-table :deep(.t-table__cell--title) {
-  justify-content: flex-start;
+  gap: var(--td-comp-margin-xxl);
 }
 
 .role-tabs {
-  margin-bottom: var(--td-comp-margin-l);
-}
-
-.role-tabs :deep(.t-tabs__nav-item) {
-  color: var(--td-text-color-secondary);
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 
 .role-tabs :deep(.t-is-active) {
@@ -541,19 +512,12 @@ onMounted(() => {
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
   flex-wrap: nowrap;
   white-space: nowrap;
 }
 
 .table-action-placeholder {
   color: var(--td-text-color-placeholder);
-}
-
-@media (max-width: 960px) {
-  .page-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
 }
 </style>
