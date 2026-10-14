@@ -32,16 +32,18 @@ test('keeps foundation pagination spacing consistent inside list layouts', async
     const paginationStyle = getComputedStyle(pagination);
     return {
       hostMarginTop: hostStyle.marginTop,
+      hostPadding: hostStyle.padding,
       paginationDisplay: paginationStyle.display,
       paginationJustifyContent: paginationStyle.justifyContent,
       paginationMarginTop: paginationStyle.marginTop,
       paginationWidth: paginationStyle.width,
-      hostWidth: getComputedStyle(host).width,
+      hostWidth: `${host.clientWidth - parseFloat(hostStyle.paddingLeft) - parseFloat(hostStyle.paddingRight)}px`,
     };
   });
 
   expect(styles).toEqual({
-    hostMarginTop: '24px',
+    hostMarginTop: '0px',
+    hostPadding: '16px',
     paginationDisplay: 'flex',
     paginationJustifyContent: 'flex-end',
     paginationMarginTop: '0px',
@@ -76,6 +78,49 @@ test('uses the official TDesign pagination controls on routed list pages', async
   }
 });
 
+test('matches the independent official filter grid and native pagination padding', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await setMockBusinessClient(page, 'supply-chain');
+  await page.goto('/supplier-management');
+  const form = page.locator('.zdm-admin-filter-form');
+  await expect(form).toBeVisible();
+  const formWidth = (await form.boundingBox())!.width;
+  const reference = await context.newPage();
+  await reference.goto('/tests/fixtures/official-ui/reference.html');
+  await reference.locator('.list-common-table').evaluate((host, width) => {
+    (host as HTMLElement).style.width = `${width + 64}px`;
+    (host as HTMLElement).style.boxSizing = 'border-box';
+  }, formWidth);
+  const measurements = (root: Element) => {
+    const left = root.getBoundingClientRect().left;
+    return Array.from(root.querySelectorAll('.t-form__item'))
+      .slice(0, 2)
+      .map((item) => {
+        const label = item.querySelector('.t-form__label')!;
+        const control = item.querySelector('.t-form__controls')!;
+        return {
+          labelLeft: label.getBoundingClientRect().left - left,
+          labelWidth: label.getBoundingClientRect().width,
+          controlLeft: control.getBoundingClientRect().left - left,
+          controlWidth: control.getBoundingClientRect().width,
+        };
+      });
+  };
+  const actual = await form.evaluate(measurements);
+  const expected = await reference.locator('.list-common-table > .t-form').evaluate(measurements);
+  actual.forEach((item, index) => {
+    for (const key of Object.keys(item) as (keyof typeof item)[]) {
+      expect(item[key], `${index}: ${key}`).toBeCloseTo(expected[index]![key], 0);
+    }
+  });
+  const nativePadding = await reference.locator('.t-table__pagination').evaluate((el) => getComputedStyle(el).padding);
+  await expect(page.locator('.table-card > .zdm-admin-pagination')).toHaveCSS('padding', nativePadding);
+  const filterBottom = (await page.locator('.filter-card').boundingBox())!;
+  const tableTop = (await page.locator('.table-card').boundingBox())!;
+  expect(tableTop.y).toBeCloseTo(filterBottom.y + filterBottom.height, 0);
+  await reference.close();
+});
+
 test('searches slabs by name, id, or SKU with the shared filter on every status tab', async ({ page }) => {
   await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
     await route.fulfill({
@@ -93,7 +138,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
     const styles = getComputedStyle(element);
     return { columnGap: styles.columnGap, rowGap: styles.rowGap };
   });
-  expect(primaryGap.columnGap).toBe(primaryGap.rowGap);
+  expect(primaryGap).toEqual({ columnGap: '0px', rowGap: '24px' });
   const keywordBox = await page.locator('.slab-keyword-filter').boundingBox();
   const supplierBox = await page.locator('.supplier-filter').boundingBox();
   const searchBox = await page.getByRole('button', { name: '查询', exact: true }).boundingBox();
@@ -140,7 +185,7 @@ test('aligns grade before supplier while keeping slab filter actions on the righ
   const resetBox = await page.locator('.reset-filter-button').boundingBox();
   const gradeBox = await page.locator('.grade-filter').boundingBox();
   expect(gradeBox?.x).toBe((await page.locator('.slab-keyword-filter').boundingBox())?.x);
-  expect(supplierBox!.x - gradeBox!.x - gradeBox!.width).toBeCloseTo(24, 0);
+  expect(supplierBox!.x - gradeBox!.x - gradeBox!.width).toBeCloseTo(0, 0);
   expect(resetBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
   expect(supplierBox!.x + supplierBox!.width).toBeCloseTo(itemBoxes[1].right, 0);
   expect((await page.locator('.slab-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
@@ -418,7 +463,7 @@ test('uses consistent label and condition spacing across list filters', async ({
     });
     for (const item of result) {
       expect(item.gap, route).toBeCloseTo(24, 0);
-      expect(item.groupGap, route).toBe('24px');
+      expect(item.groupGap, route).toBe('0px');
       expect(item.width, route).toBeGreaterThan(40);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), route).toBe(true);
@@ -468,7 +513,7 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
     const fields = page.locator('.filter-fields');
     const overflow = await fields.evaluate((host) => {
       const right = host.getBoundingClientRect().right;
-      return Array.from(host.querySelectorAll('.t-form__item, .filter-actions')).some(
+      return Array.from(host.querySelectorAll('.t-form__controls, .filter-actions > .t-button')).some(
         (item) => item.getBoundingClientRect().right > right + 1,
       );
     });

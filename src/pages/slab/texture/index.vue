@@ -14,7 +14,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="纹理" name="name">
@@ -89,7 +89,7 @@
       @cancel="formVisible = false"
       @close="formVisible = false"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="72px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="标准纹理" name="name"
           ><t-input v-model="formData.name" clearable placeholder="请输入标准纹理"
         /></t-form-item>
@@ -134,7 +134,7 @@
       @cancel="aliasFormVisible = false"
       @close="aliasFormVisible = false"
     >
-      <t-form ref="aliasFormRef" :data="aliasForm" :rules="aliasRules" label-width="72px" colon>
+      <t-form ref="aliasFormRef" :data="aliasForm" :rules="aliasRules" label-width="100px" colon>
         <t-form-item label="别名" name="name"
           ><t-input v-model="aliasForm.name" clearable placeholder="请输入纹理别名"
         /></t-form-item>
@@ -402,7 +402,7 @@ onMounted(loadData);
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
 }
 .filter-actions {
   justify-content: flex-end;
@@ -415,7 +415,7 @@ onMounted(loadData);
 }
 .table-actions {
   justify-content: flex-start;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 .zdm-admin-pagination {
   margin-top: var(--td-comp-margin-xxl);

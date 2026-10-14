@@ -7,7 +7,7 @@
     @update:visible="emit('update:visible', $event)"
   >
     <t-space direction="vertical" size="large" style="width: 100%">
-      <t-form class="zdm-admin-filter-form" label-width="100px" :data="filter" colon>
+      <t-form class="zdm-admin-filter-form" label-width="80px" :data="filter" colon>
         <div class="operation-log-filters">
           <t-form-item :label="subjectLabel" class="operation-log-keyword-filter">
             <t-input
@@ -191,12 +191,14 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: start;
-  gap: var(--td-comp-margin-xxl);
+  gap: var(--td-comp-margin-xxl) 0;
+  margin-inline: -12px;
 }
 .operation-log-filters :deep(.t-form__item) {
   min-width: 0;
   width: auto;
-  margin-bottom: 0;
+  padding-inline: 12px;
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 .operation-log-date-filter {
   grid-column: span 2;
@@ -207,6 +209,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
 }
 .operation-log-filter-actions {
   display: flex;
+  padding-inline: 12px;
   align-items: center;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);

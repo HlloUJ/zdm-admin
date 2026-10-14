@@ -2,7 +2,7 @@
   "version": 1,
   "starter": "0.14.0",
   "referenceComponent": "1.20.2",
-  "projectComponent": "1.20.7",
+  "projectComponent": "1.20.2",
   "sources": {
     "tests/fixtures/official-ui/upstream/src/components/common-table/index.vue": {
       "upstream": "src/components/common-table/index.vue",
@@ -43,7 +43,7 @@
   },
   "extension": {
     "id": "tab-filter-list",
-    "status": "pending-user-acceptance",
-    "scope": "Native Tabs + native inline Form with left-aligned labels + configured actions; list container/spacing from common-table; business cells via slots. No new visual constants."
+    "status": "accepted",
+    "scope": "Native Tabs + official common-table 10:2 / 4-column-span query grid with 80px right-aligned labels + configured actions; list container/spacing from common-table; business cells via slots. Existing inline configuration API retained for its consumers. No new visual constants."
   }
 }

@@ -970,10 +970,6 @@ onBeforeUnmount(() => {
 .category-content :deep(.t-space-item) {
   width: 100%;
 }
-.category-content :deep(.t-tree__item.t-is-active) {
-  background-color: var(--td-brand-color-light);
-  border-radius: var(--td-radius-default);
-}
 .attribute-table :deep(.attribute-drag-cell:first-child) {
   padding-left: 0;
   padding-right: 0;

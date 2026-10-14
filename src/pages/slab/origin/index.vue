@@ -18,7 +18,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="产地" name="name">
@@ -102,7 +102,7 @@
       @cancel="closeFormDialog"
       @close="closeFormDialog"
     >
-      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="72px" colon>
+      <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="产地" name="name">
           <t-input v-model="formData.name" clearable placeholder="请输入产地" />
         </t-form-item>
@@ -383,7 +383,7 @@ onMounted(loadOrigins);
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
 }
 .filter-actions {
   justify-content: flex-end;
@@ -396,7 +396,7 @@ onMounted(loadOrigins);
 }
 .table-actions {
   justify-content: flex-start;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 .zdm-admin-pagination {
   margin-top: var(--td-comp-margin-xxl);

@@ -512,7 +512,7 @@ onMounted(() => {
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
   flex-wrap: nowrap;
   white-space: nowrap;
 }

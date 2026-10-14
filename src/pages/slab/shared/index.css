@@ -53,10 +53,6 @@
   margin-top: var(--td-comp-margin-l);
 }
 
-.operation-log-detail__prices :deep(thead th) {
-  background-color: var(--td-bg-color-secondarycontainer);
-}
-
 .operation-log-detail :deep(.t-descriptions__content),
 .operation-log-detail :deep(.t-descriptions__label) {
   overflow-wrap: anywhere;
@@ -281,18 +277,6 @@
 .selection-info {
   color: var(--td-text-color-secondary);
   font: var(--td-font-body-medium);
-}
-
-.brown-button {
-  color: var(--td-text-color-anti);
-  background: var(--td-warning-color);
-  border-color: var(--td-warning-color);
-}
-
-.dark-red-button {
-  color: var(--td-text-color-anti);
-  background: var(--td-error-color);
-  border-color: var(--td-error-color);
 }
 
 .slab-image {

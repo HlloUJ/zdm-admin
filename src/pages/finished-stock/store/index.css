@@ -49,15 +49,6 @@
 :deep(.finished-stock-table .t-table__empty-row > td) {
   padding-inline: 0;
 }
-.brown-button {
-  color: var(--td-text-color-anti);
-  background: var(--td-warning-color);
-  border-color: var(--td-warning-color);
-}
-.deep-danger-button {
-  background: var(--td-error-color);
-  border-color: var(--td-error-color);
-}
 @media (max-width: 1180px) {
   .filter-fields {
     grid-template-columns: repeat(2, minmax(220px, 1fr));

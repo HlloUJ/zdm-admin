@@ -31,7 +31,7 @@
     <div ref="readonlyFields" class="readonly-product-fields">
       <StoreProductDetail :product="product" editor-layout>
         <template #basic-extra>
-          <t-form ref="formRef" class="supplier-form" :data="form" :rules="rules" label-width="116px" colon>
+          <t-form ref="formRef" class="supplier-form" :data="form" :rules="rules" label-width="100px" colon>
             <t-form-item label="门店分类" name="categoryId"
               ><t-cascader
                 v-model="form.categoryId"
@@ -46,7 +46,7 @@
         <template #sales="{ rows, columns, span }">
           <AdminSectionCard id="store-finished-product-sales" class="form-section" aria-label="销售信息">
             <h2 class="form-section-title">销售信息</h2>
-            <t-form :data="form" label-width="116px" colon>
+            <t-form :data="form" label-width="100px" colon>
               <t-form-item label="销售规格">
                 <div class="spec-table-block">
                   <t-table

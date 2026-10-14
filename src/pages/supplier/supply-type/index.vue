@@ -9,7 +9,7 @@
         </AdminPageHeader>
         <AdminListLayout>
           <template #filters>
-            <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon @submit="handleSearch">
+            <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon @submit="handleSearch">
               <div class="supply-type-filter-row">
                 <div class="supply-type-filter-fields">
                   <div class="supply-type-name-filter">

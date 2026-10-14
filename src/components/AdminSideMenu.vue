@@ -1,10 +1,17 @@
 <template>
-  <aside ref="sideNav" class="side-nav" @click.capture="handleSideNavClick" @scroll.capture="rememberScroll">
+  <aside
+    ref="sideNav"
+    class="side-nav"
+    :class="{ 'side-nav--compact': sidebarCollapsed }"
+    @click.capture="handleSideNavClick"
+    @scroll.capture="rememberScroll"
+  >
     <t-menu
       :value="activeMenu"
       class="menu"
       theme="light"
       :expanded="expandedMenus"
+      :collapsed="sidebarCollapsed"
       @change="handleMenuChange"
       @expand="handleMenuExpand"
     >
@@ -24,6 +31,7 @@
           <template #icon>
             <t-icon :name="entry.icon" />
           </template>
+          <span class="zdm-menu-hover-bridge" aria-hidden="true" />
           <template v-for="child in entry.children" :key="'path' in child ? child.path : child.value">
             <t-menu-item
               v-if="'path' in child"
@@ -34,6 +42,7 @@
               {{ child.label }}
             </t-menu-item>
             <t-submenu v-else :value="child.value" :title="child.label" class="menu-level-two">
+              <span class="zdm-menu-hover-bridge zdm-menu-hover-bridge--nested" aria-hidden="true" />
               <t-menu-item
                 v-for="grandchild in child.children"
                 :key="grandchild.path"
@@ -68,6 +77,15 @@ const route = useRoute();
 const router = useRouter();
 const { expandedMenus, handleMenuExpand, scrollPosition } = useSideMenuState();
 const sideNav = ref<HTMLElement>();
+const sidebarCollapsed = ref(false);
+const syncSidebarLayout = () => {
+  sidebarCollapsed.value = window.innerWidth <= 991;
+};
+onMounted(() => {
+  syncSidebarLayout();
+  window.addEventListener('resize', syncSidebarLayout);
+});
+onBeforeUnmount(() => window.removeEventListener('resize', syncSidebarLayout));
 let restoringScroll = true;
 
 const rememberScroll = () => {

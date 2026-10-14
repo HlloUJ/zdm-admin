@@ -50,7 +50,7 @@
                   </t-form>
                 </div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店级别" name="name">
@@ -629,7 +629,7 @@ onMounted(loadData);
   gap: var(--td-comp-margin-s);
 }
 .table-actions {
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 .price-level-select,
 .price-coefficient-input {

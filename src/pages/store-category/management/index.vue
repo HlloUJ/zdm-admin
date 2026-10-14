@@ -15,7 +15,7 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showTabRail" v-model="activeScope" :list="scopeTabs" :disabled="sorting" />
-              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="分类名称" name="keyword">

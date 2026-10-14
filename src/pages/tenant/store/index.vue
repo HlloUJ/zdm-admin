@@ -12,7 +12,7 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showStoreTabRail" v-model="activeTab" :list="storeTabs" />
-              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店名称" name="shopName">
@@ -826,7 +826,7 @@ onMounted(loadStorePage);
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 
 :deep(.t-dialog__body) {

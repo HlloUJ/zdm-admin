@@ -107,3 +107,14 @@ test('approved visual surfaces use official color and shadow tokens', () => {
       });
   }
 });
+
+test('approved responsive sidebar additions cannot hide business changes or a different breakpoint', () => {
+  const file = 'src/components/AdminSideMenu.vue';
+  const source = read(file);
+  const baseline = refactor.contracts[file];
+  assert.deepEqual(contractViolations(file, source, baseline), []);
+  assert.ok(contractViolations(file, source.replace('<= 991', '<= 990'), baseline).length);
+  assert.ok(
+    contractViolations(file, source.replace('@change="handleMenuChange"', '@change="otherHandler"'), baseline).length,
+  );
+});

@@ -23,7 +23,7 @@
           <t-tabs v-model="activeTab" class="attribute-tabs" :list="tabList" @change="handleTabChange" />
 
           <section class="filter-card">
-            <t-form class="zdm-admin-filter-form" label-width="100px" :data="currentState.searchForm" colon>
+            <t-form class="zdm-admin-filter-form" label-width="80px" :data="currentState.searchForm" colon>
               <div class="filter-row">
                 <div class="filter-fields">
                   <t-form-item label="属性" name="name">
@@ -711,7 +711,7 @@ const handleConfirm = () => {
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 
 .option-panel {

@@ -25,7 +25,7 @@
                 @change="handleManagedClientChange"
               />
 
-              <t-form class="zdm-admin-filter-form" label-width="100px" :data="filterDraft" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="filterDraft" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="姓名" name="name" class="name-filter">
@@ -933,7 +933,7 @@ onMounted(() => {
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
   white-space: nowrap;
 }
 

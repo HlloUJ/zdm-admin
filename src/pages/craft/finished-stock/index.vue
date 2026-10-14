@@ -18,7 +18,7 @@
         </header>
 
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="工艺名称">
@@ -749,7 +749,7 @@ onMounted(loadCrafts);
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: var(--td-comp-margin-m);
+  gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
 
 @media (max-width: 960px) {

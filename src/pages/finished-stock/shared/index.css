@@ -45,15 +45,6 @@
 :deep(.finished-stock-table .t-table__empty-row > td) {
   padding-inline: 0;
 }
-.brown-button {
-  color: var(--td-text-color-anti);
-  background: var(--td-warning-color);
-  border-color: var(--td-warning-color);
-}
-.deep-danger-button {
-  background: var(--td-error-color);
-  border-color: var(--td-error-color);
-}
 @media (max-width: 1180px) {
   .filter-fields {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
@@ -244,16 +235,16 @@
 }
 
 .form-section-title {
-  margin: 0 0 var(--td-comp-margin-xxl);
-  font-size: var(--td-font-size-body-large);
-  font-weight: 600;
-  line-height: 24px;
+  margin: var(--td-comp-margin-xxl) 0 var(--td-comp-margin-xl);
+  color: var(--td-text-color-primary);
+  font: var(--td-font-title-large);
+  font-weight: 400;
   text-align: left;
 }
 
 .form-grid {
   display: grid;
-  gap: 16px 20px;
+  gap: var(--td-comp-margin-xxl) var(--td-comp-margin-xxxl);
 }
 
 .form-grid.two {
@@ -378,18 +369,6 @@
 :deep(.spec-table-block .t-table__th),
 :deep(.spec-table-block .t-table__td) {
   white-space: nowrap;
-  border-right: 1px solid var(--td-component-border);
-  border-bottom: 1px solid var(--td-component-border);
-}
-
-:deep(.spec-table-block .t-table__th:first-child),
-:deep(.spec-table-block .t-table__td:first-child) {
-  border-left: 1px solid var(--td-component-border);
-}
-
-.spec-table-block :deep(.t-table thead th) {
-  background: var(--td-bg-color-secondarycontainer);
-  border-top: 1px solid var(--td-component-border);
 }
 
 .spec-table-block .price-pair {
@@ -807,10 +786,6 @@
 .batch-field-grid > :deep(.t-form__item) {
   min-width: 0;
   margin-bottom: 0;
-}
-
-.batch-field-grid :deep(.t-form__label) {
-  font-size: var(--td-font-size-body-small);
 }
 
 .batch-field-grid .price-pair.wide {

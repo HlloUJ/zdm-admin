@@ -43,7 +43,17 @@ export function businessFingerprint(source) {
 export function contractViolations(file, source, baseline) {
   if (!baseline) return [`${file}: missing pre-refactor business contract`];
   if (!file.endsWith('.vue')) return digest(source) === baseline.content ? [] : [`${file}: nonvisual source changed`];
-  const current = businessFingerprint(source);
+  let protectedSource = source;
+  // Exact, recorded user-approved presentation changes. The original
+  // pre-refactor hashes stay intact; any other script/template edit still fails.
+  if (baseline.approvedVisualPatches) {
+    for (const patch of baseline.approvedVisualPatches ?? []) {
+      if (!patch.after || protectedSource.split(patch.after).length !== 2)
+        return [`${file}: approved visual patch changed`];
+      protectedSource = protectedSource.replace(patch.after, patch.before);
+    }
+  }
+  const current = businessFingerprint(protectedSource);
   return ['script', 'template']
     .filter((key) => current[key] !== baseline[key])
     .map((key) => `${file}: ${key} business contract changed`);

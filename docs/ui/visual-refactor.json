@@ -98,7 +98,34 @@
     },
     "src/components/AdminSideMenu.vue": {
       "script": "f52b00a25f57aa54dec8335839182309ed10324623fc0918cd00cdc5fc9e71be",
-      "template": "3431a9cae80c6bfcbe4ea75e7cda3ad0f4327e022a05e8588eb89688a77850e0"
+      "template": "3431a9cae80c6bfcbe4ea75e7cda3ad0f4327e022a05e8588eb89688a77850e0",
+      "approvedVisualPatches": [
+        {
+          "reason": "2026-10-14 user explicitly approved official <=991px native menu collapse; preserve all existing handlers and menu data.",
+          "before": "",
+          "after": "const sidebarCollapsed = ref(false);\nconst syncSidebarLayout = () => {\n  sidebarCollapsed.value = window.innerWidth <= 991;\n};\nonMounted(() => {\n  syncSidebarLayout();\n  window.addEventListener('resize', syncSidebarLayout);\n});\nonBeforeUnmount(() => window.removeEventListener('resize', syncSidebarLayout));\n"
+        },
+        {
+          "reason": "Native menu collapsed presentation only.",
+          "before": "",
+          "after": ":collapsed=\"sidebarCollapsed\""
+        },
+        {
+          "reason": "Collapsed sidebar layout width only.",
+          "before": "",
+          "after": ":class=\"{ 'side-nav--compact': sidebarCollapsed }\""
+        },
+        {
+          "reason": "User approved fixing collapsed submenu hover continuity; decorative real hit target matching native spacer, no menu data or events changed.",
+          "before": "",
+          "after": "<span class=\"zdm-menu-hover-bridge\" aria-hidden=\"true\" />"
+        },
+        {
+          "reason": "Same approved hover continuity correction for the third-level popup.",
+          "before": "",
+          "after": "<span class=\"zdm-menu-hover-bridge zdm-menu-hover-bridge--nested\" aria-hidden=\"true\" />"
+        }
+      ]
     },
     "src/components/AdminTopNav.vue": {
       "script": "98b6f6dccb8f55f21788fdac1207ec00fb888d3c10f1ca69062e509c2f2b961c",
@@ -110,11 +137,25 @@
     },
     "src/components/foundation/AdminConfirmDialog.vue": {
       "script": "d862bb54aaaeea4738bdf7cbed53f72f1d5c346abbcf5c186955139c358b0441",
-      "template": "0151079d2a81f739ad7ea591c6bfeaa170db180fd6aaeec655875f096f52c7fc"
+      "template": "0151079d2a81f739ad7ea591c6bfeaa170db180fd6aaeec655875f096f52c7fc",
+      "approvedVisualPatches": [
+        {
+          "reason": "User explicitly approved native confirmation dialog default width including customer management; preserve explicit widths, content, buttons and all events.",
+          "before": "width: '440px',",
+          "after": "width: '480px',"
+        }
+      ]
     },
     "src/components/foundation/AdminDialog.vue": {
       "script": "4c08e5d71115198f1ffb0bf2b9c74487e220ba73becc36224f3deafd96c56c2c",
-      "template": "29cef91425fac4697daa7cb8452425e0c92e04267d83efc96d1414a84a821fb5"
+      "template": "29cef91425fac4697daa7cb8452425e0c92e04267d83efc96d1414a84a821fb5",
+      "approvedVisualPatches": [
+        {
+          "reason": "User approved native dialog default width only. Explicit page widths, placement, scroll, events and buttons stay unchanged.",
+          "before": "width: '520px',",
+          "after": "width: '480px',"
+        }
+      ]
     },
     "src/components/foundation/AdminListLayout.vue": {
       "script": "439083f38956ba51ece90631552c6ea23c5c29570d3d5710e408e77e01ba7375",
@@ -304,7 +345,14 @@
     },
     "src/pages/finished-stock/management/index.vue": {
       "script": "94b21bac2c10aec59df17259ae9f5922a16fd0a29d84ea78228fe300db5fca5a",
-      "template": "bb99f54b1d202688b357254852f4b439172010438903d7e4878d59a101361c51"
+      "template": "bb99f54b1d202688b357254852f4b439172010438903d7e4878d59a101361c51",
+      "approvedVisualPatches": [
+        {
+          "reason": "User approved purely visual native warning theme; preserve action IDs, labels, disabled states, permissions and handlers.",
+          "before": ":theme=\"action.theme\"",
+          "after": ":theme=\"action.className === 'brown-button' ? 'warning' : action.theme\""
+        }
+      ]
     },
     "src/pages/finished-stock/management/layeredSpecs.test.ts": {
       "content": "2412ee03460ff2409c9736fbc4d14d891763cbc368085fc1a3bdf9ee94ab150f"
@@ -380,7 +428,14 @@
     },
     "src/pages/finished-stock/store/index.vue": {
       "script": "9f3128f29756dfab485f8adf3ebaa74e9d05724e2c7d3746dd1920bc55a74dbf",
-      "template": "a62d729be2ab3ea4325042db4d4d1580bb55bdf2cb7afb78e827f86d0f7f4dea"
+      "template": "a62d729be2ab3ea4325042db4d4d1580bb55bdf2cb7afb78e827f86d0f7f4dea",
+      "approvedVisualPatches": [
+        {
+          "reason": "User approved purely visual native warning theme; preserve action IDs, labels, disabled states, permissions and handlers.",
+          "before": ":theme=\"action.theme\"",
+          "after": ":theme=\"action.className === 'brown-button' ? 'warning' : action.theme\""
+        }
+      ]
     },
     "src/pages/finished-stock/store/price-configuration.vue": {
       "script": "75d9397a56222144493f74c7f20438b35f39edbce7d3ff0dd146f92645e4a435",
@@ -403,7 +458,14 @@
     },
     "src/pages/finished-stock/supply-chain/index.vue": {
       "script": "851647590db2f97118f7c7d89620db0ecd8d9ca380e6595f196a173490e503b4",
-      "template": "35bc188eb018465e9c51cf1bdac516cb6611b062264adc6f777a756da4d8acb4"
+      "template": "35bc188eb018465e9c51cf1bdac516cb6611b062264adc6f777a756da4d8acb4",
+      "approvedVisualPatches": [
+        {
+          "reason": "User approved purely visual native warning theme; preserve action IDs, labels, disabled states, permissions and handlers.",
+          "before": ":theme=\"action.theme\"",
+          "after": ":theme=\"action.className === 'brown-button' ? 'warning' : action.theme\""
+        }
+      ]
     },
     "src/pages/login/index.vue": {
       "script": "cf0abe436abb83c3dd3c74cf1016e7e6c58e1d55b729a0695e2728a7da17329b",
@@ -463,7 +525,14 @@
     },
     "src/pages/slab/management/index.vue": {
       "script": "f71d4f197094e545157d2cf5cce6f02cefc619c424f54891066705bace218f4f",
-      "template": "adf809635676231455289b8467a2f73e1366cf276b9ca18bf6ad36e90432e664"
+      "template": "adf809635676231455289b8467a2f73e1366cf276b9ca18bf6ad36e90432e664",
+      "approvedVisualPatches": [
+        {
+          "reason": "User approved purely visual native warning theme; preserve action IDs, labels, disabled states, permissions and handlers.",
+          "before": ":theme=\"button.theme\"",
+          "after": ":theme=\"button.className === 'brown-button' ? 'warning' : button.theme\""
+        }
+      ]
     },
     "src/pages/slab/management/priceInteraction.test.ts": {
       "content": "8e67c5724f73bcb1fde3407104985a5dba22a000835a46a2766fb10cebd0e250"
@@ -507,7 +576,14 @@
     },
     "src/pages/slab/supply-chain/index.vue": {
       "script": "251b0c61243b185ecf3fc1f2be8a0ef5977321d7ef9e158b8cd9eec781282290",
-      "template": "35c971b52e8a54de2adae17be567e2f469f79fc14d1787e7e390acfe14583627"
+      "template": "35c971b52e8a54de2adae17be567e2f469f79fc14d1787e7e390acfe14583627",
+      "approvedVisualPatches": [
+        {
+          "reason": "User approved purely visual native warning theme; preserve action IDs, labels, disabled states, permissions and handlers.",
+          "before": ":theme=\"button.theme\"",
+          "after": ":theme=\"button.className === 'brown-button' ? 'warning' : button.theme\""
+        }
+      ]
     },
     "src/pages/slab/texture/index.vue": {
       "script": "8bba28675bec70ee93d43597733493354c15db4b63f754a91ff512c88145b11e",

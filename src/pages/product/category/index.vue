@@ -17,7 +17,7 @@
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" class="scope-tabs" />
                 <div class="source-caption">通过层级关系维护商品分类；末级分类可配置发布属性模板，最多支持 4 级。</div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="分类名称" name="keyword">

@@ -26,7 +26,7 @@
                 <t-tab-panel v-for="tab in slabTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
               </t-tabs>
 
-              <t-form class="zdm-admin-filter-form" label-width="100px" :data="currentFilter" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="currentFilter" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
@@ -127,7 +127,7 @@
                   <t-button
                     v-for="button in batchButtons"
                     :key="button.action"
-                    :theme="button.theme"
+                    :theme="button.className === 'brown-button' ? 'warning' : button.theme"
                     :class="button.className"
                     :disabled="saving"
                     @click="handleBatchAction(button.action)"
@@ -334,13 +334,7 @@
             </div>
           </template>
           <template #base>
-            <t-form
-              ref="productFormRef"
-              :data="productForm"
-              :rules="productRules"
-              :label-width="isProductFormPage ? '116px' : '92px'"
-              colon
-            >
+            <t-form ref="productFormRef" :data="productForm" :rules="productRules" label-width="100px" colon>
               <div class="dialog-form-grid" :class="{ 'publish-base-grid': isProductFormPage }">
                 <t-form-item label="品种" name="variety">
                   <t-select
@@ -501,7 +495,7 @@
               :class="{ 'publish-sales-form': isProductFormPage }"
               :data="productForm"
               :rules="salesRules"
-              :label-width="isProductFormPage ? '116px' : '96px'"
+              label-width="100px"
               colon
             >
               <t-form-item label="成本价" name="cost" required-mark>

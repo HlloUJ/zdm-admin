@@ -425,6 +425,11 @@ test('customer profile, followup, assignment and confirmations retain native com
     await reference.mouse.move(0, 0);
     for (const selector of ['.t-dialog__header', '.t-dialog__body', '.t-dialog__footer', '.t-button--variant-base'])
       await expect.poll(() => styleOf(dialog.locator(selector))).toEqual(await styleOf(native.locator(selector)));
+    const confirmationContent = dialog.locator('.zdm-admin-confirm-dialog__content');
+    if (await confirmationContent.count()) {
+      await expect(dialog).toHaveCSS('width', await native.evaluate((element) => getComputedStyle(element).width));
+      await expect(confirmationContent).toHaveCSS('color', (await styleOf(native.locator('.t-dialog__body'))).color);
+    }
     if (fields) {
       expect(await styleOf(dialog.locator('.t-form__label'))).toEqual(await styleOf(native.locator('.t-form__label')));
       for (const selector of ['.t-input', '.t-textarea__inner', '.t-upload', '.t-date-picker', '.t-select']) {
@@ -576,4 +581,22 @@ test('customer detail loading, empty followups and read-only states remain visib
   await expect(detail.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(detail.getByText('删除', { exact: true })).toHaveCount(0);
   await detail.screenshot({ path: testInfo.outputPath('detail-readonly.png'), animations: 'disabled' });
+});
+
+test('customer query grid retains the official desktop structure at narrow widths', async ({ page }) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  for (const width of [1366, 992, 991, 619, 375]) {
+    await page.setViewportSize({ width, height: 858 });
+    const form = page.locator('.zdm-official-list-page__grid-filters');
+    await expect(form.locator('.t-form > .t-row > .t-col').first()).toHaveClass(/t-col-10/);
+    await expect(form.locator('.t-col-10 > .t-row > .t-col-4')).toHaveCount(3);
+    await expect(form.locator('.t-col-2')).toBeVisible();
+    await expect(page.locator('.admin-shell > .page')).toHaveCSS('min-width', '760px');
+    await expect(page.locator('.admin-shell')).toHaveCSS('display', 'flex');
+    await expect(form.locator('.t-col-10 > .t-row')).toHaveCSS('display', 'flex');
+    await expect(page.locator('.side-nav > .t-default-menu')).toHaveClass(
+      width <= 991 ? /t-is-collapsed/ : /^(?!.*t-is-collapsed)/,
+    );
+  }
 });

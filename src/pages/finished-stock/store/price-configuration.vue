@@ -20,7 +20,7 @@
               <div class="list-controls">
                 <t-form
                   class="zdm-admin-filter-form"
-                  label-width="100px"
+                  label-width="80px"
                   :data="searchForm"
                   colon
                   @submit="queryCategories"

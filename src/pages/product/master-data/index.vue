@@ -12,7 +12,7 @@
         </header>
         <t-alert theme="info" class="page-tip">{{ config.tip }}</t-alert>
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon
+          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon
             ><div class="filter-row">
               <div class="filter-fields">
                 <t-form-item :label="config.entityName"
@@ -250,7 +250,7 @@ onMounted(loadData);
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-xxl);
+  gap: var(--td-comp-margin-xxl) var(--td-comp-margin-l);
 }
 .filter-row {
   justify-content: space-between;
@@ -268,6 +268,6 @@ onMounted(loadData);
   font-size: var(--td-font-size-body-medium);
 }
 .table-actions {
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
 }
 </style>

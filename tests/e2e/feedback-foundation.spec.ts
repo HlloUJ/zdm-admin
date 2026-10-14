@@ -31,7 +31,7 @@ async function expectUnifiedConfirmDialog(page: Page, options: { action: string;
   const confirmButton = dialog.getByRole('button', { name: `确认${options.action}`, exact: true });
   await expect(confirmButton).toBeVisible();
   if (options.danger) await expect(confirmButton).toHaveClass(/t-button--theme-danger/);
-  await expect(dialog).toHaveCSS('width', '440px');
+  await expect(dialog).toHaveCSS('width', '480px');
 }
 
 async function selectProductOption(

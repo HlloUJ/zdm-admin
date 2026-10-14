@@ -15,7 +15,7 @@
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
                 <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="100px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="所属属性" name="attribute">
@@ -504,7 +504,7 @@ onMounted(loadValues);
 .table-actions {
   display: flex;
   align-items: center;
-  gap: var(--td-comp-margin-s);
+  gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
   white-space: nowrap;
 }
 .table-action-placeholder {
