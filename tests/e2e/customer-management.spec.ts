@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 const prefix = 'store.customer-management';
 const ok = (data: unknown) => ({ code: 0, message: 'ok', data });
@@ -394,12 +394,7 @@ test('customer list follows standard spacing without clipped columns at the revi
 });
 
 // Native component reference imports no application stylesheet or foundation wrapper.
-test('customer profile, followup, assignment and confirmations retain native component visuals', async ({
-  page,
-}, testInfo) => {
-  test.setTimeout(60000);
-  await setup(page, [...daily, ...archived]);
-  await page.goto('/store/customer-management');
+async function nativeDialogVisuals(page: Page, testInfo: TestInfo) {
   const reference = await page.context().newPage();
   await reference.goto('/tests/fixtures/official-ui/reference.html?mode=dialog');
   const native = reference.locator('.t-dialog:visible');
@@ -440,6 +435,13 @@ test('customer profile, followup, assignment and confirmations retain native com
     await dialog.screenshot({ path: testInfo.outputPath(image + '.png'), animations: 'disabled' });
     return dialog;
   };
+  return { reference, native, styleOf, checkDialog };
+}
+
+test('customer profile dialogs retain native component visuals', async ({ page }, testInfo) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  const { reference, checkDialog, native, styleOf } = await nativeDialogVisuals(page, testInfo);
   await page.getByRole('button', { name: '新增', exact: true }).click();
   let dialog = await checkDialog('新增客户', 'profile-create', true);
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
@@ -453,6 +455,15 @@ test('customer profile, followup, assignment and confirmations retain native com
   await own.getByText('编辑', { exact: true }).click();
   dialog = await checkDialog('编辑客户', 'profile-edit', true);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await reference.close();
+});
+
+test('customer followup dialogs retain native component visuals', async ({ page }, testInfo) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  const { reference, checkDialog, native, styleOf } = await nativeDialogVisuals(page, testInfo);
+  const own = page.locator('tr').filter({ hasText: '王先生1' });
+  let dialog: ReturnType<Page['locator']>;
   await own.getByText('详情', { exact: true }).click();
   const detail = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
   await expect(detail.getByText('原导购历史跟进', { exact: true })).toBeVisible();
@@ -472,6 +483,15 @@ test('customer profile, followup, assignment and confirmations retain native com
   await dialog.screenshot({ path: testInfo.outputPath('followup-delete.png'), animations: 'disabled' });
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await detail.getByRole('button', { name: '关闭', exact: true }).click();
+  await reference.close();
+});
+
+test('daily customer assignment and confirmations retain native component visuals', async ({ page }, testInfo) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  const { reference, checkDialog } = await nativeDialogVisuals(page, testInfo);
+  const own = page.locator('tr').filter({ hasText: '王先生1' });
+  let dialog: ReturnType<Page['locator']>;
   await own.getByText('调整归属', { exact: true }).click();
   dialog = await checkDialog('调整归属', 'assign-single', true);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -479,12 +499,21 @@ test('customer profile, followup, assignment and confirmations retain native com
   dialog = await checkDialog('是否归档', 'archive-single', false);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await own.locator('.t-checkbox').click();
+  await expect(own.getByRole('checkbox')).toBeChecked();
   await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
   dialog = await checkDialog('调整归属', 'assign-batch', true);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await page.getByRole('button', { name: '批量归档', exact: true }).click();
   dialog = await checkDialog('是否归档', 'archive-batch', false);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await reference.close();
+});
+
+test('archived customer assignment and confirmations retain native component visuals', async ({ page }, testInfo) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  const { reference, checkDialog, native, styleOf } = await nativeDialogVisuals(page, testInfo);
+  let dialog: ReturnType<Page['locator']>;
   await page.getByText('归档客户', { exact: true }).click();
   const archivedRow = page.locator('tr').filter({ hasText: '王先生3' });
   await archivedRow.getByText('调整归属', { exact: true }).click();
@@ -506,6 +535,7 @@ test('customer profile, followup, assignment and confirmations retain native com
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
   }
   await archivedRow.locator('.t-checkbox').click();
+  await expect(archivedRow.getByRole('checkbox')).toBeChecked();
   for (const label of ['批量取消归档', '批量彻底删除']) {
     await page.getByRole('button', { name: label, exact: true }).click();
     dialog = page.locator('.t-dialog:visible').filter({ hasText: `是否${label.slice(2)}` });
