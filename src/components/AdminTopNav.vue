@@ -1,6 +1,6 @@
 <template>
   <header class="top-nav">
-    <div class="brand">
+    <div class="brand identity-brand">
       <div class="brand-logo">装</div>
       <div class="brand-title">装点猫</div>
     </div>
@@ -10,15 +10,42 @@
         v-model="selectedIdentityId"
         v-model:popup-visible="identitySelectorOpen"
         class="brand-context-select"
-        :loading="switchingIdentity"
-        :input-props="{ inputClass: 'identity-context-input' }"
-        :popup-props="{ overlayInnerStyle: { minWidth: '320px', maxWidth: 'calc(100vw - 32px)' } }"
+        :readonly="switchingIdentity"
+        :aria-busy="switchingIdentity"
+        :class="{ 'identity-pointer-focus': identityPointerFocus }"
+        :input-props="{ inputClass: 'identity-context-input', borderless: true }"
+        :popup-props="{
+          overlayInnerClassName: 'zdm-identity-popup',
+          placement: 'bottom-left',
+          popperOptions: { modifiers: [{ name: 'offset', options: { offset: [48, 4] } }] },
+          overlayInnerStyle: { minWidth: '340px', maxWidth: 'calc(100vw - 32px)' },
+        }"
         aria-label="切换业务身份"
+        @pointerdown.capture="identityPointerFocus = true"
+        @keydown.capture="identityPointerFocus = false"
+        @keyup.capture="identityPointerFocus = false"
         @change="handleIdentityChange"
       >
+        <template #prefixIcon>
+          <span class="identity-icon identity-trigger-icon"
+            ><IdentityContextIcon :name="identityIcon(loginUser)"
+          /></span>
+        </template>
+        <template #panelTopContent><div class="identity-panel-heading">切换身份</div></template>
+        <template #suffixIcon><span /></template>
         <template #valueDisplay>
           <span class="brand-context-label identity-lines">
-            <span class="identity-name" :title="currentIdentityLabel">{{ currentIdentityLabel }}</span>
+            <span class="identity-title-row">
+              <span class="identity-name" :title="currentIdentityLabel">{{ currentIdentityLabel }}</span>
+              <t-loading v-if="switchingIdentity" size="small" />
+              <t-icon
+                v-else
+                name="chevron-down"
+                class="identity-toggle"
+                :class="{ 'identity-toggle-open': identitySelectorOpen }"
+                aria-hidden="true"
+              />
+            </span>
             <span class="identity-type">{{ currentIdentityType }}</span>
           </span>
         </template>
@@ -29,7 +56,8 @@
           :label="option.label"
           :value="option.value"
         >
-          <span class="identity-option-layout">
+          <span class="identity-option-layout" :class="{ 'identity-section-start': option.sectionStart }">
+            <span class="identity-icon identity-option-icon"><IdentityContextIcon :name="option.icon" /></span>
             <span class="identity-lines">
               <span class="identity-name" :title="option.name">{{ option.name }}</span>
               <span class="identity-type">{{ option.type }}</span>
@@ -43,9 +71,12 @@
           </span>
         </t-option>
       </t-select>
-      <div v-else class="brand-subtitle identity-lines">
-        <span class="identity-name" :title="currentIdentityLabel">{{ currentIdentityLabel }}</span>
-        <span class="identity-type">{{ currentIdentityType }}</span>
+      <div v-else class="identity-static">
+        <span class="identity-icon identity-trigger-icon"><IdentityContextIcon :name="identityIcon(loginUser)" /></span>
+        <span class="brand-subtitle identity-lines">
+          <span class="identity-name" :title="currentIdentityLabel">{{ currentIdentityLabel }}</span>
+          <span class="identity-type">{{ currentIdentityType }}</span>
+        </span>
       </div>
     </div>
 
@@ -69,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import IdentityContextIcon from '@/components/IdentityContextIcon.vue';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { adminFeedback } from '@/components/foundation';
 import { computed, onMounted, ref } from 'vue';
@@ -81,6 +113,7 @@ const loginUser = computed(() => getLoginUser());
 const identityContexts = ref<IdentityContext[]>([]);
 const selectedIdentityId = ref<number>();
 const switchingIdentity = ref(false);
+const identityPointerFocus = ref(false);
 const identitySelectorOpen = ref(false);
 const avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');
 const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string> = {
@@ -124,27 +157,33 @@ const switchableIdentityContexts = computed(() =>
     (context) => !context.tenantId || context.identityType === 'platform_admin' || Boolean(context.storeId),
   ),
 );
+// Icons describe the existing context; they never decide access or switching scope.
+const identityIcon = (
+  context: Pick<IdentityContext, 'storeId' | 'storeName' | 'storeType'>,
+): 'city' | 'storefront' | 'city-8' =>
+  context.storeId || context.storeName ? (context.storeType === 'factory' ? 'city' : 'storefront') : 'city-8';
 const identityOptions = computed(() =>
-  switchableIdentityContexts.value.map((context) => ({
+  switchableIdentityContexts.value.map((context, index, contexts) => ({
     name: identityLabel(context),
     type: identityTypeLabel(context),
     label: `${identityLabel(context)} · ${identityTypeLabel(context)}`,
     value: context.identityId,
+    icon: identityIcon(context),
+    sectionStart: index > 0 && Boolean(context.storeId) && !contexts[index - 1]?.storeId,
   })),
 );
 
 const handleIdentityChange = async (value: string | number) => {
   const identityId = Number(value);
-  if (!Number.isFinite(identityId) || identityId === loginUser.value.identityId) return;
+  if (switchingIdentity.value || !Number.isFinite(identityId) || identityId === loginUser.value.identityId) return;
   switchingIdentity.value = true;
   try {
     await switchIdentity(identityId);
-    await router.replace('/dashboard');
-    window.location.reload();
+    // One document navigation preserves full identity initialization without an intermediate route render.
+    window.location.replace(router.resolve('/dashboard').href);
   } catch (error) {
     selectedIdentityId.value = loginUser.value.identityId;
     adminFeedback.error(error instanceof Error ? error.message : '业务身份切换失败');
-  } finally {
     switchingIdentity.value = false;
   }
 };
@@ -166,14 +205,22 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.top-nav .brand.identity-brand {
+  width: auto;
+  flex: 0 0 auto;
+}
+
 .identity-context {
   min-width: 0;
   max-width: 30vw;
+  margin-left: var(--td-comp-margin-l);
   margin-right: var(--td-comp-margin-l);
+  padding-left: var(--td-comp-paddingLR-l);
+  border-left: 1px solid var(--td-component-stroke);
 }
 
 .brand-context-select {
-  width: 260px;
+  width: 240px;
   max-width: 100%;
 }
 
@@ -185,19 +232,102 @@ onMounted(async () => {
   padding-bottom: var(--td-comp-paddingTB-xxs);
 }
 
+.brand-context-select :deep(.identity-context-input > .t-input__prefix:not(.t-input__prefix-icon)) {
+  min-width: 0;
+  flex: 1;
+}
+
+.brand-context-select :deep(.identity-context-input > .t-input__inner) {
+  width: 0;
+  flex: none;
+}
+
+.identity-icon {
+  display: inline-flex;
+  width: var(--td-comp-size-xl);
+  height: var(--td-comp-size-xl);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--td-radius-default);
+  font-size: var(--td-font-size-title-medium);
+}
+
+.identity-trigger-icon {
+  width: var(--td-comp-size-m);
+  height: var(--td-comp-size-m);
+  margin-right: var(--td-comp-margin-s);
+  color: var(--td-brand-color);
+  background: #e2edfe;
+}
+
+.identity-option-icon {
+  color: var(--td-text-color-secondary);
+  background: #f0f2f5;
+}
+
+.identity-panel-heading {
+  margin: 0 var(--td-comp-margin-s);
+  padding: var(--td-comp-paddingTB-m) var(--td-comp-paddingLR-s);
+  border-bottom: 1px solid var(--td-component-stroke);
+  color: var(--td-text-color-primary);
+  font: var(--td-font-mark-medium);
+}
+
+.identity-static {
+  display: flex;
+  align-items: center;
+}
+
 .identity-lines {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  gap: var(--td-comp-margin-xxs);
   text-align: left;
+  max-width: 100%;
 }
 
 .identity-name {
   overflow: hidden;
   color: var(--td-text-color-primary);
-  font: var(--td-font-body-medium);
+  font: var(--td-font-mark-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.brand-context-label .identity-name,
+.identity-static .identity-name {
+  font: var(--td-font-mark-medium);
+}
+
+.brand-context-label {
+  width: 100%;
+}
+
+.identity-title-row {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--td-comp-margin-l);
+}
+
+.identity-title-row .identity-name {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.identity-toggle {
+  width: var(--td-comp-size-xxxs);
+  height: var(--td-comp-size-xxxs);
+  flex: none;
+  color: var(--td-text-color-primary);
+}
+
+.identity-toggle-open {
+  transform: rotate(180deg);
 }
 
 .identity-type {
@@ -206,22 +336,90 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.t-select-option.identity-context-option {
+:global(.zdm-identity-popup .t-select-option) {
   height: auto;
-  padding-top: var(--td-comp-paddingTB-s);
-  padding-bottom: var(--td-comp-paddingTB-s);
+  position: relative;
+  min-height: var(--td-comp-size-xxxxl);
+  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);
 }
 
-.identity-context-option .identity-option-layout {
+:global(.zdm-identity-popup .t-select-option > span) {
+  width: 100%;
+}
+
+.identity-option-layout {
   display: flex;
   width: 100%;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-l);
+  gap: var(--td-comp-margin-m);
+}
+
+.identity-option-layout > .identity-lines {
+  flex: 1;
+}
+
+:global(.zdm-identity-popup .t-select-option:has(.identity-section-start)) {
+  margin-top: calc(var(--td-comp-margin-s) * 2 + 1px);
+}
+
+:global(.zdm-identity-popup .t-select-option:has(.identity-section-start)::before) {
+  position: absolute;
+  top: calc(-1 * var(--td-comp-margin-s) - 1px);
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--td-component-stroke);
+  content: '';
+}
+
+:global(.zdm-identity-popup .t-select-option.t-is-selected:not(.t-is-disabled)),
+:global(.zdm-identity-popup .t-select-option.t-is-selected:not(.t-is-disabled):hover) {
+  background-color: #ebf3fe;
+  color: var(--td-brand-color);
+}
+
+:global(.zdm-identity-popup .t-is-selected .identity-name),
+:global(.zdm-identity-popup .t-is-selected .identity-option-icon) {
+  color: var(--td-brand-color);
+}
+
+:global(.zdm-identity-popup .t-is-selected .identity-option-icon) {
+  background: #e2edfe;
+}
+
+/* Approved C uses a blue tint locally; the project theme remains unchanged. */
+:global(.t-popup[data-popper-placement] .zdm-identity-popup.t-popup__content) {
+  margin: 0;
+  max-height: min(600px, calc(100vh - 88px));
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--td-radius-default);
+  background: var(--td-bg-color-container);
+}
+
+:global(.zdm-identity-popup .t-select__list) {
+  padding: var(--td-comp-paddingTB-s);
+}
+
+:global(.zdm-identity-popup .t-select-option + .t-select-option:not(:has(.identity-section-start))) {
+  margin-top: var(--td-comp-margin-xxs);
+}
+
+.brand-context-select :deep(.identity-context-input.t-input--borderless) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.brand-context-select:not(.identity-pointer-focus) :deep(.identity-context-input:has(input:focus-visible)) {
+  outline: 2px solid var(--td-brand-color);
+  outline-offset: 2px;
 }
 
 .identity-current-check {
   flex: none;
+  width: var(--td-comp-size-xxs);
+  height: var(--td-comp-size-xxs);
   color: var(--td-brand-color);
 }
 

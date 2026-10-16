@@ -79,7 +79,8 @@
     "src/pages/supplier/supply-type/index.vue",
     "src/pages/tenant/management/index.vue",
     "src/pages/tenant/store/index.vue",
-    "src/styles/index.css"
+    "src/styles/index.css",
+    "src/components/IdentityContextIcon.vue"
   ],
   "contracts": {
     "src/App.vue": {
@@ -158,6 +159,246 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "        v-model:popup-visible=\"identitySelectorOpen\"\n        class=\"brand-context-select\"\n        :loading=\"switchingIdentity\"\n        :input-props=\"{ inputClass: 'identity-context-input', borderless: true }\"\n        :popup-props=\"{\n",
+          "after": "        v-model:popup-visible=\"identitySelectorOpen\"\n        class=\"brand-context-select\"\n        :readonly=\"switchingIdentity\"\n        :aria-busy=\"switchingIdentity\"\n        :class=\"{ 'identity-pointer-focus': identityPointerFocus }\"\n        :input-props=\"{ inputClass: 'identity-context-input', borderless: true }\"\n        :popup-props=\"{\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "        }\"\n        aria-label=\"切换业务身份\"\n        @change=\"handleIdentityChange\"\n      >\n",
+          "after": "        }\"\n        aria-label=\"切换业务身份\"\n        @pointerdown.capture=\"identityPointerFocus = true\"\n        @keydown.capture=\"identityPointerFocus = false\"\n        @keyup.capture=\"identityPointerFocus = false\"\n        @change=\"handleIdentityChange\"\n      >\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "const selectedIdentityId = ref<number>();\nconst switchingIdentity = ref(false);\nconst identitySelectorOpen = ref(false);\nconst avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');\n",
+          "after": "const selectedIdentityId = ref<number>();\nconst switchingIdentity = ref(false);\nconst identityPointerFocus = ref(false);\nconst identitySelectorOpen = ref(false);\nconst avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "const handleIdentityChange = async (value: string | number) => {\n  const identityId = Number(value);\n  if (!Number.isFinite(identityId) || identityId === loginUser.value.identityId) return;\n  switchingIdentity.value = true;\n  try {\n    await switchIdentity(identityId);\n    await router.replace('/dashboard');\n    window.location.reload();\n  } catch (error) {\n    selectedIdentityId.value = loginUser.value.identityId;\n    adminFeedback.error(error instanceof Error ? error.message : '业务身份切换失败');\n  } finally {\n    switchingIdentity.value = false;\n  }\n",
+          "after": "const handleIdentityChange = async (value: string | number) => {\n  const identityId = Number(value);\n  if (switchingIdentity.value || !Number.isFinite(identityId) || identityId === loginUser.value.identityId) return;\n  switchingIdentity.value = true;\n  try {\n    await switchIdentity(identityId);\n    // One document navigation preserves full identity initialization without an intermediate route render.\n    window.location.replace(router.resolve('/dashboard').href);\n  } catch (error) {\n    selectedIdentityId.value = loginUser.value.identityId;\n    adminFeedback.error(error instanceof Error ? error.message : '业务身份切换失败');\n    switchingIdentity.value = false;\n  }\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "}\n\n.identity-icon {\n  display: inline-flex;\n",
+          "after": "}\n\n.brand-context-select :deep(.identity-context-input > .t-input__prefix:not(.t-input__prefix-icon)) {\n  min-width: 0;\n  flex: 1;\n}\n\n.brand-context-select :deep(.identity-context-input > .t-input__inner) {\n  width: 0;\n  flex: none;\n}\n\n.identity-icon {\n  display: inline-flex;\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "\n.identity-trigger-icon {\n  margin-right: var(--td-comp-margin-s);\n  color: var(--td-brand-color);\n",
+          "after": "\n.identity-trigger-icon {\n  width: var(--td-comp-size-m);\n  height: var(--td-comp-size-m);\n  margin-right: var(--td-comp-margin-s);\n  color: var(--td-brand-color);\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "  gap: var(--td-comp-margin-xxs);\n  text-align: left;\n}\n\n",
+          "after": "  gap: var(--td-comp-margin-xxs);\n  text-align: left;\n  max-width: 100%;\n}\n\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "}\n\n.identity-title-row {\n  display: flex;\n  width: max-content;\n  max-width: 100%;\n  align-items: center;\n  gap: var(--td-comp-margin-l);\n}\n\n",
+          "after": "}\n\n.brand-context-label {\n  width: 100%;\n}\n\n.identity-title-row {\n  display: flex;\n  min-width: 0;\n  width: 100%;\n  max-width: 100%;\n  align-items: center;\n  gap: var(--td-comp-margin-l);\n}\n\n.identity-title-row .identity-name {\n  min-width: 0;\n  flex: 0 1 auto;\n}\n\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "  position: absolute;\n  top: calc(-1 * var(--td-comp-margin-s) - 1px);\n  right: var(--td-comp-margin-s);\n  left: var(--td-comp-margin-s);\n  height: 1px;\n  background: var(--td-component-stroke);\n",
+          "after": "  position: absolute;\n  top: calc(-1 * var(--td-comp-margin-s) - 1px);\n  right: 0;\n  left: 0;\n  height: 1px;\n  background: var(--td-component-stroke);\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "  margin: 0;\n  max-height: min(600px, calc(100vh - 88px));\n  box-shadow: var(--td-shadow-1);\n  border: 1px solid var(--td-component-stroke);\n  border-radius: var(--td-radius-default);\n",
+          "after": "  margin: 0;\n  max-height: min(600px, calc(100vh - 88px));\n  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);\n  border: 1px solid var(--td-component-stroke);\n  border-radius: var(--td-radius-default);\n"
+        },
+        {
+          "reason": "2026-10-16 user requests complete proposal C comparison and smoother switching: pointer vs keyboard focus, header icon proportion, divider alignment, one loading indicator and one full navigation to the unchanged dashboard/permission guard. Identity API, scope and stored session semantics preserved.",
+          "stage": "before-migrations",
+          "before": "}\n\n.brand-context-select :deep(.identity-context-input:has(input:focus-visible)) {\n  outline: 2px solid var(--td-brand-color);\n  outline-offset: 2px;\n",
+          "after": "}\n\n.brand-context-select:not(.identity-pointer-focus) :deep(.identity-context-input:has(input:focus-visible)) {\n  outline: 2px solid var(--td-brand-color);\n  outline-offset: 2px;\n"
+        },
+        {
+          "reason": "2026-10-16 user requests proposal C popup position, light shadow and arrow alignment with first-line name; native switching, loading feedback and permissions preserved.",
+          "stage": "before-migrations",
+          "before": "        :popup-props=\"{\n          overlayInnerClassName: 'zdm-identity-popup',\n          overlayInnerStyle: { minWidth: '340px', maxWidth: 'calc(100vw - 32px)' },\n        }\"\n",
+          "after": "        :popup-props=\"{\n          overlayInnerClassName: 'zdm-identity-popup',\n          placement: 'bottom-left',\n          popperOptions: { modifiers: [{ name: 'offset', options: { offset: [48, 4] } }] },\n          overlayInnerStyle: { minWidth: '340px', maxWidth: 'calc(100vw - 32px)' },\n        }\"\n"
+        },
+        {
+          "reason": "2026-10-16 user requests proposal C popup position, light shadow and arrow alignment with first-line name; native switching, loading feedback and permissions preserved.",
+          "stage": "before-migrations",
+          "before": "        </template>\n        <template #panelTopContent><div class=\"identity-panel-heading\">切换身份</div></template>\n        <template #valueDisplay>\n          <span class=\"brand-context-label identity-lines\">\n            <span class=\"identity-name\" :title=\"currentIdentityLabel\">{{ currentIdentityLabel }}</span>\n            <span class=\"identity-type\">{{ currentIdentityType }}</span>\n          </span>\n",
+          "after": "        </template>\n        <template #panelTopContent><div class=\"identity-panel-heading\">切换身份</div></template>\n        <template #suffixIcon><span /></template>\n        <template #valueDisplay>\n          <span class=\"brand-context-label identity-lines\">\n            <span class=\"identity-title-row\">\n              <span class=\"identity-name\" :title=\"currentIdentityLabel\">{{ currentIdentityLabel }}</span>\n              <t-loading v-if=\"switchingIdentity\" size=\"small\" />\n              <t-icon\n                v-else\n                name=\"chevron-down\"\n                class=\"identity-toggle\"\n                :class=\"{ 'identity-toggle-open': identitySelectorOpen }\"\n                aria-hidden=\"true\"\n              />\n            </span>\n            <span class=\"identity-type\">{{ currentIdentityType }}</span>\n          </span>\n"
+        },
+        {
+          "reason": "2026-10-16 user requests proposal C popup position, light shadow and arrow alignment with first-line name; native switching, loading feedback and permissions preserved.",
+          "stage": "before-migrations",
+          "before": "}\n\n.identity-type {\n  color: var(--td-text-color-secondary);\n",
+          "after": "}\n\n.identity-title-row {\n  display: flex;\n  width: max-content;\n  max-width: 100%;\n  align-items: center;\n  gap: var(--td-comp-margin-l);\n}\n\n.identity-toggle {\n  width: var(--td-comp-size-xxxs);\n  height: var(--td-comp-size-xxxs);\n  flex: none;\n  color: var(--td-text-color-primary);\n}\n\n.identity-toggle-open {\n  transform: rotate(180deg);\n}\n\n.identity-type {\n  color: var(--td-text-color-secondary);\n"
+        },
+        {
+          "reason": "2026-10-16 user requests proposal C popup position, light shadow and arrow alignment with first-line name; native switching, loading feedback and permissions preserved.",
+          "stage": "before-migrations",
+          "before": "\n/* Approved C uses a blue tint locally; the project theme remains unchanged. */\n:global(.zdm-identity-popup.t-popup__content) {\n  max-height: min(600px, calc(100vh - 88px));\n  border: 1px solid var(--td-component-stroke);\n  border-radius: var(--td-radius-default);\n",
+          "after": "\n/* Approved C uses a blue tint locally; the project theme remains unchanged. */\n:global(.t-popup[data-popper-placement] .zdm-identity-popup.t-popup__content) {\n  margin: 0;\n  max-height: min(600px, calc(100vh - 88px));\n  box-shadow: var(--td-shadow-1);\n  border: 1px solid var(--td-component-stroke);\n  border-radius: var(--td-radius-default);\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "      >\n        <template #prefixIcon>\n          <span class=\"identity-icon identity-trigger-icon\"><t-icon :name=\"identityIcon(loginUser)\" /></span>\n        </template>\n        <template #panelTopContent><div class=\"identity-panel-heading\">切换身份</div></template>\n",
+          "after": "      >\n        <template #prefixIcon>\n          <span class=\"identity-icon identity-trigger-icon\"\n            ><IdentityContextIcon :name=\"identityIcon(loginUser)\"\n          /></span>\n        </template>\n        <template #panelTopContent><div class=\"identity-panel-heading\">切换身份</div></template>\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "        >\n          <span class=\"identity-option-layout\" :class=\"{ 'identity-section-start': option.sectionStart }\">\n            <span class=\"identity-icon identity-option-icon\"><t-icon :name=\"option.icon\" /></span>\n            <span class=\"identity-lines\">\n              <span class=\"identity-name\" :title=\"option.name\">{{ option.name }}</span>\n",
+          "after": "        >\n          <span class=\"identity-option-layout\" :class=\"{ 'identity-section-start': option.sectionStart }\">\n            <span class=\"identity-icon identity-option-icon\"><IdentityContextIcon :name=\"option.icon\" /></span>\n            <span class=\"identity-lines\">\n              <span class=\"identity-name\" :title=\"option.name\">{{ option.name }}</span>\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "      </t-select>\n      <div v-else class=\"identity-static\">\n        <span class=\"identity-icon identity-trigger-icon\"><t-icon :name=\"identityIcon(loginUser)\" /></span>\n        <span class=\"brand-subtitle identity-lines\">\n          <span class=\"identity-name\" :title=\"currentIdentityLabel\">{{ currentIdentityLabel }}</span>\n",
+          "after": "      </t-select>\n      <div v-else class=\"identity-static\">\n        <span class=\"identity-icon identity-trigger-icon\"><IdentityContextIcon :name=\"identityIcon(loginUser)\" /></span>\n        <span class=\"brand-subtitle identity-lines\">\n          <span class=\"identity-name\" :title=\"currentIdentityLabel\">{{ currentIdentityLabel }}</span>\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { adminFeedback } from '@/components/foundation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport IdentityContextIcon from '@/components/IdentityContextIcon.vue';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { adminFeedback } from '@/components/foundation';\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": ");\n// Icons describe the existing context; they never decide access or switching scope.\nconst identityIcon = (context: Pick<IdentityContext, 'storeId' | 'storeName' | 'storeType'>) =>\n  context.storeId || context.storeName ? (context.storeType === 'factory' ? 'building-4' : 'shop') : 'building';\nconst identityOptions = computed(() =>\n  switchableIdentityContexts.value.map((context, index, contexts) => ({\n",
+          "after": ");\n// Icons describe the existing context; they never decide access or switching scope.\nconst identityIcon = (\n  context: Pick<IdentityContext, 'storeId' | 'storeName' | 'storeType'>,\n): 'city' | 'storefront' | 'city-8' =>\n  context.storeId || context.storeName ? (context.storeType === 'factory' ? 'city' : 'storefront') : 'city-8';\nconst identityOptions = computed(() =>\n  switchableIdentityContexts.value.map((context, index, contexts) => ({\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": ".identity-icon {\n  display: inline-flex;\n  width: var(--td-comp-size-m);\n  height: var(--td-comp-size-m);\n  flex: none;\n  align-items: center;\n",
+          "after": ".identity-icon {\n  display: inline-flex;\n  width: var(--td-comp-size-xl);\n  height: var(--td-comp-size-xl);\n  flex: none;\n  align-items: center;\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "  margin-right: var(--td-comp-margin-s);\n  color: var(--td-brand-color);\n  background: var(--td-brand-color-light);\n}\n\n.identity-option-icon {\n  color: var(--td-text-color-secondary);\n  background: var(--td-bg-color-secondarycontainer);\n}\n\n",
+          "after": "  margin-right: var(--td-comp-margin-s);\n  color: var(--td-brand-color);\n  background: #e2edfe;\n}\n\n.identity-option-icon {\n  color: var(--td-text-color-secondary);\n  background: #f0f2f5;\n}\n\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "  overflow: hidden;\n  color: var(--td-text-color-primary);\n  font: var(--td-font-body-medium);\n  text-overflow: ellipsis;\n  white-space: nowrap;\n",
+          "after": "  overflow: hidden;\n  color: var(--td-text-color-primary);\n  font: var(--td-font-mark-medium);\n  text-overflow: ellipsis;\n  white-space: nowrap;\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": ":global(.zdm-identity-popup .t-select-option) {\n  height: auto;\n  padding-top: var(--td-comp-paddingTB-s);\n  padding-bottom: var(--td-comp-paddingTB-s);\n}\n\n",
+          "after": ":global(.zdm-identity-popup .t-select-option) {\n  height: auto;\n  position: relative;\n  min-height: var(--td-comp-size-xxxxl);\n  padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);\n}\n\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "\n:global(.zdm-identity-popup .t-select-option:has(.identity-section-start)) {\n  margin-top: var(--td-comp-margin-s);\n  border-top: 1px solid var(--td-component-stroke);\n}\n\n:global(.zdm-identity-popup .t-select-option.t-is-selected) {\n  color: var(--td-brand-color);\n}\n",
+          "after": "\n:global(.zdm-identity-popup .t-select-option:has(.identity-section-start)) {\n  margin-top: calc(var(--td-comp-margin-s) * 2 + 1px);\n}\n\n:global(.zdm-identity-popup .t-select-option:has(.identity-section-start)::before) {\n  position: absolute;\n  top: calc(-1 * var(--td-comp-margin-s) - 1px);\n  right: var(--td-comp-margin-s);\n  left: var(--td-comp-margin-s);\n  height: 1px;\n  background: var(--td-component-stroke);\n  content: '';\n}\n\n:global(.zdm-identity-popup .t-select-option.t-is-selected:not(.t-is-disabled)),\n:global(.zdm-identity-popup .t-select-option.t-is-selected:not(.t-is-disabled):hover) {\n  background-color: #ebf3fe;\n  color: var(--td-brand-color);\n}\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requested faithful proposal C icon silhouettes, measured blue tints, typography, dimensions and spacing; identity candidates, switching and permission logic preserved.",
+          "stage": "before-migrations",
+          "before": "\n:global(.zdm-identity-popup .t-is-selected .identity-option-icon) {\n  background: var(--td-brand-color-light);\n}\n\n.identity-current-check {\n  flex: none;\n  color: var(--td-brand-color);\n}\n",
+          "after": "\n:global(.zdm-identity-popup .t-is-selected .identity-option-icon) {\n  background: #e2edfe;\n}\n\n/* Approved C uses a blue tint locally; the project theme remains unchanged. */\n:global(.zdm-identity-popup.t-popup__content) {\n  max-height: min(600px, calc(100vh - 88px));\n  border: 1px solid var(--td-component-stroke);\n  border-radius: var(--td-radius-default);\n  background: var(--td-bg-color-container);\n}\n\n:global(.zdm-identity-popup .t-select__list) {\n  padding: var(--td-comp-paddingTB-s);\n}\n\n:global(.zdm-identity-popup .t-select-option + .t-select-option:not(:has(.identity-section-start))) {\n  margin-top: var(--td-comp-margin-xxs);\n}\n\n.brand-context-select :deep(.identity-context-input.t-input--borderless) {\n  border-color: transparent;\n  background: transparent;\n  box-shadow: none;\n}\n\n.brand-context-select :deep(.identity-context-input:has(input:focus-visible)) {\n  outline: 2px solid var(--td-brand-color);\n  outline-offset: 2px;\n}\n\n.identity-current-check {\n  flex: none;\n  width: var(--td-comp-size-xxs);\n  height: var(--td-comp-size-xxs);\n  color: var(--td-brand-color);\n}\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "        :popup-props=\"{\n          overlayInnerClassName: 'zdm-identity-popup',\n          overlayInnerStyle: { minWidth: '320px', maxWidth: 'calc(100vw - 32px)' },\n        }\"\n        aria-label=\"切换业务身份\"\n        @change=\"handleIdentityChange\"\n      >\n        <template #prefixIcon><t-icon name=\"user-circle\" size=\"var(--td-font-size-title-extraLarge)\" /></template>\n        <template #valueDisplay>\n          <span class=\"brand-context-label identity-lines\">\n",
+          "after": "        :popup-props=\"{\n          overlayInnerClassName: 'zdm-identity-popup',\n          overlayInnerStyle: { minWidth: '340px', maxWidth: 'calc(100vw - 32px)' },\n        }\"\n        aria-label=\"切换业务身份\"\n        @change=\"handleIdentityChange\"\n      >\n        <template #prefixIcon>\n          <span class=\"identity-icon identity-trigger-icon\"><t-icon :name=\"identityIcon(loginUser)\" /></span>\n        </template>\n        <template #panelTopContent><div class=\"identity-panel-heading\">切换身份</div></template>\n        <template #valueDisplay>\n          <span class=\"brand-context-label identity-lines\">\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "          :value=\"option.value\"\n        >\n          <span class=\"identity-option-layout\">\n            <span class=\"identity-lines\">\n              <span class=\"identity-name\" :title=\"option.name\">{{ option.name }}</span>\n",
+          "after": "          :value=\"option.value\"\n        >\n          <span class=\"identity-option-layout\" :class=\"{ 'identity-section-start': option.sectionStart }\">\n            <span class=\"identity-icon identity-option-icon\"><t-icon :name=\"option.icon\" /></span>\n            <span class=\"identity-lines\">\n              <span class=\"identity-name\" :title=\"option.name\">{{ option.name }}</span>\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "        </t-option>\n      </t-select>\n      <div v-else class=\"brand-subtitle identity-lines\">\n        <span class=\"identity-name\" :title=\"currentIdentityLabel\">{{ currentIdentityLabel }}</span>\n        <span class=\"identity-type\">{{ currentIdentityType }}</span>\n      </div>\n    </div>\n",
+          "after": "        </t-option>\n      </t-select>\n      <div v-else class=\"identity-static\">\n        <span class=\"identity-icon identity-trigger-icon\"><t-icon :name=\"identityIcon(loginUser)\" /></span>\n        <span class=\"brand-subtitle identity-lines\">\n          <span class=\"identity-name\" :title=\"currentIdentityLabel\">{{ currentIdentityLabel }}</span>\n          <span class=\"identity-type\">{{ currentIdentityType }}</span>\n        </span>\n      </div>\n    </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "  ),\n);\nconst identityOptions = computed(() =>\n  switchableIdentityContexts.value.map((context) => ({\n    name: identityLabel(context),\n    type: identityTypeLabel(context),\n    label: `${identityLabel(context)} · ${identityTypeLabel(context)}`,\n    value: context.identityId,\n  })),\n);\n",
+          "after": "  ),\n);\n// Icons describe the existing context; they never decide access or switching scope.\nconst identityIcon = (context: Pick<IdentityContext, 'storeId' | 'storeName' | 'storeType'>) =>\n  context.storeId || context.storeName ? (context.storeType === 'factory' ? 'building-4' : 'shop') : 'building';\nconst identityOptions = computed(() =>\n  switchableIdentityContexts.value.map((context, index, contexts) => ({\n    name: identityLabel(context),\n    type: identityTypeLabel(context),\n    label: `${identityLabel(context)} · ${identityTypeLabel(context)}`,\n    value: context.identityId,\n    icon: identityIcon(context),\n    sectionStart: index > 0 && Boolean(context.storeId) && !contexts[index - 1]?.storeId,\n  })),\n);\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "  margin-left: var(--td-comp-margin-l);\n  margin-right: var(--td-comp-margin-l);\n}\n\n",
+          "after": "  margin-left: var(--td-comp-margin-l);\n  margin-right: var(--td-comp-margin-l);\n  padding-left: var(--td-comp-paddingLR-l);\n  border-left: 1px solid var(--td-component-stroke);\n}\n\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "}\n\n.identity-lines {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  text-align: left;\n}\n",
+          "after": "}\n\n.identity-icon {\n  display: inline-flex;\n  width: var(--td-comp-size-m);\n  height: var(--td-comp-size-m);\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  border-radius: var(--td-radius-default);\n  font-size: var(--td-font-size-title-medium);\n}\n\n.identity-trigger-icon {\n  margin-right: var(--td-comp-margin-s);\n  color: var(--td-brand-color);\n  background: var(--td-brand-color-light);\n}\n\n.identity-option-icon {\n  color: var(--td-text-color-secondary);\n  background: var(--td-bg-color-secondarycontainer);\n}\n\n.identity-panel-heading {\n  margin: 0 var(--td-comp-margin-s);\n  padding: var(--td-comp-paddingTB-m) var(--td-comp-paddingLR-s);\n  border-bottom: 1px solid var(--td-component-stroke);\n  color: var(--td-text-color-primary);\n  font: var(--td-font-mark-medium);\n}\n\n.identity-static {\n  display: flex;\n  align-items: center;\n}\n\n.identity-lines {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: var(--td-comp-margin-xxs);\n  text-align: left;\n}\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "}\n\n.brand-context-label .identity-name {\n  font: var(--td-font-mark-medium);\n}\n",
+          "after": "}\n\n.brand-context-label .identity-name,\n.identity-static .identity-name {\n  font: var(--td-font-mark-medium);\n}\n"
+        },
+        {
+          "reason": "2026-10-16 user selected visual proposal C: icon-led two-line identity entry, popup heading and section divider; candidate scope/order, switch handler, permissions and session behavior preserved.",
+          "stage": "before-migrations",
+          "before": "  width: 100%;\n  align-items: center;\n  justify-content: space-between;\n  gap: var(--td-comp-margin-l);\n}\n\n",
+          "after": "  width: 100%;\n  align-items: center;\n  gap: var(--td-comp-margin-m);\n}\n\n.identity-option-layout > .identity-lines {\n  flex: 1;\n}\n\n:global(.zdm-identity-popup .t-select-option:has(.identity-section-start)) {\n  margin-top: var(--td-comp-margin-s);\n  border-top: 1px solid var(--td-component-stroke);\n}\n\n:global(.zdm-identity-popup .t-select-option.t-is-selected) {\n  color: var(--td-brand-color);\n}\n\n:global(.zdm-identity-popup .t-is-selected .identity-name),\n:global(.zdm-identity-popup .t-is-selected .identity-option-icon) {\n  color: var(--td-brand-color);\n}\n\n:global(.zdm-identity-popup .t-is-selected .identity-option-icon) {\n  background: var(--td-brand-color-light);\n}\n\n"
+        },
+        {
+          "reason": "2026-10-16 user requested better top navigation and identity popup presentation: compact brand, native borderless trigger and scoped-to-popup two-line option layout; all identity and permission logic unchanged.",
+          "stage": "before-migrations",
+          "before": "<template>\n  <header class=\"top-nav\">\n    <div class=\"brand\">\n      <div class=\"brand-logo\">装</div>\n      <div class=\"brand-title\">装点猫</div>\n",
+          "after": "<template>\n  <header class=\"top-nav\">\n    <div class=\"brand identity-brand\">\n      <div class=\"brand-logo\">装</div>\n      <div class=\"brand-title\">装点猫</div>\n"
+        },
+        {
+          "reason": "2026-10-16 user requested better top navigation and identity popup presentation: compact brand, native borderless trigger and scoped-to-popup two-line option layout; all identity and permission logic unchanged.",
+          "stage": "before-migrations",
+          "before": "        class=\"brand-context-select\"\n        :loading=\"switchingIdentity\"\n        :input-props=\"{ inputClass: 'identity-context-input' }\"\n        :popup-props=\"{ overlayInnerStyle: { minWidth: '320px', maxWidth: 'calc(100vw - 32px)' } }\"\n        aria-label=\"切换业务身份\"\n        @change=\"handleIdentityChange\"\n      >\n        <template #valueDisplay>\n          <span class=\"brand-context-label identity-lines\">\n",
+          "after": "        class=\"brand-context-select\"\n        :loading=\"switchingIdentity\"\n        :input-props=\"{ inputClass: 'identity-context-input', borderless: true }\"\n        :popup-props=\"{\n          overlayInnerClassName: 'zdm-identity-popup',\n          overlayInnerStyle: { minWidth: '320px', maxWidth: 'calc(100vw - 32px)' },\n        }\"\n        aria-label=\"切换业务身份\"\n        @change=\"handleIdentityChange\"\n      >\n        <template #prefixIcon><t-icon name=\"user-circle\" size=\"var(--td-font-size-title-extraLarge)\" /></template>\n        <template #valueDisplay>\n          <span class=\"brand-context-label identity-lines\">\n"
+        },
+        {
+          "reason": "2026-10-16 user requested better top navigation and identity popup presentation: compact brand, native borderless trigger and scoped-to-popup two-line option layout; all identity and permission logic unchanged.",
+          "stage": "before-migrations",
+          "before": "\n<style scoped>\n.identity-context {\n  min-width: 0;\n  max-width: 30vw;\n  margin-right: var(--td-comp-margin-l);\n}\n\n.brand-context-select {\n  width: 260px;\n  max-width: 100%;\n}\n",
+          "after": "\n<style scoped>\n.top-nav .brand.identity-brand {\n  width: auto;\n  flex: 0 0 auto;\n}\n\n.identity-context {\n  min-width: 0;\n  max-width: 30vw;\n  margin-left: var(--td-comp-margin-l);\n  margin-right: var(--td-comp-margin-l);\n}\n\n.brand-context-select {\n  width: 240px;\n  max-width: 100%;\n}\n"
+        },
+        {
+          "reason": "2026-10-16 user requested better top navigation and identity popup presentation: compact brand, native borderless trigger and scoped-to-popup two-line option layout; all identity and permission logic unchanged.",
+          "stage": "before-migrations",
+          "before": "}\n\n.identity-type {\n  color: var(--td-text-color-secondary);\n",
+          "after": "}\n\n.brand-context-label .identity-name {\n  font: var(--td-font-mark-medium);\n}\n\n.identity-type {\n  color: var(--td-text-color-secondary);\n"
+        },
+        {
+          "reason": "2026-10-16 user requested better top navigation and identity popup presentation: compact brand, native borderless trigger and scoped-to-popup two-line option layout; all identity and permission logic unchanged.",
+          "stage": "before-migrations",
+          "before": "}\n\n.t-select-option.identity-context-option {\n  height: auto;\n  padding-top: var(--td-comp-paddingTB-s);\n",
+          "after": "}\n\n:global(.zdm-identity-popup .t-select-option) {\n  height: auto;\n  padding-top: var(--td-comp-paddingTB-s);\n"
+        },
+        {
+          "reason": "2026-10-16 user requested better top navigation and identity popup presentation: compact brand, native borderless trigger and scoped-to-popup two-line option layout; all identity and permission logic unchanged.",
+          "stage": "before-migrations",
+          "before": "}\n\n.identity-context-option .identity-option-layout {\n  display: flex;\n  width: 100%;\n",
+          "after": "}\n\n:global(.zdm-identity-popup .t-select-option > span) {\n  width: 100%;\n}\n\n.identity-option-layout {\n  display: flex;\n  width: 100%;\n"
+        },
         {
           "reason": "2026-10-16 user approved two-line current identity and options: name above existing identity/store type, explicit current check; replace small badges, preserve context filtering, switching, routes, session and permissions.",
           "stage": "before-migrations",
@@ -8540,6 +8781,10 @@
     "src/utils/formatStoreRuleDateTime.ts": {
       "content": "8dac5b79c7235361b53d2c97d99b747f85311bec808675b5c741b1b414689188",
       "approvedPlaceholderPatches": []
+    },
+    "src/components/IdentityContextIcon.vue": {
+      "script": "28244204c15ad5c8535d01e7c2151d2b9c43659ddc9cd71924c00f123df15e90",
+      "template": "7c675925a8f840ac9d8783c6be6acce3156a35454b2f4fa1c501500ccdc75eec"
     }
   },
   "modules": [
@@ -8792,6 +9037,43 @@
       "file": "src/pages/tenant/store/index.vue",
       "status": "implemented-pending-final-validation",
       "visualRoute": "official token/component styles; business script and template contract frozen"
+    }
+  ],
+  "approvedVisualDeclarations": [
+    {
+      "file": "src/components/AdminTopNav.vue",
+      "selector": ".identity-trigger-icon",
+      "property": "background",
+      "value": "#e2edfe",
+      "reason": "2026-10-16 user explicitly requires faithful proposal C colors, sampled from the approved mockup; identity switcher only."
+    },
+    {
+      "file": "src/components/AdminTopNav.vue",
+      "selector": ".identity-option-icon",
+      "property": "background",
+      "value": "#f0f2f5",
+      "reason": "2026-10-16 user explicitly requires faithful proposal C colors, sampled from the approved mockup; identity switcher only."
+    },
+    {
+      "file": "src/components/AdminTopNav.vue",
+      "selector": ":global(.zdm-identity-popup .t-select-option.t-is-selected:not(.t-is-disabled)),\n:global(.zdm-identity-popup .t-select-option.t-is-selected:not(.t-is-disabled):hover)",
+      "property": "background-color",
+      "value": "#ebf3fe",
+      "reason": "2026-10-16 user explicitly requires faithful proposal C colors, sampled from the approved mockup; identity switcher only."
+    },
+    {
+      "file": "src/components/AdminTopNav.vue",
+      "selector": ":global(.zdm-identity-popup .t-is-selected .identity-option-icon)",
+      "property": "background",
+      "value": "#e2edfe",
+      "reason": "2026-10-16 user explicitly requires faithful proposal C colors, sampled from the approved mockup; identity switcher only."
+    },
+    {
+      "file": "src/components/AdminTopNav.vue",
+      "selector": ":global(.t-popup[data-popper-placement] .zdm-identity-popup.t-popup__content)",
+      "property": "box-shadow",
+      "value": "0 4px 12px rgb(0 0 0 / 10%)",
+      "reason": "2026-10-16 user explicitly requires approved proposal C shadow instead of the official default; identity popup only."
     }
   ]
 }

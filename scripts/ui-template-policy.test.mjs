@@ -115,17 +115,44 @@ test('visual migration never authorizes changing business events, copy, conditio
   }
 });
 
-test('approved visual surfaces use official color and shadow tokens', () => {
+test('approved visual surfaces use official tokens or exact user-approved local declarations', () => {
+  const approvals = refactor.approvedVisualDeclarations ?? [];
+  const consumed = new Set();
+  const matchesApproval = (entry, file, declaration) =>
+    entry.file === file &&
+    entry.selector === declaration.parent.selector &&
+    entry.property === declaration.prop &&
+    entry.value === declaration.value;
+  for (const entry of approvals) {
+    assert.ok(
+      approvedVisualFiles.has(entry.file) && entry.reason,
+      'Local visual approvals must have a registered surface and reason',
+    );
+    // An approval never authorizes a different surface, selector, property or value.
+    const declaration = { parent: { selector: entry.selector }, prop: entry.property, value: entry.value };
+    assert.equal(matchesApproval(entry, `${entry.file}.other`, declaration), false);
+    assert.equal(matchesApproval(entry, entry.file, { ...declaration, value: '#ff0000' }), false);
+    assert.equal(matchesApproval(entry, entry.file, { ...declaration, prop: 'border-color' }), false);
+    assert.equal(matchesApproval(entry, entry.file, { ...declaration, parent: { selector: '.other' } }), false);
+  }
   for (const file of approvedVisualFiles) {
     const source = read(file);
     const styles = file.endsWith('.vue') ? inspectPage(source).styles.map((s) => s.content) : [source];
     for (const style of styles)
       postcss.parse(style).walkDecls((declaration) => {
-        assert.doesNotMatch(declaration.value, /#[a-f\d]{3,8}\b/i, `${file}: use official semantic color tokens`);
-        if (declaration.prop === 'box-shadow')
+        if (
+          /#[a-f\d]{3,8}\b/i.test(declaration.value) ||
+          (declaration.prop === 'box-shadow' && !/^(none|var\(--td-shadow-)/.test(declaration.value))
+        ) {
+          const approval = approvals.find((entry) => matchesApproval(entry, file, declaration));
+          assert.ok(approval, `${file}: unapproved local color at ${declaration.parent.selector}: ${declaration.prop}`);
+          consumed.add(approval);
+        }
+        if (declaration.prop === 'box-shadow' && !approvals.some((entry) => matchesApproval(entry, file, declaration)))
           assert.match(declaration.value, /^(none|var\(--td-shadow-)/, `${file}: use official shadows`);
       });
   }
+  assert.equal(consumed.size, approvals.length, 'Local visual approvals must remain exact and used');
 });
 
 test('approved responsive sidebar additions cannot hide business changes or a different breakpoint', () => {
