@@ -71,7 +71,7 @@
 
 本节是项目统一约定，采用TDesign原生主题，不冒称官方对业务名称的强制规定。覆盖现有运营、供应链、门店及后续页面。普通、文字、图标、单条、批量和确认按钮按同一功能取色；形式、图标、文案、顺序、权限、禁用、加载、选择、数据范围及全部业务流程保持。
 
-唯一运行映射：`src/components/foundation/actions/button-functions.json`；公共实现：`buttonFunctions.ts`。页面使用 `buttonTheme('功能标识')`，动态动作使用已明确登记的 `buttonFunctionFor('分组', action)`；不能按显示文案推断，也不能自行设置theme或覆盖颜色。`ListAction.function` 必填。公共弹窗显式传 `confirm-function`，`AdminConfirmDialog` 显式传 `function`；原生弹窗通过 `actionButtonProps` 保留原按钮内容、加载、禁用等属性，仅统一主题。
+唯一运行映射：`src/components/foundation/actions/button-functions.json`；公共实现：`buttonFunctions.ts`。页面使用 `buttonTheme('功能标识')`，动态动作使用已明确登记的 `buttonFunctionFor('分组', action)`；不能按显示文案推断，也不能自行设置theme或覆盖颜色。`ListAction.function` 必填。公共弹窗显式传 `confirm-function`，`AdminConfirmDialog` 显式传 `function`；原生弹窗通过 `dialogButtonProps` 统一确认文案与主题，保留加载、禁用等行为属性，命名遵守下文执行按钮命名约定。
 
 | 类别       | 原生主题       | 判定原则                   |
 | ---------- | -------------- | -------------------------- |
@@ -162,3 +162,13 @@
 ## 静态检查零告警
 
 ESLint 全量、增量、自动修复和提交前检查统一使用 `--max-warnings=0`；现有 CI 通过 `quality:static` 执行同一门禁。任何剩余告警均使检查失败，不关闭规则或放宽告警阈值。可选属性应明确默认值；未传入本身有含义时保留 `undefined`，不为消除告警改变空值、取值优先级或业务行为。测试替身按真实接口声明属性类型，无用绑定仅在保持调用及行为后清理。
+
+## 执行按钮命名（2026-10-16确认）
+
+这是基于TDesign原生组件的项目命名约定，不是官方强制文案。覆盖各端新增、编辑表单（弹框、整页和抽屉）及业务操作确认弹框。新增使用“确认新增”，编辑使用“确认保存”；业务操作使用“确认＋完整操作名称”，批量保留“批量”，例如“确认停用”“确认批量停用”“确认下架”“确认批量下架”。保留入口、标题、字段、默认值、校验、请求、权限、数据范围、加载、禁用、事件及关闭流程。
+
+公共实现为 `src/components/foundation/actions/confirmation.ts`。表单显式使用 `formConfirmation('create' | 'edit')`，随真实模式切换；独立保存按钮使用 `formConfirmationText`。业务操作使用 `operationConfirmation(登记动作, 是否批量)`；完整名称及明确兼容别名登记在现有 `button-functions.json` 的 `confirmationActions`。不按标题、旧按钮文案或选中数量推断动作和批量状态；恢复类需明确登记“取消归档”“放回仓库”“恢复运营”等实际含义。
+
+`AdminDialog` 和 `AdminFormDialog` 的 `confirmation` 必填；`AdminConfirmDialog` 使用已登记 `action` 和显式批量状态；原生弹框通过 `dialogButtonProps` 生成。确认按钮仅提供加载、禁用等行为选项，不覆盖名称或主题；原有功能映射继续决定颜色。取消保留“取消”；详情关闭、无法操作的“我知道了”、无执行按钮及下一步导航显式登记，保留其原有含义。
+
+新动作先登记完整名称，再接入公共入口；未知动作和表单模式不得回退为“提交”“确定”。现有源码守卫覆盖存量与新增页面：缺失配置、未登记动作、手写确认文案或绕过公共入口均失败；运行时同样拒绝未知动作。特殊场景须明确登记用途及固定文案，并补对应检查，不能自行豁免。

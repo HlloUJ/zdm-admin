@@ -23,7 +23,7 @@
               :disabled="!currentModules.length"
               @click="saveAllocation"
             >
-              保存
+              {{ formConfirmationText('edit') }}
             </t-button>
             <t-button :theme="buttonTheme('reset')" variant="base" :disabled="loading" @click="resetAllocation"
               >重置</t-button
@@ -36,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { getLoginUser } from '@/services/auth';
 import { isPlatformSuperAdmin } from '@/services/adminPermissions';

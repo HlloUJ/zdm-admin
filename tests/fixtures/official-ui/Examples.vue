@@ -32,6 +32,7 @@
     />
     <AdminFormDialog
       v-model:visible="visible"
+      :confirmation="formConfirmation('create')"
       confirm-function="submit"
       header="表单范例"
       :data="values"
@@ -42,6 +43,7 @@
   </t-space>
 </template>
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { computed, ref } from 'vue';
 import { AdminListPage, AdminFormDialog, AdminDetailPage } from '@/components/foundation';
 import type { ListFilter, ListAction, FilterValues } from '@/components/foundation';

@@ -61,7 +61,7 @@ test('发布直接进入三段整页表单，导航固定且返回保留列表�
   await form.getByRole('link', { name: '销售信息', exact: true }).click();
   await expect(form.getByRole('link', { name: '销售信息', exact: true })).toHaveAttribute('aria-current', 'location');
   await expect(form.getByRole('radio', { name: '暂不上架', exact: true })).toBeChecked();
-  await expect(form.getByRole('button', { name: '提交商品信息', exact: true })).toBeInViewport();
+  await expect(form.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })).toBeInViewport();
   await expect(form.getByRole('navigation')).toBeInViewport();
   expect(await form.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   expect(errors).toEqual([]);
@@ -80,7 +80,7 @@ test('缺少必填媒体时回到图文描述并保留已填内容', async ({ pa
   const originalSupplierOffset = await form
     .locator('.t-form-item__supplier')
     .evaluate((element) => element.getBoundingClientRect().top - element.closest('form')!.getBoundingClientRect().top);
-  await form.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await form.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(cost.getByText('请输入成本价', { exact: true })).toHaveCount(1);
   expect(await cost.evaluate((element) => element.getBoundingClientRect().height)).toBe(originalCostHeight);
   expect(
@@ -234,6 +234,6 @@ test('供应链大板库存禁止零值输入而保留正常整数和清空校�
   await stock.press('ArrowDown');
   await expect(stock).toHaveValue('1');
   await stock.fill('');
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(item.getByText('请输入库存', { exact: true })).toBeVisible();
 });

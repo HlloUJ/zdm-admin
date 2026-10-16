@@ -72,7 +72,7 @@
                     :loading="saving"
                     :disabled="loading"
                     @click="savePrices"
-                    ><template #icon><t-icon name="save" /></template>保存</t-button
+                    ><template #icon><t-icon name="save" /></template>{{ formConfirmationText('edit') }}</t-button
                   >
                 </div>
               </div>
@@ -184,11 +184,12 @@
     </div>
     <AdminDialog
       v-model:visible="createVisible"
+      :confirmation="formConfirmation(editingDiscountId == null ? 'create' : 'edit')"
       confirm-function="save"
       :header="editingDiscountId == null ? '新增' : '编辑'"
       dialog-class-name="discount-config-dialog zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      :confirm-btn="{ content: '保存', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="saveDiscount"
       @cancel="createVisible = false"
       @close="createVisible = false"
@@ -250,10 +251,11 @@
     </AdminConfirmDialog>
     <AdminDialog
       v-model:visible="formVisible"
+      :confirmation="operationConfirmation('批量设置')"
       confirm-function="batch-fill"
       width="320px"
       header="批量设置"
-      :confirm-btn="{ content: '完成', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="save"
       @cancel="formVisible = false"
       @close="formVisible = false"
@@ -276,6 +278,8 @@
   </div>
 </template>
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 

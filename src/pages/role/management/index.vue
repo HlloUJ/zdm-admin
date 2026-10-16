@@ -84,7 +84,7 @@
       width="480px"
       placement="center"
       :close-on-overlay-click="true"
-      :confirm-btn="actionButtonProps('submit', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('submit', formConfirmation(dialogMode))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
@@ -124,7 +124,7 @@
       width="min(1560px, calc(100vw - 48px))"
       placement="center"
       :close-on-overlay-click="true"
-      :confirm-btn="actionButtonProps('permissions', '保存', '确认')"
+      :confirm-btn="dialogButtonProps('permissions', operationConfirmation('配置权限'))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handlePermissionSave"
       @cancel="closePermissionDialog"
@@ -140,7 +140,12 @@
 </template>
 
 <script setup lang="ts">
-import { buttonTheme, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
+import {
+  formConfirmation,
+  dialogButtonProps,
+  operationConfirmation,
+} from '@/components/foundation/actions/confirmation';
+import { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

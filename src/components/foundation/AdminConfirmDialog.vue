@@ -5,7 +5,7 @@
     :header="dialogTitle"
     :width="width"
     dialog-class-name="zdm-admin-confirm-dialog"
-    :confirm-btn="confirmText"
+    :confirmation="confirmation"
     :cancel-btn="mode === 'blocked' ? null : '取消'"
     @update:visible="emit('update:visible', $event)"
     @confirm="handleConfirm"
@@ -21,8 +21,8 @@
 </template>
 
 <script setup lang="ts">
-import type { ButtonProps } from 'tdesign-vue-next';
-import { buttonTheme, type ButtonFunction } from './actions/buttonFunctions';
+import { operationConfirmation, type Confirmation } from './actions/confirmation';
+import { type ButtonFunction } from './actions/buttonFunctions';
 import { computed } from 'vue';
 
 import AdminDialog from './AdminDialog.vue';
@@ -31,6 +31,7 @@ const props = withDefaults(
   defineProps<{
     function: ButtonFunction;
     action: string;
+    batch?: boolean;
     description?: string;
     mode?: 'confirm' | 'blocked';
     objectName?: string;
@@ -40,6 +41,7 @@ const props = withDefaults(
     width?: string;
   }>(),
   {
+    batch: false,
     description: '',
     mode: 'confirm',
     objectName: '',
@@ -65,10 +67,13 @@ const targetText = computed(() => {
 const dialogTitle = computed(
   () => props.title || (props.mode === 'blocked' ? `无法${props.action}` : `是否${props.action}`),
 );
-const confirmText = computed<ButtonProps>(() => ({
-  content: props.mode === 'blocked' ? '我知道了' : `确认${props.action}`,
-  theme: buttonTheme(props.mode === 'blocked' ? 'close' : props.function),
-}));
+const confirmation = computed<Confirmation>(() =>
+  props.mode === 'blocked'
+    ? { kind: 'close', text: '我知道了' }
+    : props.visible
+      ? operationConfirmation(props.action, props.batch)
+      : { kind: 'none' },
+);
 const dialogDescription = computed(() => {
   if (props.description) return props.description;
   return props.mode === 'blocked'

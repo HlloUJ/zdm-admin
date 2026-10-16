@@ -98,6 +98,7 @@
 
     <AdminDialog
       v-model:visible="formVisible"
+      :confirmation="formConfirmation(editingId ? 'edit' : 'create')"
       confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
@@ -138,6 +139,7 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';

@@ -125,7 +125,7 @@
       :header="dialogMode === 'create' ? '新增' : '编辑'"
       width="480px"
       placement="center"
-      :confirm-btn="actionButtonProps('submit', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('submit', formConfirmation(dialogMode))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
@@ -160,7 +160,7 @@
       header="业务开通"
       width="520px"
       placement="center"
-      :confirm-btn="actionButtonProps('activate-business', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('activate-business', operationConfirmation('业务开通'))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleBusinessSubmit"
       @cancel="closeBusinessDialog"
@@ -196,6 +196,7 @@
 
     <AdminDialog
       v-model:visible="purgeDialogVisible"
+      :confirmation="operationConfirmation('彻底删除')"
       confirm-function="purge"
       header="彻底删除租户"
       width="560px"
@@ -234,11 +235,11 @@
 
 <script setup lang="ts">
 import {
-  buttonTheme,
-  buttonFunctionFor,
-  actionButtonProps,
-  cancelButtonProps,
-} from '@/components/foundation/actions/buttonFunctions';
+  formConfirmation,
+  dialogButtonProps,
+  operationConfirmation,
+} from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
@@ -393,7 +394,6 @@ const purgePreview = ref<TenantPurgePreview | null>(null);
 const purgeConfirmationName = ref('');
 const purgeSubmitting = ref(false);
 const purgeConfirmButton = computed(() => ({
-  content: '确认彻底删除',
   loading: purgeSubmitting.value,
   disabled: !purgePreview.value?.eligible || purgeConfirmationName.value !== purgePreview.value.tenantName,
 }));

@@ -45,6 +45,7 @@
     </template>
   </ProductOperationLogTemplate>
   <AdminDialog
+    :confirmation="{ kind: 'none' }"
     confirm-function="close"
     :visible="!!preview"
     header="历史媒体"

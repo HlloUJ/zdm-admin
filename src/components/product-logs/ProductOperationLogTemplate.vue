@@ -92,12 +92,12 @@
     </t-space>
   </t-drawer>
   <AdminDialog
+    :confirmation="{ kind: 'close', text: '关闭' }"
     confirm-function="close"
     :visible="detailVisible"
     header="操作详情"
     width="min(1240px, 94vw)"
     :cancel-btn="null"
-    confirm-btn="关闭"
     @confirm="emit('update:detailVisible', false)"
     @update:visible="emit('update:detailVisible', $event)"
   >

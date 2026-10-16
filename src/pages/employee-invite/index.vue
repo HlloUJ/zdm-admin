@@ -105,9 +105,9 @@
               <t-button :theme="buttonTheme('previous')" size="large" variant="outline" @click="step = 1"
                 >上一步</t-button
               >
-              <t-button :theme="buttonTheme('submit')" size="large" type="submit" :loading="submitting"
-                >提交注册</t-button
-              >
+              <t-button :theme="buttonTheme('submit')" size="large" type="submit" :loading="submitting">{{
+                confirmationText(operationConfirmation('提交注册'))
+              }}</t-button>
             </div>
           </t-form-item>
         </t-form>
@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { confirmationText, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { adminFeedback } from '@/components/foundation';

@@ -103,7 +103,7 @@
       header="新增标准属性"
       width="480px"
       placement="center"
-      :confirm-btn="actionButtonProps('submit', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('submit', formConfirmation('create'))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
@@ -212,12 +212,8 @@
 </template>
 
 <script setup lang="ts">
-import {
-  buttonTheme,
-  buttonFunctionFor,
-  actionButtonProps,
-  cancelButtonProps,
-} from '@/components/foundation/actions/buttonFunctions';
+import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';

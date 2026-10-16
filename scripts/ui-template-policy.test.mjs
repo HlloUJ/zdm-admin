@@ -1,3 +1,4 @@
+import { confirmationRegistryViolations, confirmationViolations } from './confirmation-policy.mjs';
 import { parse as parseSfc } from '@vue/compiler-sfc';
 import { parse as parseTemplate, NodeTypes } from '@vue/compiler-dom';
 import test from 'node:test';
@@ -797,4 +798,48 @@ test('public button and confirmation contracts require semantic IDs without lega
     'src/pages/slab/shared/slabPageActions.ts',
   ])
     assert.doesNotMatch(read(file), /\btheme\??:/);
+});
+
+test('all existing and future confirmations use registered naming without local caption overrides', () => {
+  assert.deepEqual(
+    [
+      ...confirmationRegistryViolations(),
+      ...files('src')
+        .filter((file) => file.endsWith('.vue'))
+        .flatMap((file) => confirmationViolations(file, read(file))),
+    ],
+    [],
+  );
+});
+test('confirmation naming rejects missing registration, unknown actions and manual captions', () => {
+  const source = (template) =>
+    `<template>${template}</template><script setup>import { formConfirmation, operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';</script>`;
+  assert.ok(
+    confirmationViolations(
+      'new.vue',
+      source('<Alias />').replace(
+        '</script>',
+        "import { AdminDialog as Alias } from '@/components/foundation';</script>",
+      ),
+    ).length,
+  );
+  for (const template of [
+    '<AdminDialog />',
+    '<AdminFormDialog :confirmation="formConfirmation(\'unknown\')" />',
+    '<AdminDialog :confirmation="operationConfirmation(\'未知动作\')" />',
+    '<AdminDialog :confirmation="formConfirmation(\'create\')" confirm-btn="提交" />',
+    '<AdminDialog :confirmation="formConfirmation(\'create\')" :confirm-btn="{content: \'保存\'}" />',
+    '<AdminConfirmDialog action="未知动作" />',
+    "<t-dialog :confirm-btn=\"actionButtonProps('delete', '提交')\" />",
+    '<t-button :theme="buttonTheme(\'save\')">保存</t-button>',
+    '<t-button data-form-submit :theme="buttonTheme(\'create\')">确认创建</t-button>',
+  ])
+    assert.ok(confirmationViolations('new.vue', source(template)).length, template);
+  for (const template of [
+    '<AdminDialog :confirmation="formConfirmation(\'create\')" />',
+    "<AdminFormDialog :confirmation=\"formConfirmation(editing ? 'edit' : 'create')\" />",
+    "<t-dialog :confirm-btn=\"dialogButtonProps('off-shelf', operationConfirmation('下架', batch), {loading: true})\" />",
+    '<AdminConfirmDialog action="停用" :batch="true" />',
+  ])
+    assert.deepEqual(confirmationViolations('new.vue', source(template)), []);
 });

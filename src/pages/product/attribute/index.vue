@@ -79,13 +79,13 @@
     </div>
     <AdminDialog
       v-model:visible="dialogVisible"
+      :confirmation="formConfirmation('create')"
       confirm-function="submit"
       header="新增"
       width="480px"
       placement="center"
       :prevent-scroll-through="false"
       dialog-class-name="attribute-create-dialog zdm-admin-dialog zdm-admin-single-form"
-      confirm-btn="提交"
       @confirm="submit"
       @close="closeCreateDialog"
       @opened="restorePageScroll"
@@ -119,6 +119,7 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';

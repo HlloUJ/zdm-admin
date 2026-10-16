@@ -69,7 +69,7 @@ for (const status of ['offShelf', 'soldOut', 'recycle']) {
     await expect(drawer.getByText('最新协同大板', { exact: true })).toBeVisible();
     await expect(drawer.getByText('库存异常', { exact: true })).toHaveCount(0);
     await expect(drawer.getByText('待核对库存', { exact: true })).toHaveCount(0);
-    await expect(drawer.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+    await expect(drawer.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true })).toHaveCount(0);
   });
 }
 for (const source of ['offShelf', 'recycle', 'purged', 'warehouse']) {
@@ -168,7 +168,12 @@ test('操作时来源已下架会刷新遮罩并清除旧选择', async ({ page 
       },
     }),
   );
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toContainText('该商品已被供应链下架');
   await expect(page.getByRole('main').locator('tbody tr').first().getByRole('checkbox')).not.toBeChecked();
   await expect(page.locator('.selection-info')).toHaveCount(0);
@@ -230,7 +235,12 @@ test('批量下架初次打开和重新打开不显示校验错误，提交时�
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.t-form__controls-message')).toHaveCount(0);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await page.getByRole('button', { name: '批量下架', exact: true }).click();
@@ -436,7 +446,7 @@ for (const reason of ['该商品已被供应链下架', '该商品已被供应�
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '大板详情' });
     await expect(drawer).toContainText(reason);
     await expect(drawer.getByText('失效时的大板', { exact: true })).toBeVisible();
-    await expect(drawer.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+    await expect(drawer.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true })).toHaveCount(0);
   });
 }
 

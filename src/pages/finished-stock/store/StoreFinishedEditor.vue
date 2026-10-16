@@ -122,13 +122,14 @@
     </div>
     <AdminSectionCard class="form-submit-bar">
       <t-button :theme="buttonTheme('submit')" :loading="saving" @click="save"
-        ><template #icon><t-icon name="check" /></template>提交商品信息</t-button
+        ><template #icon><t-icon name="check" /></template>{{ formConfirmationText('edit') }}</t-button
       >
       <t-button :theme="buttonTheme('cancel')" variant="base" :disabled="saving" @click="emit('cancel')">取消</t-button>
     </AdminSectionCard>
   </section>
 </template>
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch, h } from 'vue';

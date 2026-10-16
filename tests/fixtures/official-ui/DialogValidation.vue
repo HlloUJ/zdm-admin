@@ -5,15 +5,15 @@
       kind === 'native'
         ? {}
         : kind === 'foundation'
-          ? { data, confirmFunction: 'submit' }
-          : { confirmFunction: 'submit' }
+          ? { data, confirmFunction: 'submit', confirmation: formConfirmation('create') }
+          : { confirmFunction: 'submit', confirmation: formConfirmation('create') }
     "
     :visible="true"
     header="新增"
     width="560px"
     placement="center"
     :prevent-scroll-through="false"
-    confirm-btn="提交"
+    :confirm-btn="kind === 'native' ? '提交' : undefined"
     @confirm="validate"
   >
     <t-form v-if="kind !== 'foundation'" ref="formRef" :data="data" :rules="rules" label-width="100px" colon>
@@ -53,6 +53,7 @@
   </component>
 </template>
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { reactive, ref } from 'vue';
 import type { FormInstanceFunctions, FormRule } from 'tdesign-vue-next';
 import AdminDialog from '@/components/foundation/AdminDialog.vue';

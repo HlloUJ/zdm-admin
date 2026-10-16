@@ -13,6 +13,7 @@
     <template v-if="$slots.sale" #sale="slotProps"><slot name="sale" v-bind="slotProps" /></template>
   </ProductDetail>
   <AdminDialog
+    :confirmation="{ kind: 'none' }"
     confirm-function="close"
     :visible="Boolean(preview)"
     header="商品媒体"

@@ -41,7 +41,7 @@
                       :loading="guideSaving"
                       @click="saveGuidePriceSetting"
                     >
-                      保存指导价
+                      {{ formConfirmationText('edit') }}
                     </t-button>
                   </t-form>
                 </div>
@@ -132,6 +132,7 @@
 
     <AdminDialog
       v-model:visible="formVisible"
+      :confirmation="formConfirmation(editingId ? 'edit' : 'create')"
       confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="editingId ? '编辑' : '新增'"
@@ -197,6 +198,8 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';

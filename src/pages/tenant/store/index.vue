@@ -135,6 +135,7 @@
 
     <AdminDialog
       v-model:visible="formDialogVisible"
+      :confirmation="formConfirmation(dialogMode)"
       confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
@@ -207,6 +208,7 @@
 
     <AdminDialog
       v-model:visible="levelDialogVisible"
+      :confirmation="operationConfirmation('调整门店级别')"
       confirm-function="edit"
       header="门店级别"
       dialog-class-name="zdm-admin-single-form"
@@ -240,6 +242,7 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';

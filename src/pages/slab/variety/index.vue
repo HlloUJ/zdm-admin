@@ -96,7 +96,7 @@
       :header="dialogMode === 'create' ? '新增品种' : '编辑品种'"
       width="480px"
       placement="center"
-      :confirm-btn="actionButtonProps('submit', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('submit', formConfirmation(dialogMode))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
@@ -133,12 +133,8 @@
 </template>
 
 <script setup lang="ts">
-import {
-  buttonTheme,
-  buttonFunctionFor,
-  actionButtonProps,
-  cancelButtonProps,
-} from '@/components/foundation/actions/buttonFunctions';
+import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { adminFeedback, AdminConfirmDialog } from '@/components/foundation';

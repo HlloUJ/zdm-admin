@@ -143,7 +143,11 @@ export function buttonColorViolations(file, source) {
           fail('Do not duplicate a dialog theme; register its actual function');
       }
       if (tag === 't-dialog' && !adapters.has(file) && value(attr(node, 'footer')) !== 'false') {
-        if (!callValid(value(attr(node, 'confirm-btn')) ?? '', 'actionButtonProps', file))
+        if (
+          !['actionButtonProps', 'dialogButtonProps'].some((helper) =>
+            callValid(value(attr(node, 'confirm-btn')) ?? '', helper, file),
+          )
+        )
           fail('Raw dialog confirmation must use actionButtonProps with a registered function');
         if (!/^cancelButtonProps\(/.test(value(attr(node, 'cancel-btn')) ?? ''))
           fail('Raw dialog cancellation must use cancelButtonProps');

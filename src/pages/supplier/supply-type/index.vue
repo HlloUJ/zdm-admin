@@ -90,11 +90,12 @@
     </div>
     <AdminDialog
       v-model:visible="visible"
+      :confirmation="formConfirmation(editing ? 'edit' : 'create')"
       confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
       :header="editing ? '编辑供货类型' : '新增供货类型'"
-      :confirm-btn="{ content: '提交', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="save"
     >
       <t-form
@@ -108,11 +109,12 @@
       ></t-form>
     </AdminDialog>
     <AdminDialog
+      :confirmation="operationConfirmation(statusAction)"
       :confirm-function="buttonFunctionFor('supply-status', statusAction)"
       :visible="statusDialogVisible"
       :header="`是否${statusAction}`"
       width="440px"
-      :confirm-btn="{ content: `确认${statusAction}`, loading: changingStatus }"
+      :confirm-btn="{ loading: changingStatus }"
       :cancel-btn="{ content: '取消', disabled: changingStatus }"
       @confirm="confirmStatusChange"
       @cancel="closeStatusDialog"
@@ -121,10 +123,11 @@
       是否{{ statusAction }}供货类型“{{ statusTarget?.name }}”？
     </AdminDialog>
     <AdminDialog
+      :confirmation="operationConfirmation('删除')"
       confirm-function="delete"
       :visible="Boolean(deleting)"
       header="删除供货类型"
-      :confirm-btn="{ content: '删除', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="remove"
       @cancel="deleting = undefined"
       @close="deleting = undefined"
@@ -134,6 +137,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch } from 'vue';

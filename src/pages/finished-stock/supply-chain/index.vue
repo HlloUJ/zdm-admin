@@ -676,7 +676,7 @@
             <AdminSectionCard class="form-submit-bar">
               <t-button :theme="buttonTheme('submit')" :loading="saving" @click="submitProductForm">
                 <template #icon><t-icon name="check" /></template>
-                提交商品信息
+                {{ formConfirmationText(formPageMode === 'edit' ? 'edit' : 'create') }}
               </t-button>
               <t-button :theme="buttonTheme('cancel')" variant="base" @click="closeFormPage">取消</t-button>
             </AdminSectionCard>
@@ -686,9 +686,9 @@
     </div>
     <AdminDialog
       v-model:visible="categorySwitchWarningVisible"
+      :confirmation="operationConfirmation('切换分类')"
       confirm-function="switch-category"
       header="切换分类"
-      confirm-btn="确认切换"
       cancel-btn="取消"
       @confirm="confirmCategorySwitchWarning"
     >
@@ -696,10 +696,10 @@
     </AdminDialog>
     <AdminDialog
       v-model:visible="categoryDialogVisible"
+      :confirmation="{ kind: 'navigation', action: 'select-category' }"
       confirm-function="switch-category"
       header="选择商品分类"
       width="920px"
-      confirm-btn="确认，下一步"
       cancel-btn="取消"
       @confirm="confirmCategory"
       @cancel="closeCategoryDialog"
@@ -727,6 +727,7 @@
     </AdminDialog>
     <AdminDialog
       v-model:visible="specDialogVisible"
+      :confirmation="{ kind: 'none' }"
       confirm-function="close"
       header="创建规格"
       width="920px"
@@ -885,16 +886,18 @@
 
         <div class="spec-dialog-footer">
           <t-button :theme="buttonTheme('reset')" variant="text" @click="resetSpecDialog">重置</t-button>
-          <t-button :theme="buttonTheme('create')" @click="confirmCreateSpec">确认创建</t-button>
+          <t-button data-form-submit :theme="buttonTheme('create')" @click="confirmCreateSpec">{{
+            formConfirmationText(specFormMode)
+          }}</t-button>
           <t-button :theme="buttonTheme('cancel')" variant="base" @click="closeSpecDialog">取消</t-button>
         </div>
       </div>
     </AdminDialog>
     <AdminDialog
       v-model:visible="specModeConfirmVisible"
+      :confirmation="operationConfirmation('切换展示模式')"
       confirm-function="edit"
       header="切换展示模式"
-      confirm-btn="确认切换"
       cancel-btn="取消"
       @confirm="confirmSpecModeChange"
       @cancel="specModeConfirmVisible = false"
@@ -919,7 +922,7 @@
         </div>
         <t-button :theme="buttonTheme('save')" @click="savePriceDrawer">
           <template #icon><t-icon name="save" /></template>
-          保存
+          {{ formConfirmationText('edit') }}
         </t-button>
       </div>
 
@@ -1028,7 +1031,7 @@
       header="下架"
       width="520px"
       placement="center"
-      :confirm-btn="actionButtonProps('off-shelf', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('off-shelf', operationConfirmation('下架', reasonState.isBatch))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="submitReason"
       @cancel="closeReasonDialog"
@@ -1105,12 +1108,9 @@
 </template>
 
 <script setup lang="ts">
-import {
-  buttonTheme,
-  buttonFunctionFor,
-  actionButtonProps,
-  cancelButtonProps,
-} from '@/components/foundation/actions/buttonFunctions';
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
@@ -2321,6 +2321,7 @@ const {
   handleBatchCostChange,
 } = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
 const {
+  specFormMode,
   specModeChanged,
   openSpecDialog,
   closeSpecDialog,

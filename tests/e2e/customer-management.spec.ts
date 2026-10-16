@@ -172,10 +172,20 @@ test('new customer requires only name and never asks for shipping or source', as
   await page.goto('/store/customer-management');
   await page.getByRole('button', { name: '新增', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增客户' });
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请输入客户姓名', { exact: true })).toBeVisible();
   await dialog.locator('.t-form__item').filter({ hasText: '客户姓名' }).locator('input').fill('李女士');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('李女士', { exact: true })).toBeVisible();
   expect(requests.at(-1)).toMatchObject({ name: '李女士', phone: '' });
   expect(requests.at(-1)).not.toHaveProperty('ownerAccountId');
@@ -189,7 +199,12 @@ test('current owner edits historical followup without a separate followup grant'
   await detail.getByText('编辑', { exact: true }).click();
   const edit = page.locator('.t-dialog:visible').filter({ hasText: '编辑跟进' });
   await edit.locator('textarea').first().fill('接手后补充');
-  await edit.getByRole('button', { name: '提交', exact: true }).click();
+  await edit
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(detail.getByText('接手后补充', { exact: true })).toBeVisible();
   expect(requests.at(-1)).toMatchObject({ content: '接手后补充', mediaIds: [] });
 });
@@ -202,7 +217,12 @@ test('archive assignment is independent of role and returns the customer to dail
   await expect(dialog.getByText('调整归属后，客户将自动恢复为日常客户。')).toBeVisible();
   await dialog.locator('.t-select').click();
   await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('王先生3', { exact: true })).toHaveCount(0);
   expect(requests.at(-1)).toMatchObject({ action: 'assign', status: 'archived', ownerAccountId: 8 });
   await page.getByText('日常客户', { exact: true }).click();
@@ -234,7 +254,12 @@ test('followup accepts at most three attachments and blocks files above 5MiB bef
     await expect(dialog.getByText(`note${index}.bin`, { exact: true })).toBeVisible();
   }
   await dialog.locator('textarea').first().fill('三个附件');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.locator('.t-dialog:visible').getByText('三个附件', { exact: true })).toBeVisible();
   expect((requests.at(-1)?.mediaIds as number[]).length).toBe(3);
 });
@@ -449,7 +474,12 @@ test('customer profile dialogs retain native component visuals', async ({ page }
   const { reference, checkDialog, native, styleOf } = await nativeDialogVisuals(page, testInfo);
   await page.getByRole('button', { name: '新增', exact: true }).click();
   let dialog = await checkDialog('新增客户', 'profile-create', true);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请输入客户姓名', { exact: true })).toBeVisible();
   expect(await styleOf(dialog.locator('.t-form-item-tips'))).toEqual(
     await styleOf(native.locator('.t-form-item-tips')),
@@ -643,7 +673,12 @@ test('followup submission keeps its original rules and displays a field error un
   const dialog = page
     .locator('.t-dialog:visible')
     .filter({ has: page.locator('.t-dialog__header').filter({ hasText: /^新增跟进$/ }) });
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   const field = dialog
     .locator('.t-form__item')
     .filter({ has: page.locator('.t-form__label').filter({ hasText: '跟进内容' }) });
@@ -655,7 +690,12 @@ test('followup submission keeps its original rules and displays a field error un
   expect(requests.some((item) => item.content)).toBe(false);
   await field.locator('textarea').fill('修正后的跟进内容');
   await expect(field.getByText('请输入跟进内容', { exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog).toBeHidden();
   expect(requests.at(-1)).toMatchObject({ content: '修正后的跟进内容', mediaIds: [] });
 });
@@ -665,7 +705,12 @@ test('assignment missing-owner feedback stays at the field and clears after sele
   await page.getByText('归档客户', { exact: true }).click();
   await page.locator('tr').filter({ hasText: '王先生3' }).getByText('调整归属', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '调整归属' });
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请选择新归属人', { exact: true })).toBeVisible();
   await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '请选择新归属人' })).toHaveCount(0);
   const errorColor = await dialog

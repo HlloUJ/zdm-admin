@@ -79,6 +79,7 @@
     <AdminFormDialog
       ref="profileDialog"
       v-model:visible="profileVisible"
+      :confirmation="formConfirmation(editingId ? 'edit' : 'create')"
       confirm-function="submit"
       width="480px"
       :data="profile"
@@ -107,10 +108,10 @@
     </AdminFormDialog>
     <AdminDialog
       v-model:visible="detailVisible"
+      :confirmation="{ kind: 'close', text: '关闭' }"
       confirm-function="close"
       header="客户详情"
       width="min(1100px, 94vw)"
-      :confirm-btn="'关闭'"
       :cancel-btn="null"
       @confirm="detailVisible = false"
     >
@@ -163,6 +164,7 @@
     <AdminFormDialog
       ref="followDialog"
       v-model:visible="followVisible"
+      :confirmation="formConfirmation(followId ? 'edit' : 'create')"
       confirm-function="submit"
       :data="followForm"
       label-width="calc(7em + var(--td-comp-paddingLR-xl))"
@@ -214,6 +216,7 @@
     <AdminFormDialog
       ref="assignDialog"
       v-model:visible="assignVisible"
+      :confirmation="operationConfirmation('调整归属', pending.batch)"
       confirm-function="assign"
       :data="{ ownerAccountId: newOwner }"
       header="调整归属"
@@ -239,6 +242,7 @@
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
       :function="deletingFollowId != null ? 'delete' : buttonFunctionFor('customer', pending.action)"
+      :batch="deletingFollowId == null && pending.batch"
       :action="confirmAction"
       object-type="客户"
       :description="confirmDescription"
@@ -248,6 +252,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
@@ -483,7 +488,6 @@ const profile = ref<CustomerProfile>(emptyProfile());
 const submitting = ref(false);
 const uploading = ref(0);
 const submitButton = computed(() => ({
-  content: '提交',
   loading: submitting.value || uploading.value > 0,
   disabled: submitting.value,
 }));

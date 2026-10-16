@@ -8,6 +8,7 @@
     @preview="(media, type) => (preview = { url: media.url, kind: type })"
   />
   <AdminDialog
+    :confirmation="{ kind: 'none' }"
     confirm-function="close"
     :visible="Boolean(preview)"
     header="商品媒体"

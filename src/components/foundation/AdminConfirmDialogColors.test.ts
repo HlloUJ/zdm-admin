@@ -3,6 +3,7 @@ import { defineComponent, h, nextTick, ref } from 'vue';
 import { describe, expect, it } from 'vitest';
 import AdminConfirmDialog from './AdminConfirmDialog.vue';
 import AdminDialog from './AdminDialog.vue';
+import { operationConfirmation } from './actions/confirmation';
 const Dialog = defineComponent({
   props: {
     confirmBtn: { type: [Object, String], default: undefined },
@@ -47,14 +48,15 @@ describe('confirmation color integration', () => {
           visible: true,
           header: '下架',
           confirmFunction: 'off-shelf',
-          confirmBtn: { content: '提交', loading: true, disabled: true },
+          confirmation: operationConfirmation('下架'),
+          confirmBtn: { loading: true, disabled: true },
           cancelBtn: null,
         }),
     };
     const wrapper = mount(Host, { global });
     const dialog = wrapper.findComponent(Dialog);
     expect(dialog.props('confirmBtn')).toMatchObject({
-      content: '提交',
+      content: '确认下架',
       loading: true,
       disabled: true,
       theme: 'warning',

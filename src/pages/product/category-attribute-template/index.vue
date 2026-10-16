@@ -268,10 +268,11 @@
     </div>
     <AdminDialog
       v-model:visible="addVisible"
+      :confirmation="operationConfirmation('添加属性')"
       confirm-function="create"
       header="添加属性"
       width="720px"
-      :confirm-btn="{ content: '提交', disabled: !addIds.length }"
+      :confirm-btn="{ disabled: !addIds.length }"
       @confirm="addAttributes"
     >
       <t-input v-model="attributeKeyword" placeholder="请输入属性名称" clearable />
@@ -296,6 +297,7 @@
     </AdminDialog>
     <AdminDialog
       v-model:visible="valuesVisible"
+      :confirmation="formConfirmation('edit')"
       confirm-function="options"
       :header="`${editable ? '编辑' : '查看'}选项值 · ${valueTarget?.name || ''}`"
       width="720px"
@@ -333,10 +335,11 @@
     />
     <AdminDialog
       v-model:visible="publishVisible"
+      :confirmation="operationConfirmation('发布版本')"
       confirm-function="publish-version"
       header="发布新版本"
       width="max-content"
-      :confirm-btn="{ content: '确认发布', loading: busy }"
+      :confirm-btn="{ loading: busy }"
       @confirm="publish"
     >
       <div class="publish-confirm-content">
@@ -345,10 +348,11 @@
       </div>
     </AdminDialog>
     <AdminDialog
+      :confirmation="operationConfirmation('复制版本')"
       confirm-function="copy-version"
       :visible="!!copyTarget"
       header="复制版本"
-      :confirm-btn="{ content: '确认复制', loading: busy }"
+      :confirm-btn="{ loading: busy }"
       @confirm="copyVersion(copyTarget!)"
       @close="copyTarget = undefined"
       @cancel="copyTarget = undefined"
@@ -382,6 +386,7 @@
 </template>
 
 <script setup lang="ts">
+import { operationConfirmation, formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { toRaw, computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';

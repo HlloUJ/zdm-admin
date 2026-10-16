@@ -988,7 +988,7 @@
         <div class="drawer-actions">
           <t-button v-if="!priceDrawerReadonly" :theme="buttonTheme('save')" block @click="saveBatchPrice">
             <template #icon><t-icon name="save" /></template>
-            保存
+            {{ formConfirmationText('edit') }}
           </t-button>
         </div>
         <t-form ref="priceDrawerFormRef" :data="priceDrawerForm" class="price-drawer-form">
@@ -1086,7 +1086,12 @@
       :header="reasonDialogTitle"
       width="520px"
       placement="center"
-      :confirm-btn="actionButtonProps('off-shelf', '提交', '确认')"
+      :confirm-btn="
+        dialogButtonProps(
+          'off-shelf',
+          operationConfirmation(reasonState.type === 'deleteExternal' ? '删除' : '下架', reasonState.isBatch),
+        )
+      "
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleReasonSubmit"
       @cancel="closeReasonDialog"
@@ -1124,10 +1129,10 @@
 
     <AdminDialog
       v-model:visible="offShelfHistoryVisible"
+      :confirmation="{ kind: 'close', text: '关闭' }"
       confirm-function="close"
       header="历史下架原因"
       width="800px"
-      confirm-btn="关闭"
       :cancel-btn="null"
       @confirm="closeOffShelfHistory"
       @close="closeOffShelfHistory"
@@ -1150,12 +1155,9 @@
 </template>
 
 <script setup lang="ts">
-import {
-  buttonTheme,
-  buttonFunctionFor,
-  actionButtonProps,
-  cancelButtonProps,
-} from '@/components/foundation/actions/buttonFunctions';
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';

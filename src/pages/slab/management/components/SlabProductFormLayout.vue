@@ -51,7 +51,7 @@
       <AdminSectionCard class="form-submit-bar">
         <t-button :theme="buttonTheme('submit')" :loading="loading" @click="emit('confirm')">
           <template #icon><t-icon name="check" /></template>
-          提交商品信息
+          {{ formConfirmationText(mode === 'edit' ? 'edit' : 'create') }}
         </t-button>
         <t-button :theme="buttonTheme('cancel')" variant="base" :disabled="loading" @click="emit('close')"
           >取消</t-button
@@ -65,7 +65,7 @@
     :header="title"
     width="940px"
     placement="center"
-    :confirm-btn="actionButtonProps('submit', mode === 'view' ? null : '提交商品信息', '确认')"
+    :confirm-btn="dialogButtonProps('submit', { kind: 'none' }, null)"
     :cancel-btn="cancelButtonProps('取消')"
     @confirm="emit('confirm')"
     @cancel="emit('close')"
@@ -85,7 +85,9 @@
 </template>
 
 <script setup lang="ts">
-import { buttonTheme, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { nextTick, ref, watch } from 'vue';
 import { AdminSectionCard } from '@/components/foundation';
 const props = defineProps<{

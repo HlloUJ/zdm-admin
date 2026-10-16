@@ -83,6 +83,7 @@
 
     <AdminDialog
       v-model:visible="formVisible"
+      :confirmation="formConfirmation(editingId ? 'edit' : 'create')"
       confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
@@ -107,10 +108,10 @@
 
     <AdminDialog
       v-model:visible="aliasesVisible"
+      :confirmation="{ kind: 'close', text: '关闭' }"
       confirm-function="close"
       :header="`别名管理 - ${activeTexture?.name ?? ''}`"
       width="680px"
-      confirm-btn="关闭"
       :cancel-btn="null"
       @confirm="aliasesVisible = false"
       @close="aliasesVisible = false"
@@ -132,6 +133,7 @@
 
     <AdminDialog
       v-model:visible="aliasFormVisible"
+      :confirmation="formConfirmation(editingAliasId ? 'edit' : 'create')"
       confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
@@ -165,6 +167,7 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';

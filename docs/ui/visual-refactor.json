@@ -196,6 +196,36 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    :width=\"width\"\n    dialog-class-name=\"zdm-admin-confirm-dialog\"\n    :confirm-btn=\"confirmText\"\n    :cancel-btn=\"mode === 'blocked' ? null : '取消'\"\n    @update:visible=\"emit('update:visible', $event)\"\n",
+          "after": "    :width=\"width\"\n    dialog-class-name=\"zdm-admin-confirm-dialog\"\n    :confirmation=\"confirmation\"\n    :cancel-btn=\"mode === 'blocked' ? null : '取消'\"\n    @update:visible=\"emit('update:visible', $event)\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport type { ButtonProps } from 'tdesign-vue-next';\nimport { buttonTheme, type ButtonFunction } from './actions/buttonFunctions';\nimport { computed } from 'vue';\n\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { operationConfirmation, type Confirmation } from './actions/confirmation';\nimport { type ButtonFunction } from './actions/buttonFunctions';\nimport { computed } from 'vue';\n\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    function: ButtonFunction;\n    action: string;\n    description?: string;\n    mode?: 'confirm' | 'blocked';\n",
+          "after": "    function: ButtonFunction;\n    action: string;\n    batch?: boolean;\n    description?: string;\n    mode?: 'confirm' | 'blocked';\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  }>(),\n  {\n    description: '',\n    mode: 'confirm',\n",
+          "after": "  }>(),\n  {\n    batch: false,\n    description: '',\n    mode: 'confirm',\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  () => props.title || (props.mode === 'blocked' ? `无法${props.action}` : `是否${props.action}`),\n);\nconst confirmText = computed<ButtonProps>(() => ({\n  content: props.mode === 'blocked' ? '我知道了' : `确认${props.action}`,\n  theme: buttonTheme(props.mode === 'blocked' ? 'close' : props.function),\n}));\nconst dialogDescription = computed(() => {\n  if (props.description) return props.description;\n",
+          "after": "  () => props.title || (props.mode === 'blocked' ? `无法${props.action}` : `是否${props.action}`),\n);\nconst confirmation = computed<Confirmation>(() =>\n  props.mode === 'blocked'\n    ? { kind: 'close', text: '我知道了' }\n    : props.visible\n      ? operationConfirmation(props.action, props.batch)\n      : { kind: 'none' },\n);\nconst dialogDescription = computed(() => {\n  if (props.description) return props.description;\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "    :visible=\"visible\"\n    :header=\"dialogTitle\"\n",
@@ -245,6 +275,30 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    placement=\"center\"\n    :prevent-scroll-through=\"false\"\n    :confirm-btn=\"actionButtonProps(confirmFunction, confirmBtn)\"\n    :cancel-btn=\"cancelButtonProps(cancelBtn)\"\n    @update:visible=\"emit('update:visible', $event)\"\n",
+          "after": "    placement=\"center\"\n    :prevent-scroll-through=\"false\"\n    :confirm-btn=\"dialogButtonProps(confirmFunction, confirmation, confirmBtn)\"\n    :cancel-btn=\"cancelButtonProps(cancelBtn)\"\n    @update:visible=\"emit('update:visible', $event)\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport type { ButtonProps } from 'tdesign-vue-next';\nimport { actionButtonProps, cancelButtonProps, type ButtonFunction } from './actions/buttonFunctions';\n\nwithDefaults(\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { dialogButtonProps, type Confirmation, type ConfirmationButtonOptions } from './actions/confirmation';\nimport type { ButtonProps } from 'tdesign-vue-next';\nimport { cancelButtonProps, type ButtonFunction } from './actions/buttonFunctions';\n\nwithDefaults(\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    dialogClassName?: string;\n    confirmFunction: ButtonFunction;\n    confirmBtn?: string | ButtonProps;\n    cancelBtn?: string | ButtonProps | null;\n  }>(),\n",
+          "after": "    dialogClassName?: string;\n    confirmFunction: ButtonFunction;\n    confirmation: Confirmation;\n    confirmBtn?: ConfirmationButtonOptions | null;\n    cancelBtn?: string | ButtonProps | null;\n  }>(),\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    width: '480px',\n    dialogClassName: '',\n    confirmBtn: '提交',\n    cancelBtn: '取消',\n  },\n",
+          "after": "    width: '480px',\n    dialogClassName: '',\n    confirmBtn: undefined,\n    cancelBtn: '取消',\n  },\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -395,6 +449,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "        .join(' ')\n    \"\n    :confirm-btn=\"actionButtonProps(confirmFunction, confirmBtn)\"\n    :cancel-btn=\"cancelButtonProps(cancelBtn)\"\n    placement=\"center\"\n",
+          "after": "        .join(' ')\n    \"\n    :confirm-btn=\"dialogButtonProps(confirmFunction, confirmation, confirmBtn)\"\n    :cancel-btn=\"cancelButtonProps(cancelBtn)\"\n    placement=\"center\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "</template>\n<script setup lang=\"ts\">\nimport { ref } from 'vue';\nimport { actionButtonProps, cancelButtonProps, type ButtonFunction } from '../actions/buttonFunctions';\nimport type { FormProps, ButtonProps, FormInstanceFunctions } from 'tdesign-vue-next';\nimport { formElement } from '@/utils/submitValidation';\n",
+          "after": "</template>\n<script setup lang=\"ts\">\nimport { dialogButtonProps, type Confirmation, type ConfirmationButtonOptions } from '../actions/confirmation';\nimport { ref } from 'vue';\nimport { cancelButtonProps, type ButtonFunction } from '../actions/buttonFunctions';\nimport type { FormProps, ButtonProps, FormInstanceFunctions } from 'tdesign-vue-next';\nimport { formElement } from '@/utils/submitValidation';\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    formLayout?: 'single-column' | 'custom';\n    confirmFunction: ButtonFunction;\n    cancelBtn?: string | ButtonProps | null;\n    confirmBtn?: string | ButtonProps;\n  }>(),\n  { labelWidth: '100px', confirmBtn: '提交', cancelBtn: undefined, dialogClassName: '', formLayout: 'single-column' },\n);\nconst emit = defineEmits<{ 'update:visible': [value: boolean] }>();\n",
+          "after": "    formLayout?: 'single-column' | 'custom';\n    confirmFunction: ButtonFunction;\n    confirmation: Confirmation;\n    cancelBtn?: string | ButtonProps | null;\n    confirmBtn?: ConfirmationButtonOptions | null;\n  }>(),\n  {\n    labelWidth: '100px',\n    confirmBtn: undefined,\n    cancelBtn: undefined,\n    dialogClassName: '',\n    formLayout: 'single-column',\n  },\n);\nconst emit = defineEmits<{ 'update:visible': [value: boolean] }>();\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -679,6 +751,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  </t-drawer>\n  <AdminDialog\n    confirm-function=\"close\"\n    :visible=\"detailVisible\"\n",
+          "after": "  </t-drawer>\n  <AdminDialog\n    :confirmation=\"{ kind: 'close', text: '关闭' }\"\n    confirm-function=\"close\"\n    :visible=\"detailVisible\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    width=\"min(1240px, 94vw)\"\n    :cancel-btn=\"null\"\n    confirm-btn=\"关闭\"\n    @confirm=\"emit('update:detailVisible', false)\"\n    @update:visible=\"emit('update:detailVisible', $event)\"\n",
+          "after": "    width=\"min(1240px, 94vw)\"\n    :cancel-btn=\"null\"\n    @confirm=\"emit('update:detailVisible', false)\"\n    @update:visible=\"emit('update:detailVisible', $event)\"\n"
+        },
+        {
           "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
           "stage": "before-migrations",
           "before": "  }>(),\n  {\n    loading: false,\n    subjectCodeLabel: '',\n",
@@ -838,6 +922,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation('create'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -1010,6 +1106,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
+          "after": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation(dialogMode))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -1215,6 +1323,48 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      ref=\"profileDialog\"\n      v-model:visible=\"profileVisible\"\n      confirm-function=\"submit\"\n      width=\"480px\"\n",
+          "after": "      ref=\"profileDialog\"\n      v-model:visible=\"profileVisible\"\n      :confirmation=\"formConfirmation(editingId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      width=\"480px\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"detailVisible\"\n      confirm-function=\"close\"\n      header=\"客户详情\"\n      width=\"min(1100px, 94vw)\"\n      :confirm-btn=\"'关闭'\"\n      :cancel-btn=\"null\"\n      @confirm=\"detailVisible = false\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"detailVisible\"\n      :confirmation=\"{ kind: 'close', text: '关闭' }\"\n      confirm-function=\"close\"\n      header=\"客户详情\"\n      width=\"min(1100px, 94vw)\"\n      :cancel-btn=\"null\"\n      @confirm=\"detailVisible = false\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      ref=\"followDialog\"\n      v-model:visible=\"followVisible\"\n      confirm-function=\"submit\"\n      :data=\"followForm\"\n",
+          "after": "      ref=\"followDialog\"\n      v-model:visible=\"followVisible\"\n      :confirmation=\"formConfirmation(followId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      :data=\"followForm\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      ref=\"assignDialog\"\n      v-model:visible=\"assignVisible\"\n      confirm-function=\"assign\"\n      :data=\"{ ownerAccountId: newOwner }\"\n",
+          "after": "      ref=\"assignDialog\"\n      v-model:visible=\"assignVisible\"\n      :confirmation=\"operationConfirmation('调整归属', pending.batch)\"\n      confirm-function=\"assign\"\n      :data=\"{ ownerAccountId: newOwner }\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      v-model:visible=\"confirmVisible\"\n      :function=\"deletingFollowId != null ? 'delete' : buttonFunctionFor('customer', pending.action)\"\n      :action=\"confirmAction\"\n      object-type=\"客户\"\n",
+          "after": "      v-model:visible=\"confirmVisible\"\n      :function=\"deletingFollowId != null ? 'delete' : buttonFunctionFor('customer', pending.action)\"\n      :batch=\"deletingFollowId == null && pending.batch\"\n      :action=\"confirmAction\"\n      object-type=\"客户\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "</template>\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "</template>\n<script setup lang=\"ts\">\nimport { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "const uploading = ref(0);\nconst submitButton = computed(() => ({\n  content: '提交',\n  loading: submitting.value || uploading.value > 0,\n  disabled: submitting.value,\n",
+          "after": "const uploading = ref(0);\nconst submitButton = computed(() => ({\n  loading: submitting.value || uploading.value > 0,\n  disabled: submitting.value,\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "          <template #name=\"{ row }\"\n            ><t-link v-if=\"can('detail')\" theme=\"primary\" @click=\"openDetail(row.id)\">{{ row.name }}</t-link\n            ><span v-else>{{ row.name }}</span></template\n",
@@ -1349,6 +1499,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "                >上一步</t-button\n              >\n              <t-button :theme=\"buttonTheme('submit')\" size=\"large\" type=\"submit\" :loading=\"submitting\"\n                >提交注册</t-button\n              >\n            </div>\n          </t-form-item>\n",
+          "after": "                >上一步</t-button\n              >\n              <t-button :theme=\"buttonTheme('submit')\" size=\"large\" type=\"submit\" :loading=\"submitting\">{{\n                confirmationText(operationConfirmation('提交注册'))\n              }}</t-button>\n            </div>\n          </t-form-item>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { confirmationText, operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -1494,6 +1656,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation('create'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "                <div class=\"filter-actions\">\n                  <t-button theme=\"primary\" @click=\"handleSearch\">\n                    <template #icon><t-icon name=\"search\" /></template>\n",
@@ -1630,6 +1804,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  </ProductOperationLogTemplate>\n  <AdminDialog\n    confirm-function=\"close\"\n    :visible=\"!!preview\"\n",
+          "after": "  </ProductOperationLogTemplate>\n  <AdminDialog\n    :confirmation=\"{ kind: 'none' }\"\n    confirm-function=\"close\"\n    :visible=\"!!preview\"\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "  <AdminDialog\n    :visible=\"!!preview\"\n",
@@ -1693,6 +1873,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  <AdminDialog\n    v-model:visible=\"confirmVisible\"\n    confirm-function=\"edit\"\n    attach=\"body\"\n    header=\"更改价格浮动方式\"\n    confirm-btn=\"确认\"\n    @confirm=\"confirmToggle\"\n    @cancel=\"confirmVisible = false\"\n",
+          "after": "  <AdminDialog\n    v-model:visible=\"confirmVisible\"\n    :confirmation=\"operationConfirmation('更改价格浮动方式')\"\n    confirm-function=\"edit\"\n    attach=\"body\"\n    header=\"更改价格浮动方式\"\n    @confirm=\"confirmToggle\"\n    @cancel=\"confirmVisible = false\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "</template>\n<script setup lang=\"ts\">\nimport { computed, ref } from 'vue';\nimport { AdminDialog, adminFeedback } from '@/components/foundation';\n",
+          "after": "</template>\n<script setup lang=\"ts\">\nimport { operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { computed, ref } from 'vue';\nimport { AdminDialog, adminFeedback } from '@/components/foundation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -2211,6 +2403,66 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "              <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"submitProductForm\">\n                <template #icon><t-icon name=\"check\" /></template>\n                提交商品信息\n              </t-button>\n              <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeFormPage\">取消</t-button>\n",
+          "after": "              <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"submitProductForm\">\n                <template #icon><t-icon name=\"check\" /></template>\n                {{ formConfirmationText(formPageMode === 'edit' ? 'edit' : 'create') }}\n              </t-button>\n              <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeFormPage\">取消</t-button>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"categorySwitchWarningVisible\"\n      confirm-function=\"switch-category\"\n      header=\"切换分类\"\n      confirm-btn=\"确认切换\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategorySwitchWarning\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"categorySwitchWarningVisible\"\n      :confirmation=\"operationConfirmation('切换分类')\"\n      confirm-function=\"switch-category\"\n      header=\"切换分类\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategorySwitchWarning\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"categoryDialogVisible\"\n      confirm-function=\"switch-category\"\n      header=\"选择商品分类\"\n      width=\"920px\"\n      confirm-btn=\"确认，下一步\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategory\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"categoryDialogVisible\"\n      :confirmation=\"{ kind: 'navigation', action: 'select-category' }\"\n      confirm-function=\"switch-category\"\n      header=\"选择商品分类\"\n      width=\"920px\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategory\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"specDialogVisible\"\n      confirm-function=\"close\"\n      header=\"创建规格\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"specDialogVisible\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      header=\"创建规格\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "        <div class=\"spec-dialog-footer\">\n          <t-button :theme=\"buttonTheme('reset')\" variant=\"text\" @click=\"resetSpecDialog\">重置</t-button>\n          <t-button :theme=\"buttonTheme('create')\" @click=\"confirmCreateSpec\">确认创建</t-button>\n          <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeSpecDialog\">取消</t-button>\n        </div>\n",
+          "after": "        <div class=\"spec-dialog-footer\">\n          <t-button :theme=\"buttonTheme('reset')\" variant=\"text\" @click=\"resetSpecDialog\">重置</t-button>\n          <t-button data-form-submit :theme=\"buttonTheme('create')\" @click=\"confirmCreateSpec\">{{\n            formConfirmationText(specFormMode)\n          }}</t-button>\n          <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeSpecDialog\">取消</t-button>\n        </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"specModeConfirmVisible\"\n      confirm-function=\"edit\"\n      header=\"切换展示模式\"\n      confirm-btn=\"确认切换\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmSpecModeChange\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"specModeConfirmVisible\"\n      :confirmation=\"operationConfirmation('切换展示模式')\"\n      confirm-function=\"edit\"\n      header=\"切换展示模式\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmSpecModeChange\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "        <t-button :theme=\"buttonTheme('save')\" @click=\"savePriceDrawer\">\n          <template #icon><t-icon name=\"save\" /></template>\n          保存\n        </t-button>\n      </div>\n",
+          "after": "        <t-button :theme=\"buttonTheme('save')\" @click=\"savePriceDrawer\">\n          <template #icon><t-icon name=\"save\" /></template>\n          {{ formConfirmationText('edit') }}\n        </t-button>\n      </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('off-shelf', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"submitReason\"\n",
+          "after": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('off-shelf', operationConfirmation('下架', reasonState.isBatch))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"submitReason\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);\nconst {\n  openSpecDialog,\n  closeSpecDialog,\n",
+          "after": "} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);\nconst {\n  specFormMode,\n  openSpecDialog,\n  closeSpecDialog,\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "                  :key=\"section.key\"\n                  :href=\"`#finished-product-${section.key}`\"\n",
@@ -2492,6 +2744,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  </ProductDetail>\n  <AdminDialog\n    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n",
+          "after": "  </ProductDetail>\n  <AdminDialog\n    :confirmation=\"{ kind: 'none' }\"\n    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "  <AdminDialog\n    :visible=\"Boolean(preview)\"\n",
@@ -2504,6 +2762,12 @@
       "template": "1929b9d23c12c448f2ad0b5ba772fb61bd8ddafc2f37d5bd4ef5dcf788cb0691",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  />\n  <AdminDialog\n    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n",
+          "after": "  />\n  <AdminDialog\n    :confirmation=\"{ kind: 'none' }\"\n    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -2686,6 +2950,20 @@
           "after": "        : buildLayeredSpecRows();\n    if (!rows.length) {\n      specDraftError.value = '请至少配置一条商品规格';\n      return onValidationFailed();\n    }\n    const fields = selectedSpecGroups.value.map((group) => group.field);\n    if (specMode.value === 'layered' && rows.some((row) => fields.some((field) => !String(row[field] || '').trim()))) {\n      specDraftError.value = '请补充每条规格的属性值后再确认创建';\n      return onValidationFailed();\n    }\n    if (specMode.value === 'layered' && new Set(rows.map((row) => specIdentity(row, fields))).size !== rows.length) {\n      specDraftError.value = '规格组合不能重复，请修改后再确认创建';\n      return onValidationFailed();\n    }\n    confirmedSpecDimensions.value =\n      specMode.value === 'layered'\n",
           "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  salesAttributeByKey,\n}: SpecDialogContext) {\n  const openSpecDialog = async (preserveCurrent = false) => {\n    validatedSpecDraftIds.value = new Set();\n    try {\n",
+          "after": "  salesAttributeByKey,\n}: SpecDialogContext) {\n  const specFormMode = ref<'create' | 'edit'>('create');\n  const openSpecDialog = async (preserveCurrent = false) => {\n    specFormMode.value = preserveCurrent === true ? 'edit' : 'create';\n    validatedSpecDraftIds.value = new Set();\n    try {\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "  });\n  return {\n    specModeChanged,\n    openSpecDialog,\n",
+          "after": "  });\n  return {\n    specFormMode,\n    specModeChanged,\n    openSpecDialog,\n"
+        }
       ]
     },
     "src/pages/finished-stock/store/StoreFinishedEditor.vue": {
@@ -2729,6 +3007,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminSectionCard class=\"form-submit-bar\">\n      <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"save\"\n        ><template #icon><t-icon name=\"check\" /></template>提交商品信息</t-button\n      >\n      <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"saving\" @click=\"emit('cancel')\">取消</t-button>\n",
+          "after": "    <AdminSectionCard class=\"form-submit-bar\">\n      <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"save\"\n        ><template #icon><t-icon name=\"check\" /></template>{{ formConfirmationText('edit') }}</t-button\n      >\n      <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"saving\" @click=\"emit('cancel')\">取消</t-button>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "</template>\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "</template>\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -2896,6 +3186,42 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"poolVisible\"\n      confirm-function=\"close\"\n      header=\"商品中心\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"poolVisible\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      header=\"商品中心\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n    <AdminDialog\n      confirm-function=\"close\"\n      :visible=\"Boolean(logVideoPreview)\"\n",
+          "after": "\n    <AdminDialog\n      :confirmation=\"{ kind: 'close', text: '关闭' }\"\n      confirm-function=\"close\"\n      :visible=\"Boolean(logVideoPreview)\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"min(960px, 94vw)\"\n      :cancel-btn=\"null\"\n      confirm-btn=\"关闭\"\n      @confirm=\"logVideoPreview = null\"\n      @close=\"logVideoPreview = null\"\n",
+          "after": "      width=\"min(960px, 94vw)\"\n      :cancel-btn=\"null\"\n      @confirm=\"logVideoPreview = null\"\n      @close=\"logVideoPreview = null\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n    <AdminDialog\n      confirm-function=\"close\"\n      :visible=\"Boolean(imagePreview)\"\n",
+          "after": "\n    <AdminDialog\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      :visible=\"Boolean(imagePreview)\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"offShelfVisible\"\n      confirm-function=\"off-shelf\"\n      :header=\"pendingOffShelf?.batch ? '下架' : '下架商品'\"\n      :width=\"pendingOffShelf?.batch ? '520px' : '500px'\"\n      :confirm-btn=\"pendingOffShelf?.batch ? '提交' : undefined\"\n      @confirm=\"confirmOffShelf\"\n      @cancel=\"offShelfVisible = false\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"offShelfVisible\"\n      :confirmation=\"operationConfirmation('下架', Boolean(pendingOffShelf?.batch))\"\n      confirm-function=\"off-shelf\"\n      :header=\"pendingOffShelf?.batch ? '下架' : '下架商品'\"\n      :width=\"pendingOffShelf?.batch ? '520px' : '500px'\"\n      @confirm=\"confirmOffShelf\"\n      @cancel=\"offShelfVisible = false\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "                  <div class=\"filter-actions\">\n                    <t-button theme=\"primary\" @click=\"searchList\">\n                      <template #icon><t-icon name=\"search\" /></template>查询\n                    </t-button>\n                    <t-button theme=\"default\" variant=\"base\" @click=\"resetFilter\">\n                      <template #icon><t-icon name=\"refresh\" /></template>重置\n",
@@ -3045,6 +3371,30 @@
       "script": "75d9397a56222144493f74c7f20438b35f39edbce7d3ff0dd146f92645e4a435",
       "template": "ebb4878bc7f0fc8b0b22a500a07cfd0d164e2544418482624da67cf5bf2285d3",
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "                    :disabled=\"loading\"\n                    @click=\"savePrices\"\n                    ><template #icon><t-icon name=\"save\" /></template>保存</t-button\n                  >\n                </div>\n",
+          "after": "                    :disabled=\"loading\"\n                    @click=\"savePrices\"\n                    ><template #icon><t-icon name=\"save\" /></template>{{ formConfirmationText('edit') }}</t-button\n                  >\n                </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"createVisible\"\n      confirm-function=\"save\"\n      :header=\"editingDiscountId == null ? '新增' : '编辑'\"\n      dialog-class-name=\"discount-config-dialog zdm-admin-dialog zdm-admin-single-form\"\n      width=\"480px\"\n      :confirm-btn=\"{ content: '保存', loading: saving }\"\n      @confirm=\"saveDiscount\"\n      @cancel=\"createVisible = false\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"createVisible\"\n      :confirmation=\"formConfirmation(editingDiscountId == null ? 'create' : 'edit')\"\n      confirm-function=\"save\"\n      :header=\"editingDiscountId == null ? '新增' : '编辑'\"\n      dialog-class-name=\"discount-config-dialog zdm-admin-dialog zdm-admin-single-form\"\n      width=\"480px\"\n      :confirm-btn=\"{ loading: saving }\"\n      @confirm=\"saveDiscount\"\n      @cancel=\"createVisible = false\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"batch-fill\"\n      width=\"320px\"\n      header=\"批量设置\"\n      :confirm-btn=\"{ content: '完成', loading: saving }\"\n      @confirm=\"save\"\n      @cancel=\"formVisible = false\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      :confirmation=\"operationConfirmation('批量设置')\"\n      confirm-function=\"batch-fill\"\n      width=\"320px\"\n      header=\"批量设置\"\n      :confirm-btn=\"{ loading: saving }\"\n      @confirm=\"save\"\n      @cancel=\"formVisible = false\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "</template>\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "</template>\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -3858,6 +4208,66 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "              <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"submitProductForm\">\n                <template #icon><t-icon name=\"check\" /></template>\n                提交商品信息\n              </t-button>\n              <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeFormPage\">取消</t-button>\n",
+          "after": "              <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"submitProductForm\">\n                <template #icon><t-icon name=\"check\" /></template>\n                {{ formConfirmationText(formPageMode === 'edit' ? 'edit' : 'create') }}\n              </t-button>\n              <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeFormPage\">取消</t-button>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"categorySwitchWarningVisible\"\n      confirm-function=\"switch-category\"\n      header=\"切换分类\"\n      confirm-btn=\"确认切换\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategorySwitchWarning\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"categorySwitchWarningVisible\"\n      :confirmation=\"operationConfirmation('切换分类')\"\n      confirm-function=\"switch-category\"\n      header=\"切换分类\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategorySwitchWarning\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"categoryDialogVisible\"\n      confirm-function=\"switch-category\"\n      header=\"选择商品分类\"\n      width=\"920px\"\n      confirm-btn=\"确认，下一步\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategory\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"categoryDialogVisible\"\n      :confirmation=\"{ kind: 'navigation', action: 'select-category' }\"\n      confirm-function=\"switch-category\"\n      header=\"选择商品分类\"\n      width=\"920px\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmCategory\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"specDialogVisible\"\n      confirm-function=\"close\"\n      header=\"创建规格\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"specDialogVisible\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      header=\"创建规格\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "        <div class=\"spec-dialog-footer\">\n          <t-button :theme=\"buttonTheme('reset')\" variant=\"text\" @click=\"resetSpecDialog\">重置</t-button>\n          <t-button :theme=\"buttonTheme('create')\" @click=\"confirmCreateSpec\">确认创建</t-button>\n          <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeSpecDialog\">取消</t-button>\n        </div>\n",
+          "after": "        <div class=\"spec-dialog-footer\">\n          <t-button :theme=\"buttonTheme('reset')\" variant=\"text\" @click=\"resetSpecDialog\">重置</t-button>\n          <t-button data-form-submit :theme=\"buttonTheme('create')\" @click=\"confirmCreateSpec\">{{\n            formConfirmationText(specFormMode)\n          }}</t-button>\n          <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeSpecDialog\">取消</t-button>\n        </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"specModeConfirmVisible\"\n      confirm-function=\"edit\"\n      header=\"切换展示模式\"\n      confirm-btn=\"确认切换\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmSpecModeChange\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"specModeConfirmVisible\"\n      :confirmation=\"operationConfirmation('切换展示模式')\"\n      confirm-function=\"edit\"\n      header=\"切换展示模式\"\n      cancel-btn=\"取消\"\n      @confirm=\"confirmSpecModeChange\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "        <t-button :theme=\"buttonTheme('save')\" @click=\"savePriceDrawer\">\n          <template #icon><t-icon name=\"save\" /></template>\n          保存\n        </t-button>\n      </div>\n",
+          "after": "        <t-button :theme=\"buttonTheme('save')\" @click=\"savePriceDrawer\">\n          <template #icon><t-icon name=\"save\" /></template>\n          {{ formConfirmationText('edit') }}\n        </t-button>\n      </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('off-shelf', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"submitReason\"\n",
+          "after": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('off-shelf', operationConfirmation('下架', reasonState.isBatch))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"submitReason\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);\nconst {\n  specModeChanged,\n  openSpecDialog,\n",
+          "after": "} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);\nconst {\n  specFormMode,\n  specModeChanged,\n  openSpecDialog,\n"
+        },
+        {
           "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
           "stage": "before-migrations",
           "before": "const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.finished-stock-management`);\nconst sourceBlocked = (_row: StockItem) => false;\nconst activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n",
@@ -4214,6 +4624,30 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      v-model:visible=\"inviteDialogVisible\"\n      :cancel-btn=\"cancelButtonProps(undefined)\"\n      :confirm-btn=\"actionButtonProps('submit', undefined, '确认')\"\n      header=\"邀请员工\"\n      width=\"560px\"\n",
+          "after": "      v-model:visible=\"inviteDialogVisible\"\n      :cancel-btn=\"cancelButtonProps(undefined)\"\n      :confirm-btn=\"dialogButtonProps('submit', operationConfirmation('邀请员工'))\"\n      header=\"邀请员工\"\n      width=\"560px\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleProfileSubmit\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation('edit'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleProfileSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"560px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('permissions', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handlePermissionSubmit\"\n",
+          "after": "      width=\"560px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('permissions', operationConfirmation('配置权限'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handlePermissionSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "<script setup lang=\"ts\">\nimport {\n  operationConfirmation,\n  dialogButtonProps,\n  formConfirmation,\n} from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "                  <div class=\"filter-actions\">\n                    <t-button theme=\"primary\" @click=\"handleSearch\">\n                      <template #icon><t-icon name=\"search\" /></template>\n",
@@ -4317,6 +4751,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "              @click=\"saveAllocation\"\n            >\n              保存\n            </t-button>\n            <t-button :theme=\"buttonTheme('reset')\" variant=\"base\" :disabled=\"loading\" @click=\"resetAllocation\"\n",
+          "after": "              @click=\"saveAllocation\"\n            >\n              {{ formConfirmationText('edit') }}\n            </t-button>\n            <t-button :theme=\"buttonTheme('reset')\" variant=\"base\" :disabled=\"loading\" @click=\"resetAllocation\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { getLoginUser } from '@/services/auth';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { getLoginUser } from '@/services/auth';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "              v-if=\"canSave\"\n              theme=\"primary\"\n              :loading=\"loading\"\n",
@@ -4404,6 +4850,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"dialogVisible\"\n      confirm-function=\"submit\"\n      header=\"新增\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"dialogVisible\"\n      :confirmation=\"formConfirmation('create')\"\n      confirm-function=\"submit\"\n      header=\"新增\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      :prevent-scroll-through=\"false\"\n      dialog-class-name=\"attribute-create-dialog zdm-admin-dialog zdm-admin-single-form\"\n      confirm-btn=\"提交\"\n      @confirm=\"submit\"\n      @close=\"closeCreateDialog\"\n",
+          "after": "      :prevent-scroll-through=\"false\"\n      dialog-class-name=\"attribute-create-dialog zdm-admin-dialog zdm-admin-single-form\"\n      @confirm=\"submit\"\n      @close=\"closeCreateDialog\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -4521,6 +4985,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"dialogVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"dialogVisible\"\n      :confirmation=\"formConfirmation('create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      confirm-btn=\"提交\"\n      @confirm=\"submit\"\n      @close=\"closeFormDialog\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      @confirm=\"submit\"\n      @close=\"closeFormDialog\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -4654,6 +5136,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      placement=\"center\"\n      :prevent-scroll-through=\"false\"\n      :confirm-btn=\"actionButtonProps('save', '保存', '确认')\"\n      @confirm=\"handleSubmit\"\n      @close=\"closeFormDialog\"\n",
+          "after": "      placement=\"center\"\n      :prevent-scroll-through=\"false\"\n      :confirm-btn=\"dialogButtonProps('save', formConfirmation(formMode))\"\n      @confirm=\"handleSubmit\"\n      @close=\"closeFormDialog\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -4791,6 +5285,36 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"addVisible\"\n      confirm-function=\"create\"\n      header=\"添加属性\"\n      width=\"720px\"\n      :confirm-btn=\"{ content: '提交', disabled: !addIds.length }\"\n      @confirm=\"addAttributes\"\n    >\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"addVisible\"\n      :confirmation=\"operationConfirmation('添加属性')\"\n      confirm-function=\"create\"\n      header=\"添加属性\"\n      width=\"720px\"\n      :confirm-btn=\"{ disabled: !addIds.length }\"\n      @confirm=\"addAttributes\"\n    >\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"valuesVisible\"\n      confirm-function=\"options\"\n      :header=\"`${editable ? '编辑' : '查看'}选项值 · ${valueTarget?.name || ''}`\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"valuesVisible\"\n      :confirmation=\"formConfirmation('edit')\"\n      confirm-function=\"options\"\n      :header=\"`${editable ? '编辑' : '查看'}选项值 · ${valueTarget?.name || ''}`\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"publishVisible\"\n      confirm-function=\"publish-version\"\n      header=\"发布新版本\"\n      width=\"max-content\"\n      :confirm-btn=\"{ content: '确认发布', loading: busy }\"\n      @confirm=\"publish\"\n    >\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"publishVisible\"\n      :confirmation=\"operationConfirmation('发布版本')\"\n      confirm-function=\"publish-version\"\n      header=\"发布新版本\"\n      width=\"max-content\"\n      :confirm-btn=\"{ loading: busy }\"\n      @confirm=\"publish\"\n    >\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    </AdminDialog>\n    <AdminDialog\n      confirm-function=\"copy-version\"\n      :visible=\"!!copyTarget\"\n      header=\"复制版本\"\n      :confirm-btn=\"{ content: '确认复制', loading: busy }\"\n      @confirm=\"copyVersion(copyTarget!)\"\n      @close=\"copyTarget = undefined\"\n",
+          "after": "    </AdminDialog>\n    <AdminDialog\n      :confirmation=\"operationConfirmation('复制版本')\"\n      confirm-function=\"copy-version\"\n      :visible=\"!!copyTarget\"\n      header=\"复制版本\"\n      :confirm-btn=\"{ loading: busy }\"\n      @confirm=\"copyVersion(copyTarget!)\"\n      @close=\"copyTarget = undefined\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { operationConfirmation, formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "                      class=\"exit-edit\"\n                      theme=\"default\"\n                      hover=\"color\"\n",
@@ -4904,6 +5428,24 @@
       "script": "c6fa58a7218a606353f86b4986997e836fb888e3a23a2fcf70a482e548935fe0",
       "template": "5e3c0a78337d9dfc5455d79cd1734fbfacea060c58f3b27362c9647869b2bf52",
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "                      @click=\"saveGuidePriceSetting\"\n                    >\n                      保存指导价\n                    </t-button>\n                  </t-form>\n",
+          "after": "                      @click=\"saveGuidePriceSetting\"\n                    >\n                      {{ formConfirmationText('edit') }}\n                    </t-button>\n                  </t-form>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      :confirmation=\"formConfirmation(editingId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -5076,6 +5618,24 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
+          "after": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation(dialogMode))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"actionButtonProps('permissions', '保存', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handlePermissionSave\"\n",
+          "after": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"dialogButtonProps('permissions', operationConfirmation('配置权限'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handlePermissionSave\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport {\n  formConfirmation,\n  dialogButtonProps,\n  operationConfirmation,\n} from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "              <AdminListToolbar :has-actions=\"canCreateRole\"\n                ><t-button theme=\"primary\" @click=\"openCreateDialog\">\n                  <template #icon><t-icon name=\"add\" /></template>\n",
@@ -5188,6 +5748,30 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      :confirmation=\"formConfirmation(editingId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"categoryManagementVisible\"\n      confirm-function=\"close\"\n      header=\"色系分类管理\"\n      width=\"980px\"\n      confirm-btn=\"关闭\"\n      :cancel-btn=\"null\"\n      @confirm=\"categoryManagementVisible = false\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"categoryManagementVisible\"\n      :confirmation=\"{ kind: 'close', text: '关闭' }\"\n      confirm-function=\"close\"\n      header=\"色系分类管理\"\n      width=\"980px\"\n      :cancel-btn=\"null\"\n      @confirm=\"categoryManagementVisible = false\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"categoryFormVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"categoryFormVisible\"\n      :confirmation=\"formConfirmation(editingCategoryId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -5311,6 +5895,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      :confirmation=\"formConfirmation(editingId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "              <div class=\"filter-actions\">\n                <t-button theme=\"primary\" @click=\"handleSearch\">\n                  <template #icon><t-icon name=\"search\" /></template>查询\n                </t-button>\n                <t-button theme=\"default\" variant=\"base\" @click=\"handleReset\">\n                  <template #icon><t-icon name=\"refresh\" /></template>重置\n",
@@ -5386,6 +5982,24 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "        <t-button :theme=\"buttonTheme('submit')\" :loading=\"loading\" @click=\"emit('confirm')\">\n          <template #icon><t-icon name=\"check\" /></template>\n          提交商品信息\n        </t-button>\n        <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"loading\" @click=\"emit('close')\"\n",
+          "after": "        <t-button :theme=\"buttonTheme('submit')\" :loading=\"loading\" @click=\"emit('confirm')\">\n          <template #icon><t-icon name=\"check\" /></template>\n          {{ formConfirmationText(mode === 'edit' ? 'edit' : 'create') }}\n        </t-button>\n        <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"loading\" @click=\"emit('close')\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    width=\"940px\"\n    placement=\"center\"\n    :confirm-btn=\"actionButtonProps('submit', mode === 'view' ? null : '提交商品信息', '确认')\"\n    :cancel-btn=\"cancelButtonProps('取消')\"\n    @confirm=\"emit('confirm')\"\n",
+          "after": "    width=\"940px\"\n    placement=\"center\"\n    :confirm-btn=\"dialogButtonProps('submit', { kind: 'none' }, null)\"\n    :cancel-btn=\"cancelButtonProps('取消')\"\n    @confirm=\"emit('confirm')\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { nextTick, ref, watch } from 'vue';\nimport { AdminSectionCard } from '@/components/foundation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { nextTick, ref, watch } from 'vue';\nimport { AdminSectionCard } from '@/components/foundation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "              :key=\"section.key\"\n              :href=\"`#slab-product-${section.key}`\"\n",
@@ -5455,6 +6069,30 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "          <t-button v-if=\"!priceDrawerReadonly\" :theme=\"buttonTheme('save')\" block @click=\"saveBatchPrice\">\n            <template #icon><t-icon name=\"save\" /></template>\n            保存\n          </t-button>\n        </div>\n",
+          "after": "          <t-button v-if=\"!priceDrawerReadonly\" :theme=\"buttonTheme('save')\" block @click=\"saveBatchPrice\">\n            <template #icon><t-icon name=\"save\" /></template>\n            {{ formConfirmationText('edit') }}\n          </t-button>\n        </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('off-shelf', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleReasonSubmit\"\n",
+          "after": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"\n        dialogButtonProps(\n          'off-shelf',\n          operationConfirmation(reasonState.type === 'deleteExternal' ? '删除' : '下架', reasonState.isBatch),\n        )\n      \"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleReasonSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"offShelfHistoryVisible\"\n      confirm-function=\"close\"\n      header=\"历史下架原因\"\n      width=\"800px\"\n      confirm-btn=\"关闭\"\n      :cancel-btn=\"null\"\n      @confirm=\"closeOffShelfHistory\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"offShelfHistoryVisible\"\n      :confirmation=\"{ kind: 'close', text: '关闭' }\"\n      confirm-function=\"close\"\n      header=\"历史下架原因\"\n      width=\"800px\"\n      :cancel-btn=\"null\"\n      @confirm=\"closeOffShelfHistory\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -5926,6 +6564,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation(dialogMode))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "              <div class=\"filter-actions\">\n                <t-button theme=\"primary\" @click=\"handleSearch\">\n                  <template #icon><t-icon name=\"search\" /></template>\n",
@@ -6108,6 +6758,30 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "          <t-button v-if=\"!priceDrawerReadonly\" :theme=\"buttonTheme('save')\" block @click=\"saveBatchPrice\">\n            <template #icon><t-icon name=\"save\" /></template>\n            保存\n          </t-button>\n        </div>\n",
+          "after": "          <t-button v-if=\"!priceDrawerReadonly\" :theme=\"buttonTheme('save')\" block @click=\"saveBatchPrice\">\n            <template #icon><t-icon name=\"save\" /></template>\n            {{ formConfirmationText('edit') }}\n          </t-button>\n        </div>\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('off-shelf', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleReasonSubmit\"\n",
+          "after": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"\n        dialogButtonProps(\n          'off-shelf',\n          operationConfirmation(reasonState.type === 'deleteExternal' ? '删除' : '下架', reasonState.isBatch),\n        )\n      \"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleReasonSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"offShelfHistoryVisible\"\n      confirm-function=\"close\"\n      header=\"历史下架原因\"\n      width=\"800px\"\n      confirm-btn=\"关闭\"\n      :cancel-btn=\"null\"\n      @confirm=\"closeOffShelfHistory\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"offShelfHistoryVisible\"\n      :confirmation=\"{ kind: 'close', text: '关闭' }\"\n      confirm-function=\"close\"\n      header=\"历史下架原因\"\n      width=\"800px\"\n      :cancel-btn=\"null\"\n      @confirm=\"closeOffShelfHistory\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity } from '@/utils/quantityInput';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity } from '@/utils/quantityInput';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
           "stage": "before-migrations",
@@ -6517,6 +7191,30 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      :confirmation=\"formConfirmation(editingId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"aliasesVisible\"\n      confirm-function=\"close\"\n      :header=\"`别名管理 - ${activeTexture?.name ?? ''}`\"\n      width=\"680px\"\n      confirm-btn=\"关闭\"\n      :cancel-btn=\"null\"\n      @confirm=\"aliasesVisible = false\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"aliasesVisible\"\n      :confirmation=\"{ kind: 'close', text: '关闭' }\"\n      confirm-function=\"close\"\n      :header=\"`别名管理 - ${activeTexture?.name ?? ''}`\"\n      width=\"680px\"\n      :cancel-btn=\"null\"\n      @confirm=\"aliasesVisible = false\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"aliasFormVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"aliasFormVisible\"\n      :confirmation=\"formConfirmation(editingAliasId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "              <div class=\"filter-actions\">\n                <t-button theme=\"primary\" @click=\"handleSearch\"\n                  ><template #icon><t-icon name=\"search\" /></template>查询</t-button\n                >\n                <t-button theme=\"default\" variant=\"base\" @click=\"handleReset\"\n                  ><template #icon><t-icon name=\"refresh\" /></template>重置</t-button\n",
@@ -6632,6 +7330,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation(dialogMode))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -6772,6 +7482,24 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"save\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      :confirmation=\"formConfirmation(formMode)\"\n      confirm-function=\"save\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      confirm-btn=\"保存\"\n      @confirm=\"handleSubmit\"\n      @close=\"closeFormDialog\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      @confirm=\"handleSubmit\"\n      @close=\"closeFormDialog\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "                  <div class=\"filter-actions\">\n                    <t-button theme=\"primary\" @click=\"handleSearch\"\n                      ><template #icon><t-icon name=\"search\" /></template>查询</t-button\n                    >\n                    <t-button theme=\"default\" variant=\"base\" @click=\"handleReset\"\n                      ><template #icon><t-icon name=\"refresh\" /></template>重置</t-button\n",
@@ -6894,6 +7622,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      :confirmation=\"formConfirmation(editingId ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "              <div class=\"filter-actions\">\n                <t-button theme=\"primary\" @click=\"handleSearch\"\n                  ><template #icon><t-icon name=\"search\" /></template>查询</t-button\n                >\n                <t-button theme=\"default\" variant=\"base\" @click=\"handleReset\"\n                  ><template #icon><t-icon name=\"refresh\" /></template>重置</t-button\n",
@@ -7000,6 +7740,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formDialogVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formDialogVisible\"\n      :confirmation=\"formConfirmation(dialogMode)\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -7119,6 +7871,30 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"visible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      width=\"480px\"\n      :header=\"editing ? '编辑供货类型' : '新增供货类型'\"\n      :confirm-btn=\"{ content: '提交', loading: saving }\"\n      @confirm=\"save\"\n    >\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"visible\"\n      :confirmation=\"formConfirmation(editing ? 'edit' : 'create')\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      width=\"480px\"\n      :header=\"editing ? '编辑供货类型' : '新增供货类型'\"\n      :confirm-btn=\"{ loading: saving }\"\n      @confirm=\"save\"\n    >\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    </AdminDialog>\n    <AdminDialog\n      :confirm-function=\"buttonFunctionFor('supply-status', statusAction)\"\n      :visible=\"statusDialogVisible\"\n      :header=\"`是否${statusAction}`\"\n      width=\"440px\"\n      :confirm-btn=\"{ content: `确认${statusAction}`, loading: changingStatus }\"\n      :cancel-btn=\"{ content: '取消', disabled: changingStatus }\"\n      @confirm=\"confirmStatusChange\"\n",
+          "after": "    </AdminDialog>\n    <AdminDialog\n      :confirmation=\"operationConfirmation(statusAction)\"\n      :confirm-function=\"buttonFunctionFor('supply-status', statusAction)\"\n      :visible=\"statusDialogVisible\"\n      :header=\"`是否${statusAction}`\"\n      width=\"440px\"\n      :confirm-btn=\"{ loading: changingStatus }\"\n      :cancel-btn=\"{ content: '取消', disabled: changingStatus }\"\n      @confirm=\"confirmStatusChange\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    </AdminDialog>\n    <AdminDialog\n      confirm-function=\"delete\"\n      :visible=\"Boolean(deleting)\"\n      header=\"删除供货类型\"\n      :confirm-btn=\"{ content: '删除', loading: saving }\"\n      @confirm=\"remove\"\n      @cancel=\"deleting = undefined\"\n",
+          "after": "    </AdminDialog>\n    <AdminDialog\n      :confirmation=\"operationConfirmation('删除')\"\n      confirm-function=\"delete\"\n      :visible=\"Boolean(deleting)\"\n      header=\"删除供货类型\"\n      :confirm-btn=\"{ loading: saving }\"\n      @confirm=\"remove\"\n      @cancel=\"deleting = undefined\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "</template>\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "</template>\n<script setup lang=\"ts\">\nimport { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "                  <t-space>\n                    <t-button theme=\"primary\" type=\"submit\">\n                      <template #icon><t-icon name=\"search\" /></template>查询\n                    </t-button>\n                    <t-button theme=\"default\" variant=\"base\" @click=\"handleReset\">\n                      <template #icon><t-icon name=\"refresh\" /></template>重置\n",
@@ -7231,6 +8007,36 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
+          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation(dialogMode))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('activate-business', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleBusinessSubmit\"\n",
+          "after": "      width=\"520px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('activate-business', operationConfirmation('业务开通'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleBusinessSubmit\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"purgeDialogVisible\"\n      confirm-function=\"purge\"\n      header=\"彻底删除租户\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"purgeDialogVisible\"\n      :confirmation=\"operationConfirmation('彻底删除')\"\n      confirm-function=\"purge\"\n      header=\"彻底删除租户\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n",
+          "after": "<script setup lang=\"ts\">\nimport {\n  formConfirmation,\n  dialogButtonProps,\n  operationConfirmation,\n} from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "const purgeSubmitting = ref(false);\nconst purgeConfirmButton = computed(() => ({\n  content: '确认彻底删除',\n  loading: purgeSubmitting.value,\n  disabled: !purgePreview.value?.eligible || purgeConfirmationName.value !== purgePreview.value.tenantName,\n",
+          "after": "const purgeSubmitting = ref(false);\nconst purgeConfirmButton = computed(() => ({\n  loading: purgeSubmitting.value,\n  disabled: !purgePreview.value?.eligible || purgeConfirmationName.value !== purgePreview.value.tenantName,\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -7409,6 +8215,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"formDialogVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"formDialogVisible\"\n      :confirmation=\"formConfirmation(dialogMode)\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "    <AdminDialog\n      v-model:visible=\"levelDialogVisible\"\n      confirm-function=\"edit\"\n      header=\"门店级别\"\n",
+          "after": "    <AdminDialog\n      v-model:visible=\"levelDialogVisible\"\n      :confirmation=\"operationConfirmation('调整门店级别')\"\n      confirm-function=\"edit\"\n      header=\"门店级别\"\n"
+        },
+        {
+          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
+          "stage": "before-migrations",
+          "before": "\n<script setup lang=\"ts\">\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",

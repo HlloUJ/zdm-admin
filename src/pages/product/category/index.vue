@@ -137,7 +137,7 @@
       width="480px"
       placement="center"
       :prevent-scroll-through="false"
-      :confirm-btn="actionButtonProps('save', '保存', '确认')"
+      :confirm-btn="dialogButtonProps('save', formConfirmation(formMode))"
       @confirm="handleSubmit"
       @close="closeFormDialog"
       @opened="restorePageScroll"
@@ -195,7 +195,8 @@
 </template>
 
 <script setup lang="ts">
-import { buttonTheme, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
+import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { adminFeedback, AdminConfirmDialog, AdminListLayout } from '@/components/foundation';

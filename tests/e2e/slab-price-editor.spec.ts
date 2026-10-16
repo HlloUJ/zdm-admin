@@ -180,7 +180,7 @@ for (const status of ['enabled', 'disabled', undefined] as const) {
     const costRow = editor.locator('.price-editor__row').filter({ hasText: '成本价' });
     await expect(costRow.locator('input')).toHaveCount(0);
     await expect(costRow).toContainText('1000.00');
-    await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
     await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
     expect(await level.evaluate((element) => element.getBoundingClientRect().height)).toBe(rowHeight);
     await assertCentered();
@@ -195,7 +195,7 @@ for (const status of ['enabled', 'disabled', undefined] as const) {
     await level.getByPlaceholder('请输入系数', { exact: true }).blur();
     await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
     await expect(level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true })).toBeVisible();
-    await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
     await expect(editor).not.toBeVisible();
     expect(state.saves).toHaveLength(1);
     expect(state.saves[0].markupPrices).toEqual([
@@ -283,11 +283,11 @@ test('恢复跟随需确认，确认后按当前启用系数计算并保存自�
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
   await level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
-  await dialog.getByRole('button', { name: '确认', exact: true }).click();
+  await dialog.getByRole('button', { name: '确认更改价格浮动方式', exact: true }).click();
   await expect(level.getByPlaceholder('请输入系数', { exact: true })).toHaveValue('1.40');
   await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1400.00');
   await expect(level.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
-  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(state.saves).toHaveLength(1);
   expect(state.saves[0].markupPrices).toEqual([
@@ -319,7 +319,7 @@ test('停用门店级别不展示历史价格且保存不提交停用级别', as
   );
   const { editor, level } = await openEditor(page);
   await expect(level).toHaveCount(0);
-  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(editor).toHaveCount(0);
   expect(state.saves).toHaveLength(1);
   expect(state.saves[0].markupPrices).toEqual([]);
@@ -403,7 +403,7 @@ test('运营编辑大板的只读信息使用无必填星号表格，保留价�
   await level.getByPlaceholder('请输入系数', { exact: true }).fill('1.60');
   await level.getByPlaceholder('请输入系数', { exact: true }).blur();
   await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
-  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect.poll(() => state.saves.length).toBe(1);
   expect(Object.keys(state.saves[0]).sort()).toEqual(
     ['name', 'serialNo', 'status', 'costPrice', 'guidePrice', 'guidePriceCoefficient', 'markupPrices'].sort(),

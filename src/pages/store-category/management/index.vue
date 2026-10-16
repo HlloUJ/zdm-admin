@@ -128,12 +128,12 @@
 
     <AdminDialog
       v-model:visible="formVisible"
+      :confirmation="formConfirmation(formMode)"
       confirm-function="save"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="formMode === 'create' ? `新增${formLevel}级分类` : '编辑分类'"
       width="480px"
       placement="center"
-      confirm-btn="保存"
       @confirm="handleSubmit"
       @close="closeFormDialog"
     >
@@ -199,6 +199,7 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';

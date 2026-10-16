@@ -153,7 +153,7 @@
     <t-dialog
       v-model:visible="inviteDialogVisible"
       :cancel-btn="cancelButtonProps(undefined)"
-      :confirm-btn="actionButtonProps('submit', undefined, '确认')"
+      :confirm-btn="dialogButtonProps('submit', operationConfirmation('邀请员工'))"
       header="邀请员工"
       width="560px"
       placement="center"
@@ -186,7 +186,7 @@
       header="编辑资料"
       width="480px"
       placement="center"
-      :confirm-btn="actionButtonProps('submit', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('submit', formConfirmation('edit'))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleProfileSubmit"
       @cancel="closeProfileDialog"
@@ -218,7 +218,7 @@
       header="配置权限"
       width="560px"
       placement="center"
-      :confirm-btn="actionButtonProps('permissions', '提交', '确认')"
+      :confirm-btn="dialogButtonProps('permissions', operationConfirmation('配置权限'))"
       :cancel-btn="cancelButtonProps('取消')"
       @confirm="handlePermissionSubmit"
       @cancel="closePermissionDialog"
@@ -261,11 +261,11 @@
 
 <script setup lang="ts">
 import {
-  buttonTheme,
-  buttonFunctionFor,
-  actionButtonProps,
-  cancelButtonProps,
-} from '@/components/foundation/actions/buttonFunctions';
+  operationConfirmation,
+  dialogButtonProps,
+  formConfirmation,
+} from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

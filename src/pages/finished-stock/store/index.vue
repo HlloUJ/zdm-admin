@@ -244,6 +244,7 @@
 
     <AdminDialog
       v-model:visible="poolVisible"
+      :confirmation="{ kind: 'none' }"
       confirm-function="close"
       header="商品中心"
       :footer="false"
@@ -367,12 +368,12 @@
     </t-drawer>
 
     <AdminDialog
+      :confirmation="{ kind: 'close', text: '关闭' }"
       confirm-function="close"
       :visible="Boolean(logVideoPreview)"
       header="商品视频"
       width="min(960px, 94vw)"
       :cancel-btn="null"
-      confirm-btn="关闭"
       @confirm="logVideoPreview = null"
       @close="logVideoPreview = null"
       @update:visible="!$event && (logVideoPreview = null)"
@@ -384,6 +385,7 @@
     </t-drawer>
 
     <AdminDialog
+      :confirmation="{ kind: 'none' }"
       confirm-function="close"
       :visible="Boolean(imagePreview)"
       header="商品主图"
@@ -397,10 +399,10 @@
 
     <AdminDialog
       v-model:visible="offShelfVisible"
+      :confirmation="operationConfirmation('下架', Boolean(pendingOffShelf?.batch))"
       confirm-function="off-shelf"
       :header="pendingOffShelf?.batch ? '下架' : '下架商品'"
       :width="pendingOffShelf?.batch ? '520px' : '500px'"
-      :confirm-btn="pendingOffShelf?.batch ? '提交' : undefined"
       @confirm="confirmOffShelf"
       @cancel="offShelfVisible = false"
       @close="offShelfVisible = false"
@@ -484,6 +486,7 @@
 </template>
 
 <script setup lang="ts">
+import { operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { useFormFeedback } from '@/utils/formValidation';
