@@ -114,25 +114,6 @@ public class CustomerService {
     }
     return rows.get(0);
   }
-  private void requireOwner(Customer c) {
-    CurrentIdentity i = identity();
-    if (Objects.equals(c.ownerAccountId(), i.accountId())) { return; }
-    if (DataScope.isAll(i)) {
-      Integer managers = jdbc.queryForObject("""
-          SELECT COUNT(*) FROM account_identities ai
-          WHERE ai.id=? AND ai.account_id=? AND ai.client_code='admin'
-            AND ai.tenant_id=? AND ai.store_id=? AND ai.status='enabled'
-            AND (ai.identity_type='store_admin' OR (ai.identity_type='employee' AND EXISTS (
-              SELECT 1 FROM account_roles ar JOIN roles r ON r.id=ar.role_id
-              WHERE ar.account_id=ai.account_id AND ar.client_code=ai.client_code
-                AND ar.tenant_id=ai.tenant_id AND ar.store_id=ai.store_id
-                AND r.tenant_id=ai.tenant_id AND r.store_id=ai.store_id AND r.client_code=ai.client_code
-                AND r.builtin_key='STORE_MANAGER' AND r.status='enabled')))
-          """, Integer.class, i.identityId(), i.accountId(), i.tenantId(), i.storeId());
-      if (managers != null && managers > 0) { return; }
-    }
-    throw new AccessDeniedException("只能维护本人客户，或由具备全部数据权限的门店管理员、店长维护");
-  }
   public Detail detail(Long id) {
     Customer c = accessible(id,false); permission(c.status(),"detail");
     return new Detail(c,followups(id));
@@ -168,7 +149,7 @@ public class CustomerService {
   }
   @Transactional
   public Customer update(Long id, CustomerRequests.Profile p) {
-    Customer c=accessible(id,true); permission(c.status(),"edit"); requireOwner(c);
+    Customer c=accessible(id,true); permission(c.status(),"edit");
     if (!Objects.equals(c.ownerAccountId(),p.ownerAccountId())) { permission(c.status(),"assign"); }
     if (validOwnerCandidates(identity()).stream().noneMatch(o -> Objects.equals(o.accountId(),p.ownerAccountId()))) {
       throw new IllegalArgumentException("请选择当前门店有效的归属人");
@@ -194,7 +175,7 @@ public class CustomerService {
         && region.isEmpty() && Objects.equals(phone,previous.phone());
     if (!phone.isEmpty() && !unchangedLegacy) {
       if (!phone.matches("[0-9]+")) { throw new IllegalArgumentException("联系电话仅允许输入数字"); }
-      if (region.isEmpty()) { throw new IllegalArgumentException("请选择号码所属国家／地区"); }
+      if (region.isEmpty()) { throw new IllegalArgumentException("请选择号码归属地"); }
     }
     return callingCode;
   }
@@ -216,7 +197,7 @@ public class CustomerService {
     if (customerId == null) { permission("daily","create"); }
     else {
       Customer c=accessible(customerId,false);
-      permission(c.status(),"edit"); requireOwner(c);
+      permission(c.status(),"edit");
     }
     return validOwnerCandidates(identity());
   }
@@ -260,7 +241,6 @@ public class CustomerService {
     for (Long id:ids) {
       Customer c=accessible(id,true);
       if (!request.status().equals(c.status())) { throw new IllegalArgumentException("客户状态已变化，请刷新后重试"); }
-      if (!"assign".equals(request.action())) { requireOwner(c); }
       records.add(c);
     }
     if ("assign".equals(request.action()) && owners(request.status()).stream()
@@ -289,7 +269,7 @@ public class CustomerService {
   }
   @Transactional
   public void saveFollowup(Long customerId, Long id, CustomerRequests.Followup p) {
-    Customer c=accessible(customerId,true); permission(c.status(),"detail"); requireOwner(c);
+    Customer c=accessible(customerId,true); permission(c.status(),"detail");
     if (p.mediaIds().stream().distinct().count()!=p.mediaIds().size()) { throw new IllegalArgumentException("附件不能重复"); }
     for (Long mediaId:p.mediaIds()) {
       MediaAsset a=media.requireAvailableForUpdate(mediaId);
@@ -321,12 +301,12 @@ public class CustomerService {
   }
   @Transactional
   public void deleteFollowup(Long customerId, Long id) {
-    Customer c=accessible(customerId,true); permission(c.status(),"detail"); requireOwner(c); requireFollowup(customerId,id);
+    Customer c=accessible(customerId,true); permission(c.status(),"detail"); requireFollowup(customerId,id);
     references.removeBusiness(DOMAIN,id,"跟进记录删除");
     jdbc.update("DELETE FROM store_customer_followups WHERE id=?",id);
   }
   public void requireUpload(Long customerId) {
-    Customer c=accessible(customerId,false); permission(c.status(),"detail"); requireOwner(c);
+    Customer c=accessible(customerId,false); permission(c.status(),"detail");
   }
   @Transactional
   public void releaseUpload(Long customerId,Long mediaId) {

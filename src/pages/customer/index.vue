@@ -42,7 +42,7 @@
           <template #operation="{ row }">
             <t-space break-line size="small">
               <t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">详情</t-link>
-              <t-link v-if="can('edit') && isOwned(row)" :theme="buttonTheme('edit')" @click="openProfile(row)"
+              <t-link v-if="can('edit') && isInDataScope(row)" :theme="buttonTheme('edit')" @click="openProfile(row)"
                 >编辑</t-link
               >
               <t-link
@@ -52,19 +52,19 @@
                 >调整归属</t-link
               >
               <t-link
-                v-if="status === 'daily' && can('archive') && isOwned(row)"
+                v-if="status === 'daily' && can('archive') && isInDataScope(row)"
                 :theme="buttonTheme('archive')"
                 @click="prepareAction('archive', [row.id], false)"
                 >归档</t-link
               >
               <t-link
-                v-if="status === 'archived' && can('restore') && isOwned(row)"
+                v-if="status === 'archived' && can('restore') && isInDataScope(row)"
                 :theme="buttonTheme('unarchive')"
                 @click="prepareAction('restore', [row.id], false)"
                 >取消归档</t-link
               >
               <t-link
-                v-if="status === 'archived' && can('purge') && isOwned(row)"
+                v-if="status === 'archived' && can('purge') && isInDataScope(row)"
                 :theme="buttonTheme('purge')"
                 @click="prepareAction('purge', [row.id], false)"
                 >彻底删除</t-link
@@ -100,17 +100,17 @@
       <t-form-item label="客户姓名" required-mark v-bind="fieldFeedback(nameError, nameError)"
         ><t-input v-model="profile.name" :maxlength="80" clearable placeholder="请输入客户姓名"
       /></t-form-item>
-      <t-form-item label="国籍">
+      <t-form-item label="客户国籍">
         <t-select
           v-model="profile.nationality"
           :options="nationalityOptions"
           filterable
           clearable
-          placeholder="请选择国籍"
+          placeholder="请选择客户国籍"
         />
       </t-form-item>
       <t-form-item
-        label="号码所属国家／地区"
+        label="号码归属地"
         :required-mark="Boolean(profile.phone) && !unchangedLegacyPhone"
         v-bind="profileFeedback.field('phoneRegion', profile.phoneRegion)"
       >
@@ -119,7 +119,7 @@
           :options="phoneRegionOptions"
           filterable
           clearable
-          placeholder="请选择号码所属国家／地区"
+          placeholder="请选择号码归属地"
         />
       </t-form-item>
       <t-form-item label="联系电话" v-bind="profileFeedback.field('phone', profile.phone)">
@@ -150,7 +150,7 @@
           <AdminDetailPage embedded title="客户资料" :items="detailItems">
             <t-space
               ><span>跟进记录</span
-              ><t-button v-if="isOwned(detail.customer)" :theme="buttonTheme('create')" @click="openFollowup()"
+              ><t-button v-if="isInDataScope(detail.customer)" :theme="buttonTheme('create')" @click="openFollowup()"
                 >新增跟进</t-button
               ></t-space
             >
@@ -175,7 +175,7 @@
                     >下次跟进：{{ time(record.nextFollowAt) }} {{ record.nextFollowTask }}</span
                   >
                 </t-space>
-                <template v-if="isOwned(detail.customer)" #action
+                <template v-if="isInDataScope(detail.customer)" #action
                   ><t-space
                     ><t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link
                     ><t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)"
@@ -340,9 +340,8 @@ const tabs = computed(() =>
   ].filter((tab) => can('view', tab.value)),
 );
 const allData = computed(() => user.value.dataPermission === 'all' || user.value.roles.includes('SUPER_ADMIN'));
-const isOwned = (row: Customer) =>
-  row.ownerAccountId === user.value.id ||
-  (allData.value && user.value.roles.some((role) => role === 'STORE_ADMIN' || role === 'STORE_MANAGER'));
+const isInDataScope = (row: Customer) =>
+  allData.value || (user.value.dataPermission === 'self' && row.ownerAccountId === user.value.id);
 const rows = ref<Customer[]>([]);
 const owners = ref<Owner[]>([]);
 const loading = ref(false);
@@ -360,9 +359,10 @@ function changePage(info: PageInfo) {
   page.value = info.current;
   pageSize.value = info.pageSize;
 }
-const selectionOwned = computed(
+const selectionInDataScope = computed(
   () =>
-    selected.value.length > 0 && selected.value.every((id) => rows.value.some((row) => row.id === id && isOwned(row))),
+    selected.value.length > 0 &&
+    selected.value.every((id) => rows.value.some((row) => row.id === id && isInDataScope(row))),
 );
 const filterFields = computed<ListFilter[]>(() => [
   { key: 'name', label: '客户姓名' },
@@ -395,7 +395,15 @@ const toolbarActions = computed<ListAction[]>(() => [
       ]
     : []),
   ...(status.value === 'daily' && can('batch-archive')
-    ? [{ id: 'archive', function: 'archive' as const, batch: true, label: '批量归档', disabled: !selectionOwned.value }]
+    ? [
+        {
+          id: 'archive',
+          function: 'archive' as const,
+          batch: true,
+          label: '批量归档',
+          disabled: !selectionInDataScope.value,
+        },
+      ]
     : []),
   ...(status.value === 'archived' && can('batch-restore')
     ? [
@@ -404,12 +412,20 @@ const toolbarActions = computed<ListAction[]>(() => [
           function: 'unarchive' as const,
           batch: true,
           label: '批量取消归档',
-          disabled: !selectionOwned.value,
+          disabled: !selectionInDataScope.value,
         },
       ]
     : []),
   ...(status.value === 'archived' && can('batch-purge')
-    ? [{ id: 'purge', function: 'purge' as const, batch: true, label: '批量彻底删除', disabled: !selectionOwned.value }]
+    ? [
+        {
+          id: 'purge',
+          function: 'purge' as const,
+          batch: true,
+          label: '批量彻底删除',
+          disabled: !selectionInDataScope.value,
+        },
+      ]
     : []),
 ]);
 function handleToolbarAction(id: string) {
@@ -433,7 +449,7 @@ const detailItems = computed(() => {
   return [
     { label: '客户姓名', value: customer.name },
     {
-      label: '国籍',
+      label: '客户国籍',
       value:
         contactCatalogue.value.nationalities.find((item) => item.code === customer.nationality)?.name ||
         customer.nationality ||
@@ -441,7 +457,7 @@ const detailItems = computed(() => {
     },
     { label: '联系电话', value: displayCustomerPhone(customer) },
     {
-      label: '号码所属国家／地区',
+      label: '号码归属地',
       value:
         contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||
         customer.phoneRegion ||
@@ -620,7 +636,7 @@ async function submitProfile() {
       invalid = true;
     }
     if (!profile.value.phoneRegion) {
-      profileFeedback.reject('phoneRegion', profile.value.phoneRegion, '请选择号码所属国家／地区');
+      profileFeedback.reject('phoneRegion', profile.value.phoneRegion, '请选择号码归属地');
       invalid = true;
     }
   }

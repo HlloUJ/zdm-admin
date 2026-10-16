@@ -189,17 +189,17 @@ test('single authorized tab hides tab bar and self scope hides owner filter', as
     0,
   );
 });
-test('all data without manager role sees others but cannot edit or archive them', async ({ page }) => {
+test('all data with grants allows ordinary staff to maintain other owner customers', async ({ page }) => {
   await setup(page, daily);
   await page.goto('/store/customer-management');
   const row = page.locator('tr').filter({ hasText: '王先生2' });
   await expect(row).toBeVisible();
   await expect(row.getByText('调整归属', { exact: true })).toBeVisible();
-  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('归档', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(row.getByText('归档', { exact: true })).toBeVisible();
   await row.getByText('详情', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
-  await expect(dialog.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '新增跟进', exact: true })).toBeVisible();
 });
 test('new customer requires name and defaults the required owner to self', async ({ page }) => {
   const requests = await setup(page, daily);
@@ -653,7 +653,7 @@ test('customer attachments retain native replace, remove and image preview behav
   await page.screenshot({ path: testInfo.outputPath('attachment-image-preview.png'), animations: 'disabled' });
 });
 
-test('customer detail loading, empty followups and read-only states remain visible and bounded', async ({
+test('customer detail loading and authorized other-owner followups remain visible and bounded', async ({
   page,
 }, testInfo) => {
   await setup(page, [...daily, ...archived]);
@@ -676,10 +676,10 @@ test('customer detail loading, empty followups and read-only states remain visib
   await detail.getByRole('button', { name: '关闭', exact: true }).click();
   await page.locator('tr').filter({ hasText: '王先生2' }).getByText('详情', { exact: true }).click();
   await expect(detail.getByText('王先生2', { exact: true })).toBeVisible();
-  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
-  await expect(detail.getByText('编辑', { exact: true })).toHaveCount(0);
-  await expect(detail.getByText('删除', { exact: true })).toHaveCount(0);
-  await detail.screenshot({ path: testInfo.outputPath('detail-readonly.png'), animations: 'disabled' });
+  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toBeVisible();
+  await expect(detail.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(detail.getByText('删除', { exact: true })).toBeVisible();
+  await detail.screenshot({ path: testInfo.outputPath('detail-other-owner.png'), animations: 'disabled' });
 });
 
 test('customer query grid uses the accepted adaptive structure at narrow widths', async ({ page }) => {
@@ -804,7 +804,7 @@ test('edit owner saves the transfer and the new owner sees the persisted selecti
   expect(requests.at(-1)).toMatchObject({ ownerAccountId: 8 });
   const row = page.locator('tr').filter({ hasText: '王先生1' });
   await expect(row).toContainText('导购B');
-  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('编辑', { exact: true })).toBeVisible();
   await page.addInitScript(() => {
     const stored = JSON.parse(localStorage.getItem('zdm-admin-user')!);
     localStorage.setItem('zdm-admin-user', JSON.stringify({ ...stored, id: 8, name: '导购B' }));
@@ -837,9 +837,7 @@ test('edit transfer removes the customer from the old owner self scope', async (
   await expect(page.getByText('暂无客户', { exact: true })).toBeVisible();
 });
 
-test('customer batch buttons distinguish selected records from current-owner maintenance eligibility', async ({
-  page,
-}) => {
+test('customer batch buttons use selection and data scope across mixed owners', async ({ page }) => {
   await setup(page, daily);
   await page.goto('/store/customer-management');
   const assign = page.getByRole('button', { name: '批量调整归属', exact: true });
@@ -853,10 +851,10 @@ test('customer batch buttons distinguish selected records from current-owner mai
   await expect(archive).toBeEnabled();
   await other.click();
   await expect(assign).toBeEnabled();
-  await expect(archive).toBeDisabled();
+  await expect(archive).toBeEnabled();
   await own.click();
   await expect(assign).toBeEnabled();
-  await expect(archive).toBeDisabled();
+  await expect(archive).toBeEnabled();
   await other.click();
   await expect(assign).toBeDisabled();
   await expect(archive).toBeDisabled();
@@ -872,14 +870,20 @@ test('nationality and phone region are independent and native calling code is re
   const requests = await setup(page, daily);
   await page.goto('/store/customer-management');
   await page.getByRole('button', { name: '新增', exact: true }).click();
-  await selectContact(page, '国籍', '法国');
+  await selectContact(page, '客户国籍', '法国');
   await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('');
-  await selectContact(page, '号码所属国家', '中国 +86');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toBeDisabled();
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeDisabled();
+  await expect(page.getByText('请先选择号码归属地', { exact: true })).toBeVisible();
+  await selectContact(page, '号码归属地', '中国 +86');
+  await expect(page.getByText('请先选择号码归属地', { exact: true })).toHaveCount(0);
   await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('+86');
   await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveAttribute('readonly', '');
-  await selectContact(page, '国籍', '美国');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toBeDisabled();
+  await selectContact(page, '客户国籍', '美国');
   await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('+86');
   const phone = page.locator('.zdm-admin-phone-input input').last();
+  await expect(phone).toBeEnabled();
   await phone.fill('000123');
   await phone.pressSequentially('Ab-+中');
   await expect(phone).toHaveValue('000123');
@@ -898,20 +902,31 @@ test('nationality and phone region are independent and native calling code is re
   const row = page.locator('tr').filter({ hasText: '国际客户' });
   await expect(row).toContainText('+86 000123');
   await row.getByText('编辑', { exact: true }).click();
-  await expect(profileField(page, '国籍').locator('input')).toHaveValue('美国');
-  await expect(profileField(page, '号码所属国家').locator('input')).toHaveValue('中国 +86');
+  await expect(profileField(page, '客户国籍').locator('input')).toHaveValue('美国');
+  await expect(profileField(page, '号码归属地').locator('input')).toHaveValue('中国 +86');
+  await expect(phone).toHaveValue('000123');
+  await profileField(page, '号码归属地').hover();
+  await profileField(page, '号码归属地').locator('.t-input__clear').click();
+  await expect(phone).toBeDisabled();
+  await expect(page.getByText('请先选择号码归属地', { exact: true })).toBeVisible();
+  await expect(phone).toHaveValue('000123');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveAttribute('readonly', '');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toBeDisabled();
+  await selectContact(page, '号码归属地', '法国 +33');
+  await expect(phone).toBeEnabled();
   await expect(phone).toHaveValue('000123');
 });
-test('a changed nonempty number requires region but never country specific length', async ({ page }) => {
+test('phone entry requires a selected region but never country specific length', async ({ page }) => {
   const requests = await setup(page, daily);
   await page.goto('/store/customer-management');
   await page.getByRole('button', { name: '新增', exact: true }).click();
   await profileField(page, '客户姓名').locator('input').fill('短号码客户');
-  await page.locator('.zdm-admin-phone-input input').last().fill('01');
-  await page.getByRole('button', { name: '确认新增', exact: true }).click();
-  await expect(page.getByText('请选择号码所属国家／地区', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeDisabled();
   expect(requests).toHaveLength(0);
-  await selectContact(page, '号码所属国家', '法国 +33');
+  await selectContact(page, '号码归属地', '法国 +33');
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeEnabled();
+  await page.locator('.zdm-admin-phone-input input').last().fill('01');
   await page.getByRole('button', { name: '确认新增', exact: true }).click();
   await expect(page.getByText('短号码客户', { exact: true })).toBeVisible();
   expect(requests.at(-1)).toMatchObject({ phone: '01', phoneRegion: 'FR' });
@@ -957,8 +972,29 @@ test('legacy raw phone remains unchanged when editing unrelated fields', async (
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
   await expect(page.locator('.zdm-admin-phone-input input').last()).toHaveValue(' +1 (020) ABC ext 9 ');
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeDisabled();
   await profileField(page, '客户姓名').locator('input').fill('保留历史号码');
   await page.getByRole('button', { name: '确认保存', exact: true }).click();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   expect(saved).toMatchObject({ name: '保留历史号码', phone: ' +1 (020) ABC ext 9 ', phoneRegion: '' });
+});
+
+test('all data never grants missing edit or archive functions', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  await page.goto('/store/customer-management');
+  const other = page.locator('tr').filter({ hasText: '王先生2' });
+  await expect(other.getByText('详情', { exact: true })).toBeVisible();
+  await expect(other.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(other.getByText('归档', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '批量归档', exact: true })).toHaveCount(0);
+});
+test('ordinary staff archives another owner customer without transferring ownership', async ({ page }) => {
+  const requests = await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生2' }).getByText('归档', { exact: true }).click();
+  await page.getByRole('button', { name: '确认归档', exact: true }).click();
+  await expect(page.getByText('王先生2', { exact: true })).toHaveCount(0);
+  expect(requests.at(-1)).toMatchObject({ action: 'archive', ids: [2] });
+  await page.getByText('归档客户', { exact: true }).click();
+  await expect(page.locator('tr').filter({ hasText: '王先生2' })).toContainText('导购B');
 });

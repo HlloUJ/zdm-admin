@@ -1603,6 +1603,108 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n              <t-link v-if=\"can('edit') && isOwned(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n",
+          "after": "            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n              <t-link v-if=\"can('edit') && isInDataScope(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "              >\n              <t-link\n                v-if=\"status === 'daily' && can('archive') && isOwned(row)\"\n                :theme=\"buttonTheme('archive')\"\n                @click=\"prepareAction('archive', [row.id], false)\"\n",
+          "after": "              >\n              <t-link\n                v-if=\"status === 'daily' && can('archive') && isInDataScope(row)\"\n                :theme=\"buttonTheme('archive')\"\n                @click=\"prepareAction('archive', [row.id], false)\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "              >\n              <t-link\n                v-if=\"status === 'archived' && can('restore') && isOwned(row)\"\n                :theme=\"buttonTheme('unarchive')\"\n                @click=\"prepareAction('restore', [row.id], false)\"\n",
+          "after": "              >\n              <t-link\n                v-if=\"status === 'archived' && can('restore') && isInDataScope(row)\"\n                :theme=\"buttonTheme('unarchive')\"\n                @click=\"prepareAction('restore', [row.id], false)\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "              >\n              <t-link\n                v-if=\"status === 'archived' && can('purge') && isOwned(row)\"\n                :theme=\"buttonTheme('purge')\"\n                @click=\"prepareAction('purge', [row.id], false)\"\n",
+          "after": "              >\n              <t-link\n                v-if=\"status === 'archived' && can('purge') && isInDataScope(row)\"\n                :theme=\"buttonTheme('purge')\"\n                @click=\"prepareAction('purge', [row.id], false)\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "            <t-space\n              ><span>跟进记录</span\n              ><t-button v-if=\"isOwned(detail.customer)\" :theme=\"buttonTheme('create')\" @click=\"openFollowup()\"\n                >新增跟进</t-button\n              ></t-space\n",
+          "after": "            <t-space\n              ><span>跟进记录</span\n              ><t-button v-if=\"isInDataScope(detail.customer)\" :theme=\"buttonTheme('create')\" @click=\"openFollowup()\"\n                >新增跟进</t-button\n              ></t-space\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "                  >\n                </t-space>\n                <template v-if=\"isOwned(detail.customer)\" #action\n                  ><t-space\n                    ><t-link :theme=\"buttonTheme('edit')\" @click=\"openFollowup(record)\">编辑</t-link\n",
+          "after": "                  >\n                </t-space>\n                <template v-if=\"isInDataScope(detail.customer)\" #action\n                  ><t-space\n                    ><t-link :theme=\"buttonTheme('edit')\" @click=\"openFollowup(record)\">编辑</t-link\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": ");\nconst allData = computed(() => user.value.dataPermission === 'all' || user.value.roles.includes('SUPER_ADMIN'));\nconst isOwned = (row: Customer) =>\n  row.ownerAccountId === user.value.id ||\n  (allData.value && user.value.roles.some((role) => role === 'STORE_ADMIN' || role === 'STORE_MANAGER'));\nconst rows = ref<Customer[]>([]);\nconst owners = ref<Owner[]>([]);\n",
+          "after": ");\nconst allData = computed(() => user.value.dataPermission === 'all' || user.value.roles.includes('SUPER_ADMIN'));\nconst isInDataScope = (row: Customer) =>\n  allData.value || (user.value.dataPermission === 'self' && row.ownerAccountId === user.value.id);\nconst rows = ref<Customer[]>([]);\nconst owners = ref<Owner[]>([]);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "  pageSize.value = info.pageSize;\n}\nconst selectionOwned = computed(\n  () =>\n    selected.value.length > 0 && selected.value.every((id) => rows.value.some((row) => row.id === id && isOwned(row))),\n);\nconst filterFields = computed<ListFilter[]>(() => [\n",
+          "after": "  pageSize.value = info.pageSize;\n}\nconst selectionInDataScope = computed(\n  () =>\n    selected.value.length > 0 &&\n    selected.value.every((id) => rows.value.some((row) => row.id === id && isInDataScope(row))),\n);\nconst filterFields = computed<ListFilter[]>(() => [\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "    : []),\n  ...(status.value === 'daily' && can('batch-archive')\n    ? [{ id: 'archive', function: 'archive' as const, batch: true, label: '批量归档', disabled: !selectionOwned.value }]\n    : []),\n  ...(status.value === 'archived' && can('batch-restore')\n",
+          "after": "    : []),\n  ...(status.value === 'daily' && can('batch-archive')\n    ? [\n        {\n          id: 'archive',\n          function: 'archive' as const,\n          batch: true,\n          label: '批量归档',\n          disabled: !selectionInDataScope.value,\n        },\n      ]\n    : []),\n  ...(status.value === 'archived' && can('batch-restore')\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "          batch: true,\n          label: '批量取消归档',\n          disabled: !selectionOwned.value,\n        },\n      ]\n    : []),\n  ...(status.value === 'archived' && can('batch-purge')\n    ? [{ id: 'purge', function: 'purge' as const, batch: true, label: '批量彻底删除', disabled: !selectionOwned.value }]\n    : []),\n]);\n",
+          "after": "          batch: true,\n          label: '批量取消归档',\n          disabled: !selectionInDataScope.value,\n        },\n      ]\n    : []),\n  ...(status.value === 'archived' && can('batch-purge')\n    ? [\n        {\n          id: 'purge',\n          function: 'purge' as const,\n          batch: true,\n          label: '批量彻底删除',\n          disabled: !selectionInDataScope.value,\n        },\n      ]\n    : []),\n]);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认客户模块移除管理员、店长及仅归属人可维护门槛，统一按功能权限、数据权限和业务状态判断，前后端及批量一致，保留门店隔离与其他业务行为。"
+        },
+        {
+          "before": "        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n      /></t-form-item>\n      <t-form-item label=\"国籍\">\n        <t-select\n          v-model=\"profile.nationality\"\n",
+          "after": "        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n      /></t-form-item>\n      <t-form-item label=\"客户国籍\">\n        <t-select\n          v-model=\"profile.nationality\"\n",
+          "reason": "用户要求国籍字段统一命名为客户国籍，同步新增编辑及详情标题和占位文案，字段逻辑不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "          filterable\n          clearable\n          placeholder=\"请选择国籍\"\n        />\n      </t-form-item>\n",
+          "after": "          filterable\n          clearable\n          placeholder=\"请选择客户国籍\"\n        />\n      </t-form-item>\n",
+          "reason": "用户要求国籍字段统一命名为客户国籍，同步新增编辑及详情标题和占位文案，字段逻辑不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    { label: '客户姓名', value: customer.name },\n    {\n      label: '国籍',\n      value:\n        contactCatalogue.value.nationalities.find((item) => item.code === customer.nationality)?.name ||\n",
+          "after": "    { label: '客户姓名', value: customer.name },\n    {\n      label: '客户国籍',\n      value:\n        contactCatalogue.value.nationalities.find((item) => item.code === customer.nationality)?.name ||\n",
+          "reason": "用户要求国籍字段统一命名为客户国籍，同步新增编辑及详情标题和占位文案，字段逻辑不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "      </t-form-item>\n      <t-form-item\n        label=\"号码所属国家／地区\"\n        :required-mark=\"Boolean(profile.phone) && !unchangedLegacyPhone\"\n        v-bind=\"profileFeedback.field('phoneRegion', profile.phoneRegion)\"\n",
+          "after": "      </t-form-item>\n      <t-form-item\n        label=\"号码归属地\"\n        :required-mark=\"Boolean(profile.phone) && !unchangedLegacyPhone\"\n        v-bind=\"profileFeedback.field('phoneRegion', profile.phoneRegion)\"\n",
+          "reason": "用户要求将客户新增、编辑、详情的字段标题统一为号码归属地，并同步选择占位文案及校验提示；字段和选择逻辑不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "          filterable\n          clearable\n          placeholder=\"请选择号码所属国家／地区\"\n        />\n      </t-form-item>\n",
+          "after": "          filterable\n          clearable\n          placeholder=\"请选择号码归属地\"\n        />\n      </t-form-item>\n",
+          "reason": "用户要求将客户新增、编辑、详情的字段标题统一为号码归属地，并同步选择占位文案及校验提示；字段和选择逻辑不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    { label: '联系电话', value: displayCustomerPhone(customer) },\n    {\n      label: '号码所属国家／地区',\n      value:\n        contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||\n",
+          "after": "    { label: '联系电话', value: displayCustomerPhone(customer) },\n    {\n      label: '号码归属地',\n      value:\n        contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||\n",
+          "reason": "用户要求将客户新增、编辑、详情的字段标题统一为号码归属地，并同步选择占位文案及校验提示；字段和选择逻辑不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    }\n    if (!profile.value.phoneRegion) {\n      profileFeedback.reject('phoneRegion', profile.value.phoneRegion, '请选择号码所属国家／地区');\n      invalid = true;\n    }\n",
+          "after": "    }\n    if (!profile.value.phoneRegion) {\n      profileFeedback.reject('phoneRegion', profile.value.phoneRegion, '请选择号码归属地');\n      invalid = true;\n    }\n",
+          "reason": "用户要求将客户新增、编辑、详情的字段标题统一为号码归属地，并同步选择占位文案及校验提示；字段和选择逻辑不变。",
+          "stage": "before-migrations"
+        },
+        {
           "before": "            ><span v-else>{{ row.name }}</span></template\n          >\n          <template #phone=\"{ row }\">{{ row.phone || '-' }}</template>\n          <template #ownerName=\"{ row }\">{{ row.ownerName || '-' }}</template>\n          <template #lastFollowedAt=\"{ row }\">{{ time(row.lastFollowedAt) }}</template>\n",
           "after": "            ><span v-else>{{ row.name }}</span></template\n          >\n          <template #phone=\"{ row }\">{{ displayCustomerPhone(row) }}</template>\n          <template #ownerName=\"{ row }\">{{ row.ownerName || '-' }}</template>\n          <template #lastFollowedAt=\"{ row }\">{{ time(row.lastFollowedAt) }}</template>\n",
           "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
@@ -9035,7 +9137,33 @@
     },
     "src/components/foundation/AdminPhoneInput.vue": {
       "script": "b3e96df04797434667b42975ec73a073571177ad90def5b70a48f617a0529eca",
-      "template": "6208710a532ca31ea151dc0dea2a06a63c3f0ad52581401ea16d1586b09d4702"
+      "template": "6208710a532ca31ea151dc0dea2a06a63c3f0ad52581401ea16d1586b09d4702",
+      "approvedBusinessPatches": [
+        {
+          "before": "      :disabled=\"!callingCode\"\n      :maxlength=\"80\"",
+          "after": "      :disabled=\"!callingCode\"\n      :tips=\"callingCode ? undefined : '请先选择号码归属地'\"\n      :maxlength=\"80\"",
+          "stage": "before-migrations",
+          "reason": "用户要求联系电话输入框下方按公共标准显示请先选择号码归属地，使用原生Input tips，无归属地时显示、选择后隐藏；不改业务逻辑。"
+        },
+        {
+          "before": "    <t-input :value=\"callingCode\" readonly placeholder=\"区号\" aria-label=\"国际区号\" />",
+          "after": "    <t-input :value=\"callingCode\" readonly disabled placeholder=\"区号\" aria-label=\"国际区号\" />",
+          "stage": "before-migrations",
+          "reason": "用户要求国际区号框始终显示原生禁用灰底，选择归属地后仍不可编辑，区号映射及号码启用逻辑不变。"
+        },
+        {
+          "before": "      :value=\"modelValue\"\n      :maxlength=\"80\"",
+          "after": "      :value=\"modelValue\"\n      :disabled=\"!callingCode\"\n      :maxlength=\"80\"",
+          "stage": "before-migrations",
+          "reason": "用户要求未选择号码归属地时联系电话使用原生禁用状态；有实际区号后启用号码，区号始终只读，保留已有号码。"
+        },
+        {
+          "before": "    <t-input :value=\"callingCode\" readonly placeholder=\"\" aria-label=\"国际区号\" />",
+          "after": "    <t-input :value=\"callingCode\" readonly placeholder=\"区号\" aria-label=\"国际区号\" />",
+          "reason": "用户要求只读国际区号为空时显示区号占位提示，不写入表单数据，不改变区号派生或选择逻辑。",
+          "stage": "before-migrations"
+        }
+      ]
     }
   },
   "modules": [

@@ -130,15 +130,14 @@ class CustomerApiTest extends SpringContainerTestSupport {
     action(id,"daily","archive",null).andExpect(status().isOk());
     assertThat(jdbc.queryForObject("SELECT owner_account_id FROM store_customers WHERE id=?",Long.class,id)).isEqualTo(90002);
   }
-  @Test void managerNeedsBothExplicitFunctionAndDataGrantsAndValidScopedMembership() throws Exception {
+  @Test void roleNamesNeverBypassFunctionOrConfiguredDataScope() throws Exception {
     long id=create();action(id,"daily","assign",90002L);
-    jdbc.update("INSERT INTO roles(id,client_code,tenant_id,store_id,name,code,builtin_key,function_permissions) VALUES(90099,'admin',1,90001,'店长','CUSTOMER_MANAGER','STORE_MANAGER','')");
-    jdbc.update("INSERT INTO account_roles(account_id,role_id,client_code,tenant_id,store_id) VALUES(90001,90099,'admin',1,90001)");
     authenticatedRole("employee","all","daily.view");action(id,"daily","archive",null).andExpect(status().isForbidden());
     authenticatedRole("employee","self","all");action(id,"daily","archive",null).andExpect(status().isForbidden());
     authenticatedRole("employee","","all");action(id,"daily","archive",null).andExpect(status().isForbidden());
-    authenticatedRole("employee","all","all");action(id,"daily","archive",null).andExpect(status().isOk());
-    jdbc.update("UPDATE account_roles SET store_id=90002 WHERE account_id=90001 AND role_id=90099");
+    identity(90001,90001L,"all","daily.view","daily.archive");
+    action(id,"daily","archive",null).andExpect(status().isOk());
+    identity(90001,90001L,"self","archived.view","archived.restore");
     action(id,"archived","restore",null).andExpect(status().isForbidden());
   }
   @Test void duplicateNamesAndPhonesAndMissingPhoneAreAccepted() throws Exception {
@@ -173,13 +172,35 @@ class CustomerApiTest extends SpringContainerTestSupport {
     mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("ids",List.of(a),"status","daily","action","archive")))).andExpect(status().isForbidden());
     action(a,"daily","archive",null).andExpect(status().isOk());
   }
-  @Test void allViewNeverAllowsMaintainingOthersButAssignmentNeedsNoRoleName() throws Exception {
-    long a=create(); identity(90002,90001L,"all","all");
-    mvc.perform(put(BASE+"/"+a).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"篡改\",\"ownerAccountId\":90001}")).andExpect(status().isForbidden());
-    action(a,"daily","archive",null).andExpect(status().isForbidden());
-    follow(a,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"越权\",\"mediaIds\":[]}").andExpect(status().isForbidden());
+  @Test void allDataAllowsOrdinaryStaffToMaintainOthersWithoutChangingOwner() throws Exception {
+    long a=create();identity(90002,90001L,"all","all");
+    mvc.perform(put(BASE+"/"+a).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"合法维护\",\"ownerAccountId\":90001}"))
+        .andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT owner_account_id FROM store_customers WHERE id=?",Long.class,a)).isEqualTo(90001);
+    follow(a,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"授权跟进\",\"mediaIds\":[]}").andExpect(status().isOk());
+    long followup=jdbc.queryForObject("SELECT id FROM store_customer_followups WHERE customer_id=?",Long.class,a);
+    mvc.perform(put(BASE+"/"+a+"/followups/"+followup).contentType(MediaType.APPLICATION_JSON)
+        .content("{\"followedAt\":\"2026-10-14T10:00:00\",\"content\":\"授权修改\",\"mediaIds\":[]}")).andExpect(status().isOk());
+    mvc.perform(delete(BASE+"/"+a+"/followups/"+followup)).andExpect(status().isOk());
+    action(a,"daily","archive",null).andExpect(status().isOk());
+    action(a,"archived","restore",null).andExpect(status().isOk());
     action(a,"daily","assign",90002L).andExpect(status().isOk());
-    mvc.perform(put(BASE+"/"+a).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"合法维护\",\"ownerAccountId\":90002}")).andExpect(status().isOk());
+  }
+  @Test void batchAllDataAcceptsMixedOwnersAndSelfDataRejectsAtomically() throws Exception {
+    long a=create();long b=create();action(b,"daily","assign",90002L).andExpect(status().isOk());
+    String body=json.writeValueAsString(java.util.Map.of("ids",List.of(a,b),"status","daily","action","archive"));
+    identity(90001,90001L,"self","all");
+    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+    assertThat(jdbc.queryForObject("SELECT status FROM store_customers WHERE id=?",String.class,a)).isEqualTo("daily");
+    identity(90001,90001L,"all","daily.view","daily.archive");
+    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+    identity(90001,90001L,"all","daily.view","daily.batch-archive");
+    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_customers WHERE id IN (?,?) AND status='archived'",Integer.class,a,b)).isEqualTo(2);
+    identity(90001,90001L,"all","archived.view","archived.batch-restore");
+    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(
+        java.util.Map.of("ids",List.of(a,b),"status","archived","action","restore")))).andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_customers WHERE id IN (?,?) AND status='daily'",Integer.class,a,b)).isEqualTo(2);
   }
   @Test void createdScopeCannotBeForgedAndAuthorizedEditingTransfersOwner() throws Exception {
     var c=data(mvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"客户\",\"tenantId\":999,\"storeId\":90002,\"ownerAccountId\":90002}")));
@@ -272,7 +293,7 @@ class CustomerApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT name FROM store_customers WHERE id=?",String.class,id)).isEqualTo("普通修改");
     assertThat(jdbc.queryForObject("SELECT owner_account_id FROM store_customers WHERE id=?",Long.class,id)).isEqualTo(90001);
     identity(90002,90001L,"all","all");
-    mvc.perform(get(BASE+"/owner-candidates").param("customerId",String.valueOf(id))).andExpect(status().isForbidden());
+    mvc.perform(get(BASE+"/owner-candidates").param("customerId",String.valueOf(id))).andExpect(status().isOk());
   }
   @Test void editTransferMovesDataScopeAndPreservesHistoryAndArchivedStatus() throws Exception {
     long id=create();
@@ -328,8 +349,9 @@ class CustomerApiTest extends SpringContainerTestSupport {
     action(a,"archived","purge",null).andExpect(status().isOk());
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_customer_followups WHERE customer_id=?",Integer.class,a)).isZero();
   }
-  @Test void mixedOwnershipBatchMakesNoPartialChanges() throws Exception {
+  @Test void crossStoreBatchMakesNoPartialChanges() throws Exception {
     long a=create(); long b=create(); action(b,"daily","assign",90002L).andExpect(status().isOk());
+    jdbc.update("UPDATE store_customers SET store_id=90002 WHERE id=?",b);
     mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("ids",List.of(a,b),"status","daily","action","archive")))).andExpect(status().isForbidden());
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_customers WHERE status='archived'",Integer.class)).isZero();
   }

@@ -1,8 +1,10 @@
 <template>
   <t-input-group class="zdm-admin-phone-input" separate @beforeinput.capture="beforeInput" @paste.capture="paste">
-    <t-input :value="callingCode" readonly placeholder="" aria-label="国际区号" />
+    <t-input :value="callingCode" readonly disabled placeholder="区号" aria-label="国际区号" />
     <t-input
       :value="modelValue"
+      :disabled="!callingCode"
+      :tips="callingCode ? undefined : '请先选择号码归属地'"
       :maxlength="80"
       type="tel"
       clearable

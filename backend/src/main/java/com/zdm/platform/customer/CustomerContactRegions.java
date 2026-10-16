@@ -46,13 +46,13 @@ public final class CustomerContactRegions {
   public Catalogue catalogue() { return catalogue; }
   public String nationality(String code) {
     String value=code==null ? "" : code;
-    if (!value.isEmpty() && !nationalityCodes.contains(value)) { throw new IllegalArgumentException("请选择有效的国籍"); }
+    if (!value.isEmpty() && !nationalityCodes.contains(value)) { throw new IllegalArgumentException("请选择有效的客户国籍"); }
     return value;
   }
   public String callingCode(String region) {
     if (region==null || region.isEmpty()) { return ""; }
     String value=callingCodes.get(region);
-    if (value==null) { throw new IllegalArgumentException("请选择有效的号码所属国家／地区"); }
+    if (value==null) { throw new IllegalArgumentException("请选择有效的号码归属地"); }
     return value;
   }
 }
