@@ -80,7 +80,8 @@
     "src/pages/tenant/management/index.vue",
     "src/pages/tenant/store/index.vue",
     "src/styles/index.css",
-    "src/components/IdentityContextIcon.vue"
+    "src/components/IdentityContextIcon.vue",
+    "src/components/foundation/AdminPhoneInput.vue"
   ],
   "contracts": {
     "src/App.vue": {
@@ -676,6 +677,14 @@
           "before": "export type { ListFilter, ListAction, ListTab, FilterValues } from './official/types';\n\nexport { default as AdminOfficialMediaUpload } from './official/AdminOfficialMediaUpload.vue';\n",
           "after": "export type { ListFilter, ListAction, ListTab, FilterValues } from './official/types';\n\nexport { default as AdminOfficialMediaUpload } from './official/AdminOfficialMediaUpload.vue';\n\nexport { default as AdminListToolbar } from './AdminListToolbar.vue';\n",
           "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
+        }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "before": "\nexport { default as AdminListToolbar } from './AdminListToolbar.vue';\n",
+          "after": "\nexport { default as AdminListToolbar } from './AdminListToolbar.vue';\n\nexport { default as AdminPhoneInput } from './AdminPhoneInput.vue';\n",
+          "reason": "用户确认按全局原生表单规范增加复用的只读区号和号码组合控件。",
+          "stage": "before-migrations"
         }
       ]
     },
@@ -1593,6 +1602,150 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "            ><span v-else>{{ row.name }}</span></template\n          >\n          <template #phone=\"{ row }\">{{ row.phone || '-' }}</template>\n          <template #ownerName=\"{ row }\">{{ row.ownerName || '-' }}</template>\n          <template #lastFollowedAt=\"{ row }\">{{ time(row.lastFollowedAt) }}</template>\n",
+          "after": "            ><span v-else>{{ row.name }}</span></template\n          >\n          <template #phone=\"{ row }\">{{ displayCustomerPhone(row) }}</template>\n          <template #ownerName=\"{ row }\">{{ row.ownerName || '-' }}</template>\n          <template #lastFollowedAt=\"{ row }\">{{ time(row.lastFollowedAt) }}</template>\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n      /></t-form-item>\n      <t-form-item label=\"联系电话\"\n        ><t-input v-model=\"profile.phone\" :maxlength=\"80\" clearable placeholder=\"请输入联系电话\"\n      /></t-form-item>\n      <t-form-item label=\"微信号\"\n        ><t-input v-model=\"profile.wechat\" :maxlength=\"100\" clearable placeholder=\"请输入微信号\"\n",
+          "after": "        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n      /></t-form-item>\n      <t-form-item label=\"国籍\">\n        <t-select\n          v-model=\"profile.nationality\"\n          :options=\"nationalityOptions\"\n          filterable\n          clearable\n          placeholder=\"请选择国籍\"\n        />\n      </t-form-item>\n      <t-form-item\n        label=\"号码所属国家／地区\"\n        :required-mark=\"Boolean(profile.phone) && !unchangedLegacyPhone\"\n        v-bind=\"profileFeedback.field('phoneRegion', profile.phoneRegion)\"\n      >\n        <t-select\n          v-model=\"profile.phoneRegion\"\n          :options=\"phoneRegionOptions\"\n          filterable\n          clearable\n          placeholder=\"请选择号码所属国家／地区\"\n        />\n      </t-form-item>\n      <t-form-item label=\"联系电话\" v-bind=\"profileFeedback.field('phone', profile.phone)\">\n        <AdminPhoneInput v-model=\"profile.phone\" :calling-code=\"phoneCallingCode\" />\n      </t-form-item>\n      <t-form-item label=\"微信号\"\n        ><t-input v-model=\"profile.wechat\" :maxlength=\"100\" clearable placeholder=\"请输入微信号\"\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  AdminListPage,\n  AdminFormDialog,\n  AdminDetailPage,\n  AdminDialog,\n",
+          "after": "  AdminListPage,\n  AdminFormDialog,\n  AdminPhoneInput,\n  AdminDetailPage,\n  AdminDialog,\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  listCustomerOwners,\n  listCustomerOwnerCandidates,\n  getCustomerDetail,\n  saveCustomer,\n",
+          "after": "  listCustomerOwners,\n  listCustomerOwnerCandidates,\n  listCustomerContactRegions,\n  displayCustomerPhone,\n  type CustomerContactCatalogue,\n  getCustomerDetail,\n  saveCustomer,\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": ");\nconst allData = computed(() => user.value.dataPermission === 'all' || user.value.roles.includes('SUPER_ADMIN'));\nconst isOwned = (row: Customer) => row.ownerAccountId === user.value.id;\nconst rows = ref<Customer[]>([]);\nconst owners = ref<Owner[]>([]);\n",
+          "after": ");\nconst allData = computed(() => user.value.dataPermission === 'all' || user.value.roles.includes('SUPER_ADMIN'));\nconst isOwned = (row: Customer) =>\n  row.ownerAccountId === user.value.id ||\n  (allData.value && user.value.roles.some((role) => role === 'STORE_ADMIN' || role === 'STORE_MANAGER'));\nconst rows = ref<Customer[]>([]);\nconst owners = ref<Owner[]>([]);\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  return [\n    { label: '客户姓名', value: customer.name },\n    { label: '联系电话', value: customer.phone || '-' },\n    { label: '微信号', value: customer.wechat || '-' },\n    { label: '归属人', value: customer.ownerName || '-' },\n",
+          "after": "  return [\n    { label: '客户姓名', value: customer.name },\n    {\n      label: '国籍',\n      value:\n        contactCatalogue.value.nationalities.find((item) => item.code === customer.nationality)?.name ||\n        customer.nationality ||\n        '-',\n    },\n    { label: '联系电话', value: displayCustomerPhone(customer) },\n    {\n      label: '号码所属国家／地区',\n      value:\n        contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||\n        customer.phoneRegion ||\n        '-',\n    },\n    { label: '微信号', value: customer.wechat || '-' },\n    { label: '归属人', value: customer.ownerName || '-' },\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "const profileOwners = ref<Owner[]>([]);\nconst profileFeedback = useFormFeedback(profileVisible);\nconst emptyProfile = (): CustomerProfile => ({ name: '', phone: '', wechat: '', requirement: '', remark: '' });\nconst profile = ref<CustomerProfile>(emptyProfile());\nconst submitting = ref(false);\nconst uploading = ref(0);\n",
+          "after": "const profileOwners = ref<Owner[]>([]);\nconst profileFeedback = useFormFeedback(profileVisible);\nconst emptyProfile = (): CustomerProfile => ({\n  name: '',\n  phone: '',\n  nationality: '',\n  phoneRegion: '',\n  wechat: '',\n  requirement: '',\n  remark: '',\n});\nconst profile = ref<CustomerProfile>(emptyProfile());\nconst originalContact = ref({ phone: '', phoneRegion: '' });\nconst contactCatalogue = ref<CustomerContactCatalogue>({ nationalities: [], phoneRegions: [] });\nconst nationalityOptions = computed(() =>\n  contactCatalogue.value.nationalities.map((item) => ({ value: item.code, label: item.name })),\n);\nconst phoneRegionOptions = computed(() =>\n  contactCatalogue.value.phoneRegions.map((item) => ({ value: item.code, label: `${item.name} ${item.callingCode}` })),\n);\nconst phoneCallingCode = computed(\n  () => contactCatalogue.value.phoneRegions.find((item) => item.code === profile.value.phoneRegion)?.callingCode ?? '',\n);\nconst unchangedLegacyPhone = computed(\n  () =>\n    Boolean(editingId.value) &&\n    !originalContact.value.phoneRegion &&\n    !profile.value.phoneRegion &&\n    profile.value.phone === originalContact.value.phone,\n);\n\nconst submitting = ref(false);\nconst uploading = ref(0);\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  const currentIdentity = user.value;\n  try {\n    const candidates = await listCustomerOwnerCandidates(row?.id);\n    if (user.value !== currentIdentity) return;\n    profileOwners.value = candidates.filter((owner) => owner.active);\n  } catch (error) {\n    return fail('查询归属人', error);\n",
+          "after": "  const currentIdentity = user.value;\n  try {\n    const [candidates, catalogue] = await Promise.all([\n      listCustomerOwnerCandidates(row?.id),\n      listCustomerContactRegions(row?.status ?? status.value),\n    ]);\n    if (user.value !== currentIdentity) return;\n    profileOwners.value = candidates.filter((owner) => owner.active);\n    contactCatalogue.value = catalogue;\n  } catch (error) {\n    return fail('查询归属人', error);\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  editingId.value = row?.id;\n  profile.value = row\n    ? { name: row.name, phone: row.phone, wechat: row.wechat, requirement: row.requirement, remark: row.remark }\n    : emptyProfile();\n  profile.value.ownerAccountId =\n",
+          "after": "  editingId.value = row?.id;\n  profile.value = row\n    ? {\n        name: row.name,\n        phone: row.phone,\n        nationality: row.nationality ?? '',\n        phoneRegion: row.phoneRegion ?? '',\n        wechat: row.wechat,\n        requirement: row.requirement,\n        remark: row.remark,\n      }\n    : emptyProfile();\n  profile.value.ownerAccountId =\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);\n  editingStatus.value = row?.status ?? 'daily';\n  nameError.value = '';\n  profileVisible.value = true;\n",
+          "after": "    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);\n  editingStatus.value = row?.status ?? 'daily';\n  originalContact.value = { phone: row?.phone ?? '', phoneRegion: row?.phoneRegion ?? '' };\n  nameError.value = '';\n  profileVisible.value = true;\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    profileFeedback.reject('owner', profile.value.ownerAccountId, '请选择归属人');\n    invalid = true;\n  }\n  if (invalid) return rejectFormSubmission(profileDialog.value);\n",
+          "after": "    profileFeedback.reject('owner', profile.value.ownerAccountId, '请选择归属人');\n    invalid = true;\n  }\n  if (profile.value.phone && !unchangedLegacyPhone.value) {\n    if (!/^[0-9]+$/.test(profile.value.phone)) {\n      profileFeedback.reject('phone', profile.value.phone, '联系电话仅允许输入数字');\n      invalid = true;\n    }\n    if (!profile.value.phoneRegion) {\n      profileFeedback.reject('phoneRegion', profile.value.phoneRegion, '请选择号码所属国家／地区');\n      invalid = true;\n    }\n  }\n  if (invalid) return rejectFormSubmission(profileDialog.value);\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  detailLoading.value = true;\n  try {\n    const result = await getCustomerDetail(id);\n    if (version === detailVersion) detail.value = result;\n  } catch (error) {\n",
+          "after": "  detailLoading.value = true;\n  try {\n    const [result, catalogue] = await Promise.all([getCustomerDetail(id), listCustomerContactRegions(status.value)]);\n    if (version === detailVersion) contactCatalogue.value = catalogue;\n    if (version === detailVersion) detail.value = result;\n  } catch (error) {\n",
+          "reason": "用户确认客户国籍和号码地区独立、只读区号及数字电话；补充门店管理员和获得功能及全部数据权限的内置店长可维护全店客户，保留组织边界。",
+          "stage": "before-migrations"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requires editing saved customer owner with searchable single select, persisted transfer and original edit/current-owner/assign/data-scope restrictions; preserve archived state and creation/followup history.",
+          "stage": "before-migrations",
+          "before": "      @confirm=\"submitProfile\"\n    >\n      <t-form-item\n        v-if=\"!editingId\"\n        label=\"归属人\"\n        required-mark\n        v-bind=\"profileFeedback.field('owner', profile.ownerAccountId)\"\n      >\n        <t-select\n          v-model=\"profile.ownerAccountId\"\n          filterable\n          clearable\n",
+          "after": "      @confirm=\"submitProfile\"\n    >\n      <t-form-item label=\"归属人\" required-mark v-bind=\"profileFeedback.field('owner', profile.ownerAccountId)\">\n        <t-select\n          v-model=\"profile.ownerAccountId\"\n          :disabled=\"Boolean(editingId) && !can('assign', editingStatus)\"\n          filterable\n          clearable\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requires editing saved customer owner with searchable single select, persisted transfer and original edit/current-owner/assign/data-scope restrictions; preserve archived state and creation/followup history.",
+          "stage": "before-migrations",
+          "before": "        />\n      </t-form-item>\n      <t-form-item v-else label=\"归属人\"\n        ><span>{{ profileOwner }}</span></t-form-item\n      >\n      <t-form-item label=\"客户姓名\" required-mark v-bind=\"fieldFeedback(nameError, nameError)\"\n        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n",
+          "after": "        />\n      </t-form-item>\n      <t-form-item label=\"客户姓名\" required-mark v-bind=\"fieldFeedback(nameError, nameError)\"\n        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requires editing saved customer owner with searchable single select, persisted transfer and original edit/current-owner/assign/data-scope restrictions; preserve archived state and creation/followup history.",
+          "stage": "before-migrations",
+          "before": "const editingId = ref<number>();\nconst nameError = ref('');\nconst profileOwner = ref('');\nconst profileOwners = ref<Owner[]>([]);\nconst profileFeedback = useFormFeedback(profileVisible);\n",
+          "after": "const editingId = ref<number>();\nconst nameError = ref('');\nconst editingStatus = ref<CustomerStatus>('daily');\nconst profileOwners = ref<Owner[]>([]);\nconst profileFeedback = useFormFeedback(profileVisible);\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requires editing saved customer owner with searchable single select, persisted transfer and original edit/current-owner/assign/data-scope restrictions; preserve archived state and creation/followup history.",
+          "stage": "before-migrations",
+          "before": "}));\nasync function openProfile(row?: Customer) {\n  if (!row) {\n    const currentIdentity = user.value;\n    try {\n      const candidates = await listCustomerOwnerCandidates();\n      if (user.value !== currentIdentity) return;\n      profileOwners.value = candidates.filter((owner) => owner.active);\n    } catch (error) {\n      return fail('查询归属人', error);\n    }\n  }\n  editingId.value = row?.id;\n",
+          "after": "}));\nasync function openProfile(row?: Customer) {\n  const currentIdentity = user.value;\n  try {\n    const candidates = await listCustomerOwnerCandidates(row?.id);\n    if (user.value !== currentIdentity) return;\n    profileOwners.value = candidates.filter((owner) => owner.active);\n  } catch (error) {\n    return fail('查询归属人', error);\n  }\n  editingId.value = row?.id;\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requires editing saved customer owner with searchable single select, persisted transfer and original edit/current-owner/assign/data-scope restrictions; preserve archived state and creation/followup history.",
+          "stage": "before-migrations",
+          "before": "    row?.ownerAccountId ??\n    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);\n  profileOwner.value = row?.ownerName ?? user.value.name;\n  nameError.value = '';\n  profileVisible.value = true;\n",
+          "after": "    row?.ownerAccountId ??\n    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);\n  editingStatus.value = row?.status ?? 'daily';\n  nameError.value = '';\n  profileVisible.value = true;\n"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requires editing saved customer owner with searchable single select, persisted transfer and original edit/current-owner/assign/data-scope restrictions; preserve archived state and creation/followup history.",
+          "stage": "before-migrations",
+          "before": "    invalid = true;\n  }\n  if (!editingId.value && !profileOwners.value.some((owner) => owner.accountId === profile.value.ownerAccountId)) {\n    profileFeedback.reject('owner', profile.value.ownerAccountId, '请选择归属人');\n    invalid = true;\n",
+          "after": "    invalid = true;\n  }\n  if (!profileOwners.value.some((owner) => owner.accountId === profile.value.ownerAccountId)) {\n    profileFeedback.reject('owner', profile.value.ownerAccountId, '请选择归属人');\n    invalid = true;\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "      @confirm=\"submitProfile\"\n    >\n      <t-form-item label=\"客户姓名\" required-mark v-bind=\"fieldFeedback(nameError, nameError)\"\n        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n",
+          "after": "      @confirm=\"submitProfile\"\n    >\n      <t-form-item\n        v-if=\"!editingId\"\n        label=\"归属人\"\n        required-mark\n        v-bind=\"profileFeedback.field('owner', profile.ownerAccountId)\"\n      >\n        <t-select\n          v-model=\"profile.ownerAccountId\"\n          filterable\n          clearable\n          placeholder=\"请选择归属人\"\n          :options=\"profileOwners.map((owner) => ({ value: owner.accountId, label: owner.name }))\"\n        />\n      </t-form-item>\n      <t-form-item v-else label=\"归属人\"\n        ><span>{{ profileOwner }}</span></t-form-item\n      >\n      <t-form-item label=\"客户姓名\" required-mark v-bind=\"fieldFeedback(nameError, nameError)\"\n        ><t-input v-model=\"profile.name\" :maxlength=\"80\" clearable placeholder=\"请输入客户姓名\"\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "      /></t-form-item>\n      <t-form-item label=\"客户需求\"\n        ><t-textarea v-model=\"profile.requirement\" :maxlength=\"10000\" placeholder=\"请输入客户需求\"\n      /></t-form-item>\n      <t-form-item label=\"客户备注\"\n        ><t-textarea v-model=\"profile.remark\" :maxlength=\"10000\" placeholder=\"请输入客户备注\"\n      /></t-form-item>\n      <t-form-item label=\"归属人\"\n        ><span>{{ profileOwner }}</span></t-form-item\n      >\n    </AdminFormDialog>\n    <AdminDialog\n",
+          "after": "      /></t-form-item>\n      <t-form-item label=\"客户需求\"\n        ><t-textarea v-model=\"profile.requirement\" :maxlength=\"100\" placeholder=\"请输入客户需求\"\n      /></t-form-item>\n      <t-form-item label=\"客户备注\"\n        ><t-textarea v-model=\"profile.remark\" :maxlength=\"100\" placeholder=\"请输入客户备注\"\n      /></t-form-item>\n    </AdminFormDialog>\n    <AdminDialog\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "  listCustomers,\n  listCustomerOwners,\n  getCustomerDetail,\n  saveCustomer,\n",
+          "after": "  listCustomers,\n  listCustomerOwners,\n  listCustomerOwnerCandidates,\n  getCustomerDetail,\n  saveCustomer,\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "const nameError = ref('');\nconst profileOwner = ref('');\nconst emptyProfile = (): CustomerProfile => ({ name: '', phone: '', wechat: '', requirement: '', remark: '' });\nconst profile = ref<CustomerProfile>(emptyProfile());\n",
+          "after": "const nameError = ref('');\nconst profileOwner = ref('');\nconst profileOwners = ref<Owner[]>([]);\nconst profileFeedback = useFormFeedback(profileVisible);\nconst emptyProfile = (): CustomerProfile => ({ name: '', phone: '', wechat: '', requirement: '', remark: '' });\nconst profile = ref<CustomerProfile>(emptyProfile());\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "  disabled: submitting.value,\n}));\nfunction openProfile(row?: Customer) {\n  editingId.value = row?.id;\n  profile.value = row\n    ? { name: row.name, phone: row.phone, wechat: row.wechat, requirement: row.requirement, remark: row.remark }\n    : emptyProfile();\n  profileOwner.value = row?.ownerName ?? user.value.name;\n  nameError.value = '';\n",
+          "after": "  disabled: submitting.value,\n}));\nasync function openProfile(row?: Customer) {\n  if (!row) {\n    const currentIdentity = user.value;\n    try {\n      const candidates = await listCustomerOwnerCandidates();\n      if (user.value !== currentIdentity) return;\n      profileOwners.value = candidates.filter((owner) => owner.active);\n    } catch (error) {\n      return fail('查询归属人', error);\n    }\n  }\n  editingId.value = row?.id;\n  profile.value = row\n    ? { name: row.name, phone: row.phone, wechat: row.wechat, requirement: row.requirement, remark: row.remark }\n    : emptyProfile();\n  profile.value.ownerAccountId =\n    row?.ownerAccountId ??\n    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);\n  profileOwner.value = row?.ownerName ?? user.value.name;\n  nameError.value = '';\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "async function submitProfile() {\n  if (submitting.value) return;\n  if (!profile.value.name.trim()) {\n    nameError.value = '请输入客户姓名';\n    return rejectFormSubmission(profileDialog.value);\n  }\n  submitting.value = true;\n  try {\n",
+          "after": "async function submitProfile() {\n  if (submitting.value) return;\n  let invalid = false;\n  if (!profile.value.name.trim()) {\n    nameError.value = '请输入客户姓名';\n    invalid = true;\n  }\n  if (!editingId.value && !profileOwners.value.some((owner) => owner.accountId === profile.value.ownerAccountId)) {\n    profileFeedback.reject('owner', profile.value.ownerAccountId, '请选择归属人');\n    invalid = true;\n  }\n  if (invalid) return rejectFormSubmission(profileDialog.value);\n  submitting.value = true;\n  try {\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -5889,6 +6042,54 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "              <template #operation=\"{ row }\">\n                <div class=\"table-actions\">\n                  <t-link v-if=\"canEditRole\" :theme=\"buttonTheme('edit')\" hover=\"color\" @click=\"openEditDialog(row)\"\n                    >编辑</t-link\n                  >\n",
+          "after": "              <template #operation=\"{ row }\">\n                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canEditRole && !isStoreManagerRole(row)\"\n                    :theme=\"buttonTheme('edit')\"\n                    hover=\"color\"\n                    @click=\"openEditDialog(row)\"\n                    >编辑</t-link\n                  >\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "                  </t-link>\n                  <t-link\n                    v-if=\"canDeleteRole && !isSuperAdminRole(row)\"\n                    :theme=\"buttonTheme('delete')\"\n                    hover=\"color\"\n",
+          "after": "                  </t-link>\n                  <t-link\n                    v-if=\"canDeleteRole && !isSuperAdminRole(row) && !isStoreManagerRole(row)\"\n                    :theme=\"buttonTheme('delete')\"\n                    hover=\"color\"\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "                  <span\n                    v-if=\"\n                      !canEditRole &&\n                      !(canDeleteRole && !isSuperAdminRole(row)) &&\n                      !(canManageRolePermission && !isSuperAdminRole(row))\n                    \"\n",
+          "after": "                  <span\n                    v-if=\"\n                      !(canEditRole && !isStoreManagerRole(row)) &&\n                      !(canDeleteRole && !isSuperAdminRole(row) && !isStoreManagerRole(row)) &&\n                      !(canManageRolePermission && !isSuperAdminRole(row))\n                    \"\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "\ninterface RoleItem {\n  createdByClientCode?: 'admin' | 'supply-chain' | null;\n  id: number;\n",
+          "after": "\ninterface RoleItem {\n  builtinKey?: 'STORE_MANAGER' | null;\n  createdByClientCode?: 'admin' | 'supply-chain' | null;\n  id: number;\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "const toRoleItem = (record: RoleRecord): RoleItem => ({\n  id: record.id,\n  createdByClientCode: record.createdByClientCode,\n  code: record.code,\n",
+          "after": "const toRoleItem = (record: RoleRecord): RoleItem => ({\n  id: record.id,\n  builtinKey: record.builtinKey,\n  createdByClientCode: record.createdByClientCode,\n  code: record.code,\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  functionPermissions: role.functionPermissions.join(','),\n});\n\nconst isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';\n",
+          "after": "  functionPermissions: role.functionPermissions.join(','),\n});\n\nconst isStoreManagerRole = (row: RoleItem) => row.builtinKey === 'STORE_MANAGER';\n\nconst isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "\nconst openEditDialog = (row: RoleItem) => {\n  dialogMode.value = 'edit';\n  editingId.value = row.id;\n",
+          "after": "\nconst openEditDialog = (row: RoleItem) => {\n  if (isStoreManagerRole(row)) return;\n  dialogMode.value = 'edit';\n  editingId.value = row.id;\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "\nconst openDeleteConfirm = (row: RoleItem) => {\n  if (isSuperAdminRole(row)) {\n    adminFeedback.warning('超级管理员角色不可删除');\n",
+          "after": "\nconst openDeleteConfirm = (row: RoleItem) => {\n  if (isStoreManagerRole(row)) return;\n  if (isSuperAdminRole(row)) {\n    adminFeedback.warning('超级管理员角色不可删除');\n",
+          "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
+          "stage": "before-migrations"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
@@ -8592,7 +8793,45 @@
     },
     "src/services/customers.ts": {
       "content": "8740dc7f0a54f7bff04922ce51204ba61049d4a9c1075b694c05638cfd9e081a",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "export interface CustomerProfile {\n  ownerAccountId?: number;\n  name: string;\n  phone: string;\n",
+          "after": "export interface CustomerProfile {\n  ownerAccountId?: number;\n  nationality?: string;\n  phoneRegion?: string;\n  name: string;\n  phone: string;\n",
+          "reason": "用户确认增加国籍、独立号码地区、服务端区号目录与号码展示，保留历史原始号码。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "}\nexport interface Customer extends CustomerProfile {\n  id: number;\n  tenantId: number;\n",
+          "after": "}\nexport interface Customer extends CustomerProfile {\n  callingCode?: string;\n  id: number;\n  tenantId: number;\n",
+          "reason": "用户确认增加国籍、独立号码地区、服务端区号目录与号码展示，保留历史原始号码。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "export const listCustomerOwnerCandidates = (customerId?: number) =>\n  request<Owner[]>(`${base}/owner-candidates${customerId == null ? '' : `?customerId=${customerId}`}`);\nexport const getCustomerDetail = (id: number) => request<CustomerDetail>(`${base}/${id}`);\nexport const saveCustomer = (payload: CustomerProfile, id?: number) =>\n",
+          "after": "export const listCustomerOwnerCandidates = (customerId?: number) =>\n  request<Owner[]>(`${base}/owner-candidates${customerId == null ? '' : `?customerId=${customerId}`}`);\nexport interface CustomerContactCatalogue {\n  nationalities: { code: string; name: string }[];\n  phoneRegions: { code: string; name: string; callingCode: string }[];\n}\nexport const listCustomerContactRegions = (status: CustomerStatus) =>\n  request<CustomerContactCatalogue>(`${base}/contact-regions?status=${status}`);\nexport const displayCustomerPhone = (customer: Pick<Customer, 'phone' | 'callingCode'>) =>\n  customer.phone ? [customer.callingCode, customer.phone].filter(Boolean).join(' ') : '-';\nexport const getCustomerDetail = (id: number) => request<CustomerDetail>(`${base}/${id}`);\nexport const saveCustomer = (payload: CustomerProfile, id?: number) =>\n",
+          "reason": "用户确认增加国籍、独立号码地区、服务端区号目录与号码展示，保留历史原始号码。",
+          "stage": "before-migrations"
+        },
+        {
+          "reason": "2026-10-16 user explicitly requires editing saved customer owner with searchable single select, persisted transfer and original edit/current-owner/assign/data-scope restrictions; preserve archived state and creation/followup history.",
+          "stage": "before-migrations",
+          "before": "};\nexport const listCustomerOwners = (status: CustomerStatus) => request<Owner[]>(`${base}/owners?status=${status}`);\nexport const listCustomerOwnerCandidates = () => request<Owner[]>(`${base}/owner-candidates`);\nexport const getCustomerDetail = (id: number) => request<CustomerDetail>(`${base}/${id}`);\nexport const saveCustomer = (payload: CustomerProfile, id?: number) =>\n",
+          "after": "};\nexport const listCustomerOwners = (status: CustomerStatus) => request<Owner[]>(`${base}/owners?status=${status}`);\nexport const listCustomerOwnerCandidates = (customerId?: number) =>\n  request<Owner[]>(`${base}/owner-candidates${customerId == null ? '' : `?customerId=${customerId}`}`);\nexport const getCustomerDetail = (id: number) => request<CustomerDetail>(`${base}/${id}`);\nexport const saveCustomer = (payload: CustomerProfile, id?: number) =>\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "export type CustomerStatus = 'daily' | 'archived';\nexport interface CustomerProfile {\n  name: string;\n  phone: string;\n",
+          "after": "export type CustomerStatus = 'daily' | 'archived';\nexport interface CustomerProfile {\n  ownerAccountId?: number;\n  name: string;\n  phone: string;\n"
+        },
+        {
+          "reason": "2026-10-16 user requires customer requirement/remark max 100, create owner required above name with searchable single selection defaulting to self, active same-store employees and current store administrator self; existing edit/assignment permission behavior preserved.",
+          "stage": "before-migrations",
+          "before": "};\nexport const listCustomerOwners = (status: CustomerStatus) => request<Owner[]>(`${base}/owners?status=${status}`);\nexport const getCustomerDetail = (id: number) => request<CustomerDetail>(`${base}/${id}`);\nexport const saveCustomer = (payload: CustomerProfile, id?: number) =>\n",
+          "after": "};\nexport const listCustomerOwners = (status: CustomerStatus) => request<Owner[]>(`${base}/owners?status=${status}`);\nexport const listCustomerOwnerCandidates = () => request<Owner[]>(`${base}/owner-candidates`);\nexport const getCustomerDetail = (id: number) => request<CustomerDetail>(`${base}/${id}`);\nexport const saveCustomer = (payload: CustomerProfile, id?: number) =>\n"
+        }
+      ]
     },
     "src/services/employeeInvites.ts": {
       "content": "5b3a4178aed9bd2d26a15c3ecb5cc5ba79fa7267e2bd57b80791f5264b4d1ee0",
@@ -8688,7 +8927,15 @@
     },
     "src/services/roles.ts": {
       "content": "3313c3d7abade5d115762a769af60e47b9d8054050dec54aa73d4421fd21f160",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "\nexport interface RoleRecord {\n  createdByClientCode?: 'admin' | 'supply-chain' | null;\n  clientCode?: 'admin' | 'supply-chain';\n",
+          "after": "\nexport interface RoleRecord {\n  builtinKey?: 'STORE_MANAGER' | null;\n  createdByClientCode?: 'admin' | 'supply-chain' | null;\n  clientCode?: 'admin' | 'supply-chain';\n",
+          "reason": "用户确认使用稳定的内置角色标识，保留原有角色编号和业务编码。",
+          "stage": "before-migrations"
+        }
+      ]
     },
     "src/services/slabColors.ts": {
       "content": "804b693f3ee81016aace1f7c4557e4da0b5db70f17bdb1d97daee8471e90ba62",
@@ -8785,6 +9032,10 @@
     "src/components/IdentityContextIcon.vue": {
       "script": "28244204c15ad5c8535d01e7c2151d2b9c43659ddc9cd71924c00f123df15e90",
       "template": "7c675925a8f840ac9d8783c6be6acce3156a35454b2f4fa1c501500ccdc75eec"
+    },
+    "src/components/foundation/AdminPhoneInput.vue": {
+      "script": "b3e96df04797434667b42975ec73a073571177ad90def5b70a48f617a0529eca",
+      "template": "6208710a532ca31ea151dc0dea2a06a63c3f0ad52581401ea16d1586b09d4702"
     }
   },
   "modules": [

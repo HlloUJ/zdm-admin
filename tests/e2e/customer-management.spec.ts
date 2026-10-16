@@ -9,6 +9,9 @@ const customer = (id: number, ownerAccountId: number, status = 'daily') => ({
   storeId: 2,
   name: `王先生${id}`,
   phone: '',
+  nationality: '',
+  phoneRegion: '',
+  callingCode: '',
   wechat: '',
   requirement: '餐桌',
   remark: '',
@@ -60,7 +63,22 @@ async function setup(page: Page, grants: string[], scope = 'all', empty = false)
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
-    if (path.endsWith('/owners'))
+    if (path.endsWith('/contact-regions'))
+      return route.fulfill({
+        json: ok({
+          nationalities: [
+            { code: 'CN', name: '中国' },
+            { code: 'FR', name: '法国' },
+            { code: 'US', name: '美国' },
+          ],
+          phoneRegions: [
+            { code: 'CN', name: '中国', callingCode: '+86' },
+            { code: 'FR', name: '法国', callingCode: '+33' },
+            { code: 'US', name: '美国', callingCode: '+1' },
+          ],
+        }),
+      });
+    if (path.endsWith('/owners') || path.endsWith('/owner-candidates'))
       return route.fulfill({
         json: ok([
           { accountId: 7, name: '导购A', active: true },
@@ -105,11 +123,27 @@ async function setup(page: Page, grants: string[], scope = 'all', empty = false)
       return route.fulfill({ json: ok(true) });
     }
     const id = Number(path.split('/').at(-1));
+    const callingCode = (region: string) => ({ CN: '+86', FR: '+33', US: '+1' })[region] ?? '';
+    if (id && request.method() === 'PUT') {
+      const body = request.postDataJSON();
+      requests.push(body);
+      records = records.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              ...body,
+              callingCode: callingCode(body.phoneRegion),
+              ownerName: body.ownerAccountId === 7 ? '导购A' : '导购B',
+            }
+          : c,
+      );
+      return route.fulfill({ json: ok(records.find((c) => c.id === id)) });
+    }
     if (id) return route.fulfill({ json: ok({ customer: records.find((c) => c.id === id), followups }) });
     if (request.method() === 'POST') {
       const body = request.postDataJSON();
       requests.push(body);
-      const c = { ...customer(4, 7), ...body };
+      const c = { ...customer(4, 7), ...body, callingCode: callingCode(body.phoneRegion) };
       records.push(c);
       return route.fulfill({ json: ok(c) });
     }
@@ -167,7 +201,7 @@ test('all data without manager role sees others but cannot edit or archive them'
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
   await expect(dialog.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
 });
-test('new customer requires only name and never asks for shipping or source', async ({ page }) => {
+test('new customer requires name and defaults the required owner to self', async ({ page }) => {
   const requests = await setup(page, daily);
   await page.goto('/store/customer-management');
   await page.getByRole('button', { name: '新增', exact: true }).click();
@@ -188,7 +222,7 @@ test('new customer requires only name and never asks for shipping or source', as
     .click();
   await expect(page.getByText('李女士', { exact: true })).toBeVisible();
   expect(requests.at(-1)).toMatchObject({ name: '李女士', phone: '' });
-  expect(requests.at(-1)).not.toHaveProperty('ownerAccountId');
+  expect(requests.at(-1)).toHaveProperty('ownerAccountId', 7);
 });
 test('current owner edits historical followup without a separate followup grant', async ({ page }) => {
   const requests = await setup(page, ['daily.view', 'daily.detail']);
@@ -721,4 +755,210 @@ test('assignment missing-owner feedback stays at the field and clears after sele
   await dialog.locator('.t-select').click();
   await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
   await expect(dialog.getByText('请选择新归属人', { exact: true })).toHaveCount(0);
+});
+
+test('new customer selects a searchable owner and limits both notes to 100 characters', async ({ page }) => {
+  const requests = await setup(page, daily);
+  await page.goto('/store/customer-management');
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增客户' });
+  const owner = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: /^归属人/ }) });
+  const name = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: '客户姓名' }) });
+  await expect(owner.locator('input')).toHaveValue('导购A');
+  const ownerBox = await owner.boundingBox();
+  const nameBox = await name.boundingBox();
+  expect(ownerBox!.y).toBeLessThan(nameBox!.y);
+  await expect(owner.locator('.t-form__label')).toHaveClass(/--required/);
+  await owner.locator('.t-select').hover();
+  await owner.locator('.t-input__clear').click();
+  await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(owner).toContainText('请选择归属人');
+  expect(requests).toHaveLength(0);
+  await owner.locator('input').fill('导购B');
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await name.locator('input').fill('指定归属客户');
+  for (const label of ['客户需求', '客户备注']) {
+    const textarea = dialog
+      .locator('.t-form__item')
+      .filter({ has: page.locator('label', { hasText: label }) })
+      .locator('textarea');
+    await textarea.fill('字'.repeat(101));
+    await expect(textarea).toHaveValue('字'.repeat(100));
+  }
+  await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 8, requirement: '字'.repeat(100), remark: '字'.repeat(100) });
+});
+
+test('edit owner saves the transfer and the new owner sees the persisted selection', async ({ page }) => {
+  const requests = await setup(page, ['daily.view', 'daily.edit', 'daily.assign']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
+  const owner = dialog.getByPlaceholder('请选择归属人');
+  await expect(owner).toHaveValue('导购A');
+  await owner.fill('导购B');
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 8 });
+  const row = page.locator('tr').filter({ hasText: '王先生1' });
+  await expect(row).toContainText('导购B');
+  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
+  await page.addInitScript(() => {
+    const stored = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    localStorage.setItem('zdm-admin-user', JSON.stringify({ ...stored, id: 8, name: '导购B' }));
+  });
+  await page.reload();
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  await expect(dialog.getByPlaceholder('请选择归属人')).toHaveValue('导购B');
+});
+test('edit without assign permission retains the stored owner and can save other fields', async ({ page }) => {
+  const requests = await setup(page, ['daily.view', 'daily.edit']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
+  await expect(dialog.getByPlaceholder('请选择归属人')).toHaveValue('导购A');
+  await expect(dialog.getByPlaceholder('请选择归属人')).toBeDisabled();
+  await dialog.getByPlaceholder('请输入客户姓名').fill('仍归属本人');
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 7, name: '仍归属本人' });
+});
+test('edit transfer removes the customer from the old owner self scope', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.edit', 'daily.assign'], 'self');
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
+  await dialog.getByPlaceholder('请选择归属人').fill('导购B');
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('暂无客户', { exact: true })).toBeVisible();
+});
+
+test('customer batch buttons distinguish selected records from current-owner maintenance eligibility', async ({
+  page,
+}) => {
+  await setup(page, daily);
+  await page.goto('/store/customer-management');
+  const assign = page.getByRole('button', { name: '批量调整归属', exact: true });
+  const archive = page.getByRole('button', { name: '批量归档', exact: true });
+  await expect(assign).toBeDisabled();
+  await expect(archive).toBeDisabled();
+  const own = page.locator('tr').filter({ hasText: '王先生1' }).locator('.t-checkbox');
+  const other = page.locator('tr').filter({ hasText: '王先生2' }).locator('.t-checkbox');
+  await own.click();
+  await expect(assign).toBeEnabled();
+  await expect(archive).toBeEnabled();
+  await other.click();
+  await expect(assign).toBeEnabled();
+  await expect(archive).toBeDisabled();
+  await own.click();
+  await expect(assign).toBeEnabled();
+  await expect(archive).toBeDisabled();
+  await other.click();
+  await expect(assign).toBeDisabled();
+  await expect(archive).toBeDisabled();
+});
+
+const profileField = (page: Page, label: string) =>
+  page.locator('.t-dialog:visible .t-form__item').filter({ has: page.locator('.t-form__label', { hasText: label }) });
+async function selectContact(page: Page, label: string, option: string) {
+  await profileField(page, label).locator('.t-select').click();
+  await page.locator('.t-select-option:visible').getByText(option, { exact: true }).click();
+}
+test('nationality and phone region are independent and native calling code is read only', async ({ page }) => {
+  const requests = await setup(page, daily);
+  await page.goto('/store/customer-management');
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  await selectContact(page, '国籍', '法国');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('');
+  await selectContact(page, '号码所属国家', '中国 +86');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('+86');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveAttribute('readonly', '');
+  await selectContact(page, '国籍', '美国');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('+86');
+  const phone = page.locator('.zdm-admin-phone-input input').last();
+  await phone.fill('000123');
+  await phone.pressSequentially('Ab-+中');
+  await expect(phone).toHaveValue('000123');
+  await profileField(page, '客户姓名').locator('input').fill('国际客户');
+  const sizes = await page.locator('.zdm-admin-phone-input').evaluate((el) => ({
+    group: el.getBoundingClientRect().width,
+    inputs: [...el.querySelectorAll('.t-input__wrap')].map((input) => input.getBoundingClientRect().width),
+  }));
+  expect(sizes.inputs).toHaveLength(2);
+  expect(sizes.inputs[0]).toBe(80);
+  expect(sizes.inputs[1]).toBeGreaterThan(100);
+  expect(sizes.inputs.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(sizes.group);
+  await page.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(page.getByText('国际客户', { exact: true })).toBeVisible();
+  expect(requests.at(-1)).toMatchObject({ nationality: 'US', phoneRegion: 'CN', phone: '000123' });
+  const row = page.locator('tr').filter({ hasText: '国际客户' });
+  await expect(row).toContainText('+86 000123');
+  await row.getByText('编辑', { exact: true }).click();
+  await expect(profileField(page, '国籍').locator('input')).toHaveValue('美国');
+  await expect(profileField(page, '号码所属国家').locator('input')).toHaveValue('中国 +86');
+  await expect(phone).toHaveValue('000123');
+});
+test('a changed nonempty number requires region but never country specific length', async ({ page }) => {
+  const requests = await setup(page, daily);
+  await page.goto('/store/customer-management');
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  await profileField(page, '客户姓名').locator('input').fill('短号码客户');
+  await page.locator('.zdm-admin-phone-input input').last().fill('01');
+  await page.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(page.getByText('请选择号码所属国家／地区', { exact: true })).toBeVisible();
+  expect(requests).toHaveLength(0);
+  await selectContact(page, '号码所属国家', '法国 +33');
+  await page.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(page.getByText('短号码客户', { exact: true })).toBeVisible();
+  expect(requests.at(-1)).toMatchObject({ phone: '01', phoneRegion: 'FR' });
+});
+test('store admin and manager with all data can operate other owner while self scope cannot', async ({ page }) => {
+  await setup(page, daily);
+  await page.addInitScript(() => {
+    const u = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    u.roles = ['STORE_MANAGER'];
+    localStorage.setItem('zdm-admin-user', JSON.stringify(u));
+  });
+  await page.goto('/store/customer-management');
+  const other = page.locator('tr').filter({ hasText: '王先生2' });
+  await expect(other.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(other.getByText('归档', { exact: true })).toBeVisible();
+  await other.locator('.t-checkbox').click();
+  await expect(page.getByRole('button', { name: '批量归档', exact: true })).toBeEnabled();
+  await page.evaluate(() => {
+    const u = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    u.roles = ['STORE_ADMIN'];
+    localStorage.setItem('zdm-admin-user', JSON.stringify(u));
+  });
+  await page.reload();
+  await expect(other.getByText('编辑', { exact: true })).toBeVisible();
+});
+
+test('legacy raw phone remains unchanged when editing unrelated fields', async ({ page }) => {
+  await setup(page, daily);
+  let saved: Record<string, unknown> | undefined;
+  await page.route('**/api/admin/store-customers/1', async (route) => {
+    if (route.request().method() === 'PUT') {
+      saved = route.request().postDataJSON();
+      return route.fulfill({ json: ok({ ...customer(1, 7), ...saved }) });
+    }
+    return route.fulfill({
+      json: ok({ customer: { ...customer(1, 7), phone: ' +1 (020) ABC ext 9 ' }, followups: [] }),
+    });
+  });
+  // The list fixture contains the raw historical value, as the real list API does.
+  await page.route('**/api/admin/store-customers?status=daily**', async (route) =>
+    route.fulfill({ json: ok([{ ...customer(1, 7), phone: ' +1 (020) ABC ext 9 ' }]) }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toHaveValue(' +1 (020) ABC ext 9 ');
+  await profileField(page, '客户姓名').locator('input').fill('保留历史号码');
+  await page.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  expect(saved).toMatchObject({ name: '保留历史号码', phone: ' +1 (020) ABC ext 9 ', phoneRegion: '' });
 });

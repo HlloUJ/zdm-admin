@@ -35,7 +35,7 @@
             }}</t-link
             ><span v-else>{{ row.name }}</span></template
           >
-          <template #phone="{ row }">{{ row.phone || '-' }}</template>
+          <template #phone="{ row }">{{ displayCustomerPhone(row) }}</template>
           <template #ownerName="{ row }">{{ row.ownerName || '-' }}</template>
           <template #lastFollowedAt="{ row }">{{ time(row.lastFollowedAt) }}</template>
           <template #nextFollowAt="{ row }">{{ time(row.nextFollowAt) }}</template>
@@ -87,24 +87,53 @@
       :confirm-btn="submitButton"
       @confirm="submitProfile"
     >
+      <t-form-item label="归属人" required-mark v-bind="profileFeedback.field('owner', profile.ownerAccountId)">
+        <t-select
+          v-model="profile.ownerAccountId"
+          :disabled="Boolean(editingId) && !can('assign', editingStatus)"
+          filterable
+          clearable
+          placeholder="请选择归属人"
+          :options="profileOwners.map((owner) => ({ value: owner.accountId, label: owner.name }))"
+        />
+      </t-form-item>
       <t-form-item label="客户姓名" required-mark v-bind="fieldFeedback(nameError, nameError)"
         ><t-input v-model="profile.name" :maxlength="80" clearable placeholder="请输入客户姓名"
       /></t-form-item>
-      <t-form-item label="联系电话"
-        ><t-input v-model="profile.phone" :maxlength="80" clearable placeholder="请输入联系电话"
-      /></t-form-item>
+      <t-form-item label="国籍">
+        <t-select
+          v-model="profile.nationality"
+          :options="nationalityOptions"
+          filterable
+          clearable
+          placeholder="请选择国籍"
+        />
+      </t-form-item>
+      <t-form-item
+        label="号码所属国家／地区"
+        :required-mark="Boolean(profile.phone) && !unchangedLegacyPhone"
+        v-bind="profileFeedback.field('phoneRegion', profile.phoneRegion)"
+      >
+        <t-select
+          v-model="profile.phoneRegion"
+          :options="phoneRegionOptions"
+          filterable
+          clearable
+          placeholder="请选择号码所属国家／地区"
+        />
+      </t-form-item>
+      <t-form-item label="联系电话" v-bind="profileFeedback.field('phone', profile.phone)">
+        <AdminPhoneInput v-model="profile.phone" :calling-code="phoneCallingCode" />
+      </t-form-item>
       <t-form-item label="微信号"
         ><t-input v-model="profile.wechat" :maxlength="100" clearable placeholder="请输入微信号"
       /></t-form-item>
       <t-form-item label="客户需求"
-        ><t-textarea v-model="profile.requirement" :maxlength="10000" placeholder="请输入客户需求"
+        ><t-textarea v-model="profile.requirement" :maxlength="100" placeholder="请输入客户需求"
       /></t-form-item>
       <t-form-item label="客户备注"
-        ><t-textarea v-model="profile.remark" :maxlength="10000" placeholder="请输入客户备注"
+        ><t-textarea v-model="profile.remark" :maxlength="100" placeholder="请输入客户备注"
       /></t-form-item>
-      <t-form-item label="归属人"
-        ><span>{{ profileOwner }}</span></t-form-item
-      >
     </AdminFormDialog>
     <AdminDialog
       v-model:visible="detailVisible"
@@ -263,6 +292,7 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import {
   AdminListPage,
   AdminFormDialog,
+  AdminPhoneInput,
   AdminDetailPage,
   AdminDialog,
   AdminConfirmDialog,
@@ -276,6 +306,10 @@ import { hasPermission } from '@/services/adminPermissions';
 import {
   listCustomers,
   listCustomerOwners,
+  listCustomerOwnerCandidates,
+  listCustomerContactRegions,
+  displayCustomerPhone,
+  type CustomerContactCatalogue,
   getCustomerDetail,
   saveCustomer,
   actOnCustomers,
@@ -306,7 +340,9 @@ const tabs = computed(() =>
   ].filter((tab) => can('view', tab.value)),
 );
 const allData = computed(() => user.value.dataPermission === 'all' || user.value.roles.includes('SUPER_ADMIN'));
-const isOwned = (row: Customer) => row.ownerAccountId === user.value.id;
+const isOwned = (row: Customer) =>
+  row.ownerAccountId === user.value.id ||
+  (allData.value && user.value.roles.some((role) => role === 'STORE_ADMIN' || role === 'STORE_MANAGER'));
 const rows = ref<Customer[]>([]);
 const owners = ref<Owner[]>([]);
 const loading = ref(false);
@@ -396,7 +432,21 @@ const detailItems = computed(() => {
   if (!customer) return [];
   return [
     { label: '客户姓名', value: customer.name },
-    { label: '联系电话', value: customer.phone || '-' },
+    {
+      label: '国籍',
+      value:
+        contactCatalogue.value.nationalities.find((item) => item.code === customer.nationality)?.name ||
+        customer.nationality ||
+        '-',
+    },
+    { label: '联系电话', value: displayCustomerPhone(customer) },
+    {
+      label: '号码所属国家／地区',
+      value:
+        contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||
+        customer.phoneRegion ||
+        '-',
+    },
     { label: '微信号', value: customer.wechat || '-' },
     { label: '归属人', value: customer.ownerName || '-' },
     { label: '建档人', value: customer.createdByName || '-' },
@@ -482,30 +532,99 @@ watch(
 const profileVisible = ref(false);
 const editingId = ref<number>();
 const nameError = ref('');
-const profileOwner = ref('');
-const emptyProfile = (): CustomerProfile => ({ name: '', phone: '', wechat: '', requirement: '', remark: '' });
+const editingStatus = ref<CustomerStatus>('daily');
+const profileOwners = ref<Owner[]>([]);
+const profileFeedback = useFormFeedback(profileVisible);
+const emptyProfile = (): CustomerProfile => ({
+  name: '',
+  phone: '',
+  nationality: '',
+  phoneRegion: '',
+  wechat: '',
+  requirement: '',
+  remark: '',
+});
 const profile = ref<CustomerProfile>(emptyProfile());
+const originalContact = ref({ phone: '', phoneRegion: '' });
+const contactCatalogue = ref<CustomerContactCatalogue>({ nationalities: [], phoneRegions: [] });
+const nationalityOptions = computed(() =>
+  contactCatalogue.value.nationalities.map((item) => ({ value: item.code, label: item.name })),
+);
+const phoneRegionOptions = computed(() =>
+  contactCatalogue.value.phoneRegions.map((item) => ({ value: item.code, label: `${item.name} ${item.callingCode}` })),
+);
+const phoneCallingCode = computed(
+  () => contactCatalogue.value.phoneRegions.find((item) => item.code === profile.value.phoneRegion)?.callingCode ?? '',
+);
+const unchangedLegacyPhone = computed(
+  () =>
+    Boolean(editingId.value) &&
+    !originalContact.value.phoneRegion &&
+    !profile.value.phoneRegion &&
+    profile.value.phone === originalContact.value.phone,
+);
+
 const submitting = ref(false);
 const uploading = ref(0);
 const submitButton = computed(() => ({
   loading: submitting.value || uploading.value > 0,
   disabled: submitting.value,
 }));
-function openProfile(row?: Customer) {
+async function openProfile(row?: Customer) {
+  const currentIdentity = user.value;
+  try {
+    const [candidates, catalogue] = await Promise.all([
+      listCustomerOwnerCandidates(row?.id),
+      listCustomerContactRegions(row?.status ?? status.value),
+    ]);
+    if (user.value !== currentIdentity) return;
+    profileOwners.value = candidates.filter((owner) => owner.active);
+    contactCatalogue.value = catalogue;
+  } catch (error) {
+    return fail('查询归属人', error);
+  }
   editingId.value = row?.id;
   profile.value = row
-    ? { name: row.name, phone: row.phone, wechat: row.wechat, requirement: row.requirement, remark: row.remark }
+    ? {
+        name: row.name,
+        phone: row.phone,
+        nationality: row.nationality ?? '',
+        phoneRegion: row.phoneRegion ?? '',
+        wechat: row.wechat,
+        requirement: row.requirement,
+        remark: row.remark,
+      }
     : emptyProfile();
-  profileOwner.value = row?.ownerName ?? user.value.name;
+  profile.value.ownerAccountId =
+    row?.ownerAccountId ??
+    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);
+  editingStatus.value = row?.status ?? 'daily';
+  originalContact.value = { phone: row?.phone ?? '', phoneRegion: row?.phoneRegion ?? '' };
   nameError.value = '';
   profileVisible.value = true;
 }
 async function submitProfile() {
   if (submitting.value) return;
+  let invalid = false;
   if (!profile.value.name.trim()) {
     nameError.value = '请输入客户姓名';
-    return rejectFormSubmission(profileDialog.value);
+    invalid = true;
   }
+  if (!profileOwners.value.some((owner) => owner.accountId === profile.value.ownerAccountId)) {
+    profileFeedback.reject('owner', profile.value.ownerAccountId, '请选择归属人');
+    invalid = true;
+  }
+  if (profile.value.phone && !unchangedLegacyPhone.value) {
+    if (!/^[0-9]+$/.test(profile.value.phone)) {
+      profileFeedback.reject('phone', profile.value.phone, '联系电话仅允许输入数字');
+      invalid = true;
+    }
+    if (!profile.value.phoneRegion) {
+      profileFeedback.reject('phoneRegion', profile.value.phoneRegion, '请选择号码所属国家／地区');
+      invalid = true;
+    }
+  }
+  if (invalid) return rejectFormSubmission(profileDialog.value);
   submitting.value = true;
   try {
     await saveCustomer(profile.value, editingId.value);
@@ -528,7 +647,8 @@ async function openDetail(id: number) {
   detailVisible.value = true;
   detailLoading.value = true;
   try {
-    const result = await getCustomerDetail(id);
+    const [result, catalogue] = await Promise.all([getCustomerDetail(id), listCustomerContactRegions(status.value)]);
+    if (version === detailVersion) contactCatalogue.value = catalogue;
     if (version === detailVersion) detail.value = result;
   } catch (error) {
     if (version === detailVersion) {

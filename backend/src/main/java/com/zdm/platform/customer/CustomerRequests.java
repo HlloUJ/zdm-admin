@@ -11,7 +11,8 @@ public final class CustomerRequests {
   private CustomerRequests() {}
   public record Profile(@NotBlank @Size(max = 80) String name,
       @Size(max = 80) String phone, @Size(max = 100) String wechat,
-      @Size(max = 10000) String requirement, @Size(max = 10000) String remark) {}
+      @Size(max = 100) String requirement, @Size(max = 100) String remark,
+      @NotNull Long ownerAccountId, @Size(max = 2) String nationality, @Size(max = 2) String phoneRegion) {}
   public record Action(@NotNull @Size(min = 1, max = 200) List<@NotNull Long> ids,
       @NotNull @Pattern(regexp = "daily|archived") String status,
       @NotNull @Pattern(regexp = "assign|archive|restore|purge") String action,

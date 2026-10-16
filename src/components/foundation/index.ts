@@ -18,3 +18,5 @@ export type { ListFilter, ListAction, ListTab, FilterValues } from './official/t
 export { default as AdminOfficialMediaUpload } from './official/AdminOfficialMediaUpload.vue';
 
 export { default as AdminListToolbar } from './AdminListToolbar.vue';
+
+export { default as AdminPhoneInput } from './AdminPhoneInput.vue';

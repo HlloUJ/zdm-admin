@@ -1760,3 +1760,61 @@ for (const identity of [
     await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
   });
 }
+
+test('builtin store manager exposes permissions only while ordinary roles keep edit and delete', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 7,
+        name: '管理员',
+        clientCode: 'admin',
+        tenantId: 1,
+        storeId: 2,
+        storeType: 'cityPartner',
+        roles: ['STORE_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+  await page.route('**/api/admin/roles**', async (route) => {
+    if (route.request().url().includes('permission-scope'))
+      return route.fulfill({
+        json: { code: 0, data: { audience: 'store', functionPermissions: 'store.customer-management.daily.view' } },
+      });
+    return route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            id: 701,
+            name: '店长',
+            code: 'OLD_MANAGER',
+            builtinKey: 'STORE_MANAGER',
+            status: 'enabled',
+            dataScope: 'all',
+            functionPermissions: '',
+            createdAt: '2026-10-16T10:00:00',
+          },
+          {
+            id: 702,
+            name: '普通导购',
+            code: 'GUIDE',
+            status: 'enabled',
+            dataScope: 'all',
+            functionPermissions: '',
+            createdAt: '2026-10-16T10:00:00',
+          },
+        ],
+      },
+    });
+  });
+  await page.goto('/role-management');
+  const manager = page.locator('tbody tr').filter({ hasText: '店长' });
+  await expect(manager.locator('.table-actions .t-link')).toHaveText(['权限']);
+  const ordinary = page.locator('tbody tr').filter({ hasText: '普通导购' });
+  await expect(ordinary.locator('.table-actions .t-link')).toHaveText(['编辑', '权限', '删除']);
+  await manager.getByText('权限', { exact: true }).click();
+  await expect(page.getByText('权限配置', { exact: true })).toBeVisible();
+});

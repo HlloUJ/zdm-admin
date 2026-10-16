@@ -31,13 +31,15 @@ public class CustomerService {
   private final MediaAssetService media;
   private final MediaReferenceService references;
   private final MediaCleanupService cleanup;
+  private final CustomerContactRegions contactRegions;
 
   public CustomerService(JdbcTemplate jdbc, PermissionGuard guard, MediaAssetService media,
-      MediaReferenceService references, MediaCleanupService cleanup) {
+      MediaReferenceService references, MediaCleanupService cleanup, CustomerContactRegions contactRegions) {
     this.jdbc = jdbc; this.guard = guard; this.media = media;
-    this.references = references; this.cleanup = cleanup;
+    this.references = references; this.cleanup = cleanup; this.contactRegions = contactRegions;
   }
   public record Customer(Long id, Long tenantId, Long storeId, String name, String phone,
+      String nationality, String phoneRegion, String callingCode,
       String wechat, String requirement, String remark, Long ownerAccountId, String ownerName,
       Long createdByAccountId, String createdByName, String status, LocalDateTime archivedAt,
       LocalDateTime createdAt, LocalDateTime lastFollowedAt, LocalDateTime nextFollowAt) {}
@@ -86,7 +88,8 @@ public class CustomerService {
       """;
   private Customer row(ResultSet rs, int index) throws SQLException {
     return new Customer(number(rs,"id"), number(rs,"tenant_id"), number(rs,"store_id"),
-        rs.getString("name"),rs.getString("phone"),rs.getString("wechat"),rs.getString("requirement"),
+        rs.getString("name"),rs.getString("phone"),rs.getString("nationality"),rs.getString("phone_region"),
+        rs.getString("calling_code"),rs.getString("wechat"),rs.getString("requirement"),
         rs.getString("remark"),number(rs,"owner_account_id"),rs.getString("owner_name"),
         number(rs,"created_by_account_id"),rs.getString("creator_name"),rs.getString("status"),
         date(rs,"archived_at"),date(rs,"created_at"),date(rs,"last_followed_at"),date(rs,"next_follow_at"));
@@ -112,9 +115,23 @@ public class CustomerService {
     return rows.get(0);
   }
   private void requireOwner(Customer c) {
-    if (!Objects.equals(c.ownerAccountId(),identity().accountId())) {
-      throw new AccessDeniedException("只能维护当前归属自己的客户档案");
+    CurrentIdentity i = identity();
+    if (Objects.equals(c.ownerAccountId(), i.accountId())) { return; }
+    if (DataScope.isAll(i)) {
+      Integer managers = jdbc.queryForObject("""
+          SELECT COUNT(*) FROM account_identities ai
+          WHERE ai.id=? AND ai.account_id=? AND ai.client_code='admin'
+            AND ai.tenant_id=? AND ai.store_id=? AND ai.status='enabled'
+            AND (ai.identity_type='store_admin' OR (ai.identity_type='employee' AND EXISTS (
+              SELECT 1 FROM account_roles ar JOIN roles r ON r.id=ar.role_id
+              WHERE ar.account_id=ai.account_id AND ar.client_code=ai.client_code
+                AND ar.tenant_id=ai.tenant_id AND ar.store_id=ai.store_id
+                AND r.tenant_id=ai.tenant_id AND r.store_id=ai.store_id AND r.client_code=ai.client_code
+                AND r.builtin_key='STORE_MANAGER' AND r.status='enabled')))
+          """, Integer.class, i.identityId(), i.accountId(), i.tenantId(), i.storeId());
+      if (managers != null && managers > 0) { return; }
     }
+    throw new AccessDeniedException("只能维护本人客户，或由具备全部数据权限的门店管理员、店长维护");
   }
   public Detail detail(Long id) {
     Customer c = accessible(id,false); permission(c.status(),"detail");
@@ -139,16 +156,47 @@ public class CustomerService {
   @Transactional
   public Customer create(CustomerRequests.Profile p) {
     permission("daily","create"); CurrentIdentity i = identity();
-    long id = insert("INSERT INTO store_customers(tenant_id,store_id,name,phone,wechat,requirement,remark,owner_account_id,created_by_account_id) VALUES (?,?,?,?,?,?,?,?,?)",
-        i.tenantId(),i.storeId(),text(p.name()),text(p.phone()),text(p.wechat()),text(p.requirement()),text(p.remark()),i.accountId(),i.accountId());
-    return accessible(id,false);
+    if (validOwnerCandidates(i).stream().noneMatch(o -> Objects.equals(o.accountId(),p.ownerAccountId()))) {
+      throw new IllegalArgumentException("请选择当前门店有效的归属人");
+    }
+    String callingCode=validateContact(p,null);
+    long id = insert("INSERT INTO store_customers(tenant_id,store_id,name,phone,wechat,requirement,remark,owner_account_id,created_by_account_id,nationality,phone_region,calling_code) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        i.tenantId(),i.storeId(),text(p.name()),phoneText(p.phone()),text(p.wechat()),text(p.requirement()),text(p.remark()),p.ownerAccountId(),i.accountId(),text(p.nationality()),text(p.phoneRegion()),callingCode);
+    // Creation may explicitly select another owner; later reads still enforce the configured data scope.
+    return jdbc.query(SELECT + " WHERE c.id=? AND c.tenant_id=? AND c.store_id=?",
+        this::row,id,i.tenantId(),i.storeId()).getFirst();
   }
   @Transactional
   public Customer update(Long id, CustomerRequests.Profile p) {
     Customer c=accessible(id,true); permission(c.status(),"edit"); requireOwner(c);
-    jdbc.update("UPDATE store_customers SET name=?,phone=?,wechat=?,requirement=?,remark=? WHERE id=?",
-        text(p.name()),text(p.phone()),text(p.wechat()),text(p.requirement()),text(p.remark()),id);
-    return accessible(id,false);
+    if (!Objects.equals(c.ownerAccountId(),p.ownerAccountId())) { permission(c.status(),"assign"); }
+    if (validOwnerCandidates(identity()).stream().noneMatch(o -> Objects.equals(o.accountId(),p.ownerAccountId()))) {
+      throw new IllegalArgumentException("请选择当前门店有效的归属人");
+    }
+    String callingCode=validateContact(p,c);
+    jdbc.update("UPDATE store_customers SET name=?,phone=?,wechat=?,requirement=?,remark=?,owner_account_id=?,nationality=?,phone_region=?,calling_code=? WHERE id=?",
+        text(p.name()),phoneText(p.phone()),text(p.wechat()),text(p.requirement()),text(p.remark()),p.ownerAccountId(),text(p.nationality()),text(p.phoneRegion()),callingCode,id);
+    // The pre-update owner is authorized above; later requests use the newly persisted owner.
+    CurrentIdentity i=identity();
+    return jdbc.query(SELECT + " WHERE c.id=? AND c.tenant_id=? AND c.store_id=?",
+        this::row,id,i.tenantId(),i.storeId()).getFirst();
+  }
+  public CustomerContactRegions.Catalogue contactCatalogue(String status) {
+    permission(status,"view"); return contactRegions.catalogue();
+  }
+  private static String phoneText(String value) { return value == null ? "" : value; }
+  private String validateContact(CustomerRequests.Profile p, Customer previous) {
+    contactRegions.nationality(text(p.nationality()));
+    String region=text(p.phoneRegion());
+    String callingCode=contactRegions.callingCode(region);
+    String phone=phoneText(p.phone());
+    boolean unchangedLegacy=previous!=null && text(previous.phoneRegion()).isEmpty()
+        && region.isEmpty() && Objects.equals(phone,previous.phone());
+    if (!phone.isEmpty() && !unchangedLegacy) {
+      if (!phone.matches("[0-9]+")) { throw new IllegalArgumentException("联系电话仅允许输入数字"); }
+      if (region.isEmpty()) { throw new IllegalArgumentException("请选择号码所属国家／地区"); }
+    }
+    return callingCode;
   }
   private long insert(String sql, Object... args) {
     GeneratedKeyHolder key = new GeneratedKeyHolder();
@@ -163,6 +211,28 @@ public class CustomerService {
       }
     },key);
     return Objects.requireNonNull(key.getKey()).longValue();
+  }
+  public List<Owner> ownerCandidates(Long customerId) {
+    if (customerId == null) { permission("daily","create"); }
+    else {
+      Customer c=accessible(customerId,false);
+      permission(c.status(),"edit"); requireOwner(c);
+    }
+    return validOwnerCandidates(identity());
+  }
+  private List<Owner> validOwnerCandidates(CurrentIdentity i) {
+    return jdbc.query("""
+        SELECT DISTINCT a.id,a.display_name FROM accounts a
+        JOIN account_identities ai ON ai.account_id=a.id
+        LEFT JOIN employees e ON ai.identity_type='employee' AND ai.subject_id=e.id
+        WHERE a.status='enabled' AND ai.client_code='admin' AND ai.status='enabled'
+          AND ai.tenant_id=? AND ai.store_id=?
+          AND (ai.identity_type='store_admin'
+            OR (ai.identity_type='employee' AND e.status='enabled' AND e.account_id=a.id
+              AND e.tenant_id=ai.tenant_id AND e.store_id=ai.store_id AND e.client_code=ai.client_code))
+        ORDER BY a.display_name,a.id
+        """, (rs,n) -> new Owner(number(rs,"id"),rs.getString("display_name"),true),
+        i.tenantId(),i.storeId());
   }
   public List<Owner> owners(String status) {
     permission(status,"view"); CurrentIdentity i=identity();

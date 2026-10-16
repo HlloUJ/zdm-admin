@@ -32,7 +32,11 @@
               </template>
               <template #operation="{ row }">
                 <div class="table-actions">
-                  <t-link v-if="canEditRole" :theme="buttonTheme('edit')" hover="color" @click="openEditDialog(row)"
+                  <t-link
+                    v-if="canEditRole && !isStoreManagerRole(row)"
+                    :theme="buttonTheme('edit')"
+                    hover="color"
+                    @click="openEditDialog(row)"
                     >编辑</t-link
                   >
                   <t-link
@@ -44,7 +48,7 @@
                     权限
                   </t-link>
                   <t-link
-                    v-if="canDeleteRole && !isSuperAdminRole(row)"
+                    v-if="canDeleteRole && !isSuperAdminRole(row) && !isStoreManagerRole(row)"
                     :theme="buttonTheme('delete')"
                     hover="color"
                     @click="openDeleteConfirm(row)"
@@ -53,8 +57,8 @@
                   </t-link>
                   <span
                     v-if="
-                      !canEditRole &&
-                      !(canDeleteRole && !isSuperAdminRole(row)) &&
+                      !(canEditRole && !isStoreManagerRole(row)) &&
+                      !(canDeleteRole && !isSuperAdminRole(row) && !isStoreManagerRole(row)) &&
                       !(canManageRolePermission && !isSuperAdminRole(row))
                     "
                     class="table-action-placeholder"
@@ -178,6 +182,7 @@ import {
 type DialogMode = 'create' | 'edit';
 
 interface RoleItem {
+  builtinKey?: 'STORE_MANAGER' | null;
   createdByClientCode?: 'admin' | 'supply-chain' | null;
   id: number;
   code: string;
@@ -289,6 +294,7 @@ const formatDateTime = (value?: string) => {
 
 const toRoleItem = (record: RoleRecord): RoleItem => ({
   id: record.id,
+  builtinKey: record.builtinKey,
   createdByClientCode: record.createdByClientCode,
   code: record.code,
   dataScope: record.dataScope,
@@ -311,6 +317,8 @@ const toRolePayload = (role: RoleItem): RolePayload => ({
   remark: role.remark,
   functionPermissions: role.functionPermissions.join(','),
 });
+
+const isStoreManagerRole = (row: RoleItem) => row.builtinKey === 'STORE_MANAGER';
 
 const isSuperAdminRole = (row: RoleItem) => row.code === 'SUPER_ADMIN';
 
@@ -358,6 +366,7 @@ const openCreateDialog = () => {
 };
 
 const openEditDialog = (row: RoleItem) => {
+  if (isStoreManagerRole(row)) return;
   dialogMode.value = 'edit';
   editingId.value = row.id;
   fillFormData(row);
@@ -409,6 +418,7 @@ const handleSubmit = async () => {
 };
 
 const openDeleteConfirm = (row: RoleItem) => {
+  if (isStoreManagerRole(row)) return;
   if (isSuperAdminRole(row)) {
     adminFeedback.warning('超级管理员角色不可删除');
     return;
