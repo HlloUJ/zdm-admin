@@ -1603,6 +1603,54 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
+          "stage": "before-migrations",
+          "before": "      <t-form-item label=\"归属人\" required-mark v-bind=\"profileFeedback.field('owner', profile.ownerAccountId)\">\n        <t-select\n          v-model=\"profile.ownerAccountId\"\n          :disabled=\"Boolean(editingId) && !can('assign', editingStatus)\"\n          filterable\n          clearable\n          placeholder=\"请选择归属人\"\n",
+          "after": "      <t-form-item label=\"归属人\" required-mark v-bind=\"profileFeedback.field('owner', profile.ownerAccountId)\">\n        <t-select\n          v-model=\"profile.ownerAccountId\"\n          filterable\n          clearable\n          placeholder=\"请选择归属人\"\n"
+        },
+        {
+          "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
+          "stage": "before-migrations",
+          "before": "const profileVisible = ref(false);\nconst editingId = ref<number>();\nconst nameError = ref('');\nconst editingStatus = ref<CustomerStatus>('daily');\nconst profileOwners = ref<Owner[]>([]);\nconst profileFeedback = useFormFeedback(profileVisible);\nconst emptyProfile = (): CustomerProfile => ({\n",
+          "after": "const profileVisible = ref(false);\nconst editingId = ref<number>();\nconst nameError = ref('');\nconst profileOwners = ref<Owner[]>([]);\nconst profileFeedback = useFormFeedback(profileVisible);\nconst emptyProfile = (): CustomerProfile => ({\n"
+        },
+        {
+          "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
+          "stage": "before-migrations",
+          "before": "  profile.value.ownerAccountId =\n    row?.ownerAccountId ??\n    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);\n  editingStatus.value = row?.status ?? 'daily';\n  originalContact.value = { phone: row?.phone ?? '', phoneRegion: row?.phoneRegion ?? '' };\n  nameError.value = '';\n  profileVisible.value = true;\n",
+          "after": "  profile.value.ownerAccountId =\n    row?.ownerAccountId ??\n    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);\n  originalContact.value = { phone: row?.phone ?? '', phoneRegion: row?.phoneRegion ?? '' };\n  nameError.value = '';\n  profileVisible.value = true;\n"
+        },
+        {
+          "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
+          "stage": "before-migrations",
+          "before": "  deletingFollowId.value != null ? '删除跟进记录' : actionLabels[pending.value.action],\n);\nconst confirmObjectType = computed(() =>\n  pending.value.action === 'archive' && pending.value.batch ? `选中的${pending.value.ids.length}条客户` : '客户',\n);\nconst confirmObjectName = computed(() =>\n  pending.value.action === 'archive' && !pending.value.batch\n    ? (rows.value.find((row) => row.id === pending.value.ids[0])?.name ?? '')\n    : '',\n);\nconst confirmDescription = computed(() =>\n  deletingFollowId.value != null\n    ? '是否删除该跟进记录？'\n    : pending.value.action === 'archive'\n      ? ''\n      : pending.value.action === 'purge'\n        ? `是否彻底删除选中的${pending.value.ids.length}条客户档案及全部跟进和附件？删除后无法恢复，已有订单不受影响。`\n        : `是否${actionLabels[pending.value.action]}选中的${pending.value.ids.length}条客户档案？`,\n);\nfunction prepareAction(action: CustomerAction, ids: number[], batch: boolean) {\n  pending.value = { action, ids: [...ids], batch, status: status.value };\n",
+          "after": "  deletingFollowId.value != null ? '删除跟进记录' : actionLabels[pending.value.action],\n);\nconst confirmObjectType = computed(() =>\n  ['archive', 'restore', 'purge'].includes(pending.value.action) && pending.value.batch\n    ? `选中的${pending.value.ids.length}条客户`\n    : '客户',\n);\nconst confirmObjectName = computed(() =>\n  ['archive', 'restore', 'purge'].includes(pending.value.action) && !pending.value.batch\n    ? (rows.value.find((row) => row.id === pending.value.ids[0])?.name ?? '')\n    : '',\n);\nconst confirmDescription = computed(() =>\n  deletingFollowId.value != null\n    ? '是否删除该跟进记录？'\n    : pending.value.action === 'purge'\n      ? `是否彻底删除${confirmObjectType.value}${confirmObjectName.value ? `“${confirmObjectName.value}”` : ''}？客户的全部跟进记录及附件将一并删除，删除后无法恢复，已有订单不受影响。`\n      : '',\n);\nfunction prepareAction(action: CustomerAction, ids: number[], batch: boolean) {\n  pending.value = { action, ids: [...ids], batch, status: status.value };\n"
+        },
+        {
+          "before": "    { label: '联系电话', value: displayCustomerPhone(customer) },\n    {\n      label: '号码归属地',\n      value:\n        contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||\n        customer.phoneRegion ||\n        '-',\n    },\n    { label: '微信号', value: customer.wechat || '-' },\n    { label: '归属人', value: customer.ownerName || '-' },\n    { label: '建档人', value: customer.createdByName || '-' },\n    { label: '建档时间', value: time(customer.createdAt) },\n    { label: '客户需求', value: customer.requirement || '-', span: 3 },\n    { label: '客户备注', value: customer.remark || '-', span: 3 },",
+          "after": "    {\n      label: '号码归属地',\n      value:\n        contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||\n        customer.phoneRegion ||\n        '-',\n    },\n    { label: '联系电话', value: displayCustomerPhone(customer) },\n    { label: '微信号', value: customer.wechat || '-' },\n    { label: '归属人', value: customer.ownerName || '-' },\n    { label: '客户需求', value: customer.requirement || '-', span: 3 },\n    { label: '客户备注', value: customer.remark || '-', span: 3 },\n    { label: '建档人', value: customer.createdByName || '-' },\n    { label: '建档时间', value: time(customer.createdAt) },",
+          "stage": "before-migrations",
+          "reason": "用户要求客户详情中号码归属地与联系电话交换顺序，客户需求及客户备注置于建档人、建档时间之前；字段内容、布局规格与业务逻辑不变。"
+        },
+        {
+          "before": "              <t-link v-if=\"can('edit') && isInDataScope(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n              <t-link\n                v-if=\"can('assign')\"\n                :theme=\"buttonTheme('assign')\"\n                @click=\"prepareAction('assign', [row.id], false)\"\n                >调整归属</t-link\n              >\n              <t-link\n",
+          "after": "              <t-link v-if=\"can('edit') && isInDataScope(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n              <t-link\n",
+          "stage": "before-migrations",
+          "reason": "用户要求删除客户行内单条调整归属入口，保留编辑内归属修改和批量操作；归档单条/批量确认复用公共模板按姓名/数量显示。用户撤销删除详情要求，详情及跟进保留。"
+        },
+        {
+          "before": "      :batch=\"deletingFollowId == null && pending.batch\"\n      :action=\"confirmAction\"\n      object-type=\"客户\"\n      :description=\"confirmDescription\"\n      @confirm=\"confirmOperation\"\n",
+          "after": "      :batch=\"deletingFollowId == null && pending.batch\"\n      :action=\"confirmAction\"\n      :object-type=\"confirmObjectType\"\n      :object-name=\"confirmObjectName\"\n      :description=\"confirmDescription\"\n      @confirm=\"confirmOperation\"\n",
+          "stage": "before-migrations",
+          "reason": "用户要求删除客户行内单条调整归属入口，保留编辑内归属修改和批量操作；归档单条/批量确认复用公共模板按姓名/数量显示。用户撤销删除详情要求，详情及跟进保留。"
+        },
+        {
+          "before": "  deletingFollowId.value != null ? '删除跟进记录' : actionLabels[pending.value.action],\n);\nconst confirmDescription = computed(() =>\n  deletingFollowId.value != null\n    ? '是否删除该跟进记录？'\n    : pending.value.action === 'purge'\n      ? `是否彻底删除选中的${pending.value.ids.length}条客户档案及全部跟进和附件？删除后无法恢复，已有订单不受影响。`\n      : `是否${actionLabels[pending.value.action]}选中的${pending.value.ids.length}条客户档案？`,\n);\nfunction prepareAction(action: CustomerAction, ids: number[], batch: boolean) {\n",
+          "after": "  deletingFollowId.value != null ? '删除跟进记录' : actionLabels[pending.value.action],\n);\nconst confirmObjectType = computed(() =>\n  pending.value.action === 'archive' && pending.value.batch ? `选中的${pending.value.ids.length}条客户` : '客户',\n);\nconst confirmObjectName = computed(() =>\n  pending.value.action === 'archive' && !pending.value.batch\n    ? (rows.value.find((row) => row.id === pending.value.ids[0])?.name ?? '')\n    : '',\n);\nconst confirmDescription = computed(() =>\n  deletingFollowId.value != null\n    ? '是否删除该跟进记录？'\n    : pending.value.action === 'archive'\n      ? ''\n      : pending.value.action === 'purge'\n        ? `是否彻底删除选中的${pending.value.ids.length}条客户档案及全部跟进和附件？删除后无法恢复，已有订单不受影响。`\n        : `是否${actionLabels[pending.value.action]}选中的${pending.value.ids.length}条客户档案？`,\n);\nfunction prepareAction(action: CustomerAction, ids: number[], batch: boolean) {\n",
+          "stage": "before-migrations",
+          "reason": "用户要求删除客户行内单条调整归属入口，保留编辑内归属修改和批量操作；归档单条/批量确认复用公共模板按姓名/数量显示。用户撤销删除详情要求，详情及跟进保留。"
+        },
+        {
           "before": "            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n              <t-link v-if=\"can('edit') && isOwned(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n",
           "after": "            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n              <t-link v-if=\"can('edit') && isInDataScope(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n",
           "stage": "before-migrations",
@@ -8891,7 +8939,33 @@
     },
     "src/services/customerCatalog.test.ts": {
       "content": "48ee44f52cc27d9060a6ccdb7b317f44f665955377777479313a8a32fb66e2eb",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "expect(new Set(grants).size).toBe(17)",
+          "after": "expect(new Set(grants).size).toBe(15)",
+          "stage": "before-migrations",
+          "reason": "User approved retiring exactly two customer standalone assignment permissions; update unique grant count to 15."
+        },
+        {
+          "before": "import { adminMenuEntries } from './adminPermissions';\n\ndescribe('customer catalog', () => {\n  it('publishes exactly the confirmed two tabs and 17 grants on store only', () => {\n    const module = terminalFunctionTrees.store.find((item) => item.value === 'store.customer-management')!;\n    expect(module.label).toBe('客户管理');\n    const tabs = module.menus[0].pages[0].tabs;\n",
+          "after": "import { adminMenuEntries } from './adminPermissions';\n\ndescribe('customer catalog', () => {\n  it('publishes exactly the confirmed two tabs and 15 grants on store only', () => {\n    const module = terminalFunctionTrees.store.find((item) => item.value === 'store.customer-management')!;\n    expect(module.label).toBe('客户管理');\n    const tabs = module.menus[0].pages[0].tabs;\n",
+          "stage": "before-migrations",
+          "reason": "User approved retiring two standalone customer assignment grants while preserving edit and bulk assignment; synchronize exact catalogue regression assertions."
+        },
+        {
+          "before": "      '批量归档',\n      '详情',\n      '编辑',\n      '调整归属',\n      '归档',\n    ]);\n    expect(tabs[1].actions.map((action) => action.label)).toEqual([\n",
+          "after": "      '批量归档',\n      '详情',\n      '编辑',\n      '归档',\n    ]);\n    expect(tabs[1].actions.map((action) => action.label)).toEqual([\n",
+          "stage": "before-migrations",
+          "reason": "User approved retiring two standalone customer assignment grants while preserving edit and bulk assignment; synchronize exact catalogue regression assertions."
+        },
+        {
+          "before": "      '批量彻底删除',\n      '详情',\n      '编辑',\n      '调整归属',\n      '取消归档',\n      '彻底删除',\n    ]);\n    const grants = getFunctionModulePermissionValues(module);\n    expect(grants).toHaveLength(17);\n    expect(new Set(grants).size).toBe(17);\n    expect(grants.some((value) => /followup|query|reset|operation-log|delegate/.test(value))).toBe(false);\n    for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {\n",
+          "after": "      '批量彻底删除',\n      '详情',\n      '编辑',\n      '取消归档',\n      '彻底删除',\n    ]);\n    const grants = getFunctionModulePermissionValues(module);\n    expect(grants).toHaveLength(15);\n    expect(new Set(grants).size).toBe(17);\n    expect(grants.some((value) => /followup|query|reset|operation-log|delegate/.test(value))).toBe(false);\n    for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {\n",
+          "stage": "before-migrations",
+          "reason": "User approved retiring two standalone customer assignment grants while preserving edit and bulk assignment; synchronize exact catalogue regression assertions."
+        }
+      ]
     },
     "src/services/customers.ts": {
       "content": "8740dc7f0a54f7bff04922ce51204ba61049d4a9c1075b694c05638cfd9e081a",
@@ -8961,7 +9035,15 @@
     },
     "src/services/functionCatalog.test.ts": {
       "content": "74ccb48297c3d1c6b680750b1e260a63db93b4fe16c97d1d9001ae759868ac67",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "];\n\ndescribe('full function catalog', () => {\n  it('registers two independent store category tabs with scoped maintenance actions', () => {\n    const prefix = 'admin.tenant.store-category-management';\n    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;\n",
+          "after": "];\n\ndescribe('full function catalog', () => {\n  it('registers the actual customer operations and retires only standalone assignment', () => {\n    const prefix = 'store.customer-management';\n    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;\n    expect(module.menus[0].direct).toBe(true);\n    const page = module.menus[0].pages[0];\n    expect(page.actions).toEqual([]);\n    expect(page.tabs.map((tab) => tab.label)).toEqual(['日常客户', '归档客户']);\n    const codes = [\n      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'edit', 'archive'],\n      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'edit', 'restore', 'purge'],\n    ];\n    page.tabs.forEach((tab, index) =>\n      expect(tab.actions.map((action) => action.value)).toEqual(codes[index].map((code) => `${tab.value}.${code}`)),\n    );\n    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(15);\n    expect(\n      normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.assign`, `${prefix}.archived.assign`]),\n    ).toEqual([]);\n    const bulk = normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.batch-assign`]);\n    expect(bulk).toContain(`${prefix}.daily.batch-assign`);\n    expect(bulk).toContain(`${prefix}.daily.view`);\n    expect(bulk).not.toContain(`${prefix}.daily.edit`);\n  });\n\n  it('registers two independent store category tabs with scoped maintenance actions', () => {\n    const prefix = 'admin.tenant.store-category-management';\n    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;\n",
+          "stage": "before-migrations",
+          "reason": "User approved retiring two standalone customer assignment grants while preserving edit and bulk assignment; synchronize exact catalogue regression assertions."
+        }
+      ]
     },
     "src/services/functionCatalog.ts": {
       "content": "1209bc105a9465acd24974c6fd642993f1463bc39659f30d418a2eae55f6f190",
@@ -8973,7 +9055,21 @@
     },
     "src/services/functionCatalogStoreData.ts": {
       "content": "39a9ce84ce5c5bedd35582287c540670fbd8ffb0774b8545fdaa553452199a08",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
+          "stage": "before-migrations",
+          "before": "                ['batch-archive', '批量归档'],\n                ['detail', '详情'],\n                ['edit', '编辑'],\n                ['assign', '调整归属'],\n                ['archive', '归档'],\n              ].map(([code, label]) => ({ label, value: `store.customer-management.daily.${code}` })),\n            },\n",
+          "after": "                ['batch-archive', '批量归档'],\n                ['detail', '详情'],\n                ['edit', '编辑'],\n                ['archive', '归档'],\n              ].map(([code, label]) => ({ label, value: `store.customer-management.daily.${code}` })),\n            },\n"
+        },
+        {
+          "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
+          "stage": "before-migrations",
+          "before": "                ['batch-purge', '批量彻底删除'],\n                ['detail', '详情'],\n                ['edit', '编辑'],\n                ['assign', '调整归属'],\n                ['restore', '取消归档'],\n                ['purge', '彻底删除'],\n              ].map(([code, label]) => ({ label, value: `store.customer-management.archived.${code}` })),\n",
+          "after": "                ['batch-purge', '批量彻底删除'],\n                ['detail', '详情'],\n                ['edit', '编辑'],\n                ['restore', '取消归档'],\n                ['purge', '彻底删除'],\n              ].map(([code, label]) => ({ label, value: `store.customer-management.archived.${code}` })),\n"
+        }
+      ]
     },
     "src/services/functionCatalogSupplyData.ts": {
       "content": "e82de3f048c120f818b0f1d4b3344242161bc3dab3e42599d3f14bb364885ee3",

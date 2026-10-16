@@ -150,7 +150,6 @@ public class CustomerService {
   @Transactional
   public Customer update(Long id, CustomerRequests.Profile p) {
     Customer c=accessible(id,true); permission(c.status(),"edit");
-    if (!Objects.equals(c.ownerAccountId(),p.ownerAccountId())) { permission(c.status(),"assign"); }
     if (validOwnerCandidates(identity()).stream().noneMatch(o -> Objects.equals(o.accountId(),p.ownerAccountId()))) {
       throw new IllegalArgumentException("请选择当前门店有效的归属人");
     }
@@ -231,6 +230,9 @@ public class CustomerService {
   }
   @Transactional
   public void action(CustomerRequests.Action request, boolean batch) {
+    if (!batch && "assign".equals(request.action())) {
+      throw new IllegalArgumentException("请通过编辑客户修改归属人");
+    }
     String operation = (batch ? "batch-" : "") + request.action();
     permission(request.status(),operation);
     List<Long> ids=request.ids().stream().distinct().sorted().toList();

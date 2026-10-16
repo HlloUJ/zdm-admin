@@ -1332,7 +1332,6 @@ test('filters terminal allocation to shared and terminal-only modules and persis
         '批量归档',
         '详情',
         '编辑',
-        '调整归属',
         '归档',
         '查看',
         '批量调整归属',
@@ -1340,7 +1339,6 @@ test('filters terminal allocation to shared and terminal-only modules and persis
         '批量彻底删除',
         '详情',
         '编辑',
-        '调整归属',
         '取消归档',
         '彻底删除',
       ]);
@@ -1817,4 +1815,75 @@ test('builtin store manager exposes permissions only while ordinary roles keep e
   await expect(ordinary.locator('.table-actions .t-link')).toHaveText(['编辑', '权限', '删除']);
   await manager.getByText('权限', { exact: true }).click();
   await expect(page.getByText('权限配置', { exact: true })).toBeVisible();
+});
+
+test('store role customer matrix retains bulk assignment and removes retired standalone grants', async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 7,
+        name: '管理员',
+        clientCode: 'admin',
+        tenantId: 1,
+        storeId: 2,
+        storeType: 'cityPartner',
+        roles: ['STORE_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    ),
+  );
+  let saved: Record<string, unknown> | undefined;
+  const role = {
+    id: 702,
+    name: '普通导购',
+    code: 'GUIDE',
+    status: 'enabled',
+    dataScope: 'all',
+    functionPermissions: 'store.customer-management.daily.assign,store.customer-management.archived.assign',
+    createdAt: '2026-10-16T10:00:00',
+  };
+  await page.route('**/api/admin/roles**', async (route) => {
+    if (route.request().url().includes('permission-scope'))
+      return route.fulfill({ json: { code: 0, data: { audience: 'store', functionPermissions: 'all' } } });
+    if (route.request().method() === 'PUT') {
+      saved = route.request().postDataJSON();
+      return route.fulfill({ json: { code: 0, data: { ...role, ...saved } } });
+    }
+    return route.fulfill({ json: { code: 0, data: [role] } });
+  });
+  await page.goto('/role-management');
+  await page.locator('tbody tr').filter({ hasText: '普通导购' }).getByText('权限', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
+  await dialog.locator('.permission-module-list').getByText('客户管理', { exact: true }).click();
+  const matrix = dialog.locator('.permission-matrix');
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '批量调整归属',
+    '批量归档',
+    '详情',
+    '编辑',
+    '归档',
+    '查看',
+    '批量调整归属',
+    '批量取消归档',
+    '批量彻底删除',
+    '详情',
+    '编辑',
+    '取消归档',
+    '彻底删除',
+  ]);
+  const daily = matrix.locator('tbody tr').filter({ hasText: '日常客户' });
+  await daily
+    .locator('.t-checkbox')
+    .filter({ hasText: /^编辑$/ })
+    .click();
+  await dialog.getByRole('button', { name: '确认配置权限', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(String(saved?.functionPermissions).split(',').sort()).toEqual([
+    'store.customer-management.daily.edit',
+    'store.customer-management.daily.view',
+  ]);
 });

@@ -162,7 +162,6 @@ const daily = [
   'daily.create',
   'daily.detail',
   'daily.edit',
-  'daily.assign',
   'daily.archive',
   'daily.batch-assign',
   'daily.batch-archive',
@@ -171,7 +170,6 @@ const archived = [
   'archived.view',
   'archived.detail',
   'archived.edit',
-  'archived.assign',
   'archived.restore',
   'archived.purge',
   'archived.batch-assign',
@@ -194,7 +192,7 @@ test('all data with grants allows ordinary staff to maintain other owner custome
   await page.goto('/store/customer-management');
   const row = page.locator('tr').filter({ hasText: '王先生2' });
   await expect(row).toBeVisible();
-  await expect(row.getByText('调整归属', { exact: true })).toBeVisible();
+  await expect(row.getByText('调整归属', { exact: true })).toHaveCount(0);
   await expect(row.getByText('编辑', { exact: true })).toBeVisible();
   await expect(row.getByText('归档', { exact: true })).toBeVisible();
   await row.getByText('详情', { exact: true }).click();
@@ -246,7 +244,8 @@ test('archive assignment is independent of role and returns the customer to dail
   const requests = await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');
   await page.getByText('归档客户', { exact: true }).click();
-  await page.locator('tr').filter({ hasText: '王先生3' }).getByText('调整归属', { exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生3' }).locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '调整归属' });
   await expect(dialog.getByText('调整归属后，客户将自动恢复为日常客户。')).toBeVisible();
   await dialog.locator('.t-select').click();
@@ -561,9 +560,6 @@ test('daily customer assignment and confirmations retain native component visual
   const { reference, checkDialog } = await nativeDialogVisuals(page, testInfo);
   const own = page.locator('tr').filter({ hasText: '王先生1' });
   let dialog: ReturnType<Page['locator']>;
-  await own.getByText('调整归属', { exact: true }).click();
-  dialog = await checkDialog('调整归属', 'assign-single', true);
-  await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await own.getByText('归档', { exact: true }).click();
   dialog = await checkDialog('是否归档', 'archive-single', false);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -585,7 +581,8 @@ test('archived customer assignment and confirmations retain native component vis
   let dialog: ReturnType<Page['locator']>;
   await page.getByText('归档客户', { exact: true }).click();
   const archivedRow = page.locator('tr').filter({ hasText: '王先生3' });
-  await archivedRow.getByText('调整归属', { exact: true }).click();
+  await archivedRow.locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
   dialog = await checkDialog('调整归属', 'assign-archived', true);
   expect(await styleOf(dialog.locator('.t-alert'))).toEqual(await styleOf(native.locator('.t-alert')));
   const alert = (await dialog.locator('.t-alert').boundingBox())!;
@@ -603,7 +600,6 @@ test('archived customer assignment and confirmations retain native component vis
     await dialog.screenshot({ path: testInfo.outputPath(`archived-${label}.png`), animations: 'disabled' });
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
   }
-  await archivedRow.locator('.t-checkbox').click();
   await expect(archivedRow.getByRole('checkbox')).toBeChecked();
   for (const label of ['批量取消归档', '批量彻底删除']) {
     await page.getByRole('button', { name: label, exact: true }).click();
@@ -737,7 +733,8 @@ test('assignment missing-owner feedback stays at the field and clears after sele
   const requests = await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');
   await page.getByText('归档客户', { exact: true }).click();
-  await page.locator('tr').filter({ hasText: '王先生3' }).getByText('调整归属', { exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生3' }).locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '调整归属' });
   await dialog
     .getByRole('button', {
@@ -791,7 +788,7 @@ test('new customer selects a searchable owner and limits both notes to 100 chara
 });
 
 test('edit owner saves the transfer and the new owner sees the persisted selection', async ({ page }) => {
-  const requests = await setup(page, ['daily.view', 'daily.edit', 'daily.assign']);
+  const requests = await setup(page, ['daily.view', 'daily.edit']);
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
@@ -813,20 +810,22 @@ test('edit owner saves the transfer and the new owner sees the persisted selecti
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
   await expect(dialog.getByPlaceholder('请选择归属人')).toHaveValue('导购B');
 });
-test('edit without assign permission retains the stored owner and can save other fields', async ({ page }) => {
+test('edit permission includes owner transfer without retired assignment permission', async ({ page }) => {
   const requests = await setup(page, ['daily.view', 'daily.edit']);
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
   await expect(dialog.getByPlaceholder('请选择归属人')).toHaveValue('导购A');
-  await expect(dialog.getByPlaceholder('请选择归属人')).toBeDisabled();
+  await expect(dialog.getByPlaceholder('请选择归属人')).toBeEnabled();
+  await dialog.getByPlaceholder('请选择归属人').click();
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
   await dialog.getByPlaceholder('请输入客户姓名').fill('仍归属本人');
   await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
   await expect(dialog).toBeHidden();
-  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 7, name: '仍归属本人' });
+  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 8, name: '仍归属本人' });
 });
 test('edit transfer removes the customer from the old owner self scope', async ({ page }) => {
-  await setup(page, ['daily.view', 'daily.edit', 'daily.assign'], 'self');
+  await setup(page, ['daily.view', 'daily.edit'], 'self');
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
@@ -997,4 +996,55 @@ test('ordinary staff archives another owner customer without transferring owners
   expect(requests.at(-1)).toMatchObject({ action: 'archive', ids: [2] });
   await page.getByText('归档客户', { exact: true }).click();
   await expect(page.locator('tr').filter({ hasText: '王先生2' })).toContainText('导购B');
+});
+
+test('row assignment is removed while details and edit owner remain and archive uses shared wording', async ({
+  page,
+}) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  const first = page.locator('tr').filter({ hasText: '王先生1' });
+  await expect(first.getByText('调整归属', { exact: true })).toHaveCount(0);
+  await expect(first.getByText('详情', { exact: true })).toBeVisible();
+  await first.getByText('归档', { exact: true }).click();
+  let dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText('是否归档客户“王先生1”？');
+  await expect(dialog.getByRole('button', { name: '确认归档', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await first.locator('.t-checkbox').click();
+  await page.locator('tr').filter({ hasText: '王先生2' }).locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量归档', exact: true }).click();
+  dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText('是否归档选中的2条客户？');
+  await expect(dialog.getByRole('button', { name: '确认批量归档', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(page.getByRole('button', { name: '批量调整归属', exact: true })).toBeEnabled();
+});
+
+test('restore and purge confirmations name the customer or selected count and retain deletion consequences', async ({
+  page,
+}) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  await page.getByText('归档客户', { exact: true }).click();
+  const row = page.locator('tr').filter({ hasText: '王先生3' });
+  for (const action of ['取消归档', '彻底删除']) {
+    await row.getByText(action, { exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    const consequence =
+      action === '彻底删除' ? '客户的全部跟进记录及附件将一并删除，删除后无法恢复，已有订单不受影响。' : '';
+    await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText(
+      `是否${action}客户“王先生3”？${consequence}`,
+    );
+    await expect(dialog.getByRole('button', { name: `确认${action}`, exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await row.locator('.t-checkbox').click();
+    await page.getByRole('button', { name: `批量${action}`, exact: true }).click();
+    await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText(
+      `是否${action}选中的1条客户？${consequence}`,
+    );
+    await expect(dialog.getByRole('button', { name: `确认批量${action}`, exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await row.locator('.t-checkbox').click();
+  }
 });

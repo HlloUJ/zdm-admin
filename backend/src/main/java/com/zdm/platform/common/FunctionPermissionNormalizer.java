@@ -10,6 +10,8 @@ import org.springframework.util.StringUtils;
 
 public final class FunctionPermissionNormalizer {
   private static final String ALL_PERMISSION = "all";
+  private static final Set<String> RETIRED_CUSTOMER_ASSIGN = Set.of(
+      "store.customer-management.daily.assign", "store.customer-management.archived.assign");
   private static final List<String> LEGACY_SCOPED_PERMISSION_PREFIXES = List.of(
       "admin.product-data-center.attribute.",
       "admin.product-data-center.attribute-value.");
@@ -49,6 +51,7 @@ public final class FunctionPermissionNormalizer {
         .flatMap(FunctionPermissionNormalizer::expandLegacyScopedPermission)
         .toList();
     for (String permission : compatibleValues) {
+      if (RETIRED_CUSTOMER_ASSIGN.contains(permission)) { continue; }
       String suffix = suffix(permission);
       if (RESET_SUFFIXES.contains(suffix)) {
         continue;

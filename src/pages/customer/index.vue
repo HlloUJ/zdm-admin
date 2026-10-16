@@ -46,12 +46,6 @@
                 >编辑</t-link
               >
               <t-link
-                v-if="can('assign')"
-                :theme="buttonTheme('assign')"
-                @click="prepareAction('assign', [row.id], false)"
-                >调整归属</t-link
-              >
-              <t-link
                 v-if="status === 'daily' && can('archive') && isInDataScope(row)"
                 :theme="buttonTheme('archive')"
                 @click="prepareAction('archive', [row.id], false)"
@@ -90,7 +84,6 @@
       <t-form-item label="归属人" required-mark v-bind="profileFeedback.field('owner', profile.ownerAccountId)">
         <t-select
           v-model="profile.ownerAccountId"
-          :disabled="Boolean(editingId) && !can('assign', editingStatus)"
           filterable
           clearable
           placeholder="请选择归属人"
@@ -273,7 +266,8 @@
       :function="deletingFollowId != null ? 'delete' : buttonFunctionFor('customer', pending.action)"
       :batch="deletingFollowId == null && pending.batch"
       :action="confirmAction"
-      object-type="客户"
+      :object-type="confirmObjectType"
+      :object-name="confirmObjectName"
       :description="confirmDescription"
       @confirm="confirmOperation"
     />
@@ -455,7 +449,6 @@ const detailItems = computed(() => {
         customer.nationality ||
         '-',
     },
-    { label: '联系电话', value: displayCustomerPhone(customer) },
     {
       label: '号码归属地',
       value:
@@ -463,12 +456,13 @@ const detailItems = computed(() => {
         customer.phoneRegion ||
         '-',
     },
+    { label: '联系电话', value: displayCustomerPhone(customer) },
     { label: '微信号', value: customer.wechat || '-' },
     { label: '归属人', value: customer.ownerName || '-' },
-    { label: '建档人', value: customer.createdByName || '-' },
-    { label: '建档时间', value: time(customer.createdAt) },
     { label: '客户需求', value: customer.requirement || '-', span: 3 },
     { label: '客户备注', value: customer.remark || '-', span: 3 },
+    { label: '建档人', value: customer.createdByName || '-' },
+    { label: '建档时间', value: time(customer.createdAt) },
   ];
 });
 const time = (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-');
@@ -548,7 +542,6 @@ watch(
 const profileVisible = ref(false);
 const editingId = ref<number>();
 const nameError = ref('');
-const editingStatus = ref<CustomerStatus>('daily');
 const profileOwners = ref<Owner[]>([]);
 const profileFeedback = useFormFeedback(profileVisible);
 const emptyProfile = (): CustomerProfile => ({
@@ -614,7 +607,6 @@ async function openProfile(row?: Customer) {
   profile.value.ownerAccountId =
     row?.ownerAccountId ??
     (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);
-  editingStatus.value = row?.status ?? 'daily';
   originalContact.value = { phone: row?.phone ?? '', phoneRegion: row?.phoneRegion ?? '' };
   nameError.value = '';
   profileVisible.value = true;
@@ -693,12 +685,22 @@ const actionLabels = { assign: '调整归属', archive: '归档', restore: '取�
 const confirmAction = computed(() =>
   deletingFollowId.value != null ? '删除跟进记录' : actionLabels[pending.value.action],
 );
+const confirmObjectType = computed(() =>
+  ['archive', 'restore', 'purge'].includes(pending.value.action) && pending.value.batch
+    ? `选中的${pending.value.ids.length}条客户`
+    : '客户',
+);
+const confirmObjectName = computed(() =>
+  ['archive', 'restore', 'purge'].includes(pending.value.action) && !pending.value.batch
+    ? (rows.value.find((row) => row.id === pending.value.ids[0])?.name ?? '')
+    : '',
+);
 const confirmDescription = computed(() =>
   deletingFollowId.value != null
     ? '是否删除该跟进记录？'
     : pending.value.action === 'purge'
-      ? `是否彻底删除选中的${pending.value.ids.length}条客户档案及全部跟进和附件？删除后无法恢复，已有订单不受影响。`
-      : `是否${actionLabels[pending.value.action]}选中的${pending.value.ids.length}条客户档案？`,
+      ? `是否彻底删除${confirmObjectType.value}${confirmObjectName.value ? `“${confirmObjectName.value}”` : ''}？客户的全部跟进记录及附件将一并删除，删除后无法恢复，已有订单不受影响。`
+      : '',
 );
 function prepareAction(action: CustomerAction, ids: number[], batch: boolean) {
   pending.value = { action, ids: [...ids], batch, status: status.value };

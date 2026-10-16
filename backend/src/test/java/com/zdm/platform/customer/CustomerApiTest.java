@@ -73,7 +73,7 @@ class CustomerApiTest extends SpringContainerTestSupport {
         java.util.Map.of("name","王先生","phone","","wechat","","requirement","餐桌","remark","","ownerAccountId",current.accountId()))))).path("id").asLong();
   }
   private ResultActions action(long id,String source,String action,Long owner) throws Exception {
-    return mvc.perform(post(BASE+"/action").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(
+    return mvc.perform(post(BASE+("assign".equals(action) ? "/batch" : "/action")).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(
         java.util.Map.of("ids",List.of(id),"status",source,"action",action,"ownerAccountId",owner==null ? 90001L : owner))));
   }
   private ResultActions follow(long id,String content) throws Exception {
@@ -281,25 +281,34 @@ class CustomerApiTest extends SpringContainerTestSupport {
     }
     mvc.perform(put(BASE+"/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body))).andExpect(status().isOk());
   }
-  @Test void editingOwnerRequiresAssignButNormalEditingDoesNotRequireCreateOrAssign() throws Exception {
+  @Test void editingIncludesOwnerChangeWithoutRetiredAssignmentOrCreatePermission() throws Exception {
     long id=create();
     identity(90001,90001L,"self","daily.view","daily.edit");
     mvc.perform(get(BASE+"/owner-candidates").param("customerId",String.valueOf(id))).andExpect(status().isOk());
     mvc.perform(get(BASE+"/owner-candidates")).andExpect(status().isForbidden());
     mvc.perform(put(BASE+"/"+id).contentType(MediaType.APPLICATION_JSON)
-        .content("{\"name\":\"普通修改\",\"ownerAccountId\":90001}")).andExpect(status().isOk());
+        .content("{\"name\":\"编辑并转交\",\"ownerAccountId\":90002}")).andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT name FROM store_customers WHERE id=?",String.class,id)).isEqualTo("编辑并转交");
+    assertThat(jdbc.queryForObject("SELECT owner_account_id FROM store_customers WHERE id=?",Long.class,id)).isEqualTo(90002);
+    mvc.perform(get(BASE+"/"+id)).andExpect(status().isForbidden());
+    identity(90002,90001L,"self","daily.view");
     mvc.perform(put(BASE+"/"+id).contentType(MediaType.APPLICATION_JSON)
-        .content("{\"name\":\"不能部分保存\",\"ownerAccountId\":90002}")).andExpect(status().isForbidden());
-    assertThat(jdbc.queryForObject("SELECT name FROM store_customers WHERE id=?",String.class,id)).isEqualTo("普通修改");
-    assertThat(jdbc.queryForObject("SELECT owner_account_id FROM store_customers WHERE id=?",Long.class,id)).isEqualTo(90001);
-    identity(90002,90001L,"all","all");
-    mvc.perform(get(BASE+"/owner-candidates").param("customerId",String.valueOf(id))).andExpect(status().isOk());
+        .content("{\"name\":\"无编辑权限\",\"ownerAccountId\":90001}")).andExpect(status().isForbidden());
+  }
+  @Test void retiredSingleAssignmentRejectsAndBatchAssignmentStaysIndependentOfEdit() throws Exception {
+    long id=create();identity(90001,90001L,"all","daily.view","daily.batch-assign");
+    String body=json.writeValueAsString(java.util.Map.of("ids",List.of(id),"status","daily","action","assign","ownerAccountId",90002));
+    mvc.perform(post(BASE+"/action").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT owner_account_id FROM store_customers WHERE id=?",Long.class,id)).isEqualTo(90002);
+    identity(90001,90001L,"all","daily.view","daily.edit");
+    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
   }
   @Test void editTransferMovesDataScopeAndPreservesHistoryAndArchivedStatus() throws Exception {
     long id=create();
     data(follow(id,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"转移前跟进\",\"mediaIds\":[]}"));
     action(id,"daily","archive",null).andExpect(status().isOk());
-    identity(90001,90001L,"self","archived.view","archived.edit","archived.assign");
+    identity(90001,90001L,"self","archived.view","archived.edit");
     var edited=data(mvc.perform(put(BASE+"/"+id).contentType(MediaType.APPLICATION_JSON)
         .content("{\"name\":\"归档中转移\",\"ownerAccountId\":90002}")));
     assertThat(edited.path("ownerAccountId").asLong()).isEqualTo(90002);
