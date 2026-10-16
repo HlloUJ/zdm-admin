@@ -1,8 +1,9 @@
+import { isPositiveIntegerQuantity } from '@/utils/quantityInput';
 import { isValidSpecPriceNumber } from '../management/priceValidation';
 import type { FormSectionKey, LayeredSpecField, ProductForm, SpecMode, SpecRow } from './finishedStockPageModel';
 
 type FormField = { key: string; label: string; required: boolean };
-type FormIssue = { kind: 'error' | 'warning'; message: string; tab?: FormSectionKey };
+type FormIssue = { kind: 'error' | 'warning'; message: string; tab?: FormSectionKey; operation?: true };
 
 export interface FinishedStockValidationInput {
   client: 'admin' | 'supply-chain';
@@ -25,7 +26,8 @@ export interface FinishedStockValidationInput {
 export const isValidSpecQuantity = (value: unknown) =>
   String(value ?? '').trim() !== '' && Number.isFinite(Number(value)) && Number(value) > 0;
 
-export function finishedStockFormIssue(input: FinishedStockValidationInput): FormIssue | null {
+export function finishedStockFormIssues(input: FinishedStockValidationInput): FormIssue[] {
+  const issues: FormIssue[] = [];
   const { client, specRows, priceLevelIds } = input;
   const priceLevelsComplete = (row: SpecRow) =>
     priceLevelIds.every((id) => {
@@ -39,15 +41,15 @@ export function finishedStockFormIssue(input: FinishedStockValidationInput): For
         (row) =>
           isValidSpecPriceNumber(row.guideCoefficient) && isValidSpecPriceNumber(row.guide) && priceLevelsComplete(row),
       );
-    return valid ? null : { kind: 'warning', message: '请完善每条规格的指导价和合伙人价格' };
+    return valid ? [] : [{ kind: 'warning', message: '请完善每条规格的指导价和合伙人价格' }];
   }
   if (input.specMode === 'layered') {
     if (!input.specDimensionsCount) {
-      return { kind: 'error', message: '请先编辑并确认分层规格，补齐属性顺序' };
+      issues.push({ kind: 'error', message: '请先编辑并确认分层规格，补齐属性顺序' });
     }
     const combinations = specRows.map((row) => JSON.stringify(input.layeredFields.map((key) => row[key])));
     if (new Set(combinations).size !== combinations.length) {
-      return { kind: 'error', message: '销售规格组合重复，请重新编辑规格' };
+      issues.push({ kind: 'error', message: '销售规格组合重复，请重新编辑规格' });
     }
   }
   const pricesComplete = specRows.every(
@@ -62,7 +64,7 @@ export function finishedStockFormIssue(input: FinishedStockValidationInput): For
   const missingSalesAttribute = input.salesAttributeFields.find(
     (field) => field.required && specRows.some((row) => !String(row[field.key] ?? '').trim()),
   );
-  const checks: { valid: boolean; tab: FormSectionKey; message: string }[] = [
+  const checks: { valid: boolean; tab: FormSectionKey; message: string; operation?: true }[] = [
     { valid: Boolean(input.mainImageMediaId), tab: 'description', message: '请上传商品主图' },
     { valid: Boolean(input.videoMediaId), tab: 'description', message: '请上传商品视频' },
     { valid: Boolean(input.form.detail.trim()), tab: 'description', message: '请输入宝贝详情' },
@@ -76,9 +78,11 @@ export function finishedStockFormIssue(input: FinishedStockValidationInput): For
     { valid: input.categoryId != null, tab: 'base', message: '请选择商品分类' },
     { valid: specRows.length > 0, tab: 'sales', message: '请创建销售规格' },
     {
-      valid: specRows.every((row) => isValidSpecQuantity(row.quantity)),
+      valid: specRows.every((row) =>
+        client === 'supply-chain' ? isPositiveIntegerQuantity(row.quantity) : isValidSpecQuantity(row.quantity),
+      ),
       tab: 'sales',
-      message: '请输入每条规格大于 0 的数量',
+      message: client === 'supply-chain' ? '请输入每条规格大于 0 的整数数量' : '请输入每条规格大于 0 的数量',
     },
     {
       valid: !missingSalesAttribute,
@@ -89,6 +93,7 @@ export function finishedStockFormIssue(input: FinishedStockValidationInput): For
       valid: client !== 'admin' || input.editingProduct || input.guidePriceSettingCoefficient != null,
       tab: 'sales',
       message: '请先配置成品指导价默认系数',
+      operation: true,
     },
     {
       valid: pricesComplete,
@@ -97,6 +102,20 @@ export function finishedStockFormIssue(input: FinishedStockValidationInput): For
     },
     { valid: client !== 'admin' || Boolean(input.form.shelfNow), tab: 'sales', message: '请选择上架方式' },
   ];
-  const failed = checks.find((item) => !item.valid);
-  return failed ? { kind: 'warning', tab: failed.tab, message: failed.message } : null;
+  return [
+    ...issues,
+    ...checks
+      .filter((item) => !item.valid)
+      .map((item): FormIssue => ({
+        kind: 'warning',
+        tab: item.tab,
+        message: item.message,
+        ...(item.operation ? { operation: true } : {}),
+      })),
+  ];
+}
+
+/** Compatibility for consumers that need the original first rejection reason. */
+export function finishedStockFormIssue(input: FinishedStockValidationInput): FormIssue | null {
+  return finishedStockFormIssues(input)[0] ?? null;
 }

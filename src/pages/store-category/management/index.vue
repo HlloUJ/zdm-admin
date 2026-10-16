@@ -6,8 +6,6 @@
       <AdminSideMenu />
 
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['门店分类管理']" />
-
         <t-alert v-if="tipVisible" theme="info" class="page-tip" close-btn @close="tipVisible = false">
           商品分类最多支持 3 级；已关联商品的分类不支持删除；停用后不可用于新商品发布，历史商品保留原分类。
         </t-alert>
@@ -15,14 +13,14 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showTabRail" v-model="activeScope" :list="scopeTabs" :disabled="sorting" />
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="分类名称" name="keyword">
                       <t-input v-model="searchForm.keyword" clearable placeholder="请输入分类名称" />
                     </t-form-item>
                     <t-form-item class="zdm-status-filter" label="分类状态" name="status">
-                      <t-select v-model="searchForm.status" clearable placeholder="全部">
+                      <t-select v-model="searchForm.status" clearable placeholder="请选择分类状态">
                         <t-option label="启用" value="enabled" />
                         <t-option label="停用" value="disabled" />
                       </t-select>
@@ -38,11 +36,11 @@
                   </div>
                 </div>
               </t-form>
-              <div class="table-toolbar">
-                <t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()"
+              <AdminListToolbar :has-actions="canCreateRootCategory"
+                ><t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()"
                   ><template #icon><t-icon name="add" /></template>新增一级分类</t-button
-                >
-              </div>
+                ></AdminListToolbar
+              >
             </div>
           </template>
           <template #table>
@@ -124,9 +122,10 @@
     </div>
 
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formVisible"
       :header="formMode === 'create' ? `新增${formLevel}级分类` : '编辑分类'"
-      width="520px"
+      width="480px"
       placement="center"
       confirm-btn="保存"
       @confirm="handleSubmit"
@@ -136,15 +135,14 @@
         <t-form-item v-if="formData.parentId" label="上级分类">
           <t-input :value="parentName" disabled />
         </t-form-item>
-        <t-form-item label="分类名称" name="name" required-mark>
-          <t-input v-model="formData.name" :maxlength="20" clearable placeholder="请输入，最多20个字符" />
+        <t-form-item help="最多输入6个字符" label="分类名称" name="name" required-mark>
+          <t-input v-model="formData.name" :maxlength="6" clearable placeholder="请输入分类名称" />
         </t-form-item>
         <t-form-item label="分类状态" name="status" required-mark>
           <t-radio-group v-model="formData.status" :disabled="formMode === 'edit' && !canToggleCategoryStatus">
             <t-radio value="enabled">启用</t-radio>
             <t-radio value="disabled">停用</t-radio>
           </t-radio-group>
-          <p class="form-help">停用分类不可用于新商品上架。</p>
         </t-form-item>
       </t-form>
     </AdminDialog>
@@ -192,18 +190,14 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
 
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
-import {
-  adminFeedback,
-  AdminConfirmDialog,
-  AdminDialog,
-  AdminListLayout,
-  AdminPageHeader,
-} from '@/components/foundation';
+import { adminFeedback, AdminConfirmDialog, AdminDialog, AdminListLayout } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
@@ -295,10 +289,7 @@ const statusTarget = ref<CategoryNode | null>(null);
 const deleteBlocked = computed(() => Boolean(deleteTarget.value?.productCount || deleteTarget.value?.children.length));
 
 const formRules: Record<string, FormRule[]> = {
-  name: [
-    { required: true, message: '请输入分类名称', type: 'error' },
-    { max: 20, message: '分类名称最多20个字符', type: 'error' },
-  ],
+  name: [{ required: true, message: '请输入分类名称', type: 'error' }],
 };
 
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
@@ -517,11 +508,11 @@ const formSubmitting = ref(false);
 const handleSubmit = async (confirmPriceRemoval = false) => {
   if (formSubmitting.value) return;
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
   const name = formData.name.trim();
   if (categoryNameExists()) {
-    adminFeedback.warning('同级分类名称不能重复');
-    return;
+    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '同级分类名称不能重复' }] });
+    return rejectFormSubmission(formRef.value);
   }
   formSubmitting.value = true;
   try {
@@ -703,32 +694,11 @@ watch(
   gap: var(--td-comp-margin-xxl);
 }
 
-.filter-row,
-.filter-fields,
-.filter-actions,
 .table-toolbar,
 .table-actions,
 .category-name-cell {
   display: flex;
   align-items: center;
-}
-
-.filter-row {
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields {
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-actions {
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
 }
 
 /* 与商品分类管理一致，将排序标识放在行左侧，名称列紧随其后。 */
@@ -748,7 +718,7 @@ watch(
   gap: var(--td-comp-margin-s);
 }
 .category-name-cell.level-1 {
-  font-weight: 600;
+  font: var(--td-font-mark-medium);
 }
 .category-name-cell.level-2 {
   padding-left: 28px;
@@ -782,20 +752,5 @@ watch(
 }
 .table-actions :deep(.t-link) {
   white-space: nowrap;
-}
-.form-help {
-  margin: 6px 0 0;
-  color: var(--td-text-color-placeholder);
-  font: var(--td-font-body-small);
-}
-
-@media (max-width: 1120px) {
-  .filter-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .filter-actions {
-    flex-wrap: wrap;
-  }
 }
 </style>

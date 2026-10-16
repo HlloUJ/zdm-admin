@@ -1,6 +1,7 @@
 <template>
-  <t-input-number
+  <DecimalInput
     class="spec-price-input"
+    :class="{ 'spec-price-input--reserved-tips': !formLayout }"
     :auto-width="false"
     :disabled="disabled"
     :model-value="modelValue"
@@ -18,6 +19,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import DecimalInput from '@/components/DecimalInput.vue';
 import { isValidSpecPriceNumber } from '../priceValidation';
 const props = defineProps<{
   modelValue: string;
@@ -26,6 +28,8 @@ const props = defineProps<{
   submitted: boolean;
   optional?: boolean;
   disabled?: boolean;
+  formLayout?: boolean;
+  validationDeferred?: boolean;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string]; change: [value: string]; commit: [] }>();
 const touched = ref(false);
@@ -62,6 +66,7 @@ const handleBlur = () => {
   focused.value = false;
 };
 const error = computed(() => {
+  if (props.validationDeferred) return '';
   if (!touched.value && !props.submitted) return '';
   if (!String(props.modelValue ?? '').trim()) return props.optional ? '' : `请输入${props.label}`;
   return isValidSpecPriceNumber(props.modelValue) ? '' : `请输入正确的${props.label}`;
@@ -87,8 +92,13 @@ const handleChange = (value: unknown, context: { type?: string }) => {
   min-width: 0;
   max-width: 100%;
 }
-.spec-price-input :deep(.t-input__tips) {
-  position: static;
+.spec-price-input--reserved-tips {
+  padding-block: var(--td-comp-margin-m);
+}
+
+/* Table makes native tips participate in layout; use the space already reserved above. */
+.spec-price-input--reserved-tips :deep(.t-input__tips) {
+  position: absolute;
   overflow-wrap: anywhere;
 }
 </style>

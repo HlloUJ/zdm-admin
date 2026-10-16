@@ -411,6 +411,8 @@ for (const [client, retryFailure] of [
     await expect(main.getByText('批量上架验收83', { exact: true })).toBeVisible();
     await main.locator('thead .t-checkbox__input').click();
     await expect(main.locator('.selection-info')).toHaveText('已选 3 项');
+    if (client === 'supply-chain')
+      await expect(main.locator('.toolbar-buttons .selection-info')).toHaveText('已选 3 项');
     await main.getByRole('button', { name: '批量上架', exact: true }).click();
     const dialog = page.locator('.t-dialog:visible');
     await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
@@ -422,7 +424,7 @@ for (const [client, retryFailure] of [
       await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
     }
     await expect(dialog).toBeHidden();
-    await expect(main.locator('.selection-info')).toHaveText('已选 0 项');
+    await expect(main.locator('.selection-info')).toHaveCount(0);
     expect(attempts).toEqual(retryFailure ? [83, 82, 82, 81] : [83, 82, 81]);
     expect(maximumActive).toBe(1);
     await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
@@ -492,3 +494,117 @@ test('operations batch shelf continues after failure and retains the failed row 
   await expect(page.locator('.finished-row-warning')).toContainText('请完善全部成品现货价格后再上架');
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
 });
+
+for (const client of ['supply-chain', 'admin']) {
+  for (const mode of ['tabs', 'single', 'log-only'] as const) {
+    test(`${client} shared toolbar preserves log access for ${mode}`, async ({ page }) => {
+      const prefix = `${client}.finished-stock-management.`;
+      await setup(
+        page,
+        [
+          prefix + 'operation-log.view',
+          ...(mode === 'log-only' ? [] : [prefix + 'warehouse.view']),
+          ...(mode === 'tabs' ? [prefix + 'selling.view'] : []),
+        ],
+        client,
+      );
+      await page.route('**/api/admin/finished-products/operation-logs?**', (route) =>
+        route.fulfill({ json: { code: 0, message: 'ok', data: { records: [], total: 0 } } }),
+      );
+      await page.goto(client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management');
+      const main = page.getByRole('main');
+      await expect(main.locator('.page-header')).toHaveCount(0);
+      const log = main.getByRole('button', { name: '操作日志', exact: true });
+      await expect(log).toBeVisible();
+      await expect(log).toHaveClass(/t-button--theme-default/);
+      await expect(log).toHaveClass(/t-button--variant-outline/);
+      await expect(main.locator('.selection-info')).toHaveCount(0);
+      if (mode !== 'log-only') {
+        const toolbar = main.locator('.table-toolbar');
+        await expect(toolbar.getByRole('button', { name: '操作日志', exact: true })).toBeVisible();
+        const toolbarBox = (await toolbar.boundingBox())!;
+        const logBox = (await log.boundingBox())!;
+        const formBox = (await main.locator('.zdm-standard-query').boundingBox())!;
+        expect(logBox.x + logBox.width).toBeCloseTo(toolbarBox.x + toolbarBox.width, 0);
+        expect(logBox.y + logBox.height / 2).toBeCloseTo(toolbarBox.y + toolbarBox.height / 2, 0);
+        expect(toolbarBox.y - formBox.y - formBox.height).toBeCloseTo(24, 0);
+        if (mode === 'tabs') {
+          await expect(main.locator('.status-tabs .t-tabs__bar')).toBeVisible();
+          await expect(main.locator('.status-tabs').getByRole('button', { name: '操作日志', exact: true })).toHaveCount(
+            0,
+          );
+          await main.locator('.status-tabs .t-tabs__nav-item').nth(1).click();
+          await expect(log).toBeVisible();
+        } else {
+          await expect(main.locator('.status-tabs')).toHaveCount(0);
+          await main.locator('tbody .t-checkbox').first().click();
+          await expect(main.locator('.selection-info')).toHaveCount(0);
+        }
+      } else {
+        await expect(main.locator('table')).toHaveCount(0);
+        await expect(main.locator('.status-tabs')).toHaveCount(0);
+      }
+      await log.click();
+      await expect(
+        page.locator('.t-drawer--open .t-drawer__header').getByText('操作日志', { exact: true }),
+      ).toBeVisible();
+    });
+  }
+}
+
+test('supply-chain publish alone does not display selected count', async ({ page }) => {
+  const prefix = 'supply-chain.finished-stock-management.';
+  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.publish'], 'supply-chain');
+  await page.goto('/supply-chain/finished-stock-management');
+  const main = page.getByRole('main');
+  await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();
+  await expect(main.getByRole('button', { name: '批量上架', exact: true })).toHaveCount(0);
+  await main.locator('tbody .t-checkbox').first().click();
+  await expect(main.locator('.selection-info')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '操作日志', exact: true })).toHaveCount(0);
+});
+
+for (const client of ['admin', 'supply-chain']) {
+  test(`${client} finished off-shelf reason keeps required rejection and field feedback`, async ({ page }) => {
+    await setup(page, ['all'], client);
+    const product = {
+      id: 87,
+      name: '下架校验商品',
+      status: 'selling',
+      sourceStatus: 'selling',
+      totalStock: 1,
+      categoryId: 2,
+      supplierId: 2,
+      variants: [],
+    };
+    let writes = 0;
+    await page.route('**/api/admin/finished-products', (route) =>
+      route.fulfill({ json: { code: 0, data: [product] } }),
+    );
+    await page.route('**/api/admin/finished-products/87**', (route) => {
+      if (route.request().method() !== 'GET') writes++;
+      return route.fulfill({ json: { code: 0, data: product } });
+    });
+    await page.goto(client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management');
+    await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+    await page.getByRole('row').filter({ hasText: '下架校验商品' }).getByText('下架', { exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    const field = dialog
+      .locator('.t-form__item')
+      .filter({ has: page.locator('.t-form__label').filter({ hasText: '下架原因' }) });
+    await expect(field.getByText('请选择下架原因', { exact: true })).toBeVisible();
+    await expect(field.locator('.t-input')).toHaveClass(/t-is-error/);
+    await expect(page.locator('.zdm-admin-feedback').filter({ hasText: /请选择.*原因/ })).toHaveCount(0);
+    expect(writes).toBe(0);
+    await field.locator('.t-select').click();
+    await page
+      .locator('.t-select-option')
+      .filter({ hasText: /^库存异常$/ })
+      .click();
+    await expect(field.getByText('请选择下架原因', { exact: true })).toHaveCount(0);
+    await expect(field.locator('.t-input')).not.toHaveClass(/t-is-error/);
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    expect(writes).toBe(0);
+  });
+}

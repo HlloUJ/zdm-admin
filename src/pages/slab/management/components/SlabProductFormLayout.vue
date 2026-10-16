@@ -1,5 +1,5 @@
 <template>
-  <section v-if="visible && mode !== 'view'" class="slab-publish-page" :aria-label="title">
+  <section v-if="visible && mode !== 'view'" ref="formRoot" class="slab-publish-page" :aria-label="title">
     <div ref="anchorSlot" :style="{ height: `${anchorHeight}px` }">
       <AdminSectionCard class="form-anchor-card" :style="anchorStyle">
         <nav ref="anchorNav" aria-label="商品信息分区导航">
@@ -151,7 +151,8 @@ const scrollToSection = async (key: string) => {
     behavior: 'smooth',
   });
 };
-defineExpose({ scrollToSection });
+const formRoot = ref<HTMLElement>();
+defineExpose({ scrollToSection, getFormElement: () => formRoot.value });
 </script>
 
 <style scoped>
@@ -169,7 +170,7 @@ defineExpose({ scrollToSection });
 }
 .form-title-row h1 {
   margin: 0;
-  font-size: var(--td-font-size-title-large);
+  font: var(--td-font-title-large);
 }
 .form-anchor-card {
   position: fixed;
@@ -185,11 +186,9 @@ defineExpose({ scrollToSection });
   min-width: 0;
 }
 .form-section-title {
-  margin: 0 0 var(--td-comp-margin-xxl);
-  font-size: var(--td-font-size-body-large);
-  font-weight: 600;
-  line-height: 24px;
   text-align: left;
+  font: var(--td-font-title-large);
+  font-weight: 400;
 }
 .form-submit-bar {
   position: sticky;

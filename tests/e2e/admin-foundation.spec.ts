@@ -129,23 +129,29 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
     });
   });
   await page.goto('/slab-management');
-  const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('大板名称/ID/大板编号', { exact: true });
+  const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('请输入大板名称/ID/编号', { exact: true });
   expect((await page.locator('.slab-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
-  const primaryLabels = await page.locator('.filter-primary-row .t-form__label').allTextContents();
-  expect(primaryLabels.slice(-2)).toEqual(['纹理：', '色系：']);
-  await expect(page.locator('.filter-secondary-row .t-form__label')).toHaveText(['等级：', '供应商：']);
-  const primaryGap = await page.locator('.filter-primary-row').evaluate((element) => {
+  await expect(page.locator('.filter-fields .t-form__label')).toHaveText([
+    '大板：',
+    '品种：',
+    '产地：',
+    '纹理：',
+    '色系：',
+    '等级：',
+    '供应商：',
+  ]);
+  const filterGap = await page.locator('.filter-fields').evaluate((element) => {
     const styles = getComputedStyle(element);
     return { columnGap: styles.columnGap, rowGap: styles.rowGap };
   });
-  expect(primaryGap).toEqual({ columnGap: '0px', rowGap: '24px' });
-  const keywordBox = await page.locator('.slab-keyword-filter').boundingBox();
-  const supplierBox = await page.locator('.supplier-filter').boundingBox();
-  const searchBox = await page.getByRole('button', { name: '查询', exact: true }).boundingBox();
-  expect((await page.locator('.grade-filter').boundingBox())?.x).toBe(keywordBox?.x);
-  expect(supplierBox?.x).toBeGreaterThan(keywordBox?.x ?? 0);
-  expect(searchBox?.y).toBe(supplierBox?.y);
-  expect(searchBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
+  expect(filterGap).toEqual({ columnGap: '0px', rowGap: '24px' });
+  const keywordBox = (await page.locator('.slab-keyword-filter').boundingBox())!;
+  const supplierBox = (await page.locator('.supplier-filter').boundingBox())!;
+  const searchBox = (await page.getByRole('button', { name: '查询', exact: true }).boundingBox())!;
+  expect(supplierBox.x).toBeCloseTo(keywordBox.x, 0);
+  expect(supplierBox.y).toBeGreaterThan(keywordBox.y);
+  expect(searchBox.y).toBeCloseTo(keywordBox.y, 0);
+  expect(searchBox.x).toBeGreaterThan(supplierBox.x + supplierBox.width);
 
   for (const tabLabel of ['仓库中 1', '已上架', '已下架', '已售完', '回收站 2']) {
     await page.getByText(tabLabel, { exact: true }).click();
@@ -166,30 +172,86 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   await expect(page.getByRole('row', { name: /回收站大板 07/ })).toHaveCount(0);
 });
 
-test('aligns grade before supplier while keeping slab filter actions on the right', async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.goto('/slab-management');
-
-  const primaryItems = page.locator('.filter-primary-row .t-form__item');
-  await expect(primaryItems).toHaveCount(5);
-  const itemBoxes = await primaryItems.evaluateAll((items) =>
-    items.map((item) => {
-      const box = item.getBoundingClientRect();
-      return { left: box.left, right: box.right };
-    }),
-  );
-  const gaps = itemBoxes.slice(1).map((box, index) => Math.round(box.left - itemBoxes[index].right));
-  expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
-
-  const supplierBox = await page.locator('.supplier-filter').boundingBox();
-  const resetBox = await page.locator('.reset-filter-button').boundingBox();
-  const gradeBox = await page.locator('.grade-filter').boundingBox();
-  expect(gradeBox?.x).toBe((await page.locator('.slab-keyword-filter').boundingBox())?.x);
-  expect(supplierBox!.x - gradeBox!.x - gradeBox!.width).toBeCloseTo(0, 0);
-  expect(resetBox?.x).toBeGreaterThan((supplierBox?.x ?? 0) + (supplierBox?.width ?? 0));
-  expect(supplierBox!.x + supplierBox!.width).toBeCloseTo(itemBoxes[1].right, 0);
-  expect((await page.locator('.slab-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
-});
+for (const client of ['admin', 'supply-chain'] as const) {
+  test(`${client} slab filters follow their configured grid and right-hand actions`, async ({ page }) => {
+    await setMockBusinessClient(page, client);
+    await page.goto(client === 'admin' ? '/slab-management' : '/supply-chain/slab-management');
+    const sizes = [
+      [1920, 4],
+      [1689, 4],
+      [1393, 3],
+      [1100, 2],
+    ];
+    for (const [width, columns] of sizes) {
+      await page.setViewportSize({ width, height: 1080 });
+      for (const tab of ['仓库中', '已下架']) {
+        await page
+          .locator('.status-tabs')
+          .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
+          .click();
+        const fields = page.locator('.filter-fields');
+        const items = fields.locator('.t-form__item');
+        await expect(items).toHaveCount(tab === '已下架' ? 4 : 7);
+        const boxes = await items.evaluateAll((elements) =>
+          elements.map((el) => {
+            const { x, y, width } = el.getBoundingClientRect();
+            return { x, y, width };
+          }),
+        );
+        expect(
+          await fields.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length),
+          `${client} viewport ${width}; fields ${(await fields.boundingBox())!.width}`,
+        ).toBe(columns);
+        for (let index = 0; index < boxes.length; index++) {
+          expect(boxes[index].x).toBeCloseTo(boxes[index % columns].x, 0);
+          expect(boxes[index].y).toBeCloseTo(boxes[Math.floor(index / columns) * columns].y, 0);
+          if (index >= columns) expect(boxes[index].y).toBeGreaterThan(boxes[index - columns].y);
+        }
+        for (const box of boxes) expect(box.width).toBeCloseTo(boxes[0].width, 0);
+        const row = page.locator('.filter-row');
+        const ratio = await row.evaluate((el) => {
+          const columns = getComputedStyle(el).gridTemplateColumns.split(' ').map(parseFloat);
+          return columns[0] / columns[1];
+        });
+        expect(ratio).toBeCloseTo(5, 1);
+        {
+          const lastControlBottom = await fields
+            .locator('.t-form__controls')
+            .evaluateAll((controls) => Math.max(...controls.map((control) => control.getBoundingClientRect().bottom)));
+          const toolbar = (await page.locator('.table-toolbar').boundingBox())!;
+          expect(toolbar.y - lastControlBottom).toBeCloseTo(24, 0);
+          const actions = row.locator('.filter-actions');
+          const actionWidth = (await actions.boundingBox())!.width;
+          const buttons = await actions.locator('.t-button').all();
+          const buttonWidth = (await buttons[0].boundingBox())!.width + (await buttons[1].boundingBox())!.width;
+          expect(actionWidth).toBeGreaterThanOrEqual(buttonWidth + 8);
+          const actionBox = (await actions.boundingBox())!;
+          const resetBox = (await buttons[1].boundingBox())!;
+          expect(resetBox.x + resetBox.width).toBeCloseTo(actionBox.x + actionBox.width, 0);
+          if (boxes.length > columns) {
+            const first = (await items.first().locator('.t-form__controls').boundingBox())!;
+            const next = (await items.nth(columns).locator('.t-form__controls').boundingBox())!;
+            expect(next.y - first.y - first.height).toBeCloseTo(24, 0);
+          }
+        }
+        const search = (await row.getByRole('button', { name: '查询', exact: true }).boundingBox())!;
+        expect(search.y).toBeCloseTo(boxes[0].y, 0);
+        const lastControl = (await items
+          .nth(columns - 1)
+          .locator('.t-form__controls')
+          .boundingBox())!;
+        expect(search.x).toBeGreaterThan(lastControl.x + lastControl.width);
+        if (tab === '已下架') {
+          await expect(fields.locator('.off-shelf-date-filter')).toHaveCount(0);
+          for (const input of await fields.locator('.t-form__controls').all()) {
+            expect((await input.boundingBox())!.width).toBeGreaterThanOrEqual(134);
+          }
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      }
+    }
+  });
+}
 
 test('orders the requested management lists by creation time descending', async ({ page }) => {
   const cases = [
@@ -288,7 +350,7 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
   await page.goto('/tenant-management');
   const main = page.getByRole('main');
 
-  await expect(main.getByText('租户管理').first()).toBeVisible();
+  await expect(main.locator('.page-header')).toHaveCount(0);
   await expect(main.getByText('运营中', { exact: true })).toBeVisible();
   await expect(main.getByText('已归档', { exact: true })).toBeVisible();
   await expect(main.getByText('状态', { exact: true })).toHaveCount(0);
@@ -343,9 +405,9 @@ test('gates tenant actions by status and requires the exact name before permanen
   await expect(dialog).toContainText('释放手机号4');
   const confirmButton = dialog.getByRole('button', { name: '确认彻底删除', exact: true });
   await expect(confirmButton).toBeDisabled();
-  await dialog.getByPlaceholder('请输入完整租户名称').fill('错误名称');
+  await dialog.getByPlaceholder('请输入租户名称').fill('错误名称');
   await expect(confirmButton).toBeDisabled();
-  await dialog.getByPlaceholder('请输入完整租户名称').fill('临时归档租户');
+  await dialog.getByPlaceholder('请输入租户名称').fill('临时归档租户');
   await expect(confirmButton).toBeEnabled();
   await confirmButton.click();
   await expect(page.getByText('已彻底删除“临时归档租户”', { exact: true })).toBeVisible();
@@ -355,7 +417,7 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
   await page.goto('/tenant-store-management');
   const main = page.getByRole('main');
 
-  await expect(main.getByText('门店管理').first()).toBeVisible();
+  await expect(main.locator('.page-header')).toHaveCount(0);
   await expect(main.getByText('杭州体验门店')).toBeVisible();
   await expect(main.getByText('状态', { exact: true })).toHaveCount(0);
   const tableHeaders = main.locator('thead th');
@@ -394,7 +456,7 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   await page.goto('/supplier-management');
   const main = page.getByRole('main');
 
-  await expect(main.getByText('供应商管理').first()).toBeVisible();
+  await expect(main.locator('.page-header')).toHaveCount(0);
   await expect(main.getByText('装点猫大板供应商')).toBeVisible();
 
   await main.getByRole('button', { name: /新增/ }).click();
@@ -495,7 +557,7 @@ test('resets category browsing and keeps the four-level filter popup stable', as
   await category.locator('.t-input').click();
   await expect(panel.getByText('成品现货', { exact: true })).toBeVisible();
   await expect(panel.getByText('餐桌', { exact: true })).toHaveCount(0);
-  await page.getByText('成品现货管理', { exact: true }).last().click();
+  await page.getByRole('columnheader', { name: '商品主图', exact: true }).click();
   await expect(category).toContainText('奢石餐桌');
   await category.locator('.t-input').hover();
   await category.locator('.t-input__suffix-clear').click();
@@ -520,10 +582,17 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
     expect(overflow, tab).toBe(false);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tab).toBe(true);
     if (tab === '已下架') {
-      await expect(page.locator('.filter-secondary-row')).toContainText('下架时间');
+      await expect(fields.locator('.t-form__label')).toHaveText(['大板：', '品种：', '下架原因：', '下架人：']);
     } else {
-      await expect(page.locator('.filter-secondary-row')).toContainText('等级');
-      await expect(page.locator('.filter-primary-row')).not.toContainText('等级');
+      await expect(fields.locator('.t-form__label')).toHaveText([
+        '大板：',
+        '品种：',
+        '产地：',
+        '纹理：',
+        '色系：',
+        '等级：',
+        '供应商：',
+      ]);
     }
   }
 });

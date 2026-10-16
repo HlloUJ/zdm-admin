@@ -1,0 +1,140 @@
+/* Official form/base title and native Form spacing; existing column counts stay intact. */
+.form-section-title {
+  margin: var(--td-comp-margin-xxl) 0 var(--td-comp-margin-xl);
+}
+.form-grid,
+.slab-publish-page .form-section :is(.dialog-form-grid, .dimension-grid, .corner-grid) {
+  gap: var(--td-comp-margin-xxl) var(--td-comp-margin-xxxl);
+}
+.slab-publish-page .form-section :is(.dialog-form-grid, .dimension-grid, .corner-grid) {
+  padding-top: 0;
+}
+.form-grid > .t-form__item,
+.slab-publish-page .form-section :is(.dialog-form-grid, .dimension-grid, .corner-grid) > .t-form__item {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.batch-fill-panel {
+  display: grid;
+  gap: var(--td-comp-margin-xxl);
+}
+
+.batch-section {
+  padding: var(--td-comp-paddingTB-l) var(--td-comp-paddingLR-xl);
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
+}
+
+.batch-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-s);
+  margin-bottom: var(--td-comp-margin-l);
+}
+
+.batch-section-head strong {
+  color: var(--td-text-color-primary);
+  font-size: var(--td-font-size-body-medium);
+}
+
+.batch-section-head span,
+.batch-match-tip {
+  color: var(--td-text-color-secondary);
+  font-size: var(--td-font-size-body-medium);
+}
+
+.batch-filter-list {
+  display: grid;
+  gap: var(--td-comp-margin-s);
+}
+
+.batch-filter-row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: var(--td-comp-margin-s);
+  align-items: flex-start;
+}
+
+.batch-filter-label {
+  padding-top: 0;
+  color: var(--td-text-color-primary);
+  font: var(--td-font-mark-medium);
+}
+
+.batch-filter-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--td-comp-margin-s);
+}
+
+.batch-chip {
+  height: var(--td-comp-size-xs);
+  padding: 0 var(--td-comp-paddingLR-s);
+  color: var(--td-text-color-primary);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-default);
+  display: inline-flex;
+  align-items: center;
+  font: var(--td-font-body-small);
+}
+
+.batch-chip.active {
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  border-color: var(--td-brand-color);
+  font: var(--td-font-body-small);
+}
+
+.batch-match-tip {
+  margin-top: var(--td-comp-margin-l);
+}
+
+.batch-field-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--td-comp-margin-xxl) var(--td-comp-margin-xxxl);
+}
+
+.batch-field-grid > :is(.t-form__item) {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.batch-field-grid .price-pair.wide {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.batch-field-grid :is(.t-input-number) {
+  max-width: 100%;
+}
+
+.batch-chip:hover {
+  color: var(--td-brand-color-hover);
+}
+
+/* Ordinary single-column create/edit dialogs use native 480px Dialog and 100px labels. */
+.zdm-admin-single-form .t-form {
+  width: 100%;
+  min-width: 0;
+}
+
+.zdm-admin-single-form
+  .t-form__controls-content
+  > :is(
+    .t-input__wrap,
+    .t-input-number,
+    .t-select__wrap,
+    .t-cascader,
+    .t-date-picker,
+    .t-date-range-picker,
+    .t-textarea
+  ) {
+  width: 100%;
+  max-width: 100%;
+}

@@ -1,0 +1,76 @@
+/* Keep manual field feedback in the same reserved area as native Form validation. */
+.t-form__controls > .t-form-item-tips {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+}
+
+/* Help and feedback share the native help row, including during validation. */
+.t-form__item.t-form__item-with-help {
+  margin-bottom: var(--td-comp-margin-xs);
+}
+
+.t-form__item-with-help > .t-form__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.t-form__item-with-help > .t-form__controls > .t-form__controls-content {
+  grid-area: 1 / 1;
+}
+
+.t-form__item-with-help > .t-form__controls > .t-input__help {
+  grid-area: 2 / 1;
+}
+
+.t-form__item-with-help > .t-form__controls > :is(.t-input__extra, .t-form-item-tips) {
+  position: absolute;
+  grid-area: 2 / 1;
+  inset: 0 0 auto;
+  width: 100%;
+  overflow: visible;
+  white-space: normal;
+}
+
+/* Some existing forms pass feedback directly to the input/select/textarea. */
+.t-form__item-with-help .t-form__controls-content :is(.t-input__wrap, .t-select-input, .t-textarea) {
+  position: relative;
+}
+
+.t-form__item-with-help .t-form__controls-content :is(.t-input__tips, .t-textarea__tips) {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  overflow: visible;
+  white-space: normal;
+}
+
+.t-form__item-with-help
+  > .t-form__controls:has(> .t-input__extra, > .t-form-item-tips, .t-input__tips, .t-textarea__tips)
+  > .t-input__help {
+  visibility: hidden;
+}
+
+/* Upload cards retain their height while the concrete error remains below the card. */
+.admin-media-upload {
+  position: relative;
+}
+
+.admin-media-upload > .t-upload__tips {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0;
+}
+
+/* Native last FormItem has no margin: reserve its error line inside public dialogs. */
+.zdm-admin-dialog .t-dialog__body > .t-form:not(:has(> .t-form__item-with-help:last-child)),
+.zdm-admin-dialog
+  .t-dialog__body
+  > .t-space
+  > .t-space-item:last-child
+  > .t-form:not(:has(> .t-form__item-with-help:last-child)) {
+  padding-bottom: var(--td-line-height-body-small);
+}

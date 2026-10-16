@@ -4,7 +4,6 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '属性值管理']" badge="标准属性值库" />
         <t-alert theme="info" class="page-tip"
           >用于维护各属性的可选值。适用于枚举 / 下拉类型属性；停用后不再允许新商品选择。</t-alert
         >
@@ -15,11 +14,11 @@
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
                 <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="所属属性" name="attribute">
-                      <t-select v-model="searchForm.attribute" clearable placeholder="全部">
+                      <t-select v-model="searchForm.attribute" clearable placeholder="请选择所属属性">
                         <t-option
                           v-for="item in attributesInScope"
                           :key="item.code"
@@ -29,10 +28,10 @@
                       </t-select>
                     </t-form-item>
                     <t-form-item label="属性值名称" name="keyword">
-                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入" />
+                      <t-input v-model="searchForm.keyword" clearable placeholder="请输入属性值名称" />
                     </t-form-item>
                     <t-form-item class="zdm-status-filter" label="状态" name="status">
-                      <t-select v-model="searchForm.status" clearable placeholder="全部">
+                      <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                         <t-option label="启用" value="enabled" />
                         <t-option label="停用" value="disabled" />
                       </t-select>
@@ -50,12 +49,12 @@
                   </div>
                 </div>
               </t-form>
-              <div class="table-toolbar">
-                <t-button v-if="canCreateValue" theme="primary" @click="openCreate">
+              <AdminListToolbar :has-actions="canCreateValue"
+                ><t-button v-if="canCreateValue" theme="primary" @click="openCreate">
                   <template #icon><t-icon name="add" /></template>
                   新增
-                </t-button>
-              </div>
+                </t-button></AdminListToolbar
+              >
             </div>
           </template>
           <template #table>
@@ -93,9 +92,10 @@
       </main>
     </div>
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="dialogVisible"
       header="新增"
-      width="560px"
+      width="480px"
       placement="center"
       confirm-btn="提交"
       @confirm="submit"
@@ -103,12 +103,12 @@
     >
       <t-form ref="formRef" :data="form" :rules="formRules" label-width="100px" colon>
         <t-form-item label="所属属性" name="attribute" required-mark>
-          <t-select v-model="form.attribute">
+          <t-select v-model="form.attribute" placeholder="请选择所属属性">
             <t-option v-for="item in formAttributes" :key="item.code" :label="item.name" :value="item.code" />
           </t-select>
         </t-form-item>
         <t-form-item label="值名称" name="name" required-mark>
-          <t-input v-model="form.name" clearable placeholder="请输入" />
+          <t-input v-model="form.name" clearable placeholder="请输入值名称" />
         </t-form-item>
       </t-form>
     </AdminDialog>
@@ -127,6 +127,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -137,7 +139,6 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminListLayout,
-  AdminPageHeader,
   AdminPagination,
 } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
@@ -354,15 +355,15 @@ const closeFormDialog = () => {
 };
 const submit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
   const name = form.name.trim();
   if (!form.attribute) {
-    adminFeedback.warning('请先新增可选类型的属性');
-    return;
+    formRef.value?.setValidateMessage({ attribute: [{ type: 'error', message: '请先新增可选类型的属性' }] });
+    return rejectFormSubmission(formRef.value);
   }
   if (data.value.some((item) => item.attribute === form.attribute && item.name === name)) {
-    adminFeedback.warning('该属性下的值名称已存在');
-    return;
+    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '该属性下的值名称已存在' }] });
+    return rejectFormSubmission(formRef.value);
   }
   try {
     await createProductAttributeValue({
@@ -470,33 +471,6 @@ onMounted(loadValues);
   display: block;
   min-height: 0;
 }
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-fields :deep(.t-input),
-.filter-fields :deep(.t-select) {
-  width: 100%;
-}
-.filter-actions {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
 .table-toolbar {
   display: flex;
   align-items: center;
@@ -509,15 +483,5 @@ onMounted(loadValues);
 }
 .table-action-placeholder {
   color: var(--td-text-color-placeholder);
-}
-@media (max-width: 1120px) {
-  .filter-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .filter-actions {
-    flex-wrap: wrap;
-  }
 }
 </style>

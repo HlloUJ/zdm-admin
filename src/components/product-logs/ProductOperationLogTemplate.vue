@@ -7,50 +7,58 @@
     @update:visible="emit('update:visible', $event)"
   >
     <t-space direction="vertical" size="large" style="width: 100%">
-      <t-form class="zdm-admin-filter-form" label-width="80px" :data="filter" colon>
-        <div class="operation-log-filters">
-          <t-form-item :label="subjectLabel" class="operation-log-keyword-filter">
-            <t-input
-              :value="filter.keyword"
-              clearable
-              :placeholder="keywordPlaceholder"
-              @change="emit('filter-change', 'keyword', $event)"
-            />
-          </t-form-item>
-          <t-form-item label="操作类型">
-            <t-select
-              :value="filter.operationType"
-              :popup-props="
-                operationTypePopupMinWidth
-                  ? { overlayInnerStyle: { width: 'auto', minWidth: operationTypePopupMinWidth } }
-                  : undefined
-              "
-              clearable
-              placeholder="请选择"
-              @change="emit('filter-change', 'operationType', String($event || ''))"
-            >
-              <t-option v-for="item in typeOptions" :key="item.value" v-bind="item" />
-            </t-select>
-          </t-form-item>
-          <t-form-item label="操作人" class="operation-log-operator-filter">
-            <t-input
-              :value="filter.operatorName"
-              clearable
-              placeholder="请输入"
-              @change="emit('filter-change', 'operatorName', $event)"
-            />
-          </t-form-item>
-          <t-form-item label="操作时间" class="operation-log-date-filter">
-            <t-date-range-picker
-              :value="filter.dateRange"
-              class="operation-log-date-picker"
-              clearable
-              allow-input
-              value-type="YYYY-MM-DD"
-              :placeholder="['开始日期', '结束日期']"
-              @change="emit('filter-change', 'dateRange', Array.isArray($event) ? $event : [])"
-            />
-          </t-form-item>
+      <t-form
+        class="zdm-admin-filter-form zdm-standard-query"
+        data-query-layout="log"
+        label-width="80px"
+        :data="filter"
+        colon
+      >
+        <div class="standard-query-row">
+          <div class="operation-log-filters">
+            <t-form-item :label="subjectLabel" class="operation-log-keyword-filter">
+              <t-input
+                :value="filter.keyword"
+                clearable
+                :placeholder="controlPlaceholder(subjectLabel, 'input')"
+                @change="emit('filter-change', 'keyword', $event)"
+              />
+            </t-form-item>
+            <t-form-item label="操作类型">
+              <t-select
+                :value="filter.operationType"
+                :popup-props="
+                  operationTypePopupMinWidth
+                    ? { overlayInnerStyle: { width: 'auto', minWidth: operationTypePopupMinWidth } }
+                    : undefined
+                "
+                clearable
+                placeholder="请选择操作类型"
+                @change="emit('filter-change', 'operationType', String($event || ''))"
+              >
+                <t-option v-for="item in typeOptions" :key="item.value" v-bind="item" />
+              </t-select>
+            </t-form-item>
+            <t-form-item label="操作人" class="operation-log-operator-filter">
+              <t-input
+                :value="filter.operatorName"
+                clearable
+                placeholder="请输入操作人"
+                @change="emit('filter-change', 'operatorName', $event)"
+              />
+            </t-form-item>
+            <t-form-item label="操作时间" class="operation-log-date-filter">
+              <t-date-range-picker
+                :value="filter.dateRange"
+                class="operation-log-date-picker"
+                clearable
+                allow-input
+                value-type="YYYY-MM-DD"
+                :placeholder="['请选择开始日期', '请选择结束日期']"
+                @change="emit('filter-change', 'dateRange', Array.isArray($event) ? $event : [])"
+              />
+            </t-form-item>
+          </div>
           <div class="operation-log-filter-actions">
             <t-button theme="primary" @click="emit('search')"
               ><template #icon><t-icon name="search" /></template>查询</t-button
@@ -121,6 +129,7 @@
 </template>
 
 <script setup lang="ts">
+import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { computed } from 'vue';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import type { PageInfo } from 'tdesign-vue-next';
@@ -185,41 +194,3 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'operation', title: '操作', width: 76, fixed: 'right' },
 ]);
 </script>
-
-<style scoped>
-.operation-log-filters {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: start;
-  gap: var(--td-comp-margin-xxl) 0;
-  margin-inline: -12px;
-}
-.operation-log-filters :deep(.t-form__item) {
-  min-width: 0;
-  width: auto;
-  padding-inline: 12px;
-  margin-bottom: var(--td-comp-margin-xxl);
-}
-.operation-log-date-filter {
-  grid-column: span 2;
-}
-.operation-log-date-picker {
-  width: 100%;
-  min-width: 0;
-}
-.operation-log-filter-actions {
-  display: flex;
-  padding-inline: 12px;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-@media (max-width: 860px) {
-  .operation-log-filters {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .operation-log-date-filter {
-    grid-column: auto;
-  }
-}
-</style>

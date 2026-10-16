@@ -299,3 +299,23 @@ for (const platformIdentityType of ['platform_admin', 'employee']) {
     expect(switchedIds).toEqual([21, 24, 25, 26, 23]);
   });
 }
+
+test('submit validation uses one summary and both inline errors without sending a login request', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/admin/auth/login', async (route) => {
+    requests++;
+    await route.fulfill({ json: { code: 400, message: '不应提交空表单' } });
+  });
+  await page.goto('/login');
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
+  for (const field of ['phone', 'verifyCode']) {
+    const item = page.locator(`.t-form-item__${field}`);
+    const color = await item.locator('.t-input__extra').evaluate((element) => getComputedStyle(element).color);
+    await expect(item.locator('.t-input')).toHaveCSS('border-top-color', color);
+  }
+  await expect(page.locator('.t-form-item__phone')).toContainText('请输入手机号');
+  await expect(page.locator('.t-form-item__verifyCode')).toContainText('请输入验证码');
+  expect(requests).toBe(0);
+  await expect(page).toHaveURL(/\/login$/);
+});

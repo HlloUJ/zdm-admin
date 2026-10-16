@@ -162,7 +162,7 @@ onMounted(async () => {
   justify-content: center;
   padding: 0;
   font-size: var(--td-font-size-body-small);
-  line-height: 12px;
+  line-height: var(--td-line-height-body-small);
   text-align: center;
 }
 
@@ -173,7 +173,7 @@ onMounted(async () => {
 }
 
 .city-partner-option-name {
-  line-height: 12px;
+  line-height: var(--td-line-height-body-medium);
 }
 
 .brand-context-label.is-city-partner,
@@ -226,7 +226,7 @@ onMounted(async () => {
   flex: 0 0 auto;
   align-items: center;
   gap: var(--td-comp-margin-s);
-  line-height: 1;
+  line-height: var(--td-line-height-body-medium);
   white-space: nowrap;
 }
 

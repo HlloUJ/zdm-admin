@@ -6,26 +6,15 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
-              <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
-              <t-breadcrumb-item>品种管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
-        </header>
-
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="品种" name="name">
-                  <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                  <t-input v-model="searchForm.name" clearable placeholder="请输入品种" />
                 </t-form-item>
                 <t-form-item class="zdm-status-filter" label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
@@ -47,12 +36,12 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
-            <t-button v-if="canCreateVariety" theme="primary" @click="openCreateDialog">
+          <AdminListToolbar :has-actions="canCreateVariety"
+            ><t-button v-if="canCreateVariety" theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
-            </t-button>
-          </div>
+            </t-button></AdminListToolbar
+          >
 
           <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
@@ -95,9 +84,10 @@
     </div>
 
     <t-dialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增品种' : '编辑品种'"
-      width="520px"
+      width="480px"
       placement="center"
       confirm-btn="提交"
       cancel-btn="取消"
@@ -135,6 +125,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { adminFeedback, AdminConfirmDialog } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -345,7 +337,7 @@ const closeFormDialog = () => {
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
 
   try {
     if (dialogMode.value === 'create') {
@@ -446,30 +438,6 @@ onMounted(loadVarieties);
   border-radius: var(--td-radius-medium);
 }
 
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
 .table-toolbar {
   display: flex;
   justify-content: flex-start;
@@ -492,14 +460,9 @@ onMounted(loadVarieties);
 
 @media (max-width: 960px) {
   .page-header,
-  .filter-row,
   .pagination-bar {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .filter-actions {
-    justify-content: flex-start;
   }
 }
 </style>

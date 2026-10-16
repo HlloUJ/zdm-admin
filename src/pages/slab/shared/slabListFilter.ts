@@ -39,12 +39,6 @@ export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter
       activeTab !== 'offShelf' ||
       !offShelvedByKeyword ||
       latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);
-    const [offShelfStartDate, offShelfEndDate] = filter.offShelfDateRange;
-    const offShelfTime = offShelfTimestamp(latestRecord);
-    const offShelfDateMatched =
-      activeTab !== 'offShelf' ||
-      ((!offShelfStartDate || offShelfTime >= new Date(`${offShelfStartDate}T00:00:00`).getTime()) &&
-        (!offShelfEndDate || offShelfTime <= new Date(`${offShelfEndDate}T23:59:59.999`).getTime()));
     return (
       statusMatched &&
       keywordMatched &&
@@ -55,8 +49,7 @@ export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter
       gradeMatched &&
       supplierMatched &&
       offShelfReasonMatched &&
-      offShelvedByMatched &&
-      offShelfDateMatched
+      offShelvedByMatched
     );
   });
   return sortByStateActivity(matchedItems);

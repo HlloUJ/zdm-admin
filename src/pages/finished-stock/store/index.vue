@@ -4,15 +4,6 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page" :class="{ 'page--form': editingId }">
-        <header v-if="!editingId" class="page-header">
-          <t-breadcrumb
-            ><t-breadcrumb-item @click="closeEdit">成品现货管理</t-breadcrumb-item
-            ><t-breadcrumb-item v-if="editingId">编辑商品</t-breadcrumb-item></t-breadcrumb
-          >
-          <t-link v-if="!editingId && canGlobal('operation-log.view')" theme="primary" @click="openLogs"
-            >操作日志</t-link
-          >
-        </header>
         <StoreFinishedEditor
           v-if="editingId && current && current.id === editingId && priceEditable"
           :key="editingId"
@@ -35,11 +26,16 @@
               >
                 <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tab.label" />
               </t-tabs>
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="filter" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="filter" colon>
                 <div class="filter-row">
                   <div class="filter-fields pool-filter-fields">
                     <t-form-item label="商品">
-                      <t-input v-model="filter.keyword" clearable placeholder="商品名称 / ID" />
+                      <t-input
+                        v-model="filter.keyword"
+                        clearable
+                        data-query-search-scope="商品名称/ID/编号"
+                        placeholder="请输入商品名称/ID/编号"
+                      />
                     </t-form-item>
                     <t-form-item label="商品分类">
                       <t-select-input
@@ -52,7 +48,7 @@
                           popperOptions: { modifiers: [{ name: 'flip', enabled: false }] },
                         }"
                         clearable
-                        placeholder="请选择"
+                        placeholder="请选择商品分类"
                         @popup-visible-change="listCategoryVisible = $event"
                         @clear="filter.category = undefined"
                       >
@@ -82,23 +78,28 @@
                   </div>
                 </div>
               </t-form>
-              <div v-if="true" class="table-toolbar">
-                <div class="toolbar-buttons">
-                  <t-button
-                    v-for="action in storeToolbarActions"
-                    :key="action.id === 'batch' ? batchAction?.kind : action.id"
-                    :theme="action.className === 'brown-button' ? 'warning' : action.theme"
-                    :variant="action.variant"
-                    :class="action.className"
-                    :disabled="action.disabled"
-                    @click="handleStoreToolbarAction(action.id)"
-                  >
-                    <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>
-                    {{ action.label }}
-                  </t-button>
-                </div>
-                <div class="selection-info">已选 {{ selected.length }} 项</div>
-              </div>
+              <AdminListToolbar
+                :has-actions="storeToolbarActions.length > 0"
+                :selected-count="selected.length"
+                :has-batch-actions="Boolean(batchAction)"
+                :has-auxiliary="canGlobal('operation-log.view')"
+                ><t-button
+                  v-for="action in storeToolbarActions"
+                  :key="action.id === 'batch' ? batchAction?.kind : action.id"
+                  :theme="action.className === 'brown-button' ? 'warning' : action.theme"
+                  :variant="action.variant"
+                  :class="action.className"
+                  :disabled="action.disabled"
+                  @click="handleStoreToolbarAction(action.id)"
+                >
+                  <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>
+                  {{ action.label }} </t-button
+                ><template #auxiliary
+                  ><t-button v-if="canGlobal('operation-log.view')" theme="default" variant="outline" @click="openLogs"
+                    >操作日志</t-button
+                  ></template
+                ></AdminListToolbar
+              >
             </div>
           </template>
           <template #table
@@ -210,7 +211,16 @@
             />
           </template>
         </AdminListLayout>
-        <t-empty v-else description="暂无成品现货管理权限" />
+        <template v-else>
+          <AdminListToolbar :has-auxiliary="canGlobal('operation-log.view')">
+            <template #auxiliary>
+              <t-button v-if="canGlobal('operation-log.view')" theme="default" variant="outline" @click="openLogs"
+                >操作日志</t-button
+              >
+            </template>
+          </AdminListToolbar>
+          <t-empty description="暂无成品现货管理权限" />
+        </template>
       </main>
     </div>
 
@@ -223,7 +233,7 @@
     >
       <t-space direction="vertical" style="width: 100%">
         <t-form
-          class="zdm-admin-filter-form"
+          class="zdm-admin-filter-form zdm-standard-query"
           label-width="80px"
           :data="{ keyword: poolKeyword, category: poolCategory }"
           colon
@@ -231,7 +241,7 @@
           <div class="filter-row">
             <div class="filter-fields pool-filter-fields">
               <t-form-item label="商品名称/ID">
-                <t-input v-model="poolKeyword" clearable placeholder="商品名称 / ID" />
+                <t-input v-model="poolKeyword" clearable placeholder="请输入商品名称/ID" />
               </t-form-item>
               <t-form-item label="商品分类">
                 <t-select-input
@@ -244,7 +254,7 @@
                     popperOptions: { modifiers: [{ name: 'flip', enabled: false }] },
                   }"
                   clearable
-                  placeholder="请选择"
+                  placeholder="请选择商品分类"
                   @popup-visible-change="poolCategoryVisible = $event"
                   @clear="poolCategory = undefined"
                 >
@@ -274,11 +284,9 @@
             </div>
           </div>
         </t-form>
-        <div class="table-toolbar">
-          <div class="toolbar-buttons">
-            <t-button theme="primary" @click="selectPool">批量选择</t-button>
-          </div>
-        </div>
+        <AdminListToolbar has-actions>
+          <t-button theme="primary" @click="selectPool">批量选择</t-button>
+        </AdminListToolbar>
         <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
           <template #poolSelectTitle>
             <t-checkbox
@@ -371,18 +379,21 @@
       @cancel="offShelfVisible = false"
       @close="offShelfVisible = false"
     >
-      <t-form :data="offShelf" label-width="100px" colon>
+      <t-form ref="offShelfFormRoot" :data="offShelf" label-width="100px" colon>
         <t-form-item label="下架原因" :required-mark="Boolean(pendingOffShelf?.batch)"
-          ><t-select v-model="offShelf.reason" placeholder="请选择"
+          ><t-select
+            v-bind="offShelfFeedback.field('reason', offShelf.reason)"
+            v-model="offShelf.reason"
+            placeholder="请选择下架原因"
             ><t-option value="商品暂停售卖" label="商品暂停售卖" /><t-option
               value="商品信息调整"
               label="商品信息调整" /><t-option value="其他" label="其他" /></t-select
         ></t-form-item>
-        <t-form-item label="详细说明"
+        <t-form-item :help="pendingOffShelf?.batch ? undefined : '选填'" label="详细说明"
           ><t-textarea
             v-model="offShelf.detail"
             :maxlength="500"
-            :placeholder="pendingOffShelf?.batch ? '请输入' : '选填'"
+            placeholder="请输入详细说明"
             :autosize="pendingOffShelf?.batch ? { minRows: 4, maxRows: 6 } : undefined"
         /></t-form-item>
       </t-form>
@@ -446,6 +457,9 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import { useFormFeedback } from '@/utils/formValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { formatProductDateTime } from '@/utils/formatProductDateTime';
 import { stateActivityColumns, stateSourceLabel, sortByStateActivity } from '@/services/productStateActivity';
 import FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';
@@ -691,6 +705,8 @@ function togglePoolPage(checked: boolean) {
     : poolSelected.value.filter((id) => !ids.has(id));
 }
 const offShelfVisible = ref(false);
+const offShelfFormRoot = ref();
+const offShelfFeedback = useFormFeedback(offShelfVisible);
 const offShelf = reactive({ reason: '', detail: '' });
 const pendingOffShelf = ref<{ ids: number[]; batch: boolean } | null>(null);
 type ActionKind = 'shelf' | 'delete' | 'restore' | 'purge' | 'batch-shelf' | 'batch-restore' | 'batch-purge' | 'clear';
@@ -1014,8 +1030,8 @@ async function confirmOffShelf() {
     return;
   }
   if (!offShelf.reason) {
-    adminFeedback.warning(pendingOffShelf.value?.batch ? '请选择原因' : '请选择下架原因');
-    return;
+    offShelfFeedback.reject('reason', offShelf.reason, '请选择下架原因');
+    return rejectFormSubmission(offShelfFormRoot.value);
   }
   const pending = pendingOffShelf.value;
   if (!pending) return;

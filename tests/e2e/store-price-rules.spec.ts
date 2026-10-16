@@ -1,3 +1,4 @@
+import { checkDecimalEditing } from './decimal-editing';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 async function setup(page: Page, grants: string[], extendedTree = false) {
@@ -191,6 +192,7 @@ test('price batch fills selected inputs locally and only Save writes configurati
   await page.goto('/store/price-configuration');
   const batch = page.getByRole('button', { name: '批量设置', exact: true });
   await expect(page.getByRole('row').filter({ hasText: '本店餐桌' })).toBeVisible();
+  await checkDecimalEditing(page.locator('tbody .t-input-number input').first());
   await batch.click();
   await expect(page.getByText('请先选择分类', { exact: true })).toBeVisible();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
@@ -200,6 +202,7 @@ test('price batch fills selected inputs locally and only Save writes configurati
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.locator('.t-dialog__header-content')).toHaveText('批量设置');
   await expect(dialog.getByText(/已选分类|已选择.*个分类|留空将/)).toHaveCount(0);
+  await checkDecimalEditing(dialog.locator('.t-input-number input'));
   await dialog.locator('.t-input-number input').fill('2.2');
   await dialog.getByRole('button', { name: '完成', exact: true }).click();
   await expect(dialog).toBeHidden();
@@ -268,11 +271,56 @@ test('query and reset preserve drafts; blur never saves and mixed edits save tog
   const firstLeaf = page.getByRole('row').filter({ hasText: '石材餐桌' });
   const input = firstLeaf.locator('input:not([type=checkbox])');
   await expect(input).toHaveValue('2.00');
+  const actions = page.locator('.zdm-standard-query .filter-actions');
+  await expect(actions).toHaveCSS('justify-content', 'flex-end');
+  const queryGap = await page.locator('.zdm-standard-query').evaluate((form) => {
+    const input = form.querySelector('.t-form__item .t-input__wrap')!.getBoundingClientRect();
+    const checkbox = form.querySelector('.t-checkbox')!.getBoundingClientRect();
+    return checkbox.left - input.right;
+  });
+  expect(queryGap).toBeCloseTo(24, 0);
+  const rowHeight = await firstLeaf.evaluate((row) => row.getBoundingClientRect().height);
+  expect(rowHeight).toBe(57);
+  const inputCenterOffset = () =>
+    firstLeaf.evaluate((row) => {
+      const input = row.querySelector('input:not([type=checkbox])')!.getBoundingClientRect();
+      const cell = row.getBoundingClientRect();
+      return Math.abs(input.y + input.height / 2 - cell.y - cell.height / 2);
+    });
+  expect(await inputCenterOffset()).toBeLessThanOrEqual(1);
   await input.fill('1000');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(firstLeaf.getByText('请输入0.01至999之间的系数，最多两位小数')).toBeVisible();
+  const feedback = await firstLeaf.evaluate((row) => {
+    const tip = [...row.querySelectorAll('*')].find(
+      (element) => element.textContent === '请输入0.01至999之间的系数，最多两位小数' && element.children.length === 0,
+    )!;
+    const cell = tip.closest('td')!;
+    const a = tip.getBoundingClientRect();
+    const b = cell.getBoundingClientRect();
+    return {
+      rowHeight: row.getBoundingClientRect().height,
+      tipBottom: a.bottom,
+      cellBottom: b.bottom,
+      tipWidth: a.width,
+      cellWidth: b.width,
+      inputWidth: row.querySelector('.t-input__wrap')!.getBoundingClientRect().width,
+      inputBottom: row.querySelector('input:not([type=checkbox])')!.getBoundingClientRect().bottom,
+      tipTop: a.top,
+      tipHeight: a.height,
+    };
+  });
+  expect(feedback.rowHeight).toBe(rowHeight + 20);
+  expect(feedback.tipBottom).toBeLessThanOrEqual(feedback.cellBottom);
+  expect(feedback.tipWidth).toBeLessThan(feedback.cellWidth);
+  expect(feedback.inputWidth).toBe(72);
+  expect(feedback.tipTop).toBeGreaterThanOrEqual(feedback.inputBottom);
+  expect(feedback.tipHeight).toBe(20);
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
   await input.fill('');
+  await expect(firstLeaf.getByText('请输入0.01至999之间的系数，最多两位小数')).toHaveCount(0);
+  expect(await firstLeaf.evaluate((row) => row.getBoundingClientRect().height)).toBe(rowHeight);
+  expect(await inputCenterOffset()).toBeLessThanOrEqual(1);
   const child = page.getByRole('row').filter({ hasText: '木质餐桌' });
   await child.locator('input:not([type=checkbox])').fill('1.8');
   await child.locator('input:not([type=checkbox])').press('e');
@@ -369,7 +417,8 @@ test('blank batch is required and leaves category inputs unchanged; inline clear
   await dialog.getByRole('button', { name: '完成', exact: true }).click();
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.t-input__tips')).toHaveText('请输入价格系数');
-  await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '请输入价格系数' })).toBeVisible();
+  await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
+  await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '请输入价格系数' })).toHaveCount(0);
   const categoryInput = page.getByRole('row').filter({ hasText: '石材餐桌' }).locator('input:not([type=checkbox])');
   await expect(categoryInput).toHaveValue('2.00');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -542,11 +591,12 @@ test('discounts list configured records only; query is explicit and create valid
   await expect(page.getByText('店长', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '新增', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.getByText('请输入0.01～1之间的值', { exact: true })).toBeVisible();
   const initialDialogHeight = await dialog.evaluate((element) => element.clientHeight);
   await expect
     .poll(() =>
       dialog.evaluate((element) => {
-        const input = element.querySelector('.t-input-number') as HTMLElement;
+        const input = element.querySelector('.t-input__help') as HTMLElement;
         const button = element.querySelector('.t-dialog__footer .t-button') as HTMLElement;
         return Math.round(button.getBoundingClientRect().top - input.getBoundingClientRect().bottom);
       }),
@@ -593,11 +643,7 @@ test('discounts list configured records only; query is explicit and create valid
     .poll(() =>
       coefficientError.evaluate((element) => {
         const style = getComputedStyle(element);
-        return (
-          element.scrollWidth <= element.clientWidth &&
-          style.whiteSpace === 'normal' &&
-          element.clientHeight > parseFloat(style.lineHeight)
-        );
+        return element.scrollWidth <= element.clientWidth && style.whiteSpace === 'normal';
       }),
     )
     .toBe(true);
@@ -608,7 +654,8 @@ test('discounts list configured records only; query is explicit and create valid
         .evaluate((body) => body.scrollHeight <= body.clientHeight || getComputedStyle(body).overflowY === 'visible'),
     )
     .toBe(true);
-  await expect.poll(() => dialog.evaluate((element) => element.clientHeight)).toBeGreaterThan(initialDialogHeight);
+  // Shared help/error space keeps this dialog stable for the existing concrete error too.
+  await expect.poll(() => dialog.evaluate((element) => element.clientHeight)).toBe(initialDialogHeight);
   await expect
     .poll(() =>
       coefficientError.evaluate((element) => {
@@ -657,6 +704,7 @@ test('discount audit fields and permission-controlled edit, disable, enable and 
   await dialog.locator('.t-input-number input').fill('0.7');
   await dialog.locator('.t-input-number input').press('Tab');
   await expect(dialog.locator('.t-input-number input')).toHaveValue('0.70');
+  await checkDecimalEditing(dialog.locator('.t-input-number input'));
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(requests.find((request) => request.method === 'PUT')).toMatchObject({ body: { coefficient: 0.7, roleId: 7 } });

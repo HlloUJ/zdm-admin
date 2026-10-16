@@ -1,3 +1,4 @@
+import { checkDecimalEditing } from './decimal-editing';
 import { expect, test, type Page } from '@playwright/test';
 import type { SlabPayload, SlabPrice, SlabRecord } from '../../src/services/slabs';
 import type { SlabMarkupConfigurationRecord } from '../../src/services/slabMarkupConfigurations';
@@ -156,19 +157,33 @@ for (const status of ['enabled', 'disabled', undefined] as const) {
   test(`缺失四级价格与成品现货一致：${status ?? 'unconfigured'} 不在编辑器中预计算`, async ({ page }) => {
     const state = await setup(page, status);
     const { editor, level } = await openEditor(page);
-    await expect(level.getByPlaceholder('系数', { exact: true })).toHaveValue(status === 'enabled' ? '1.40' : '');
-    await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+    await expect(level.getByPlaceholder('请输入系数', { exact: true })).toHaveValue(status === 'enabled' ? '1.40' : '');
+    await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
     await expect(
       level.getByRole('button', {
         name: status === 'enabled' ? '跟随配置，点击切换手工价格' : '手工价格，点击切换跟随配置',
         exact: true,
       }),
     ).toBeVisible();
-    await expect(
-      editor.locator('.price-editor__row').filter({ hasText: '成本价' }).getByPlaceholder('请输入', { exact: true }),
-    ).toBeDisabled();
+    const rowHeight = await level.evaluate((element) => element.getBoundingClientRect().height);
+    const assertCentered = async () => {
+      const offsets = await level.evaluate((element) => {
+        const row = element.getBoundingClientRect();
+        return [...element.querySelectorAll('.t-input, button')].map((control) => {
+          const box = control.getBoundingClientRect();
+          return Math.abs(box.y + box.height / 2 - (row.y + row.height / 2));
+        });
+      });
+      offsets.forEach((offset) => expect(offset).toBeLessThan(1));
+    };
+    await assertCentered();
+    const costRow = editor.locator('.price-editor__row').filter({ hasText: '成本价' });
+    await expect(costRow.locator('input')).toHaveCount(0);
+    await expect(costRow).toContainText('1000.00');
     await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
-    await expect(page.getByText('请完善价格信息', { exact: true })).toBeVisible();
+    await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
+    expect(await level.evaluate((element) => element.getBoundingClientRect().height)).toBe(rowHeight);
+    await assertCentered();
     await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
     expect(state.saves).toHaveLength(0);
     if (status !== 'enabled') {
@@ -176,9 +191,9 @@ for (const status of ['enabled', 'disabled', undefined] as const) {
       await expect(page.getByText('暂无有效价格配置，无法切换为跟随配置', { exact: true })).toBeVisible();
       await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
     }
-    await level.getByPlaceholder('系数', { exact: true }).fill('1.60');
-    await level.getByPlaceholder('系数', { exact: true }).blur();
-    await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
+    await level.getByPlaceholder('请输入系数', { exact: true }).fill('1.60');
+    await level.getByPlaceholder('请输入系数', { exact: true }).blur();
+    await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
     await expect(level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true })).toBeVisible();
     await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
     await expect(editor).not.toBeVisible();
@@ -210,10 +225,10 @@ for (const source of ['auto', 'manual'] as const) {
       },
     ]);
     const { level } = await openEditor(page);
-    await expect(level.getByPlaceholder('系数', { exact: true })).toHaveValue('1.60');
-    await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
-    await level.getByPlaceholder('价格', { exact: true }).focus();
-    await level.getByPlaceholder('价格', { exact: true }).blur();
+    await expect(level.getByPlaceholder('请输入系数', { exact: true })).toHaveValue('1.60');
+    await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
+    await level.getByPlaceholder('请输入价格', { exact: true }).focus();
+    await level.getByPlaceholder('请输入价格', { exact: true }).blur();
     await expect(
       level.getByRole('button', {
         name: source === 'auto' ? '跟随配置，点击切换手工价格' : '手工价格，点击切换跟随配置',
@@ -240,10 +255,10 @@ test('打开商品编辑页刷新配置和价格，已保存的零成本零售�
     },
   ];
   const { editor, level } = await openEditor(page);
-  await expect(
-    editor.locator('.price-editor__row').filter({ hasText: '成本价' }).getByPlaceholder('请输入', { exact: true }),
-  ).toHaveValue('0.00');
-  await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('0.00');
+  const costRow = editor.locator('.price-editor__row').filter({ hasText: '成本价' });
+  await expect(costRow.locator('input')).toHaveCount(0);
+  await expect(costRow).toContainText('0.00');
+  await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('0.00');
   await level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
   await expect(page.getByText('暂无有效价格配置，无法切换为跟随配置', { exact: true })).toBeVisible();
   expect(state.saves).toHaveLength(0);
@@ -264,13 +279,13 @@ test('恢复跟随需确认，确认后按当前启用系数计算并保存自�
   await level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog).toContainText('是否更改价格跟随价格配置浮动？');
-  await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
+  await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
-  await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
+  await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
   await level.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
   await dialog.getByRole('button', { name: '确认', exact: true }).click();
-  await expect(level.getByPlaceholder('系数', { exact: true })).toHaveValue('1.40');
-  await expect(level.getByPlaceholder('价格', { exact: true })).toHaveValue('1400.00');
+  await expect(level.getByPlaceholder('请输入系数', { exact: true })).toHaveValue('1.40');
+  await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1400.00');
   await expect(level.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
   await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(editor).not.toBeVisible();
@@ -308,4 +323,94 @@ test('停用门店级别不展示历史价格且保存不提交停用级别', as
   await expect(editor).toHaveCount(0);
   expect(state.saves).toHaveLength(1);
   expect(state.saves[0].markupPrices).toEqual([]);
+});
+
+test('大板价格与系数删除末位后可继续输入小数', async ({ page }) => {
+  await setup(page, 'enabled');
+  const { editor, level } = await openEditor(page);
+  const guide = editor.locator('.price-editor__row').filter({ hasText: '指导价' });
+  for (const row of [guide, level]) {
+    await checkDecimalEditing(row.getByPlaceholder('请输入系数', { exact: true }));
+    await checkDecimalEditing(row.getByPlaceholder('请输入价格', { exact: true }));
+  }
+});
+
+test('运营编辑大板的只读信息使用无必填星号表格，保留价格编辑和原数据提交', async ({ page }) => {
+  const state = await setup(page, 'enabled');
+  Object.assign(state.product, {
+    varietyId: 11,
+    varietyName: '只读品种',
+    originId: 21,
+    originName: '只读产地',
+    textureId: 31,
+    colorId: 41,
+    gradeId: 51,
+    supplierId: 61,
+    supplierName: '只读供应商',
+    serialNo: 'READONLY-SLAB',
+    lengthMm: 2000,
+    widthMm: 1800,
+    thicknessMm: 10,
+    toleranceMm: 0,
+    corner1LengthMm: 0,
+    corner1WidthMm: 10,
+  });
+  await page.route('**/api/admin/slabs/form-options', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          textures: [{ id: 31, label: '只读纹理', status: 'enabled' }],
+          colorCategories: [
+            {
+              id: 40,
+              label: '只读色系分组',
+              status: 'enabled',
+              children: [{ id: 41, label: '只读色系', status: 'enabled' }],
+            },
+          ],
+          grades: [{ id: 51, label: 'A', description: '只读等级', status: 'enabled' }],
+          suppliers: [{ id: 61, label: '只读供应商', status: 'enabled' }],
+          varieties: [{ id: 11, label: '只读品种', status: 'enabled' }],
+          origins: [{ id: 21, label: '只读产地', status: 'enabled' }],
+          storeLevels: [{ id: 4, label: '4级合伙人', status: 'enabled' }],
+        },
+      },
+    }),
+  );
+  await page.reload();
+  const { editor, level } = await openEditor(page);
+  const base = editor.locator('#slab-product-base');
+  await expect(base.locator('input, select, textarea')).toHaveCount(0);
+  for (const text of ['只读品种', '只读产地', '只读纹理', '只读色系', 'A（只读等级）', '3.60 ㎡']) {
+    await expect(base.getByText(text, { exact: true })).toBeVisible();
+  }
+  await expect(base.locator('table')).toHaveCount(3);
+  await expect(base.getByText('0', { exact: true })).toHaveCount(2);
+  await expect(base.getByText('*', { exact: true })).toHaveCount(0);
+  await expect(editor.locator('#slab-product-images .admin-media-upload__required')).toHaveCount(0);
+  const sales = editor.locator('#slab-product-sales');
+  await expect(sales.locator('.t-descriptions')).toHaveCount(1);
+  await expect(sales.locator('.t-descriptions input')).toHaveCount(0);
+  await expect(sales.locator('.t-descriptions').getByText('*', { exact: true })).toHaveCount(0);
+  await expect(sales.locator('.price-required-star')).toHaveCount(2);
+  for (const field of ['supplier', 'stock', 'sku']) {
+    await expect(sales.locator(`.t-form-item__${field} input`)).toHaveCount(0);
+  }
+  await expect(sales.getByText('只读供应商', { exact: true })).toBeVisible();
+  await expect(sales.getByText('READONLY-SLAB', { exact: true })).toBeVisible();
+  await expect(level.getByPlaceholder('请输入系数', { exact: true })).toBeEditable();
+  await level.getByPlaceholder('请输入系数', { exact: true }).fill('1.60');
+  await level.getByPlaceholder('请输入系数', { exact: true }).blur();
+  await expect(level.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
+  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect.poll(() => state.saves.length).toBe(1);
+  expect(Object.keys(state.saves[0]).sort()).toEqual(
+    ['name', 'serialNo', 'status', 'costPrice', 'guidePrice', 'guidePriceCoefficient', 'markupPrices'].sort(),
+  );
+  expect(state.saves[0]).toMatchObject({
+    serialNo: 'READONLY-SLAB',
+    costPrice: 1000,
+    markupPrices: [{ storeLevelId: 4, priceCoefficient: 1.6, costPrice: 1000, price: 1600 }],
+  });
 });

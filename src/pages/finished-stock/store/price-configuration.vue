@@ -3,8 +3,7 @@
     <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
-      <main class="page">
-        <AdminPageHeader :breadcrumbs="['价格配置']" />
+      <main ref="priceFormRoot" class="page">
         <div class="price-workspace">
           <t-card size="small" class="price-navigation">
             <t-menu width="160px" class="price-menu" :value="activeKey" @change="selectMenu">
@@ -19,7 +18,7 @@
             <template #toolbar>
               <div class="list-controls">
                 <t-form
-                  class="zdm-admin-filter-form"
+                  class="zdm-admin-filter-form zdm-standard-query"
                   label-width="80px"
                   :data="searchForm"
                   colon
@@ -31,15 +30,15 @@
                         <t-input
                           v-model="searchForm.keyword"
                           clearable
-                          :placeholder="activeKind === 'price' ? '请输入分类名称' : '请输入角色'"
+                          :placeholder="controlPlaceholder(activeKind === 'price' ? '分类名称' : '角色', 'input')"
                           @enter="queryCategories"
                         />
                       </t-form-item>
-                      <t-form-item v-if="activeKind === 'price'" name="onlyUnconfigured">
+                      <t-form-item v-if="activeKind === 'price'" name="onlyUnconfigured" label-width="0">
                         <t-checkbox v-model="searchForm.onlyUnconfigured">仅看未配置分类</t-checkbox>
                       </t-form-item>
                     </div>
-                    <t-space size="small">
+                    <t-space class="filter-actions" size="small">
                       <t-button theme="primary" @click="queryCategories"
                         ><template #icon><t-icon name="search" /></template>查询</t-button
                       >
@@ -49,7 +48,7 @@
                     </t-space>
                   </div>
                 </t-form>
-                <t-space v-if="activeKind === 'discount' && can('create')" size="small">
+                <AdminListToolbar v-if="activeKind === 'discount'" :has-actions="can('create')">
                   <t-button
                     v-if="can('create')"
                     theme="primary"
@@ -58,7 +57,7 @@
                   >
                     <template #icon><t-icon name="add" /></template>新增
                   </t-button>
-                </t-space>
+                </AdminListToolbar>
                 <div v-if="activeKind === 'price' && can('batch-set')" class="price-actions">
                   <t-button theme="primary" variant="outline" :disabled="saving || loading" @click="openBatch"
                     >批量设置</t-button
@@ -122,25 +121,30 @@
                   <span v-else>{{ row.name }}</span>
                 </template>
                 <template #coefficient="{ row }">
-                  <t-input-number
+                  <div
                     v-if="activeKind === 'price' && !row.hasChildren"
-                    class="price-coefficient-input"
-                    :value="coefficientDrafts[row.id]"
-                    large-number
-                    :decimal-places="2"
-                    theme="normal"
-                    placeholder="请输入"
-                    :aria-label="`${row.name}分类系数`"
-                    :disabled="!can('batch-set') || row.status !== 'enabled' || saving"
-                    :status="coefficientErrors[row.id] ? 'error' : undefined"
-                    :tips="coefficientErrors[row.id]"
-                    @change="
-                      (value: string | number | undefined, context: { type?: string }) =>
-                        changeCoefficient(row.id, value, context)
-                    "
-                    @keydown="handleCoefficientKeydown"
-                    @blur="validateCoefficient(row.id)"
-                  />
+                    class="price-coefficient-field"
+                    :class="{ 'price-coefficient-field--invalid': coefficientErrors[row.id] }"
+                  >
+                    <DecimalInput
+                      class="price-coefficient-input"
+                      :value="coefficientDrafts[row.id]"
+                      large-number
+                      :decimal-places="2"
+                      theme="normal"
+                      placeholder="请输入价格系数"
+                      :aria-label="`${row.name}分类系数`"
+                      :disabled="!can('batch-set') || row.status !== 'enabled' || saving"
+                      :status="coefficientErrors[row.id] ? 'error' : undefined"
+                      :tips="coefficientErrors[row.id]"
+                      @change="
+                        (value: string | number | undefined, context: { type?: string }) =>
+                          changeCoefficient(row.id, value, context)
+                      "
+                      @keydown="handleCoefficientKeydown"
+                      @blur="validateCoefficient(row.id)"
+                    />
+                  </div>
                   <template v-else-if="activeKind === 'discount'">{{
                     row.rule ? Number(row.rule.coefficient).toFixed(2) : '—'
                   }}</template>
@@ -171,8 +175,8 @@
     <AdminDialog
       v-model:visible="createVisible"
       :header="editingDiscountId == null ? '新增' : '编辑'"
-      dialog-class-name="discount-config-dialog"
-      width="360px"
+      dialog-class-name="discount-config-dialog zdm-admin-dialog zdm-admin-single-form"
+      width="480px"
       :confirm-btn="{ content: '保存', loading: saving }"
       @confirm="saveDiscount"
       @cancel="createVisible = false"
@@ -185,7 +189,7 @@
         :rules="createRules"
         :label-width="100"
         label-align="right"
-        :style="{ width: '272px', maxWidth: '100%', minHeight: '88px', margin: '0 auto' }"
+        :style="{ maxWidth: '100%', minHeight: '88px', margin: '0 auto' }"
         colon
       >
         <t-form-item label="角色" name="roleId">
@@ -198,8 +202,8 @@
             filterable
           />
         </t-form-item>
-        <t-form-item label="折扣系数" name="coefficient">
-          <t-input-number
+        <t-form-item help="请输入0.01～1之间的值" label="折扣系数" name="coefficient">
+          <DecimalInput
             v-model="createForm.coefficient"
             :style="{ width: '100%' }"
             theme="normal"
@@ -207,7 +211,7 @@
             :min="0.01"
             :max="1"
             allow-input-over-limit
-            placeholder="请输入0.01～1之间的值"
+            placeholder="请输入折扣系数"
             @keydown="handleCoefficientKeydown"
           />
         </t-form-item>
@@ -239,10 +243,11 @@
       @cancel="formVisible = false"
       @close="formVisible = false"
     >
-      <t-form label-align="right" label-width="auto" :data="form" colon>
+      <t-form ref="batchFormRoot" label-align="right" label-width="auto" :data="form" colon>
         <t-form-item :label="kindLabel" required
-          ><t-input-number
+          ><DecimalInput
             v-model="form.coefficient"
+            :placeholder="controlPlaceholder(kindLabel, 'input')"
             :decimal-places="2"
             :min="0.01"
             :max="999"
@@ -256,6 +261,10 @@
   </div>
 </template>
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+
+import { controlPlaceholder } from '@/utils/controlPlaceholder';
+import DecimalInput from '@/components/DecimalInput.vue';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -264,7 +273,7 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminListLayout,
-  AdminPageHeader,
+  AdminListToolbar,
   adminFeedback,
   getSafeErrorMessage,
 } from '@/components/foundation';
@@ -405,7 +414,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   {
     colKey: 'coefficient',
     title: activeKind.value === 'price' ? '价格系数' : '折扣系数',
-    width: activeKind.value === 'price' ? 200 : 120,
+    width: activeKind.value === 'price' ? 320 : 120,
   },
   ...(activeKind.value === 'discount'
     ? [
@@ -542,8 +551,7 @@ async function savePrices() {
   const editable = categories.value.filter((category) => category.status === 'enabled' && isLeafCategory(category.id));
   const valid = editable.map((category) => validateCoefficient(category.id)).every(Boolean);
   if (!valid) {
-    adminFeedback.warning('请填写正确的价格系数');
-    return;
+    return rejectFormSubmission(priceFormRoot.value);
   }
   const changes = editable
     .map((category) => {
@@ -572,6 +580,8 @@ async function savePrices() {
 }
 const createVisible = ref(false);
 const editingDiscountId = ref<number | null>(null);
+const priceFormRoot = ref<HTMLElement>();
+const batchFormRoot = ref();
 const createFormRef = ref<FormInstanceFunctions>();
 const createRules: Record<string, FormRule[]> = {
   roleId: [{ required: true, message: '请选择角色', type: 'error' }],
@@ -609,7 +619,8 @@ function openCreateDiscount() {
 }
 async function saveDiscount() {
   if (saving.value || !can(editingDiscountId.value == null ? 'create' : 'edit')) return;
-  if ((await createFormRef.value?.validate()) !== true || createForm.roleId == null) return;
+  if ((await createFormRef.value?.validate()) !== true || createForm.roleId == null)
+    return rejectFormSubmission(createFormRef.value);
   saving.value = true;
   try {
     rules.value =
@@ -687,13 +698,11 @@ function save() {
   if (saving.value || activeKind.value !== 'price' || !can('batch-set')) return;
   if (form.coefficient == null || String(form.coefficient).trim() === '') {
     batchError.value = '请输入价格系数';
-    adminFeedback.warning(batchError.value);
-    return;
+    return rejectFormSubmission(batchFormRoot.value);
   }
   if (form.coefficient <= 0 || form.coefficient > 999) {
     batchError.value = '请填写正确的系数';
-    adminFeedback.warning(batchError.value);
-    return;
+    return rejectFormSubmission(batchFormRoot.value);
   }
   for (const id of selectedEditableLeafIds.value) {
     coefficientDrafts.value[id] = Number(form.coefficient).toFixed(2);
@@ -746,26 +755,30 @@ watch(
   flex: 1;
   min-width: 0;
 }
+
+/* Normal rows retain native height; only an invalid coefficient needs a tip line. */
+.price-coefficient-field {
+  position: relative;
+  height: var(--td-comp-size-m);
+}
+.price-coefficient-field--invalid {
+  height: calc(var(--td-comp-size-m) + var(--td-line-height-body-small));
+}
 .price-coefficient-input {
+  position: static;
   width: 72px;
 }
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
+.price-coefficient-input :deep(.t-input__tips) {
+  position: absolute;
+  top: var(--td-comp-size-m);
+  left: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
 }
 .list-controls {
   display: grid;
   width: 100%;
   gap: var(--td-comp-margin-xxl);
-}
-.filter-fields {
-  display: flex;
-  align-items: flex-start;
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
 }
 .price-actions {
   display: flex;
@@ -773,16 +786,13 @@ watch(
   justify-content: space-between;
   gap: var(--td-comp-margin-l);
 }
-.price-actions .t-input {
-  max-width: 320px;
-}
 .category-name-cell {
   display: flex;
   align-items: center;
   gap: var(--td-comp-margin-s);
 }
 .category-name-cell.level-1 {
-  font-weight: 600;
+  font: var(--td-font-mark-medium);
 }
 .category-name-cell.level-2 {
   padding-left: 28px;
@@ -806,16 +816,6 @@ watch(
   align-items: center;
   justify-content: center;
   color: var(--td-text-color-placeholder);
-}
-.discount-config-form :deep(.t-form-item__coefficient .t-input__extra) {
-  position: static;
-  width: 100%;
-  max-width: 100%;
-  margin-bottom: calc(0px - var(--td-line-height-body-small));
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 :global(.discount-config-dialog .t-dialog__body) {
   overflow: visible;

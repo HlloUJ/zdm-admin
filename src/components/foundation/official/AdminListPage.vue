@@ -3,7 +3,48 @@
     <t-tabs v-if="tabs.length > 1" :value="activeTab" @change="emit('tabChange', $event)">
       <t-tab-panel v-for="tab in tabs" :key="tab.value" :value="tab.value" :label="tab.label" />
     </t-tabs>
-    <div v-if="filters.length && filterLayout === 'official-grid'" class="zdm-official-list-page__grid-filters">
+    <div v-if="filters.length && filterLayout === 'adaptive-grid'" class="zdm-official-list-page__grid-filters">
+      <t-form
+        class="zdm-admin-filter-form zdm-standard-query"
+        :data="filterValues"
+        :label-width="80"
+        colon
+        @submit="emit('search')"
+        @reset="emit('reset')"
+      >
+        <div class="filter-row">
+          <div class="filter-fields">
+            <t-form-item v-for="field in filters" :key="field.key" :label="field.label" :name="field.key">
+              <slot :name="`filter-${field.key}`" :field="field" :value="filterValues[field.key]">
+                <t-select
+                  v-if="field.kind === 'select'"
+                  style="width: 100%"
+                  :value="filterValues[field.key]"
+                  :options="field.options"
+                  :filterable="field.filterable"
+                  clearable
+                  :placeholder="controlPlaceholder(field.label, 'select')"
+                  @change="setFilter(field.key, $event)"
+                />
+                <t-input
+                  v-else
+                  :value="filterValues[field.key]"
+                  clearable
+                  :data-query-search-scope="field.searchScope"
+                  :placeholder="controlPlaceholder(field.searchScope ?? field.label, 'input')"
+                  @change="setFilter(field.key, $event)"
+                />
+              </slot>
+            </t-form-item>
+          </div>
+          <div class="filter-actions">
+            <t-button theme="primary" type="submit">查询</t-button>
+            <t-button theme="default" variant="base" type="reset">重置</t-button>
+          </div>
+        </div>
+      </t-form>
+    </div>
+    <div v-else-if="filters.length && filterLayout === 'official-grid'" class="zdm-official-list-page__grid-filters">
       <t-form :data="filterValues" :label-width="80" colon @submit="emit('search')" @reset="emit('reset')">
         <t-row>
           <t-col :span="10">
@@ -17,7 +58,7 @@
                     :options="field.options"
                     :filterable="field.filterable"
                     clearable
-                    :placeholder="`请选择${field.label}`"
+                    :placeholder="controlPlaceholder(field.label, 'select')"
                     @change="setFilter(field.key, $event)"
                   />
                   <t-input
@@ -25,7 +66,8 @@
                     :style="{ width: '100%', minWidth: '134px' }"
                     :value="filterValues[field.key]"
                     clearable
-                    :placeholder="`请输入${field.label}`"
+                    :data-query-search-scope="field.searchScope"
+                    :placeholder="controlPlaceholder(field.searchScope ?? field.label, 'input')"
                     @change="setFilter(field.key, $event)"
                   />
                 </t-form-item>
@@ -62,7 +104,7 @@
             :options="field.options"
             :filterable="field.filterable"
             clearable
-            placeholder="请选择"
+            :placeholder="controlPlaceholder(field.label, 'select')"
             @change="setFilter(field.key, $event)"
           />
           <t-input
@@ -70,7 +112,8 @@
             :style="{ width: '200px' }"
             :value="filterValues[field.key]"
             clearable
-            placeholder="请输入"
+            :data-query-search-scope="field.searchScope"
+            :placeholder="controlPlaceholder(field.searchScope ?? field.label, 'input')"
             @change="setFilter(field.key, $event)"
           />
         </t-form-item>
@@ -80,25 +123,35 @@
         <t-button theme="default" @click="emit('reset')">重置</t-button>
       </t-space>
     </div>
-    <t-row
-      v-if="actions.length || selectedCount !== undefined"
+    <AdminListToolbar
       class="zdm-official-list-page__operations"
-      justify="space-between"
-      align="center"
+      :has-actions="actions.length > 0"
+      :has-auxiliary="auxiliaryActions.length > 0"
+      :has-batch-actions="actions.some((action) => action.batch)"
+      :selected-count="selectedCount ?? 0"
     >
-      <t-space size="small" break-line>
+      <t-button
+        v-for="action in actions"
+        :key="action.id"
+        :theme="action.theme ?? 'primary'"
+        :disabled="action.disabled"
+        @click="emit('action', action.id)"
+      >
+        <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>{{ action.label }}
+      </t-button>
+      <template #auxiliary>
         <t-button
-          v-for="action in actions"
+          v-for="action in auxiliaryActions"
           :key="action.id"
-          :theme="action.theme ?? 'primary'"
+          theme="default"
+          variant="outline"
           :disabled="action.disabled"
           @click="emit('action', action.id)"
         >
           <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>{{ action.label }}
         </t-button>
-      </t-space>
-      <span v-if="selectedCount !== undefined">已选 {{ selectedCount }} 项</span>
-    </t-row>
+      </template>
+    </AdminListToolbar>
     <t-table
       v-bind="tableProps"
       @page-change="emit('pageChange', $event)"
@@ -109,6 +162,8 @@
   </section>
 </template>
 <script setup lang="ts">
+import AdminListToolbar from '../AdminListToolbar.vue';
+import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { computed } from 'vue';
 import type { PageInfo, TableProps } from 'tdesign-vue-next';
 import type { FilterValues, ListAction, ListFilter, ListTab } from './types';
@@ -117,14 +172,22 @@ const props = withDefaults(
   defineProps<{
     tabs?: ListTab[];
     activeTab?: string;
-    filterLayout?: 'inline' | 'official-grid';
+    filterLayout?: 'adaptive-grid' | 'inline' | 'official-grid';
     filters?: ListFilter[];
     filterValues?: FilterValues;
     actions?: ListAction[];
+    auxiliaryActions?: ListAction[];
     selectedCount?: number;
     tableProps: TableProps;
   }>(),
-  { filterLayout: 'inline', tabs: () => [], filters: () => [], filterValues: () => ({}), actions: () => [] },
+  {
+    filterLayout: 'adaptive-grid',
+    tabs: () => [],
+    filters: () => [],
+    filterValues: () => ({}),
+    actions: () => [],
+    auxiliaryActions: () => [],
+  },
 );
 const templateKind = computed(() =>
   props.tabs.length > 1 ? 'tab-filter-list' : props.filters.length ? 'filter-list' : 'base-list',
@@ -185,3 +248,5 @@ function setFilter(key: string, value: unknown) {
   margin-left: var(--td-comp-margin-s);
 }
 </style>
+
+<style src="./query-layout.css"></style>

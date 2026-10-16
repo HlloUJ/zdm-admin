@@ -141,7 +141,8 @@ test('操作时来源已下架会刷新遮罩并清除旧选择', async ({ page 
   });
   await page.reload();
   await page.getByRole('main').locator('tbody tr').first().locator('.t-checkbox').click();
-  await expect(page.locator('.selection-info')).toContainText('已选 1 项');
+  await expect(page.locator('.selection-info')).toHaveCount(0);
+  await expect(page.getByRole('main').locator('tbody tr').first().getByRole('checkbox')).toBeChecked();
   await page.getByRole('main').locator('.table-actions').getByText('下架', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await dialog.locator('.t-select').click();
@@ -169,7 +170,8 @@ test('操作时来源已下架会刷新遮罩并清除旧选择', async ({ page 
   );
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
   await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toContainText('该商品已被供应链下架');
-  await expect(page.locator('.selection-info')).toContainText('已选 0 项');
+  await expect(page.getByRole('main').locator('tbody tr').first().getByRole('checkbox')).not.toBeChecked();
+  await expect(page.locator('.selection-info')).toHaveCount(0);
 });
 
 test('操作时来源不可用直接刷新遮罩，不显示 toast 或确认弹框', async ({ page }) => {
@@ -209,7 +211,7 @@ test('操作时来源不可用直接刷新遮罩，不显示 toast 或确认弹�
   );
   await page.getByRole('main').locator('.table-actions').getByText('下架', { exact: true }).click();
   await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toContainText('该商品已被供应链下架');
-  await expect(page.locator('.selection-info')).toContainText('已选 0 项');
+  await expect(page.locator('.selection-info')).toHaveCount(0);
   await expect(page.locator('.t-message')).toHaveCount(0);
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   expect(submissions).toBe(0);

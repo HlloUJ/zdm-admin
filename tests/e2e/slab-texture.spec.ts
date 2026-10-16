@@ -31,14 +31,14 @@ test('manages standard textures and multiple aliases from the third-level menu',
     '等级管理',
   ]);
   await expect(page.locator('[data-menu-path="/slab-texture"]')).toBeVisible();
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*纹理管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveCount(0);
   await expect(main.getByText('细纹', { exact: true })).toBeVisible();
   await expect(main.locator('tbody tr').filter({ hasText: '细纹' })).toContainText('1');
 
   await main
     .locator('.t-form__item')
     .filter({ hasText: '纹理' })
-    .getByPlaceholder('请输入', { exact: true })
+    .getByPlaceholder('请输入纹理', { exact: true })
     .fill('不存在');
   await main.getByRole('button', { name: '查询', exact: true }).click();
   await expect(main.getByText('细纹', { exact: true })).toHaveCount(0);
@@ -47,7 +47,7 @@ test('manages standard textures and multiple aliases from the third-level menu',
   await main
     .locator('.t-form__item')
     .filter({ hasText: '别名' })
-    .getByPlaceholder('请输入', { exact: true })
+    .getByPlaceholder('请输入别名', { exact: true })
     .fill('幼纹');
   await main.getByRole('button', { name: '查询', exact: true }).click();
   await expect(main.getByText('细纹', { exact: true })).toBeVisible();
@@ -59,7 +59,7 @@ test('manages standard textures and multiple aliases from the third-level menu',
   const aliasDialog = page.locator('.t-dialog').filter({ hasText: '别名管理 - 细纹' });
   await expect(aliasDialog.getByText('幼纹', { exact: true })).toBeVisible();
   await aliasDialog.getByRole('button', { name: '新增别名', exact: true }).click();
-  await page.getByPlaceholder('请输入纹理别名').fill('细花纹');
+  await page.locator('.t-dialog:visible').getByPlaceholder('请输入别名').fill('细花纹');
   await page.locator('.t-dialog').filter({ hasText: '新增别名' }).getByRole('button', { name: '提交' }).click();
   await expect(page.getByText('已新增“细花纹”', { exact: true })).toBeVisible();
   await expect(aliasDialog.getByText('细花纹', { exact: true })).toBeVisible();

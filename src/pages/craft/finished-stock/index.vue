@@ -6,26 +6,15 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>商品管理</t-breadcrumb-item>
-              <t-breadcrumb-item>成品现货基础数据</t-breadcrumb-item>
-              <t-breadcrumb-item>工艺管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
-        </header>
-
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="工艺名称">
-                  <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                  <t-input v-model="searchForm.name" clearable placeholder="请输入工艺名称" />
                 </t-form-item>
                 <t-form-item label="工艺类型" class="craft-type-filter">
-                  <t-select v-model="searchForm.type" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.type" clearable placeholder="请选择工艺类型">
                     <t-option
                       v-for="item in craftTypeOptions"
                       :key="item.value"
@@ -40,7 +29,7 @@
                       :model-value="searchForm.widthStart"
                       clearable
                       inputmode="numeric"
-                      placeholder="长"
+                      placeholder="请输入工艺宽度"
                       @update:model-value="handleWidthSearchInput('widthStart', $event)"
                     />
                     <span>-</span>
@@ -48,13 +37,13 @@
                       :model-value="searchForm.widthEnd"
                       clearable
                       inputmode="numeric"
-                      placeholder="宽"
+                      placeholder="请输入工艺宽度"
                       @update:model-value="handleWidthSearchInput('widthEnd', $event)"
                     />
                   </div>
                 </t-form-item>
                 <t-form-item label="状态" class="zdm-status-filter craft-status-filter">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
@@ -76,12 +65,12 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
-            <t-button v-if="canCreateCraft" theme="primary" @click="openCreateDialog">
+          <AdminListToolbar :has-actions="canCreateCraft"
+            ><t-button v-if="canCreateCraft" theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
-            </t-button>
-          </div>
+            </t-button></AdminListToolbar
+          >
 
           <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
@@ -126,9 +115,10 @@
     </div>
 
     <t-dialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
-      width="640px"
+      width="480px"
       placement="center"
       :close-on-overlay-click="true"
       confirm-btn="提交"
@@ -141,7 +131,6 @@
         <t-form-item label="工艺图片" name="image">
           <AdminMediaUpload
             v-model="formData.image"
-            class="craft-media-upload"
             title="工艺图片"
             accept="image/*"
             :show-title="false"
@@ -153,10 +142,10 @@
           />
         </t-form-item>
         <t-form-item label="工艺名称" name="name">
-          <t-input v-model="formData.name" clearable placeholder="请输入" />
+          <t-input v-model="formData.name" clearable placeholder="请输入工艺名称" />
         </t-form-item>
         <t-form-item label="工艺类型" name="type">
-          <t-select v-model="formData.type" placeholder="请选择">
+          <t-select v-model="formData.type" placeholder="请选择工艺类型">
             <t-option v-for="item in craftTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
@@ -165,7 +154,7 @@
             :model-value="formData.width"
             clearable
             inputmode="numeric"
-            placeholder="请输入"
+            placeholder="请输入工艺宽度"
             suffix="mm"
             @update:model-value="handleFormWidthInput"
           />
@@ -173,7 +162,7 @@
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="formData.remark"
-            placeholder="请输入"
+            placeholder="请输入备注"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
@@ -210,6 +199,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, UploadFile } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -510,16 +501,15 @@ const openFormImagePreview = () => {
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
 
   const normalizedName = formData.name.trim();
   const duplicateName = tableData.value.some(
     (item) => item.id !== editingId.value && item.name.trim() === normalizedName,
   );
   if (duplicateName) {
-    adminFeedback.warning('工艺名称已存在');
-    return;
+    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '工艺名称已存在' }] });
   }
+  if (result !== true || duplicateName) return rejectFormSubmission(formRef.value);
 
   try {
     const imageMediaId = formData.image?.mediaId;
@@ -627,24 +617,6 @@ onMounted(loadCrafts);
   border-radius: var(--td-radius-medium);
 }
 
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
 .width-range {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -654,13 +626,6 @@ onMounted(loadCrafts);
 
 .width-range span {
   color: var(--td-text-color-placeholder);
-}
-
-.filter-actions {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
 }
 
 .table-toolbar {
@@ -715,10 +680,6 @@ onMounted(loadCrafts);
   font-size: var(--td-font-size-body-small);
 }
 
-.craft-media-upload {
-  width: 168px;
-}
-
 .image-preview {
   height: 360px;
   display: flex;
@@ -754,14 +715,9 @@ onMounted(loadCrafts);
 
 @media (max-width: 960px) {
   .page-header,
-  .filter-row,
   .table-toolbar {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .filter-actions {
-    justify-content: flex-start;
   }
 }
 </style>

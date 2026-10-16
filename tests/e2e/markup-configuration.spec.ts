@@ -1,3 +1,4 @@
+import { checkDecimalEditing } from './decimal-editing';
 import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
@@ -165,7 +166,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await mockMarkupConfigurations(page);
   await page.goto('/markup-configuration');
 
-  await expect(page.getByText('商品默认价格规则')).toBeVisible();
+  await expect(page.getByRole('main').locator('.page-header')).toHaveCount(0);
   await expect(page.getByText('指导价设置', { exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '门店级别' })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '状态' })).toBeVisible();
@@ -201,13 +202,14 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
 
   const guideCoefficientInput = page.locator('.guide-coefficient-input input');
   await expect(guideCoefficientInput).toHaveValue('1.50');
+  await checkDecimalEditing(guideCoefficientInput);
   await guideCoefficientInput.fill('0.5');
   await guideCoefficientInput.blur();
   await expect(page.getByText('价格系数不能小于1.00', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '新增', exact: true }).click();
   const createDialog = page.locator('.t-dialog:visible').filter({ has: page.getByText('新增', { exact: true }) });
-  await createDialog.getByPlaceholder('请选择', { exact: true }).click();
+  await createDialog.getByPlaceholder('请选择门店级别', { exact: true }).click();
   const levelDropdown = page.locator('.t-select__dropdown:visible');
   await expect(levelDropdown.getByText('城市中心店', { exact: true })).toBeVisible();
   await expect(levelDropdown.getByText('区域合作店', { exact: true })).toBeVisible();
@@ -216,6 +218,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
     'width',
     await createDialog.locator('.price-coefficient-input').evaluate((element) => getComputedStyle(element).width),
   );
+  await checkDecimalEditing(createDialog.locator('.price-coefficient-input input'));
   await createDialog.locator('.price-coefficient-input input').fill('-1');
   await createDialog.locator('.price-coefficient-input input').blur();
   await expect(createDialog.getByText('请输入正确的价格系数', { exact: true })).toBeVisible();
@@ -230,6 +233,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   expect((await createRequest).postDataJSON()).toEqual({ storeLevelId: 13, priceCoefficient: 0.5 });
 
   await page.getByText('大板价格配置', { exact: true }).click();
+  await checkDecimalEditing(page.locator('.guide-coefficient-input input'));
   await expect(page.getByRole('columnheader', { name: '状态' })).toBeVisible();
   await expect(page.getByRole('cell', { name: '城市中心店', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '1.2', exact: true })).toBeVisible();

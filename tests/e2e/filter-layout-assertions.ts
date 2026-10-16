@@ -23,10 +23,13 @@ export async function expectOfficialLayout(page: Page, form: Locator) {
       };
     });
   expect(columns.display).toBe('grid');
-  expect(columns.columns).toBe(columns.grouped ? 1 : 3);
+  const fields = form.locator('.filter-fields');
+  const available = await fields.evaluate((el) => el.getBoundingClientRect().width);
+  const fieldCount = await fields.locator(':scope > *').count();
+  const expectedColumns = Math.max(1, Math.min(Math.max(3, Math.min(fieldCount, 4)), Math.floor(available / 238)));
+  expect(columns.columns).toBe(expectedColumns);
   const row = form.locator('.filter-row, .supply-type-filter-row').first();
   await expect(row).toHaveCSS('display', 'grid');
   const count = await row.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
-  const grouped = await row.locator('.filter-primary-row').count();
-  expect(count).toBe(grouped ? 1 : 2);
+  expect(count).toBe(2);
 }

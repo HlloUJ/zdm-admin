@@ -39,16 +39,16 @@ test('shows slab origin in the slab base-data submenu and supports search and CR
     await originMenuItem.evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
   ).toBe('/slab-variety');
   await expect(main.getByText('巴西', { exact: true })).toBeVisible();
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*产地管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveCount(0);
 
-  await main.getByPlaceholder('请输入', { exact: true }).fill('不存在');
+  await main.getByPlaceholder('请输入产地', { exact: true }).fill('不存在');
   await main.getByRole('button', { name: '查询', exact: true }).click();
   await expect(main.getByText('巴西', { exact: true })).toHaveCount(0);
   await main.getByRole('button', { name: '重置', exact: true }).click();
   await expect(main.getByText('巴西', { exact: true })).toBeVisible();
 
   await main.getByRole('button', { name: '新增', exact: true }).click();
-  await page.getByPlaceholder('请输入产地', { exact: true }).fill('意大利');
+  await page.locator('.t-dialog:visible').getByPlaceholder('请输入产地', { exact: true }).fill('意大利');
   await page.getByRole('button', { name: '提交', exact: true }).click();
   await expect(page.getByText('已新增“意大利”', { exact: true })).toBeVisible();
 

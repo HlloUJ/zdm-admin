@@ -15,12 +15,12 @@ test('whole page examples reuse all list modes and native client pagination with
   await host.locator('.t-pagination__btn-next').click();
   await expect(host.getByText('客户11', { exact: true })).toBeVisible();
   await expect(host.getByText('客户1', { exact: true })).toHaveCount(0);
-  await host.getByPlaceholder('请输入').first().fill('测试客户');
+  await host.getByPlaceholder('请输入姓名').first().fill('测试客户');
   await expect(page.getByText('查询次数：0')).toBeVisible();
   await host.getByRole('button', { name: '查询', exact: true }).click();
   await expect(page.getByText('查询次数：1')).toBeVisible();
   await host.getByRole('button', { name: '重置', exact: true }).click();
-  await expect(host.getByPlaceholder('请输入').first()).toHaveValue('');
+  await expect(host.getByPlaceholder('请输入姓名').first()).toHaveValue('');
   await page.getByRole('button', { name: '基础列表', exact: true }).click();
   await expect(host).toHaveAttribute('data-page-template', 'base-list');
   await expect(host.locator('.t-tabs')).toHaveCount(0);
@@ -48,7 +48,7 @@ test('registered extension wraps predictably and contains long labels without cl
   for (const width of [1366, 1024, 768]) {
     await page.setViewportSize({ width, height: 858 });
     await page.goto('/tests/fixtures/official-ui/examples.html');
-    const form = page.locator('.zdm-official-list-page__filters');
+    const form = page.locator('.zdm-official-list-page__grid-filters');
     await expect(form.getByRole('button', { name: '查询', exact: true })).toBeVisible();
     const geometry = await form.evaluate((element) => {
       const host = element.getBoundingClientRect();
@@ -65,4 +65,68 @@ test('registered extension wraps predictably and contains long labels without cl
     expect(geometry.scroll).toBeLessThanOrEqual(geometry.viewport);
     for (const right of geometry.rightEdges) expect(right).toBeLessThanOrEqual(geometry.hostRight + 1);
   }
+});
+
+for (const count of [1, 2, 3, 4, 7]) {
+  test(`default query standard keeps ${count} fields aligned across container widths`, async ({ page }) => {
+    await page.goto(`/tests/fixtures/official-ui/examples.html?filterCount=${count}`);
+    const host = page.locator('.zdm-official-list-page');
+    const form = host.locator('.zdm-standard-query');
+    const fields = form.locator('.filter-fields');
+    await expect(fields.locator('.t-form__item')).toHaveCount(count);
+    await host.getByPlaceholder('请输入姓名').fill('保留条件');
+    for (const width of [1689, 1024, 768]) {
+      await page.setViewportSize({ width, height: 858 });
+      const metrics = await form.evaluate((el) => {
+        const grid = el.querySelector('.filter-fields')!;
+        const area = el.querySelector('.filter-row')!;
+        const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+        const division = getComputedStyle(area).gridTemplateColumns.split(' ').map(parseFloat);
+        const controls = [...grid.querySelectorAll('.t-form__controls')].map((control) => {
+          const { x, y, width, bottom, height } = control.getBoundingClientRect();
+          return { x, y, width, bottom, height };
+        });
+        const labels = [...grid.querySelectorAll('.t-form__label')].map((label) => label.getBoundingClientRect().width);
+        return { columns, division, controls, labels, width: grid.getBoundingClientRect().width };
+      });
+      const maxColumns = count >= 4 ? 4 : 3;
+      expect(metrics.columns).toBe(Math.max(1, Math.min(maxColumns, Math.floor(metrics.width / 238))));
+      expect(metrics.division[0] / metrics.division[1]).toBeCloseTo(5, 1);
+      for (const labelWidth of metrics.labels) expect(labelWidth).toBeCloseTo(80, 0);
+      for (let index = 0; index < count; index++) {
+        const control = metrics.controls[index];
+        expect(control.width).toBeCloseTo(metrics.controls[0].width, 0);
+        expect(control.x).toBeCloseTo(metrics.controls[index % metrics.columns].x, 0);
+        if (index >= metrics.columns) {
+          expect(control.y - metrics.controls[index - metrics.columns].bottom).toBeCloseTo(24, 0);
+        }
+      }
+      const lastBottom = Math.max(...metrics.controls.map((control) => control.bottom));
+      const operations = (await host.locator('.zdm-official-list-page__operations').boundingBox())!;
+      expect(operations.y - lastBottom).toBeCloseTo(24, 0);
+      await expect(host.getByPlaceholder('请输入姓名')).toHaveValue('保留条件');
+      await expect(page.getByText('查询次数：0')).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await form.getByRole('button', { name: '查询', exact: true }).click();
+    await expect(page.getByText('查询次数：1')).toBeVisible();
+    await form.getByRole('button', { name: '重置', exact: true }).click();
+    await expect(host.getByPlaceholder('请输入姓名')).toHaveValue('');
+  });
+}
+
+test('compound search uses a short label with explicit full hint without changing query timing', async ({ page }) => {
+  await page.goto('/tests/fixtures/official-ui/examples.html?compoundSearch=1');
+  const form = page.locator('.zdm-standard-query');
+  const item = form.locator('.t-form__item').first();
+  await expect(item.locator('.t-form__label')).toHaveText('商品：');
+  expect((await item.locator('.t-form__label').boundingBox())!.width).toBe(80);
+  const input = item.getByPlaceholder('请输入商品名称/ID/编号', { exact: true });
+  await input.fill('测试编号');
+  await expect(page.getByText('查询次数：0')).toBeVisible();
+  await form.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(page.getByText('查询次数：1')).toBeVisible();
+  await form.getByRole('button', { name: '重置', exact: true }).click();
+  await expect(input).toHaveValue('');
+  await expect(form.locator('.t-form__item').nth(1).getByPlaceholder('请输入联系电话')).toBeVisible();
 });

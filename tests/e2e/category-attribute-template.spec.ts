@@ -272,7 +272,7 @@ test('add attributes paginates and retains selections across search and pages', 
   await dialog.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await expect(dialog.locator('tbody tr')).toHaveCount(2);
   await dialog.locator('tbody tr').first().locator('.t-checkbox').click();
-  await dialog.getByPlaceholder('搜索属性名称').fill('候选属性12');
+  await dialog.getByPlaceholder('请输入属性名称').fill('候选属性12');
   await expect(dialog.locator('tbody tr')).toHaveCount(1);
   await expect(dialog.locator('tbody tr')).toContainText('文本输入');
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
@@ -294,7 +294,7 @@ test('publish highlights missing roles and dropdown options', async ({ page }) =
   await expect(table.getByRole('columnheader', { name: '属性角色 *', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader', { name: '选项值 *', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '发布新版本', exact: true }).click();
-  await expect(page.getByText('请完善属性角色和选项值后发布', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
   await expect(table.locator('.t-select .t-input')).toHaveClass(/t-is-error/);
   await expect(table.locator('.t-link--theme-danger').filter({ hasText: /^0$/ })).toBeVisible();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
@@ -334,7 +334,7 @@ test('option values support row selection and pagination without applying on can
   await link.click();
   await dialog.locator('.zdm-admin-pagination:visible').getByText('2', { exact: true }).click();
   await dialog.getByText('选项11', { exact: true }).click();
-  await dialog.getByPlaceholder('搜索选项值').fill('选项12');
+  await dialog.getByPlaceholder('请输入选项值').fill('选项12');
   await expect(dialog.locator('tbody tr')).toHaveCount(1);
   await dialog.getByText('选项12', { exact: true }).click();
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
@@ -420,7 +420,7 @@ test('published option values show all rows without search pagination or footer 
   await page.locator('.t-table__body').getByText('12', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.getByText('只读选项12', { exact: true })).toBeVisible();
-  await expect(dialog.getByPlaceholder('搜索选项值')).toHaveCount(0);
+  await expect(dialog.getByPlaceholder('请输入选项值')).toHaveCount(0);
   await expect(dialog.locator('.t-pagination')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '取消', exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '提交', exact: true })).toHaveCount(0);

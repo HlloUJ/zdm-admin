@@ -8,10 +8,27 @@ export function inspectPage(source) {
   const ast = parseTemplate(descriptor.template.content);
   const tags = [];
   const visuals = [];
+  const queryLayouts = [];
+  const queryForms = [];
   function walk(node) {
     if (node.type === NodeTypes.ELEMENT) {
       tags.push(node.tag);
+      if (node.tag === 't-form') {
+        const classes =
+          node.props.find((prop) => prop.type === NodeTypes.ATTRIBUTE && prop.name === 'class')?.value?.content ?? '';
+        if (classes.split(/\s+/).includes('zdm-admin-filter-form')) queryForms.push(classes);
+      }
       for (const prop of node.props) {
+        if (node.tag === 'AdminListPage') {
+          if (prop.type === NodeTypes.ATTRIBUTE && ['filter-layout', 'filterLayout'].includes(prop.name))
+            queryLayouts.push(prop.value?.content ?? '');
+          if (
+            prop.type === NodeTypes.DIRECTIVE &&
+            prop.name === 'bind' &&
+            (!prop.arg || ['filter-layout', 'filterLayout'].includes(prop.arg.content))
+          )
+            queryLayouts.push('dynamic');
+        }
         if (
           prop.type === NodeTypes.ATTRIBUTE &&
           ['class', 'style', 'width', 'height', 'label-width', 'table-layout', 'table-content-width'].includes(
@@ -32,16 +49,18 @@ export function inspectPage(source) {
   }
   walk(ast);
   const styles = descriptor.styles.map((style) => ({ content: style.content, scoped: style.scoped, lang: style.lang }));
-  return { tags, styles, visuals, visualDigest: digest(JSON.stringify({ styles, visuals })) };
+  return { tags, styles, visuals, queryLayouts, queryForms, visualDigest: digest(JSON.stringify({ styles, visuals })) };
 }
 export function pageViolations(file, source, baseline) {
   const page = inspectPage(source);
   if (baseline)
     return page.visualDigest === baseline ? [] : [`${file}: legacy visual inputs changed before migration approval`];
-  const errors = [];
+  const errors = listLayoutViolations(file, source);
   if (!page.tags.some((tag) => ['AdminListPage', 'AdminFormDialog', 'AdminDetailPage'].includes(tag)))
     errors.push(`${file}: use a registered whole-page component`);
   if (page.styles.length) errors.push(`${file}: page-local CSS requires a reviewed business-layout exception`);
+  if (page.queryLayouts.some((layout) => layout !== 'adaptive-grid'))
+    errors.push(`${file}: new list queries must use the adaptive-grid standard`);
   const forbidden = new Set([
     't-card',
     't-tabs',
@@ -90,4 +109,32 @@ export function templateShape(source, targetTag) {
     return null;
   }
   return find(ast);
+}
+
+// Main list surfaces share one toolbar; editor/dialog toolbars retain their contracts.
+export function listLayoutViolations(file, source) {
+  const { descriptor } = parse(source);
+  if (!descriptor.template) return [];
+  const errors = [];
+  function walk(node) {
+    if (node.type === NodeTypes.ELEMENT) {
+      if (
+        ['AdminDialog', 'AdminFormDialog', 't-dialog', 't-drawer', 'AdminDrawer', 'AdminProductEditorPage'].includes(
+          node.tag,
+        )
+      )
+        return;
+      const classes =
+        node.props
+          .find((prop) => prop.type === NodeTypes.ATTRIBUTE && prop.name === 'class')
+          ?.value?.content?.split(/\s+/) ?? [];
+      if (node.tag === 'AdminPageHeader' || classes.includes('page-header'))
+        errors.push(`${file}: display-only page headers are retired`);
+      if (classes.includes('table-toolbar') && node.tag !== 'AdminListToolbar')
+        errors.push(`${file}: use the shared list toolbar`);
+    }
+    for (const child of node.children ?? []) walk(child);
+  }
+  walk(parseTemplate(descriptor.template.content));
+  return errors;
 }

@@ -1,0 +1,6 @@
+.admin-media-upload--invalid .t-upload__card-container,
+.admin-media-upload--invalid .t-upload__card-container:hover:not(.t-is-disabled),
+.t-form .t-is-error .admin-media-upload .t-upload__card-container,
+.t-form .t-is-error .admin-media-upload .t-upload__card-container:hover:not(.t-is-disabled) {
+  border-color: var(--td-error-color);
+}

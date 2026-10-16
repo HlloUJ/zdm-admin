@@ -6,20 +6,18 @@
       <AdminSideMenu />
 
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['租户与门店', '门店管理']" badge="租户业务开通后生成门店" />
-
         <AdminListLayout class="store-list-layout">
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showStoreTabRail" v-model="activeTab" :list="storeTabs" />
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店名称" name="shopName">
-                      <t-input v-model="searchForm.shopName" clearable placeholder="请输入" />
+                      <t-input v-model="searchForm.shopName" clearable placeholder="请输入门店名称" />
                     </t-form-item>
                     <t-form-item label="门店类型" name="shopType" class="shop-type-filter">
-                      <t-select v-model="searchForm.shopType" clearable placeholder="请选择">
+                      <t-select v-model="searchForm.shopType" clearable placeholder="请选择门店类型">
                         <t-option
                           v-for="item in shopTypeOptions"
                           :key="item.value"
@@ -29,7 +27,7 @@
                       </t-select>
                     </t-form-item>
                     <t-form-item label="租户姓名" name="tenantName" class="compact-select-filter">
-                      <t-select v-model="searchForm.tenantName" clearable filterable placeholder="请选择">
+                      <t-select v-model="searchForm.tenantName" clearable filterable placeholder="请选择租户姓名">
                         <t-option
                           v-for="item in tenantOptions"
                           :key="item.name"
@@ -52,12 +50,12 @@
                   </div>
                 </div>
               </t-form>
-              <div v-if="activeTab === 'operating' && canCreate" class="table-toolbar">
-                <t-button theme="primary" @click="openCreateDialog">
+              <AdminListToolbar :has-actions="activeTab === 'operating' && canCreate"
+                ><t-button theme="primary" @click="openCreateDialog">
                   <template #icon><t-icon name="add" /></template>
                   新增
-                </t-button>
-              </div>
+                </t-button></AdminListToolbar
+              >
             </div>
           </template>
 
@@ -124,9 +122,10 @@
     </div>
 
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
-      width="620px"
+      width="480px"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
       @close="closeFormDialog"
@@ -138,7 +137,7 @@
               v-model="formData.tenantName"
               clearable
               filterable
-              placeholder="请选择"
+              placeholder="请选择选择租户"
               @change="handleTenantChange"
             >
               <t-option v-for="item in tenantOptions" :key="item.name" :label="item.name" :value="item.name" />
@@ -149,7 +148,7 @@
               v-model="formData.shopType"
               :popup-visible="shopTypePopupVisible"
               clearable
-              placeholder="请选择"
+              placeholder="请选择门店类型"
               @popup-visible-change="handleShopTypePopupVisibleChange"
             >
               <t-option
@@ -162,7 +161,7 @@
           </t-form-item>
         </template>
         <t-form-item label="门店名称" name="shopName" required-mark>
-          <t-input v-model="formData.shopName" clearable placeholder="请输入" />
+          <t-input v-model="formData.shopName" clearable placeholder="请输入门店名称" />
         </t-form-item>
         <t-form-item label="门店地址" name="region" required-mark>
           <t-cascader
@@ -171,21 +170,21 @@
             :keys="chinaRegionKeys"
             clearable
             filterable
-            placeholder="请选择省 / 市 / 区"
+            placeholder="请选择门店地址"
           />
         </t-form-item>
         <t-form-item label="详细地址" name="detailAddress" required-mark>
-          <t-input v-model="formData.detailAddress" clearable placeholder="请输入" />
+          <t-input v-model="formData.detailAddress" clearable placeholder="请输入详细地址" />
         </t-form-item>
         <t-form-item v-if="dialogMode === 'create'" label="门店级别" name="storeLevelId" required-mark>
-          <t-select v-model="formData.storeLevelId" clearable filterable placeholder="请选择">
+          <t-select v-model="formData.storeLevelId" clearable filterable placeholder="请选择门店级别">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="formData.remark"
-            placeholder="请输入"
+            placeholder="请输入备注"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
@@ -196,14 +195,15 @@
     <AdminDialog
       v-model:visible="levelDialogVisible"
       header="门店级别"
-      width="420px"
+      dialog-class-name="zdm-admin-single-form"
+      width="480px"
       @confirm="handleLevelSubmit"
       @cancel="closeLevelDialog"
       @close="closeLevelDialog"
     >
       <t-form ref="levelFormRef" :data="levelFormData" :rules="levelFormRules" label-width="100px" colon>
         <t-form-item label="门店级别" name="storeLevelId" required-mark>
-          <t-select v-model="levelFormData.storeLevelId" clearable filterable placeholder="请选择">
+          <t-select v-model="levelFormData.storeLevelId" clearable filterable placeholder="请选择门店级别">
             <t-option v-for="item in shopLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
@@ -226,6 +226,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -237,7 +239,6 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminListLayout,
-  AdminPageHeader,
   AdminPagination,
 } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
@@ -567,6 +568,7 @@ const handleTenantChange = () => {
 const handleShopTypePopupVisibleChange = (visible: boolean) => {
   if (visible && !selectedTenant.value) {
     shopTypePopupVisible.value = false;
+    formRef.value?.setValidateMessage({ tenantName: [{ type: 'error', message: '请先选择租户' }] });
     adminFeedback.warning('请先选择租户');
     return;
   }
@@ -596,7 +598,7 @@ const closeFormDialog = () => {
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
 
   if (!formData.region) return;
   const action = dialogMode.value === 'create' ? '新增' : '编辑';
@@ -650,7 +652,7 @@ const closeLevelDialog = () => {
 
 const handleLevelSubmit = async () => {
   const result = await levelFormRef.value?.validate();
-  if (result !== true || !levelFormData.storeLevelId) return;
+  if (result !== true || !levelFormData.storeLevelId) return rejectFormSubmission(levelFormRef.value);
 
   const target = tableData.value.find((item) => item.id === levelEditingId.value);
   if (!target) return;
@@ -753,30 +755,6 @@ onMounted(loadStorePage);
   min-height: 0;
 }
 
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
 .table-toolbar {
   display: flex;
   align-items: center;
@@ -831,17 +809,5 @@ onMounted(loadStorePage);
 
 :deep(.t-dialog__body) {
   padding-top: var(--td-comp-paddingTB-l);
-}
-
-@media (max-width: 1080px) {
-  .filter-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .filter-actions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
 }
 </style>

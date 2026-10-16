@@ -16,3 +16,5 @@ export { default as AdminDetailPage } from './official/AdminDetailPage.vue';
 export type { ListFilter, ListAction, ListTab, FilterValues } from './official/types';
 
 export { default as AdminOfficialMediaUpload } from './official/AdminOfficialMediaUpload.vue';
+
+export { default as AdminListToolbar } from './AdminListToolbar.vue';

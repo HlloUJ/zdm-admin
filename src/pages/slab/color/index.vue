@@ -4,29 +4,20 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <header class="page-header">
-          <t-breadcrumb>
-            <t-breadcrumb-item>商品管理</t-breadcrumb-item>
-            <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
-            <t-breadcrumb-item>色系管理</t-breadcrumb-item>
-          </t-breadcrumb>
-          <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
-        </header>
-
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="色系" name="name">
-                  <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                  <t-input v-model="searchForm.name" clearable placeholder="请输入色系" />
                 </t-form-item>
                 <t-form-item label="色系分类" name="categoryId">
-                  <t-select v-model="searchForm.categoryId" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.categoryId" clearable placeholder="请选择色系分类">
                     <t-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
                   </t-select>
                 </t-form-item>
                 <t-form-item class="zdm-status-filter" label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
@@ -45,16 +36,16 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
-            <div class="toolbar-actions">
+          <AdminListToolbar :has-actions="canCreate || canManageCategories"
+            ><div class="toolbar-actions">
               <t-button v-if="canCreate" theme="primary" @click="openCreate">
                 <template #icon><t-icon name="add" /></template>新增
               </t-button>
               <t-button v-if="canManageCategories" theme="default" variant="outline" @click="openCategoryManagement">
                 色系分类管理
               </t-button>
-            </div>
-          </div>
+            </div></AdminListToolbar
+          >
           <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
               {{ (pagination.current - 1) * pagination.pageSize + rowIndex + 1 }}
@@ -92,6 +83,8 @@
     </div>
 
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
+      width="480px"
       v-model:visible="formVisible"
       :header="editingId ? '编辑色系' : '新增色系'"
       @confirm="submitColor"
@@ -143,15 +136,17 @@
     </AdminDialog>
 
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
+      width="480px"
       v-model:visible="categoryFormVisible"
       :header="editingCategoryId ? '编辑色系分类' : '新增色系分类'"
       @confirm="submitCategory"
       @cancel="closeCategoryForm"
       @close="closeCategoryForm"
     >
-      <t-form ref="categoryFormRef" :data="categoryForm" :rules="categoryRules" label-width="104px" colon>
+      <t-form ref="categoryFormRef" :data="categoryForm" :rules="categoryRules" label-width="100px" colon>
         <t-form-item label="分类名称" name="name">
-          <t-input v-model="categoryForm.name" clearable placeholder="请输入色系分类名称" />
+          <t-input v-model="categoryForm.name" clearable placeholder="请输入分类名称" />
         </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
@@ -189,6 +184,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -353,7 +350,7 @@ const closeColorForm = () => {
   formRef.value?.clearValidate();
 };
 const submitColor = async () => {
-  if ((await formRef.value?.validate()) !== true || !formData.categoryId) return;
+  if ((await formRef.value?.validate()) !== true || !formData.categoryId) return rejectFormSubmission(formRef.value);
   const payload: SlabColorPayload = {
     categoryId: formData.categoryId,
     name: formData.name.trim(),
@@ -420,7 +417,7 @@ const closeCategoryForm = () => {
   categoryFormRef.value?.clearValidate();
 };
 const submitCategory = async () => {
-  if ((await categoryFormRef.value?.validate()) !== true) return;
+  if ((await categoryFormRef.value?.validate()) !== true) return rejectFormSubmission(categoryFormRef.value);
   const payload = { name: categoryForm.name.trim(), remark: categoryForm.remark.trim() };
   try {
     if (editingCategoryId.value) await updateSlabColorCategory(editingCategoryId.value, payload);
@@ -469,30 +466,11 @@ onMounted(async () => {
   padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
   border-radius: var(--td-radius-medium);
 }
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-actions,
 .toolbar-actions,
 .table-actions {
   display: flex;
   align-items: center;
   gap: var(--td-comp-margin-s) var(--td-comp-margin-l);
-}
-.filter-actions {
-  justify-content: flex-end;
 }
 .table-toolbar {
   display: flex;
