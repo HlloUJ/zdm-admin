@@ -1,6 +1,9 @@
 import { request, getAuthToken, ApiError } from './http';
 export type CustomerStatus = 'daily' | 'archived';
 export interface CustomerProfile {
+  ownerAccountId?: number;
+  nationality?: string;
+  phoneRegion?: string;
   name: string;
   phone: string;
   wechat: string;
@@ -8,6 +11,7 @@ export interface CustomerProfile {
   remark: string;
 }
 export interface Customer extends CustomerProfile {
+  callingCode?: string;
   id: number;
   tenantId: number;
   storeId: number;
@@ -63,6 +67,16 @@ export const listCustomers = (status: CustomerStatus, name = '', phone = '', own
   return request<Customer[]>(`${base}?${query}`);
 };
 export const listCustomerOwners = (status: CustomerStatus) => request<Owner[]>(`${base}/owners?status=${status}`);
+export const listCustomerOwnerCandidates = (customerId?: number) =>
+  request<Owner[]>(`${base}/owner-candidates${customerId == null ? '' : `?customerId=${customerId}`}`);
+export interface CustomerContactCatalogue {
+  nationalities: { code: string; name: string }[];
+  phoneRegions: { code: string; name: string; callingCode: string }[];
+}
+export const listCustomerContactRegions = (status: CustomerStatus) =>
+  request<CustomerContactCatalogue>(`${base}/contact-regions?status=${status}`);
+export const displayCustomerPhone = (customer: Pick<Customer, 'phone' | 'callingCode'>) =>
+  customer.phone ? [customer.callingCode, customer.phone].filter(Boolean).join(' ') : '-';
 export const getCustomerDetail = (id: number) => request<CustomerDetail>(`${base}/${id}`);
 export const saveCustomer = (payload: CustomerProfile, id?: number) =>
   request<Customer>(id ? `${base}/${id}` : base, { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });

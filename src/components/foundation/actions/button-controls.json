@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "file": "src/components/AdminTopNav.vue",
+      "tag": "t-button",
+      "fingerprint": "b42114e8764d09d3824abe9aedb6d09d6cc2e8fdfa4cda90719c2b20d1e0ff1d",
+      "kind": "notification-indicator",
+      "reason": "既有无业务点击处理的通知指示图标"
+    },
+    {
+      "file": "src/components/permission/PermissionAssignmentMatrix.vue",
+      "tag": "button",
+      "fingerprint": "66e5009a6c1935cd2cb1318c543a0286730c54ec1cef5d146b69778b27d84549",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/components/product-logs/ProductLogFieldValue.vue",
+      "tag": "button",
+      "fingerprint": "c49ac7994a685960fd076426efc57069d9c92e00a07c8b484238a8095d23f1c5",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/craft/finished-stock/index.vue",
+      "tag": "button",
+      "fingerprint": "fadcd65130fd762a771017d78149378b67459e21e3879a151344d1ab6d763a68",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue",
+      "tag": "button",
+      "fingerprint": "1a4f3f0d71c5f3feb2e4712ec46984965d8686cbc95121efb33de5d7f66eb165",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/PriceSourceToggle.vue",
+      "tag": "button",
+      "fingerprint": "ac30f928c91b2d5830b06b47b0c266b03cabd8c2a3401427e19771ac56e78326",
+      "kind": "price-mode-control",
+      "reason": "价格跟随模式指示及切换控件，保留模式状态色"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/ProductDetail.vue",
+      "tag": "button",
+      "fingerprint": "5d758c6fdc8e156fd7357466358b71619ec40432de75b9a5fd4d3400e2fcd56d",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/finished-stock/management/components/ProductDetail.vue",
+      "tag": "button",
+      "fingerprint": "a2a011ec3ce5adc006ac53f617a7b105f6e02de367c77da9524f6d8c63af93fa",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/finished-stock/management/index.vue",
+      "tag": "t-link",
+      "fingerprint": "acfb74811e20d2ebfec27f1b70ebf68957a03469ad5aaf636a0e30e1cfd9163a",
+      "kind": "section-navigation",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/management/index.vue",
+      "tag": "button",
+      "fingerprint": "cf72a33dff1f35feaaf36cf6b2f8ab340b82b030ce1a045d4710c0ae3831dfd0",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/finished-stock/management/index.vue",
+      "tag": "button",
+      "fingerprint": "9735fa107a6090f7ca3270a39664ed91a4082c9c8304bc6c3193ca1d257e7300",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/management/index.vue",
+      "tag": "button",
+      "fingerprint": "83384327f54f99b227796e33a483530acd3370a6e45997f0dd17313816178db9",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/management/index.vue",
+      "tag": "button",
+      "fingerprint": "888e48953f213fe44ddd9d051d90bdd08565cabd55f13dbef2fcddbc3b8f9550",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/management/index.vue",
+      "tag": "button",
+      "fingerprint": "aaf134488e2aa823729cc665fc0187c429a6feb3d5b9a17d354ae0aeb7aa5901",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/store/StoreFinishedEditor.vue",
+      "tag": "t-link",
+      "fingerprint": "e989d51ab14af88c9ac10d877483de4ccb5570c1b46bc969a9ec23a70d421033",
+      "kind": "section-navigation",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/store/index.vue",
+      "tag": "button",
+      "fingerprint": "b6361edbd6b698781eeb82bd2c8217c859f2b7b26e5a74fb172c1747ecea1646",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/finished-stock/supply-chain/index.vue",
+      "tag": "t-link",
+      "fingerprint": "acfb74811e20d2ebfec27f1b70ebf68957a03469ad5aaf636a0e30e1cfd9163a",
+      "kind": "section-navigation",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/supply-chain/index.vue",
+      "tag": "button",
+      "fingerprint": "cf72a33dff1f35feaaf36cf6b2f8ab340b82b030ce1a045d4710c0ae3831dfd0",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/finished-stock/supply-chain/index.vue",
+      "tag": "button",
+      "fingerprint": "9735fa107a6090f7ca3270a39664ed91a4082c9c8304bc6c3193ca1d257e7300",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/supply-chain/index.vue",
+      "tag": "button",
+      "fingerprint": "83384327f54f99b227796e33a483530acd3370a6e45997f0dd17313816178db9",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/supply-chain/index.vue",
+      "tag": "button",
+      "fingerprint": "888e48953f213fe44ddd9d051d90bdd08565cabd55f13dbef2fcddbc3b8f9550",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/finished-stock/supply-chain/index.vue",
+      "tag": "button",
+      "fingerprint": "aaf134488e2aa823729cc665fc0187c429a6feb3d5b9a17d354ae0aeb7aa5901",
+      "kind": "selection-control",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/slab/management/components/SlabProductFormLayout.vue",
+      "tag": "t-link",
+      "fingerprint": "c4ecb490a1693504ff30c7dd29e0da520985a9ff743ac5f708ea474c6e737fd1",
+      "kind": "section-navigation",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/slab/management/index.vue",
+      "tag": "button",
+      "fingerprint": "34a7c9ba26dbda397252babc2e84b7ee444f6c75f72142f21c0c5c4dec62a2ef",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/slab/management/index.vue",
+      "tag": "button",
+      "fingerprint": "3ec861587b947222e45b3533107dbb03d73a74c0bf3104766def9ca3525d2ac6",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/slab/supply-chain/index.vue",
+      "tag": "button",
+      "fingerprint": "34a7c9ba26dbda397252babc2e84b7ee444f6c75f72142f21c0c5c4dec62a2ef",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/slab/supply-chain/index.vue",
+      "tag": "button",
+      "fingerprint": "3ec861587b947222e45b3533107dbb03d73a74c0bf3104766def9ca3525d2ac6",
+      "kind": "media-surface",
+      "reason": "媒体缩略图是内容预览面，不改写图片、视频及原有遮罩外观"
+    },
+    {
+      "file": "src/pages/tenant/management/index.vue",
+      "tag": "t-button",
+      "fingerprint": "80199bcb830e46561c48963f0c909a5a1e951bc0874d833e6102ef468d64d16c",
+      "kind": "business-selection",
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    }
+  ]
+}

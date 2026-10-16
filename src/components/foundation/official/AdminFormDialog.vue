@@ -8,7 +8,8 @@
         .filter(Boolean)
         .join(' ')
     "
-    :confirm-btn="confirmBtn"
+    :confirm-btn="dialogButtonProps(confirmFunction, confirmation, confirmBtn)"
+    :cancel-btn="cancelButtonProps(cancelBtn)"
     placement="center"
     :prevent-scroll-through="false"
     @update:visible="emit('update:visible', $event)"
@@ -20,7 +21,9 @@
   </t-dialog>
 </template>
 <script setup lang="ts">
+import { dialogButtonProps, type Confirmation, type ConfirmationButtonOptions } from '../actions/confirmation';
 import { ref } from 'vue';
+import { cancelButtonProps, type ButtonFunction } from '../actions/buttonFunctions';
 import type { FormProps, ButtonProps, FormInstanceFunctions } from 'tdesign-vue-next';
 import { formElement } from '@/utils/submitValidation';
 const formRef = ref<FormInstanceFunctions>();
@@ -34,9 +37,18 @@ withDefaults(
     labelWidth?: FormProps['labelWidth'];
     dialogClassName?: string;
     formLayout?: 'single-column' | 'custom';
-    confirmBtn?: string | ButtonProps;
+    confirmFunction: ButtonFunction;
+    confirmation: Confirmation;
+    cancelBtn?: string | ButtonProps | null;
+    confirmBtn?: ConfirmationButtonOptions | null;
   }>(),
-  { labelWidth: '100px', confirmBtn: '提交', dialogClassName: '', formLayout: 'single-column' },
+  {
+    labelWidth: '100px',
+    confirmBtn: undefined,
+    cancelBtn: undefined,
+    dialogClassName: '',
+    formLayout: 'single-column',
+  },
 );
 const emit = defineEmits<{ 'update:visible': [value: boolean] }>();
 </script>

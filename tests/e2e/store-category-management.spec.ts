@@ -109,7 +109,7 @@ test('switches isolated category types and limits maintenance to three levels', 
   expect(statusTops).toHaveLength(2);
   expect(Math.max(...statusTops) - Math.min(...statusTops)).toBeLessThanOrEqual(1);
   await name.fill('新增配件分类');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(requests.find((item) => item.method === 'POST')?.payload).toMatchObject({
     scope: 'accessory',
@@ -145,7 +145,7 @@ test('edit without status permission preserves status and never grants sorting',
   await expect(dialog.getByRole('radio', { name: '启用', exact: true })).toBeDisabled();
   await expect(dialog.getByRole('radio', { name: '停用', exact: true })).toBeDisabled();
   await dialog.getByPlaceholder('请输入分类名称').fill('修改名称');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(requests.find((item) => item.method === 'PUT')?.payload).toEqual({ name: '修改名称' });
   await expect(page.locator('[data-category-id]')).toHaveCount(0);
@@ -165,14 +165,14 @@ test('adding a child to a priced category requires confirmation; cancel preserve
   await page.getByRole('row').filter({ hasText: '成品另一级' }).getByText('新增下级', { exact: true }).click();
   const form = page.locator('.t-dialog:visible').filter({ hasText: '分类名称' });
   await form.getByPlaceholder('请输入分类名称').fill('新增二级');
-  await form.getByRole('button', { name: '保存', exact: true }).click();
+  await form.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const confirmation = page.locator('.t-dialog:visible').filter({ hasText: '已有商品价格不受影响' });
   await expect(confirmation).toBeVisible();
   expect(requests.filter((item) => item.method === 'POST')).toHaveLength(0);
   await confirmation.getByRole('button', { name: '取消', exact: true }).click();
   await expect(confirmation).toBeHidden();
   await expect(form.getByPlaceholder('请输入分类名称')).toHaveValue('新增二级');
-  await form.getByRole('button', { name: '保存', exact: true }).click();
+  await form.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await confirmation.getByRole('button', { name: '确认新增', exact: true }).click();
   await expect(form).toBeHidden();
   await expect(confirmation).toBeHidden();
@@ -191,7 +191,7 @@ test('duplicate category names keep the original rejection and show its native f
   await page.getByRole('button', { name: '新增一级分类', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await dialog.getByPlaceholder('请输入分类名称').fill('成品一级');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const field = dialog
     .locator('.t-form__item')
     .filter({ has: page.locator('.t-form__label').filter({ hasText: '分类名称' }) });
@@ -199,6 +199,6 @@ test('duplicate category names keep the original rejection and show its native f
   await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '同级分类名称不能重复' })).toHaveCount(0);
   expect(requests.some((item) => item.method === 'POST')).toBe(false);
   await dialog.getByPlaceholder('请输入分类名称').fill('合法的新分类');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(dialog).toBeHidden();
 });

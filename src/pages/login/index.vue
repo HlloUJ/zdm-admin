@@ -35,7 +35,13 @@
             placeholder="请输入验证码"
             @update:model-value="normalizeVerifyCode"
           />
-          <t-button size="large" variant="outline" :disabled="countDown > 0" @click="sendCode">
+          <t-button
+            :theme="buttonTheme('verification-code')"
+            size="large"
+            variant="outline"
+            :disabled="countDown > 0"
+            @click="sendCode"
+          >
             {{ countDown > 0 ? `${countDown}s` : '获取验证码' }}
           </t-button>
         </t-form-item>
@@ -45,7 +51,7 @@
         </div>
 
         <t-form-item class="btn-container">
-          <t-button block size="large" type="submit" :loading="submitting">登录</t-button>
+          <t-button :theme="buttonTheme('login')" block size="large" type="submit" :loading="submitting">登录</t-button>
         </t-form-item>
       </t-form>
     </section>
@@ -53,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { adminFeedback } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue-next';

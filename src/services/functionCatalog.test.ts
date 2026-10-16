@@ -48,6 +48,30 @@ const catalogFixture: FunctionModule[] = [
 ];
 
 describe('full function catalog', () => {
+  it('registers the actual customer operations and retires only standalone assignment', () => {
+    const prefix = 'store.customer-management';
+    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;
+    expect(module.menus[0].direct).toBe(true);
+    const page = module.menus[0].pages[0];
+    expect(page.actions).toEqual([]);
+    expect(page.tabs.map((tab) => tab.label)).toEqual(['日常客户', '归档客户']);
+    const codes = [
+      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'edit', 'archive'],
+      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'edit', 'restore', 'purge'],
+    ];
+    page.tabs.forEach((tab, index) =>
+      expect(tab.actions.map((action) => action.value)).toEqual(codes[index].map((code) => `${tab.value}.${code}`)),
+    );
+    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(15);
+    expect(
+      normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.assign`, `${prefix}.archived.assign`]),
+    ).toEqual([]);
+    const bulk = normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.batch-assign`]);
+    expect(bulk).toContain(`${prefix}.daily.batch-assign`);
+    expect(bulk).toContain(`${prefix}.daily.view`);
+    expect(bulk).not.toContain(`${prefix}.daily.edit`);
+  });
+
   it('registers two independent store category tabs with scoped maintenance actions', () => {
     const prefix = 'admin.tenant.store-category-management';
     const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;

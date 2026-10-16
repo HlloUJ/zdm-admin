@@ -42,6 +42,14 @@ public class CustomerController {
   public ApiResponse<List<CustomerService.Owner>> owners(@RequestParam String status) {
     return ApiResponse.ok(service.owners(status));
   }
+  @GetMapping("/contact-regions")
+  public ApiResponse<CustomerContactRegions.Catalogue> contactRegions(@RequestParam String status) {
+    return ApiResponse.ok(service.contactCatalogue(status));
+  }
+  @GetMapping("/owner-candidates")
+  public ApiResponse<List<CustomerService.Owner>> ownerCandidates(@RequestParam(required=false) Long customerId) {
+    return ApiResponse.ok(service.ownerCandidates(customerId));
+  }
   @GetMapping("/{id}")
   public ApiResponse<CustomerService.Detail> detail(@PathVariable Long id) { return ApiResponse.ok(service.detail(id)); }
   @PostMapping

@@ -176,7 +176,10 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   const videoBounds = await video.boundingBox();
   expect(videoBounds!.y).toBeGreaterThanOrEqual(imageBounds!.y + imageBounds!.height);
 
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page
+    .locator('.form-shell .form-submit-bar')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const errorColor = await images
     .locator('.t-upload__tips-error')
     .first()
@@ -465,7 +468,7 @@ test('shows every publish section and navigates anchors without losing form inpu
     })
     .toBe(true);
   await page.screenshot({ path: '/tmp/finished-product-cards-scrolled.png' });
-  await form.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await form.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(form.locator('.admin-media-upload--invalid').first()).toBeInViewport();
   await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
   await nameInput.fill('');
@@ -529,7 +532,7 @@ test('confirms category changes and replaces the cleared form attributes', async
   await page.getByRole('button', { name: '取消', exact: true }).last().click();
   await expect(nameInput).toHaveValue('需要保留的名称');
   await page.getByRole('button', { name: '切换分类', exact: true }).click();
-  await page.getByRole('button', { name: '确认切换', exact: true }).click();
+  await page.getByRole('button', { name: '确认切换分类', exact: true }).click();
   await picker.getByRole('button', { name: '分类乙', exact: true }).click();
   await page.getByRole('button', { name: '确认，下一步' }).click();
   await expect(nameInput).toHaveValue('');
@@ -548,7 +551,10 @@ test('source specification editor exposes cost and stock without operations pric
   await page.getByRole('button', { name: '确认，下一步' }).click();
   await page.getByRole('button', { name: '创建规格', exact: true }).click();
   await page.getByPlaceholder('请输入商品规格').fill('测试规格');
-  await page.getByRole('button', { name: '确认创建', exact: true }).click();
+  await page
+    .locator('.t-dialog:visible')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const table = page.locator('.spec-table-block');
   await expect(table.getByRole('columnheader', { name: '成本价*', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader', { name: /指导价/ })).toHaveCount(0);
@@ -629,12 +635,18 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   await page.getByRole('button', { name: '重置', exact: true }).click();
 
   await page.getByPlaceholder('请输入商品规格').fill('标准规格');
-  await page.getByRole('button', { name: '确认创建', exact: true }).click();
+  await page
+    .locator('.t-dialog:visible')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const table = page.locator('.spec-table-block');
   await expect(table.getByRole('columnheader', { name: '销售测试属性*', exact: true })).toBeVisible();
   for (const name of ['商品测试属性', '未绑定测试属性', '无角色测试属性', '大理石台面材质', '颜色分类', '尺寸'])
     await expect(table.getByRole('columnheader', { name, exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page
+    .locator('.form-shell .form-submit-bar')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const salesColumn = await table.getByRole('columnheader').allTextContents();
   const salesInput = table
     .locator('tbody tr')
@@ -651,19 +663,19 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   await expect(batchFields).not.toContainText('商品测试属性');
   await expect(batchFields).not.toContainText('无角色测试属性');
   await batchFields.locator('.t-form__item').filter({ hasText: '销售测试属性' }).getByRole('textbox').fill('大号');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.locator('.t-drawer:visible').getByRole('button', { name: '确认保存', exact: true }).click();
   await expect(salesInput).toHaveValue('大号');
   await page.getByRole('button', { name: '批量填写', exact: true }).click();
   await expect(
     batchFields.locator('.t-form__item').filter({ hasText: '销售测试属性' }).getByRole('textbox'),
   ).toHaveValue('');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.locator('.t-drawer:visible').getByRole('button', { name: '确认保存', exact: true }).click();
   await expect(salesInput).toHaveValue('大号');
   await expect(salesInput.locator('..')).not.toHaveClass(/t-is-error/);
   await page.getByRole('button', { name: '编辑规格', exact: true }).click();
   await page.getByPlaceholder('请输入商品规格').fill('大号');
   await page.getByText('分层展示：选择标准属性构建规格', { exact: true }).click();
-  await page.getByRole('button', { name: '确认切换', exact: true }).click();
+  await page.getByRole('button', { name: '确认切换展示模式', exact: true }).click();
   await expect(page.locator('.spec-attr-tag')).toHaveText(['销售测试属性']);
   // This product has not been saved, even though its single specifications were created.
   await expect(page.locator('.spec-attr-tag.active')).toHaveCount(0);
@@ -673,7 +685,10 @@ test('uses only template-bound role attributes and builds dynamic sales specific
     .locator('.layered-value-row')
     .getByPlaceholder(/^请输入.+/)
     .fill('小号');
-  await page.getByRole('button', { name: '确认创建', exact: true }).click();
+  await page
+    .locator('.t-dialog:visible')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   await expect(table.locator('tbody tr td').first()).toHaveText('小号');
 });
 
@@ -856,25 +871,25 @@ test('edits prices in a specification table and preserves product details on sav
     visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }),
   ).toBeVisible();
   await visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }).click();
-  await page.getByRole('button', { name: '确认', exact: true }).click();
+  await page.getByRole('button', { name: '确认更改价格浮动方式', exact: true }).click();
   await expect(editor).toBeVisible();
   expect(saves).toBe(0);
   expect(product.markupPrices[0].priceSource).toBe('auto');
   await visibleRows.nth(3).getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
-  await page.getByRole('button', { name: '确认', exact: true }).click();
+  await page.getByRole('button', { name: '确认更改价格浮动方式', exact: true }).click();
   await expect(editor).toBeVisible();
   expect(saves).toBe(0);
   expect(product.markupPrices[0].priceSource).toBe('auto');
   await expect(visibleRows.nth(3).getByPlaceholder('请输入价格', { exact: true })).toHaveValue('30.00');
 
-  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);
   expect(product.guidePrices[1].price).toBe(20);
   await page.getByText('编辑', { exact: true }).click();
   await expect(visibleRows.nth(1)).toHaveText('10.00');
   await visibleRows.nth(3).getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true }).click();
-  await page.getByRole('button', { name: '确认', exact: true }).click();
+  await page.getByRole('button', { name: '确认更改价格浮动方式', exact: true }).click();
   await expect(
     visibleRows.nth(3).getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }),
   ).toBeVisible();
@@ -896,7 +911,7 @@ test('edits prices in a specification table and preserves product details on sav
   await page.getByText('详情', { exact: true }).click();
   const detail = page.locator('.t-drawer').filter({ hasText: '商品详情' });
   await expect(detail).toBeVisible();
-  await expect(detail.getByRole('button', { name: '提交商品信息', exact: true })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })).toHaveCount(0);
   await expect(page.getByText('价格', { exact: true })).toHaveCount(0);
 });
 
@@ -990,7 +1005,7 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await expect(cost).toBeEnabled();
   await expect(cost).toHaveValue('10.00');
   await cost.fill('15');
-  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(saves).toBe(1);
 });
@@ -1091,7 +1106,7 @@ test('supply-chain layered product edit exposes cost for each specification', as
   await cost.blur();
   await expect(table.getByText('请输入价格', { exact: true })).toHaveCount(1);
   await expectPriceTableStable(table, geometry);
-  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expectPriceTableStable(table, geometry);
   await cost.fill('-1');
   await cost.blur();
@@ -1554,7 +1569,7 @@ for (const coefficient of [1.8, 0, undefined]) {
       await expect(zeroCostLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
       const table = editor.locator('.spec-table-block .t-table');
       const geometry = await priceTableGeometry(table);
-      await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+      await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
       await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
       await expectPriceTableStable(table, geometry);
       await expect(missingLevel.getByText('请输入价格', { exact: true })).toHaveCount(1);
@@ -1567,7 +1582,7 @@ for (const coefficient of [1.8, 0, undefined]) {
     );
     await expect(zeroCostLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('0.00');
     await expect(missingLevel.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
-    await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
     await expect(editor).not.toBeVisible();
     expect(saves).toHaveLength(1);
     expect(saves[0].markupPrices).toEqual([
@@ -1653,7 +1668,7 @@ test('switches empty and cleared select attributes to single mode without errors
   await expect(singles).toHaveValue('');
   await switchSpecMode(page, 'layered', false);
   for (const name of ['颜色', '尺寸']) await dialog.locator('.spec-attr-tag').getByText(name, { exact: true }).click();
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(dialog.locator('.t-alert')).toContainText('请填写所有规格属性值后再确认创建');
   await size
     .locator('.layered-value-row')
@@ -1744,7 +1759,7 @@ test('clears unsaved specification drafts on mode changes and preserves confirma
     await expect(singles).toHaveValue('');
   }
   await singles.fill('新规格');
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   const table = page.locator('.spec-table-block');
   await table.getByPlaceholder('请输入价格', { exact: true }).fill('30');
   await table.locator('.quantity-editor input').fill('4');
@@ -1755,7 +1770,7 @@ test('clears unsaved specification drafts on mode changes and preserves confirma
     .locator('.layered-value-row')
     .getByPlaceholder(/^请输入.+/)
     .fill('新规格');
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await expect(table.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
   await expect(table.locator('.quantity-editor input')).toHaveValue('');
@@ -1842,11 +1857,11 @@ async function switchSpecMode(page: Page, mode: 'single' | 'layered', expectConf
   await dialog.getByText(label, { exact: true }).click();
   if (expectConfirmation) {
     await expect(page.getByText(/您正在从【单层展示】切换至【分层展示】/)).toBeVisible();
-    await page.getByRole('button', { name: '确认切换', exact: true }).click();
+    await page.getByRole('button', { name: '确认切换展示模式', exact: true }).click();
   }
   await expect(dialog.getByRole('radio', { name: label, exact: true })).toBeChecked();
   await expect(dialog.locator('.t-alert')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '确认切换', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '确认切换展示模式', exact: true })).toHaveCount(0);
 }
 
 for (const originalMode of ['single', 'layered'] as const) {
@@ -1860,7 +1875,10 @@ for (const originalMode of ['single', 'layered'] as const) {
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     const firstCost = page.locator('.spec-table-block').getByPlaceholder('请输入价格', { exact: true }).first();
     await firstCost.fill('');
-    await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await page
+      .locator('.form-shell .form-submit-bar')
+      .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+      .click();
     await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toBeVisible();
     await firstCost.fill('10');
     await page.getByRole('button', { name: '编辑规格', exact: true }).click();
@@ -1920,7 +1938,7 @@ for (const originalMode of ['single', 'layered'] as const) {
           .fill(value);
       }
     }
-    await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+    await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
     await expect(table.locator('tbody tr')).toHaveCount(1);
     await expect(table.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
     await expect(table.locator('.quantity-editor input')).toHaveValue('');
@@ -1929,7 +1947,10 @@ for (const originalMode of ['single', 'layered'] as const) {
     await expect(table.locator('.t-input__tips')).toHaveCount(0);
     await expect(table.locator('.t-is-error')).toHaveCount(0);
     const regeneratedGeometry = await priceTableGeometry(table.locator('.t-table'));
-    await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await page
+      .locator('.form-shell .form-submit-bar')
+      .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+      .click();
     await expect(table.getByText('请输入数量', { exact: true })).toBeVisible();
     await expect(table.getByText('请输入价格', { exact: true })).toBeVisible();
     await expectPriceTableStable(table.locator('.t-table'), regeneratedGeometry);
@@ -1938,7 +1959,10 @@ for (const originalMode of ['single', 'layered'] as const) {
     const requestPromise = page.waitForRequest(
       (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
     );
-    await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await page
+      .locator('.form-shell .form-submit-bar')
+      .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+      .click();
     const variants = (await requestPromise).postDataJSON().variants;
     expect(variants).toHaveLength(1);
     expect(variants[0]).not.toHaveProperty('id');
@@ -1971,12 +1995,15 @@ test('preserves sparse SKU identities and values when editing without changing d
     .getByPlaceholder(/^请输入.+/)
     .first()
     .fill('米白色');
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(page.locator('.spec-table-block tbody tr')).toHaveCount(2);
   const requestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page
+    .locator('.form-shell .form-submit-bar')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const variants = (await requestPromise).postDataJSON().variants;
   expect(variants).toEqual([
     expect.objectContaining({
@@ -2015,7 +2042,7 @@ test('rebuilds eight distinct specifications from three edited dimensions withou
       .fill(`${index + 1}乙`);
   }
   await expect(dialog.getByTestId('spec-combination-editor')).toHaveCount(0);
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const table = page.locator('.spec-table-block');
   await expect(table.locator('tbody tr')).toHaveCount(8);
@@ -2031,7 +2058,10 @@ test('rebuilds eight distinct specifications from three edited dimensions withou
   const requestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page
+    .locator('.form-shell .form-submit-bar')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const variants = (await requestPromise).postDataJSON().variants;
   expect(variants).toHaveLength(8);
   const combinations = variants.map((variant: { salesAttributes: Record<string, string> }) =>
@@ -2061,12 +2091,12 @@ test('retains matched specification attributes and SKU data when adding and remo
     .getByPlaceholder(/^请输入.+/)
     .nth(2)
     .fill('中号');
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   const table = page.locator('.spec-table-block');
   await expect(table.locator('tbody tr')).toHaveCount(6);
   await page.getByRole('button', { name: '编辑规格', exact: true }).click();
   await size.locator('.layered-value-row').nth(2).getByRole('button').first().click();
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(table.locator('tbody tr')).toHaveCount(4);
   for (const row of await table.locator('tbody tr').all()) {
     if ((await row.getByPlaceholder('请输入价格', { exact: true }).inputValue()) === '') {
@@ -2077,7 +2107,10 @@ test('retains matched specification attributes and SKU data when adding and remo
   const requestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page
+    .locator('.form-shell .form-submit-bar')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const variants = (await requestPromise).postDataJSON().variants;
   expect(variants).toHaveLength(4);
   expect(variants).toEqual(
@@ -2117,7 +2150,7 @@ test('prefills corresponding non-dimension attributes when a saved specification
     .getByPlaceholder(/^请输入.+/)
     .nth(1)
     .fill('木材');
-  await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const table = page.locator('.spec-table-block');
   await expect(table.locator('tbody tr')).toHaveCount(8);
@@ -2130,7 +2163,10 @@ test('prefills corresponding non-dimension attributes when a saved specification
   const requestPromise = page.waitForRequest(
     (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
   );
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page
+    .locator('.form-shell .form-submit-bar')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const variants = (await requestPromise).postDataJSON().variants;
   expect(variants).toHaveLength(8);
   for (const variant of variants) {
@@ -2194,7 +2230,12 @@ for (const failSecond of [false, true]) {
     await dialog.locator('.t-select').click();
     await page.getByText('价格调整', { exact: true }).click();
     await dialog.locator('textarea').fill('  批量调整  ');
-    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    await dialog
+      .getByRole('button', {
+        name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+        exact: true,
+      })
+      .click();
     await expect(page.getByText(failSecond ? '商品状态已变化' : '已批量下架', { exact: true })).toBeVisible();
     expect(maxActive).toBe(1);
     expect(requests).toEqual(failSecond ? [73, 72] : [73, 72, 71]);
@@ -2221,7 +2262,10 @@ test('repeated layered specification rejection has a native field message withou
     writes.push(route.request().postDataJSON());
     return route.fulfill({ json: { code: 0, data: true } });
   });
-  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await page
+    .locator('.form-shell .form-submit-bar')
+    .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+    .click();
   const field = page
     .locator('.t-form__item')
     .filter({ has: page.locator('.t-form__label').filter({ hasText: /^销售规格[：:]?$/ }) });
@@ -2251,7 +2295,7 @@ test('empty publish reports every existing field once and locates the cover; edi
   }
   await page.getByRole('button', { name: '确认，下一步' }).click();
   const form = page.locator('.form-shell');
-  await form.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await form.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
   for (const message of [
     '请上传图片',
@@ -2340,11 +2384,16 @@ for (const submittedBeforeCreation of [false, true]) {
     expect(
       await supplierLabel.locator('label').evaluate((element) => getComputedStyle(element, '::before').content),
     ).toContain('*');
-    const submit = page.getByRole('button', { name: '提交商品信息', exact: true });
+    const submit = page
+      .locator('.form-shell .form-submit-bar')
+      .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true });
     if (submittedBeforeCreation) await submit.click();
     await page.getByRole('button', { name: '创建规格', exact: true }).click();
     await page.getByPlaceholder('请输入商品规格').fill('新规格');
-    await page.getByRole('button', { name: '确认创建', exact: true }).click();
+    await page
+      .locator('.t-dialog:visible')
+      .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+      .click();
     const table = page.locator('.spec-table-block');
     const cost = table.getByPlaceholder('请输入价格', { exact: true });
     const quantity = table.locator('.quantity-editor input');
@@ -2378,7 +2427,7 @@ for (const submittedBeforeCreation of [false, true]) {
     await batchQuantity.click();
     await batchQuantity.pressSequentially('12');
     await expect(batchQuantity).toHaveValue('12');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.locator('.t-drawer:visible').getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(quantity).toHaveValue('12');
     await quantity.fill('');
     await table.locator('.t-table__content').evaluateAll((elements) =>

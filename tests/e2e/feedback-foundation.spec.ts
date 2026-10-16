@@ -90,7 +90,7 @@ async function submitSlabProduct(page: Page) {
     await coefficientInput.fill('0.8');
     await coefficientInput.press('Tab');
   }
-  await productDialog.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await productDialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
 }
 
 test('uses the same action-specific confirmation foundation across modules', async ({ page }) => {
@@ -540,7 +540,7 @@ test('shows recycled slab prices without allowing edits', async ({ page }) => {
   await recycleRow.getByText('详情', { exact: true }).click();
   const detailDrawer = page.locator('.t-drawer').filter({ hasText: '大板详情' });
   await expect(detailDrawer).toBeVisible();
-  await expect(detailDrawer.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+  await expect(detailDrawer.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true })).toHaveCount(0);
   await expect(recycleRow.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(recycleRow.getByText('价格', { exact: true })).toHaveCount(0);
 });
@@ -816,14 +816,24 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('下架原因', { exact: true })).toBeVisible();
   await expect(dialog.getByText('请选择下架原因', { exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible({ timeout: 10_000 });
   expect(statusPayload).toBeUndefined();
 
   await dialog.getByRole('textbox').first().click();
   await page.locator('.t-popup__content:visible').getByText('库存异常', { exact: true }).click();
   await dialog.locator('textarea').fill(latestDetailReason);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
 
   await expect
     .poll(() => statusPayload)
@@ -956,7 +966,13 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
   });
 
   await expect(page.getByText('已上传“1:1主图”', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '提交', exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', {
+      name: '提交',
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '确认新增', exact: true })).toBeVisible();
   const preview = page.locator('.admin-media-upload[aria-label="1:1主图"] .t-upload__card-image img');
   await expect(preview).toBeVisible();
   await expect(preview).toHaveAttribute('src', previewDataUrl);
@@ -1200,7 +1216,12 @@ test('shows 已新增加名称 after creating an item', async ({ page }) => {
 
   await page.locator('.t-dialog:visible').getByPlaceholder('请输入属性名称').fill('E2E 新增属性');
   await page.getByText('文本输入', { exact: true }).click();
-  await page.getByRole('button', { name: '提交', exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
 
   await expect(page.getByText('已新增“E2E 新增属性”', { exact: true })).toBeVisible();
 });
@@ -1252,7 +1273,12 @@ test('shows the duplicate store name error on the edit form', async ({ page }) =
     .filter({ hasText: '门店名称' })
     .getByPlaceholder('请输入门店名称')
     .fill('已归档门店');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
 
   await expect(dialog.locator('.t-form__item').filter({ hasText: '门店名称' })).toContainText('门店名称已存在');
   await expect(page.getByText('编辑“已归档门店”失败：门店名称已存在', { exact: true })).toBeVisible();

@@ -60,7 +60,11 @@ test('manages standard textures and multiple aliases from the third-level menu',
   await expect(aliasDialog.getByText('幼纹', { exact: true })).toBeVisible();
   await aliasDialog.getByRole('button', { name: '新增别名', exact: true }).click();
   await page.locator('.t-dialog:visible').getByPlaceholder('请输入别名').fill('细花纹');
-  await page.locator('.t-dialog').filter({ hasText: '新增别名' }).getByRole('button', { name: '提交' }).click();
+  await page
+    .locator('.t-dialog')
+    .filter({ hasText: '新增别名' })
+    .getByRole('button', { name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/ })
+    .click();
   await expect(page.getByText('已新增“细花纹”', { exact: true })).toBeVisible();
   await expect(aliasDialog.getByText('细花纹', { exact: true })).toBeVisible();
 });

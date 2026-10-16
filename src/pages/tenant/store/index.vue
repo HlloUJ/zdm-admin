@@ -39,11 +39,11 @@
                   </div>
 
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="handleSearch">
+                    <t-button :theme="buttonTheme('search')" @click="handleSearch">
                       <template #icon><t-icon name="search" /></template>
                       查询
                     </t-button>
-                    <t-button theme="default" variant="base" @click="handleReset">
+                    <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                       <template #icon><t-icon name="refresh" /></template>
                       重置
                     </t-button>
@@ -51,7 +51,7 @@
                 </div>
               </t-form>
               <AdminListToolbar :has-actions="activeTab === 'operating' && canCreate"
-                ><t-button theme="primary" @click="openCreateDialog">
+                ><t-button :theme="buttonTheme('create')" @click="openCreateDialog">
                   <template #icon><t-icon name="add" /></template>
                   新增
                 </t-button></AdminListToolbar
@@ -78,7 +78,7 @@
                     shape="square"
                     size="small"
                     variant="text"
-                    theme="primary"
+                    :theme="buttonTheme('edit')"
                     aria-label="修改门店级别"
                     @click="openLevelDialog(row)"
                   >
@@ -94,14 +94,26 @@
               </template>
               <template #operation="{ row }">
                 <div v-if="activeTab === 'operating'" class="table-actions">
-                  <t-link v-if="canEdit" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                  <t-link v-if="canArchive" theme="warning" hover="color" @click="openArchiveConfirm(row)">归档</t-link>
+                  <t-link v-if="canEdit" :theme="buttonTheme('edit')" hover="color" @click="openEditDialog(row)"
+                    >编辑</t-link
+                  >
+                  <t-link
+                    v-if="canArchive"
+                    :theme="buttonTheme('archive')"
+                    hover="color"
+                    @click="openArchiveConfirm(row)"
+                    >归档</t-link
+                  >
                 </div>
                 <div v-else class="table-actions">
-                  <t-link v-if="canRestore" theme="success" hover="color" @click="openRestoreConfirm(row)"
+                  <t-link
+                    v-if="canRestore"
+                    :theme="buttonTheme('restore-operation')"
+                    hover="color"
+                    @click="openRestoreConfirm(row)"
                     >恢复运营</t-link
                   >
-                  <t-link v-if="canDelete" theme="danger" hover="color" @click="openDeleteConfirm(row)"
+                  <t-link v-if="canDelete" :theme="buttonTheme('purge')" hover="color" @click="openDeleteConfirm(row)"
                     >彻底删除</t-link
                   >
                 </div>
@@ -122,8 +134,10 @@
     </div>
 
     <AdminDialog
-      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
+      :confirmation="formConfirmation(dialogMode)"
+      confirm-function="submit"
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
       width="480px"
       @confirm="handleSubmit"
@@ -194,6 +208,8 @@
 
     <AdminDialog
       v-model:visible="levelDialogVisible"
+      :confirmation="operationConfirmation('调整门店级别')"
+      confirm-function="edit"
       header="门店级别"
       dialog-class-name="zdm-admin-single-form"
       width="480px"
@@ -212,8 +228,8 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmAction"
-      :danger="confirmState.type === 'delete'"
       object-type="门店"
       :object-name="confirmState.row?.shopName"
       @confirm="handleConfirm"
@@ -226,6 +242,8 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

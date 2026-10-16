@@ -19,7 +19,7 @@ public interface AuthAccountMapper {
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
-        COALESCE(e.data_permission, 'all') AS dataPermission,
+        CASE WHEN ai.identity_type = 'employee' THEN COALESCE(e.data_permission, '') ELSE 'all' END AS dataPermission,
         tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
@@ -89,7 +89,7 @@ public interface AuthAccountMapper {
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
-        COALESCE(e.data_permission, 'all') AS dataPermission,
+        CASE WHEN ai.identity_type = 'employee' THEN COALESCE(e.data_permission, '') ELSE 'all' END AS dataPermission,
         tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
@@ -147,7 +147,7 @@ public interface AuthAccountMapper {
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
-        COALESCE(e.data_permission, 'all') AS dataPermission,
+        CASE WHEN ai.identity_type = 'employee' THEN COALESCE(e.data_permission, '') ELSE 'all' END AS dataPermission,
         tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
@@ -192,7 +192,7 @@ public interface AuthAccountMapper {
         e.id AS employeeId,
         ai.tenant_id AS tenantId,
         ai.store_id AS storeId,
-        COALESCE(e.data_permission, 'all') AS dataPermission,
+        CASE WHEN ai.identity_type = 'employee' THEN COALESCE(e.data_permission, '') ELSE 'all' END AS dataPermission,
         tenant_owner.display_name AS tenantName,
         s.name AS storeName,
         s.type AS storeType
@@ -238,7 +238,7 @@ public interface AuthAccountMapper {
   String findTerminalPermissionValue(@Param("storeType") String storeType);
 
   @Select("""
-      SELECT DISTINCT r.code
+      SELECT DISTINCT CASE WHEN semantic.marker=0 THEN r.code ELSE r.builtin_key END
       FROM account_roles ar
       JOIN account_identities ai
         ON ai.id = #{identityId}
@@ -253,7 +253,9 @@ public interface AuthAccountMapper {
        AND r.client_code = ai.client_code
        AND ((r.tenant_id = ai.tenant_id) OR (r.tenant_id IS NULL AND ai.tenant_id IS NULL))
        AND ((r.store_id = ai.store_id) OR (r.store_id IS NULL AND ai.store_id IS NULL))
-      WHERE ar.account_id = #{accountId}
+      CROSS JOIN (SELECT 0 marker UNION ALL SELECT 1) semantic
+      WHERE (semantic.marker=0 OR r.builtin_key IS NOT NULL)
+        AND ar.account_id = #{accountId}
         AND ar.client_code IN ('admin', 'supply-chain')
         AND r.status = 'enabled'
       """)

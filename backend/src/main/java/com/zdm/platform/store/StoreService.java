@@ -16,15 +16,18 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   private static final String SUPPLIER_REFERENCED_MESSAGE = "该门店仍有供应商被商品引用，不能彻底删除";
   private static final String DUPLICATE_NAME_MESSAGE = "店铺名称已存在";
 
+  private final com.zdm.platform.role.StoreBuiltinRoleService builtinRoles;
   private final CurrentIdentityProvider identityProvider;
   private final StoreLevelService storeLevelService;
   private final JdbcTemplate jdbcTemplate;
   private final com.zdm.platform.account.AccountLifecycleService accountLifecycle;
 
   public StoreService(
+      com.zdm.platform.role.StoreBuiltinRoleService builtinRoles,
       CurrentIdentityProvider identityProvider,
       StoreLevelService storeLevelService,
       JdbcTemplate jdbcTemplate, com.zdm.platform.account.AccountLifecycleService accountLifecycle) {
+    this.builtinRoles = builtinRoles;
     this.identityProvider = identityProvider;
     this.storeLevelService = storeLevelService;
     this.jdbcTemplate = jdbcTemplate;
@@ -50,6 +53,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     store.setCreatedBy(identity.displayName());
     store.setCreatedByAccountId(identity.accountId());
     boolean saved = save(store);
+    builtinRoles.provision(store.getId(), store.getTenantId(), identity.accountId());
     provisionStoreAdmins(store);
     return saved;
   }

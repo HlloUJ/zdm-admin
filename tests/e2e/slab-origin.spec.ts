@@ -49,7 +49,12 @@ test('shows slab origin in the slab base-data submenu and supports search and CR
 
   await main.getByRole('button', { name: '新增', exact: true }).click();
   await page.locator('.t-dialog:visible').getByPlaceholder('请输入产地', { exact: true }).fill('意大利');
-  await page.getByRole('button', { name: '提交', exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('已新增“意大利”', { exact: true })).toBeVisible();
 
   const originRow = main.locator('tbody tr').filter({ hasText: '巴西' });

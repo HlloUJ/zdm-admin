@@ -7,7 +7,12 @@ test('pure native Dialog and Form reproduce last-field error overflow without ap
   const body = dialog.locator('.t-dialog__body');
   await expect(dialog).toBeVisible();
   const before = await body.evaluate((element) => ({ height: element.clientHeight, scroll: element.scrollHeight }));
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: '提交',
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请选择所属属性', { exact: true })).toBeVisible();
   await expect(dialog.getByText('请输入值名称', { exact: true })).toBeVisible();
   const after = await body.evaluate((element) => ({
@@ -41,7 +46,12 @@ for (const kind of ['public', 'foundation']) {
     const geometry = () => body.evaluate((element) => ({ height: element.clientHeight, scroll: element.scrollHeight }));
     const before = await geometry();
     expect(before.scroll).toBeLessThanOrEqual(before.height);
-    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    await dialog
+      .getByRole('button', {
+        name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+        exact: true,
+      })
+      .click();
     await expect(dialog.getByText('请输入值名称', { exact: true })).toBeVisible();
     expect(await geometry()).toEqual(before);
     const field = dialog.locator('.t-form__item').last();
@@ -74,13 +84,28 @@ for (const kind of ['public', 'foundation']) {
           ),
         );
     expect(await hasScroll()).toBe(true);
-    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    await dialog
+      .getByRole('button', {
+        name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+        exact: true,
+      })
+      .click();
     const field = dialog.locator('.t-form__item').last();
     await field.getByText('请输入值名称', { exact: true }).scrollIntoViewIfNeeded();
     await expect(field.getByText('请输入值名称', { exact: true })).toBeInViewport();
     expect(await hasScroll()).toBe(true);
-    await dialog.getByRole('button', { name: '提交', exact: true }).scrollIntoViewIfNeeded();
-    await expect(dialog.getByRole('button', { name: '提交', exact: true })).toBeInViewport();
+    await dialog
+      .getByRole('button', {
+        name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+        exact: true,
+      })
+      .scrollIntoViewIfNeeded();
+    await expect(
+      dialog.getByRole('button', {
+        name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+        exact: true,
+      }),
+    ).toBeInViewport();
   });
 }
 
@@ -108,7 +133,12 @@ test('attribute value create dialog keeps its final field error visible without 
   const body = dialog.locator('.t-dialog__body');
   const geometry = () => body.evaluate((element) => ({ height: element.clientHeight, scroll: element.scrollHeight }));
   const before = await geometry();
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请选择所属属性', { exact: true })).toBeVisible();
   await expect(dialog.getByText('请输入值名称', { exact: true })).toBeVisible();
   const after = await geometry();

@@ -31,7 +31,12 @@ test('whole page examples reuse all list modes and native client pagination with
   await page.getByRole('button', { name: '表单弹窗', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.locator('.t-form')).toBeVisible();
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText('详情范例', { exact: true })).toBeVisible();
   expect(requests).toEqual([]);

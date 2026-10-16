@@ -6,8 +6,8 @@
     :dialog-class-name="['zdm-admin-dialog', dialogClassName].filter(Boolean).join(' ')"
     placement="center"
     :prevent-scroll-through="false"
-    :confirm-btn="confirmBtn"
-    :cancel-btn="cancelBtn"
+    :confirm-btn="dialogButtonProps(confirmFunction, confirmation, confirmBtn)"
+    :cancel-btn="cancelButtonProps(cancelBtn)"
     @update:visible="emit('update:visible', $event)"
     @confirm="emit('confirm')"
     @cancel="emit('cancel')"
@@ -20,7 +20,9 @@
 </template>
 
 <script setup lang="ts">
+import { dialogButtonProps, type Confirmation, type ConfirmationButtonOptions } from './actions/confirmation';
 import type { ButtonProps } from 'tdesign-vue-next';
+import { cancelButtonProps, type ButtonFunction } from './actions/buttonFunctions';
 
 withDefaults(
   defineProps<{
@@ -28,13 +30,15 @@ withDefaults(
     header: string;
     width?: string;
     dialogClassName?: string;
-    confirmBtn?: string | ButtonProps;
+    confirmFunction: ButtonFunction;
+    confirmation: Confirmation;
+    confirmBtn?: ConfirmationButtonOptions | null;
     cancelBtn?: string | ButtonProps | null;
   }>(),
   {
     width: '480px',
     dialogClassName: '',
-    confirmBtn: '提交',
+    confirmBtn: undefined,
     cancelBtn: '取消',
   },
 );

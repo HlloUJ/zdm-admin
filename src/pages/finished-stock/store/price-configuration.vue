@@ -39,10 +39,10 @@
                       </t-form-item>
                     </div>
                     <t-space class="filter-actions" size="small">
-                      <t-button theme="primary" @click="queryCategories"
+                      <t-button :theme="buttonTheme('search')" @click="queryCategories"
                         ><template #icon><t-icon name="search" /></template>查询</t-button
                       >
-                      <t-button theme="default" @click="resetCategories"
+                      <t-button :theme="buttonTheme('reset')" @click="resetCategories"
                         ><template #icon><t-icon name="refresh" /></template>重置</t-button
                       >
                     </t-space>
@@ -51,7 +51,7 @@
                 <AdminListToolbar v-if="activeKind === 'discount'" :has-actions="can('create')">
                   <t-button
                     v-if="can('create')"
-                    theme="primary"
+                    :theme="buttonTheme('create')"
                     :disabled="loading || saving"
                     @click="openCreateDiscount"
                   >
@@ -59,16 +59,20 @@
                   </t-button>
                 </AdminListToolbar>
                 <div v-if="activeKind === 'price' && can('batch-set')" class="price-actions">
-                  <t-button theme="primary" variant="outline" :disabled="saving || loading" @click="openBatch"
+                  <t-button
+                    :theme="buttonTheme('batch-fill')"
+                    variant="outline"
+                    :disabled="saving || loading || !selectedEditableLeafIds.length"
+                    @click="openBatch"
                     >批量设置</t-button
                   >
                   <t-button
                     v-if="activeKind === 'price'"
-                    theme="primary"
+                    :theme="buttonTheme('save')"
                     :loading="saving"
                     :disabled="loading"
                     @click="savePrices"
-                    ><template #icon><t-icon name="save" /></template>保存</t-button
+                    ><template #icon><t-icon name="save" /></template>{{ formConfirmationText('edit') }}</t-button
                   >
                 </div>
               </div>
@@ -104,6 +108,7 @@
                   <div v-if="activeKind === 'price'" :class="['category-name-cell', `level-${row.depth + 1}`]">
                     <t-button
                       v-if="row.hasChildren"
+                      :theme="buttonTheme(isExpanded(row.id) ? 'collapse' : 'expand')"
                       class="tree-toggle"
                       variant="text"
                       shape="square"
@@ -153,14 +158,19 @@
                 <template #createdAt="{ row }">{{ formatStoreRuleDateTime(row.rule?.createdAt) }}</template>
                 <template #operation="{ row }">
                   <t-space size="small">
-                    <t-link v-if="can('edit')" theme="primary" @click="editDiscount(row.rule)">编辑</t-link>
+                    <t-link v-if="can('edit')" :theme="buttonTheme('edit')" @click="editDiscount(row.rule)"
+                      >编辑</t-link
+                    >
                     <t-link
                       v-if="can('toggle-status')"
-                      :theme="row.rule.status === 'disabled' ? 'success' : 'warning'"
+                      :theme="buttonTheme(row.rule.status === 'disabled' ? 'enable' : 'disable')"
                       @click="confirmDiscountAction(row.rule, 'status')"
                       >{{ row.rule.status === 'disabled' ? '启用' : '停用' }}</t-link
                     >
-                    <t-link v-if="can('delete')" theme="danger" @click="confirmDiscountAction(row.rule, 'delete')"
+                    <t-link
+                      v-if="can('delete')"
+                      :theme="buttonTheme('delete')"
+                      @click="confirmDiscountAction(row.rule, 'delete')"
                       >删除</t-link
                     >
                   </t-space>
@@ -174,10 +184,12 @@
     </div>
     <AdminDialog
       v-model:visible="createVisible"
+      :confirmation="formConfirmation(editingDiscountId == null ? 'create' : 'edit')"
+      confirm-function="save"
       :header="editingDiscountId == null ? '新增' : '编辑'"
       dialog-class-name="discount-config-dialog zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      :confirm-btn="{ content: '保存', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="saveDiscount"
       @cancel="createVisible = false"
       @close="createVisible = false"
@@ -219,6 +231,9 @@
     </AdminDialog>
     <AdminConfirmDialog
       v-model:visible="discountConfirmVisible"
+      :function="
+        discountAction === 'delete' ? 'delete' : discountActionTarget?.status === 'disabled' ? 'enable' : 'disable'
+      "
       :action="discountActionLabel"
       object-type="折扣配置"
       :object-name="discountActionTarget?.targetName"
@@ -236,9 +251,11 @@
     </AdminConfirmDialog>
     <AdminDialog
       v-model:visible="formVisible"
+      :confirmation="operationConfirmation('批量设置')"
+      confirm-function="batch-fill"
       width="320px"
       header="批量设置"
-      :confirm-btn="{ content: '完成', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="save"
       @cancel="formVisible = false"
       @close="formVisible = false"
@@ -261,6 +278,9 @@
   </div>
 </template>
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
@@ -807,9 +827,6 @@ watch(
   flex: 0 0 20px;
   width: 20px;
   height: 20px;
-}
-.tree-toggle {
-  color: var(--td-text-color-secondary);
 }
 .tree-toggle-placeholder {
   display: inline-flex;

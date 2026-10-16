@@ -13,9 +13,10 @@
   </t-tooltip>
   <AdminDialog
     v-model:visible="confirmVisible"
+    :confirmation="operationConfirmation('更改价格浮动方式')"
+    confirm-function="edit"
     attach="body"
     header="更改价格浮动方式"
-    confirm-btn="确认"
     @confirm="confirmToggle"
     @cancel="confirmVisible = false"
   >
@@ -23,6 +24,7 @@
   </AdminDialog>
 </template>
 <script setup lang="ts">
+import { operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { computed, ref } from 'vue';
 import { AdminDialog, adminFeedback } from '@/components/foundation';
 const props = defineProps<{

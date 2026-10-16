@@ -6,6 +6,7 @@
           <t-link
             v-for="section in formSections"
             :key="section.key"
+            data-button-control="section-navigation"
             :href="`#store-finished-product-${section.key}`"
             :theme="activeFormSection === section.key ? 'primary' : 'default'"
             :aria-current="activeFormSection === section.key ? 'location' : undefined"
@@ -23,7 +24,7 @@
           <h1>编辑商品</h1>
           <div class="selected-category">平台分类：{{ product.categoryName || '—' }}</div>
         </div>
-        <t-button theme="default" variant="base" :disabled="saving" @click="emit('cancel')"
+        <t-button :theme="buttonTheme('back')" variant="base" :disabled="saving" @click="emit('cancel')"
           ><template #icon><t-icon name="rollback" /></template>返回列表</t-button
         >
       </div>
@@ -83,8 +84,8 @@
                       <div class="price-pair with-source">
                         <SpecPriceInput
                           v-if="drafts[row.skuId]"
-                          class="store-sale-coefficient-input"
                           v-model="drafts[row.skuId].coefficient"
+                          class="store-sale-coefficient-input"
                           placeholder="请输入系数"
                           label="系数"
                           :submitted="submitted"
@@ -92,8 +93,8 @@
                         />
                         <SpecPriceInput
                           v-if="drafts[row.skuId]"
-                          class="decimal-input store-sale-price-input"
                           v-model="drafts[row.skuId].price"
+                          class="decimal-input store-sale-price-input"
                           label="商品售价"
                           placeholder="请输入商品售价"
                           :submitted="submitted"
@@ -120,14 +121,16 @@
       </StoreProductDetail>
     </div>
     <AdminSectionCard class="form-submit-bar">
-      <t-button theme="primary" :loading="saving" @click="save"
-        ><template #icon><t-icon name="check" /></template>提交商品信息</t-button
+      <t-button :theme="buttonTheme('submit')" :loading="saving" @click="save"
+        ><template #icon><t-icon name="check" /></template>{{ formConfirmationText('edit') }}</t-button
       >
-      <t-button theme="default" variant="base" :disabled="saving" @click="emit('cancel')">取消</t-button>
+      <t-button :theme="buttonTheme('cancel')" variant="base" :disabled="saving" @click="emit('cancel')">取消</t-button>
     </AdminSectionCard>
   </section>
 </template>
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch, h } from 'vue';
 import type { FormInstanceFunctions, PrimaryTableCol } from 'tdesign-vue-next';

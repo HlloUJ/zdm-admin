@@ -31,10 +31,10 @@
                 </div>
                 <div class="supply-type-filter-actions filter-actions">
                   <t-space>
-                    <t-button theme="primary" type="submit">
+                    <t-button :theme="buttonTheme('search')" type="submit">
                       <template #icon><t-icon name="search" /></template>查询
                     </t-button>
-                    <t-button theme="default" variant="base" @click="handleReset">
+                    <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                       <template #icon><t-icon name="refresh" /></template>重置
                     </t-button>
                   </t-space>
@@ -44,7 +44,7 @@
           </template>
           <template #toolbar>
             <AdminListToolbar :has-actions="can('create')">
-              <t-button theme="primary" @click="openForm()"
+              <t-button :theme="buttonTheme('create')" @click="openForm()"
                 ><template #icon><t-icon name="add" /></template>新增</t-button
               >
             </AdminListToolbar>
@@ -60,15 +60,19 @@
               >
               <template #operation="{ row }"
                 ><t-space size="medium">
-                  <t-link v-if="can('edit')" theme="primary" hover="color" @click="openForm(row)">编辑</t-link>
+                  <t-link v-if="can('edit')" :theme="buttonTheme('edit')" hover="color" @click="openForm(row)"
+                    >编辑</t-link
+                  >
                   <t-link
                     v-if="can('toggle-status')"
-                    :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                    :theme="buttonTheme(row.status === 'enabled' ? 'disable' : 'enable')"
                     hover="color"
                     @click="openStatusDialog(row)"
                     >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
                   >
-                  <t-link v-if="can('delete')" theme="danger" hover="color" @click="deleting = row">删除</t-link>
+                  <t-link v-if="can('delete')" :theme="buttonTheme('delete')" hover="color" @click="deleting = row"
+                    >删除</t-link
+                  >
                 </t-space></template
               >
             </t-table>
@@ -85,11 +89,13 @@
       </main>
     </div>
     <AdminDialog
+      v-model:visible="visible"
+      :confirmation="formConfirmation(editing ? 'edit' : 'create')"
+      confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      v-model:visible="visible"
       :header="editing ? '编辑供货类型' : '新增供货类型'"
-      :confirm-btn="{ content: '提交', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="save"
     >
       <t-form
@@ -103,10 +109,12 @@
       ></t-form>
     </AdminDialog>
     <AdminDialog
+      :confirmation="operationConfirmation(statusAction)"
+      :confirm-function="buttonFunctionFor('supply-status', statusAction)"
       :visible="statusDialogVisible"
       :header="`是否${statusAction}`"
       width="440px"
-      :confirm-btn="{ content: `确认${statusAction}`, loading: changingStatus }"
+      :confirm-btn="{ loading: changingStatus }"
       :cancel-btn="{ content: '取消', disabled: changingStatus }"
       @confirm="confirmStatusChange"
       @cancel="closeStatusDialog"
@@ -115,9 +123,11 @@
       是否{{ statusAction }}供货类型“{{ statusTarget?.name }}”？
     </AdminDialog>
     <AdminDialog
+      :confirmation="operationConfirmation('删除')"
+      confirm-function="delete"
       :visible="Boolean(deleting)"
       header="删除供货类型"
-      :confirm-btn="{ content: '删除', theme: 'danger', loading: saving }"
+      :confirm-btn="{ loading: saving }"
       @confirm="remove"
       @cancel="deleting = undefined"
       @close="deleting = undefined"
@@ -127,6 +137,8 @@
   </div>
 </template>
 <script setup lang="ts">
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import type { FormInstanceFunctions, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

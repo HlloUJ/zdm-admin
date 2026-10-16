@@ -229,16 +229,16 @@ for (const displayMode of ['single', 'layered'] as const) {
     const imageDialog = page.locator('.t-dialog:visible').filter({ hasText: '商品主图' }).last();
     await expect(imageDialog.locator('img[alt="商品主图"]')).toHaveAttribute('src', imageUrl);
     await imageDialog.locator('.t-dialog__close').click();
+    await expect(page.locator('.t-dialog:visible')).toHaveCount(1);
     const selectButton = dialog.getByRole('button', { name: '批量选择', exact: true });
-    await expect(selectButton).toBeEnabled();
-    await selectButton.click();
-    await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
+    await expect(selectButton).toBeDisabled();
     expect(writes).toBe(0);
     expect((await dialog.boundingBox())!.width).toBeGreaterThan(1100);
     expect(
       (await dialog.getByRole('columnheader', { name: '商品名称/ID', exact: true }).boundingBox())!.width,
     ).toBeGreaterThan(400);
     await dialog.locator('thead .t-checkbox').click();
+    await expect(selectButton).toBeEnabled();
     await dialog.getByText('详情', { exact: true }).click();
     const drawer = page.locator('.t-drawer:visible');
     await expect(drawer.getByText('商品中心只读详情')).toBeVisible();
@@ -379,7 +379,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await priceInput.fill('140');
   await priceInput.blur();
   await expect(main.getByRole('button', { name: '手工价格，点击切换跟随配置' })).toBeVisible();
-  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect.poll(() => saleWrites).toBe(1);
   await expect(page).toHaveURL('/store/finished-stock-management');
   await expect(main.getByText('门店测试商品', { exact: true })).toBeVisible();
@@ -390,7 +390,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await coefficientInput.fill('2');
   await coefficientInput.blur();
   await expect(priceInput).toHaveValue('200.00');
-  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect.poll(() => saleWrites).toBe(2);
   await expect(page).toHaveURL('/store/finished-stock-management');
   await main.getByText('编辑', { exact: true }).click();
@@ -832,12 +832,15 @@ test('store batch shelf matches shared confirmation and partial failure feedback
   await page.goto('/store/finished-stock-management');
   const main = page.getByRole('main');
   const button = main.getByRole('button', { name: '批量上架', exact: true });
-  await expect(button).toBeEnabled();
+  await expect(button).toBeDisabled();
   await expect(button).toHaveClass(/t-button--theme-primary/);
   await expect(button.locator('.t-icon-upload')).toBeVisible();
-  await button.click();
-  await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
   await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeEnabled();
+  await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeDisabled();
+  await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeEnabled();
   await button.click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.getByText('是否批量上架所选成品现货？', { exact: true })).toBeVisible();
@@ -864,7 +867,7 @@ for (const scenario of [
     status: 'offShelf',
     button: '批量放回到仓库',
     icon: 'rollback',
-    theme: 'primary',
+    theme: 'success',
     description: '是否将所选成品现货放回仓库？',
     success: '操作已完成',
   },
@@ -873,7 +876,7 @@ for (const scenario of [
     status: 'recycle',
     button: '批量放回到仓库',
     icon: 'rollback',
-    theme: 'primary',
+    theme: 'success',
     description: '是否将所选成品现货放回仓库？',
     success: '操作已完成',
   },
@@ -922,14 +925,14 @@ for (const scenario of [
     const main = page.getByRole('main');
     await main.getByText(`${scenario.tab}（1）`, { exact: true }).click();
     const button = main.getByRole('button', { name: scenario.button, exact: true });
-    await expect(button).toBeEnabled();
+    if (scenario.button === '清空回收站') await expect(button).toBeEnabled();
+    else await expect(button).toBeDisabled();
     await expect(button).toHaveClass(new RegExp(`t-button--theme-${scenario.theme}`));
     await expect(button.locator(`.t-icon-${scenario.icon}`)).toBeVisible();
     if (scenario.button === '批量彻底删除') await expect(button).toHaveClass(/deep-danger-button/);
     if (scenario.button !== '清空回收站') {
-      await button.click();
-      await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
       await main.locator('thead .t-checkbox').click();
+      await expect(button).toBeEnabled();
     }
     await button.click();
     const dialog = page.locator('.t-dialog:visible');
@@ -937,12 +940,22 @@ for (const scenario of [
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     expect(writes).toBe(0);
     await button.click();
-    await dialog.getByRole('button', { name: `确认${scenario.button}`, exact: true }).click();
+    await dialog
+      .getByRole('button', {
+        name: scenario.button === '批量放回到仓库' ? '确认批量放回仓库' : `确认${scenario.button}`,
+        exact: true,
+      })
+      .click();
     await expect(page.getByText('当前商品状态不支持此操作', { exact: true })).toBeVisible();
     await expect(dialog).toBeVisible();
     await expect(main.getByText('门店测试商品', { exact: true })).toBeVisible();
     fail = false;
-    await dialog.getByRole('button', { name: `确认${scenario.button}`, exact: true }).click();
+    await dialog
+      .getByRole('button', {
+        name: scenario.button === '批量放回到仓库' ? '确认批量放回仓库' : `确认${scenario.button}`,
+        exact: true,
+      })
+      .click();
     await expect(dialog).toHaveCount(0);
     await expect(page.getByText(scenario.success, { exact: true })).toBeVisible();
     await expect(main.getByText('暂无商品', { exact: true })).toBeVisible();
@@ -971,21 +984,31 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
   const button = main.getByRole('button', { name: '批量下架', exact: true });
   await expect(button).toHaveClass(/brown-button/);
   await expect(button.locator('.t-icon-download')).toBeVisible();
-  await button.click();
-  await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
+  await expect(button).toBeDisabled();
   await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeEnabled();
   await button.click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.locator('.t-dialog__header')).toHaveText('下架');
   await expect(dialog).toHaveCSS('width', '520px');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible();
   await expect(page.locator('.zdm-admin-feedback').filter({ hasText: /请选择.*原因/ })).toHaveCount(0);
   expect(payload).toBeUndefined();
   await dialog.locator('.t-select').click();
   await page.getByText('商品暂停售卖', { exact: true }).click();
   await dialog.locator('textarea').fill('  门店调整  ');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText('商品已售完，不能下架', { exact: true })).toBeVisible();
   expect(payload).toEqual({ ids: [41], target: 'offShelf', reason: '商品暂停售卖', detail: '门店调整' });
@@ -994,7 +1017,12 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
   await button.click();
   await dialog.locator('.t-select').click();
   await page.getByText('商品暂停售卖', { exact: true }).click();
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('已批量下架', { exact: true })).toBeVisible();
   await expect(main.getByText('暂无商品', { exact: true })).toBeVisible();
 });
@@ -1190,7 +1218,7 @@ test('store editor requires category, leaves missing prices empty, and follows o
   const input = main.locator('.store-sale-price-input input');
   await expect(input).toHaveValue('');
   await expect(main.getByText(/无法自动计算|缺失原因/)).toHaveCount(0);
-  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(main.getByText('请选择门店分类', { exact: true })).toBeVisible();
   await main.locator('.t-cascader input').click();
   await page.locator('.t-cascader__item').filter({ hasText: '一级分类' }).hover();
@@ -1212,7 +1240,7 @@ test('store editor requires category, leaves missing prices empty, and follows o
   await input.blur();
   await main.getByRole('button', { name: '手工价格，点击切换跟随配置' }).click();
   const confirm = page.locator('.t-dialog:visible');
-  await confirm.getByRole('button', { name: '确认', exact: true }).click();
+  await confirm.getByRole('button', { name: '确认更改价格浮动方式', exact: true }).click();
   await expect(input).toHaveValue('150.00');
   await main.locator('.t-cascader input').click();
   await page.locator('.t-cascader__item').filter({ hasText: '无系数分类' }).click();
@@ -1222,13 +1250,13 @@ test('store editor requires category, leaves missing prices empty, and follows o
   const table = main.locator('.spec-table-block .t-table');
   const geometry = await priceTableGeometry(table);
   await coefficientInput.fill('');
-  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(main.locator('.store-sale-coefficient-input .t-input')).toHaveClass(/t-is-error/);
   await expect(main.getByText('请输入系数', { exact: true })).toBeVisible();
   await expectPriceTableStable(table, geometry);
   await expect(page).toHaveURL(/\/41\/edit$/);
   await input.fill('');
-  await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(main.locator('.store-sale-price-input .t-input')).toHaveClass(/t-is-error/);
   await expect(main.getByText('请输入商品售价', { exact: true })).toBeVisible();
   await expectPriceTableStable(table, geometry);

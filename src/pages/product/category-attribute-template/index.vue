@@ -47,7 +47,7 @@
                   <div v-if="isDraft" class="template-tab-bar">
                     <t-link
                       class="exit-edit"
-                      theme="default"
+                      :theme="buttonTheme('back')"
                       hover="color"
                       :underline="false"
                       :disabled="busy"
@@ -75,6 +75,7 @@
                         </t-space>
                         <t-button
                           v-if="can('create')"
+                          :theme="buttonTheme('publish-version')"
                           class="publish-draft"
                           :disabled="busy || (dirty && !can('create'))"
                           @click="preparePublish"
@@ -83,7 +84,7 @@
                         <t-button
                           v-if="editable"
                           class="add-attribute"
-                          theme="default"
+                          :theme="buttonTheme('create')"
                           variant="outline"
                           @click="openAdd"
                           ><template #icon><t-icon name="add" /></template>添加属性</t-button
@@ -93,13 +94,14 @@
                         <t-space class="version-actions">
                           <t-button
                             v-if="!draft && can('create')"
+                            :theme="buttonTheme('create')"
                             :disabled="!categoryId || busy"
                             @click="createDraft()"
                             >创建新版本草稿</t-button
                           >
                           <t-button
                             v-if="draft && isCurrentDisplayedVersion && selectedId !== draft.id && can('create')"
-                            theme="default"
+                            :theme="buttonTheme('edit')"
                             @click="navigate(() => choose(draft!))"
                             >继续编辑草稿</t-button
                           >
@@ -107,7 +109,7 @@
                         <t-button
                           v-if="can('history')"
                           class="version-history"
-                          theme="default"
+                          :theme="buttonTheme('versions')"
                           variant="outline"
                           :disabled="!versions.length"
                           @click="historyVisible = true"
@@ -224,18 +226,22 @@
                                   status="error"
                                   tips="请选择选项值"
                                 >
-                                  <t-link theme="danger" @click="openValues(row)">{{ row.options.length }}</t-link>
+                                  <t-link :theme="buttonTheme('options')" @click="openValues(row)">{{
+                                    row.options.length
+                                  }}</t-link>
                                 </t-form-item>
                                 <t-link
                                   v-else-if="row.valueType === 'select'"
-                                  theme="primary"
+                                  :theme="buttonTheme('options')"
                                   @click="openValues(row)"
                                   >{{ row.options.length }}</t-link
                                 >
                                 <span v-else>—</span>
                               </template>
                               <template #operation="{ row }"
-                                ><t-link theme="danger" @click="removeTarget = row">移除</t-link></template
+                                ><t-link :theme="buttonTheme('remove')" @click="removeTarget = row"
+                                  >移除</t-link
+                                ></template
                               >
                             </t-table>
                             <AdminPagination
@@ -260,7 +266,15 @@
         </AdminListLayout>
       </main>
     </div>
-    <AdminDialog v-model:visible="addVisible" header="添加属性" width="720px" @confirm="addAttributes">
+    <AdminDialog
+      v-model:visible="addVisible"
+      :confirmation="operationConfirmation('添加属性')"
+      confirm-function="create"
+      header="添加属性"
+      width="720px"
+      :confirm-btn="{ disabled: !addIds.length }"
+      @confirm="addAttributes"
+    >
       <t-input v-model="attributeKeyword" placeholder="请输入属性名称" clearable />
       <t-table
         hover
@@ -283,6 +297,8 @@
     </AdminDialog>
     <AdminDialog
       v-model:visible="valuesVisible"
+      :confirmation="formConfirmation('edit')"
+      confirm-function="options"
       :header="`${editable ? '编辑' : '查看'}选项值 · ${valueTarget?.name || ''}`"
       width="720px"
       :footer="editable ? undefined : false"
@@ -308,6 +324,7 @@
       />
     </AdminDialog>
     <AdminConfirmDialog
+      function="remove"
       :visible="!!removeTarget"
       action="移除"
       object-type="属性"
@@ -318,9 +335,11 @@
     />
     <AdminDialog
       v-model:visible="publishVisible"
+      :confirmation="operationConfirmation('发布版本')"
+      confirm-function="publish-version"
       header="发布新版本"
       width="max-content"
-      :confirm-btn="{ content: '确认发布', loading: busy }"
+      :confirm-btn="{ loading: busy }"
       @confirm="publish"
     >
       <div class="publish-confirm-content">
@@ -329,9 +348,11 @@
       </div>
     </AdminDialog>
     <AdminDialog
+      :confirmation="operationConfirmation('复制版本')"
+      confirm-function="copy-version"
       :visible="!!copyTarget"
       header="复制版本"
-      :confirm-btn="{ content: '确认复制', loading: busy }"
+      :confirm-btn="{ loading: busy }"
       @confirm="copyVersion(copyTarget!)"
       @close="copyTarget = undefined"
       @cancel="copyTarget = undefined"
@@ -353,8 +374,10 @@
         <template #publishedAt="{ row }">{{ formatDateTime(row.publishedAt) }}</template>
         <template #operation="{ row }">
           <t-space>
-            <t-link theme="primary" @click="viewHistoryVersion(row)">查看</t-link>
-            <t-link v-if="can('create')" theme="primary" :disabled="busy" @click="prepareCopy(row)">复制</t-link>
+            <t-link :theme="buttonTheme('view')" @click="viewHistoryVersion(row)">查看</t-link>
+            <t-link v-if="can('create')" :theme="buttonTheme('copy-version')" :disabled="busy" @click="prepareCopy(row)"
+              >复制</t-link
+            >
           </t-space>
         </template>
       </t-table>
@@ -363,6 +386,8 @@
 </template>
 
 <script setup lang="ts">
+import { operationConfirmation, formConfirmation } from '@/components/foundation/actions/confirmation';
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { toRaw, computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
@@ -820,6 +845,7 @@ async function openAdd() {
   }
 }
 function addAttributes() {
+  if (!addIds.value.length) return;
   for (const attribute of availableAttributes.value.filter((a) => addIds.value.includes(a.id)))
     rows.value.push({
       attributeId: attribute.id,

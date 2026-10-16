@@ -275,7 +275,12 @@ test('add attributes paginates and retains selections across search and pages', 
   await dialog.getByPlaceholder('请输入属性名称').fill('候选属性12');
   await expect(dialog.locator('tbody tr')).toHaveCount(1);
   await expect(dialog.locator('tbody tr')).toContainText('文本输入');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.locator('.attribute-table')).toContainText('候选属性1');
   await expect(page.locator('.attribute-table')).toContainText('候选属性11');
 });
@@ -296,12 +301,18 @@ test('publish highlights missing roles and dropdown options', async ({ page }) =
   await page.getByRole('button', { name: '发布新版本', exact: true }).click();
   await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
   await expect(table.locator('.t-select .t-input')).toHaveClass(/t-is-error/);
-  await expect(table.locator('.t-link--theme-danger').filter({ hasText: /^0$/ })).toBeVisible();
+  await expect(table.locator('.t-link--theme-primary').filter({ hasText: /^0$/ })).toBeVisible();
+  await expect(table.getByText('请选择选项值', { exact: true })).toBeVisible();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await page.getByRole('button', { name: '添加属性', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await dialog.getByText('尺寸', { exact: true }).click();
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   const addedRole = table.locator('tbody tr').last().locator('.t-select .t-input');
   await expect(addedRole).not.toHaveClass(/t-is-error/);
   await page.getByRole('button', { name: '发布新版本', exact: true }).click();
@@ -337,7 +348,12 @@ test('option values support row selection and pagination without applying on can
   await dialog.getByPlaceholder('请输入选项值').fill('选项12');
   await expect(dialog.locator('tbody tr')).toHaveCount(1);
   await dialog.getByText('选项12', { exact: true }).click();
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(link).toHaveText(String(Number(originalCount) + 2));
 });
 
@@ -423,7 +439,12 @@ test('published option values show all rows without search pagination or footer 
   await expect(dialog.getByPlaceholder('请输入选项值')).toHaveCount(0);
   await expect(dialog.locator('.t-pagination')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '取消', exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: '提交', exact: true })).toHaveCount(0);
+  await expect(
+    dialog.getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    }),
+  ).toHaveCount(0);
 });
 
 test('attribute list and draft show serial numbers and support dragging', async ({ page }) => {
@@ -516,7 +537,7 @@ test('auto-save serializes rapid changes and publish waits for the latest revisi
   expect(revisions).toEqual([0, 1]);
   const draft = versions.find((v) => v.id === 2)!;
   expect((draft.content as Array<{ requiredFlag: boolean }>)[0]!.requiredFlag).toBe(true);
-  await page.locator('.t-dialog:visible').getByRole('button', { name: '确认发布', exact: true }).click();
+  await page.locator('.t-dialog:visible').getByRole('button', { name: '确认发布版本', exact: true }).click();
   await expect(page.getByText('已发布“新版本”', { exact: true })).toBeVisible();
   expect(draft.revision).toBe(3);
 });
@@ -669,7 +690,7 @@ test('copy after view confirms before replacing a draft and opens the complete c
   await page.getByText('复制', { exact: true }).click();
   await expect(page.getByText('当前分类已有草稿，复制后将覆盖草稿中的全部配置，是否继续？')).toBeVisible();
   expect(copies).toBe(0);
-  await page.getByRole('button', { name: '确认复制', exact: true }).click();
+  await page.getByRole('button', { name: '确认复制版本', exact: true }).click();
   await expect(page.getByRole('button', { name: '添加属性', exact: true })).toBeVisible();
   await expect(page.locator('.attribute-table')).toContainText('颜色');
   await expect(page.locator('.t-drawer')).not.toHaveClass(/t-drawer--open/);
@@ -691,7 +712,7 @@ test('copy creates a draft immediately when none exists', async ({ page }) => {
   await page.getByText('复制', { exact: true }).click();
   await expect(page.getByRole('button', { name: '添加属性', exact: true })).toBeVisible();
   await expect(page.locator('.attribute-table')).toContainText('颜色');
-  await expect(page.getByRole('button', { name: '确认复制', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '确认复制版本', exact: true })).toHaveCount(0);
 });
 
 for (const action of ['create', 'sort']) {

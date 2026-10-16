@@ -109,7 +109,11 @@ test('log-only access does not expose unauthorized warehouse content', async ({ 
   await expect(main.getByText('操作日志', { exact: true })).toBeVisible();
   await expect(main.locator('.status-tabs')).toHaveCount(0);
   await expect(main.locator('table')).toHaveCount(0);
-  await expect(main.getByRole('button', { name: '提交' })).toHaveCount(0);
+  await expect(
+    main.getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+    }),
+  ).toHaveCount(0);
   expect(listRequested).toBe(false);
 });
 
@@ -589,7 +593,12 @@ for (const client of ['admin', 'supply-chain']) {
     await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
     await page.getByRole('row').filter({ hasText: '下架校验商品' }).getByText('下架', { exact: true }).click();
     const dialog = page.locator('.t-dialog:visible');
-    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    await dialog
+      .getByRole('button', {
+        name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+        exact: true,
+      })
+      .click();
     const field = dialog
       .locator('.t-form__item')
       .filter({ has: page.locator('.t-form__label').filter({ hasText: '下架原因' }) });

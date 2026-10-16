@@ -43,6 +43,16 @@ export function businessFingerprint(source) {
 export function contractViolations(file, source, baseline) {
   if (!baseline) return [`${file}: missing pre-refactor business contract`];
   let protectedSource = source;
+  const businessPatches = baseline.approvedBusinessPatches ?? [];
+  if (businessPatches.some((patch) => patch.stage !== undefined && patch.stage !== 'before-migrations'))
+    return [`${file}: invalid approved business patch stage`];
+  // Later user-approved behavior fixes may overlap older migration snapshots.
+  // Reverse only those explicitly staged fixes first, retaining all original hashes.
+  for (const patch of businessPatches.filter((item) => item.stage === 'before-migrations')) {
+    if (!patch.reason?.trim() || !patch.after || protectedSource.split(patch.after).length !== 2)
+      return [`${file}: approved business patch changed`];
+    protectedSource = protectedSource.replace(patch.after, patch.before);
+  }
   // Reverse explicitly approved placeholder/help migrations before the earlier
   // visual/business patches, keeping the original protected hashes intact.
   for (const patch of baseline.approvedPlaceholderPatches ?? []) {
@@ -61,7 +71,7 @@ export function contractViolations(file, source, baseline) {
   }
   // Later, explicitly approved bug fixes are recorded separately from visual
   // migration. Restore only their exact bytes before checking the original hashes.
-  for (const patch of baseline.approvedBusinessPatches ?? []) {
+  for (const patch of businessPatches.filter((item) => item.stage === undefined)) {
     if (!patch.reason?.trim() || !patch.after || protectedSource.split(patch.after).length !== 2)
       return [`${file}: approved business patch changed`];
     protectedSource = protectedSource.replace(patch.after, patch.before);

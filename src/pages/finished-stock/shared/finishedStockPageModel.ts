@@ -10,7 +10,7 @@ import type {
 export interface FinishedStockToolbarAction {
   id: string;
   label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
+
   variant?: 'base' | 'outline' | 'text';
   icon?: string;
   className?: string;
@@ -19,7 +19,6 @@ export interface FinishedStockToolbarAction {
 export interface FinishedStockRowAction {
   id: string;
   label: string;
-  theme: 'primary' | 'default' | 'danger' | 'warning';
 }
 export type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
 export type PublisherType = '平台发布' | '接口获取';

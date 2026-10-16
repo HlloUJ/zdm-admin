@@ -47,7 +47,7 @@ for (const client of ['supply-chain'] as const) {
     const form = page.locator('.slab-publish-page');
     const cards = form.locator('.admin-media-upload.t-upload');
     await expect(cards).toHaveCount(4);
-    await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await page.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
     await expect(form.locator('.admin-media-upload--invalid')).toHaveCount(3);
     await expect(cards.last()).not.toHaveClass(/--invalid/);
     await cards.first().locator('input[type="file"]').setInputFiles(file);
@@ -83,7 +83,12 @@ test('craft image retains required validation, preview and cancellation release 
   const dialog = page.locator('.t-dialog:visible');
   const upload = dialog.locator('.admin-media-upload.t-upload');
   await expect(upload).toHaveCount(1);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请上传工艺图片', { exact: true })).toBeVisible();
   const errorColor = await dialog
     .getByText('请上传工艺图片', { exact: true })

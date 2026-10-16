@@ -30,13 +30,20 @@
         { label: '联系电话', value: '13800000000' },
       ]"
     />
-    <AdminFormDialog v-model:visible="visible" header="表单范例" :data="values" @confirm="visible = false"
+    <AdminFormDialog
+      v-model:visible="visible"
+      :confirmation="formConfirmation('create')"
+      confirm-function="submit"
+      header="表单范例"
+      :data="values"
+      @confirm="visible = false"
       ><t-form-item label="姓名"><t-input v-model="name" /></t-form-item
     ></AdminFormDialog>
     <span>查询次数：{{ searches }}</span>
   </t-space>
 </template>
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { computed, ref } from 'vue';
 import { AdminListPage, AdminFormDialog, AdminDetailPage } from '@/components/foundation';
 import type { ListFilter, ListAction, FilterValues } from '@/components/foundation';
@@ -64,8 +71,8 @@ const filters: ListFilter[] = Array.from(
   (_, index) => baseFilters[index] ?? { key: `extra${index}`, label: `条件${index + 1}` },
 );
 const actions: ListAction[] = [
-  { id: 'create', label: '新增' },
-  { id: 'archive', batch: true, label: '批量归档', disabled: true },
+  { id: 'create', function: 'create', label: '新增' },
+  { id: 'archive', function: 'archive', batch: true, label: '批量归档', disabled: true },
 ];
 const rows = computed(() => Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: '客户' + (i + 1) })));
 const columns = [

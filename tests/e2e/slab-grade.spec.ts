@@ -77,7 +77,12 @@ test('manages slab grades below color management', async ({ page }) => {
   const formDialog = page.locator('.t-dialog').filter({ hasText: '新增等级' });
   await formDialog.getByPlaceholder('请输入等级', { exact: true }).fill('S');
   await formDialog.getByPlaceholder('请输入等级名称').fill('测试等级');
-  await formDialog.getByRole('button', { name: '提交', exact: true }).click();
+  await formDialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('已新增“S 测试等级”', { exact: true })).toBeVisible();
 
   const gradeRow = main.locator('tbody tr').filter({ hasText: '超精品料' });

@@ -176,7 +176,7 @@ const props = withDefaults(
     editorLayout?: boolean;
     enabledLevelIds?: number[];
   }>(),
-  { showSales: true },
+  { storeLevelName: undefined, enabledLevelIds: undefined, showSales: true },
 );
 defineSlots<{
   sale?: (props: { row: TableRowData }) => VNode[];
