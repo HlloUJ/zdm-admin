@@ -38,8 +38,8 @@
             </t-form-item>
           </div>
           <div class="filter-actions">
-            <t-button theme="primary" type="submit">查询</t-button>
-            <t-button theme="default" variant="base" type="reset">重置</t-button>
+            <t-button :theme="buttonTheme('search')" type="submit">查询</t-button>
+            <t-button :theme="buttonTheme('reset')" variant="base" type="reset">重置</t-button>
           </div>
         </div>
       </t-form>
@@ -75,8 +75,10 @@
             </t-row>
           </t-col>
           <t-col :span="2" class="zdm-official-list-page__query-actions">
-            <t-button theme="primary" type="submit" :style="{ marginLeft: 'var(--td-comp-margin-s)' }">查询</t-button>
-            <t-button theme="default" variant="base" type="reset">重置</t-button>
+            <t-button :theme="buttonTheme('search')" type="submit" :style="{ marginLeft: 'var(--td-comp-margin-s)' }"
+              >查询</t-button
+            >
+            <t-button :theme="buttonTheme('reset')" variant="base" type="reset">重置</t-button>
           </t-col>
         </t-row>
       </t-form>
@@ -119,8 +121,8 @@
         </t-form-item>
       </t-form>
       <t-space size="small">
-        <t-button theme="primary" @click="emit('search')">查询</t-button>
-        <t-button theme="default" @click="emit('reset')">重置</t-button>
+        <t-button :theme="buttonTheme('search')" @click="emit('search')">查询</t-button>
+        <t-button :theme="buttonTheme('reset')" @click="emit('reset')">重置</t-button>
       </t-space>
     </div>
     <AdminListToolbar
@@ -133,7 +135,7 @@
       <t-button
         v-for="action in actions"
         :key="action.id"
-        :theme="action.theme ?? 'primary'"
+        :theme="buttonTheme(action.function)"
         :disabled="action.disabled || (action.batch && !selectedCount)"
         @click="emit('action', action.id)"
       >
@@ -143,7 +145,7 @@
         <t-button
           v-for="action in auxiliaryActions"
           :key="action.id"
-          theme="default"
+          :theme="buttonTheme(action.function)"
           variant="outline"
           :disabled="action.disabled"
           @click="emit('action', action.id)"
@@ -162,6 +164,7 @@
   </section>
 </template>
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import AdminListToolbar from '../AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { computed } from 'vue';

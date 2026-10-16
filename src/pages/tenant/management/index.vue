@@ -22,11 +22,11 @@
                   </div>
 
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="handleSearch">
+                    <t-button :theme="buttonTheme('search')" @click="handleSearch">
                       <template #icon><t-icon name="search" /></template>
                       查询
                     </t-button>
-                    <t-button theme="default" variant="base" @click="handleReset">
+                    <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                       <template #icon><t-icon name="refresh" /></template>
                       重置
                     </t-button>
@@ -34,7 +34,7 @@
                 </div>
               </t-form>
               <AdminListToolbar :has-actions="activeTab === 'unarchived' && canCreateTenant"
-                ><t-button theme="primary" @click="openCreateDialog">
+                ><t-button :theme="buttonTheme('create')" @click="openCreateDialog">
                   <template #icon><t-icon name="add" /></template>
                   新增
                 </t-button></AdminListToolbar
@@ -65,19 +65,41 @@
               </template>
               <template #operation="{ row }">
                 <div v-if="activeTab === 'unarchived'" class="table-actions">
-                  <t-link v-if="canOpenTenantBusiness" theme="primary" hover="color" @click="openBusinessDialog(row)">
+                  <t-link
+                    v-if="canOpenTenantBusiness"
+                    :theme="buttonTheme('activate-business')"
+                    hover="color"
+                    @click="openBusinessDialog(row)"
+                  >
                     业务开通
                   </t-link>
-                  <t-link v-if="canEditTenant" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
-                  <t-link v-if="canArchiveTenant" theme="warning" hover="color" @click="openStatusConfirm(row)">
+                  <t-link v-if="canEditTenant" :theme="buttonTheme('edit')" hover="color" @click="openEditDialog(row)"
+                    >编辑</t-link
+                  >
+                  <t-link
+                    v-if="canArchiveTenant"
+                    :theme="buttonTheme('archive')"
+                    hover="color"
+                    @click="openStatusConfirm(row)"
+                  >
                     归档
                   </t-link>
                 </div>
                 <div v-else class="table-actions">
-                  <t-link v-if="canRestoreTenant" theme="success" hover="color" @click="openStatusConfirm(row)">
+                  <t-link
+                    v-if="canRestoreTenant"
+                    :theme="buttonTheme('restore-operation')"
+                    hover="color"
+                    @click="openStatusConfirm(row)"
+                  >
                     恢复运营
                   </t-link>
-                  <t-link v-if="canDeleteTenant" theme="danger" hover="color" @click="openPurgeDialog(row)">
+                  <t-link
+                    v-if="canDeleteTenant"
+                    :theme="buttonTheme('purge')"
+                    hover="color"
+                    @click="openPurgeDialog(row)"
+                  >
                     彻底删除
                   </t-link>
                 </div>
@@ -98,13 +120,13 @@
     </div>
 
     <t-dialog
-      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
       width="480px"
       placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
+      :confirm-btn="actionButtonProps('submit', '提交', '确认')"
+      :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
       @close="closeFormDialog"
@@ -138,8 +160,8 @@
       header="业务开通"
       width="520px"
       placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
+      :confirm-btn="actionButtonProps('activate-business', '提交', '确认')"
+      :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleBusinessSubmit"
       @cancel="closeBusinessDialog"
       @close="closeBusinessDialog"
@@ -148,6 +170,7 @@
         <t-button
           v-for="item in businessOptions"
           :key="item.value"
+          data-button-control="business-selection"
           :theme="businessSelection.includes(item.value) ? 'primary' : 'default'"
           :variant="businessSelection.includes(item.value) ? 'base' : 'outline'"
           class="business-option-button"
@@ -160,6 +183,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmState.type === 'archive' ? '归档' : '恢复运营'"
       object-type="租户"
       :object-name="confirmState.row?.tenantName"
@@ -172,6 +196,7 @@
 
     <AdminDialog
       v-model:visible="purgeDialogVisible"
+      confirm-function="purge"
       header="彻底删除租户"
       width="560px"
       :confirm-btn="purgeConfirmButton"
@@ -208,6 +233,12 @@
 </template>
 
 <script setup lang="ts">
+import {
+  buttonTheme,
+  buttonFunctionFor,
+  actionButtonProps,
+  cancelButtonProps,
+} from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
@@ -363,7 +394,6 @@ const purgeConfirmationName = ref('');
 const purgeSubmitting = ref(false);
 const purgeConfirmButton = computed(() => ({
   content: '确认彻底删除',
-  theme: 'danger' as const,
   loading: purgeSubmitting.value,
   disabled: !purgePreview.value?.eligible || purgeConfirmationName.value !== purgePreview.value.tenantName,
 }));

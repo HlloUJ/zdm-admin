@@ -296,7 +296,8 @@ test('publish highlights missing roles and dropdown options', async ({ page }) =
   await page.getByRole('button', { name: '发布新版本', exact: true }).click();
   await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
   await expect(table.locator('.t-select .t-input')).toHaveClass(/t-is-error/);
-  await expect(table.locator('.t-link--theme-danger').filter({ hasText: /^0$/ })).toBeVisible();
+  await expect(table.locator('.t-link--theme-primary').filter({ hasText: /^0$/ })).toBeVisible();
+  await expect(table.getByText('请选择选项值', { exact: true })).toBeVisible();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await page.getByRole('button', { name: '添加属性', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');

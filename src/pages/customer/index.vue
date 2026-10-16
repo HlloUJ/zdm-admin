@@ -30,7 +30,9 @@
           @select-change="selectRows"
         >
           <template #name="{ row }"
-            ><t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">{{ row.name }}</t-link
+            ><t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">{{
+              row.name
+            }}</t-link
             ><span v-else>{{ row.name }}</span></template
           >
           <template #phone="{ row }">{{ row.phone || '-' }}</template>
@@ -39,26 +41,31 @@
           <template #nextFollowAt="{ row }">{{ time(row.nextFollowAt) }}</template>
           <template #operation="{ row }">
             <t-space break-line size="small">
-              <t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">详情</t-link>
-              <t-link v-if="can('edit') && isOwned(row)" theme="primary" @click="openProfile(row)">编辑</t-link>
-              <t-link v-if="can('assign')" theme="primary" @click="prepareAction('assign', [row.id], false)"
+              <t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">详情</t-link>
+              <t-link v-if="can('edit') && isOwned(row)" :theme="buttonTheme('edit')" @click="openProfile(row)"
+                >编辑</t-link
+              >
+              <t-link
+                v-if="can('assign')"
+                :theme="buttonTheme('assign')"
+                @click="prepareAction('assign', [row.id], false)"
                 >调整归属</t-link
               >
               <t-link
                 v-if="status === 'daily' && can('archive') && isOwned(row)"
-                theme="warning"
+                :theme="buttonTheme('archive')"
                 @click="prepareAction('archive', [row.id], false)"
                 >归档</t-link
               >
               <t-link
                 v-if="status === 'archived' && can('restore') && isOwned(row)"
-                theme="primary"
+                :theme="buttonTheme('unarchive')"
                 @click="prepareAction('restore', [row.id], false)"
                 >取消归档</t-link
               >
               <t-link
                 v-if="status === 'archived' && can('purge') && isOwned(row)"
-                theme="danger"
+                :theme="buttonTheme('purge')"
                 @click="prepareAction('purge', [row.id], false)"
                 >彻底删除</t-link
               >
@@ -71,8 +78,9 @@
     </div>
     <AdminFormDialog
       ref="profileDialog"
-      width="480px"
       v-model:visible="profileVisible"
+      confirm-function="submit"
+      width="480px"
       :data="profile"
       :header="editingId ? '编辑客户' : '新增客户'"
       :confirm-btn="submitButton"
@@ -99,6 +107,7 @@
     </AdminFormDialog>
     <AdminDialog
       v-model:visible="detailVisible"
+      confirm-function="close"
       header="客户详情"
       width="min(1100px, 94vw)"
       :confirm-btn="'关闭'"
@@ -111,7 +120,7 @@
           <AdminDetailPage embedded title="客户资料" :items="detailItems">
             <t-space
               ><span>跟进记录</span
-              ><t-button v-if="isOwned(detail.customer)" theme="primary" @click="openFollowup()"
+              ><t-button v-if="isOwned(detail.customer)" :theme="buttonTheme('create')" @click="openFollowup()"
                 >新增跟进</t-button
               ></t-space
             >
@@ -127,7 +136,7 @@
                     ><t-link
                       v-for="attachment in record.attachments"
                       :key="attachment.mediaId"
-                      theme="primary"
+                      :theme="buttonTheme('preview')"
                       @click="previewAttachment(record, attachment)"
                       >{{ attachment.name }}</t-link
                     ></t-space
@@ -138,8 +147,10 @@
                 </t-space>
                 <template v-if="isOwned(detail.customer)" #action
                   ><t-space
-                    ><t-link theme="primary" @click="openFollowup(record)">编辑</t-link
-                    ><t-link theme="danger" @click="prepareFollowupDelete(record.id)">删除</t-link></t-space
+                    ><t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link
+                    ><t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)"
+                      >删除</t-link
+                    ></t-space
                   ></template
                 >
               </t-list-item>
@@ -152,6 +163,7 @@
     <AdminFormDialog
       ref="followDialog"
       v-model:visible="followVisible"
+      confirm-function="submit"
       :data="followForm"
       label-width="calc(7em + var(--td-comp-paddingLR-xl))"
       :header="followId ? '编辑跟进' : '新增跟进'"
@@ -202,6 +214,7 @@
     <AdminFormDialog
       ref="assignDialog"
       v-model:visible="assignVisible"
+      confirm-function="assign"
       :data="{ ownerAccountId: newOwner }"
       header="调整归属"
       :confirm-btn="submitButton"
@@ -225,16 +238,17 @@
     </AdminFormDialog>
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
+      :function="deletingFollowId != null ? 'delete' : buttonFunctionFor('customer', pending.action)"
       :action="confirmAction"
       object-type="客户"
       :description="confirmDescription"
-      :danger="pending.action === 'purge' || deletingFollowId != null"
       @confirm="confirmOperation"
     />
     <t-image-viewer v-model:visible="imageVisible" :images="previewImages" />
   </div>
 </template>
 <script setup lang="ts">
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -325,18 +339,36 @@ const filterFields = computed<ListFilter[]>(() => [
     : []),
 ]);
 const toolbarActions = computed<ListAction[]>(() => [
-  ...(status.value === 'daily' && can('create') ? [{ id: 'create', label: '新增', icon: 'add' }] : []),
+  ...(status.value === 'daily' && can('create')
+    ? [{ id: 'create', function: 'create' as const, label: '新增', icon: 'add' }]
+    : []),
   ...(can('batch-assign')
-    ? [{ id: 'assign', batch: true, label: '批量调整归属', disabled: !selected.value.length }]
+    ? [
+        {
+          id: 'assign',
+          function: 'assign' as const,
+          batch: true,
+          label: '批量调整归属',
+          disabled: !selected.value.length,
+        },
+      ]
     : []),
   ...(status.value === 'daily' && can('batch-archive')
-    ? [{ id: 'archive', batch: true, label: '批量归档', disabled: !selectionOwned.value }]
+    ? [{ id: 'archive', function: 'archive' as const, batch: true, label: '批量归档', disabled: !selectionOwned.value }]
     : []),
   ...(status.value === 'archived' && can('batch-restore')
-    ? [{ id: 'restore', batch: true, label: '批量取消归档', disabled: !selectionOwned.value }]
+    ? [
+        {
+          id: 'restore',
+          function: 'unarchive' as const,
+          batch: true,
+          label: '批量取消归档',
+          disabled: !selectionOwned.value,
+        },
+      ]
     : []),
   ...(status.value === 'archived' && can('batch-purge')
-    ? [{ id: 'purge', batch: true, label: '批量彻底删除', theme: 'danger' as const, disabled: !selectionOwned.value }]
+    ? [{ id: 'purge', function: 'purge' as const, batch: true, label: '批量彻底删除', disabled: !selectionOwned.value }]
     : []),
 ]);
 function handleToolbarAction(id: string) {

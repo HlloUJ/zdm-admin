@@ -24,11 +24,11 @@
 - **新增普通列表查询区强制遵守 [列表查询区全局标准](query-standard.md)**：使用 `AdminListPage` 默认 `adaptive-grid`，10:2 分区，条件数量1～3最多三列、≥4最多四列，日志公共变体最多三列，均按可用宽度自动换行；80px右对齐标签、134px控件最小宽、24px横向列间距、两行控件之间及末行到业务按钮均24px。唯一实现为公共 `query-layout.css`，不得在新页面局部重写。该规则是2026-10-15用户验收的项目扩展，替代旧的固定三列和大板主次分行说明。
 - 2026-10-15用户已授权全局推广：现有普通列表、商品中心弹窗及日志查询统一接入公共查询样式并清理旧布局覆盖；编辑表单、矩阵和单控件即时搜索保留原契约。官方原始快照不改。
 - 表格保持原有列配置，移除强制左对齐及字号覆盖，恢复原生Table行为。分页保持原事件、页码及页大小；外置分页沿用原事件入口，区域采用原生Table分页的上下/左右l内边距16px，不叠加24px外边距。规格表已有bordered属性保留，边框与表头背景使用原生Table，不覆盖单元格边框。
-- 按钮保留原variant、图标、文案、顺序、权限、禁用条件和事件。原棕色批量下架按钮使用原生warning主题，原深红危险按钮使用原生danger主题，移除背景/边框覆盖，由组件统一普通、悬停、按下及禁用视觉。业务动作配置脚本不改。
+- 按钮保留原variant、图标、文案、顺序、权限、禁用条件和事件。颜色按下方2026-10-16确认的“按钮功能与颜色”规则执行，沿用TDesign原生主题及悬停、按下、禁用态；不自定义棕色、深红等颜色。仅允许已登记的主题接入与公共映射导入，其他业务脚本仍受原契约保护。
 - 普通列表操作链接的横向间距参照common-table默认Space，为16px；纵向间距、flex-wrap和white-space保持原配置。客户页已确认的small间距、商品专用操作区和分类拖拽树表等业务布局保留，不用全局选择器覆盖。查询及工具栏按钮的8px间距不受此项影响。
 - 分类属性模板的Tree选中外观沿用原生组件：背景及圆角由标签区域绘制，不额外给整个节点行铺设背景。选择、展开、筛选及左右区域布局保持不变。
 - 标准AdminDialog默认宽度480px，与原生Dialog一致。2026-10-15用户另行确认普通单列新增／编辑弹窗统一480px、100px标签列，控件填满可用区域，按[表单样式标准](form-style-standard.md)接入唯一公共实现；大表单、矩阵、批量、查询、预览与详情保留对应布局。标准编辑表单标签统一100px，包括原72px及92/96/116px配置；客户跟进等已有长标题专用配置和无对应模板的业务布局保留。上传、预览、全屏、拖拽、只读与失效遮罩保留原工作方式。
-- AdminConfirmDialog同样默认480px，正文使用原生Dialog的次级文字色，包含客户管理的确认弹窗；页面传入的显式宽度优先。标题、文案、按钮、危险主题、取消/确认和关闭行为保持不变。
+- AdminConfirmDialog同样默认480px，正文使用原生Dialog的次级文字色，包含客户管理的确认弹窗；页面传入的显式宽度优先。标题、文案、取消/确认和关闭行为保持不变；按钮主题按下方已确认的功能颜色规则执行。
 - 商品编辑普通分区标题参照form/base，使用title-large、400字重及官方标题外边距；普通form-grid采用横向32px、纵向24px间距，保留原列数和断点。日志价格表头使用原生Table背景；SKU组合、权限矩阵、历史对照、大板详情自定义分区等无一一对应模板的业务布局不在本轮调整范围。
 
 - 展示型页面标题／面包屑栏按列表全局标准移除；编辑页业务导航保留。字体、全局antialiased、原生Tab 3px指示线等已确认样式保持不变。
@@ -66,3 +66,95 @@
 独立图片、视频上传必须使用 `@/components/foundation` 导出的 `AdminMediaUpload`，遵守 [媒体上传全局标准](./media-upload-standard.md)。原生卡片与Space为唯一实现；富文本及通用附件保留原入口，不改必填、权限和媒体生命周期。
 
 新增、编辑和动态表格的字段校验必须遵守 [全局表单校验反馈标准](./form-validation-standard.md)：错误红框＋字段下方具体提示；原生Form规则优先，既有手工状态复用 `utils/formValidation.ts`。所有表单提交校验失败统一调用 `utils/submitValidation.ts`：只弹一次“表单校验未通过，请检查标红字段”，同时显示全部字段错误并自动定位首错；输入和失焦不弹Toast、不滚动。提交失败、网络异常及非字段操作前置提醒保留Toast，不替代字段提示，不修改现有规则。
+
+## 按钮功能与颜色（2026-10-16确认）
+
+本节是项目统一约定，采用TDesign原生主题，不冒称官方对业务名称的强制规定。覆盖现有运营、供应链、门店及后续页面。普通、文字、图标、单条、批量和确认按钮按同一功能取色；形式、图标、文案、顺序、权限、禁用、加载、选择、数据范围及全部业务流程保持。
+
+唯一运行映射：`src/components/foundation/actions/button-functions.json`；公共实现：`buttonFunctions.ts`。页面使用 `buttonTheme('功能标识')`，动态动作使用已明确登记的 `buttonFunctionFor('分组', action)`；不能按显示文案推断，也不能自行设置theme或覆盖颜色。`ListAction.function` 必填。公共弹窗显式传 `confirm-function`，`AdminConfirmDialog` 显式传 `function`；原生弹窗通过 `actionButtonProps` 保留原按钮内容、加载、禁用等属性，仅统一主题。
+
+| 类别       | 原生主题       | 判定原则                   |
+| ---------- | -------------- | -------------------------- |
+| 正常业务   | primary 蓝色   | 正常业务操作、查看及入口   |
+| 警告       | warning 橙色   | 停止、限制业务，需要谨慎   |
+| 危险       | danger 红色    | 删除、移除、不可恢复清理   |
+| 启用与恢复 | success 绿色   | 启用、恢复业务可用状态     |
+| 辅助       | default 中性色 | 取消、返回、重置及辅助控制 |
+
+当前53类功能如下；这是可扩展登记表，不是数量上限。
+
+| 功能标识            | 功能           | 主题      |
+| ------------------- | -------------- | --------- |
+| `create`            | 新增／添加     | `primary` |
+| `edit`              | 编辑           | `primary` |
+| `save`              | 保存           | `primary` |
+| `submit`            | 提交           | `primary` |
+| `search`            | 查询           | `primary` |
+| `reset`             | 重置           | `default` |
+| `view`              | 查看／详情     | `primary` |
+| `preview`           | 预览           | `primary` |
+| `publish-product`   | 发布商品       | `primary` |
+| `publish-version`   | 发布版本       | `primary` |
+| `copy-version`      | 复制版本       | `primary` |
+| `copy-link`         | 复制链接       | `primary` |
+| `select-product`    | 选择商品       | `primary` |
+| `batch-fill`        | 批量设置／填写 | `primary` |
+| `assign`            | 调整归属       | `primary` |
+| `upload`            | 上传           | `primary` |
+| `shelf`             | 上架           | `primary` |
+| `off-shelf`         | 下架           | `warning` |
+| `restore-stock`     | 放回仓库       | `success` |
+| `enable`            | 启用           | `success` |
+| `disable`           | 停用           | `warning` |
+| `archive`           | 归档           | `warning` |
+| `unarchive`         | 取消归档       | `success` |
+| `restore-operation` | 恢复运营       | `success` |
+| `delete`            | 删除           | `danger`  |
+| `remove`            | 移除           | `danger`  |
+| `purge`             | 彻底删除       | `danger`  |
+| `clear-recycle`     | 清空回收站     | `danger`  |
+| `select-all`        | 全选权限       | `primary` |
+| `clear-selection`   | 清空权限选择   | `default` |
+| `roles`             | 配置角色       | `primary` |
+| `permissions`       | 配置权限       | `primary` |
+| `activate-business` | 业务开通       | `primary` |
+| `options`           | 选项管理       | `primary` |
+| `aliases`           | 别名管理       | `primary` |
+| `color-categories`  | 色系分类管理   | `primary` |
+| `product-center`    | 商品中心       | `primary` |
+| `logs`              | 操作日志       | `default` |
+| `versions`          | 版本记录       | `default` |
+| `off-shelf-history` | 历史下架原因   | `default` |
+| `switch-category`   | 切换分类       | `primary` |
+| `back`              | 返回           | `default` |
+| `cancel`            | 取消           | `default` |
+| `close`             | 关闭／我知道了 | `default` |
+| `login`             | 登录           | `primary` |
+| `logout`            | 退出登录       | `default` |
+| `verification-code` | 获取验证码     | `primary` |
+| `previous`          | 上一步         | `default` |
+| `next`              | 下一步         | `primary` |
+| `fullscreen`        | 全屏           | `default` |
+| `exit-fullscreen`   | 还原全屏       | `default` |
+| `expand`            | 展开           | `default` |
+| `collapse`          | 收起           | `default` |
+
+### 确认、取消与校验
+
+- 确认按钮跟随实际动作：如归档／停用／下架为warning，启用／恢复为success，删除为danger。即使按钮文案是“提交”，也按实际动作取色。无操作可执行的阻断弹窗“我知道了”归入close，使用default。
+- 取消始终default；关闭、返回亦为default。取消按钮的null（隐藏）、禁用、加载、回调及文案不变。
+- 校验失败使用字段红框、字段下方具体提示和原有统一提交反馈；创建规格、选择选项等正常动作不因错误改为danger。校验规则、提交时机和定位行为不变。
+- 删除与彻底删除同为danger，以原名称、说明和确认流程表达后果差异，不另造深红色。清空权限选择归入clear-selection，不按“清空”二字推断危险色。
+
+### 后续新功能登记
+
+1. 先按实际功能查表；新增订单复用create、批量归档复用archive，不能仅因模块或文案不同新增功能。
+2. 确实是新功能时，在同一JSON登记稳定标识、显示说明、语义类别及业务后果／选色依据；必要时登记明确的动态动作分组。只使用已有五类主题。
+3. “撤销”等后果不明确的动作先讨论并确认业务语义，不能默认蓝色或按名称猜测。
+4. 同步文档、公共实现的消费者及相关测试。新按钮漏登记、登记无依据、未知标识、页面直接选色或确认漏接入，必须修复后才能通过门禁。
+
+### 控件边界与门禁
+
+选中态导航、业务类型选择、价格跟随模式控件及图片／视频缩略预览面不等同于普通动作按钮，保留内容和状态表达，不强制涂成动作色。当前准确入口登记在 `button-controls.json`，记录文件、结构指纹、类型及保留理由；新增或变化必须单独审查，不接受仅加标记绕过。TDesign原生内置分页、富文本工具与媒体查看器内部工具沿用组件，不逐个重写。独立上传的上传按钮通过公共上传入口引用upload主题；上传状态及生命周期不变。
+
+`button-color-policy.mjs` 接入既有 `test:source-guards` / `check:ui-templates`，全量扫描src，新增页面自动纳入；类型检查与功能回归同时保留。公共列表和弹窗的功能标识均为必填；没有按文案猜色、默认蓝色或旧颜色兜底路径。旧动作模型不再保存重复theme字段，唯一颜色来源是登记表。

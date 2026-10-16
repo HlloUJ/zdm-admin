@@ -30,11 +30,11 @@
                     </t-form-item>
                   </div>
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="handleSearch">
+                    <t-button :theme="buttonTheme('search')" @click="handleSearch">
                       <template #icon><t-icon name="search" /></template>
                       查询
                     </t-button>
-                    <t-button theme="default" variant="base" @click="handleReset">
+                    <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                       <template #icon><t-icon name="refresh" /></template>
                       重置
                     </t-button>
@@ -42,7 +42,7 @@
                 </div>
               </t-form>
               <AdminListToolbar :has-actions="canCreateRootCategory"
-                ><t-button v-if="canCreateRootCategory" theme="primary" @click="openCreateDialog()">
+                ><t-button v-if="canCreateRootCategory" :theme="buttonTheme('create')" @click="openCreateDialog()">
                   <template #icon><t-icon name="add" /></template>
                   新增一级分类
                 </t-button></AdminListToolbar
@@ -75,6 +75,7 @@
                 <div :class="['category-name-cell', `level-${row.level}`]">
                   <t-button
                     v-if="row.node.children.length"
+                    :theme="buttonTheme(isExpanded(row.node) ? 'collapse' : 'expand')"
                     class="tree-toggle"
                     variant="text"
                     shape="square"
@@ -104,18 +105,20 @@
                 <div class="table-actions">
                   <t-link
                     v-if="canCreateChildCategory && row.level < maxCategoryLevel"
-                    theme="primary"
+                    :theme="buttonTheme('create')"
                     @click="openCreateDialog(row)"
                     >新增下级</t-link
                   >
-                  <t-link v-if="canEditCategory" theme="primary" @click="openEditDialog(row)">编辑</t-link>
+                  <t-link v-if="canEditCategory" :theme="buttonTheme('edit')" @click="openEditDialog(row)">编辑</t-link>
                   <t-link
                     v-if="canToggleCategoryStatus"
-                    :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                    :theme="buttonTheme(row.status === 'enabled' ? 'disable' : 'enable')"
                     @click="openStatusConfirm(row.node)"
                     >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
                   >
-                  <t-link v-if="canDeleteCategory" theme="danger" @click="openDeleteDialog(row.node)">删除</t-link>
+                  <t-link v-if="canDeleteCategory" :theme="buttonTheme('delete')" @click="openDeleteDialog(row.node)"
+                    >删除</t-link
+                  >
                   <span v-if="!hasVisibleRowAction(row)">-</span>
                 </div>
               </template>
@@ -127,13 +130,14 @@
     </div>
 
     <t-dialog
-      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formVisible"
+      :cancel-btn="cancelButtonProps(undefined)"
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="formMode === 'create' ? `新增${levelLabel(formLevel)}` : '编辑分类'"
       width="480px"
       placement="center"
       :prevent-scroll-through="false"
-      confirm-btn="保存"
+      :confirm-btn="actionButtonProps('save', '保存', '确认')"
       @confirm="handleSubmit"
       @close="closeFormDialog"
       @opened="restorePageScroll"
@@ -154,6 +158,7 @@
 
     <AdminConfirmDialog
       v-model:visible="deleteVisible"
+      function="delete"
       action="删除"
       object-type="分类"
       :object-name="deleteTarget?.name"
@@ -175,6 +180,7 @@
 
     <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
+      :function="statusTarget?.status === 'enabled' ? 'disable' : 'enable'"
       :action="statusTarget?.status === 'enabled' ? '停用' : '启用'"
       object-type="分类"
       :object-name="statusTarget?.name"
@@ -189,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { adminFeedback, AdminConfirmDialog, AdminListLayout } from '@/components/foundation';
@@ -800,9 +807,6 @@ onMounted(loadCategories);
   flex: 0 0 20px;
   width: 20px;
   height: 20px;
-}
-.tree-toggle {
-  color: var(--td-text-color-secondary);
 }
 .tree-toggle-placeholder {
   display: inline-flex;

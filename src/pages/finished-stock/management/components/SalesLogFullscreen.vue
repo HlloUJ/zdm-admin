@@ -13,7 +13,7 @@
         class="sales-fullscreen-button"
         shape="square"
         variant="text"
-        theme="primary"
+        :theme="buttonTheme(fullscreen ? 'exit-fullscreen' : 'fullscreen')"
         :title="fullscreen ? '还原' : '全屏显示'"
         :aria-label="fullscreen ? '还原' : '全屏显示'"
         @click="toggle"
@@ -24,6 +24,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
 withDefaults(defineProps<{ title?: string }>(), { title: '销售规格' });
 const emit = defineEmits<{ resize: [] }>();

@@ -6,6 +6,7 @@
     :class="{ 'admin-media-upload--invalid': Boolean(errorMessage) }"
     :files="files"
     theme="image"
+    :trigger-button-props="{ theme: buttonTheme('upload') }"
     :accept="accept"
     :disabled="disabled"
     :max="1"
@@ -34,6 +35,7 @@
 </template>
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { buttonTheme } from './actions/buttonFunctions';
 import './official/media-upload.css';
 import type { RequestMethodResponse, SuccessContext, UploadFile } from 'tdesign-vue-next';
 import { adminFeedback } from './feedback/adminFeedback';

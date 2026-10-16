@@ -35,7 +35,12 @@
                         @keydown="handlePriceCoefficientKeydown"
                       />
                     </t-form-item>
-                    <t-button v-if="canEditGuide" theme="primary" :loading="guideSaving" @click="saveGuidePriceSetting">
+                    <t-button
+                      v-if="canEditGuide"
+                      :theme="buttonTheme('save')"
+                      :loading="guideSaving"
+                      @click="saveGuidePriceSetting"
+                    >
                       保存指导价
                     </t-button>
                   </t-form>
@@ -49,17 +54,17 @@
                     </t-form-item>
                   </div>
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="handleSearch">
+                    <t-button :theme="buttonTheme('search')" @click="handleSearch">
                       <template #icon><t-icon name="search" /></template>查询
                     </t-button>
-                    <t-button theme="default" variant="base" @click="handleReset">
+                    <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                       <template #icon><t-icon name="refresh" /></template>重置
                     </t-button>
                   </div>
                 </div>
               </t-form>
               <AdminListToolbar :has-actions="canCreate"
-                ><t-button v-if="canCreate" theme="primary" @click="openCreate">
+                ><t-button v-if="canCreate" :theme="buttonTheme('create')" @click="openCreate">
                   <template #icon><t-icon name="add" /></template>新增
                 </t-button></AdminListToolbar
               >
@@ -95,16 +100,20 @@
               </template>
               <template #operation="{ row }">
                 <div class="table-actions">
-                  <t-link v-if="canEdit" theme="primary" hover="color" @click="openEdit(row)"> 编辑 </t-link>
+                  <t-link v-if="canEdit" :theme="buttonTheme('edit')" hover="color" @click="openEdit(row)">
+                    编辑
+                  </t-link>
                   <t-link
                     v-if="canToggleStatus"
-                    :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                    :theme="buttonTheme(row.status === 'enabled' ? 'disable' : 'enable')"
                     hover="color"
                     @click="openStatusConfirm(row)"
                   >
                     {{ row.status === 'enabled' ? '停用' : '启用' }}
                   </t-link>
-                  <t-link v-if="canDelete" theme="danger" hover="color" @click="openConfirm(row)">删除</t-link>
+                  <t-link v-if="canDelete" :theme="buttonTheme('delete')" hover="color" @click="openConfirm(row)"
+                    >删除</t-link
+                  >
                 </div>
               </template>
             </t-table>
@@ -122,8 +131,9 @@
     </div>
 
     <AdminDialog
-      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formVisible"
+      confirm-function="submit"
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="editingId ? '编辑' : '新增'"
       width="480px"
       @confirm="submitForm"
@@ -165,6 +175,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
+      function="delete"
       action="删除"
       object-type="价格配置"
       :object-name="confirmRow?.name"
@@ -174,6 +185,7 @@
     />
     <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
+      :function="statusConfirmRow?.status === 'enabled' ? 'disable' : 'enable'"
       :action="statusConfirmRow?.status === 'enabled' ? '停用' : '启用'"
       :object-type="`${activeType === 'finished' ? '成品' : '大板'}价格配置`"
       :object-name="statusConfirmRow?.name"
@@ -185,6 +197,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import DecimalInput from '@/components/DecimalInput.vue';

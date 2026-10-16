@@ -6,8 +6,8 @@
     :dialog-class-name="['zdm-admin-dialog', dialogClassName].filter(Boolean).join(' ')"
     placement="center"
     :prevent-scroll-through="false"
-    :confirm-btn="confirmBtn"
-    :cancel-btn="cancelBtn"
+    :confirm-btn="actionButtonProps(confirmFunction, confirmBtn)"
+    :cancel-btn="cancelButtonProps(cancelBtn)"
     @update:visible="emit('update:visible', $event)"
     @confirm="emit('confirm')"
     @cancel="emit('cancel')"
@@ -21,6 +21,7 @@
 
 <script setup lang="ts">
 import type { ButtonProps } from 'tdesign-vue-next';
+import { actionButtonProps, cancelButtonProps, type ButtonFunction } from './actions/buttonFunctions';
 
 withDefaults(
   defineProps<{
@@ -28,6 +29,7 @@ withDefaults(
     header: string;
     width?: string;
     dialogClassName?: string;
+    confirmFunction: ButtonFunction;
     confirmBtn?: string | ButtonProps;
     cancelBtn?: string | ButtonProps | null;
   }>(),

@@ -1,0 +1,346 @@
+{
+  "version": 1,
+  "categories": {
+    "normal": {
+      "theme": "primary",
+      "meaning": "正常业务操作、查看及业务入口"
+    },
+    "warning": {
+      "theme": "warning",
+      "meaning": "停止或限制业务，需要谨慎的状态变化"
+    },
+    "destructive": {
+      "theme": "danger",
+      "meaning": "删除、移除及不可恢复清理"
+    },
+    "restore": {
+      "theme": "success",
+      "meaning": "启用或恢复业务可用状态"
+    },
+    "auxiliary": {
+      "theme": "default",
+      "meaning": "取消、返回、重置及辅助控制"
+    }
+  },
+  "functions": {
+    "create": {
+      "label": "新增／添加",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "edit": {
+      "label": "编辑",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "save": {
+      "label": "保存",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "submit": {
+      "label": "提交",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "search": {
+      "label": "查询",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "reset": {
+      "label": "重置",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "view": {
+      "label": "查看／详情",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "preview": {
+      "label": "预览",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "publish-product": {
+      "label": "发布商品",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "publish-version": {
+      "label": "发布版本",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "copy-version": {
+      "label": "复制版本",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "copy-link": {
+      "label": "复制链接",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "select-product": {
+      "label": "选择商品",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "batch-fill": {
+      "label": "批量设置／填写",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "assign": {
+      "label": "调整归属",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "upload": {
+      "label": "上传",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "shelf": {
+      "label": "上架",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "off-shelf": {
+      "label": "下架",
+      "category": "warning",
+      "reason": "停止或限制业务，需要谨慎的状态变化"
+    },
+    "restore-stock": {
+      "label": "放回仓库",
+      "category": "restore",
+      "reason": "启用或恢复业务可用状态"
+    },
+    "enable": {
+      "label": "启用",
+      "category": "restore",
+      "reason": "启用或恢复业务可用状态"
+    },
+    "disable": {
+      "label": "停用",
+      "category": "warning",
+      "reason": "停止或限制业务，需要谨慎的状态变化"
+    },
+    "archive": {
+      "label": "归档",
+      "category": "warning",
+      "reason": "停止或限制业务，需要谨慎的状态变化"
+    },
+    "unarchive": {
+      "label": "取消归档",
+      "category": "restore",
+      "reason": "启用或恢复业务可用状态"
+    },
+    "restore-operation": {
+      "label": "恢复运营",
+      "category": "restore",
+      "reason": "启用或恢复业务可用状态"
+    },
+    "delete": {
+      "label": "删除",
+      "category": "destructive",
+      "reason": "删除、移除及不可恢复清理"
+    },
+    "remove": {
+      "label": "移除",
+      "category": "destructive",
+      "reason": "删除、移除及不可恢复清理"
+    },
+    "purge": {
+      "label": "彻底删除",
+      "category": "destructive",
+      "reason": "删除、移除及不可恢复清理"
+    },
+    "clear-recycle": {
+      "label": "清空回收站",
+      "category": "destructive",
+      "reason": "删除、移除及不可恢复清理"
+    },
+    "select-all": {
+      "label": "全选权限",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "clear-selection": {
+      "label": "清空权限选择",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "roles": {
+      "label": "配置角色",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "permissions": {
+      "label": "配置权限",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "activate-business": {
+      "label": "业务开通",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "options": {
+      "label": "选项管理",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "aliases": {
+      "label": "别名管理",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "color-categories": {
+      "label": "色系分类管理",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "product-center": {
+      "label": "商品中心",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "logs": {
+      "label": "操作日志",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "versions": {
+      "label": "版本记录",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "off-shelf-history": {
+      "label": "历史下架原因",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "switch-category": {
+      "label": "切换分类",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "back": {
+      "label": "返回",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "cancel": {
+      "label": "取消",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "close": {
+      "label": "关闭／我知道了",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "login": {
+      "label": "登录",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "logout": {
+      "label": "退出登录",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "verification-code": {
+      "label": "获取验证码",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "previous": {
+      "label": "上一步",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "next": {
+      "label": "下一步",
+      "category": "normal",
+      "reason": "正常业务操作、查看及业务入口"
+    },
+    "fullscreen": {
+      "label": "全屏",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "exit-fullscreen": {
+      "label": "还原全屏",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "expand": {
+      "label": "展开",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    },
+    "collapse": {
+      "label": "收起",
+      "category": "auxiliary",
+      "reason": "取消、返回、重置及辅助控制"
+    }
+  },
+  "groups": {
+    "stock": {
+      "publish": "publish-product",
+      "batchShelf": "shelf",
+      "batchOffShelf": "off-shelf",
+      "batchRestore": "restore-stock",
+      "batchPurge": "purge",
+      "clearRecycle": "clear-recycle",
+      "shelf": "shelf",
+      "offShelf": "off-shelf",
+      "restore": "restore-stock",
+      "purge": "purge",
+      "delete": "delete",
+      "edit": "edit",
+      "detail": "view",
+      "price": "edit"
+    },
+    "store-toolbar": {
+      "select": "product-center",
+      "batch-shelf": "shelf",
+      "off-shelf": "off-shelf",
+      "batch-restore": "restore-stock",
+      "batch-purge": "purge",
+      "clear": "clear-recycle"
+    },
+    "status": {
+      "enable": "enable",
+      "disable": "disable",
+      "delete": "delete",
+      "archive": "archive",
+      "restore": "restore-operation"
+    },
+    "customer": {
+      "create": "create",
+      "assign": "assign",
+      "archive": "archive",
+      "restore": "unarchive",
+      "purge": "purge"
+    },
+    "store-confirm": {
+      "shelf": "shelf",
+      "batch-shelf": "shelf",
+      "restore": "restore-stock",
+      "batch-restore": "restore-stock",
+      "delete": "delete",
+      "purge": "purge",
+      "batch-purge": "purge",
+      "clear": "clear-recycle"
+    },
+    "supply-status": {
+      "启用": "enable",
+      "停用": "disable"
+    }
+  }
+}

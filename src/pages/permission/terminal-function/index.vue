@@ -18,14 +18,16 @@
           <footer class="page-actions">
             <t-button
               v-if="canSave"
-              theme="primary"
+              :theme="buttonTheme('save')"
               :loading="loading"
               :disabled="!currentModules.length"
               @click="saveAllocation"
             >
               保存
             </t-button>
-            <t-button theme="default" variant="base" :disabled="loading" @click="resetAllocation">重置</t-button>
+            <t-button :theme="buttonTheme('reset')" variant="base" :disabled="loading" @click="resetAllocation"
+              >重置</t-button
+            >
           </footer>
         </section>
       </main>
@@ -34,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { getLoginUser } from '@/services/auth';
 import { isPlatformSuperAdmin } from '@/services/adminPermissions';
 import { adminFeedback } from '@/components/foundation';

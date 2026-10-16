@@ -1,4 +1,6 @@
-import type { ButtonProps, SelectProps } from 'tdesign-vue-next';
+import type { SelectProps } from 'tdesign-vue-next';
+
+import type { ButtonFunction } from '../actions/buttonFunctions';
 
 export type FilterValues = Record<string, string | number | undefined>;
 export interface ListFilter {
@@ -15,7 +17,7 @@ export interface ListAction {
   batch?: boolean;
   id: string;
   label: string;
-  theme?: ButtonProps['theme'];
+  function: ButtonFunction;
   icon?: string;
   disabled?: boolean;
 }

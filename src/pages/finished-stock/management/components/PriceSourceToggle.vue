@@ -13,6 +13,7 @@
   </t-tooltip>
   <AdminDialog
     v-model:visible="confirmVisible"
+    confirm-function="edit"
     attach="body"
     header="更改价格浮动方式"
     confirm-btn="确认"

@@ -24,10 +24,10 @@
                 </t-form-item>
               </div>
               <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
+                <t-button :theme="buttonTheme('search')" @click="handleSearch">
                   <template #icon><t-icon name="search" /></template>查询
                 </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
+                <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                   <template #icon><t-icon name="refresh" /></template>重置
                 </t-button>
               </div>
@@ -38,10 +38,15 @@
         <section class="table-card">
           <AdminListToolbar :has-actions="canCreate || canManageCategories"
             ><div class="toolbar-actions">
-              <t-button v-if="canCreate" theme="primary" @click="openCreate">
+              <t-button v-if="canCreate" :theme="buttonTheme('create')" @click="openCreate">
                 <template #icon><t-icon name="add" /></template>新增
               </t-button>
-              <t-button v-if="canManageCategories" theme="default" variant="outline" @click="openCategoryManagement">
+              <t-button
+                v-if="canManageCategories"
+                :theme="buttonTheme('color-categories')"
+                variant="outline"
+                @click="openCategoryManagement"
+              >
                 色系分类管理
               </t-button>
             </div></AdminListToolbar
@@ -57,16 +62,21 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="canEdit" theme="primary" hover="color" @click="openEdit(row)">编辑</t-link>
+                <t-link v-if="canEdit" :theme="buttonTheme('edit')" hover="color" @click="openEdit(row)">编辑</t-link>
                 <t-link
                   v-if="canToggle"
-                  :theme="row.status === 'normal' ? 'warning' : 'success'"
+                  :theme="buttonTheme(row.status === 'normal' ? 'disable' : 'enable')"
                   hover="color"
                   @click="openColorConfirm(row, row.status === 'normal' ? 'disable' : 'enable')"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link v-if="canDelete" theme="danger" hover="color" @click="openColorConfirm(row, 'delete')">
+                <t-link
+                  v-if="canDelete"
+                  :theme="buttonTheme('delete')"
+                  hover="color"
+                  @click="openColorConfirm(row, 'delete')"
+                >
                   删除
                 </t-link>
               </div>
@@ -83,9 +93,10 @@
     </div>
 
     <AdminDialog
+      v-model:visible="formVisible"
+      confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      v-model:visible="formVisible"
       :header="editingId ? '编辑色系' : '新增色系'"
       @confirm="submitColor"
       @cancel="closeColorForm"
@@ -113,6 +124,7 @@
 
     <AdminDialog
       v-model:visible="categoryManagementVisible"
+      confirm-function="close"
       header="色系分类管理"
       width="980px"
       confirm-btn="关闭"
@@ -121,24 +133,25 @@
       @close="categoryManagementVisible = false"
     >
       <div class="table-toolbar">
-        <t-button theme="primary" @click="openCategoryForm()">
+        <t-button :theme="buttonTheme('create')" @click="openCategoryForm()">
           <template #icon><t-icon name="add" /></template>新增色系分类
         </t-button>
       </div>
       <t-table row-key="id" :data="categories" :columns="categoryColumns" table-layout="fixed">
         <template #operation="{ row }">
           <div class="table-actions">
-            <t-link theme="primary" hover="color" @click="openCategoryForm(row)">编辑</t-link>
-            <t-link theme="danger" hover="color" @click="openCategoryDelete(row)">删除</t-link>
+            <t-link :theme="buttonTheme('edit')" hover="color" @click="openCategoryForm(row)">编辑</t-link>
+            <t-link :theme="buttonTheme('delete')" hover="color" @click="openCategoryDelete(row)">删除</t-link>
           </div>
         </template>
       </t-table>
     </AdminDialog>
 
     <AdminDialog
+      v-model:visible="categoryFormVisible"
+      confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      v-model:visible="categoryFormVisible"
       :header="editingCategoryId ? '编辑色系分类' : '新增色系分类'"
       @confirm="submitCategory"
       @cancel="closeCategoryForm"
@@ -161,6 +174,7 @@
 
     <AdminConfirmDialog
       v-model:visible="colorConfirmVisible"
+      :function="buttonFunctionFor('status', colorConfirmType)"
       :action="colorConfirmType === 'delete' ? '删除' : colorConfirmType === 'disable' ? '停用' : '启用'"
       object-type="色系"
       :object-name="colorConfirmRow?.name"
@@ -171,6 +185,7 @@
 
     <AdminConfirmDialog
       v-model:visible="categoryDeleteVisible"
+      function="delete"
       action="删除"
       object-type="色系分类"
       :object-name="categoryDeleteRow?.name"
@@ -184,6 +199,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

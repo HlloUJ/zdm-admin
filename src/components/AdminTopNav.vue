@@ -44,7 +44,7 @@
     </div>
 
     <div class="top-actions">
-      <t-button shape="square" variant="text" aria-label="消息通知">
+      <t-button data-button-control="notification-indicator" shape="square" variant="text" aria-label="消息通知">
         <t-icon name="notification" />
       </t-button>
       <div class="user-entry">
@@ -54,7 +54,7 @@
           <span class="user-role">{{ roleText }}</span>
         </div>
       </div>
-      <t-button variant="text" theme="default" @click="handleLogout">
+      <t-button variant="text" :theme="buttonTheme('logout')" @click="handleLogout">
         <template #icon><t-icon name="logout" /></template>
         退出登录
       </t-button>
@@ -63,6 +63,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { adminFeedback } from '@/components/foundation';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';

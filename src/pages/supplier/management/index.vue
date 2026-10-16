@@ -27,11 +27,11 @@
               </div>
 
               <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
+                <t-button :theme="buttonTheme('search')" @click="handleSearch">
                   <template #icon><t-icon name="search" /></template>
                   查询
                 </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
+                <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                   <template #icon><t-icon name="refresh" /></template>
                   重置
                 </t-button>
@@ -43,7 +43,7 @@
         <section class="table-card">
           <AdminListToolbar :has-actions="canCreateSupplier"
             ><div class="toolbar-actions">
-              <t-button v-if="canCreateSupplier" theme="primary" @click="openCreateDialog">
+              <t-button v-if="canCreateSupplier" :theme="buttonTheme('create')" @click="openCreateDialog">
                 <template #icon><t-icon name="add" /></template>
                 新增
               </t-button>
@@ -71,16 +71,23 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="canEditSupplier" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canEditSupplier" :theme="buttonTheme('edit')" hover="color" @click="openEditDialog(row)"
+                  >编辑</t-link
+                >
                 <t-link
                   v-if="canToggleSupplierStatus"
-                  :theme="row.status === 'normal' ? 'warning' : 'success'"
+                  :theme="buttonTheme(row.status === 'normal' ? 'disable' : 'enable')"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link v-if="canDeleteSupplier" theme="danger" hover="color" @click="openDeleteConfirm(row)">
+                <t-link
+                  v-if="canDeleteSupplier"
+                  :theme="buttonTheme('delete')"
+                  hover="color"
+                  @click="openDeleteConfirm(row)"
+                >
                   删除
                 </t-link>
               </div>
@@ -98,9 +105,10 @@
     </div>
 
     <AdminDialog
+      v-model:visible="formDialogVisible"
+      confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
@@ -146,6 +154,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
       object-type="供应商"
       :object-name="confirmState.row?.name"
@@ -159,6 +168,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

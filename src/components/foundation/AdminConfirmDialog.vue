@@ -1,6 +1,7 @@
 <template>
   <AdminDialog
     :visible="visible"
+    :confirm-function="mode === 'blocked' ? 'close' : props.function"
     :header="dialogTitle"
     :width="width"
     dialog-class-name="zdm-admin-confirm-dialog"
@@ -21,15 +22,16 @@
 
 <script setup lang="ts">
 import type { ButtonProps } from 'tdesign-vue-next';
+import { buttonTheme, type ButtonFunction } from './actions/buttonFunctions';
 import { computed } from 'vue';
 
 import AdminDialog from './AdminDialog.vue';
 
 const props = withDefaults(
   defineProps<{
+    function: ButtonFunction;
     action: string;
     description?: string;
-    danger?: boolean;
     mode?: 'confirm' | 'blocked';
     objectName?: string;
     objectType?: string;
@@ -39,7 +41,6 @@ const props = withDefaults(
   }>(),
   {
     description: '',
-    danger: false,
     mode: 'confirm',
     objectName: '',
     objectType: '',
@@ -66,7 +67,7 @@ const dialogTitle = computed(
 );
 const confirmText = computed<ButtonProps>(() => ({
   content: props.mode === 'blocked' ? '我知道了' : `确认${props.action}`,
-  theme: props.mode !== 'blocked' && (props.danger || /(删除|移除|清空)/.test(props.action)) ? 'danger' : 'primary',
+  theme: buttonTheme(props.mode === 'blocked' ? 'close' : props.function),
 }));
 const dialogDescription = computed(() => {
   if (props.description) return props.description;

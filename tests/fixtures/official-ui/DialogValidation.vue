@@ -1,7 +1,13 @@
 <template>
   <component
     :is="kind === 'native' ? 't-dialog' : kind === 'foundation' ? AdminFormDialog : AdminDialog"
-    v-bind="kind === 'foundation' ? { data } : {}"
+    v-bind="
+      kind === 'native'
+        ? {}
+        : kind === 'foundation'
+          ? { data, confirmFunction: 'submit' }
+          : { confirmFunction: 'submit' }
+    "
     :visible="true"
     header="新增"
     width="560px"

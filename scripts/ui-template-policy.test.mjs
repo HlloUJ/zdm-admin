@@ -7,6 +7,12 @@ import path from 'node:path';
 import postcss from 'postcss';
 import { digest, inspectPage, listLayoutViolations, pageViolations, templateShape } from './ui-template-policy.mjs';
 import { typographyViolations } from './typography-policy.mjs';
+import {
+  buttonColorViolations,
+  registryViolations,
+  buttonClasses,
+  buttonStyleViolations,
+} from './button-color-policy.mjs';
 import { businessFingerprint, contractViolations } from './visual-refactor-contract.mjs';
 const refactor = JSON.parse(readFileSync('docs/ui/visual-refactor.json', 'utf8'));
 const approvedVisualFiles = new Set(refactor.approvedVisualFiles);
@@ -716,4 +722,79 @@ test('later approved business fixes reverse before overlapping migrations withou
       contractViolations('page.vue', fixed, { ...baseline, approvedBusinessPatches: [{ ...patch, ...change }] }).length,
     );
   assert.ok(contractViolations('page.vue', fixed, { ...baseline, approvedBusinessPatches: [] }).length);
+});
+
+test('all business button and dialog colors use registered functions, including future pages', () => {
+  const problems = [
+    ...registryViolations(),
+    ...files('src')
+      .filter((file) => file.endsWith('.vue'))
+      .flatMap((file) => buttonColorViolations(file, read(file))),
+  ];
+  assert.deepEqual(problems, []);
+});
+test('unregistered functions, direct colors, missing confirmation semantics and forged controls fail closed', () => {
+  const source = (template) =>
+    `<template>${template}</template><script setup>import { buttonTheme, buttonFunctionFor, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';</script>`;
+  const good = source(
+    `<t-button :theme="buttonTheme('delete')">删除</t-button><t-link :theme="buttonTheme('delete')">删除</t-link><AdminConfirmDialog function="delete" /><AdminDialog confirm-function="off-shelf" />`,
+  );
+  assert.deepEqual(buttonColorViolations('new-page.vue', good), []);
+  for (const template of [
+    '<t-button>新增</t-button>',
+    '<t-link theme="danger">删除</t-link>',
+    `<t-button :theme="buttonTheme('not-registered')" />`,
+    `<t-button :theme="buttonTheme(buttonFunctionFor('stock', 'unknown'))" />`,
+    `<t-button :theme="buttonTheme('save')" style="color:red" />`,
+    '<t-button data-button-control="section-navigation" />',
+    '<button @click="remove">删除</button>',
+    '<AdminDialog />',
+    `<AdminDialog confirm-function="delete" :confirm-btn="{ content: '删除', theme: 'danger' }" />`,
+    '<AdminConfirmDialog function="not-registered" />',
+    '<t-dialog confirm-btn="确认" />',
+    `<t-button v-bind="overrides" :theme="buttonTheme('save')" />`,
+  ])
+    assert.ok(buttonColorViolations('new-page.vue', source(template)).length, template);
+  const invalid = {
+    categories: { normal: { theme: 'danger', meaning: 'bad mapping' } },
+    functions: { foo: { label: '新功能', category: 'unknown', reason: '' } },
+    groups: { future: { run: 'missing' } },
+  };
+  assert.ok(registryViolations(invalid).length >= 3);
+});
+
+test('button classes cannot override the public mapping in scoped or global CSS', () => {
+  const vueFiles = files('src').filter((file) => file.endsWith('.vue'));
+  const classes = new Set(vueFiles.flatMap((file) => [...buttonClasses(read(file))]));
+  const errors = [];
+  for (const file of files('src')) {
+    if (file.endsWith('.vue'))
+      for (const style of parseSfc(read(file)).descriptor.styles)
+        errors.push(...buttonStyleViolations(file, style.content, classes));
+    else if (file.endsWith('.css')) errors.push(...buttonStyleViolations(file, read(file), classes));
+  }
+  assert.deepEqual(errors, []);
+  assert.ok(buttonStyleViolations('page.vue', '.t-button:hover { color: red }').length);
+  assert.ok(buttonStyleViolations('page.vue', '.custom { background: orange }', new Set(['custom'])).length);
+  assert.deepEqual(buttonStyleViolations('page.vue', '.custom { margin-left: auto }', new Set(['custom'])), []);
+});
+
+test('public button and confirmation contracts require semantic IDs without legacy color fallbacks', () => {
+  for (const [file, field] of [
+    ['src/components/foundation/AdminDialog.vue', 'confirmFunction'],
+    ['src/components/foundation/official/AdminFormDialog.vue', 'confirmFunction'],
+    ['src/components/foundation/AdminConfirmDialog.vue', 'function'],
+    ['src/components/foundation/official/types.ts', 'function'],
+  ]) {
+    const source = read(file);
+    assert.match(source, new RegExp(field + ': ButtonFunction'));
+    assert.doesNotMatch(source, new RegExp(field + '\\?: ButtonFunction'));
+  }
+  assert.doesNotMatch(read('src/components/foundation/AdminConfirmDialog.vue'), /props\.danger|删除\|移除\|清空/);
+  for (const file of [
+    'src/pages/finished-stock/shared/finishedStockActions.ts',
+    'src/pages/finished-stock/shared/finishedStockPageModel.ts',
+    'src/pages/slab/shared/slabPageActions.ts',
+  ])
+    assert.doesNotMatch(read(file), /\btheme\??:/);
 });

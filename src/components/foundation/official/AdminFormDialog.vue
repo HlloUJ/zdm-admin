@@ -8,7 +8,8 @@
         .filter(Boolean)
         .join(' ')
     "
-    :confirm-btn="confirmBtn"
+    :confirm-btn="actionButtonProps(confirmFunction, confirmBtn)"
+    :cancel-btn="cancelButtonProps(cancelBtn)"
     placement="center"
     :prevent-scroll-through="false"
     @update:visible="emit('update:visible', $event)"
@@ -21,6 +22,7 @@
 </template>
 <script setup lang="ts">
 import { ref } from 'vue';
+import { actionButtonProps, cancelButtonProps, type ButtonFunction } from '../actions/buttonFunctions';
 import type { FormProps, ButtonProps, FormInstanceFunctions } from 'tdesign-vue-next';
 import { formElement } from '@/utils/submitValidation';
 const formRef = ref<FormInstanceFunctions>();
@@ -34,9 +36,11 @@ withDefaults(
     labelWidth?: FormProps['labelWidth'];
     dialogClassName?: string;
     formLayout?: 'single-column' | 'custom';
+    confirmFunction: ButtonFunction;
+    cancelBtn?: string | ButtonProps | null;
     confirmBtn?: string | ButtonProps;
   }>(),
-  { labelWidth: '100px', confirmBtn: '提交', dialogClassName: '', formLayout: 'single-column' },
+  { labelWidth: '100px', confirmBtn: '提交', cancelBtn: undefined, dialogClassName: '', formLayout: 'single-column' },
 );
 const emit = defineEmits<{ 'update:visible': [value: boolean] }>();
 </script>

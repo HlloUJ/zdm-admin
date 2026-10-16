@@ -22,16 +22,16 @@
                     /></t-form-item>
                   </div>
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="search"
+                    <t-button :theme="buttonTheme('search')" @click="search"
                       ><template #icon><t-icon name="search" /></template>查询</t-button
-                    ><t-button theme="default" variant="base" @click="reset"
+                    ><t-button :theme="buttonTheme('reset')" variant="base" @click="reset"
                       ><template #icon><t-icon name="refresh" /></template>重置</t-button
                     >
                   </div>
                 </div>
               </t-form>
               <AdminListToolbar :has-actions="canCreateAttribute"
-                ><t-button v-if="canCreateAttribute" theme="primary" @click="openCreate">
+                ><t-button v-if="canCreateAttribute" :theme="buttonTheme('create')" @click="openCreate">
                   <template #icon><t-icon name="add" /></template>新增
                 </t-button></AdminListToolbar
               >
@@ -49,11 +49,15 @@
                 ><div class="table-actions">
                   <t-link
                     v-if="canToggleAttributeStatus"
-                    :theme="row.status === 'enabled' ? 'warning' : 'success'"
+                    :theme="buttonTheme(row.status === 'enabled' ? 'disable' : 'enable')"
                     hover="color"
                     @click="openStatusConfirm(row)"
                     >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
-                  ><t-link v-if="canDeleteAttribute" theme="danger" hover="color" @click="openDeleteConfirm(row)"
+                  ><t-link
+                    v-if="canDeleteAttribute"
+                    :theme="buttonTheme('delete')"
+                    hover="color"
+                    @click="openDeleteConfirm(row)"
                     >删除</t-link
                   ><span v-if="!canToggleAttributeStatus && !canDeleteAttribute" class="table-action-placeholder"
                     >-</span
@@ -75,6 +79,7 @@
     </div>
     <AdminDialog
       v-model:visible="dialogVisible"
+      confirm-function="submit"
       header="新增"
       width="480px"
       placement="center"
@@ -100,6 +105,7 @@
     </AdminDialog>
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('status', confirmType)"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
       object-type="属性"
       :object-name="confirmTarget?.name"
@@ -113,6 +119,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

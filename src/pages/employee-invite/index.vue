@@ -62,6 +62,7 @@
               @update:model-value="normalizeVerifyCode"
             />
             <t-button
+              :theme="buttonTheme('verification-code')"
               size="large"
               variant="outline"
               :disabled="countDown > 0 || requestingCode"
@@ -73,7 +74,9 @@
           </t-form-item>
 
           <t-form-item class="btn-container">
-            <t-button block size="large" type="submit" :loading="submitting">下一步</t-button>
+            <t-button :theme="buttonTheme('next')" block size="large" type="submit" :loading="submitting"
+              >下一步</t-button
+            >
           </t-form-item>
         </t-form>
 
@@ -99,8 +102,12 @@
 
           <t-form-item class="btn-container">
             <div class="profile-actions">
-              <t-button size="large" variant="outline" @click="step = 1">上一步</t-button>
-              <t-button size="large" type="submit" :loading="submitting">提交注册</t-button>
+              <t-button :theme="buttonTheme('previous')" size="large" variant="outline" @click="step = 1"
+                >上一步</t-button
+              >
+              <t-button :theme="buttonTheme('submit')" size="large" type="submit" :loading="submitting"
+                >提交注册</t-button
+              >
             </div>
           </t-form-item>
         </t-form>
@@ -110,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { adminFeedback } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue-next';
