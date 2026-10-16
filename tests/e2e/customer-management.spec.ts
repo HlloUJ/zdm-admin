@@ -1070,11 +1070,26 @@ test('customer requirement uses 180px native ellipsis and hover reveals full tex
   const requirement = '客户希望定制一张可以容纳十人使用的餐桌，需要进口石材台面，并包含送货安装和后续维护服务。';
   await page.route('**/api/admin/store-customers**', async (route) => {
     if (new URL(route.request().url()).pathname === '/api/admin/store-customers' && route.request().method() === 'GET')
-      return route.fulfill({ json: ok([{ ...customer(1, 7), requirement, lastFollowedAt: '2026-10-16T19:30:45' }]) });
+      return route.fulfill({
+        json: ok([
+          {
+            ...customer(1, 7),
+            requirement,
+            phone: '123456789012345678901234567890',
+            lastFollowedAt: '2026-10-16T19:30:45',
+          },
+        ]),
+      });
     return route.fallback();
   });
   await page.goto('/store/customer-management');
   const row = page.locator('tbody tr').filter({ hasText: '王先生1' });
+  const phoneText = row.getByRole('cell').nth(2).locator('.t-table__ellipsis');
+  await phoneText.hover();
+  const phonePopup = page.locator('.t-popup__content:visible').filter({ hasText: '123456789012345678901234567890' });
+  await expect(phonePopup).toBeVisible();
+  const phoneBox = (await phoneText.boundingBox())!;
+  expect((await phonePopup.boundingBox())!.y).toBeGreaterThanOrEqual(phoneBox.y + phoneBox.height);
   const cell = row.getByRole('cell').nth(4);
   await expect(cell).toHaveText(requirement);
   expect((await cell.boundingBox())!.width).toBeCloseTo(180, 0);

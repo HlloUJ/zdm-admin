@@ -1603,6 +1603,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "{ colKey: 'phone', title: '联系电话', width: 120, ellipsis: true }",
+          "after": "{ colKey: 'phone', title: '联系电话', width: 120, ellipsis: { placement: 'bottom' } }",
+          "stage": "before-migrations",
+          "reason": "User approved native telephone ellipsis tooltip placement below the customer list column; preserve displayed phone and underlying data."
+        },
+        {
           "before": "{ colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true }",
           "after": "{ colKey: 'lastFollowedAt', title: '最近跟进时间', width: 180, ellipsis: true }",
           "stage": "before-migrations",

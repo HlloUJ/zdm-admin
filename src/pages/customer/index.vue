@@ -431,7 +431,7 @@ function handleToolbarAction(id: string) {
 const columns: TableProps['columns'] = [
   { colKey: 'row-select', type: 'multiple', width: 46 },
   { colKey: 'name', title: '客户姓名', width: 90, ellipsis: true },
-  { colKey: 'phone', title: '联系电话', width: 120, ellipsis: true },
+  { colKey: 'phone', title: '联系电话', width: 120, ellipsis: { placement: 'bottom' } },
   { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },
   { colKey: 'requirement', title: '客户需求', width: 180, ellipsis: { placement: 'bottom' } },
   { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 180, ellipsis: true },
