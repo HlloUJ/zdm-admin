@@ -2,44 +2,50 @@
   <header class="top-nav">
     <div class="brand">
       <div class="brand-logo">装</div>
-      <div>
-        <div class="brand-title">装点猫</div>
-        <div
-          v-if="switchableIdentityContexts.some((context) => context.identityId !== loginUser.identityId)"
-          class="brand-context-switcher"
-          :class="{ 'is-open': identitySelectorOpen }"
-        >
-          <span class="brand-context-label" :class="{ 'is-city-partner': isCityPartnerStore }" aria-hidden="true">
-            {{ currentIdentityLabel }}
-            <t-tag v-if="isCityPartnerStore" class="city-partner-mark" theme="warning" variant="dark" size="small"
-              >合</t-tag
-            >
+      <div class="brand-title">装点猫</div>
+    </div>
+    <div class="identity-context">
+      <t-select
+        v-if="switchableIdentityContexts.some((context) => context.identityId !== loginUser.identityId)"
+        v-model="selectedIdentityId"
+        v-model:popup-visible="identitySelectorOpen"
+        class="brand-context-select"
+        :loading="switchingIdentity"
+        :input-props="{ inputClass: 'identity-context-input' }"
+        :popup-props="{ overlayInnerStyle: { minWidth: '320px', maxWidth: 'calc(100vw - 32px)' } }"
+        aria-label="切换业务身份"
+        @change="handleIdentityChange"
+      >
+        <template #valueDisplay>
+          <span class="brand-context-label identity-lines">
+            <span class="identity-name" :title="currentIdentityLabel">{{ currentIdentityLabel }}</span>
+            <span class="identity-type">{{ currentIdentityType }}</span>
           </span>
-          <t-select
-            v-model="selectedIdentityId"
-            v-model:popup-visible="identitySelectorOpen"
-            class="brand-context-select"
-            size="small"
-            auto-width
-            :loading="switchingIdentity"
-            aria-label="切换业务身份"
-            @change="handleIdentityChange"
-          >
-            <t-option v-for="option in identityOptions" :key="option.value" :label="option.label" :value="option.value">
-              <span v-if="option.storeType === 'cityPartner'" class="city-partner-option">
-                <span class="city-partner-option-name">{{ option.label }}</span>
-                <t-tag class="city-partner-mark" theme="warning" variant="dark" size="small">合</t-tag>
-              </span>
-              <span v-else>{{ option.label }}</span>
-            </t-option>
-          </t-select>
-        </div>
-        <div v-else class="brand-subtitle" :class="{ 'is-city-partner': isCityPartnerStore }">
-          {{ currentIdentityLabel }}
-          <t-tag v-if="isCityPartnerStore" class="city-partner-mark" theme="warning" variant="dark" size="small"
-            >合</t-tag
-          >
-        </div>
+        </template>
+        <t-option
+          v-for="option in identityOptions"
+          :key="option.value"
+          class="identity-context-option"
+          :label="option.label"
+          :value="option.value"
+        >
+          <span class="identity-option-layout">
+            <span class="identity-lines">
+              <span class="identity-name" :title="option.name">{{ option.name }}</span>
+              <span class="identity-type">{{ option.type }}</span>
+            </span>
+            <t-icon
+              v-if="option.value === loginUser.identityId"
+              name="check"
+              class="identity-current-check"
+              aria-label="当前身份"
+            />
+          </span>
+        </t-option>
+      </t-select>
+      <div v-else class="brand-subtitle identity-lines">
+        <span class="identity-name" :title="currentIdentityLabel">{{ currentIdentityLabel }}</span>
+        <span class="identity-type">{{ currentIdentityType }}</span>
       </div>
     </div>
 
@@ -77,22 +83,25 @@ const selectedIdentityId = ref<number>();
 const switchingIdentity = ref(false);
 const identitySelectorOpen = ref(false);
 const avatarText = computed(() => loginUser.value.name.trim().slice(0, 1) || '管');
-const storeTypeLabels: Record<Exclude<NonNullable<IdentityContext['storeType']>, 'cityPartner'>, string> = {
+const storeTypeLabels: Record<NonNullable<IdentityContext['storeType']>, string> = {
+  cityPartner: '合伙人门店',
   slabSupplier: '大板供应商',
   finishedSupplier: '成品供应商',
   factory: '工厂',
 };
-const formatStoreLabel = (storeName: string, storeType?: IdentityContext['storeType']) =>
-  storeType && storeType !== 'cityPartner' ? `${storeName} · ${storeTypeLabels[storeType]}` : storeName;
-const isCityPartnerStore = computed(
-  () =>
-    loginUser.value.clientCode !== 'supply-chain' &&
-    Boolean(loginUser.value.storeName) &&
-    loginUser.value.storeType === 'cityPartner',
-);
+const identityTypeLabel = (
+  context: Pick<IdentityContext, 'clientCode' | 'tenantId' | 'storeId' | 'storeType' | 'storeName'>,
+) => {
+  if (context.clientCode === 'supply-chain') return '供应链端';
+  if (context.storeName || context.storeId) {
+    return context.storeType ? `门店端 · ${storeTypeLabels[context.storeType]}` : '门店端';
+  }
+  return context.tenantId ? '租户管理身份' : '运营端';
+};
+const currentIdentityType = computed(() => identityTypeLabel(loginUser.value));
 const currentIdentityLabel = computed(() => {
   if (loginUser.value.clientCode === 'supply-chain') return '供应链协同系统';
-  if (loginUser.value.storeName) return formatStoreLabel(loginUser.value.storeName, loginUser.value.storeType);
+  if (loginUser.value.storeName) return loginUser.value.storeName;
   return loginUser.value.tenantName ?? '运营管理平台';
 });
 const roleText = computed(() => {
@@ -106,7 +115,7 @@ const identityLabel = (context: IdentityContext) => {
   if (!context.tenantId && !context.storeId) return '运营管理平台';
   if (context.identityType === 'platform_admin') return '运营管理平台';
   if (context.storeName) {
-    return formatStoreLabel(context.storeName, context.storeType);
+    return context.storeName;
   }
   return context.tenantName ?? '租户管理身份';
 };
@@ -117,9 +126,10 @@ const switchableIdentityContexts = computed(() =>
 );
 const identityOptions = computed(() =>
   switchableIdentityContexts.value.map((context) => ({
-    label: identityLabel(context),
+    name: identityLabel(context),
+    type: identityTypeLabel(context),
+    label: `${identityLabel(context)} · ${identityTypeLabel(context)}`,
     value: context.identityId,
-    storeType: context.storeType,
   })),
 );
 
@@ -156,65 +166,63 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.city-partner-mark {
-  width: 12px;
-  height: 12px;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  font-size: var(--td-font-size-body-small);
-  line-height: var(--td-line-height-body-small);
-  text-align: center;
+.identity-context {
+  min-width: 0;
+  max-width: 30vw;
+  margin-right: var(--td-comp-margin-l);
 }
 
-.city-partner-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.city-partner-option-name {
-  line-height: var(--td-line-height-body-medium);
-}
-
-.brand-context-label.is-city-partner,
-.brand-subtitle.is-city-partner {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.brand-context-switcher {
-  display: grid;
-  align-items: center;
-  margin-top: 2px;
-}
-
-.brand-context-label,
 .brand-context-select {
-  grid-area: 1 / 1;
+  width: 260px;
+  max-width: 100%;
 }
 
-.brand-context-label {
-  color: var(--td-text-color-placeholder);
+/* The native input and option only need content height for the two-line layout. */
+.brand-context-select :deep(.identity-context-input) {
+  height: auto;
+  min-height: var(--td-comp-size-xxl);
+  padding-top: var(--td-comp-paddingTB-xxs);
+  padding-bottom: var(--td-comp-paddingTB-xxs);
+}
+
+.identity-lines {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  text-align: left;
+}
+
+.identity-name {
+  overflow: hidden;
+  color: var(--td-text-color-primary);
+  font: var(--td-font-body-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity-type {
+  color: var(--td-text-color-secondary);
   font: var(--td-font-body-small);
   white-space: nowrap;
 }
 
-.brand-context-select {
-  opacity: 0;
+.t-select-option.identity-context-option {
+  height: auto;
+  padding-top: var(--td-comp-paddingTB-s);
+  padding-bottom: var(--td-comp-paddingTB-s);
 }
 
-.brand-context-switcher:hover .brand-context-select,
-.brand-context-switcher:focus-within .brand-context-select,
-.brand-context-switcher.is-open .brand-context-select {
-  opacity: 1;
+.identity-context-option .identity-option-layout {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-comp-margin-l);
 }
 
-.brand-context-switcher:hover .brand-context-label,
-.brand-context-switcher:focus-within .brand-context-label,
-.brand-context-switcher.is-open .brand-context-label {
-  visibility: hidden;
+.identity-current-check {
+  flex: none;
+  color: var(--td-brand-color);
 }
 
 .user-entry {
