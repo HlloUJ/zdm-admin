@@ -692,3 +692,28 @@ test('submit validation entries share one summary and location implementation wi
     /adminFeedback.error\(getSafeErrorMessage\(error, '保存失败，请稍后重试'\)\)/,
   );
 });
+
+test('later approved business fixes reverse before overlapping migrations without relaxing exact matching', () => {
+  const original = '<template><t-button>执行</t-button></template>';
+  const migrated = original.replace('执行', '批量执行');
+  const fixed = migrated.replace('<t-button>', '<t-button :disabled="!selected.length">');
+  const patch = {
+    reason: 'User approved zero-selection disabling',
+    before: migrated,
+    after: fixed,
+    stage: 'before-migrations',
+  };
+  const baseline = {
+    ...businessFingerprint(original),
+    approvedPlaceholderPatches: [{ reason: 'Earlier approved migration', before: original, after: migrated }],
+    approvedBusinessPatches: [patch],
+  };
+  assert.deepEqual(contractViolations('page.vue', fixed, baseline), []);
+  for (const invalid of [fixed.replace('批量执行', '删除'), fixed + fixed, migrated])
+    assert.ok(contractViolations('page.vue', invalid, baseline).length);
+  for (const change of [{ reason: '' }, { stage: 'unknown' }, { after: '' }])
+    assert.ok(
+      contractViolations('page.vue', fixed, { ...baseline, approvedBusinessPatches: [{ ...patch, ...change }] }).length,
+    );
+  assert.ok(contractViolations('page.vue', fixed, { ...baseline, approvedBusinessPatches: [] }).length);
+});

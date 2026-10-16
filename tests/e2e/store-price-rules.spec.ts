@@ -193,11 +193,11 @@ test('price batch fills selected inputs locally and only Save writes configurati
   const batch = page.getByRole('button', { name: '批量设置', exact: true });
   await expect(page.getByRole('row').filter({ hasText: '本店餐桌' })).toBeVisible();
   await checkDecimalEditing(page.locator('tbody .t-input-number input').first());
-  await batch.click();
-  await expect(page.getByText('请先选择分类', { exact: true })).toBeVisible();
+  await expect(batch).toBeDisabled();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await expect(page.getByRole('row').filter({ hasText: '本店餐桌' }).getByRole('checkbox')).toBeEnabled();
   await page.locator('thead .t-checkbox').click();
+  await expect(batch).toBeEnabled();
   await batch.click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.locator('.t-dialog__header-content')).toHaveText('批量设置');

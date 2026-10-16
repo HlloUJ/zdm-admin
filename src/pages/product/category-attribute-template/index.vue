@@ -260,7 +260,13 @@
         </AdminListLayout>
       </main>
     </div>
-    <AdminDialog v-model:visible="addVisible" header="添加属性" width="720px" @confirm="addAttributes">
+    <AdminDialog
+      v-model:visible="addVisible"
+      header="添加属性"
+      width="720px"
+      :confirm-btn="{ content: '提交', disabled: !addIds.length }"
+      @confirm="addAttributes"
+    >
       <t-input v-model="attributeKeyword" placeholder="请输入属性名称" clearable />
       <t-table
         hover
@@ -820,6 +826,7 @@ async function openAdd() {
   }
 }
 function addAttributes() {
+  if (!addIds.value.length) return;
   for (const attribute of availableAttributes.value.filter((a) => addIds.value.includes(a.id)))
     rows.value.push({
       attributeId: attribute.id,

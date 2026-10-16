@@ -1943,6 +1943,7 @@ const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
     theme: button.theme as FinishedStockToolbarAction['theme'],
     icon: button.icon,
     className: button.className,
+    disabled: !['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.value.length,
   })),
 );
 // Fixed pixel widths; update only when the tab action buttons change.

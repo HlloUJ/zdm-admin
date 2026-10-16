@@ -118,7 +118,7 @@
                   :key="button.action"
                   :theme="button.className === 'brown-button' ? 'warning' : button.theme"
                   :class="button.className"
-                  :disabled="saving"
+                  :disabled="saving || (!['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.length)"
                   @click="handleBatchAction(button.action)"
                 >
                   <template #icon>

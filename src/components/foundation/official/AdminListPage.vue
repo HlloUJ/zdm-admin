@@ -134,7 +134,7 @@
         v-for="action in actions"
         :key="action.id"
         :theme="action.theme ?? 'primary'"
-        :disabled="action.disabled"
+        :disabled="action.disabled || (action.batch && !selectedCount)"
         @click="emit('action', action.id)"
       >
         <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>{{ action.label }}

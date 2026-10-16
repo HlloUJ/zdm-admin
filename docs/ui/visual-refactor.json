@@ -308,6 +308,12 @@
       "template": "e9a01ac55f3d006e202849b94af2e3539e9217e423dcc09c9c4fcda96de3650e",
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "        :theme=\"action.theme ?? 'primary'\"\n        :disabled=\"action.disabled\"\n        @click=\"emit('action', action.id)\"\n",
+          "after": "        :theme=\"action.theme ?? 'primary'\"\n        :disabled=\"action.disabled || (action.batch && !selectedCount)\"\n        @click=\"emit('action', action.id)\"\n",
+          "stage": "before-migrations"
+        },
+        {
           "reason": "2026-10-15 user accepted the supply-chain slab query layout as the mandatory global standard for future modules; share its exact styling and make the standard the new list default, retaining explicit legacy layouts and all existing business events.",
           "before": "    <div v-if=\"filters.length && filterLayout === 'official-grid'\" class=\"zdm-official-list-page__grid-filters\">",
           "after": "    <div v-if=\"filters.length && filterLayout === 'adaptive-grid'\" class=\"zdm-official-list-page__grid-filters\">\n      <t-form\n        class=\"zdm-admin-filter-form zdm-standard-query\"\n        :data=\"filterValues\"\n        :label-width=\"80\"\n        colon\n        @submit=\"emit('search')\"\n        @reset=\"emit('reset')\"\n      >\n        <div class=\"filter-row\">\n          <div class=\"filter-fields\">\n            <t-form-item v-for=\"field in filters\" :key=\"field.key\" :label=\"field.label\" :name=\"field.key\">\n              <slot :name=\"`filter-${field.key}`\" :field=\"field\" :value=\"filterValues[field.key]\">\n                <t-select\n                  v-if=\"field.kind === 'select'\"\n                  style=\"width: 100%\"\n                  :value=\"filterValues[field.key]\"\n                  :options=\"field.options\"\n                  :filterable=\"field.filterable\"\n                  clearable\n                  :placeholder=\"`请选择${field.label}`\"\n                  @change=\"setFilter(field.key, $event)\"\n                />\n                <t-input\n                  v-else\n                  :value=\"filterValues[field.key]\"\n                  clearable\n                  :placeholder=\"`请输入${field.label}`\"\n                  @change=\"setFilter(field.key, $event)\"\n                />\n              </slot>\n            </t-form-item>\n          </div>\n          <div class=\"filter-actions\">\n            <t-button theme=\"primary\" type=\"submit\">查询</t-button>\n            <t-button theme=\"default\" variant=\"base\" type=\"reset\">重置</t-button>\n          </div>\n        </div>\n      </t-form>\n    </div>\n    <div v-else-if=\"filters.length && filterLayout === 'official-grid'\" class=\"zdm-official-list-page__grid-filters\">"
@@ -1602,6 +1608,14 @@
           "before": "</template>\n\n<script setup lang=\"ts\">\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssue, isValidSpecQuantity } from '../shared/finishedStockFormValidation';\n",
           "after": "</template>\n\n<script setup lang=\"ts\">\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssue, isValidSpecQuantity } from '../shared/finishedStockFormValidation';\n"
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "    className: button.className,\n  })),\n",
+          "after": "    className: button.className,\n    disabled: !['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.value.length,\n  })),\n",
+          "stage": "before-migrations"
+        }
       ]
     },
     "src/pages/finished-stock/management/layeredSpecs.test.ts": {
@@ -1969,12 +1983,38 @@
           "before": "    >\n      <t-form :data=\"offShelf\" label-width=\"100px\" colon>\n        <t-form-item label=\"下架原因\" :required-mark=\"Boolean(pendingOffShelf?.batch)\"\n          ><t-select v-model=\"offShelf.reason\" placeholder=\"请选择\"\n            ><t-option value=\"商品暂停售卖\" label=\"商品暂停售卖\" /><t-option\n              value=\"商品信息调整\"\n              label=\"商品信息调整\" /><t-option value=\"其他\" label=\"其他\" /></t-select\n        ></t-form-item>\n        <t-form-item label=\"详细说明\"\n          ><t-textarea\n            v-model=\"offShelf.detail\"\n            :maxlength=\"500\"\n            :placeholder=\"pendingOffShelf?.batch ? '请输入' : '选填'\"\n            :autosize=\"pendingOffShelf?.batch ? { minRows: 4, maxRows: 6 } : undefined\"\n        /></t-form-item>\n      </t-form>\n",
           "after": "    >\n      <t-form :data=\"offShelf\" label-width=\"100px\" colon>\n        <t-form-item label=\"下架原因\" :required-mark=\"Boolean(pendingOffShelf?.batch)\"\n          ><t-select v-model=\"offShelf.reason\" placeholder=\"请选择下架原因\"\n            ><t-option value=\"商品暂停售卖\" label=\"商品暂停售卖\" /><t-option\n              value=\"商品信息调整\"\n              label=\"商品信息调整\" /><t-option value=\"其他\" label=\"其他\" /></t-select\n        ></t-form-item>\n        <t-form-item :help=\"pendingOffShelf?.batch ? undefined : '选填'\" label=\"详细说明\"\n          ><t-textarea\n            v-model=\"offShelf.detail\"\n            :maxlength=\"500\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"pendingOffShelf?.batch ? { minRows: 4, maxRows: 6 } : undefined\"\n        /></t-form-item>\n      </t-form>\n"
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "        <AdminListToolbar has-actions>\n          <t-button theme=\"primary\" @click=\"selectPool\">批量选择</t-button>\n        </AdminListToolbar>\n",
+          "after": "        <AdminListToolbar has-actions>\n          <t-button theme=\"primary\" :disabled=\"!poolSelected.length\" @click=\"selectPool\">批量选择</t-button>\n        </AdminListToolbar>\n",
+          "stage": "before-migrations"
+        },
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "          label: batchAction.value.label,\n          theme: batchAction.value.kind === 'off-shelf' ? ('default' as const) : ('primary' as const),\n",
+          "after": "          label: batchAction.value.label,\n          disabled: !selected.value.length,\n          theme: batchAction.value.kind === 'off-shelf' ? ('default' as const) : ('primary' as const),\n",
+          "stage": "before-migrations"
+        },
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "          label: '批量彻底删除',\n          theme: 'danger' as const,\n",
+          "after": "          label: '批量彻底删除',\n          disabled: !selected.value.length,\n          theme: 'danger' as const,\n",
+          "stage": "before-migrations"
+        }
       ]
     },
     "src/pages/finished-stock/store/price-configuration.vue": {
       "script": "75d9397a56222144493f74c7f20438b35f39edbce7d3ff0dd146f92645e4a435",
       "template": "ebb4878bc7f0fc8b0b22a500a07cfd0d164e2544418482624da67cf5bf2285d3",
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "                <div v-if=\"activeKind === 'price' && can('batch-set')\" class=\"price-actions\">\n                  <t-button theme=\"primary\" variant=\"outline\" :disabled=\"saving || loading\" @click=\"openBatch\"\n                    >批量设置</t-button\n",
+          "after": "                <div v-if=\"activeKind === 'price' && can('batch-set')\" class=\"price-actions\">\n                  <t-button\n                    theme=\"primary\"\n                    variant=\"outline\"\n                    :disabled=\"saving || loading || !selectedEditableLeafIds.length\"\n                    @click=\"openBatch\"\n                    >批量设置</t-button\n",
+          "stage": "before-migrations"
+        },
         {
           "reason": "2026-10-15 user confirmed decimal draft protection across all three clients; preserve validation, calculations, price-source switching, permissions and APIs.",
           "before": "<t-input-number\n                    v-if=\"activeKind === 'price' && !row.hasChildren\"\n                    class=\"price-coefficient-input\"",
@@ -2707,6 +2747,14 @@
           "before": "</template>\n\n<script setup lang=\"ts\">\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssue, isValidSpecQuantity } from '../shared/finishedStockFormValidation';\n",
           "after": "</template>\n\n<script setup lang=\"ts\">\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssue, isValidSpecQuantity } from '../shared/finishedStockFormValidation';\n"
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "    className: button.className,\n  })),\n",
+          "after": "    className: button.className,\n    disabled: !['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.value.length,\n  })),\n",
+          "stage": "before-migrations"
+        }
       ]
     },
     "src/pages/login/index.vue": {
@@ -3092,6 +3140,20 @@
           "before": "      :footer=\"editable ? undefined : false\"\n      @confirm=\"applyValues\"\n    >\n      <t-input v-if=\"editable\" v-model=\"valueKeyword\" placeholder=\"搜索选项值\" clearable />\n      <t-table\n        hover\n        table-layout=\"fixed\"\n",
           "after": "      :footer=\"editable ? undefined : false\"\n      @confirm=\"applyValues\"\n    >\n      <t-input v-if=\"editable\" v-model=\"valueKeyword\" placeholder=\"请输入选项值\" clearable />\n      <t-table\n        hover\n        table-layout=\"fixed\"\n"
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "    </div>\n    <AdminDialog v-model:visible=\"addVisible\" header=\"添加属性\" width=\"720px\" @confirm=\"addAttributes\">\n      <t-input v-model=\"attributeKeyword\" placeholder=\"请输入属性名称\" clearable />\n",
+          "after": "    </div>\n    <AdminDialog\n      v-model:visible=\"addVisible\"\n      header=\"添加属性\"\n      width=\"720px\"\n      :confirm-btn=\"{ content: '提交', disabled: !addIds.length }\"\n      @confirm=\"addAttributes\"\n    >\n      <t-input v-model=\"attributeKeyword\" placeholder=\"请输入属性名称\" clearable />\n",
+          "stage": "before-migrations"
+        },
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "function addAttributes() {\n  for (const attribute of availableAttributes.value.filter((a) => addIds.value.includes(a.id)))\n",
+          "after": "function addAttributes() {\n  if (!addIds.value.length) return;\n  for (const attribute of availableAttributes.value.filter((a) => addIds.value.includes(a.id)))\n",
+          "stage": "before-migrations"
+        }
       ]
     },
     "src/pages/product/markup-configuration/index.vue": {
@@ -3383,6 +3445,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "                  :class=\"button.className\"\n                  :disabled=\"saving\"\n                  @click=\"handleBatchAction(button.action)\"\n",
+          "after": "                  :class=\"button.className\"\n                  :disabled=\"saving || (!['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.length)\"\n                  @click=\"handleBatchAction(button.action)\"\n",
+          "stage": "before-migrations"
+        },
         {
           "reason": "2026-10-15 user requested read-only slab fields as bordered description tables and no required stars on read-only data or media; preserve editable fields, permissions and submission behavior.",
           "before": "                :title=\"item.title\"\n                :label=\"isProductFormPage ? '点击上传' : item.label\"\n                :required=\"item.required\"\n                :accept=\"item.accept\"\n                :disabled=\"readonlyProductFields\"\n",
@@ -3858,6 +3926,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-16 用户要求依赖勾选的批量操作在零选中时禁用，保留颜色和业务规则",
+          "before": "                  :class=\"button.className\"\n                  :disabled=\"saving\"\n                  @click=\"handleBatchAction(button.action)\"\n",
+          "after": "                  :class=\"button.className\"\n                  :disabled=\"saving || (!['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.length)\"\n                  @click=\"handleBatchAction(button.action)\"\n",
+          "stage": "before-migrations"
+        },
         {
           "reason": "2026-10-15 user explicitly removed off-shelf date filtering, including UI, state and business predicate, from supply-chain and operations slab management; retain timestamps in table, logs, state sorting and other filters.",
           "before": "                      <t-form-item v-if=\"activeTab === 'offShelf'\" label=\"下架时间\" class=\"off-shelf-date-filter\">\n                        <t-date-range-picker\n                          v-model=\"currentFilter.offShelfDateRange\"\n                          style=\"width: 100%; min-width: 0\"\n                          clearable\n                          allow-input\n                          value-type=\"YYYY-MM-DD\"\n                          start=\"day\"\n                          end=\"day\"\n                          :placeholder=\"['开始日期', '结束日期']\"\n                        />\n                      </t-form-item>\n                      <t-form-item v-if=\"activeTab !== 'offShelf'\" label=\"等级\" class=\"grade-filter\">",

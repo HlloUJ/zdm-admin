@@ -285,7 +285,7 @@
           </div>
         </t-form>
         <AdminListToolbar has-actions>
-          <t-button theme="primary" @click="selectPool">批量选择</t-button>
+          <t-button theme="primary" :disabled="!poolSelected.length" @click="selectPool">批量选择</t-button>
         </AdminListToolbar>
         <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
           <template #poolSelectTitle>
@@ -751,6 +751,7 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
         {
           id: 'batch',
           label: batchAction.value.label,
+          disabled: !selected.value.length,
           theme: batchAction.value.kind === 'off-shelf' ? ('default' as const) : ('primary' as const),
           icon:
             batchAction.value.kind === 'off-shelf'
@@ -767,6 +768,7 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
         {
           id: 'batch-purge',
           label: '批量彻底删除',
+          disabled: !selected.value.length,
           theme: 'danger' as const,
           variant: 'base' as const,
           icon: 'delete',

@@ -59,7 +59,11 @@
                   </t-button>
                 </AdminListToolbar>
                 <div v-if="activeKind === 'price' && can('batch-set')" class="price-actions">
-                  <t-button theme="primary" variant="outline" :disabled="saving || loading" @click="openBatch"
+                  <t-button
+                    theme="primary"
+                    variant="outline"
+                    :disabled="saving || loading || !selectedEditableLeafIds.length"
+                    @click="openBatch"
                     >批量设置</t-button
                   >
                   <t-button

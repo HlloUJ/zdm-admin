@@ -229,16 +229,16 @@ for (const displayMode of ['single', 'layered'] as const) {
     const imageDialog = page.locator('.t-dialog:visible').filter({ hasText: '商品主图' }).last();
     await expect(imageDialog.locator('img[alt="商品主图"]')).toHaveAttribute('src', imageUrl);
     await imageDialog.locator('.t-dialog__close').click();
+    await expect(page.locator('.t-dialog:visible')).toHaveCount(1);
     const selectButton = dialog.getByRole('button', { name: '批量选择', exact: true });
-    await expect(selectButton).toBeEnabled();
-    await selectButton.click();
-    await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
+    await expect(selectButton).toBeDisabled();
     expect(writes).toBe(0);
     expect((await dialog.boundingBox())!.width).toBeGreaterThan(1100);
     expect(
       (await dialog.getByRole('columnheader', { name: '商品名称/ID', exact: true }).boundingBox())!.width,
     ).toBeGreaterThan(400);
     await dialog.locator('thead .t-checkbox').click();
+    await expect(selectButton).toBeEnabled();
     await dialog.getByText('详情', { exact: true }).click();
     const drawer = page.locator('.t-drawer:visible');
     await expect(drawer.getByText('商品中心只读详情')).toBeVisible();
@@ -832,12 +832,15 @@ test('store batch shelf matches shared confirmation and partial failure feedback
   await page.goto('/store/finished-stock-management');
   const main = page.getByRole('main');
   const button = main.getByRole('button', { name: '批量上架', exact: true });
-  await expect(button).toBeEnabled();
+  await expect(button).toBeDisabled();
   await expect(button).toHaveClass(/t-button--theme-primary/);
   await expect(button.locator('.t-icon-upload')).toBeVisible();
-  await button.click();
-  await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
   await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeEnabled();
+  await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeDisabled();
+  await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeEnabled();
   await button.click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.getByText('是否批量上架所选成品现货？', { exact: true })).toBeVisible();
@@ -922,14 +925,14 @@ for (const scenario of [
     const main = page.getByRole('main');
     await main.getByText(`${scenario.tab}（1）`, { exact: true }).click();
     const button = main.getByRole('button', { name: scenario.button, exact: true });
-    await expect(button).toBeEnabled();
+    if (scenario.button === '清空回收站') await expect(button).toBeEnabled();
+    else await expect(button).toBeDisabled();
     await expect(button).toHaveClass(new RegExp(`t-button--theme-${scenario.theme}`));
     await expect(button.locator(`.t-icon-${scenario.icon}`)).toBeVisible();
     if (scenario.button === '批量彻底删除') await expect(button).toHaveClass(/deep-danger-button/);
     if (scenario.button !== '清空回收站') {
-      await button.click();
-      await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
       await main.locator('thead .t-checkbox').click();
+      await expect(button).toBeEnabled();
     }
     await button.click();
     const dialog = page.locator('.t-dialog:visible');
@@ -971,9 +974,9 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
   const button = main.getByRole('button', { name: '批量下架', exact: true });
   await expect(button).toHaveClass(/brown-button/);
   await expect(button.locator('.t-icon-download')).toBeVisible();
-  await button.click();
-  await expect(page.getByText('请先选择商品', { exact: true })).toBeVisible();
+  await expect(button).toBeDisabled();
   await main.locator('thead .t-checkbox').click();
+  await expect(button).toBeEnabled();
   await button.click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.locator('.t-dialog__header')).toHaveText('下架');
