@@ -1,5 +1,5 @@
 <template>
-  <t-space direction="vertical" size="large">
+  <t-space direction="vertical" size="large" style="width: 100%">
     <t-space
       ><t-button @click="mode = 'base'">基础列表</t-button><t-button @click="mode = 'filter'">筛选列表</t-button
       ><t-button @click="mode = 'tabs'">带Tab列表</t-button
@@ -51,14 +51,21 @@ const tabs = [
   { value: 'daily', label: '日常客户' },
   { value: 'archived', label: '归档客户' },
 ];
-const filters: ListFilter[] = [
+const baseFilters: ListFilter[] = [
   { key: 'name', label: '姓名' },
   { key: 'phone', label: '联系电话' },
   { key: 'owner', label: '归属人', kind: 'select', options: [{ value: 7, label: '导购A' }] },
 ];
+if (new URLSearchParams(location.search).has('compoundSearch'))
+  baseFilters[0] = { key: 'name', label: '商品', searchScope: '商品名称/ID/编号' };
+const filterCount = Number(new URLSearchParams(location.search).get('filterCount') ?? 3);
+const filters: ListFilter[] = Array.from(
+  { length: filterCount },
+  (_, index) => baseFilters[index] ?? { key: `extra${index}`, label: `条件${index + 1}` },
+);
 const actions: ListAction[] = [
   { id: 'create', label: '新增' },
-  { id: 'archive', label: '批量归档', disabled: true },
+  { id: 'archive', batch: true, label: '批量归档', disabled: true },
 ];
 const rows = computed(() => Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: '客户' + (i + 1) })));
 const columns = [

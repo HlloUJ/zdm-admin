@@ -99,12 +99,6 @@ const router = createRouter({
       component: () => import('@/pages/product/attribute/index.vue'),
     },
     {
-      path: '/unit-management',
-      name: 'unitManagement',
-      component: () => import('@/pages/product/master-data/index.vue'),
-      meta: { masterDataType: 'unit' },
-    },
-    {
       path: '/slab-variety',
       name: 'slabVariety',
       component: () => import('@/pages/slab/variety/index.vue'),

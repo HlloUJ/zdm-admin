@@ -6,20 +6,18 @@
       <AdminSideMenu />
 
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['租户与门店', '租户管理']" badge="权限驱动业务入口" />
-
         <AdminListLayout class="tenant-list-layout">
           <template #toolbar>
             <div class="list-controls">
               <t-tabs v-if="showTenantTabRail" v-model="activeTab" :list="tenantTabs" />
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="租户姓名" name="tenantName">
-                      <t-input v-model="searchForm.tenantName" clearable placeholder="请输入" />
+                      <t-input v-model="searchForm.tenantName" clearable placeholder="请输入租户姓名" />
                     </t-form-item>
                     <t-form-item label="联系方式" name="phone">
-                      <t-input v-model="searchForm.phone" clearable placeholder="请输入" />
+                      <t-input v-model="searchForm.phone" clearable placeholder="请输入联系方式" />
                     </t-form-item>
                   </div>
 
@@ -35,12 +33,12 @@
                   </div>
                 </div>
               </t-form>
-              <div v-if="activeTab === 'unarchived' && canCreateTenant" class="table-toolbar">
-                <t-button theme="primary" @click="openCreateDialog">
+              <AdminListToolbar :has-actions="activeTab === 'unarchived' && canCreateTenant"
+                ><t-button theme="primary" @click="openCreateDialog">
                   <template #icon><t-icon name="add" /></template>
                   新增
-                </t-button>
-              </div>
+                </t-button></AdminListToolbar
+              >
             </div>
           </template>
 
@@ -100,9 +98,10 @@
     </div>
 
     <t-dialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
-      width="560px"
+      width="480px"
       placement="center"
       confirm-btn="提交"
       cancel-btn="取消"
@@ -112,15 +111,21 @@
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="租户姓名" name="tenantName" required-mark>
-          <t-input v-model="formData.tenantName" clearable placeholder="请输入" />
+          <t-input v-model="formData.tenantName" clearable placeholder="请输入租户姓名" />
         </t-form-item>
         <t-form-item label="联系方式" name="phone" required-mark>
-          <t-input v-model="formData.phone" clearable placeholder="请输入" :maxlength="11" @input="handlePhoneInput" />
+          <t-input
+            v-model="formData.phone"
+            clearable
+            placeholder="请输入联系方式"
+            :maxlength="11"
+            @input="handlePhoneInput"
+          />
         </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="formData.remark"
-            placeholder="请输入"
+            placeholder="请输入备注"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
@@ -194,8 +199,8 @@
         :message="blocker"
       />
       <t-form class="purge-confirm-form" label-width="100px" colon>
-        <t-form-item label="租户名称" required-mark>
-          <t-input v-model="purgeConfirmationName" placeholder="请输入完整租户名称" />
+        <t-form-item help="请输入完整租户名称" label="租户名称" required-mark>
+          <t-input v-model="purgeConfirmationName" placeholder="请输入租户名称" />
         </t-form-item>
       </t-form>
     </AdminDialog>
@@ -203,6 +208,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -213,7 +220,6 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminListLayout,
-  AdminPageHeader,
   AdminPagination,
 } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
@@ -488,7 +494,7 @@ const closeFormDialog = () => {
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
 
   const targetName = formData.tenantName.trim();
   const action = dialogMode.value === 'create' ? '新增' : '保存';
@@ -653,30 +659,6 @@ const toggleBusiness = (business: BusinessType) => {
   min-height: 0;
 }
 
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
 .table-toolbar {
   display: flex;
   justify-content: flex-start;
@@ -740,15 +722,6 @@ const toggleBusiness = (business: BusinessType) => {
 }
 
 @media (max-width: 960px) {
-  .filter-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .filter-actions {
-    justify-content: flex-start;
-  }
-
   .business-options {
     grid-template-columns: 1fr;
   }

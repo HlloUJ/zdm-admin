@@ -48,7 +48,6 @@
   - `/api/admin/product-categories`
   - `/api/admin/product-attributes`
   - `/api/admin/product-attribute-values`
-  - `/api/admin/master-data`
 - 库存中心：
   - `/api/admin/slab-varieties`
   - `/api/admin/slabs`

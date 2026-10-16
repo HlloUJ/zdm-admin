@@ -6,19 +6,6 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header v-show="!isProductFormPage" class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>大板管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <div class="page-header-actions">
-            <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="openOperationLogDrawer">
-              操作日志
-            </t-link>
-          </div>
-        </header>
-
         <AdminListLayout v-show="!isProductFormPage" class="slab-list-layout">
           <template #toolbar>
             <div class="list-controls">
@@ -26,120 +13,128 @@
                 <t-tab-panel v-for="tab in slabTabs" :key="tab.value" :value="tab.value" :label="tabLabel(tab)" />
               </t-tabs>
 
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="currentFilter" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="currentFilter" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
-                    <div class="filter-primary-row" :class="{ 'off-shelf-filter-row': activeTab === 'offShelf' }">
-                      <t-form-item label="大板" class="slab-keyword-filter">
-                        <t-input v-model="currentFilter.keyword" clearable placeholder="大板名称/ID/大板编号" />
-                      </t-form-item>
-                      <t-form-item label="品种">
-                        <t-select v-model="currentFilter.variety" clearable filterable placeholder="请选择">
-                          <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
+                    <t-form-item label="大板" class="slab-keyword-filter">
+                      <t-input
+                        v-model="currentFilter.keyword"
+                        clearable
+                        data-query-search-scope="大板名称/ID/编号"
+                        placeholder="请输入大板名称/ID/编号"
+                      />
+                    </t-form-item>
+                    <t-form-item label="品种">
+                      <t-select v-model="currentFilter.variety" clearable filterable placeholder="请选择品种">
+                        <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
+                      </t-select>
+                    </t-form-item>
+                    <template v-if="activeTab === 'offShelf'">
+                      <t-form-item label="下架原因">
+                        <t-select
+                          v-model="currentFilter.offShelfReason"
+                          clearable
+                          filterable
+                          placeholder="请选择下架原因"
+                        >
+                          <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
                         </t-select>
                       </t-form-item>
-                      <template v-if="activeTab === 'offShelf'">
-                        <t-form-item label="下架原因">
-                          <t-select v-model="currentFilter.offShelfReason" clearable filterable placeholder="请选择">
-                            <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
-                          </t-select>
-                        </t-form-item>
-                        <t-form-item label="下架人">
-                          <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
-                        </t-form-item>
-                      </template>
-                      <template v-else>
-                        <t-form-item label="产地">
-                          <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择">
-                            <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
-                          </t-select>
-                        </t-form-item>
-                        <t-form-item label="纹理">
-                          <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择">
-                            <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
-                          </t-select>
-                        </t-form-item>
-                        <t-form-item label="色系">
-                          <t-cascader
-                            v-model="currentFilter.color"
-                            :options="colorFilterCascaderOptions"
-                            :show-all-levels="false"
-                            :check-strictly="false"
-                            clearable
-                            filterable
-                            placeholder="请选择"
-                            trigger="hover"
-                            value-mode="onlyLeaf"
-                            value-type="single"
-                          />
-                        </t-form-item>
-                      </template>
-                    </div>
-                    <div class="filter-secondary-row">
-                      <t-form-item v-if="activeTab === 'offShelf'" label="下架时间" class="off-shelf-date-filter">
-                        <t-date-range-picker
-                          v-model="currentFilter.offShelfDateRange"
+                      <t-form-item label="下架人">
+                        <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
+                      </t-form-item>
+                    </template>
+                    <template v-else>
+                      <t-form-item label="产地">
+                        <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择产地">
+                          <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
+                        </t-select>
+                      </t-form-item>
+                      <t-form-item label="纹理">
+                        <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择纹理">
+                          <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
+                        </t-select>
+                      </t-form-item>
+                      <t-form-item label="色系">
+                        <t-cascader
+                          v-model="currentFilter.color"
+                          :options="colorFilterCascaderOptions"
+                          :show-all-levels="false"
+                          :check-strictly="false"
                           clearable
-                          allow-input
-                          value-type="YYYY-MM-DD"
-                          start="day"
-                          end="day"
-                          :placeholder="['开始日期', '结束日期']"
+                          filterable
+                          placeholder="请选择色系"
+                          trigger="hover"
+                          value-mode="onlyLeaf"
+                          value-type="single"
                         />
                       </t-form-item>
-                      <t-form-item v-if="activeTab !== 'offShelf'" label="等级" class="grade-filter">
-                        <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择">
-                          <t-option
-                            v-for="item in gradeFilterOptions"
-                            :key="item.value"
-                            :label="item.label"
-                            :value="item.value"
-                          />
-                        </t-select>
-                      </t-form-item>
-                      <t-form-item v-if="activeTab !== 'offShelf'" label="供应商" class="supplier-filter">
-                        <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
-                          <t-option
-                            v-for="item in supplierFilterOptions"
-                            :key="item.id"
-                            :label="item.name"
-                            :value="item.name"
-                          />
-                        </t-select>
-                      </t-form-item>
-                      <div class="filter-actions">
-                        <t-button theme="primary" @click="handleSearch">
-                          <template #icon><t-icon name="search" /></template>
-                          查询
-                        </t-button>
-                        <t-button class="reset-filter-button" theme="default" variant="base" @click="handleReset">
-                          <template #icon><t-icon name="refresh" /></template>
-                          重置
-                        </t-button>
-                      </div>
-                    </div>
+                    </template>
+                    <t-form-item v-if="activeTab !== 'offShelf'" label="等级" class="grade-filter">
+                      <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择等级">
+                        <t-option
+                          v-for="item in gradeFilterOptions"
+                          :key="item.value"
+                          :label="item.label"
+                          :value="item.value"
+                        />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item v-if="activeTab !== 'offShelf'" label="供应商" class="supplier-filter">
+                      <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
+                        <t-option
+                          v-for="item in supplierFilterOptions"
+                          :key="item.id"
+                          :label="item.name"
+                          :value="item.name"
+                        />
+                      </t-select>
+                    </t-form-item>
+                  </div>
+                  <div class="filter-actions">
+                    <t-button theme="primary" @click="handleSearch">
+                      <template #icon><t-icon name="search" /></template>
+                      查询
+                    </t-button>
+                    <t-button class="reset-filter-button" theme="default" variant="base" @click="handleReset">
+                      <template #icon><t-icon name="refresh" /></template>
+                      重置
+                    </t-button>
                   </div>
                 </div>
               </t-form>
 
-              <div class="table-toolbar">
-                <div class="toolbar-buttons">
-                  <t-button
-                    v-for="button in batchButtons"
-                    :key="button.action"
-                    :theme="button.className === 'brown-button' ? 'warning' : button.theme"
-                    :class="button.className"
-                    :disabled="saving"
-                    @click="handleBatchAction(button.action)"
-                  >
-                    <template #icon>
-                      <t-icon :name="button.icon" />
-                    </template>
-                    {{ button.label }}
-                  </t-button>
-                </div>
-                <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
-              </div>
+              <AdminListToolbar
+                :has-actions="batchButtons.length > 0"
+                :selected-count="selectedKeys.length"
+                :has-batch-actions="
+                  batchButtons.some((button) =>
+                    ['batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
+                  )
+                "
+                :has-auxiliary="canViewOperationLogs"
+                ><t-button
+                  v-for="button in batchButtons"
+                  :key="button.action"
+                  :theme="button.className === 'brown-button' ? 'warning' : button.theme"
+                  :class="button.className"
+                  :disabled="saving"
+                  @click="handleBatchAction(button.action)"
+                >
+                  <template #icon>
+                    <t-icon :name="button.icon" />
+                  </template>
+                  {{ button.label }} </t-button
+                ><template #auxiliary
+                  ><t-button
+                    v-if="canViewOperationLogs"
+                    theme="default"
+                    variant="outline"
+                    @click="openOperationLogDrawer"
+                    >操作日志</t-button
+                  ></template
+                ></AdminListToolbar
+              >
             </div>
           </template>
           <template #table>
@@ -314,7 +309,7 @@
           @close="closeProductDialog"
         >
           <template #images>
-            <div class="upload-grid" :class="{ 'publish-upload-grid': isProductFormPage }">
+            <t-space size="small" break-line align="start">
               <AdminMediaUpload
                 v-for="item in uploadItems"
                 :key="item.key"
@@ -323,15 +318,15 @@
                 :label="isProductFormPage ? '点击上传' : item.label"
                 :required="item.required"
                 :accept="item.accept"
+                :media-type="item.key === 'video' ? 'video' : 'image'"
                 :disabled="readonlyProductFields"
                 :error-message="uploadErrors[item.key] ? `请上传${item.title}` : ''"
                 :upload="(file) => uploadSlabMedia(item, file)"
                 @uploaded="uploadErrors[item.key] = false"
                 @removed="releasePendingUpload"
-                @click.capture="handleUploadBoxClick(item, $event)"
                 @preview="openUploadPreview(item)"
               />
-            </div>
+            </t-space>
           </template>
           <template #base>
             <t-form ref="productFormRef" :data="productForm" :rules="productRules" label-width="100px" colon>
@@ -341,7 +336,7 @@
                     v-model="productForm.variety"
                     :disabled="readonlyProductFields"
                     filterable
-                    placeholder="请选择"
+                    placeholder="请选择品种"
                     @change="clearProductFieldError('variety')"
                   >
                     <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
@@ -352,7 +347,7 @@
                     v-model="productForm.origin"
                     :disabled="readonlyProductFields"
                     filterable
-                    placeholder="请选择"
+                    placeholder="请选择产地"
                     @change="clearProductFieldError('origin')"
                   >
                     <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
@@ -363,7 +358,7 @@
                     v-model="productForm.textureId"
                     :disabled="readonlyProductFields"
                     filterable
-                    placeholder="请选择"
+                    placeholder="请选择纹理"
                     @change="clearProductFieldError('textureId')"
                   >
                     <t-option
@@ -383,7 +378,7 @@
                     :show-all-levels="false"
                     :check-strictly="false"
                     filterable
-                    placeholder="请选择"
+                    placeholder="请选择色系"
                     trigger="hover"
                     value-mode="onlyLeaf"
                     value-type="single"
@@ -395,7 +390,7 @@
                     v-model="productForm.gradeId"
                     :disabled="readonlyProductFields"
                     filterable
-                    placeholder="请选择"
+                    placeholder="请选择等级"
                     @change="clearProductFieldError('gradeId')"
                   >
                     <t-option
@@ -418,7 +413,7 @@
                     :disabled="readonlyProductFields"
                     :decimal-places="2"
                     theme="normal"
-                    placeholder="请输入"
+                    placeholder="请输入长"
                     @blur="handleMeasurementBlur('length')"
                     @change="handleMeasurementChange('length')"
                   />
@@ -431,7 +426,7 @@
                     :disabled="readonlyProductFields"
                     :decimal-places="2"
                     theme="normal"
-                    placeholder="请输入"
+                    placeholder="请输入宽"
                     @blur="handleMeasurementBlur('width')"
                     @change="handleMeasurementChange('width')"
                   />
@@ -444,7 +439,7 @@
                     :disabled="readonlyProductFields"
                     :decimal-places="2"
                     theme="normal"
-                    placeholder="请输入"
+                    placeholder="请输入高"
                     @blur="handleMeasurementBlur('height')"
                     @change="handleMeasurementChange('height')"
                   />
@@ -465,7 +460,7 @@
                     :disabled="readonlyProductFields"
                     :decimal-places="2"
                     theme="normal"
-                    placeholder="请输入"
+                    :placeholder="controlPlaceholder(isProductFormPage ? '±误差' : '土误差', 'input')"
                     @blur="handleMeasurementBlur('tolerance')"
                     @change="handleMeasurementChange('tolerance')"
                   />
@@ -481,7 +476,7 @@
                     :disabled="readonlyProductFields"
                     :decimal-places="2"
                     theme="normal"
-                    placeholder="请输入"
+                    :placeholder="controlPlaceholder(item.label, 'input')"
                     @blur="handleMeasurementBlur(item.key)"
                     @change="handleMeasurementChange(item.key)"
                   />
@@ -502,7 +497,8 @@
                 <SpecPriceInput
                   v-model="productForm.cost"
                   label="成本价"
-                  placeholder="请输入"
+                  form-layout
+                  placeholder="请输入成本价"
                   :submitted="productPriceSubmitted"
                   :disabled="readonlyProductFields"
                   @change="handleCostChange"
@@ -514,7 +510,7 @@
                     v-model="productForm.supplier"
                     :disabled="readonlyProductFields"
                     filterable
-                    placeholder="请选择"
+                    placeholder="请选择供应商"
                     @change="clearSalesFieldError('supplier')"
                   >
                     <t-option
@@ -533,7 +529,10 @@
                     :decimal-places="0"
                     :input-props="stockInputProps"
                     theme="normal"
-                    placeholder="请输入"
+                    placeholder="请输入库存"
+                    @beforeinput.capture="preventZeroQuantity"
+                    @paste.capture="preventZeroQuantity"
+                    @keydown.capture="preventZeroQuantity"
                     @change="handleStockChange"
                     @keydown="handleStockKeydown"
                   />
@@ -542,7 +541,7 @@
                   <t-input
                     v-model="productForm.sku"
                     :disabled="readonlyProductFields"
-                    placeholder="请输入"
+                    placeholder="请输入大板编号"
                     @change="clearSalesFieldError('sku')"
                   />
                 </t-form-item>
@@ -826,7 +825,7 @@
       :footer="false"
       @close="closePriceDrawer"
     >
-      <div class="price-drawer-content price-drawer-content--source">
+      <div ref="priceDrawerRoot" class="price-drawer-content price-drawer-content--source">
         <div class="drawer-actions">
           <t-button v-if="!priceDrawerReadonly" theme="primary" block @click="saveBatchPrice">
             <template #icon><t-icon name="save" /></template>
@@ -836,10 +835,11 @@
         <div class="source-cost-editor">
           <span>成本价<span class="price-required-star">*</span></span>
           <SpecPriceInput
+            form-layout
             v-if="batchPriceRows[0]"
             v-model="batchPriceRows[0].price"
             label="成本价"
-            placeholder="成本价"
+            placeholder="请输入成本价"
             :submitted="drawerPriceSubmitted"
             :disabled="priceDrawerReadonly"
           />
@@ -905,7 +905,10 @@
           :label="reasonState.type === 'deleteExternal' ? '删除原因' : '下架原因'"
           required-mark
         >
-          <t-select v-model="reasonForm.reason" placeholder="请选择">
+          <t-select
+            v-model="reasonForm.reason"
+            :placeholder="controlPlaceholder(reasonState.type === 'deleteExternal' ? '删除原因' : '下架原因', 'select')"
+          >
             <t-option
               v-for="item in reasonState.type === 'deleteExternal' ? externalDeleteReasons : offShelfReasons"
               :key="item"
@@ -915,7 +918,7 @@
           </t-select>
         </t-form-item>
         <t-form-item name="detail" label="详细说明">
-          <t-textarea v-model="reasonForm.detail" placeholder="请输入" :autosize="{ minRows: 4, maxRows: 6 }" />
+          <t-textarea v-model="reasonForm.detail" placeholder="请输入详细说明" :autosize="{ minRows: 4, maxRows: 6 }" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -947,6 +950,10 @@
 </template>
 
 <script setup lang="ts">
+import { preventZeroQuantity } from '@/utils/quantityInput';
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
+import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';
 import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';
@@ -1079,10 +1086,6 @@ const productMode = ref<ProductMode>('create');
 const readonlyProductFields = computed(() => productMode.value === 'view');
 const isProductFormPage = computed(() => productDialogVisible.value && productMode.value !== 'view');
 const productLayoutRef = ref<InstanceType<typeof SlabProductFormLayout>>();
-const focusProductSection = (key: string) => {
-  productTab.value = key;
-  void productLayoutRef.value?.scrollToSection(key);
-};
 const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');
 const productTab = ref('images');
 const editingRowId = ref<number | null>(null);
@@ -1095,6 +1098,7 @@ const canPublishToShelf = computed(
 );
 const productFormRef = ref<FormInstanceFunctions>();
 const salesFormRef = ref<FormInstanceFunctions>();
+const priceDrawerRoot = ref<HTMLElement>();
 const priceDrawerFormRef = ref<FormInstanceFunctions>();
 const reasonFormRef = ref<FormInstanceFunctions>();
 const productForm = reactive<ProductForm>(makeProductForm());
@@ -1517,7 +1521,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     return [
       { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
       { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-      { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
+      { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },
       { colKey: 'variety', title: '品种', width: 140 },
       { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },
       ...stateActivityColumns(activeTab.value),
@@ -1533,7 +1537,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const baseColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
     { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-    { colKey: 'slab', title: '大板名称/ID/大板编号', minWidth: 220 },
+    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },
     { colKey: 'variety', title: '品种', width: 140 },
     { colKey: 'origin', title: '产地', width: 110 },
     { colKey: 'texture', title: '纹理', width: 110 },
@@ -1861,20 +1865,30 @@ const handleMeasurementBlur = async (field: MeasurementField) => {
     showErrorMessage: true,
   });
 };
+const rejectProductForm = () =>
+  rejectFormSubmission(productLayoutRef.value, {
+    reveal: (field) => {
+      const key = field.closest('[id^="slab-product-"]')?.id.replace('slab-product-', '');
+      if (key === 'images' || key === 'base' || key === 'sales') productTab.value = key;
+    },
+  });
 const handleProductSubmit = async () => {
   productPriceSubmitted.value = true;
   if (productMode.value === 'view') {
     closeProductDialog();
     return;
   }
+  // Show every editable field's existing validation feedback even when media rejects submission first.
+  await Promise.all([
+    productFormRef.value?.validate({ trigger: 'all', showErrorMessage: true }),
+    salesFormRef.value?.validate({ trigger: 'all', showErrorMessage: true }),
+  ]);
   const missingRequiredUploads = uploadItems.filter((item) => item.required && !uploadPreviews[item.key]);
   uploadItems.forEach((item) => {
     uploadErrors[item.key] = missingRequiredUploads.some((missingItem) => missingItem.key === item.key);
   });
   if (missingRequiredUploads.length > 0) {
-    focusProductSection('images');
-    adminFeedback.warning('请上传必填图片');
-    return;
+    return rejectProductForm();
   }
   const hasInvalidBaseInformation =
     !productForm.variety ||
@@ -1892,11 +1906,7 @@ const handleProductSubmit = async () => {
     cornerFields.some((item) => !isValidMeasurement(productForm[item.key], false)) ||
     invalidMeasurementFields.size > 0;
   if (hasInvalidBaseInformation) {
-    focusProductSection('base');
-    await nextTick();
-    await productFormRef.value?.validate({ trigger: 'all', showErrorMessage: true });
-    adminFeedback.warning('请完善基础信息');
-    return;
+    return rejectProductForm();
   }
   const normalizedStock = String(productForm.stock ?? '').trim();
   const hasInvalidSalesPrice = false;
@@ -1909,19 +1919,7 @@ const handleProductSubmit = async () => {
     hasInvalidSalesPrice ||
     hasInvalidGuidePrice;
   if (hasInvalidSalesInformation) {
-    focusProductSection('sales');
-    await nextTick();
-    await salesFormRef.value?.validate({ trigger: 'all', showErrorMessage: true });
-    adminFeedback.warning(
-      normalizedStock === '0'
-        ? '库存不能为0'
-        : stockHasLeadingZero.value || (normalizedStock && !/^[1-9]\d*$/.test(normalizedStock))
-          ? '请输入正确的库存'
-          : hasInvalidSalesPrice || hasInvalidGuidePrice || !isValidSalesNumber(productForm.cost, 0)
-            ? '请完善价格信息'
-            : '请完善销售信息',
-    );
-    return;
+    return rejectProductForm();
   }
   const targetName = `${productForm.variety}大板`;
   const editingItem =
@@ -2030,14 +2028,6 @@ const openUploadPreview = (item: (typeof uploadItems)[number]) => {
   uploadPreviewUrl.value = previewUrl;
   uploadPreviewType.value = preview?.videoUrl ? 'video' : 'image';
   uploadPreviewDialogVisible.value = true;
-};
-const handleUploadBoxClick = (item: (typeof uploadItems)[number], event: MouseEvent) => {
-  const preview = uploadPreviews[item.key];
-  if (!preview?.videoUrl && !preview?.url) return;
-  if (event.target instanceof Element && event.target.closest('.admin-media-upload__delete')) return;
-  event.preventDefault();
-  event.stopPropagation();
-  openUploadPreview(item);
 };
 const releasePendingUpload = (removed: AdminMediaValue) => {
   const removedPendingMediaIds = [removed.mediaId, removed.videoMediaId, removed.coverMediaId].filter(
@@ -2325,13 +2315,11 @@ const closeOffShelfHistory = () => {
 const handleReasonSubmit = async () => {
   if (!reasonForm.reason) {
     await reasonFormRef.value?.validate({ trigger: 'submit', showErrorMessage: true });
-    adminFeedback.warning(reasonState.type === 'deleteExternal' ? '请选择删除原因' : '请选择下架原因');
-    return;
+    return rejectFormSubmission(reasonFormRef.value);
   }
   const validation = await reasonFormRef.value?.validate({ trigger: 'submit', showErrorMessage: true });
   if (validation !== true) {
-    adminFeedback.warning(reasonState.type === 'deleteExternal' ? '请完善删除信息' : '请选择原因');
-    return;
+    return rejectFormSubmission(reasonFormRef.value);
   }
   if (reasonState.type === 'offShelf' && reasonState.isBatch) {
     const selectedCount = selectedKeys.value.length;
@@ -2409,8 +2397,7 @@ const saveBatchPrice = async () => {
   const hasInvalidPrice = !isValidSalesNumber(batchPriceRows[0]?.price ?? '', 0);
   if (hasInvalidPrice) {
     await priceDrawerFormRef.value?.validate({ trigger: 'all', showErrorMessage: true });
-    adminFeedback.warning('请完善价格信息');
-    return;
+    return rejectFormSubmission(priceDrawerRoot.value);
   }
   const target = tableData.value.find((item) => item.id === priceDrawerRowId.value);
   if (target) {
@@ -2420,3 +2407,5 @@ const saveBatchPrice = async () => {
 </script>
 
 <style scoped src="../shared/index.css"></style>
+
+<style src="../../../components/foundation/official/query-layout.css"></style>

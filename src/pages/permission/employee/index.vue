@@ -6,15 +6,6 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>权限管理</t-breadcrumb-item>
-              <t-breadcrumb-item>员工管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-        </header>
-
         <AdminListLayout class="employee-list-layout">
           <template #toolbar>
             <div class="list-controls">
@@ -25,23 +16,23 @@
                 @change="handleManagedClientChange"
               />
 
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="filterDraft" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="filterDraft" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="姓名" name="name" class="name-filter">
-                      <t-input v-model="filterDraft.name" clearable placeholder="请输入" />
+                      <t-input v-model="filterDraft.name" clearable placeholder="请输入姓名" />
                     </t-form-item>
                     <t-form-item label="手机号码" name="phone">
                       <t-input
                         :model-value="filterDraft.phone"
                         clearable
                         :maxlength="11"
-                        placeholder="请输入手机号"
+                        placeholder="请输入手机号码"
                         @update:model-value="handleFilterPhoneChange"
                       />
                     </t-form-item>
                     <t-form-item label="角色" name="role" class="role-filter">
-                      <t-select v-model="filterDraft.role" clearable placeholder="请选择">
+                      <t-select v-model="filterDraft.role" clearable placeholder="请选择角色">
                         <t-option
                           v-for="role in operationRoleOptions"
                           :key="role.value"
@@ -51,7 +42,7 @@
                       </t-select>
                     </t-form-item>
                     <t-form-item label="状态" name="status" class="zdm-status-filter status-filter">
-                      <t-select v-model="filterDraft.status" clearable placeholder="请选择">
+                      <t-select v-model="filterDraft.status" clearable placeholder="请选择状态">
                         <t-option label="启用" value="normal" />
                         <t-option label="停用" value="disabled" />
                       </t-select>
@@ -69,12 +60,12 @@
                   </div>
                 </div>
               </t-form>
-              <div v-if="canCreateEmployee" class="table-toolbar">
-                <t-button theme="primary" :loading="inviteCreating" @click="openInviteDialog">
+              <AdminListToolbar :has-actions="canCreateEmployee"
+                ><t-button theme="primary" :loading="inviteCreating" @click="openInviteDialog">
                   <template #icon><t-icon name="add" /></template>
                   邀请员工
-                </t-button>
-              </div>
+                </t-button></AdminListToolbar
+              >
             </div>
           </template>
           <template #table>
@@ -186,9 +177,10 @@
     </t-dialog>
 
     <t-dialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="profileDialogVisible"
       header="编辑资料"
-      width="560px"
+      width="480px"
       placement="center"
       confirm-btn="提交"
       cancel-btn="取消"
@@ -198,10 +190,10 @@
     >
       <t-form ref="profileFormRef" :data="profileFormData" :rules="profileFormRules" label-width="100px" colon>
         <t-form-item label="姓名" name="name" required-mark>
-          <t-input v-model="profileFormData.name" clearable placeholder="请输入" />
+          <t-input v-model="profileFormData.name" clearable placeholder="请输入姓名" />
         </t-form-item>
         <t-form-item label="性别" name="gender" required-mark>
-          <t-select v-model="profileFormData.gender" clearable placeholder="请选择">
+          <t-select v-model="profileFormData.gender" clearable placeholder="请选择性别">
             <t-option label="男" value="male" />
             <t-option label="女" value="female" />
           </t-select>
@@ -209,7 +201,7 @@
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="profileFormData.remark"
-            placeholder="请输入"
+            placeholder="请输入备注"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
@@ -230,7 +222,7 @@
     >
       <t-form ref="permissionFormRef" :data="permissionFormData" :rules="permissionFormRules" label-width="100px" colon>
         <t-form-item label="角色" name="roleIds" required-mark>
-          <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择当前组织角色">
+          <t-select v-model="permissionFormData.roleIds" multiple clearable placeholder="请选择角色">
             <t-option
               v-for="role in configurableOperationRoleOptions"
               :key="role.value"
@@ -263,6 +255,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -692,7 +686,7 @@ const closePermissionDialog = () => {
 };
 
 const handleProfileSubmit = async () => {
-  if ((await profileFormRef.value?.validate()) !== true) return;
+  if ((await profileFormRef.value?.validate()) !== true) return rejectFormSubmission(profileFormRef.value);
 
   if (activeEmployee.value) {
     try {
@@ -722,13 +716,11 @@ const handleProfileSubmit = async () => {
 };
 
 const handlePermissionSubmit = async () => {
-  if ((await permissionFormRef.value?.validate()) !== true) return;
+  if ((await permissionFormRef.value?.validate()) !== true) return rejectFormSubmission(permissionFormRef.value);
   if (!permissionFormData.roleIds.length) {
-    adminFeedback.warning('请选择角色');
     return;
   }
   if (!permissionFormData.dataPermission) {
-    adminFeedback.warning('请选择数据权限');
     return;
   }
   if (activeEmployee.value) {
@@ -893,33 +885,6 @@ onMounted(() => {
   gap: var(--td-comp-margin-xxl);
 }
 
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.filter-actions {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
 .table-toolbar {
   display: flex;
   justify-content: flex-start;
@@ -971,16 +936,5 @@ onMounted(() => {
 .copy-link {
   padding-top: 7px;
   white-space: nowrap;
-}
-
-@media (max-width: 1120px) {
-  .filter-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .filter-actions {
-    flex-wrap: wrap;
-  }
 }
 </style>

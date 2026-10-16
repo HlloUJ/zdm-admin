@@ -1,3 +1,4 @@
+import { checkCategoryHelpFeedback } from './category-help-feedback';
 import { expect, test } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -79,11 +80,25 @@ test('reopens category forms without stale validation after creating or cancelli
     await page.locator('.scope-tabs .t-tabs__nav-item').filter({ hasText: scope }).click();
     await page.getByRole('button', { name: '新增一级分类', exact: true }).click();
     const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增一级分类' });
-    await dialog.getByPlaceholder('请输入，最多20个字符').fill(`${scope}连续新增`);
+    const name = dialog.getByPlaceholder('请输入分类名称');
+    await name.fill('一二三四五六七');
+    await expect(name).toHaveValue('一二三四五六');
+    await name.press('End');
+    await name.pressSequentially('七');
+    await expect(name).toHaveValue('一二三四五六');
+    await expect(dialog.getByText('最多输入6个字符', { exact: true })).toBeVisible();
+    await checkCategoryHelpFeedback(dialog);
+    await expect(dialog.getByText('停用分类不可用于新商品发布。', { exact: true })).toHaveCount(0);
+    const statusTops = await dialog
+      .locator('.t-radio')
+      .evaluateAll((radios) => radios.map((radio) => radio.getBoundingClientRect().top));
+    expect(statusTops).toHaveLength(2);
+    expect(Math.max(...statusTops) - Math.min(...statusTops)).toBeLessThanOrEqual(1);
+    await name.fill(`${scope}连续新增`);
     await dialog.getByRole('button', { name: '保存', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await page.getByRole('button', { name: '新增一级分类', exact: true }).click();
-    await expect(dialog.getByPlaceholder('请输入，最多20个字符')).toHaveValue('');
+    await expect(dialog.getByPlaceholder('请输入分类名称')).toHaveValue('');
     await expect(dialog.locator('.t-is-error')).toHaveCount(0);
     await dialog.getByRole('button', { name: '保存', exact: true }).click();
     await expect(dialog.getByText('请输入分类名称', { exact: true })).toBeVisible();

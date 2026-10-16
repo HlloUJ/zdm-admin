@@ -146,18 +146,16 @@ class DataScopeApiTest extends SpringContainerTestSupport {
     mvc.perform(delete("/api/admin/slab-origins/"+id)).andExpect(status().isOk());
   }
 
-  @Test void masterDataSupportsOwnCrudAndDeniesForeignRows() throws Exception {
-    String prefix = "admin.product-data-center.master-data";
-    identity("self", false, prefix+".view", prefix+".create", prefix+".edit", prefix+".delete");
-    var result = mvc.perform(post("/api/admin/master-data").contentType("application/json")
-        .content("{\"dataType\":\"unit\",\"name\":\"自有单位\",\"code\":\"scope-unit\",\"status\":\"enabled\",\"createdByAccountId\":22}"))
-        .andExpect(status().isOk()).andExpect(jsonPath("$.data.createdByAccountId").value(11)).andReturn();
-    long id = json.readTree(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data").path("id").asLong();
-    mvc.perform(get("/api/admin/master-data")).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
-    jdbc.update("UPDATE master_data SET created_by_account_id=22 WHERE id=?",id);
-    sqlSession.clearCache();
-    mvc.perform(delete("/api/admin/master-data/"+id)).andExpect(status().isForbidden());
-    mvc.perform(get("/api/admin/master-data")).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+  @Test void retiredUnitStorageAndAllCrudEndpointsRemainAbsent() throws Exception {
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='master_data'",Integer.class)).isZero();
+    identity("all", true, "admin.product-data-center.master-data.view", "admin.product-data-center.master-data.create",
+        "admin.product-data-center.master-data.edit", "admin.product-data-center.master-data.delete");
+    mvc.perform(get("/api/admin/master-data")).andExpect(status().isNotFound());
+    mvc.perform(post("/api/admin/master-data").contentType("application/json").content("{}"))
+        .andExpect(status().isNotFound());
+    mvc.perform(put("/api/admin/master-data/1").contentType("application/json").content("{}"))
+        .andExpect(status().isNotFound());
+    mvc.perform(delete("/api/admin/master-data/1")).andExpect(status().isNotFound());
   }
 
   @Test void finishedStockSelfScopeReturnsOnlyOwnDataInsteadOfRejectingTheModule() throws Exception {

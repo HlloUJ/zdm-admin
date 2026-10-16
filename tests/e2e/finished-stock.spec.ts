@@ -1,3 +1,5 @@
+import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
+import { checkDecimalEditing } from './decimal-editing';
 import { expect, test, type Page } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
@@ -93,7 +95,7 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await expect(page.locator('.t-cascader__panel:visible').getByText('有效商品分类', { exact: true })).toBeVisible();
   await expect(page.getByText('已停用分类', { exact: true })).toHaveCount(0);
   await expect(page.getByText('辅料分类', { exact: true })).toHaveCount(0);
-  await page.getByPlaceholder('商品名称 / ID', { exact: true }).click();
+  await page.locator('.list-controls:visible').getByPlaceholder('请输入商品名称/ID', { exact: true }).click();
 
   await expect(page.getByText(/仓库中/)).toBeVisible();
   await expect(page.getByText('供应商', { exact: true }).first()).toBeVisible();
@@ -108,7 +110,7 @@ test('shows finished stock actions without inventory movements', async ({ page }
   await expect(page.getByText('库存流水', { exact: true })).toHaveCount(0);
   const operationHeader = page.getByRole('columnheader', { name: '操作', exact: true });
   const operationWidth = await operationHeader.evaluate((element) => element.getBoundingClientRect().width);
-  const keyword = page.getByPlaceholder('商品名称 / ID', { exact: true });
+  const keyword = page.locator('.list-controls:visible').getByPlaceholder('请输入商品名称/ID', { exact: true });
   for (const text of ['轻奢', '1', 'fp-20260727', '  岩板  ']) {
     await keyword.fill(text);
     await page.getByRole('button', { name: '查询', exact: true }).click();
@@ -153,8 +155,19 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
 
   await expect(page.locator('main.page--form > header.page-header')).toHaveCount(0);
   await expect(page.getByText('当前分类：成品现货 > 餐桌 > 石材餐桌 > 奢石餐桌')).toBeVisible();
-  const images = page.locator('.t-form__item').filter({ hasText: '最多上传5张图片' });
-  const video = page.locator('.t-form__item').filter({ hasText: '最多上传1段视频' });
+  for (const title of await page.locator('.form-section-title').all()) {
+    await expect(title).toHaveCSS('font-size', '18px');
+    await expect(title).toHaveCSS('line-height', '26px');
+    await expect(title).toHaveCSS('font-weight', '400');
+  }
+  const images = page
+    .locator('.t-form__item')
+    .filter({ has: page.locator('.t-form__label').filter({ hasText: '商品主图' }) });
+  await expect(page.getByText('最多上传5张图片，第一张作为商品封面', { exact: true })).toHaveCount(0);
+  const video = page
+    .locator('.t-form__item')
+    .filter({ has: page.locator('.t-form__label').filter({ hasText: '商品视频' }) });
+  await expect(page.getByText('最多上传1段视频', { exact: true })).toHaveCount(0);
   await expect(images.locator('input[type="file"]')).toHaveCount(5);
   await expect(video.locator('input[type="file"]')).toHaveCount(1);
   await expect(images.locator('.t-form__label')).toContainText('商品主图');
@@ -162,6 +175,38 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   const imageBounds = await images.boundingBox();
   const videoBounds = await video.boundingBox();
   expect(videoBounds!.y).toBeGreaterThanOrEqual(imageBounds!.y + imageBounds!.height);
+
+  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  const errorColor = await images
+    .locator('.t-upload__tips-error')
+    .first()
+    .evaluate((element) => getComputedStyle(element).color);
+  await expect(images.locator('.t-upload__card-container').first()).toHaveCSS('border-top-color', errorColor);
+  await expect(video.locator('.t-upload__card-container')).toHaveCSS('border-top-color', errorColor);
+  await expect(images.locator('.admin-media-upload--invalid')).toHaveCount(1);
+  for (const optionalCard of await images
+    .locator('.t-upload__card-container')
+    .all()
+    .then((cards) => cards.slice(1))) {
+    await expect(optionalCard).not.toHaveCSS('border-top-color', errorColor);
+  }
+
+  const nameField = page
+    .locator('.t-form__item')
+    .filter({ has: page.locator('.t-form__label').filter({ hasText: /^商品名称[：:]?$/ }) });
+  await expect(nameField.getByText('请输入商品名称', { exact: true })).toBeVisible();
+  await nameField.getByRole('textbox').fill('字段提示回归商品');
+  await expect(nameField.getByText('请输入商品名称', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.supplier-form').getByText('请选择供应商', { exact: true })).toBeVisible();
+  await expect(page.getByText('请输入宝贝详情', { exact: true })).toBeVisible();
+  await expect(page.getByText('请创建销售规格', { exact: true })).toBeVisible();
+  await expect(page.getByText('请选择E2E 共享属性', { exact: true })).toBeVisible();
+  await page.locator('.product-attributes-grid .t-select').first().click();
+  await page
+    .locator('.t-select-option')
+    .filter({ hasText: /^E2E 共享属性值$/ })
+    .click();
+  await expect(page.getByText('请选择E2E 共享属性', { exact: true })).toHaveCount(0);
 
   let mediaId = 100;
   await page.route('**/api/admin/finished-products/media**', (route) =>
@@ -175,9 +220,13 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
       },
     }),
   );
-  const emptyUploads = images
-    .locator('.admin-media-upload')
-    .filter({ has: page.getByText('点击上传', { exact: true }) });
+  const emptyUploads = images.locator('.t-upload').filter({ has: page.locator('.t-upload__image-add') });
+  await expect(images.locator('.admin-media-upload.t-upload')).toHaveCount(5);
+  await expect(images.locator('.admin-media-upload__preview')).toHaveCount(0);
+  await expect(images.locator('.t-upload__card-name')).toHaveCount(0);
+  const emptyFrame = (await images.locator('.t-upload__card-container').first().boundingBox())!;
+  expect(emptyFrame.width).toBe(110);
+  expect(emptyFrame.height).toBe(110);
   for (let index = 0; index < 5; index++) {
     await expect(emptyUploads).toHaveCount(5 - index);
     await emptyUploads
@@ -188,13 +237,22 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
         mimeType: 'image/png',
         buffer: Buffer.from('test-image'),
       });
-    await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(index + 1);
+    await expect(images.locator('.t-icon-delete')).toHaveCount(index + 1);
+    await expect(images.locator('.admin-media-upload--invalid')).toHaveCount(0);
   }
   await expect(emptyUploads).toHaveCount(0);
-  await expect(images.locator('input[type="file"]')).toHaveCount(0);
-  await images.getByRole('button', { name: '删除', exact: true }).first().click();
+  await expect(images.locator('.t-upload__image-add')).toHaveCount(0);
+  const firstCard = images.locator('.t-upload__card-content').first();
+  await firstCard.hover();
+  const coverReleased = page.waitForRequest(
+    (request) => request.method() === 'DELETE' && request.url().endsWith('/finished-products/media?mediaId=100'),
+  );
+  await firstCard.locator('.t-icon-delete').click();
+  await coverReleased;
   await expect(emptyUploads).toHaveCount(1);
-  await expect(images.getByRole('button', { name: '删除', exact: true })).toHaveCount(4);
+  await expect(images.locator('.t-icon-delete')).toHaveCount(4);
+  await expect(images.locator('.t-upload[aria-label="封面图"] .t-upload__image-add')).toHaveCount(1);
+  await expect(images.getByRole('button', { name: '商品主图2', exact: true })).toBeVisible();
 
   await images.getByRole('button', { name: '商品主图2', exact: true }).click();
   const preview = page.locator('.t-dialog:visible').filter({ has: page.locator('.image-preview-dialog') });
@@ -242,6 +300,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
     mimeType: 'video/webm',
     buffer: Buffer.from(videoBytes),
   });
+  await expect(video.locator('.admin-media-upload--invalid')).toHaveCount(0);
   await video.getByRole('button', { name: '播放商品视频' }).click();
   const player = preview.locator('video');
   await expect(player).toBeVisible();
@@ -249,9 +308,22 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   await expect.poll(() => player.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
   await preview.locator('.t-dialog__close').click();
   await expect(player).toHaveCount(0);
-  await video.locator('.admin-media-upload').click({ position: { x: 8, y: 80 } });
+  await expect(video.locator('.t-upload__card-image img')).toHaveAttribute('src', /^data:image\/jpeg/);
+  const videoCard = (await video.locator('.t-upload__card-content').boundingBox())!;
+  expect(videoCard.width).toBe(emptyFrame.width);
+  expect(videoCard.height).toBe(emptyFrame.height);
+  await video.getByRole('button', { name: '播放商品视频' }).click();
   await expect(preview.locator('video')).toBeVisible();
   await preview.locator('.t-dialog__close').click();
+  await expect(video.locator('.t-upload button')).toHaveCount(0);
+  const videoReleased = page.waitForRequest(
+    (request) => request.method() === 'DELETE' && request.url().endsWith('/finished-products/media?mediaId=200'),
+  );
+  await video.locator('.t-upload__card-content').hover();
+  await video.locator('.t-icon-delete').click();
+  await videoReleased;
+  await expect(video.getByRole('button', { name: '播放商品视频', exact: true })).toHaveCount(0);
+  await expect(video.locator('.t-upload__image-add')).toHaveCount(1);
 });
 
 test('edits an initially empty rich product description with real toolbar actions', async ({ page }) => {
@@ -394,11 +466,12 @@ test('shows every publish section and navigates anchors without losing form inpu
     .toBe(true);
   await page.screenshot({ path: '/tmp/finished-product-cards-scrolled.png' });
   await form.getByRole('button', { name: '提交商品信息', exact: true }).click();
-  await expect(form.getByRole('heading', { name: '图文描述', exact: true })).toBeInViewport();
-  await expect(page.getByText('请上传商品主图', { exact: true })).toBeVisible();
+  await expect(form.locator('.admin-media-upload--invalid').first()).toBeInViewport();
+  await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
   await nameInput.fill('');
   await expect(nameInput.locator('..')).toHaveClass(/t-is-error/);
-  await expect(form.locator('.supplier-form .t-input')).not.toHaveClass(/t-is-error/);
+  await expect(form.locator('.supplier-form .t-input')).toHaveClass(/t-is-error/);
+  await expect(form.locator('.supplier-form').getByText('请选择供应商', { exact: true })).toBeVisible();
   const requiredAttribute = form.locator('.product-attributes-grid .t-form__item').filter({ hasText: 'E2E 共享属性' });
   const optionalAttribute = form
     .locator('.product-attributes-grid .t-form__item')
@@ -474,7 +547,7 @@ test('source specification editor exposes cost and stock without operations pric
     await picker.getByRole('button', { name, exact: true }).click();
   await page.getByRole('button', { name: '确认，下一步' }).click();
   await page.getByRole('button', { name: '创建规格', exact: true }).click();
-  await page.getByPlaceholder('请输入规格文本，如 1500*800*750mm').fill('测试规格');
+  await page.getByPlaceholder('请输入商品规格').fill('测试规格');
   await page.getByRole('button', { name: '确认创建', exact: true }).click();
   const table = page.locator('.spec-table-block');
   await expect(table.getByRole('columnheader', { name: '成本价*', exact: true })).toBeVisible();
@@ -555,7 +628,7 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   await expect(page.locator('.selected-tags .spec-attr-tag')).toHaveText(['销售测试属性']);
   await page.getByRole('button', { name: '重置', exact: true }).click();
 
-  await page.getByPlaceholder('请输入规格文本，如 1500*800*750mm').fill('标准规格');
+  await page.getByPlaceholder('请输入商品规格').fill('标准规格');
   await page.getByRole('button', { name: '确认创建', exact: true }).click();
   const table = page.locator('.spec-table-block');
   await expect(table.getByRole('columnheader', { name: '销售测试属性*', exact: true })).toBeVisible();
@@ -572,6 +645,9 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   await expect(salesInput.locator('..')).toHaveClass(/t-is-error/);
   await page.getByRole('button', { name: '批量填写', exact: true }).click();
   const batchFields = page.locator('.batch-field-grid');
+  await expect(batchFields).toHaveCSS('row-gap', '24px');
+  await expect(batchFields).toHaveCSS('column-gap', '32px');
+  await expect(page.locator('.batch-section').first()).toHaveCSS('padding', '16px 24px');
   await expect(batchFields).not.toContainText('商品测试属性');
   await expect(batchFields).not.toContainText('无角色测试属性');
   await batchFields.locator('.t-form__item').filter({ hasText: '销售测试属性' }).getByRole('textbox').fill('大号');
@@ -585,15 +661,18 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   await expect(salesInput).toHaveValue('大号');
   await expect(salesInput.locator('..')).not.toHaveClass(/t-is-error/);
   await page.getByRole('button', { name: '编辑规格', exact: true }).click();
-  await page.getByPlaceholder('请输入规格文本，如 1500*800*750mm').fill('大号');
+  await page.getByPlaceholder('请输入商品规格').fill('大号');
   await page.getByText('分层展示：选择标准属性构建规格', { exact: true }).click();
   await page.getByRole('button', { name: '确认切换', exact: true }).click();
   await expect(page.locator('.spec-attr-tag')).toHaveText(['销售测试属性']);
   // This product has not been saved, even though its single specifications were created.
   await expect(page.locator('.spec-attr-tag.active')).toHaveCount(0);
   await page.locator('.spec-attr-tag').getByText('销售测试属性', { exact: true }).click();
-  await expect(page.getByPlaceholder('请输入属性值')).toHaveValue('');
-  await page.getByPlaceholder('请输入属性值').fill('小号');
+  await expect(page.locator('.layered-value-row').getByPlaceholder(/^请输入.+/)).toHaveValue('');
+  await page
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .fill('小号');
   await page.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(table.locator('tbody tr td').first()).toHaveText('小号');
 });
@@ -739,11 +818,24 @@ test('edits prices in a specification table and preserves product details on sav
   await expect(editor.locator('.t-select')).toHaveCount(0);
   await expect(editor.locator('.spec-table-block tbody tr').nth(1)).toContainText('规格B');
   await expect(visibleRows.nth(1)).toHaveText('10.00');
-  await expect(visibleRows.nth(1).getByPlaceholder('价格', { exact: true })).toHaveCount(0);
-  await visibleRows.nth(2).getByPlaceholder('系数', { exact: true }).fill('3');
-  await expect(visibleRows.nth(2).getByPlaceholder('价格', { exact: true })).toHaveValue('30.00');
-  await expect(visibleRows.nth(3).getByPlaceholder('价格', { exact: true })).toHaveValue('30.00');
-  for (const placeholder of ['系数', '价格']) {
+  await expect(visibleRows.nth(1).getByPlaceholder('请输入价格', { exact: true })).toHaveCount(0);
+  for (const placeholder of ['请输入系数', '请输入价格']) {
+    const input = visibleRows.nth(2).getByPlaceholder(placeholder, { exact: true });
+    await input.fill('');
+    await input.pressSequentially('52');
+    await input.press('Backspace');
+    await expect(input).toHaveValue('5');
+    await input.press('NumpadDecimal');
+    await expect(input).toHaveValue('5.');
+    await input.press('2');
+    await expect(input).toHaveValue('5.2');
+    await input.blur();
+    await expect(input).toHaveValue('5.20');
+  }
+  await visibleRows.nth(2).getByPlaceholder('请输入系数', { exact: true }).fill('3');
+  await expect(visibleRows.nth(2).getByPlaceholder('请输入价格', { exact: true })).toHaveValue('30.00');
+  await expect(visibleRows.nth(3).getByPlaceholder('请输入价格', { exact: true })).toHaveValue('30.00');
+  for (const placeholder of ['请输入系数', '请输入价格']) {
     const input = visibleRows.nth(3).getByPlaceholder(placeholder, { exact: true });
     const beforeFocus = await input.inputValue();
     await input.focus();
@@ -773,7 +865,7 @@ test('edits prices in a specification table and preserves product details on sav
   await expect(editor).toBeVisible();
   expect(saves).toBe(0);
   expect(product.markupPrices[0].priceSource).toBe('auto');
-  await expect(visibleRows.nth(3).getByPlaceholder('价格', { exact: true })).toHaveValue('30.00');
+  await expect(visibleRows.nth(3).getByPlaceholder('请输入价格', { exact: true })).toHaveValue('30.00');
 
   await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(editor).not.toBeVisible();
@@ -879,19 +971,22 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
     await preview.locator('.t-dialog__close').click();
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforePreview);
-    await thumbnail.locator('..').click({ position: { x: 8, y: 80 } });
+    await thumbnail.click();
     await expect(preview.locator(selector)).toBeVisible();
     await preview.locator('.t-dialog__close').click();
   }
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(editor.locator('.spec-table-block thead th')).toContainText(['商品规格', '成本价*']);
+  await checkDecimalEditing(
+    editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('请输入价格', { exact: true }),
+  );
   const specificationCell = editor.locator('.spec-table-block tbody tr').first().locator('td').first();
   await expect(specificationCell).toHaveText(longSpec);
   await expect(specificationCell).toHaveCSS('white-space', 'normal');
   expect(await specificationCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await expect(editor.getByText('指导价')).toHaveCount(0);
   await expect(editor.getByText('一级价格')).toHaveCount(0);
-  const cost = editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('价格', { exact: true });
+  const cost = editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('请输入价格', { exact: true });
   await expect(cost).toBeEnabled();
   await expect(cost).toHaveValue('10.00');
   await cost.fill('15');
@@ -984,11 +1079,28 @@ test('supply-chain layered product edit exposes cost for each specification', as
   ]);
   await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(2);
   await expect(
-    editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('价格', { exact: true }),
+    editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('请输入价格', { exact: true }),
   ).toHaveValue('10.00');
   await expect(
-    editor.locator('.spec-table-block tbody tr').nth(1).getByPlaceholder('价格', { exact: true }),
+    editor.locator('.spec-table-block tbody tr').nth(1).getByPlaceholder('请输入价格', { exact: true }),
   ).toHaveValue('12.00');
+  const table = editor.locator('.spec-table-block .t-table');
+  const geometry = await priceTableGeometry(table);
+  const cost = table.locator('tbody tr').first().getByPlaceholder('请输入价格', { exact: true });
+  await cost.fill('');
+  await cost.blur();
+  await expect(table.getByText('请输入价格', { exact: true })).toHaveCount(1);
+  await expectPriceTableStable(table, geometry);
+  await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expectPriceTableStable(table, geometry);
+  await cost.fill('-1');
+  await cost.blur();
+  await expect(table.getByText('请输入正确的价格', { exact: true })).toHaveCount(1);
+  await expectPriceTableStable(table, geometry);
+  await cost.fill('10');
+  await cost.blur();
+  await expect(table.locator('.t-input__tips')).toHaveCount(0);
+  await expectPriceTableStable(table, geometry);
 });
 
 test('restores the initial horizontal layout after visiting the off-shelf tab', async ({ page }) => {
@@ -1237,78 +1349,86 @@ test('shows initial warehouse prices without comparison and stacks later prices 
   await fullscreen.getByRole('button', { name: '还原', exact: true }).click();
 });
 
-test('aligns layered log cells on first display and after fullscreen without a corrective click', async ({ page }) => {
-  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
-  await installFinishedMocks(page, 'supply-chain');
-  const dimensions = ['a', 'b', 'c'].map((key) => ({ key, name: `销售属性${key}`, values: ['选项1', '选项2'] }));
-  const variants = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
-    variantKey: `key-${i}`,
-    variantLabel: `规格${i}`,
-    displayMode: 'layered',
-    stock: 1,
-    costPrice: 10,
-    salesAttributes: {
-      a: `选项${Math.floor(i / 4) + 1}`,
-      b: `选项${(Math.floor(i / 2) % 2) + 1}`,
-      c: `选项${(i % 2) + 1}`,
-      extra: '额外销售属性',
-    },
-  }));
-  const record = {
-    id: 501,
-    productId: 1,
-    productName: '分层日志',
-    operationType: 'UPDATE',
-    operationSource: 'MANUAL',
-    operatorName: '测试人员',
-    changeDetails: JSON.stringify({
-      销售规格: { before: variants, after: variants.map((v) => ({ ...v, costPrice: 20 })) },
-      规格维度: { before: dimensions, after: dimensions },
-    }),
-  };
-  await page.route('**/api/admin/finished-products/operation-logs?*', (route) =>
-    route.fulfill({ json: { code: 0, data: { records: [record], total: 1 } } }),
-  );
-  await page.route('**/api/admin/finished-products/operation-logs/501', (route) =>
-    route.fulfill({ json: { code: 0, data: record } }),
-  );
-  await page.goto('/supply-chain/finished-stock-management');
-  await page.getByRole('main').getByText('操作日志', { exact: true }).click();
-  await page.getByRole('row').filter({ hasText: '分层日志' }).getByText('详情', { exact: true }).click();
-  const tables = page.locator('.sales-log-table');
-  const aligned = async () => {
-    await expect
-      .poll(() =>
-        tables.evaluateAll((elements) =>
-          elements.every((el) => {
-            const headers = Array.from(el.querySelectorAll('thead th')).slice(0, 3);
-            const cells = Array.from(el.querySelectorAll('tbody tr:first-child td')).slice(0, 3);
-            return (
-              headers.length === 3 &&
-              cells.length === 3 &&
-              headers.every((header, i) => {
-                const rect = header.getBoundingClientRect();
-                const cell = cells[i].getBoundingClientRect();
-                const expectedLeft = headers.slice(0, i).reduce((sum, h) => sum + h.getBoundingClientRect().width, 0);
-                return (
-                  rect.width >= 129 &&
-                  Math.abs(cell.x - rect.x) < 2 &&
-                  Math.abs(parseFloat(getComputedStyle(header).left) - expectedLeft) < 2
-                );
-              })
-            );
-          }),
-        ),
-      )
-      .toBe(true);
-    await expect(tables.first().locator('tbody tr:first-child td').first()).toHaveAttribute('rowspan', '4');
-  };
-  await aligned();
-  await page.getByRole('button', { name: '全屏显示', exact: true }).click();
-  await aligned();
-  await page.getByRole('button', { name: '还原', exact: true }).click();
-  await aligned();
-});
+for (const animationDuration of [200, 1000]) {
+  test(`aligns layered log cells on first display and after fullscreen without a corrective click (${animationDuration}ms dialog animation)`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+    await installFinishedMocks(page, 'supply-chain');
+    const dimensions = ['a', 'b', 'c'].map((key) => ({ key, name: `销售属性${key}`, values: ['选项1', '选项2'] }));
+    const variants = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
+      variantKey: `key-${i}`,
+      variantLabel: `规格${i}`,
+      displayMode: 'layered',
+      stock: 1,
+      costPrice: 10,
+      salesAttributes: {
+        a: `选项${Math.floor(i / 4) + 1}`,
+        b: `选项${(Math.floor(i / 2) % 2) + 1}`,
+        c: `选项${(i % 2) + 1}`,
+        extra: '额外销售属性',
+      },
+    }));
+    const record = {
+      id: 501,
+      productId: 1,
+      productName: '分层日志',
+      operationType: 'UPDATE',
+      operationSource: 'MANUAL',
+      operatorName: '测试人员',
+      changeDetails: JSON.stringify({
+        销售规格: { before: variants, after: variants.map((v) => ({ ...v, costPrice: 20 })) },
+        规格维度: { before: dimensions, after: dimensions },
+      }),
+    };
+    await page.route('**/api/admin/finished-products/operation-logs?*', (route) =>
+      route.fulfill({ json: { code: 0, data: { records: [record], total: 1 } } }),
+    );
+    await page.route('**/api/admin/finished-products/operation-logs/501', (route) =>
+      route.fulfill({ json: { code: 0, data: record } }),
+    );
+    await page.goto('/supply-chain/finished-stock-management');
+    // A longer native animation reliably exposes widths cached during scaling.
+    await page.addStyleTag({
+      content: `.t-dialog-zoom__vue-enter-active .t-dialog { animation-duration: ${animationDuration}ms !important; }`,
+    });
+    await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+    await page.getByRole('row').filter({ hasText: '分层日志' }).getByText('详情', { exact: true }).click();
+    const tables = page.locator('.sales-log-table');
+    const aligned = async () => {
+      await expect
+        .poll(() =>
+          tables.evaluateAll((elements) =>
+            elements.every((el) => {
+              const headers = Array.from(el.querySelectorAll('thead th')).slice(0, 3);
+              const cells = Array.from(el.querySelectorAll('tbody tr:first-child td')).slice(0, 3);
+              return (
+                headers.length === 3 &&
+                cells.length === 3 &&
+                headers.every((header, i) => {
+                  const rect = header.getBoundingClientRect();
+                  const cell = cells[i].getBoundingClientRect();
+                  const expectedLeft = headers.slice(0, i).reduce((sum, h) => sum + h.getBoundingClientRect().width, 0);
+                  return (
+                    rect.width >= 129 &&
+                    Math.abs(cell.x - rect.x) < 2 &&
+                    Math.abs(parseFloat(getComputedStyle(header).left) - expectedLeft) < 2
+                  );
+                })
+              );
+            }),
+          ),
+        )
+        .toBe(true);
+      await expect(tables.first().locator('tbody tr:first-child td').first()).toHaveAttribute('rowspan', '4');
+    };
+    await aligned();
+    await page.getByRole('button', { name: '全屏显示', exact: true }).click();
+    await aligned();
+    await page.getByRole('button', { name: '还原', exact: true }).click();
+    await aligned();
+  });
+}
 
 for (const coefficient of [1.8, 0, undefined]) {
   test(`operations product edit displays persisted level prices with coefficient ${coefficient ?? 'unconfigured'}`, async ({
@@ -1405,9 +1525,9 @@ for (const coefficient of [1.8, 0, undefined]) {
     const missingLevel = editor.locator('.spec-table-block tbody tr').nth(1).locator('td').nth(3);
     const zeroCostLevel = editor.locator('.spec-table-block tbody tr').nth(2).locator('td').nth(3);
     await expect(editor.locator('.spec-table-block thead')).toContainText('4级合伙人');
-    await expect(firstLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
+    await expect(firstLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
     // Configuration alone must not invent a price absent from the server response.
-    await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+    await expect(missingLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
     await editor.getByRole('button', { name: '取消', exact: true }).click();
     await expect(editor).not.toBeVisible();
     if (coefficient != null) {
@@ -1425,21 +1545,27 @@ for (const coefficient of [1.8, 0, undefined]) {
       );
     }
     await page.getByText('编辑', { exact: true }).click();
-    await expect(firstLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('1600.00');
-    await expect(firstLevel.getByPlaceholder('系数', { exact: true })).toHaveValue('1.60');
+    await expect(firstLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('1600.00');
+    await expect(firstLevel.getByPlaceholder('请输入系数', { exact: true })).toHaveValue('1.60');
     await expect(firstLevel.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true })).toBeVisible();
     expect(saves).toHaveLength(0);
     if (coefficient == null) {
-      await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
-      await expect(zeroCostLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+      await expect(missingLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
+      await expect(zeroCostLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
+      const table = editor.locator('.spec-table-block .t-table');
+      const geometry = await priceTableGeometry(table);
       await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
-      await expect(page.getByText('请完善每条规格的指导价和合伙人价格', { exact: true })).toBeVisible();
+      await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
+      await expectPriceTableStable(table, geometry);
+      await expect(missingLevel.getByText('请输入价格', { exact: true })).toHaveCount(1);
       await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
       expect(saves).toHaveLength(0);
       return;
     }
-    await expect(missingLevel.getByPlaceholder('价格', { exact: true })).toHaveValue((2000 * coefficient).toFixed(2));
-    await expect(zeroCostLevel.getByPlaceholder('价格', { exact: true })).toHaveValue('0.00');
+    await expect(missingLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue(
+      (2000 * coefficient).toFixed(2),
+    );
+    await expect(zeroCostLevel.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('0.00');
     await expect(missingLevel.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
     await editor.getByRole('button', { name: '提交商品信息', exact: true }).click();
     await expect(editor).not.toBeVisible();
@@ -1509,7 +1635,7 @@ test('switches empty and cleared select attributes to single mode without errors
   await page.getByRole('button', { name: '确认，下一步' }).click();
   await page.getByRole('button', { name: '创建规格', exact: true }).click();
   const dialog = page.locator('.spec-dialog');
-  const singles = dialog.getByPlaceholder('请输入规格文本，如 1500*800*750mm');
+  const singles = dialog.getByPlaceholder('请输入商品规格');
   await switchSpecMode(page, 'layered', false);
   for (const name of ['颜色', '尺寸']) await dialog.locator('.spec-attr-tag').getByText(name, { exact: true }).click();
   const color = dialog.locator('.spec-group').filter({ hasText: '颜色' });
@@ -1518,18 +1644,21 @@ test('switches empty and cleared select attributes to single mode without errors
   await expect(singles).toHaveValue('');
   await switchSpecMode(page, 'layered', false);
   for (const name of ['颜色', '尺寸']) await dialog.locator('.spec-attr-tag').getByText(name, { exact: true }).click();
-  await color.getByPlaceholder('请选择属性值').click();
+  await color.getByPlaceholder(/^请选择.+/).click();
   await page.getByRole('listitem', { name: '白色', exact: true }).click();
   await color.locator('.t-select').hover();
   await color.locator('.t-input__suffix-clear').click();
-  await expect(color.getByPlaceholder('请选择属性值')).toHaveValue('');
+  await expect(color.getByPlaceholder(/^请选择.+/)).toHaveValue('');
   await switchSpecMode(page, 'single');
   await expect(singles).toHaveValue('');
   await switchSpecMode(page, 'layered', false);
   for (const name of ['颜色', '尺寸']) await dialog.locator('.spec-attr-tag').getByText(name, { exact: true }).click();
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(dialog.locator('.t-alert')).toContainText('请填写所有规格属性值后再确认创建');
-  await size.getByPlaceholder('请输入属性值').fill('大号');
+  await size
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .fill('大号');
   await switchSpecMode(page, 'single');
   await expect(singles).toHaveValue('');
   expect(errors).toEqual([]);
@@ -1569,7 +1698,7 @@ test('clears unsaved specification drafts on mode changes and preserves confirma
   await page.getByRole('button', { name: '确认，下一步' }).click();
   await page.getByRole('button', { name: '创建规格', exact: true }).click();
   const dialog = page.locator('.spec-dialog');
-  const singles = dialog.getByPlaceholder('请输入规格文本，如 1500*800*750mm');
+  const singles = dialog.getByPlaceholder('请输入商品规格');
   const size = dialog.locator('.spec-group').filter({ hasText: '尺寸' });
   const color = dialog.locator('.spec-group').filter({ hasText: '颜色' });
   await singles.fill('大号 白色');
@@ -1582,16 +1711,22 @@ test('clears unsaved specification drafts on mode changes and preserves confirma
   await expect(dialog.locator('.spec-attr-tag.active')).toHaveCount(0);
   await expect(dialog.getByTestId('spec-combination-editor')).toHaveCount(0);
   for (const name of ['尺寸', '颜色']) await dialog.locator('.spec-attr-tag').getByText(name, { exact: true }).click();
-  await expect(size.getByPlaceholder('请输入属性值')).toHaveValue('');
-  await expect(color.getByPlaceholder('请输入属性值')).toHaveValue('');
-  await size.getByPlaceholder('请输入属性值').fill('大号');
-  await color.getByPlaceholder('请输入属性值').fill('白色');
+  await expect(size.locator('.layered-value-row').getByPlaceholder(/^请输入.+/)).toHaveValue('');
+  await expect(color.locator('.layered-value-row').getByPlaceholder(/^请输入.+/)).toHaveValue('');
+  await size
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .fill('大号');
+  await color
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .fill('白色');
   // Deselect/reselect also clears just that dimension's input.
   const colorTag = dialog.locator('.spec-attr-tag').getByText('颜色', { exact: true });
   await colorTag.click();
   await colorTag.click();
-  await expect(color.getByPlaceholder('请输入属性值')).toHaveValue('');
-  await expect(size.getByPlaceholder('请输入属性值')).toHaveValue('大号');
+  await expect(color.locator('.layered-value-row').getByPlaceholder(/^请输入.+/)).toHaveValue('');
+  await expect(size.locator('.layered-value-row').getByPlaceholder(/^请输入.+/)).toHaveValue('大号');
   await switchSpecMode(page, 'single');
   await expect(singles).toHaveCount(1);
   await expect(singles).toHaveValue('');
@@ -1611,15 +1746,18 @@ test('clears unsaved specification drafts on mode changes and preserves confirma
   await singles.fill('新规格');
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   const table = page.locator('.spec-table-block');
-  await table.getByPlaceholder('价格', { exact: true }).fill('30');
+  await table.getByPlaceholder('请输入价格', { exact: true }).fill('30');
   await table.locator('.quantity-editor input').fill('4');
   await page.getByRole('button', { name: '编辑规格', exact: true }).click();
   await switchSpecMode(page, 'layered');
   await dialog.locator('.spec-attr-tag').getByText('尺寸', { exact: true }).click();
-  await size.getByPlaceholder('请输入属性值').fill('新规格');
+  await size
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .fill('新规格');
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(table.locator('tbody tr')).toHaveCount(1);
-  await expect(table.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+  await expect(table.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
   await expect(table.locator('.quantity-editor input')).toHaveValue('');
 });
 
@@ -1718,8 +1856,16 @@ for (const originalMode of ['single', 'layered'] as const) {
     const dialog = await openSpecConversionFixture(page, originalMode, ['颜色', '尺寸', '说明'], {
       attribute_4: '原规格说明',
     });
+    // Prior failed product submission must not make regenerated mode-switch rows immediately invalid.
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    const firstCost = page.locator('.spec-table-block').getByPlaceholder('请输入价格', { exact: true }).first();
+    await firstCost.fill('');
+    await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toBeVisible();
+    await firstCost.fill('10');
+    await page.getByRole('button', { name: '编辑规格', exact: true }).click();
     const targetMode = originalMode === 'single' ? 'layered' : 'single';
-    const singles = dialog.getByPlaceholder('请输入规格文本，如 1500*800*750mm');
+    const singles = dialog.getByPlaceholder('请输入商品规格');
     const table = page.locator('.spec-table-block');
     const expectBlank = async () => {
       if (targetMode === 'single') {
@@ -1740,14 +1886,21 @@ for (const originalMode of ['single', 'layered'] as const) {
       await expect(singles.nth(1)).toHaveValue('加长款');
     } else {
       await expect(dialog.locator('.spec-group-title')).toHaveText(['颜色', '尺寸']);
-      await expect(dialog.locator('.spec-group').first().getByPlaceholder('请输入属性值').first()).toHaveValue('白色');
+      await expect(
+        dialog
+          .locator('.spec-group')
+          .first()
+          .locator('.layered-value-row')
+          .getByPlaceholder(/^请输入.+/)
+          .first(),
+      ).toHaveValue('白色');
     }
     await switchSpecMode(page, targetMode);
     await expectBlank();
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     await expect(table.locator('tbody tr')).toHaveCount(2);
-    await expect(table.getByPlaceholder('价格', { exact: true }).nth(0)).toHaveValue('10.00');
-    await expect(table.getByPlaceholder('价格', { exact: true }).nth(1)).toHaveValue('20.00');
+    await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(0)).toHaveValue('10.00');
+    await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(1)).toHaveValue('20.00');
     await page.getByRole('button', { name: '编辑规格', exact: true }).click();
     await switchSpecMode(page, targetMode);
     await expectBlank();
@@ -1759,14 +1912,28 @@ for (const originalMode of ['single', 'layered'] as const) {
         ['尺寸', '大号'],
       ]) {
         await dialog.locator('.spec-attr-tag').getByText(name, { exact: true }).click();
-        await dialog.locator('.spec-group').filter({ hasText: name }).getByPlaceholder('请输入属性值').fill(value);
+        await dialog
+          .locator('.spec-group')
+          .filter({ hasText: name })
+          .locator('.layered-value-row')
+          .getByPlaceholder(/^请输入.+/)
+          .fill(value);
       }
     }
     await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
     await expect(table.locator('tbody tr')).toHaveCount(1);
-    await expect(table.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+    await expect(table.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
     await expect(table.locator('.quantity-editor input')).toHaveValue('');
-    await table.getByPlaceholder('价格', { exact: true }).fill('30');
+    await table.getByPlaceholder('请输入价格', { exact: true }).focus();
+    await table.getByPlaceholder('请输入价格', { exact: true }).blur();
+    await expect(table.locator('.t-input__tips')).toHaveCount(0);
+    await expect(table.locator('.t-is-error')).toHaveCount(0);
+    const regeneratedGeometry = await priceTableGeometry(table.locator('.t-table'));
+    await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+    await expect(table.getByText('请输入数量', { exact: true })).toBeVisible();
+    await expect(table.getByText('请输入价格', { exact: true })).toBeVisible();
+    await expectPriceTableStable(table.locator('.t-table'), regeneratedGeometry);
+    await table.getByPlaceholder('请输入价格', { exact: true }).fill('30');
     await table.locator('.quantity-editor input').fill('1');
     const requestPromise = page.waitForRequest(
       (request) => request.url().endsWith('/finished-products/95/edit') && request.method() === 'PUT',
@@ -1784,13 +1951,26 @@ test('preserves sparse SKU identities and values when editing without changing d
   const dialog = await openSpecConversionFixture(page, 'layered');
   const color = dialog.locator('.spec-group').filter({ hasText: '颜色' });
   const size = dialog.locator('.spec-group').filter({ hasText: '尺寸' });
-  await color.getByPlaceholder('请输入属性值').first().fill('未确认颜色');
+  await color
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .first()
+    .fill('未确认颜色');
   await size.locator('.spec-group-head').dragTo(color, { targetPosition: { x: 10, y: 10 } });
   await expect(dialog.locator('.spec-group-title')).toHaveText(['尺寸', '颜色']);
   await dialog.getByRole('button', { name: '重置', exact: true }).click();
   await expect(dialog.locator('.spec-group-title')).toHaveText(['颜色', '尺寸']);
-  await expect(color.getByPlaceholder('请输入属性值').first()).toHaveValue('白色');
-  await color.getByPlaceholder('请输入属性值').first().fill('米白色');
+  await expect(
+    color
+      .locator('.layered-value-row')
+      .getByPlaceholder(/^请输入.+/)
+      .first(),
+  ).toHaveValue('白色');
+  await color
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .first()
+    .fill('米白色');
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(page.locator('.spec-table-block tbody tr')).toHaveCount(2);
   const requestPromise = page.waitForRequest(
@@ -1823,10 +2003,14 @@ test('rebuilds eight distinct specifications from three edited dimensions withou
   for (const [index, name] of dimensions.entries()) {
     await dialog.locator('.spec-attr-tag').getByText(name, { exact: true }).click();
     const group = dialog.locator('.spec-group').filter({ hasText: name });
-    await group.getByPlaceholder('请输入属性值').fill(`${index + 1}甲`);
+    await group
+      .locator('.layered-value-row')
+      .getByPlaceholder(/^请输入.+/)
+      .fill(`${index + 1}甲`);
     await group.getByRole('button', { name: '新增属性值', exact: true }).click();
     await group
-      .getByPlaceholder('请输入属性值')
+      .locator('.layered-value-row')
+      .getByPlaceholder(/^请输入.+/)
       .nth(1)
       .fill(`${index + 1}乙`);
   }
@@ -1837,11 +2021,11 @@ test('rebuilds eight distinct specifications from three edited dimensions withou
   await expect(table.locator('tbody tr')).toHaveCount(8);
   // Unknown old labels cannot transfer old SKU prices or stock to an arbitrary new combination.
   for (const row of await table.locator('tbody tr').all()) {
-    await expect(row.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+    await expect(row.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
     await expect(row.locator('.quantity-editor input')).toHaveValue('');
   }
   for (const row of await table.locator('tbody tr').all()) {
-    await row.getByPlaceholder('价格', { exact: true }).fill('30');
+    await row.getByPlaceholder('请输入价格', { exact: true }).fill('30');
     await row.locator('.quantity-editor input').fill('1');
   }
   const requestPromise = page.waitForRequest(
@@ -1864,11 +2048,19 @@ test('retains matched specification attributes and SKU data when adding and remo
   });
   const size = dialog.locator('.spec-group').filter({ hasText: '尺寸' });
   await size.getByRole('button', { name: '新增属性值', exact: true }).last().click();
-  await size.getByPlaceholder('请输入属性值').nth(2).fill('中号');
+  await size
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .nth(2)
+    .fill('中号');
   await dialog.getByRole('button', { name: '重置', exact: true }).click();
-  await expect(size.getByPlaceholder('请输入属性值')).toHaveCount(2);
+  await expect(size.locator('.layered-value-row').getByPlaceholder(/^请输入.+/)).toHaveCount(2);
   await size.getByRole('button', { name: '新增属性值', exact: true }).last().click();
-  await size.getByPlaceholder('请输入属性值').nth(2).fill('中号');
+  await size
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .nth(2)
+    .fill('中号');
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   const table = page.locator('.spec-table-block');
   await expect(table.locator('tbody tr')).toHaveCount(6);
@@ -1877,8 +2069,8 @@ test('retains matched specification attributes and SKU data when adding and remo
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(table.locator('tbody tr')).toHaveCount(4);
   for (const row of await table.locator('tbody tr').all()) {
-    if ((await row.getByPlaceholder('价格', { exact: true }).inputValue()) === '') {
-      await row.getByPlaceholder('价格', { exact: true }).fill('30');
+    if ((await row.getByPlaceholder('请输入价格', { exact: true }).inputValue()) === '') {
+      await row.getByPlaceholder('请输入价格', { exact: true }).fill('30');
       await row.locator('.quantity-editor input').fill('1');
     }
   }
@@ -1915,17 +2107,24 @@ test('prefills corresponding non-dimension attributes when a saved specification
   });
   await dialog.locator('.spec-attr-tag').getByText('材质', { exact: true }).click();
   const material = dialog.locator('.spec-group').filter({ hasText: '材质' });
-  await material.getByPlaceholder('请输入属性值').fill('石材');
+  await material
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .fill('石材');
   await material.getByRole('button', { name: '新增属性值', exact: true }).click();
-  await material.getByPlaceholder('请输入属性值').nth(1).fill('木材');
+  await material
+    .locator('.layered-value-row')
+    .getByPlaceholder(/^请输入.+/)
+    .nth(1)
+    .fill('木材');
   await dialog.getByRole('button', { name: '确认创建', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const table = page.locator('.spec-table-block');
   await expect(table.locator('tbody tr')).toHaveCount(8);
   for (const row of await table.locator('tbody tr').all()) {
-    await expect(row.getByPlaceholder('价格', { exact: true })).toHaveValue('');
+    await expect(row.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
     await expect(row.locator('.quantity-editor input')).toHaveValue('');
-    await row.getByPlaceholder('价格', { exact: true }).fill('30');
+    await row.getByPlaceholder('请输入价格', { exact: true }).fill('30');
     await row.locator('.quantity-editor input').fill('1');
   }
   const requestPromise = page.waitForRequest(
@@ -2006,5 +2205,208 @@ for (const failSecond of [false, true]) {
       await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(0);
       await expect(main.getByText('批量下架商品73', { exact: true })).toHaveCount(0);
     }
+  });
+}
+
+test('repeated layered specification rejection has a native field message without losing saved SKU data', async ({
+  page,
+}) => {
+  await openSpecConversionFixture(page, 'layered', ['颜色', '尺寸'], {
+    attribute_2: '重复颜色',
+    attribute_3: '重复尺寸',
+  });
+  await page.locator('.spec-dialog-footer').getByRole('button', { name: '取消', exact: true }).click();
+  const writes: unknown[] = [];
+  await page.route('**/api/admin/finished-products/95/edit', (route) => {
+    writes.push(route.request().postDataJSON());
+    return route.fulfill({ json: { code: 0, data: true } });
+  });
+  await page.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  const field = page
+    .locator('.t-form__item')
+    .filter({ has: page.locator('.t-form__label').filter({ hasText: /^销售规格[：:]?$/ }) });
+  const message = field.getByText('销售规格组合重复，请重新编辑规格', { exact: true });
+  await expect(message).toBeVisible();
+  const errorColor = await message.evaluate((element) => getComputedStyle(element).color);
+  await expect(field.locator('.t-input').first()).toHaveCSS('border-top-color', errorColor);
+  await expect(field.locator('tbody tr')).toHaveCount(2);
+  expect(writes).toEqual([]);
+});
+
+test('empty publish reports every existing field once and locates the cover; editing and blur stay quiet', async ({
+  page,
+}) => {
+  await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page);
+  let submissions = 0;
+  await page.route('**/api/admin/finished-products', async (route) => {
+    if (route.request().method() === 'POST') submissions++;
+    await route.fallback();
+  });
+  await page.goto('/supply-chain/finished-stock-management');
+  await page.getByRole('button', { name: '发布商品', exact: true }).click();
+  const picker = page.getByTestId('finished-category-picker');
+  for (const name of ['成品现货', '餐桌', '石材餐桌', '奢石餐桌']) {
+    await picker.getByRole('button', { name }).click();
+  }
+  await page.getByRole('button', { name: '确认，下一步' }).click();
+  const form = page.locator('.form-shell');
+  await form.getByRole('button', { name: '提交商品信息', exact: true }).click();
+  await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
+  for (const message of [
+    '请上传图片',
+    '请上传视频',
+    '请输入宝贝详情',
+    '请输入商品名称',
+    '请选择供应商',
+    '请创建销售规格',
+  ]) {
+    await expect(form.getByText(message, { exact: true })).toHaveCount(1);
+  }
+  const cards = form.locator('.admin-media-upload');
+  await expect(cards.nth(0)).toHaveClass(/admin-media-upload--invalid/);
+  for (let index = 1; index < 5; index++) await expect(cards.nth(index)).not.toHaveClass(/admin-media-upload--invalid/);
+  await expect(cards.nth(5)).toHaveClass(/admin-media-upload--invalid/);
+  const requiredAttribute = form.locator('.product-attributes-grid .t-form__item').filter({ hasText: 'E2E 共享属性' });
+  await expect(requiredAttribute.locator('.t-input')).toHaveClass(/t-is-error/);
+  const optionalAttribute = form
+    .locator('.product-attributes-grid .t-form__item')
+    .filter({ hasText: 'E2E 成品现货专属属性' });
+  await expect(optionalAttribute.locator('.t-input')).not.toHaveClass(/t-is-error/);
+  await expect
+    .poll(async () => {
+      const cover = await cards.first().boundingBox();
+      const nav = await page.locator('.form-anchor-card').boundingBox();
+      return Boolean(cover && nav && cover.y >= nav.y + nav.height && cover.y + cover.height <= 858);
+    })
+    .toBe(true);
+  expect(submissions).toBe(0);
+  await expect(page.locator('.zdm-admin-feedback')).toHaveCount(0, { timeout: 6000 });
+  const nameInput = form.getByPlaceholder('请输入商品名称', { exact: true });
+  await nameInput.scrollIntoViewIfNeeded();
+  const before = await page.evaluate(() => window.scrollY);
+  await nameInput.fill('只修正名称');
+  await nameInput.evaluate((element) => element.blur());
+  await expect(form.getByText('请输入商品名称', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.zdm-admin-feedback')).toHaveCount(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(before);
+  expect(submissions).toBe(0);
+});
+
+for (const submittedBeforeCreation of [false, true]) {
+  test(`new supply specifications defer feedback until submit and reject zero (${submittedBeforeCreation})`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+    await installFinishedMocks(page);
+    await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
+      route.fulfill({
+        json: {
+          code: 0,
+          data: [
+            {
+              categoryId: 5,
+              content: [
+                {
+                  attributeId: 91,
+                  name: '销售属性1（共享）',
+                  valueType: 'select',
+                  attributeRole: 'sales',
+                  requiredFlag: true,
+                  options: [{ id: 91, value: '白色' }],
+                },
+                {
+                  attributeId: 92,
+                  name: '销售属性2（共享）',
+                  valueType: 'input',
+                  attributeRole: 'sales',
+                  requiredFlag: true,
+                  options: [],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    await page.goto('/supply-chain/finished-stock-management');
+    await page.getByRole('button', { name: '发布商品', exact: true }).click();
+    const picker = page.getByTestId('finished-category-picker');
+    for (const name of ['成品现货', '餐桌', '石材餐桌', '奢石餐桌'])
+      await picker.getByRole('button', { name, exact: true }).click();
+    await page.getByRole('button', { name: '确认，下一步' }).click();
+    const supplierLabel = page.locator('.supplier-form .t-form__label');
+    await expect(supplierLabel).toHaveClass(/t-form__label--required/);
+    expect(
+      await supplierLabel.locator('label').evaluate((element) => getComputedStyle(element, '::before').content),
+    ).toContain('*');
+    const submit = page.getByRole('button', { name: '提交商品信息', exact: true });
+    if (submittedBeforeCreation) await submit.click();
+    await page.getByRole('button', { name: '创建规格', exact: true }).click();
+    await page.getByPlaceholder('请输入商品规格').fill('新规格');
+    await page.getByRole('button', { name: '确认创建', exact: true }).click();
+    const table = page.locator('.spec-table-block');
+    const cost = table.getByPlaceholder('请输入价格', { exact: true });
+    const quantity = table.locator('.quantity-editor input');
+    await cost.focus();
+    await cost.blur();
+    await expect(table.locator('.t-input__tips')).toHaveCount(0);
+    await expect(table.locator('.t-is-error')).toHaveCount(0);
+    if (submittedBeforeCreation)
+      await expect(page.getByPlaceholder('请输入商品名称').locator('..')).toHaveClass(/t-is-error/);
+    await quantity.pressSequentially('abc-+.e中文');
+    await expect(quantity).toHaveValue('');
+    await quantity.pressSequentially('0');
+    await expect(quantity).toHaveValue('');
+    await quantity.pressSequentially('10');
+    await expect(quantity).toHaveValue('10');
+    const pastePrevented = await quantity.evaluate((input) => {
+      const data = new DataTransfer();
+      data.setData('text/plain', '0');
+      (input as HTMLInputElement).select();
+      return !input.dispatchEvent(
+        new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }),
+      );
+    });
+    expect(pastePrevented).toBe(true);
+    await expect(quantity).toHaveValue('10');
+    await page.getByRole('button', { name: '批量填写', exact: true }).click();
+    const batchQuantity = page.locator('.batch-field-grid').getByPlaceholder('请输入数量', { exact: true });
+    await batchQuantity.click();
+    await batchQuantity.pressSequentially('0abc-+.');
+    await expect(batchQuantity).toHaveValue('');
+    await batchQuantity.click();
+    await batchQuantity.pressSequentially('12');
+    await expect(batchQuantity).toHaveValue('12');
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(quantity).toHaveValue('12');
+    await quantity.fill('');
+    await table.locator('.t-table__content').evaluateAll((elements) =>
+      elements.forEach((element) => {
+        element.scrollLeft = 0;
+      }),
+    );
+    const geometry = await priceTableGeometry(table.locator('.t-table'));
+    await submit.click();
+    await expect(table.getByText('请输入数量', { exact: true })).toBeVisible();
+    await expect(table.getByText('请输入价格', { exact: true })).toBeVisible();
+    await expect(table.getByText('请选择销售属性1（共享）', { exact: true })).toBeVisible();
+    await expect(table.getByText('请输入销售属性2（共享）', { exact: true })).toBeVisible();
+    await expectPriceTableStable(table.locator('.t-table'), geometry);
+    await cost.fill('10');
+    await quantity.fill('1');
+    await quantity.press('ArrowDown');
+    await expect(quantity).toHaveValue('1');
+    await expect(table.locator('.quantity-editor .t-input__tips')).toHaveCount(0);
+    await table.getByPlaceholder('请选择销售属性1（共享）', { exact: true }).click();
+    await page.getByText('白色', { exact: true }).click();
+    await table.getByPlaceholder('请输入销售属性2（共享）', { exact: true }).fill('说明');
+    await expect(table.locator('.t-input__tips')).toHaveCount(0);
+    await table.locator('.t-table__content').evaluateAll((elements) =>
+      elements.forEach((element) => {
+        element.scrollLeft = 0;
+      }),
+    );
+    await expectPriceTableStable(table.locator('.t-table'), geometry);
   });
 }

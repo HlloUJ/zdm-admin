@@ -4,7 +4,6 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '属性库管理']" :badge="pageTitle" />
         <t-alert theme="info" class="page-tip"
           >属性库仅维护属性定义和值类型；必填及 SKU 规则统一在类目属性模板中配置。</t-alert
         >
@@ -15,11 +14,11 @@
                 <t-tabs v-if="showScopeTabRail" v-model="activeScope" :list="scopeTabs" />
                 <div class="source-caption">{{ sourceDescription }}</div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="属性名称"
-                      ><t-input v-model="searchForm.keyword" clearable placeholder="请输入"
+                      ><t-input v-model="searchForm.keyword" clearable placeholder="请输入属性名称"
                     /></t-form-item>
                   </div>
                   <div class="filter-actions">
@@ -31,11 +30,11 @@
                   </div>
                 </div>
               </t-form>
-              <div class="table-toolbar">
-                <t-button v-if="canCreateAttribute" theme="primary" @click="openCreate">
+              <AdminListToolbar :has-actions="canCreateAttribute"
+                ><t-button v-if="canCreateAttribute" theme="primary" @click="openCreate">
                   <template #icon><t-icon name="add" /></template>新增
-                </t-button>
-              </div>
+                </t-button></AdminListToolbar
+              >
             </div>
           </template>
           <template #table>
@@ -77,10 +76,10 @@
     <AdminDialog
       v-model:visible="dialogVisible"
       header="新增"
-      width="560px"
+      width="480px"
       placement="center"
       :prevent-scroll-through="false"
-      dialog-class-name="attribute-create-dialog"
+      dialog-class-name="attribute-create-dialog zdm-admin-dialog zdm-admin-single-form"
       confirm-btn="提交"
       @confirm="submit"
       @close="closeCreateDialog"
@@ -92,7 +91,7 @@
           ><t-input v-model="form.name" clearable placeholder="请输入属性名称"
         /></t-form-item>
         <t-form-item label="值类型" name="valueType" required-mark
-          ><t-radio-group v-model="form.valueType"
+          ><t-radio-group v-model="form.valueType" class="attribute-value-types"
             ><t-radio value="select">标准选项</t-radio><t-radio value="number">数值+单位</t-radio
             ><t-radio value="text">文本输入</t-radio></t-radio-group
           ></t-form-item
@@ -114,6 +113,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -124,7 +125,6 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminListLayout,
-  AdminPageHeader,
   AdminPagination,
 } from '@/components/foundation';
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
@@ -185,9 +185,6 @@ const hasAttributeAction = (action: string) =>
 const canCreateAttribute = computed(() => hasAttributeAction('create'));
 const canToggleAttributeStatus = computed(() => hasAttributeAction('toggle-status'));
 const canDeleteAttribute = computed(() => hasAttributeAction('delete'));
-const pageTitle = computed(
-  () => ({ shared: '共享基础属性库', finished: '成品现货属性库', accessory: '配件属性库' })[activeScope.value],
-);
 const sourceDescription = computed(
   () =>
     ({
@@ -310,7 +307,7 @@ const closeCreateDialog = () => {
 };
 const submit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
   const name = form.name.trim();
   try {
     await createProductAttribute({
@@ -440,30 +437,6 @@ onMounted(loadAttributes);
   display: block;
   min-height: 0;
 }
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-fields :deep(.t-input),
-.filter-fields :deep(.t-select) {
-  width: 100%;
-}
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
 .table-toolbar {
   display: flex;
   align-items: center;
@@ -479,5 +452,10 @@ onMounted(loadAttributes);
 :global(.attribute-create-dialog .t-dialog__body) {
   max-height: none;
   overflow: visible;
+}
+
+/* Preserve native option gaps; the trailing margin must not force a third option onto a new line. */
+.attribute-value-types :deep(.t-radio:last-child) {
+  margin-right: 0;
 }
 </style>

@@ -16,7 +16,7 @@
       </nav>
     </AdminSectionCard>
   </div>
-  <section class="form-shell">
+  <section ref="productFormRoot" class="form-shell">
     <AdminSectionCard class="form-heading-card" aria-label="编辑商品信息">
       <div class="form-title-row">
         <div>
@@ -38,7 +38,7 @@
                 :options="categoryOptions"
                 trigger="hover"
                 clearable
-                placeholder="请选择"
+                placeholder="请选择门店分类"
                 @change="changeCategory"
             /></t-form-item>
           </t-form>
@@ -85,7 +85,7 @@
                           v-if="drafts[row.skuId]"
                           class="store-sale-coefficient-input"
                           v-model="drafts[row.skuId].coefficient"
-                          placeholder="系数"
+                          placeholder="请输入系数"
                           label="系数"
                           :submitted="submitted"
                           @change="editDraftCoefficient(drafts[row.skuId], $event, sku(row.skuId).costPrice)"
@@ -95,7 +95,7 @@
                           class="decimal-input store-sale-price-input"
                           v-model="drafts[row.skuId].price"
                           label="商品售价"
-                          placeholder="价格"
+                          placeholder="请输入商品售价"
                           :submitted="submitted"
                           @change="editDraftPrice(drafts[row.skuId], $event, sku(row.skuId).costPrice)"
                         />
@@ -128,6 +128,7 @@
   </section>
 </template>
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch, h } from 'vue';
 import type { FormInstanceFunctions, PrimaryTableCol } from 'tdesign-vue-next';
 import { AdminSectionCard, adminFeedback, getSafeErrorMessage } from '@/components/foundation';
@@ -221,6 +222,7 @@ function editorColumns(columns: PrimaryTableCol[]): PrimaryTableCol[] {
   });
 }
 const readonlyPrice = (value: unknown) => (value == null || value === '—' ? '' : Number(value).toFixed(2));
+const productFormRoot = ref<HTMLElement>();
 const formRef = ref<FormInstanceFunctions>();
 const form = reactive<{ categoryId?: number }>({ categoryId: props.product.storeCategoryId ?? undefined });
 const rules = { categoryId: [{ required: true, message: '请选择门店分类', type: 'error' as const }] };
@@ -284,14 +286,14 @@ onMounted(async () => {
 async function save() {
   if (saving.value || !ready.value) return;
   submitted.value = true;
-  if ((await formRef.value?.validate()) !== true) return;
+  if ((await formRef.value?.validate()) !== true) return rejectFormSubmission(productFormRoot.value);
   if (
     props.product.skus.some(
       (item) =>
         !isValidSpecPriceNumber(drafts[item.skuId].price) || !isValidSpecPriceNumber(drafts[item.skuId].coefficient),
     )
   )
-    return;
+    return rejectFormSubmission(productFormRoot.value);
   saving.value = true;
   try {
     const product = await saveStoreFinishedEdit(props.product.id, {

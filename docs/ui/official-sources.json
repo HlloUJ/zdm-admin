@@ -39,11 +39,353 @@
     "tests/fixtures/official-ui/upstream/src/style/reset.less": {
       "upstream": "src/style/reset.less",
       "sha256": "1c8d988847acabad84c754bd4e7176ac5efb4ea41519de2e06981178d02fa9a3"
+    },
+    "tests/fixtures/official-ui/upstream/src/pages/form/base/index.less": {
+      "upstream": "src/pages/form/base/index.less",
+      "sha256": "2901a282840da086e27d6602e7b38f8bbc7223c54697f3c10176dbfc60df8840"
+    },
+    "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/es/card/style/index.css": {
+      "upstream": "node_modules/tdesign-vue-next/es/card/style/index.css",
+      "sha256": "3765af769e24e40804ecbddf6336884272c0ae480bf378ab2caec1ff2397dd7e"
+    },
+    "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/es/tag/style/index.css": {
+      "upstream": "node_modules/tdesign-vue-next/es/tag/style/index.css",
+      "sha256": "6ee00231a356c7d34feddad2714267e905ed3b2e35471c4a89301db75f9150e1"
+    },
+    "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/es/upload/style/index.css": {
+      "upstream": "node_modules/tdesign-vue-next/es/upload/style/index.css",
+      "sha256": "3a577fece1f3b4b42d45032d35d9436b77c73ba81fa376978d1e4ea518f973e4"
     }
   },
   "extension": {
     "id": "tab-filter-list",
     "status": "accepted",
     "scope": "Native Tabs + official common-table 10:2 / 4-column-span query grid with 80px right-aligned labels + configured actions; list container/spacing from common-table; business cells via slots. Existing inline configuration API retained for its consumers. No new visual constants."
+  },
+  "queryStandard": {
+    "id": "adaptive-query-grid-v1",
+    "status": "accepted",
+    "acceptedOn": "2026-10-15",
+    "referencePage": "src/pages/slab/supply-chain/index.vue",
+    "entry": "AdminListPage",
+    "layout": "adaptive-grid",
+    "stylesheet": "src/components/foundation/official/query-layout.css",
+    "scope": "Required for new ordinary list query areas; existing pages migrate only when explicitly authorized. Logs, dialogs, matrix editors and other specialized forms retain their contracts.",
+    "rules": {
+      "areaRatio": [10, 2],
+      "baseColumns": 3,
+      "maxColumns": 4,
+      "labelWidthPx": 80,
+      "controlMinWidthPx": 134,
+      "columnPaddingPx": 12,
+      "rowGapPx": 24,
+      "toolbarGapPx": 24,
+      "buttonGapPx": 8
+    },
+    "variants": {
+      "list": {
+        "maxColumns": 4
+      },
+      "log": {
+        "maxColumns": 3,
+        "marker": "data-query-layout=\"log\"",
+        "entry": "ProductOperationLogTemplate"
+      }
+    },
+    "compoundSearch": {
+      "label": "short",
+      "placeholder": "请输入 + explicit search scope",
+      "publicConfig": "ListFilter.searchScope",
+      "legacyMarker": "data-query-search-scope",
+      "inferScope": false
+    }
+  },
+  "placeholderStandard": {
+    "spec": "docs/ui/placeholder-standard.md",
+    "scope": "All existing and future editable controls in operations, supply-chain and store clients",
+    "authority": "User-approved product copy convention; no change to official visual styles",
+    "dynamicHelper": "src/utils/controlPlaceholder.ts",
+    "guard": "scripts/placeholder-policy.mjs"
+  },
+  "listStandard": {
+    "spec": "docs/ui/list-standard.md",
+    "entry": "AdminListPage",
+    "compatibilityEntry": "AdminListToolbar",
+    "authority": "User-approved global list layout using native TDesign components",
+    "topDisplayHeader": false,
+    "logPlacement": "toolbar-right-existing-only",
+    "selection": "after-left-batch-actions; permission-filtered batch action exists and count > 0"
+  },
+  "typographyStandard": {
+    "spec": "docs/ui/typography-standard.md",
+    "tokens": "tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/es/style/index.css",
+    "formReference": "tests/fixtures/official-ui/upstream/src/pages/form/base/index.less",
+    "guard": "scripts/typography-policy.mjs",
+    "richTextExclusion": "src/pages/finished-stock/management/components/HistoricalRichText.vue"
+  },
+  "formStyleStandard": {
+    "spec": "docs/ui/form-style-standard.md",
+    "stylesheets": [
+      "src/components/foundation/official/product-form-layout.css",
+      "src/components/foundation/official/media-upload.css",
+      "src/components/foundation/official/form-feedback-layout.css"
+    ],
+    "entry": "AdminMediaUpload and public form layout classes",
+    "authority": "Native TDesign form/base, Card body, CheckTag light-outline and Upload card visuals; business column counts and all events retained",
+    "uploadCardSizePx": 110,
+    "fieldGapPx": [24, 32]
+  },
+  "mediaUploadStandard": {
+    "spec": "docs/ui/media-upload-standard.md",
+    "entry": "src/components/foundation/AdminMediaUpload.vue",
+    "officialComponent": "TDesign Upload theme=image, Space size=small break-line",
+    "validationStylesheet": "src/components/foundation/official/media-upload.css",
+    "excluded": ["ProductRichEditor", "AdminOfficialMediaUpload (customer followup attachments)"]
+  },
+  "formValidationStandard": {
+    "spec": "docs/ui/form-validation-standard.md",
+    "entry": "src/utils/formValidation.ts",
+    "officialSource": "TDesign Form showErrorMessage=true; FormItem status/tips; Input/Select status/tips",
+    "preserve": "Existing rules, required conditions, validation triggers and submission order",
+    "layoutStylesheet": "src/components/foundation/official/form-feedback-layout.css",
+    "toastPolicy": {
+      "submitValidation": "Exactly one summary: 表单校验未通过，请检查标红字段",
+      "inputAndBlur": "Inline field feedback only; no Toast or scrolling",
+      "location": "First invalid field in DOM order; reveal before locating; do not scroll if fully visible",
+      "submissionFailure": "Retain API/network failure Toast",
+      "operationPrecondition": "Retain non-field operation reminders"
+    },
+    "submitEntry": "src/utils/submitValidation.ts"
+  },
+  "singleColumnFormStandard": {
+    "spec": "docs/ui/form-style-standard.md",
+    "stylesheet": "src/components/foundation/official/product-form-layout.css",
+    "entry": "AdminFormDialog; compatible dialogs use zdm-admin-single-form",
+    "dialogWidthPx": 480,
+    "labelWidthPx": 100,
+    "controlWidth": "100% of available field content",
+    "forms": [
+      {
+        "file": "src/pages/accessory/attribute/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/craft/finished-stock/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/customer/index.vue",
+        "visible": "profileVisible",
+        "tag": "AdminFormDialog"
+      },
+      {
+        "file": "src/pages/finished-stock/attribute/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/finished-stock/store/price-configuration.vue",
+        "visible": "createVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/permission/employee/index.vue",
+        "visible": "profileDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/product/attribute/index.vue",
+        "visible": "dialogVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/product/attribute-value/index.vue",
+        "visible": "dialogVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/product/category/index.vue",
+        "visible": "formVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/product/markup-configuration/index.vue",
+        "visible": "formVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/role/management/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/slab/color/index.vue",
+        "visible": "formVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/slab/color/index.vue",
+        "visible": "categoryFormVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/slab/grade/index.vue",
+        "visible": "formVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/slab/origin/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/slab/texture/index.vue",
+        "visible": "formVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/slab/texture/index.vue",
+        "visible": "aliasFormVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/slab/variety/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/store-category/management/index.vue",
+        "visible": "formVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/store-level/management/index.vue",
+        "visible": "formVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/supplier/management/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/supplier/supply-type/index.vue",
+        "visible": "visible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/tenant/management/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "t-dialog"
+      },
+      {
+        "file": "src/pages/tenant/store/index.vue",
+        "visible": "formDialogVisible",
+        "tag": "AdminDialog"
+      },
+      {
+        "file": "src/pages/tenant/store/index.vue",
+        "visible": "levelDialogVisible",
+        "tag": "AdminDialog"
+      }
+    ],
+    "excluded": [
+      "query areas",
+      "whole-page and multicolumn product forms",
+      "SKU/price/permission matrices",
+      "batch actions",
+      "option lists",
+      "previews and details",
+      "customer followup form with two-column attachments"
+    ],
+    "excludedForms": [
+      {
+        "file": "src/pages/accessory/attribute/index.vue",
+        "visible": "optionDialogVisible",
+        "reason": "选项列表管理"
+      },
+      {
+        "file": "src/pages/customer/index.vue",
+        "visible": "followVisible",
+        "reason": "客户跟进含两列附件，已确认保留custom布局"
+      },
+      {
+        "file": "src/pages/finished-stock/attribute/index.vue",
+        "visible": "optionDialogVisible",
+        "reason": "选项列表管理"
+      },
+      {
+        "file": "src/pages/finished-stock/management/index.vue",
+        "visible": "specDialogVisible",
+        "reason": "规格矩阵编辑器"
+      },
+      {
+        "file": "src/pages/finished-stock/management/index.vue",
+        "visible": "reasonDialogVisible",
+        "reason": "下架操作表单"
+      },
+      {
+        "file": "src/pages/finished-stock/store/index.vue",
+        "visible": "poolVisible",
+        "reason": "商品中心查询选择列表"
+      },
+      {
+        "file": "src/pages/finished-stock/store/index.vue",
+        "visible": "offShelfVisible",
+        "reason": "下架操作表单"
+      },
+      {
+        "file": "src/pages/finished-stock/store/price-configuration.vue",
+        "visible": "formVisible",
+        "reason": "批量设置"
+      },
+      {
+        "file": "src/pages/finished-stock/supply-chain/index.vue",
+        "visible": "specDialogVisible",
+        "reason": "规格矩阵编辑器"
+      },
+      {
+        "file": "src/pages/finished-stock/supply-chain/index.vue",
+        "visible": "reasonDialogVisible",
+        "reason": "下架操作表单"
+      },
+      {
+        "file": "src/pages/permission/employee/index.vue",
+        "visible": "inviteDialogVisible",
+        "reason": "只读邀请链接展示"
+      },
+      {
+        "file": "src/pages/permission/employee/index.vue",
+        "visible": "permissionDialogVisible",
+        "reason": "权限矩阵"
+      },
+      {
+        "file": "src/pages/product/category-attribute-template/index.vue",
+        "visible": "addVisible",
+        "reason": "属性选择列表"
+      },
+      {
+        "file": "src/pages/product/category-attribute-template/index.vue",
+        "visible": "valuesVisible",
+        "reason": "选项值选择列表"
+      },
+      {
+        "file": "src/pages/slab/management/index.vue",
+        "visible": "reasonDialogVisible",
+        "reason": "下架操作表单"
+      },
+      {
+        "file": "src/pages/slab/supply-chain/index.vue",
+        "visible": "reasonDialogVisible",
+        "reason": "下架操作表单"
+      },
+      {
+        "file": "src/pages/tenant/management/index.vue",
+        "visible": "purgeDialogVisible",
+        "reason": "高风险删除确认流程"
+      }
+    ]
   }
 }

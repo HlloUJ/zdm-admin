@@ -4,29 +4,32 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <AdminPageHeader class="page-header">
-          <t-breadcrumb max-item-width="300"><t-breadcrumb-item>供应商供货类型管理</t-breadcrumb-item></t-breadcrumb>
-        </AdminPageHeader>
         <AdminListLayout>
           <template #filters>
-            <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon @submit="handleSearch">
-              <div class="supply-type-filter-row">
-                <div class="supply-type-filter-fields">
+            <t-form
+              class="zdm-admin-filter-form zdm-standard-query"
+              label-width="80px"
+              :data="searchForm"
+              colon
+              @submit="handleSearch"
+            >
+              <div class="supply-type-filter-row filter-row">
+                <div class="supply-type-filter-fields filter-fields">
                   <div class="supply-type-name-filter">
                     <t-form-item label="供货类型" name="name">
-                      <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                      <t-input v-model="searchForm.name" clearable placeholder="请输入供货类型" />
                     </t-form-item>
                   </div>
                   <div class="supply-type-status-filter">
                     <t-form-item class="zdm-status-filter" label="状态" name="status">
-                      <t-select v-model="searchForm.status" clearable placeholder="请选择">
+                      <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                         <t-option label="启用" value="enabled" />
                         <t-option label="停用" value="disabled" />
                       </t-select>
                     </t-form-item>
                   </div>
                 </div>
-                <div class="supply-type-filter-actions">
+                <div class="supply-type-filter-actions filter-actions">
                   <t-space>
                     <t-button theme="primary" type="submit">
                       <template #icon><t-icon name="search" /></template>查询
@@ -40,11 +43,11 @@
             </t-form>
           </template>
           <template #toolbar>
-            <template v-if="can('create')">
+            <AdminListToolbar :has-actions="can('create')">
               <t-button theme="primary" @click="openForm()"
                 ><template #icon><t-icon name="add" /></template>新增</t-button
               >
-            </template>
+            </AdminListToolbar>
           </template>
           <template #table>
             <t-table row-key="id" :data="pageRows" :columns="columns" :loading="loading" hover table-layout="fixed">
@@ -82,6 +85,8 @@
       </main>
     </div>
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
+      width="480px"
       v-model:visible="visible"
       :header="editing ? '编辑供货类型' : '新增供货类型'"
       :confirm-btn="{ content: '提交', loading: saving }"
@@ -94,7 +99,7 @@
         label-width="100px"
         colon
         ><t-form-item label="供货类型" name="name"
-          ><t-input v-model="draft.name" clearable placeholder="请输入供货类型名称" :maxlength="80" /></t-form-item
+          ><t-input v-model="draft.name" clearable placeholder="请输入供货类型" :maxlength="80" /></t-form-item
       ></t-form>
     </AdminDialog>
     <AdminDialog
@@ -122,11 +127,18 @@
   </div>
 </template>
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import type { FormInstanceFunctions, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
-import { AdminDialog, AdminListLayout, AdminPageHeader, AdminPagination, adminFeedback } from '@/components/foundation';
+import {
+  AdminDialog,
+  AdminListToolbar,
+  AdminListLayout,
+  AdminPagination,
+  adminFeedback,
+} from '@/components/foundation';
 import { getLoginUser } from '@/services/auth';
 import { hasPermission } from '@/services/adminPermissions';
 import {
@@ -219,7 +231,8 @@ const openForm = (row?: SupplierSupplyTypeRecord) => {
   visible.value = true;
 };
 const save = async () => {
-  if (saving.value || (await form.value?.validate()) !== true) return;
+  if (saving.value) return;
+  if ((await form.value?.validate()) !== true) return rejectFormSubmission(form.value);
   saving.value = true;
   const target = draft.name.trim();
   const action = editing.value ? '保存' : '新增';
@@ -270,31 +283,3 @@ const remove = async () => {
 };
 onMounted(load);
 </script>
-
-<style scoped>
-.supply-type-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.supply-type-filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.supply-type-name-filter {
-  width: 268px;
-}
-
-.supply-type-status-filter {
-  width: 240px;
-}
-
-.supply-type-filter-actions {
-  margin-left: auto;
-}
-</style>

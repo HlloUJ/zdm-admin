@@ -3,7 +3,7 @@
     :visible="visible"
     :header="header"
     :width="width"
-    :dialog-class-name="dialogClassName"
+    :dialog-class-name="['zdm-admin-dialog', dialogClassName].filter(Boolean).join(' ')"
     placement="center"
     :prevent-scroll-through="false"
     :confirm-btn="confirmBtn"

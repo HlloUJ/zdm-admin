@@ -11,7 +11,6 @@ export interface FilterState {
   supplier: string;
   offShelfReason: string;
   offShelvedBy: string;
-  offShelfDateRange: string[];
 }
 export interface OperationLogFilterState {
   keyword: string;
@@ -192,7 +191,6 @@ export const makeFilterState = (): FilterState => ({
   supplier: '',
   offShelfReason: '',
   offShelvedBy: '',
-  offShelfDateRange: [],
 });
 export const makeProductForm = (): ProductForm => ({
   variety: '',

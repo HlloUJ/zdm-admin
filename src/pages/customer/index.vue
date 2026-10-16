@@ -4,16 +4,13 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <header class="page-header">
-          <t-breadcrumb><t-breadcrumb-item>客户管理</t-breadcrumb-item></t-breadcrumb>
-        </header>
         <AdminListPage
           v-if="tabs.length"
           v-model:filter-values="filters"
           :tabs="tabs"
           :active-tab="status"
           :filters="filterFields"
-          filter-layout="official-grid"
+          filter-layout="adaptive-grid"
           :actions="toolbarActions"
           :selected-count="selected.length"
           :table-props="{
@@ -73,26 +70,28 @@
       </main>
     </div>
     <AdminFormDialog
+      ref="profileDialog"
+      width="480px"
       v-model:visible="profileVisible"
       :data="profile"
       :header="editingId ? '编辑客户' : '新增客户'"
       :confirm-btn="submitButton"
       @confirm="submitProfile"
     >
-      <t-form-item label="客户姓名" required-mark :status="nameError ? 'error' : undefined" :tips="nameError"
-        ><t-input v-model="profile.name" :maxlength="80" clearable placeholder="请输入"
+      <t-form-item label="客户姓名" required-mark v-bind="fieldFeedback(nameError, nameError)"
+        ><t-input v-model="profile.name" :maxlength="80" clearable placeholder="请输入客户姓名"
       /></t-form-item>
       <t-form-item label="联系电话"
-        ><t-input v-model="profile.phone" :maxlength="80" clearable placeholder="请输入"
+        ><t-input v-model="profile.phone" :maxlength="80" clearable placeholder="请输入联系电话"
       /></t-form-item>
       <t-form-item label="微信号"
-        ><t-input v-model="profile.wechat" :maxlength="100" clearable placeholder="请输入"
+        ><t-input v-model="profile.wechat" :maxlength="100" clearable placeholder="请输入微信号"
       /></t-form-item>
       <t-form-item label="客户需求"
-        ><t-textarea v-model="profile.requirement" :maxlength="10000" placeholder="请输入"
+        ><t-textarea v-model="profile.requirement" :maxlength="10000" placeholder="请输入客户需求"
       /></t-form-item>
       <t-form-item label="客户备注"
-        ><t-textarea v-model="profile.remark" :maxlength="10000" placeholder="请输入"
+        ><t-textarea v-model="profile.remark" :maxlength="10000" placeholder="请输入客户备注"
       /></t-form-item>
       <t-form-item label="归属人"
         ><span>{{ profileOwner }}</span></t-form-item
@@ -151,26 +150,37 @@
       </t-loading>
     </AdminDialog>
     <AdminFormDialog
+      ref="followDialog"
       v-model:visible="followVisible"
       :data="followForm"
       label-width="calc(7em + var(--td-comp-paddingLR-xl))"
       :header="followId ? '编辑跟进' : '新增跟进'"
       width="720px"
+      form-layout="custom"
       :confirm-btn="submitButton"
       @confirm="submitFollowup"
       @closed="cleanupUploads"
     >
-      <t-form-item label="跟进时间" required-mark
-        ><t-date-picker v-model="followForm.followedAt" enable-time-picker format="YYYY-MM-DD HH:mm:ss"
+      <t-form-item label="跟进时间" required-mark v-bind="followFeedback.field('time', followForm.followedAt)"
+        ><t-date-picker
+          v-model="followForm.followedAt"
+          placeholder="请选择日期时间"
+          enable-time-picker
+          format="YYYY-MM-DD HH:mm:ss"
       /></t-form-item>
-      <t-form-item label="跟进内容" required-mark
-        ><t-textarea v-model="followForm.content" :maxlength="10000" placeholder="请输入"
+      <t-form-item label="跟进内容" required-mark v-bind="followFeedback.field('content', followForm.content)"
+        ><t-textarea v-model="followForm.content" :maxlength="10000" placeholder="请输入跟进内容"
       /></t-form-item>
       <t-form-item label="下次跟进时间"
-        ><t-date-picker v-model="followForm.nextFollowAt" enable-time-picker clearable format="YYYY-MM-DD HH:mm:ss"
+        ><t-date-picker
+          v-model="followForm.nextFollowAt"
+          placeholder="请选择日期时间"
+          enable-time-picker
+          clearable
+          format="YYYY-MM-DD HH:mm:ss"
       /></t-form-item>
       <t-form-item label="下次跟进事项"
-        ><t-textarea v-model="followForm.nextFollowTask" :maxlength="2000" placeholder="请输入"
+        ><t-textarea v-model="followForm.nextFollowTask" :maxlength="2000" placeholder="请输入下次跟进事项"
       /></t-form-item>
       <t-form-item label="附件" help="最多3个附件，单个不超过5MiB">
         <t-row :gutter="[16, 16]">
@@ -190,6 +200,7 @@
       </t-form-item>
     </AdminFormDialog>
     <AdminFormDialog
+      ref="assignDialog"
       v-model:visible="assignVisible"
       :data="{ ownerAccountId: newOwner }"
       header="调整归属"
@@ -199,8 +210,8 @@
       <t-form-item label="选中客户"
         ><span>{{ pending.ids.length }} 条</span></t-form-item
       >
-      <t-form-item label="新归属人" required-mark
-        ><t-select v-model="newOwner" filterable clearable placeholder="请选择"
+      <t-form-item label="新归属人" required-mark v-bind="assignFeedback.field('owner', newOwner)"
+        ><t-select v-model="newOwner" filterable clearable placeholder="请选择新归属人"
           ><t-option
             v-for="owner in owners.filter((item) => item.active)"
             :key="owner.accountId"
@@ -224,6 +235,8 @@
   </div>
 </template>
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { PageInfo, TableProps } from 'tdesign-vue-next';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -313,15 +326,17 @@ const filterFields = computed<ListFilter[]>(() => [
 ]);
 const toolbarActions = computed<ListAction[]>(() => [
   ...(status.value === 'daily' && can('create') ? [{ id: 'create', label: '新增', icon: 'add' }] : []),
-  ...(can('batch-assign') ? [{ id: 'assign', label: '批量调整归属', disabled: !selected.value.length }] : []),
+  ...(can('batch-assign')
+    ? [{ id: 'assign', batch: true, label: '批量调整归属', disabled: !selected.value.length }]
+    : []),
   ...(status.value === 'daily' && can('batch-archive')
-    ? [{ id: 'archive', label: '批量归档', disabled: !selectionOwned.value }]
+    ? [{ id: 'archive', batch: true, label: '批量归档', disabled: !selectionOwned.value }]
     : []),
   ...(status.value === 'archived' && can('batch-restore')
-    ? [{ id: 'restore', label: '批量取消归档', disabled: !selectionOwned.value }]
+    ? [{ id: 'restore', batch: true, label: '批量取消归档', disabled: !selectionOwned.value }]
     : []),
   ...(status.value === 'archived' && can('batch-purge')
-    ? [{ id: 'purge', label: '批量彻底删除', theme: 'danger' as const, disabled: !selectionOwned.value }]
+    ? [{ id: 'purge', batch: true, label: '批量彻底删除', theme: 'danger' as const, disabled: !selectionOwned.value }]
     : []),
 ]);
 function handleToolbarAction(id: string) {
@@ -453,7 +468,7 @@ async function submitProfile() {
   if (submitting.value) return;
   if (!profile.value.name.trim()) {
     nameError.value = '请输入客户姓名';
-    return;
+    return rejectFormSubmission(profileDialog.value);
   }
   submitting.value = true;
   try {
@@ -495,6 +510,10 @@ const pending = ref<{ ids: number[]; status: CustomerStatus; action: CustomerAct
   batch: false,
 });
 const assignVisible = ref(false);
+const profileDialog = ref<InstanceType<typeof AdminFormDialog>>();
+const followDialog = ref<InstanceType<typeof AdminFormDialog>>();
+const assignDialog = ref<InstanceType<typeof AdminFormDialog>>();
+const assignFeedback = useFormFeedback(assignVisible);
 const newOwner = ref<number>();
 const confirmVisible = ref(false);
 const deletingFollowId = ref<number>();
@@ -520,8 +539,8 @@ function prepareAction(action: CustomerAction, ids: number[], batch: boolean) {
 async function submitAction() {
   if (submitting.value) return;
   if (pending.value.action === 'assign' && !newOwner.value) {
-    adminFeedback.warning('请选择新归属人');
-    return;
+    assignFeedback.reject('owner', newOwner.value, '请选择新归属人');
+    return rejectFormSubmission(assignDialog.value);
   }
   submitting.value = true;
   try {
@@ -567,6 +586,7 @@ async function confirmOperation() {
   }
 }
 const followVisible = ref(false);
+const followFeedback = useFormFeedback(followVisible);
 const followId = ref<number>();
 const localNow = () => {
   const date = new Date();
@@ -633,8 +653,9 @@ async function cleanupUploads() {
 async function submitFollowup() {
   if (!detail.value || submitting.value || uploading.value > 0) return;
   if (!followForm.value.followedAt || !followForm.value.content.trim()) {
-    adminFeedback.warning('请填写跟进时间和跟进内容');
-    return;
+    if (!followForm.value.followedAt) followFeedback.reject('time', followForm.value.followedAt, '请选择跟进时间');
+    if (!followForm.value.content.trim()) followFeedback.reject('content', followForm.value.content, '请输入跟进内容');
+    return rejectFormSubmission(followDialog.value);
   }
   submitting.value = true;
   try {

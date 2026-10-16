@@ -1,72 +1,41 @@
 <template>
-  <div
+  <t-upload
+    :key="resetKey"
     class="admin-media-upload"
-    :class="{ 'is-disabled': disabled, 'is-error': Boolean(errorMessage), 'is-loading': loading }"
-    @click="previewFilled"
-  >
-    <span v-if="required && showTitle" class="admin-media-upload__required">*</span>
-    <t-button
-      v-if="modelValue && !disabled"
-      class="admin-media-upload__delete"
-      theme="danger"
-      variant="text"
-      size="small"
-      @click.stop="remove"
-    >
-      删除
-    </t-button>
-    <strong v-if="showTitle">{{ title }}</strong>
-    <video
-      v-if="mediaType === 'video' && modelValue?.url"
-      class="admin-media-upload__preview"
-      :src="modelValue.url"
-      :aria-label="`播放${title}`"
-      preload="metadata"
-      muted
-      playsinline
-      role="button"
-      tabindex="0"
-      @click.stop="emit('preview', modelValue)"
-      @keydown.enter.stop="emit('preview', modelValue)"
-      @keydown.space.prevent.stop="emit('preview', modelValue)"
-    />
-    <img
-      v-else-if="previewUrl"
-      class="admin-media-upload__preview"
-      :src="previewUrl"
-      :alt="title"
-      role="button"
-      tabindex="0"
-      @click.stop="emit('preview', modelValue)"
-      @keydown.enter.stop="emit('preview', modelValue)"
-    />
-    <t-loading v-else-if="loading" size="small" />
-    <t-icon
-      v-else-if="modelValue"
-      name="file"
-      class="admin-media-upload__preview"
-      role="button"
-      tabindex="0"
-      :aria-label="`查看${title}`"
-      @click.stop="emit('preview', modelValue)"
-      @keydown.enter.stop="emit('preview', modelValue)"
-    />
-    <t-icon v-else name="add" />
-    <span v-if="!modelValue || showFileName">{{ modelValue?.name || label }}</span>
-    <span v-if="errorMessage" class="admin-media-upload__error">{{ errorMessage }}</span>
-    <input
-      v-if="!previewOnFilledClick || !modelValue"
-      class="admin-media-upload__input"
-      type="file"
-      :accept="accept"
-      :disabled="disabled || loading"
-      @change="selectFile"
-    />
-  </div>
+    :aria-required="required || undefined"
+    :class="{ 'admin-media-upload--invalid': Boolean(errorMessage) }"
+    :files="files"
+    theme="image"
+    :accept="accept"
+    :disabled="disabled"
+    :max="1"
+    :multiple="false"
+    :allow-upload-duplicate-file="true"
+    :show-image-file-name="false"
+    :use-mock-progress="false"
+    :request-method="requestUpload"
+    :image-viewer-props="{ visible: false }"
+    :locale="{ triggerUploadText: { image: title } }"
+    :input-attributes="{ 'aria-label': title }"
+    :status="errorMessage ? 'error' : 'default'"
+    :tips="errorMessage"
+    :role="modelValue ? 'button' : undefined"
+    :aria-label="mediaType === 'video' ? `播放${title}` : title"
+    :tabindex="modelValue ? 0 : undefined"
+    @change="files = $event"
+    @success="uploaded"
+    @fail="uploadFailed"
+    @remove="remove"
+    @preview="preview"
+    @click.capture="previewFilled"
+    @keydown.enter="previewKey"
+    @keydown.space="previewKey"
+  />
 </template>
-
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref, watch } from 'vue';
+import './official/media-upload.css';
+import type { RequestMethodResponse, SuccessContext, UploadFile } from 'tdesign-vue-next';
 import { adminFeedback } from './feedback/adminFeedback';
 
 export interface AdminMediaValue {
@@ -83,139 +52,116 @@ const props = withDefaults(
   defineProps<{
     modelValue?: AdminMediaValue;
     title: string;
-    label?: string;
     accept?: string;
-    mediaType?: 'image' | 'video' | 'file';
+    disabled?: boolean;
     required?: boolean;
+    label?: string;
     showTitle?: boolean;
     showFileName?: boolean;
     previewOnFilledClick?: boolean;
-    disabled?: boolean;
+    mediaType?: 'image' | 'video';
     errorMessage?: string;
     upload: (file: File) => Promise<AdminMediaValue>;
   }>(),
-  {
-    modelValue: undefined,
-    label: '点击上传',
-    accept: 'image/*',
-    mediaType: 'image',
-    required: false,
-    showTitle: true,
-    showFileName: true,
-    previewOnFilledClick: false,
-    disabled: false,
-    errorMessage: '',
-  },
+  { modelValue: undefined, mediaType: 'image', accept: 'image/*', disabled: false, errorMessage: '' },
 );
-
 const emit = defineEmits<{
   'update:modelValue': [value?: AdminMediaValue];
   uploaded: [value: AdminMediaValue];
   removed: [value: AdminMediaValue];
   preview: [value?: AdminMediaValue];
 }>();
-
-const loading = ref(false);
-const previewUrl = computed(() =>
-  props.mediaType === 'file' ? undefined : props.modelValue?.coverUrl || props.modelValue?.url,
+const files = ref<UploadFile[]>([]);
+const resetKey = ref(0);
+watch(
+  () => [props.modelValue, props.mediaType] as const,
+  ([value, mediaType], _, onCleanup) => {
+    const thumbnailUrl = value?.coverUrl || (mediaType === 'video' ? '' : value?.url);
+    files.value = value ? [{ name: value.name, url: thumbnailUrl, status: 'success' }] : [];
+    const videoUrl = value?.videoUrl || value?.url;
+    if (!value || !videoUrl || mediaType !== 'video' || value.coverUrl) return;
+    // Only the native card receives a thumbnail; model/preview/save keep the original video URL.
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = 'anonymous';
+    let active = true;
+    const cleanup = () => {
+      active = false;
+      clearTimeout(timeout);
+      video.onloadeddata = null;
+      video.onerror = null;
+      video.removeAttribute('src');
+      video.load();
+    };
+    const timeout = setTimeout(cleanup, 15000);
+    onCleanup(cleanup);
+    video.onloadeddata = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, 640 / video.videoWidth);
+        canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+        const context = canvas.getContext('2d');
+        if (context && active) {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          files.value = [{ name: value.name, url: canvas.toDataURL('image/jpeg', 0.85), status: 'success' }];
+        }
+      } catch {
+        // A missing thumbnail must never block the original video preview or removal.
+      } finally {
+        cleanup();
+      }
+    };
+    video.onerror = cleanup;
+    video.src = videoUrl;
+    video.load();
+  },
+  { immediate: true },
 );
-
-const previewFilled = () => {
-  if (props.previewOnFilledClick && props.modelValue && !props.disabled) emit('preview', props.modelValue);
-};
-
-const selectFile = async (event: Event) => {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  loading.value = true;
+async function requestUpload(input: UploadFile | UploadFile[]): Promise<RequestMethodResponse> {
+  const file = Array.isArray(input) ? input[0] : input;
+  const previous = props.modelValue;
   try {
-    const previous = props.modelValue;
-    const uploaded = await props.upload(file);
-    emit('update:modelValue', uploaded);
-    emit('uploaded', uploaded);
-    if (previous) emit('removed', previous);
-    adminFeedback.actionSuccess({ action: '上传', target: props.title });
+    if (!file?.raw) throw new Error('请选择文件');
+    const media = await props.upload(file.raw);
+    return { status: 'success', response: { url: media.url, media, previous } };
   } catch (error) {
     adminFeedback.actionError({ action: '上传', error, fallback: '请稍后重试', target: props.title });
-  } finally {
-    loading.value = false;
-    input.value = '';
+    return { status: 'fail', error: error instanceof Error ? error.message : '请稍后重试', response: {} };
   }
-};
-
-const remove = () => {
+}
+function uploadFailed() {
+  if (!props.modelValue) files.value = [];
+  resetKey.value++;
+}
+function uploaded(context: SuccessContext) {
+  const { media, previous } = context.response as { media: AdminMediaValue; previous?: AdminMediaValue };
+  emit('update:modelValue', media);
+  emit('uploaded', media);
+  if (previous) emit('removed', previous);
+  adminFeedback.actionSuccess({ action: '上传', target: props.title });
+}
+function remove() {
+  if (props.disabled) return;
   if (props.modelValue) emit('removed', props.modelValue);
   emit('update:modelValue', undefined);
-};
+}
+function preview() {
+  if (props.modelValue) emit('preview', props.modelValue);
+}
+function previewKey(event: KeyboardEvent) {
+  if (!props.modelValue) return;
+  event.preventDefault();
+  preview();
+}
+function previewFilled(event: MouseEvent) {
+  if (!props.modelValue) return;
+  const target = event.target as Element;
+  if (target.closest('.t-icon-delete, .t-upload__icon-delete')) return;
+  event.preventDefault();
+  event.stopPropagation();
+  preview();
+}
 </script>
-
-<style scoped>
-.admin-media-upload {
-  position: relative;
-  min-height: 168px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--td-comp-margin-s);
-  border: 1px dashed var(--td-component-border);
-  border-radius: var(--td-radius-medium);
-  color: var(--td-text-color-secondary);
-  cursor: pointer;
-}
-
-.admin-media-upload:hover:not(.is-disabled) {
-  border-color: var(--td-brand-color);
-}
-
-.admin-media-upload.is-disabled {
-  cursor: default;
-}
-
-.admin-media-upload.is-error {
-  border-color: var(--td-error-color);
-}
-
-.admin-media-upload__required {
-  position: absolute;
-  top: var(--td-comp-paddingTB-s);
-  left: var(--td-comp-paddingLR-s);
-  color: var(--td-error-color);
-}
-
-.admin-media-upload__delete {
-  position: absolute;
-  top: var(--td-comp-paddingTB-xs);
-  right: var(--td-comp-paddingLR-xs);
-  z-index: 2;
-}
-
-.admin-media-upload__preview {
-  position: relative;
-  z-index: 2;
-  width: 96px;
-  height: 96px;
-  object-fit: cover;
-}
-
-.admin-media-upload__error {
-  color: var(--td-error-color);
-  font: var(--td-font-body-small);
-}
-
-.admin-media-upload__input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 1;
-}
-
-.admin-media-upload__delete,
-.admin-media-upload__preview {
-  pointer-events: auto;
-}
-</style>

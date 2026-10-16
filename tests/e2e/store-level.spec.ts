@@ -26,7 +26,7 @@ test('manages store levels under tenant store base data', async ({ page }) => {
   const baseDataMenu = page.locator('.menu-level-two').filter({ hasText: '门店基础数据' });
 
   await expect(baseDataMenu.locator('.menu-level-three-item')).toHaveText(['门店级别管理']);
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/租户与门店.*门店基础数据.*门店级别管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveCount(0);
   await expect(main.getByRole('row').filter({ hasText: '1级' }).first()).toBeVisible();
   await expect(main.getByRole('row').filter({ hasText: '2级' }).first()).toBeVisible();
   await expect(main.getByText('级别编码', { exact: true })).toHaveCount(0);
@@ -48,7 +48,7 @@ test('loads only enabled store levels when creating a store', async ({ page }) =
   const main = page.getByRole('main');
   await main.getByRole('button', { name: '新增', exact: true }).click();
   const dialog = page.locator('.t-dialog').filter({ hasText: '新增' });
-  await dialog.locator('.t-form__item').filter({ hasText: '门店级别' }).getByPlaceholder('请选择').click();
+  await dialog.locator('.t-form__item').filter({ hasText: '门店级别' }).getByPlaceholder('请选择门店级别').click();
   const options = page.locator('.t-select__dropdown:visible');
   await expect(options.getByText('1级', { exact: true })).toBeVisible();
   await expect(options.getByText('2级', { exact: true })).toBeVisible();

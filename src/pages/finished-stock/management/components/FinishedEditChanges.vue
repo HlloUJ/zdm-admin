@@ -321,8 +321,7 @@ const totalChanges = computed(() => groups.value.reduce((total, group) => total 
 .change-field h4 {
   margin: 0 0 var(--td-comp-margin-s);
   color: var(--td-text-color-primary);
-  font: var(--td-font-body-medium);
-  font-weight: 600;
+  font: var(--td-font-mark-medium);
 }
 .change-pair {
   display: grid;

@@ -110,6 +110,7 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
 import { adminFeedback } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue-next';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
@@ -221,7 +222,7 @@ const normalizeVerifyCode = (value: unknown) => {
 const sendCode = async () => {
   if (countDown.value > 0 || requestingCode.value || submitting.value) return;
   const validateResult = await phoneFormRef.value?.validate({ fields: ['phone'] });
-  if (validateResult !== true) return;
+  if (validateResult !== true) return rejectFormSubmission(phoneFormRef.value);
 
   requestingCode.value = true;
   try {
@@ -236,7 +237,8 @@ const sendCode = async () => {
 };
 
 const handlePhoneSubmit = async (ctx: SubmitContext) => {
-  if (ctx.validateResult !== true || submitting.value) return;
+  if (submitting.value) return;
+  if (ctx.validateResult !== true) return rejectFormSubmission(phoneFormRef.value);
   submitting.value = true;
   try {
     const result = await verifyEmployeeInviteCode(token.value, phoneForm);
@@ -255,7 +257,8 @@ const handlePhoneSubmit = async (ctx: SubmitContext) => {
 };
 
 const handleProfileSubmit = async (ctx: SubmitContext) => {
-  if (ctx.validateResult !== true || submitting.value || profileForm.gender === '') return;
+  if (submitting.value) return;
+  if (ctx.validateResult !== true || profileForm.gender === '') return rejectFormSubmission(profileFormRef.value);
   submitting.value = true;
   try {
     const result = await registerEmployeeInvite(token.value, {

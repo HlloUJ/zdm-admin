@@ -1,3 +1,5 @@
+import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
+import { checkDecimalEditing } from './decimal-editing';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -178,7 +180,7 @@ for (const displayMode of ['single', 'layered'] as const) {
     await expect(dialog.locator('.toolbar-buttons').getByRole('button', { name: '批量选择', exact: true })).toHaveClass(
       /t-button--theme-primary/,
     );
-    const keyword = dialog.getByPlaceholder('商品名称 / ID');
+    const keyword = dialog.getByPlaceholder('请输入商品名称/ID');
     const search = dialog.getByRole('button', { name: '查询', exact: true });
     const reset = dialog.getByRole('button', { name: '重置', exact: true });
     const initialInputWidth = await keyword.evaluate((element) => element.clientWidth);
@@ -370,7 +372,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await expect(main.getByRole('columnheader', { name: '库存', exact: true })).toHaveCount(0);
   await expect(main.locator('.spec-table-block input:disabled')).toHaveCount(0);
   await expect(main.locator('.quantity-editor input')).toHaveCount(0);
-  await expect(main.locator('.price-pair input[placeholder="系数"]')).toBeEnabled();
+  await expect(main.locator('.price-pair input[placeholder="请输入系数"]')).toBeEnabled();
   await expect(main.getByText('最低可售价', { exact: true })).toHaveCount(0);
   const priceInput = main.locator('.store-sale-price-input input');
   await expect(priceInput).toHaveValue('150.00');
@@ -644,8 +646,24 @@ test('store operation logs show the same filter, pagination, and detail structur
   );
   await page.goto('/store/finished-stock-management');
   await page.getByRole('main').getByText('操作日志').click();
-  const drawer = page.locator('.t-drawer:visible');
+  const drawer = page.locator('.t-drawer--open').filter({ has: page.locator('.operation-log-filters') });
   await expect(drawer.getByText('门店测试商品')).toBeVisible();
+  const dateWidth = (await drawer.locator('.operation-log-date-picker').boundingBox())!.width;
+  const keywordWidth = (await drawer.locator('.operation-log-keyword-filter .t-input').boundingBox())!.width;
+  expect(dateWidth).toBeCloseTo(keywordWidth, 1);
+  const fields = drawer.locator('.operation-log-filters');
+  await expect(drawer.locator('.zdm-standard-query')).toHaveAttribute('data-query-layout', 'log');
+  expect(await fields.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(3);
+  // Read both rectangles in one frame and wait for the drawer's native transition.
+  await expect
+    .poll(() =>
+      drawer.evaluate((element) => {
+        const keyword = element.querySelector('.operation-log-keyword-filter .t-input')!.getBoundingClientRect();
+        const date = element.querySelector('.operation-log-date-picker')!.getBoundingClientRect();
+        return { aligned: Math.abs(date.x - keyword.x) < 0.5, gap: Math.round(date.y - keyword.bottom) };
+      }),
+    )
+    .toEqual({ aligned: true, gap: 24 });
   await expect(drawer.getByRole('cell', { name: '编辑商品' }).first()).toBeVisible();
   await expect(drawer.getByRole('columnheader', { name: '操作类型' })).toBeVisible();
   await expect(drawer.getByRole('columnheader', { name: '操作时间' })).toBeVisible();
@@ -766,7 +784,7 @@ test('store list applies keyword and operations category only after query', asyn
   );
   await page.goto('/store/finished-stock-management');
   const main = page.getByRole('main');
-  const keyword = main.getByPlaceholder('商品名称 / ID');
+  const keyword = main.getByPlaceholder('请输入商品名称/ID/编号');
   const query = main.getByRole('button', { name: '查询', exact: true });
   const reset = main.getByRole('button', { name: '重置', exact: true });
   await expect(main.locator('.t-form__label').filter({ hasText: '供应商' })).toHaveCount(0);
@@ -961,7 +979,8 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
   await expect(dialog.locator('.t-dialog__header')).toHaveText('下架');
   await expect(dialog).toHaveCSS('width', '520px');
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(page.getByText('请选择原因', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-feedback').filter({ hasText: /请选择.*原因/ })).toHaveCount(0);
   expect(payload).toBeUndefined();
   await dialog.locator('.t-select').click();
   await page.getByText('商品暂停售卖', { exact: true }).click();
@@ -1138,7 +1157,7 @@ test('invalid warehouse overlay excludes selection and shows only the source rea
   await expect(overlay.getByRole('button', { name: '彻底删除', exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '批量彻底删除', exact: true })).toHaveCount(0);
   await main.locator('thead .t-checkbox').click();
-  await expect(main.getByText('已选 0 项')).toBeVisible();
+  await expect(main.locator('.selection-info')).toHaveCount(0);
   await overlay.getByRole('button', { name: '详情', exact: true }).click();
   const detail = page.locator('.t-drawer').filter({ has: page.getByText('商品详情', { exact: true }) });
   await expect(detail.locator('.t-alert')).toHaveText('该商品已被运营管理平台下架');
@@ -1183,6 +1202,8 @@ test('store editor requires category, leaves missing prices empty, and follows o
   await leaf.click();
   await expect(input).toHaveValue('150.00');
   const coefficientInput = main.locator('.store-sale-coefficient-input input');
+  await checkDecimalEditing(coefficientInput);
+  await checkDecimalEditing(input);
   await coefficientInput.fill('2');
   await coefficientInput.blur();
   await expect(input).toHaveValue('200.00');
@@ -1198,15 +1219,23 @@ test('store editor requires category, leaves missing prices empty, and follows o
   await expect(input).toHaveValue('150.00');
   await expect(main.getByRole('button', { name: '手工价格', exact: true })).toBeDisabled();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  const table = main.locator('.spec-table-block .t-table');
+  const geometry = await priceTableGeometry(table);
   await coefficientInput.fill('');
   await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(main.locator('.store-sale-coefficient-input .t-input')).toHaveClass(/t-is-error/);
   await expect(main.getByText('请输入系数', { exact: true })).toBeVisible();
+  await expectPriceTableStable(table, geometry);
   await expect(page).toHaveURL(/\/41\/edit$/);
   await input.fill('');
   await main.getByRole('button', { name: '提交商品信息', exact: true }).click();
   await expect(main.locator('.store-sale-price-input .t-input')).toHaveClass(/t-is-error/);
   await expect(main.getByText('请输入商品售价', { exact: true })).toBeVisible();
+  await expectPriceTableStable(table, geometry);
+  await input.fill('150');
+  await input.blur();
+  await expect(table.locator('.t-input__tips')).toHaveCount(0);
+  await expectPriceTableStable(table, geometry);
   await expect(page).toHaveURL(/\/41\/edit$/);
 });
 
@@ -1311,3 +1340,25 @@ for (const [status, tab] of [
     await expect(drawer.getByText('400', { exact: true })).toBeVisible();
   });
 }
+
+test('store log-only permission keeps its native toolbar entry without exposing list access', async ({ page }) => {
+  await storeLogin(page);
+  await page.addInitScript(() => {
+    const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    user.permissions = ['store.finished-stock-management.operation-log.view'];
+    localStorage.setItem('zdm-admin-user', JSON.stringify(user));
+  });
+  await page.route('**/api/admin/store-finished-products/operation-logs?**', (route) =>
+    route.fulfill({ json: ok({ records: [], total: 0 }) }),
+  );
+  await page.goto('/store/finished-stock-management');
+  const main = page.getByRole('main');
+  const log = main.locator('.zdm-admin-list-toolbar__auxiliary').getByRole('button', { name: '操作日志', exact: true });
+  await expect(log).toBeVisible();
+  await expect(log).toHaveClass(/t-button--theme-default/);
+  await expect(log).toHaveClass(/t-button--variant-outline/);
+  await expect(main.locator('table')).toHaveCount(0);
+  await expect(main.locator('.selection-info')).toHaveCount(0);
+  await log.click();
+  await expect(page.locator('.t-drawer--open .t-drawer__header')).toContainText('操作日志');
+});

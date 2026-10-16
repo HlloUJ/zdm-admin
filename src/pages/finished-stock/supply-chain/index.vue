@@ -22,40 +22,12 @@
             </nav>
           </AdminSectionCard>
         </div>
-        <header v-if="!formPageVisible && !finishedTabs.length" class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item
-                content="成品现货管理"
-                :href="'/supply-chain/finished-stock-management'"
-                :to="{ path: '/supply-chain/finished-stock-management' }"
-                replace
-                @click="closeFormPage"
-              />
-            </t-breadcrumb>
-          </div>
-          <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="operationLogsVisible = true"
-            >操作日志</t-link
-          >
-        </header>
+        <AdminListToolbar v-if="!formPageVisible && !finishedTabs.length" :has-auxiliary="canViewOperationLogs"
+          ><template #auxiliary>
+            <t-button theme="default" variant="outline" @click="operationLogsVisible = true">操作日志</t-button>
+          </template></AdminListToolbar
+        >
         <template v-if="!formPageVisible && finishedTabs.length">
-          <header class="page-header">
-            <t-breadcrumb>
-              <t-breadcrumb-item
-                content="成品现货管理"
-                :href="'/supply-chain/finished-stock-management'"
-                :to="{
-                  path: '/supply-chain/finished-stock-management',
-                }"
-                replace
-                @click="closeFormPage"
-              />
-              <t-breadcrumb-item v-if="formPageVisible">{{ formPageTitle }}</t-breadcrumb-item>
-            </t-breadcrumb>
-            <t-link v-if="canViewOperationLogs" theme="primary" hover="color" @click="operationLogsVisible = true"
-              >操作日志</t-link
-            >
-          </header>
           <AdminListLayout v-if="finishedTabs.length" class="finished-list-layout">
             <template #toolbar>
               <div class="list-controls">
@@ -75,14 +47,15 @@
                     :label="tab.label"
                   />
                 </t-tabs>
-                <t-form class="zdm-admin-filter-form" label-width="80px" :data="currentFilter" colon>
+                <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="currentFilter" colon>
                   <div class="filter-row">
                     <div class="filter-fields">
                       <t-form-item label="商品">
                         <t-input
                           :value="currentFilter.keyword"
                           clearable
-                          placeholder="商品名称 / ID"
+                          data-query-search-scope="商品名称/ID"
+                          placeholder="请输入商品名称/ID"
                           @change="updateManagementListFilter('keyword', String($event || ''))"
                           @enter="handleSearch()"
                         />
@@ -120,7 +93,7 @@
                         <t-select
                           :value="currentFilter.supplier"
                           clearable
-                          placeholder="请选择"
+                          placeholder="请选择供应商"
                           @change="updateManagementListFilter('supplier', String($event || ''))"
                         >
                           <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
@@ -137,23 +110,32 @@
                     </div>
                   </div>
                 </t-form>
-                <div v-if="Boolean(batchButtons.length)" class="table-toolbar">
-                  <div class="toolbar-buttons">
-                    <t-button
-                      v-for="action in managementToolbarActions"
-                      :key="action.id"
-                      :theme="action.className === 'brown-button' ? 'warning' : action.theme"
-                      :variant="action.variant"
-                      :class="action.className"
-                      :disabled="action.disabled"
-                      @click="handleBatchAction(action.id as BatchAction)"
-                    >
-                      <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>
-                      {{ action.label }}
-                    </t-button>
-                  </div>
-                  <div class="selection-info">已选 {{ selectedKeys.length }} 项</div>
-                </div>
+                <AdminListToolbar
+                  :has-actions="batchButtons.length > 0"
+                  :selected-count="selectedKeys.length"
+                  :has-batch-actions="hasSelectableBatchActions"
+                  :has-auxiliary="canViewOperationLogs"
+                  ><t-button
+                    v-for="action in managementToolbarActions"
+                    :key="action.id"
+                    :theme="action.className === 'brown-button' ? 'warning' : action.theme"
+                    :variant="action.variant"
+                    :class="action.className"
+                    :disabled="action.disabled"
+                    @click="handleBatchAction(action.id as BatchAction)"
+                  >
+                    <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>
+                    {{ action.label }} </t-button
+                  ><template #auxiliary
+                    ><t-button
+                      v-if="canViewOperationLogs"
+                      theme="default"
+                      variant="outline"
+                      @click="operationLogsVisible = true"
+                      >操作日志</t-button
+                    ></template
+                  ></AdminListToolbar
+                >
               </div>
             </template>
             <template #table
@@ -296,7 +278,7 @@
             </template>
           </AdminListLayout> </template
         ><template v-else-if="formPageVisible">
-          <section class="form-shell">
+          <section ref="productFormRoot" class="form-shell">
             <AdminSectionCard class="form-heading-card" aria-label="发布商品信息">
               <div class="form-title-row">
                 <div>
@@ -335,42 +317,38 @@
             >
               <h2 class="form-section-title">图文描述</h2>
               <t-form :data="productForm" label-width="100px" colon>
-                <t-form-item label="商品主图" required-mark help="最多上传5张图片，第一张作为商品封面">
-                  <div class="upload-grid main-image-upload-grid">
+                <t-form-item label="商品主图" required-mark>
+                  <t-space size="small" break-line align="start">
                     <AdminMediaUpload
                       v-for="index in mainImageUploadIndexes"
                       :key="index"
                       v-model="mainImageSlots[index]"
                       :title="index === 0 ? '封面图' : `商品主图${index + 1}`"
-                      :show-title="true"
-                      :show-file-name="formPageMode !== 'edit'"
-                      preview-on-filled-click
                       accept="image/*"
                       :error-message="submitAttempted && !mainImageMedia && index === 0 ? '请上传图片' : ''"
                       :upload="(file) => uploadProductMedia(file, 'image')"
                       @preview="openProductMediaPreview($event, 'image')"
                       @removed="releasePendingProductMedia"
                     />
-                  </div>
+                  </t-space>
                 </t-form-item>
-                <t-form-item label="商品视频" required-mark help="最多上传1段视频">
-                  <div class="upload-grid">
-                    <AdminMediaUpload
-                      v-model="videoMedia"
-                      title="商品视频"
-                      :show-title="false"
-                      :show-file-name="formPageMode !== 'edit'"
-                      preview-on-filled-click
-                      accept="video/*"
-                      media-type="video"
-                      :error-message="submitAttempted && !videoMedia ? '请上传视频' : ''"
-                      :upload="(file) => uploadProductMedia(file, 'video')"
-                      @preview="openProductMediaPreview($event, 'video')"
-                      @removed="releasePendingProductMedia"
-                    />
-                  </div>
+                <t-form-item label="商品视频" required-mark>
+                  <AdminMediaUpload
+                    v-model="videoMedia"
+                    title="商品视频"
+                    accept="video/*"
+                    media-type="video"
+                    :error-message="submitAttempted && !videoMedia ? '请上传视频' : ''"
+                    :upload="(file) => uploadProductMedia(file, 'video')"
+                    @preview="openProductMediaPreview($event, 'video')"
+                    @removed="releasePendingProductMedia"
+                  />
                 </t-form-item>
-                <t-form-item label="宝贝详情" required-mark>
+                <t-form-item
+                  label="宝贝详情"
+                  required-mark
+                  v-bind="requiredFieldFeedback(productForm.detail, '宝贝详情', submitAttempted)"
+                >
                   <ProductRichEditor
                     v-model="productForm.detail"
                     :class="{ 'required-content-error': requiredFieldStatus(productForm.detail) }"
@@ -394,9 +372,9 @@
                 <t-form-item label="商品名称" required-mark>
                   <t-input
                     v-model="productForm.name"
-                    :status="requiredFieldStatus(productForm.name)"
+                    v-bind="requiredFieldFeedback(productForm.name, '商品名称', submitAttempted)"
                     clearable
-                    placeholder="请输入"
+                    placeholder="请输入商品名称"
                     :maxlength="60"
                   />
                 </t-form-item>
@@ -426,18 +404,32 @@
                         <t-select
                           v-if="field.type === 'select'"
                           v-model="productForm[field.key]"
-                          :status="field.required ? requiredFieldStatus(productForm[field.key]) : undefined"
+                          v-bind="
+                            requiredFieldFeedback(
+                              productForm[field.key],
+                              field.label,
+                              submitAttempted && field.required,
+                              field.type === 'select',
+                            )
+                          "
                           clearable
-                          placeholder="请选择"
+                          :placeholder="controlPlaceholder(field.label, 'select')"
                         >
                           <t-option v-for="item in field.options" :key="item" :label="item" :value="item" />
                         </t-select>
                         <t-input
                           v-else
                           v-model="productForm[field.key]"
-                          :status="field.required ? requiredFieldStatus(productForm[field.key]) : undefined"
+                          v-bind="
+                            requiredFieldFeedback(
+                              productForm[field.key],
+                              field.label,
+                              submitAttempted && field.required,
+                              false,
+                            )
+                          "
                           clearable
-                          placeholder="请输入"
+                          :placeholder="controlPlaceholder(field.label, 'input')"
                         />
                       </t-form-item>
                     </div>
@@ -445,8 +437,13 @@
                 </div>
               </section>
               <t-form class="supplier-form" :data="productForm" label-width="100px" colon>
-                <t-form-item label="供应商">
-                  <t-select v-model="productForm.supplier" clearable placeholder="请选择">
+                <t-form-item label="供应商" required-mark>
+                  <t-select
+                    v-bind="requiredFieldFeedback(productForm.supplier, '供应商', submitAttempted, true)"
+                    v-model="productForm.supplier"
+                    clearable
+                    placeholder="请选择供应商"
+                  >
                     <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
                   </t-select>
                 </t-form-item>
@@ -456,7 +453,19 @@
             <AdminSectionCard id="finished-product-sales" class="form-section" aria-label="销售信息">
               <h2 class="form-section-title">销售信息</h2>
               <t-form :data="productForm" label-width="100px" colon>
-                <t-form-item label="销售规格" required-mark>
+                <t-form-item
+                  label="销售规格"
+                  required-mark
+                  v-bind="
+                    !specRows.length
+                      ? fieldFeedback(submitAttempted, '请创建销售规格')
+                      : salesSpecificationFeedback.field('specifications', [
+                          confirmedSpecMode,
+                          confirmedSpecDimensions,
+                          specRows,
+                        ])
+                  "
+                >
                   <t-button
                     v-if="!specRows.length && !isOperationsEdit"
                     :theme="submitAttempted ? 'danger' : 'primary'"
@@ -466,7 +475,7 @@
                     <template #icon><t-icon name="add" /></template>
                     创建规格
                   </t-button>
-                  <div v-if="specRows.length" class="spec-table-block">
+                  <div v-if="specRows.length" class="spec-table-block spec-table-block--stable-feedback">
                     <t-table
                       row-key="id"
                       :data="specRows"
@@ -496,25 +505,35 @@
                           v-else-if="field.type === 'select'"
                           v-model="row[field.key]"
                           clearable
-                          :status="field.required ? requiredFieldStatus(row[field.key]) : undefined"
-                          placeholder="请选择"
+                          v-bind="
+                            requiredFieldFeedback(
+                              row[field.key],
+                              field.label,
+                              specSubmitted && field.required,
+                              field.type === 'select',
+                            )
+                          "
+                          :placeholder="controlPlaceholder(field.label, 'select')"
                         >
                           <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
                         </t-select>
                         <t-input
                           v-else
                           v-model="row[field.key]"
-                          :status="field.required ? requiredFieldStatus(row[field.key]) : undefined"
-                          placeholder="请输入"
+                          v-bind="
+                            requiredFieldFeedback(row[field.key], field.label, specSubmitted && field.required, false)
+                          "
+                          :placeholder="controlPlaceholder(field.label, 'input')"
                         />
                       </template>
                       <template #cost="{ row }">
                         <SpecPriceInput
                           v-model="row.cost"
                           class="decimal-input"
-                          placeholder="价格"
+                          placeholder="请输入价格"
                           label="价格"
-                          :submitted="submitAttempted"
+                          :submitted="specSubmitted"
+                          :validation-deferred="newSpecsAwaitingSubmit"
                           :disabled="isOperationsEdit"
                           @change="handleSpecCostChange(row, $event)"
                         />
@@ -524,16 +543,18 @@
                         <div class="price-pair">
                           <SpecPriceInput
                             v-model="row.guideCoefficient"
-                            placeholder="系数"
+                            placeholder="请输入系数"
                             label="系数"
-                            :submitted="submitAttempted"
+                            :submitted="specSubmitted"
+                            :validation-deferred="newSpecsAwaitingSubmit"
                             @change="handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)"
                           />
                           <SpecPriceInput
                             v-model="row.guide"
-                            placeholder="价格"
+                            placeholder="请输入价格"
                             label="价格"
-                            :submitted="submitAttempted"
+                            :submitted="specSubmitted"
+                            :validation-deferred="newSpecsAwaitingSubmit"
                             @change="handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)"
                           />
                         </div>
@@ -542,13 +563,13 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.level1Coefficient"
-                            placeholder="系数"
+                            placeholder="请输入系数"
                             @change="handleSpecCoefficientChange(row, 'level1Coefficient', 'level1', $event)"
                             @blur="formatDecimalValue(row, 'level1Coefficient')"
                           />
                           <t-input
                             v-model="row.level1"
-                            placeholder="价格"
+                            placeholder="请输入价格"
                             @change="handleSpecPriceChange(row, 'level1', 'level1Coefficient', $event)"
                             @blur="formatDecimalValue(row, 'level1')"
                           />
@@ -558,13 +579,13 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.level2Coefficient"
-                            placeholder="系数"
+                            placeholder="请输入系数"
                             @change="handleSpecCoefficientChange(row, 'level2Coefficient', 'level2', $event)"
                             @blur="formatDecimalValue(row, 'level2Coefficient')"
                           />
                           <t-input
                             v-model="row.level2"
-                            placeholder="价格"
+                            placeholder="请输入价格"
                             @change="handleSpecPriceChange(row, 'level2', 'level2Coefficient', $event)"
                             @blur="formatDecimalValue(row, 'level2')"
                           />
@@ -574,13 +595,13 @@
                         <div class="price-pair">
                           <t-input
                             v-model="row.level3Coefficient"
-                            placeholder="系数"
+                            placeholder="请输入系数"
                             @change="handleSpecCoefficientChange(row, 'level3Coefficient', 'level3', $event)"
                             @blur="formatDecimalValue(row, 'level3Coefficient')"
                           />
                           <t-input
                             v-model="row.level3"
-                            placeholder="价格"
+                            placeholder="请输入价格"
                             @change="handleSpecPriceChange(row, 'level3', 'level3Coefficient', $event)"
                             @blur="formatDecimalValue(row, 'level3')"
                           />
@@ -593,11 +614,18 @@
                             :disabled="isOperationsEdit"
                             theme="normal"
                             :min="0"
-                            :status="submitAttempted && !isValidSpecQuantity(row.quantity) ? 'error' : undefined"
+                            :status="specSubmitted && !isPositiveIntegerQuantity(row.quantity) ? 'error' : undefined"
                             :tips="
-                              submitAttempted && !isValidSpecQuantity(row.quantity) ? '请输入大于 0 的数量' : undefined
+                              specSubmitted && !isPositiveIntegerQuantity(row.quantity)
+                                ? String(row.quantity ?? '').trim()
+                                  ? '请输入大于0的整数'
+                                  : '请输入数量'
+                                : undefined
                             "
-                            placeholder="请输入"
+                            @beforeinput.capture="preventZeroQuantity"
+                            @paste.capture="preventZeroQuantity"
+                            @keydown.capture="preventZeroQuantity"
+                            placeholder="请输入数量"
                           />
                         </div>
                       </template>
@@ -630,8 +658,8 @@
                 <t-form-item
                   v-if="!isOperationsEdit"
                   label="上架"
+                  v-bind="requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)"
                   required-mark
-                  :status="requiredFieldStatus(productForm.shelfNow)"
                 >
                   <t-radio-group v-model="productForm.shelfNow">
                     <t-radio value="now" :disabled="!canChooseShelfNow">立刻上架</t-radio>
@@ -698,21 +726,26 @@
       :footer="false"
       @close="closeSpecDialog"
     >
-      <div class="spec-dialog">
+      <div ref="specFormRoot" class="spec-dialog">
         <t-radio-group :value="specMode" @change="requestSpecModeChange">
           <t-radio value="single">单层展示：自定义填写规格</t-radio>
           <t-radio value="layered">分层展示：选择标准属性构建规格</t-radio>
         </t-radio-group>
 
-        <t-alert v-if="specDraftError" theme="error" :message="specDraftError" />
+        <t-alert v-if="specDraftError" data-form-error="true" theme="error" :message="specDraftError" />
         <div v-if="specMode === 'single'" class="single-spec-editor">
           <div class="spec-section-title">商品规格</div>
           <div class="single-spec-list">
             <div v-for="(item, index) in singleSpecs" :key="item.id" class="single-spec-row">
               <t-input
                 v-model="item.text"
-                :status="isDuplicateSingleSpec(item) ? 'error' : specDraftFieldStatus(item.text, item.id)"
-                placeholder="请输入规格文本，如 1500*800*750mm"
+                v-bind="
+                  fieldFeedback(
+                    isDuplicateSingleSpec(item) || specDraftFieldStatus(item.text, item.id),
+                    isDuplicateSingleSpec(item) ? '规格名称重复' : '请输入商品规格',
+                  )
+                "
+                placeholder="请输入商品规格"
               />
               <t-button shape="square" variant="text" theme="danger" @click="removeSingleSpec(index)">
                 <t-icon name="delete" />
@@ -795,9 +828,9 @@
                 <t-select
                   v-if="salesAttributeByKey(group.field)?.type === 'select'"
                   :value="value.value"
-                  :status="specDraftFieldStatus(value.value, value.id)"
+                  v-bind="fieldFeedback(specDraftFieldStatus(value.value, value.id), `请选择${group.name}`)"
                   clearable
-                  placeholder="请选择属性值"
+                  :placeholder="controlPlaceholder(group.name, 'select')"
                   @change="value.value = String($event ?? '')"
                 >
                   <t-option
@@ -811,8 +844,13 @@
                 <t-input
                   v-else
                   v-model="value.value"
-                  :status="isDuplicateSpecValue(group, value) ? 'error' : specDraftFieldStatus(value.value, value.id)"
-                  placeholder="请输入属性值"
+                  v-bind="
+                    fieldFeedback(
+                      isDuplicateSpecValue(group, value) || specDraftFieldStatus(value.value, value.id),
+                      isDuplicateSpecValue(group, value) ? '属性值重复' : `请输入${group.name}`,
+                    )
+                  "
+                  :placeholder="controlPlaceholder(group.name, 'input')"
                 />
                 <t-button shape="square" variant="text" theme="danger" @click="removeSpecValue(group.name, index)">
                   <t-icon name="delete" />
@@ -871,7 +909,7 @@
         </t-button>
       </div>
 
-      <div class="batch-fill-panel">
+      <div ref="priceFormRoot" class="batch-fill-panel">
         <section class="batch-section">
           <div class="batch-section-head">
             <strong>选择批量范围</strong>
@@ -911,8 +949,9 @@
           <div class="batch-field-grid">
             <t-form-item v-if="!isOperationsEdit" label="成本价">
               <SpecPriceInput
+                form-layout
                 v-model="batchFillForm.cost"
-                placeholder="价格"
+                placeholder="请输入价格"
                 label="价格"
                 optional
                 :submitted="batchFillSubmitted"
@@ -921,7 +960,30 @@
             </t-form-item>
 
             <t-form-item v-if="!isOperationsEdit" label="数量">
-              <t-input-number v-model="batchFillForm.quantity" theme="normal" :min="0" />
+              <t-input-number
+                v-model="batchFillForm.quantity"
+                :status="
+                  batchFillSubmitted &&
+                  batchFillForm.quantity != null &&
+                  !isPositiveIntegerQuantity(batchFillForm.quantity)
+                    ? 'error'
+                    : undefined
+                "
+                :tips="
+                  batchFillSubmitted &&
+                  batchFillForm.quantity != null &&
+                  !isPositiveIntegerQuantity(batchFillForm.quantity)
+                    ? '请输入大于0的整数'
+                    : undefined
+                "
+                @beforeinput.capture="preventZeroQuantity"
+                @paste.capture="preventZeroQuantity"
+                @keydown.capture="preventZeroQuantity"
+                placeholder="请输入数量"
+                theme="normal"
+                :min="0"
+                style="width: 100%"
+              />
             </t-form-item>
             <t-form-item
               v-for="field in isOperationsEdit ? [] : batchEditableSalesFields"
@@ -932,11 +994,16 @@
                 v-if="field.type === 'select'"
                 v-model="batchSalesAttributes[field.key]"
                 clearable
-                placeholder="请选择"
+                :placeholder="controlPlaceholder(field.label, 'select')"
               >
                 <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
               </t-select>
-              <t-input v-else v-model="batchSalesAttributes[field.key]" clearable placeholder="请输入" />
+              <t-input
+                v-else
+                v-model="batchSalesAttributes[field.key]"
+                clearable
+                :placeholder="controlPlaceholder(field.label, 'input')"
+              />
             </t-form-item>
           </div>
         </section>
@@ -953,14 +1020,18 @@
       @cancel="closeReasonDialog"
       @close="closeReasonDialog"
     >
-      <t-form :data="reasonForm" label-width="100px" colon>
+      <t-form ref="reasonFormRoot" :data="reasonForm" label-width="100px" colon>
         <t-form-item label="下架原因" required-mark>
-          <t-select v-model="reasonForm.reason" placeholder="请选择">
+          <t-select
+            v-bind="reasonFeedback.field('reason', reasonForm.reason)"
+            v-model="reasonForm.reason"
+            placeholder="请选择下架原因"
+          >
             <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
           </t-select>
         </t-form-item>
         <t-form-item label="详细说明">
-          <t-textarea v-model="reasonForm.detail" placeholder="请输入" :autosize="{ minRows: 4, maxRows: 6 }" />
+          <t-textarea v-model="reasonForm.detail" placeholder="请输入详细说明" :autosize="{ minRows: 4, maxRows: 6 }" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -1019,9 +1090,14 @@
 </template>
 
 <script setup lang="ts">
+import { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
+import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';
 import { filterFinishedStockItems } from '../shared/finishedStockListFilter';
-import { finishedStockFormIssue, isValidSpecQuantity } from '../shared/finishedStockFormValidation';
+import { finishedStockFormIssues } from '../shared/finishedStockFormValidation';
 import { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';
 import { buildFinishedStockTemplateFields } from '../shared/finishedStockTemplateFields';
 import { useFinishedStockPriceEditor } from '../shared/finishedStockPriceEditor';
@@ -1148,6 +1224,10 @@ const finishedActionCodes: Record<string, string> = {
 };
 const route = useRoute();
 const router = useRouter();
+const productFormRoot = ref<HTMLElement>();
+const specFormRoot = ref<HTMLElement>();
+const priceFormRoot = ref<HTMLElement>();
+const reasonFormRoot = ref();
 const loading = ref(false);
 const saving = ref(false);
 const selectedKeys = ref<number[]>([]);
@@ -1219,6 +1299,7 @@ const specDraftFieldStatus = (value: string, id: number) =>
   validatedSpecDraftIds.value.has(id) && !value?.trim() ? 'error' : undefined;
 const priceDrawerVisible = ref(false);
 const reasonDialogVisible = ref(false);
+const reasonFeedback = useFormFeedback(reasonDialogVisible);
 const confirmDialogVisible = ref(false);
 const detailDialogVisible = ref(false);
 const imagePreviewVisible = ref(false);
@@ -1246,6 +1327,9 @@ const batchFillFilters = reactive<Record<BatchFilterField, string[]>>({
   size: [],
 });
 const submitAttempted = ref(false);
+const newSpecsAwaitingSubmit = ref(false);
+const specSubmitted = computed(() => submitAttempted.value && !newSpecsAwaitingSubmit.value);
+const salesSpecificationFeedback = useFormFeedback(formPageVisible);
 const requiredFieldStatus = (value: unknown) =>
   submitAttempted.value && !String(value ?? '').trim() ? 'error' : undefined;
 const mainImageSlots = ref<(AdminMediaValue | undefined)[]>(Array.from({ length: 5 }));
@@ -1795,6 +1879,11 @@ const batchButtons = computed(() => {
   };
   return map[activeTab.value].filter((button) => hasFinishedAction(finishedActionCodes[button.action]));
 });
+const hasSelectableBatchActions = computed(() =>
+  batchButtons.value.some((button) =>
+    ['batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
+  ),
+);
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
   batchButtons.value.map((button) => ({
     id: button.action,
@@ -2115,6 +2204,7 @@ const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
   }
   activeFormSection.value = isOperationsEdit.value ? 'sales' : 'description';
   submitAttempted.value = false;
+  newSpecsAwaitingSubmit.value = false;
   resetProductForm(productForm, createEmptyProductForm());
   specRows.value = [];
   priceRows.value = [];
@@ -2210,6 +2300,7 @@ const {
   handleBatchCostChange,
 } = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
 const {
+  specModeChanged,
   openSpecDialog,
   closeSpecDialog,
   specDraftError,
@@ -2236,9 +2327,10 @@ const {
   isSpecGroupDisabled,
   toggleSpecGroup,
   resetSpecDialog,
-  confirmCreateSpec,
+  confirmCreateSpec: confirmSpecDraft,
   specToPriceRow,
 } = useFinishedStockSpecDialog({
+  onValidationFailed: () => rejectFormSubmission(specFormRoot.value),
   validatedSpecDraftIds,
   specRows,
   specMode,
@@ -2257,6 +2349,12 @@ const {
   createBaseSpecRow,
   salesAttributeByKey,
 });
+const confirmCreateSpec = () => {
+  const firstCreation = specRows.value.length === 0 || specModeChanged.value;
+  const result = confirmSpecDraft();
+  if (firstCreation && !specDialogVisible.value) newSpecsAwaitingSubmit.value = true;
+  return result;
+};
 const operationLogsVisible = ref(false);
 const canViewOperationLogs = computed(() =>
   hasPermission(getLoginUser(), `${productPermissionPrefix.value}.operation-log.view`),
@@ -2299,8 +2397,10 @@ const savePriceDrawer = () => {
       }),
     ];
     if (priceInputs.some((value) => String(value ?? '').trim() && !isValidSpecPriceNumber(value))) {
-      adminFeedback.error('请输入正确的价格或系数');
-      return;
+      return rejectFormSubmission(priceFormRoot.value);
+    }
+    if (batchFillForm.quantity != null && !isPositiveIntegerQuantity(batchFillForm.quantity)) {
+      return rejectFormSubmission(priceFormRoot.value);
     }
     const matchedIds = new Set(batchFillMatchedRows.value.map((row) => row.id));
     if (!matchedIds.size) {
@@ -2372,7 +2472,7 @@ const deleteSpec = (id: number) => {
   specRows.value = specRows.value.filter((item) => item.id !== id);
 };
 const validateProductForm = () => {
-  const issue = finishedStockFormIssue({
+  const issues = finishedStockFormIssues({
     client: 'supply-chain',
     operationsEdit: isOperationsEdit.value,
     specMode: confirmedSpecMode.value,
@@ -2389,10 +2489,18 @@ const validateProductForm = () => {
     editingProduct: editingProduct.value != null,
     guidePriceSettingCoefficient: guidePriceSettingCoefficient.value,
   });
-  if (!issue) return true;
-  if (issue.tab) scrollToFormSection(issue.tab);
-  adminFeedback[issue.kind](issue.message);
-  return false;
+  salesSpecificationFeedback.clear();
+  if (!issues.length) return issues;
+  const issue = issues.find((item) => item.kind === 'error' && !item.tab);
+  if (issue) {
+    salesSpecificationFeedback.reject(
+      'specifications',
+      [confirmedSpecMode.value, confirmedSpecDimensions.value, specRows.value],
+      issue.message,
+    );
+  }
+
+  return issues;
 };
 const specVariantLabel = (row: SpecRow) =>
   row.specText ||
@@ -2441,10 +2549,24 @@ const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string)
   else dataItems.value.unshift(nextItem);
   return nextItem;
 };
+const rejectProductForm = (issues: ReturnType<typeof finishedStockFormIssues>) => {
+  if (issues.every((issue) => issue.operation)) {
+    adminFeedback.warning(issues[0].message);
+    return;
+  }
+  return rejectFormSubmission(productFormRoot.value, {
+    reveal: (field) => {
+      const key = field.closest('[id^="finished-product-"]')?.id.replace('finished-product-', '');
+      if (key === 'description' || key === 'base' || key === 'sales') activeFormSection.value = key;
+    },
+  });
+};
 const submitProductForm = async () => {
+  newSpecsAwaitingSubmit.value = false;
   submitAttempted.value = true;
   if (isOperationsEdit.value && editingProduct.value) {
-    if (!validateProductForm()) return;
+    const issues = validateProductForm();
+    if (issues.length) return rejectProductForm(issues);
     saving.value = true;
     try {
       upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));
@@ -2467,7 +2589,8 @@ const submitProductForm = async () => {
     adminFeedback.error('商品属性模板刷新失败，请重试');
     return;
   }
-  if (!validateProductForm()) return;
+  const issues = validateProductForm();
+  if (issues.length) return rejectProductForm(issues);
   const isCreate = formPageMode.value !== 'edit' || !editingProduct.value;
   saving.value = true;
   try {
@@ -2507,8 +2630,8 @@ const closeReasonDialog = () => {
 };
 const submitReason = async () => {
   if (!reasonForm.reason) {
-    adminFeedback.warning('请选择原因');
-    return;
+    reasonFeedback.reject('reason', reasonForm.reason, '请选择下架原因');
+    return rejectFormSubmission(reasonFormRoot.value);
   }
   closeReasonDialog();
   saving.value = true;

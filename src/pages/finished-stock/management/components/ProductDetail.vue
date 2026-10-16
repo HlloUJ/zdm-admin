@@ -5,7 +5,7 @@
       <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations && !editorLayout }">
         图文描述
       </h3>
-      <div class="product-detail__media">
+      <div class="product-detail__media" :class="{ 'product-detail__media--editor': editorLayout }">
         <button v-for="(url, index) in images" :key="url" type="button" @click="emit('preview', { url }, 'image')">
           <img :src="url" :alt="`商品主图${index + 1}`" />
           <span>商品主图{{ index + 1 }}</span>
@@ -353,10 +353,8 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
 }
 .product-detail__section-title {
   margin: 0 0 var(--td-comp-margin-xxl);
-  font-size: var(--td-font-size-body-large);
-  font-weight: 600;
-  line-height: 24px;
   text-align: left;
+  font: var(--td-font-title-medium);
 }
 .product-detail__bordered-card {
   border: 1px solid var(--td-component-border);
@@ -380,7 +378,6 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
   background-color: var(--td-bg-color-secondarycontainer);
   color: var(--td-text-color-placeholder);
   font: var(--td-font-body-medium);
-  font-weight: 400;
 }
 .product-detail__basic-table {
   margin: 0;
@@ -424,5 +421,33 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
   width: 100%;
   height: 80px;
   object-fit: contain;
+}
+
+.product-detail__media--editor {
+  grid-template-columns: repeat(auto-fit, 180px);
+  gap: var(--td-comp-margin-xxl);
+}
+.product-detail__media--editor button {
+  min-height: 168px;
+  justify-content: center;
+  padding: 0;
+  border-style: dashed;
+  border-radius: var(--td-radius-medium);
+  color: var(--td-text-color-secondary);
+  font: inherit;
+}
+.product-detail__media--editor button:hover {
+  border-color: var(--td-brand-color);
+}
+.product-detail__media--editor img,
+.product-detail__media--editor video {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+}
+.product-detail__media--editor span {
+  order: -1;
+  color: var(--td-text-color-placeholder);
+  font: var(--td-font-body-small);
 }
 </style>

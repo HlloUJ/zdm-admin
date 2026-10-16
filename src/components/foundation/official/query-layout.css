@@ -1,0 +1,77 @@
+/* Accepted project extension: docs/ui/query-standard.md. Shared by the
+   accepted slab reference and the default AdminListPage query region. */
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-row, .standard-query-row) {
+  display: grid;
+  grid-template-columns: minmax(0, 10fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 0;
+  width: 100%;
+}
+
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-fields, .operation-log-filters) {
+  --zdm-query-max-columns: 3;
+
+  min-width: 0;
+  width: auto;
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, max(238px, calc(100% / var(--zdm-query-max-columns)))), 1fr)
+  );
+  gap: var(--td-comp-margin-xxl) 0;
+  margin-inline: -12px;
+}
+
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-fields, .operation-log-filters) > .t-form__item {
+  min-width: 0;
+  width: auto;
+  padding-inline: 12px;
+  margin-bottom: 0;
+}
+
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-fields, .operation-log-filters):has(> :nth-child(4)) {
+  --zdm-query-max-columns: var(--zdm-query-column-cap, 4);
+}
+
+.t-form.zdm-admin-filter-form.zdm-standard-query
+  :is(.filter-fields, .operation-log-filters)
+  .t-form__controls-content
+  > .t-input {
+  width: 100%;
+  min-width: 134px;
+}
+
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-actions, .operation-log-filter-actions) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--td-comp-margin-s);
+  margin-left: var(--td-comp-margin-s);
+}
+
+/* Compatibility wrappers keep business templates intact during migration. */
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-fields, .operation-log-filters) > div:not(.t-form__item) {
+  min-width: 0;
+  padding-inline: 12px;
+}
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-fields, .operation-log-filters) > div > .t-form__item {
+  margin-bottom: 0;
+}
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-fields, .operation-log-filters) .t-date-range-picker {
+  width: 100%;
+  min-width: 0;
+}
+.t-form.zdm-admin-filter-form.zdm-standard-query
+  :is(.filter-row, .standard-query-row)
+  > :is(.filter-actions, .operation-log-filter-actions) {
+  grid-column: auto;
+  padding-inline: 0;
+}
+.t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-actions, .operation-log-filter-actions) > .t-space {
+  gap: var(--td-comp-margin-s);
+}
+
+/* Log drawers use the same standard with a lower column cap. */
+.t-form.zdm-admin-filter-form.zdm-standard-query[data-query-layout='log'] {
+  --zdm-query-column-cap: 3;
+}

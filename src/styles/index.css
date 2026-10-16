@@ -1,3 +1,8 @@
+/* prettier-ignore */
+@import url('../components/foundation/official/query-layout.css');
+@import url('../components/foundation/official/product-form-layout.css');
+@import url('../components/foundation/official/form-feedback-layout.css');
+
 * {
   box-sizing: border-box;
 }
@@ -263,93 +268,6 @@ p {
   width: 100%;
 }
 
-/* Official common-table grid, adapted to existing form wrappers without
-   changing field order, event bindings or query/reset behavior. */
-.admin-layout .t-form.zdm-admin-filter-form .filter-row,
-.admin-layout .t-form.zdm-admin-filter-form .supply-type-filter-row {
-  display: grid;
-  grid-template-columns: minmax(0, 10fr) minmax(0, 2fr);
-  align-items: start;
-  gap: 0;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .filter-fields,
-.admin-layout .t-form.zdm-admin-filter-form .supply-type-filter-fields,
-.admin-layout .t-form.zdm-admin-filter-form .operation-log-filters,
-.admin-layout .t-form.zdm-admin-filter-form .filter-primary-row,
-.admin-layout .t-form.zdm-admin-filter-form .filter-secondary-row {
-  min-width: 0;
-  width: auto;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--td-comp-margin-xxl) 0;
-  margin-inline: -12px;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .filter-fields > .t-form__item,
-.admin-layout .t-form.zdm-admin-filter-form .filter-primary-row > .t-form__item,
-.admin-layout .t-form.zdm-admin-filter-form .filter-secondary-row > .t-form__item,
-.admin-layout .t-form.zdm-admin-filter-form .operation-log-filters > .t-form__item,
-.admin-layout .t-form.zdm-admin-filter-form .supply-type-filter-fields > div {
-  min-width: 0;
-  width: auto;
-  padding-inline: 12px;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .t-form__item {
-  min-width: 0;
-  width: auto;
-  display: block;
-  margin-bottom: var(--td-comp-margin-xxl);
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .t-form__controls-content > .t-input {
-  min-width: 134px;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .filter-actions,
-.admin-layout .t-form.zdm-admin-filter-form .supply-type-filter-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-  margin-top: 0;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .filter-row > .filter-actions,
-.admin-layout .t-form.zdm-admin-filter-form .supply-type-filter-row > .supply-type-filter-actions {
-  margin-left: var(--td-comp-margin-s);
-}
-
-/* Grouped slab filters keep their two business rows and right-hand actions.
-   Do not apply a grid to both the group wrapper and each group. */
-.admin-layout .t-form.zdm-admin-filter-form .filter-row:has(> .filter-fields > .filter-primary-row) {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .filter-fields:has(> .filter-primary-row) {
-  grid-template-columns: minmax(0, 1fr);
-  margin-inline: 0;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .filter-primary-row,
-.admin-layout .t-form.zdm-admin-filter-form .filter-secondary-row {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: start;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .filter-secondary-row > .filter-actions {
-  grid-column: 3 / -1;
-  padding-inline: 12px;
-}
-
-@media (max-width: 1600px) {
-  .admin-layout .t-form.zdm-admin-filter-form .filter-primary-row,
-  .admin-layout .t-form.zdm-admin-filter-form .filter-secondary-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 /* Existing custom drag handles occupy the native table's special drag column.
    Retain their usable hit area rather than applying normal text-cell padding. */
 .admin-layout .zdm-row-sort-table th:first-child,
@@ -361,11 +279,6 @@ p {
 .admin-layout .zdm-row-sort-table th:nth-child(2),
 .admin-layout .zdm-row-sort-table td:nth-child(2) {
   padding-left: 0;
-}
-
-.admin-layout .t-form.zdm-admin-filter-form .operation-log-date-picker {
-  width: 100%;
-  min-width: 0;
 }
 
 /* Official Starter SideNav uses a 72px collapsed layout placeholder. */
