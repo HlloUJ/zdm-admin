@@ -320,7 +320,7 @@ test('a delayed old detail response never replaces the newly opened customer', a
   await expect(dialog.getByText('王先生1', { exact: true })).toHaveCount(0);
 });
 
-test('customer list follows standard spacing without clipped columns at the review viewport', async ({
+test('customer list follows standard spacing with bounded horizontal scrolling at the review viewport', async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 1366, height: 858 });
@@ -429,7 +429,7 @@ test('customer list follows standard spacing without clipped columns at the revi
     const dimensions = await page
       .locator('.t-table__content')
       .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
-    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width + 1);
+    expect(dimensions.scroll).toBeGreaterThan(dimensions.width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1366);
     await expect(page.locator('symbol#t-icon-add')).toBeAttached({ timeout: 15000 });
     await page.screenshot({
@@ -444,7 +444,7 @@ test('customer list follows standard spacing without clipped columns at the revi
   const emptyTable = await page
     .locator('.t-table__content')
     .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
-  expect(emptyTable.scroll).toBeLessThanOrEqual(emptyTable.width + 1);
+  expect(emptyTable.scroll).toBeGreaterThanOrEqual(emptyTable.width);
   await expect(page.locator('symbol#t-icon-add')).toBeAttached({ timeout: 15000 });
   await page.screenshot({
     path: testInfo.outputPath('customer-list-empty.png'),
@@ -1047,4 +1047,58 @@ test('restore and purge confirmations name the customer or selected count and re
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     await row.locator('.t-checkbox').click();
   }
+});
+
+test('both customer tabs display creator and creation time instead of next follow time', async ({ page }) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  for (const tab of ['日常客户', '归档客户']) {
+    await page.getByText(tab, { exact: true }).click();
+    const table = page.locator('.t-table');
+    await expect(table.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '下次跟进时间', exact: true })).toHaveCount(0);
+    await expect(table.locator('tbody tr').first()).toContainText('2026-10-13 10:00');
+  }
+});
+
+test('customer requirement uses 180px native ellipsis and hover reveals full text while creation time fits', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 858 });
+  await setup(page, [...daily, ...archived]);
+  const requirement = '客户希望定制一张可以容纳十人使用的餐桌，需要进口石材台面，并包含送货安装和后续维护服务。';
+  await page.route('**/api/admin/store-customers**', async (route) => {
+    if (new URL(route.request().url()).pathname === '/api/admin/store-customers' && route.request().method() === 'GET')
+      return route.fulfill({ json: ok([{ ...customer(1, 7), requirement, lastFollowedAt: '2026-10-16T19:30:45' }]) });
+    return route.fallback();
+  });
+  await page.goto('/store/customer-management');
+  const row = page.locator('tbody tr').filter({ hasText: '王先生1' });
+  const cell = row.getByRole('cell').nth(4);
+  await expect(cell).toHaveText(requirement);
+  expect((await cell.boundingBox())!.width).toBeCloseTo(180, 0);
+  const text = cell.locator('.t-table__ellipsis');
+  await expect(text).toHaveCSS('text-overflow', 'ellipsis');
+  await text.hover();
+  await expect(page.locator('.t-popup__content:visible').filter({ hasText: requirement })).toBeVisible();
+  const popupBox = (await page.locator('.t-popup__content:visible').filter({ hasText: requirement }).boundingBox())!;
+  const textBox = (await text.boundingBox())!;
+  expect(popupBox.y).toBeGreaterThanOrEqual(textBox.y + textBox.height);
+  const date = row.getByRole('cell').nth(7);
+  await date.scrollIntoViewIfNeeded();
+  const fits = await date
+    .locator('.t-table__ellipsis')
+    .evaluate((element) => element.scrollWidth <= element.clientWidth);
+  expect(fits).toBe(true);
+  await expect(date).toHaveText('2026-10-13 10:00');
+  await expect(row.getByRole('cell').nth(5)).toHaveText('2026-10-16 19:30');
+  expect(
+    await row
+      .getByRole('cell')
+      .nth(5)
+      .locator('.t-table__ellipsis')
+      .evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1366);
 });

@@ -40,7 +40,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class CustomerApiTest extends SpringContainerTestSupport {
   private static final String BASE="/api/admin/store-customers";
   @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
-      .withDatabaseName("customer_test").withUsername("test").withPassword("test");
+      .withDatabaseName("customer_test").withUsername("test").withPassword("test")
+      .withUrlParam("serverTimezone", "Asia/Shanghai");
   @DynamicPropertySource
   static void database(DynamicPropertyRegistry r) {
     r.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -65,7 +66,7 @@ class CustomerApiTest extends SpringContainerTestSupport {
     SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(i,null,List.of()));
   }
   private JsonNode data(ResultActions result) throws Exception {
-    return json.readTree(result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data");
+    return json.readTree(result.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray()).path("data");
   }
   private long create() throws Exception {
     var current=(CurrentIdentity) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -78,6 +79,44 @@ class CustomerApiTest extends SpringContainerTestSupport {
   }
   private ResultActions follow(long id,String content) throws Exception {
     return mvc.perform(post(BASE+"/"+id+"/followups").contentType(MediaType.APPLICATION_JSON).content(content));
+  }
+  @Test void beijingDatetimeRoundTripsWithoutJvmTimezoneConversion() throws Exception {
+    var previousZone=java.util.TimeZone.getDefault();
+    try {
+      java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
+      long id=create();
+      jdbc.update("UPDATE store_customers SET created_at='2026-10-16 19:06:40' WHERE id=?",id);
+      data(follow(id,"{\"followedAt\":\"2026-10-16T19:30:45\",\"content\":\"时间回归\",\"nextFollowAt\":\"2026-10-17T09:15:00\",\"mediaIds\":[]}"));
+      var row=data(mvc.perform(get(BASE).param("status","daily"))).get(0);
+      assertThat(row.path("createdAt").asText()).isEqualTo("2026-10-16T19:06:40");
+      assertThat(row.path("lastFollowedAt").asText()).isEqualTo("2026-10-16T19:30:45");
+      var detail=data(mvc.perform(get(BASE+"/"+id)));
+      assertThat(detail.path("customer").path("createdAt").asText()).isEqualTo("2026-10-16T19:06:40");
+      var record=detail.path("followups").get(0);
+      assertThat(record.path("followedAt").asText()).isEqualTo("2026-10-16T19:30:45");
+      assertThat(record.path("nextFollowAt").asText()).isEqualTo("2026-10-17T09:15:00");
+      assertThat(jdbc.queryForObject("SELECT CAST(followed_at AS CHAR) FROM store_customer_followups WHERE customer_id=?",String.class,id)).isEqualTo("2026-10-16 19:30:45");
+    } finally {
+      java.util.TimeZone.setDefault(previousZone);
+    }
+  }
+  @Test void bothTabsOrderByCreationDescendingWithStableIdTiesInsteadOfArchiveTime() throws Exception {
+    long first=create();long second=create();long third=create();
+    jdbc.update("UPDATE store_customers SET created_at='2026-10-10 10:00:00' WHERE id=?",first);
+    jdbc.update("UPDATE store_customers SET created_at='2026-10-11 10:00:00' WHERE id IN (?,?)",second,third);
+    for (String tab:List.of("daily","archived")) {
+      if ("archived".equals(tab)) {
+        action(first,"daily","archive",null).andExpect(status().isOk());
+        action(second,"daily","archive",null).andExpect(status().isOk());
+        action(third,"daily","archive",null).andExpect(status().isOk());
+        jdbc.update("UPDATE store_customers SET archived_at='2026-10-15 10:00:00' WHERE id=?",first);
+        jdbc.update("UPDATE store_customers SET archived_at='2026-10-14 10:00:00' WHERE id IN (?,?)",second,third);
+      }
+      var listed=data(mvc.perform(get(BASE).param("status",tab)));
+      assertThat(listed.findValuesAsText("id")).containsExactly(String.valueOf(third),String.valueOf(second),String.valueOf(first));
+      assertThat(listed.get(0).path("createdByName").asText()).isEqualTo("导购A");
+      assertThat(listed.get(0).path("createdAt").asText()).startsWith("2026-10-11");
+    }
   }
   @Test void nationalityIsIndependentAndCallingCodeIsServerDerivedWithoutRegionalLengthChecks() throws Exception {
     var body=java.util.Map.of("name","国际客户","ownerAccountId",90001,"nationality","FR","phoneRegion","CN","phone","000123","callingCode","+999");

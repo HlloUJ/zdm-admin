@@ -37,8 +37,9 @@
           >
           <template #phone="{ row }">{{ displayCustomerPhone(row) }}</template>
           <template #ownerName="{ row }">{{ row.ownerName || '-' }}</template>
-          <template #lastFollowedAt="{ row }">{{ time(row.lastFollowedAt) }}</template>
-          <template #nextFollowAt="{ row }">{{ time(row.nextFollowAt) }}</template>
+          <template #lastFollowedAt="{ row }">{{ time(row.lastFollowedAt).slice(0, 16) }}</template>
+          <template #createdByName="{ row }">{{ row.createdByName || '-' }}</template>
+          <template #createdAt="{ row }">{{ time(row.createdAt).slice(0, 16) }}</template>
           <template #operation="{ row }">
             <t-space break-line size="small">
               <t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">详情</t-link>
@@ -432,9 +433,10 @@ const columns: TableProps['columns'] = [
   { colKey: 'name', title: '客户姓名', width: 90, ellipsis: true },
   { colKey: 'phone', title: '联系电话', width: 120, ellipsis: true },
   { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },
-  { colKey: 'requirement', title: '客户需求', width: 120, ellipsis: true },
-  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true },
-  { colKey: 'nextFollowAt', title: '下次跟进时间', width: 130, ellipsis: true },
+  { colKey: 'requirement', title: '客户需求', width: 180, ellipsis: { placement: 'bottom' } },
+  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 180, ellipsis: true },
+  { colKey: 'createdByName', title: '创建人', width: 90, ellipsis: true },
+  { colKey: 'createdAt', title: '创建时间', width: 180, ellipsis: true },
   { colKey: 'operation', title: '操作', width: 200 },
 ];
 const detailItems = computed(() => {

@@ -1603,6 +1603,54 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "{ colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true }",
+          "after": "{ colKey: 'lastFollowedAt', title: '最近跟进时间', width: 180, ellipsis: true }",
+          "stage": "before-migrations",
+          "reason": "User requested readable list time columns and minute precision for both timestamps; preserve full recent followup time with native 180px width and authorized horizontal scrolling."
+        },
+        {
+          "before": "{ colKey: 'requirement', title: '客户需求', width: 180, ellipsis: true }",
+          "after": "{ colKey: 'requirement', title: '客户需求', width: 180, ellipsis: { placement: 'bottom' } }",
+          "stage": "before-migrations",
+          "reason": "User approved customer requirement native tooltip placement below the column."
+        },
+        {
+          "before": "{{ time(row.lastFollowedAt) }}",
+          "after": "{{ time(row.lastFollowedAt).slice(0, 16) }}",
+          "stage": "before-migrations",
+          "reason": "User approved minute precision YYYY-MM-DD HH:mm for list last followup and creation timestamps only; preserve stored precision and other surfaces."
+        },
+        {
+          "before": "{{ time(row.createdAt) }}",
+          "after": "{{ time(row.createdAt).slice(0, 16) }}",
+          "stage": "before-migrations",
+          "reason": "User approved minute precision YYYY-MM-DD HH:mm for list last followup and creation timestamps only; preserve stored precision and other surfaces."
+        },
+        {
+          "before": "  { colKey: 'phone', title: '联系电话', width: 120, ellipsis: true },\n  { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },\n  { colKey: 'requirement', title: '客户需求', ellipsis: true },\n  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true },\n  { colKey: 'createdByName', title: '创建人', width: 90, ellipsis: true },\n  { colKey: 'createdAt', title: '创建时间', width: 160, ellipsis: true },\n  { colKey: 'operation', title: '操作', width: 200 },\n];\n",
+          "after": "  { colKey: 'phone', title: '联系电话', width: 120, ellipsis: true },\n  { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },\n  { colKey: 'requirement', title: '客户需求', width: 180, ellipsis: true },\n  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true },\n  { colKey: 'createdByName', title: '创建人', width: 90, ellipsis: true },\n  { colKey: 'createdAt', title: '创建时间', width: 180, ellipsis: true },\n  { colKey: 'operation', title: '操作', width: 200 },\n];\n",
+          "stage": "before-migrations",
+          "reason": "User approved 180px customer requirement and creation time columns, native ellipsis with full text on hover, and horizontal table scrolling on narrow viewports."
+        },
+        {
+          "before": "{ colKey: 'requirement', title: '客户需求', width: 120, ellipsis: true }",
+          "after": "{ colKey: 'requirement', title: '客户需求', ellipsis: true }",
+          "stage": "before-migrations",
+          "reason": "Accommodate user approved creator/time columns using native flexible requirement column while retaining ellipsis and avoiding fixed-width overflow."
+        },
+        {
+          "before": "          <template #phone=\"{ row }\">{{ displayCustomerPhone(row) }}</template>\n          <template #ownerName=\"{ row }\">{{ row.ownerName || '-' }}</template>\n          <template #lastFollowedAt=\"{ row }\">{{ time(row.lastFollowedAt) }}</template>\n          <template #nextFollowAt=\"{ row }\">{{ time(row.nextFollowAt) }}</template>\n          <template #operation=\"{ row }\">\n            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n",
+          "after": "          <template #phone=\"{ row }\">{{ displayCustomerPhone(row) }}</template>\n          <template #ownerName=\"{ row }\">{{ row.ownerName || '-' }}</template>\n          <template #lastFollowedAt=\"{ row }\">{{ time(row.lastFollowedAt) }}</template>\n          <template #createdByName=\"{ row }\">{{ row.createdByName || '-' }}</template>\n          <template #createdAt=\"{ row }\">{{ time(row.createdAt) }}</template>\n          <template #operation=\"{ row }\">\n            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n",
+          "stage": "before-migrations",
+          "reason": "User approved customer list removal of next follow time, addition of creator and creation time; followup and detail behavior preserved."
+        },
+        {
+          "before": "  { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },\n  { colKey: 'requirement', title: '客户需求', width: 120, ellipsis: true },\n  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true },\n  { colKey: 'nextFollowAt', title: '下次跟进时间', width: 130, ellipsis: true },\n  { colKey: 'operation', title: '操作', width: 200 },\n];\nconst detailItems = computed(() => {\n",
+          "after": "  { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },\n  { colKey: 'requirement', title: '客户需求', width: 120, ellipsis: true },\n  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true },\n  { colKey: 'createdByName', title: '创建人', width: 90, ellipsis: true },\n  { colKey: 'createdAt', title: '创建时间', width: 160, ellipsis: true },\n  { colKey: 'operation', title: '操作', width: 200 },\n];\nconst detailItems = computed(() => {\n",
+          "stage": "before-migrations",
+          "reason": "User approved customer list removal of next follow time, addition of creator and creation time; followup and detail behavior preserved."
+        },
+        {
           "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
           "stage": "before-migrations",
           "before": "      <t-form-item label=\"归属人\" required-mark v-bind=\"profileFeedback.field('owner', profile.ownerAccountId)\">\n        <t-select\n          v-model=\"profile.ownerAccountId\"\n          :disabled=\"Boolean(editingId) && !can('assign', editingStatus)\"\n          filterable\n          clearable\n          placeholder=\"请选择归属人\"\n",

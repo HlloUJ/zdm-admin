@@ -73,7 +73,7 @@ public class CustomerService {
   }
   private static String text(String value) { return value == null ? "" : value.trim(); }
   private static LocalDateTime date(ResultSet rs, String key) throws SQLException {
-    var value = rs.getTimestamp(key); return value == null ? null : value.toLocalDateTime();
+    return rs.getObject(key, LocalDateTime.class);
   }
   private static Long number(ResultSet rs, String key) throws SQLException {
     return rs.getObject(key, Long.class);
@@ -102,7 +102,7 @@ public class CustomerService {
     if (owner != null) { sql.append(" AND c.owner_account_id=?"); args.add(owner); }
     if (!text(name).isEmpty()) { sql.append(" AND LOCATE(?,c.name)>0"); args.add(text(name)); }
     if (!text(phone).isEmpty()) { sql.append(" AND LOCATE(?,c.phone)>0"); args.add(text(phone)); }
-    sql.append(" ORDER BY ").append("daily".equals(status) ? "c.created_at" : "c.archived_at").append(" DESC,c.id DESC");
+    sql.append(" ORDER BY c.created_at DESC,c.id DESC");
     return jdbc.query(sql.toString(),this::row,args.toArray());
   }
   private Customer accessible(Long id, boolean lock) {
