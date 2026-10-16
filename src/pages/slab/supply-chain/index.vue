@@ -1068,7 +1068,7 @@ type SalesNumberChangeContext = {
 const activeTab = ref<SlabTab>('warehouse');
 const loginUser = computed(() => getLoginUser());
 const productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);
-const sourceBlocked = (_row: SlabItem) => false;
+const sourceBlocked: (row: SlabItem) => boolean = () => false;
 const slabPermissionScope: Record<SlabTab, string> = {
   warehouse: 'warehouse',
   selling: 'selling',

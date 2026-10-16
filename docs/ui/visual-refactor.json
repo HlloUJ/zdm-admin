@@ -292,6 +292,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
+          "stage": "before-migrations",
+          "before": "    upload: (file: File) => Promise<AdminMediaValue>;\n  }>(),\n  { modelValue: undefined, mediaType: 'image', accept: 'image/*', disabled: false, errorMessage: '' },\n);\nconst emit = defineEmits<{\n",
+          "after": "    upload: (file: File) => Promise<AdminMediaValue>;\n  }>(),\n  { modelValue: undefined, label: undefined, mediaType: 'image', accept: 'image/*', disabled: false, errorMessage: '' },\n);\nconst emit = defineEmits<{\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "    theme=\"image\"\n    :accept=\"accept\"\n",
@@ -413,6 +419,12 @@
       "script": "9afaf73d9fdb05b9d1db2292627f1ed07a4adedd84edd8804698a7b12e3dd738",
       "template": "e9a01ac55f3d006e202849b94af2e3539e9217e423dcc09c9c4fcda96de3650e",
       "approvedBusinessPatches": [
+        {
+          "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
+          "stage": "before-migrations",
+          "before": "  }>(),\n  {\n    filterLayout: 'adaptive-grid',\n    tabs: () => [],\n",
+          "after": "  }>(),\n  {\n    activeTab: undefined,\n    selectedCount: undefined,\n    filterLayout: 'adaptive-grid',\n    tabs: () => [],\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -540,6 +552,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
+          "stage": "before-migrations",
+          "before": "    upload: (file: File) => Promise<AdminMediaValue>;\n  }>(),\n  { accept: '', disabled: false },\n);\nconst emit = defineEmits<{\n",
+          "after": "    upload: (file: File) => Promise<AdminMediaValue>;\n  }>(),\n  { modelValue: undefined, accept: '', disabled: false },\n);\nconst emit = defineEmits<{\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "    theme=\"file-input\"\n    :accept=\"accept\"\n",
@@ -660,6 +678,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
+          "stage": "before-migrations",
+          "before": "  }>(),\n  {\n    loading: false,\n    subjectCodeLabel: '',\n",
+          "after": "  }>(),\n  {\n    operationTypePopupMinWidth: undefined,\n    loading: false,\n    subjectCodeLabel: '',\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -1701,6 +1725,14 @@
           "before": "  background-color: var(--td-bg-color-secondarycontainer);\n  color: var(--td-text-color-placeholder);\n  font: var(--td-font-body-medium);\n  font-weight: 400;\n}\n.product-detail__basic-table {\n  margin: 0;\n",
           "after": "  background-color: var(--td-bg-color-secondarycontainer);\n  color: var(--td-text-color-placeholder);\n  font: var(--td-font-body-medium);\n}\n.product-detail__basic-table {\n  margin: 0;\n",
           "reason": "用户批准按TDesign官方模板统一界面字体；仅修改字体声明，保留富文本、模板、脚本、权限及交互。"
+        }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
+          "stage": "before-migrations",
+          "before": "    enabledLevelIds?: number[];\n  }>(),\n  { showSales: true },\n);\ndefineSlots<{\n",
+          "after": "    enabledLevelIds?: number[];\n  }>(),\n  { storeLevelName: undefined, enabledLevelIds: undefined, showSales: true },\n);\ndefineSlots<{\n"
         }
       ]
     },
@@ -3825,6 +3857,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
+          "stage": "before-migrations",
+          "before": "const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.finished-stock-management`);\nconst sourceBlocked = (_row: StockItem) => false;\nconst activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n",
+          "after": "const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.finished-stock-management`);\nconst sourceBlocked: (row: StockItem) => boolean = () => false;\nconst activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -6070,6 +6108,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "User approved clearing ESLint warnings without behavior changes: preserve undefined prop semantics and typed sourceBlocked callback returning false.",
+          "stage": "before-migrations",
+          "before": "const loginUser = computed(() => getLoginUser());\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);\nconst sourceBlocked = (_row: SlabItem) => false;\nconst slabPermissionScope: Record<SlabTab, string> = {\n  warehouse: 'warehouse',\n",
+          "after": "const loginUser = computed(() => getLoginUser());\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);\nconst sourceBlocked: (row: SlabItem) => boolean = () => false;\nconst slabPermissionScope: Record<SlabTab, string> = {\n  warehouse: 'warehouse',\n"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",

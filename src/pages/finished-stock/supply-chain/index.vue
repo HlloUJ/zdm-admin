@@ -1211,7 +1211,7 @@ const tabs: TabConfig[] = [
 const pageSizeOptions = [10, 20, 50];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
 const productPermissionPrefix = computed(() => `${'supply-chain'}.finished-stock-management`);
-const sourceBlocked = (_row: StockItem) => false;
+const sourceBlocked: (row: StockItem) => boolean = () => false;
 const activeTab = ref<StockStatus>('warehouse');
 const finishedScope: Record<StockStatus, string> = {
   warehouse: 'warehouse',

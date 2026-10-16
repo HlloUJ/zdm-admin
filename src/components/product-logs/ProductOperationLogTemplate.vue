@@ -167,6 +167,7 @@ const props = withDefaults(
     summaryLabel?: (row: ProductOperationLogRow) => string;
   }>(),
   {
+    operationTypePopupMinWidth: undefined,
     loading: false,
     subjectCodeLabel: '',
     formatTime: productLogTime,

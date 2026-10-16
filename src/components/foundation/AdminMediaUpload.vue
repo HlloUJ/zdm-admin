@@ -65,7 +65,7 @@ const props = withDefaults(
     errorMessage?: string;
     upload: (file: File) => Promise<AdminMediaValue>;
   }>(),
-  { modelValue: undefined, mediaType: 'image', accept: 'image/*', disabled: false, errorMessage: '' },
+  { modelValue: undefined, label: undefined, mediaType: 'image', accept: 'image/*', disabled: false, errorMessage: '' },
 );
 const emit = defineEmits<{
   'update:modelValue': [value?: AdminMediaValue];

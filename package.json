@@ -26,9 +26,9 @@
     "preview": "vite preview --configLoader runner --host 127.0.0.1",
     "typecheck": "vue-tsc --noEmit",
     "typecheck:cached": "vue-tsc --noEmit --incremental --tsBuildInfoFile .task-runtime/cache/vue-tsc.tsbuildinfo",
-    "lint": "eslint . --cache --cache-location .task-runtime/cache/eslint",
-    "lint:changed": "eslint --cache --cache-location .task-runtime/cache/eslint",
-    "lint:fix": "eslint . --fix",
+    "lint": "eslint . --cache --cache-location .task-runtime/cache/eslint --max-warnings=0",
+    "lint:changed": "eslint --cache --cache-location .task-runtime/cache/eslint --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "format:changed": "prettier --check --ignore-unknown",
@@ -77,7 +77,7 @@
   },
   "lint-staged": {
     "*.{js,ts,vue}": [
-      "eslint --fix",
+      "eslint --fix --max-warnings=0",
       "prettier --write"
     ],
     "*.{css,md,json,yml,yaml}": [

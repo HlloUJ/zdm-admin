@@ -466,7 +466,7 @@ test('customer profile dialogs retain native component visuals', async ({ page }
 test('customer followup dialogs retain native component visuals', async ({ page }, testInfo) => {
   await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');
-  const { reference, checkDialog, native, styleOf } = await nativeDialogVisuals(page, testInfo);
+  const { reference, checkDialog, styleOf } = await nativeDialogVisuals(page, testInfo);
   const own = page.locator('tr').filter({ hasText: '王先生1' });
   let dialog: ReturnType<Page['locator']>;
   await own.getByText('详情', { exact: true }).click();

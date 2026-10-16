@@ -1,22 +1,23 @@
 import { mount } from '@vue/test-utils';
-import { defineComponent, h, nextTick } from 'vue';
+import { defineComponent, h, nextTick, type PropType } from 'vue';
+import type { UploadProps } from 'tdesign-vue-next';
 import { describe, expect, it, vi } from 'vitest';
 import AdminMediaUpload from './AdminMediaUpload.vue';
 import { adminFeedback } from './feedback/adminFeedback';
 vi.mock('./feedback/adminFeedback', () => ({ adminFeedback: { actionSuccess: vi.fn(), actionError: vi.fn() } }));
 const NativeUpload = defineComponent({
   name: 'TUpload',
-  props: [
-    'files',
-    'theme',
-    'max',
-    'multiple',
-    'requestMethod',
-    'imageViewerProps',
-    'showImageFileName',
-    'trigger',
-    'disabled',
-  ],
+  props: {
+    files: { type: Array as PropType<UploadProps['files']>, default: undefined },
+    theme: { type: String as PropType<UploadProps['theme']>, default: undefined },
+    max: { type: Number, default: undefined },
+    multiple: { type: Boolean, default: undefined },
+    requestMethod: { type: Function as PropType<UploadProps['requestMethod']>, default: undefined },
+    imageViewerProps: { type: Object as PropType<UploadProps['imageViewerProps']>, default: undefined },
+    showImageFileName: { type: Boolean, default: undefined },
+    trigger: { type: [String, Function] as PropType<UploadProps['trigger']>, default: undefined },
+    disabled: { type: Boolean, default: undefined },
+  },
   render: () => h('div'),
 });
 const media = { name: 'test.png', mediaId: 42, url: '/test.png' };

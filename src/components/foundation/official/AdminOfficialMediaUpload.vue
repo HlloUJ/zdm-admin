@@ -28,7 +28,7 @@ const props = withDefaults(
     disabled?: boolean;
     upload: (file: File) => Promise<AdminMediaValue>;
   }>(),
-  { accept: '', disabled: false },
+  { modelValue: undefined, accept: '', disabled: false },
 );
 const emit = defineEmits<{
   'update:modelValue': [value?: AdminMediaValue];

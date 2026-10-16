@@ -184,6 +184,8 @@ const props = withDefaults(
     tableProps: TableProps;
   }>(),
   {
+    activeTab: undefined,
+    selectedCount: undefined,
     filterLayout: 'adaptive-grid',
     tabs: () => [],
     filters: () => [],
