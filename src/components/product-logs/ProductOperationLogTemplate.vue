@@ -60,10 +60,10 @@
             </t-form-item>
           </div>
           <div class="operation-log-filter-actions">
-            <t-button theme="primary" @click="emit('search')"
+            <t-button :theme="buttonTheme('search')" @click="emit('search')"
               ><template #icon><t-icon name="search" /></template>查询</t-button
             >
-            <t-button theme="default" variant="base" @click="emit('reset')"
+            <t-button :theme="buttonTheme('reset')" variant="base" @click="emit('reset')"
               ><template #icon><t-icon name="refresh" /></template>重置</t-button
             >
           </div>
@@ -79,7 +79,7 @@
         <template #operationSummary="{ row }">{{ summaryLabel(row) }}</template>
         <template #operatedAt="{ row }">{{ formatTime(row.operatedAt) }}</template>
         <template #operation="{ row }"
-          ><t-link theme="primary" @click="emit('open-detail', row.id)">详情</t-link></template
+          ><t-link :theme="buttonTheme('view')" @click="emit('open-detail', row.id)">详情</t-link></template
         >
         <template #empty>暂无操作日志</template>
       </t-table>
@@ -92,11 +92,12 @@
     </t-space>
   </t-drawer>
   <AdminDialog
+    :confirmation="{ kind: 'close', text: '关闭' }"
+    confirm-function="close"
     :visible="detailVisible"
     header="操作详情"
     width="min(1240px, 94vw)"
     :cancel-btn="null"
-    confirm-btn="关闭"
     @confirm="emit('update:detailVisible', false)"
     @update:visible="emit('update:detailVisible', $event)"
   >
@@ -129,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { computed } from 'vue';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
@@ -165,6 +167,7 @@ const props = withDefaults(
     summaryLabel?: (row: ProductOperationLogRow) => string;
   }>(),
   {
+    operationTypePopupMinWidth: undefined,
     loading: false,
     subjectCodeLabel: '',
     formatTime: productLogTime,

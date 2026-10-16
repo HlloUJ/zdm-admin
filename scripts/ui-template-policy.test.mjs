@@ -1,3 +1,4 @@
+import { confirmationRegistryViolations, confirmationViolations } from './confirmation-policy.mjs';
 import { parse as parseSfc } from '@vue/compiler-sfc';
 import { parse as parseTemplate, NodeTypes } from '@vue/compiler-dom';
 import test from 'node:test';
@@ -7,6 +8,12 @@ import path from 'node:path';
 import postcss from 'postcss';
 import { digest, inspectPage, listLayoutViolations, pageViolations, templateShape } from './ui-template-policy.mjs';
 import { typographyViolations } from './typography-policy.mjs';
+import {
+  buttonColorViolations,
+  registryViolations,
+  buttonClasses,
+  buttonStyleViolations,
+} from './button-color-policy.mjs';
 import { businessFingerprint, contractViolations } from './visual-refactor-contract.mjs';
 const refactor = JSON.parse(readFileSync('docs/ui/visual-refactor.json', 'utf8'));
 const approvedVisualFiles = new Set(refactor.approvedVisualFiles);
@@ -108,17 +115,44 @@ test('visual migration never authorizes changing business events, copy, conditio
   }
 });
 
-test('approved visual surfaces use official color and shadow tokens', () => {
+test('approved visual surfaces use official tokens or exact user-approved local declarations', () => {
+  const approvals = refactor.approvedVisualDeclarations ?? [];
+  const consumed = new Set();
+  const matchesApproval = (entry, file, declaration) =>
+    entry.file === file &&
+    entry.selector === declaration.parent.selector &&
+    entry.property === declaration.prop &&
+    entry.value === declaration.value;
+  for (const entry of approvals) {
+    assert.ok(
+      approvedVisualFiles.has(entry.file) && entry.reason,
+      'Local visual approvals must have a registered surface and reason',
+    );
+    // An approval never authorizes a different surface, selector, property or value.
+    const declaration = { parent: { selector: entry.selector }, prop: entry.property, value: entry.value };
+    assert.equal(matchesApproval(entry, `${entry.file}.other`, declaration), false);
+    assert.equal(matchesApproval(entry, entry.file, { ...declaration, value: '#ff0000' }), false);
+    assert.equal(matchesApproval(entry, entry.file, { ...declaration, prop: 'border-color' }), false);
+    assert.equal(matchesApproval(entry, entry.file, { ...declaration, parent: { selector: '.other' } }), false);
+  }
   for (const file of approvedVisualFiles) {
     const source = read(file);
     const styles = file.endsWith('.vue') ? inspectPage(source).styles.map((s) => s.content) : [source];
     for (const style of styles)
       postcss.parse(style).walkDecls((declaration) => {
-        assert.doesNotMatch(declaration.value, /#[a-f\d]{3,8}\b/i, `${file}: use official semantic color tokens`);
-        if (declaration.prop === 'box-shadow')
+        if (
+          /#[a-f\d]{3,8}\b/i.test(declaration.value) ||
+          (declaration.prop === 'box-shadow' && !/^(none|var\(--td-shadow-)/.test(declaration.value))
+        ) {
+          const approval = approvals.find((entry) => matchesApproval(entry, file, declaration));
+          assert.ok(approval, `${file}: unapproved local color at ${declaration.parent.selector}: ${declaration.prop}`);
+          consumed.add(approval);
+        }
+        if (declaration.prop === 'box-shadow' && !approvals.some((entry) => matchesApproval(entry, file, declaration)))
           assert.match(declaration.value, /^(none|var\(--td-shadow-)/, `${file}: use official shadows`);
       });
   }
+  assert.equal(consumed.size, approvals.length, 'Local visual approvals must remain exact and used');
 });
 
 test('approved responsive sidebar additions cannot hide business changes or a different breakpoint', () => {
@@ -691,4 +725,148 @@ test('submit validation entries share one summary and location implementation wi
     read('src/pages/finished-stock/store/price-configuration.vue'),
     /adminFeedback.error\(getSafeErrorMessage\(error, '保存失败，请稍后重试'\)\)/,
   );
+});
+
+test('later approved business fixes reverse before overlapping migrations without relaxing exact matching', () => {
+  const original = '<template><t-button>执行</t-button></template>';
+  const migrated = original.replace('执行', '批量执行');
+  const fixed = migrated.replace('<t-button>', '<t-button :disabled="!selected.length">');
+  const patch = {
+    reason: 'User approved zero-selection disabling',
+    before: migrated,
+    after: fixed,
+    stage: 'before-migrations',
+  };
+  const baseline = {
+    ...businessFingerprint(original),
+    approvedPlaceholderPatches: [{ reason: 'Earlier approved migration', before: original, after: migrated }],
+    approvedBusinessPatches: [patch],
+  };
+  assert.deepEqual(contractViolations('page.vue', fixed, baseline), []);
+  for (const invalid of [fixed.replace('批量执行', '删除'), fixed + fixed, migrated])
+    assert.ok(contractViolations('page.vue', invalid, baseline).length);
+  for (const change of [{ reason: '' }, { stage: 'unknown' }, { after: '' }])
+    assert.ok(
+      contractViolations('page.vue', fixed, { ...baseline, approvedBusinessPatches: [{ ...patch, ...change }] }).length,
+    );
+  assert.ok(contractViolations('page.vue', fixed, { ...baseline, approvedBusinessPatches: [] }).length);
+});
+
+test('all business button and dialog colors use registered functions, including future pages', () => {
+  const problems = [
+    ...registryViolations(),
+    ...files('src')
+      .filter((file) => file.endsWith('.vue'))
+      .flatMap((file) => buttonColorViolations(file, read(file))),
+  ];
+  assert.deepEqual(problems, []);
+});
+test('unregistered functions, direct colors, missing confirmation semantics and forged controls fail closed', () => {
+  const source = (template) =>
+    `<template>${template}</template><script setup>import { buttonTheme, buttonFunctionFor, actionButtonProps, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';</script>`;
+  const good = source(
+    `<t-button :theme="buttonTheme('delete')">删除</t-button><t-link :theme="buttonTheme('delete')">删除</t-link><AdminConfirmDialog function="delete" /><AdminDialog confirm-function="off-shelf" />`,
+  );
+  assert.deepEqual(buttonColorViolations('new-page.vue', good), []);
+  for (const template of [
+    '<t-button>新增</t-button>',
+    '<t-link theme="danger">删除</t-link>',
+    `<t-button :theme="buttonTheme('not-registered')" />`,
+    `<t-button :theme="buttonTheme(buttonFunctionFor('stock', 'unknown'))" />`,
+    `<t-button :theme="buttonTheme('save')" style="color:red" />`,
+    '<t-button data-button-control="section-navigation" />',
+    '<button @click="remove">删除</button>',
+    '<AdminDialog />',
+    `<AdminDialog confirm-function="delete" :confirm-btn="{ content: '删除', theme: 'danger' }" />`,
+    '<AdminConfirmDialog function="not-registered" />',
+    '<t-dialog confirm-btn="确认" />',
+    `<t-button v-bind="overrides" :theme="buttonTheme('save')" />`,
+  ])
+    assert.ok(buttonColorViolations('new-page.vue', source(template)).length, template);
+  const invalid = {
+    categories: { normal: { theme: 'danger', meaning: 'bad mapping' } },
+    functions: { foo: { label: '新功能', category: 'unknown', reason: '' } },
+    groups: { future: { run: 'missing' } },
+  };
+  assert.ok(registryViolations(invalid).length >= 3);
+});
+
+test('button classes cannot override the public mapping in scoped or global CSS', () => {
+  const vueFiles = files('src').filter((file) => file.endsWith('.vue'));
+  const classes = new Set(vueFiles.flatMap((file) => [...buttonClasses(read(file))]));
+  const errors = [];
+  for (const file of files('src')) {
+    if (file.endsWith('.vue'))
+      for (const style of parseSfc(read(file)).descriptor.styles)
+        errors.push(...buttonStyleViolations(file, style.content, classes));
+    else if (file.endsWith('.css')) errors.push(...buttonStyleViolations(file, read(file), classes));
+  }
+  assert.deepEqual(errors, []);
+  assert.ok(buttonStyleViolations('page.vue', '.t-button:hover { color: red }').length);
+  assert.ok(buttonStyleViolations('page.vue', '.custom { background: orange }', new Set(['custom'])).length);
+  assert.deepEqual(buttonStyleViolations('page.vue', '.custom { margin-left: auto }', new Set(['custom'])), []);
+});
+
+test('public button and confirmation contracts require semantic IDs without legacy color fallbacks', () => {
+  for (const [file, field] of [
+    ['src/components/foundation/AdminDialog.vue', 'confirmFunction'],
+    ['src/components/foundation/official/AdminFormDialog.vue', 'confirmFunction'],
+    ['src/components/foundation/AdminConfirmDialog.vue', 'function'],
+    ['src/components/foundation/official/types.ts', 'function'],
+  ]) {
+    const source = read(file);
+    assert.match(source, new RegExp(field + ': ButtonFunction'));
+    assert.doesNotMatch(source, new RegExp(field + '\\?: ButtonFunction'));
+  }
+  assert.doesNotMatch(read('src/components/foundation/AdminConfirmDialog.vue'), /props\.danger|删除\|移除\|清空/);
+  for (const file of [
+    'src/pages/finished-stock/shared/finishedStockActions.ts',
+    'src/pages/finished-stock/shared/finishedStockPageModel.ts',
+    'src/pages/slab/shared/slabPageActions.ts',
+  ])
+    assert.doesNotMatch(read(file), /\btheme\??:/);
+});
+
+test('all existing and future confirmations use registered naming without local caption overrides', () => {
+  assert.deepEqual(
+    [
+      ...confirmationRegistryViolations(),
+      ...files('src')
+        .filter((file) => file.endsWith('.vue'))
+        .flatMap((file) => confirmationViolations(file, read(file))),
+    ],
+    [],
+  );
+});
+test('confirmation naming rejects missing registration, unknown actions and manual captions', () => {
+  const source = (template) =>
+    `<template>${template}</template><script setup>import { formConfirmation, operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';</script>`;
+  assert.ok(
+    confirmationViolations(
+      'new.vue',
+      source('<Alias />').replace(
+        '</script>',
+        "import { AdminDialog as Alias } from '@/components/foundation';</script>",
+      ),
+    ).length,
+  );
+  for (const template of [
+    '<AdminDialog />',
+    '<AdminFormDialog :confirmation="formConfirmation(\'unknown\')" />',
+    '<AdminDialog :confirmation="operationConfirmation(\'未知动作\')" />',
+    '<AdminDialog :confirmation="formConfirmation(\'create\')" confirm-btn="提交" />',
+    '<AdminDialog :confirmation="formConfirmation(\'create\')" :confirm-btn="{content: \'保存\'}" />',
+    '<AdminConfirmDialog action="未知动作" />',
+    "<t-dialog :confirm-btn=\"actionButtonProps('delete', '提交')\" />",
+    '<t-button :theme="buttonTheme(\'save\')">保存</t-button>',
+    '<t-button data-form-submit :theme="buttonTheme(\'create\')">确认创建</t-button>',
+  ])
+    assert.ok(confirmationViolations('new.vue', source(template)).length, template);
+  for (const template of [
+    '<AdminDialog :confirmation="formConfirmation(\'create\')" />',
+    "<AdminFormDialog :confirmation=\"formConfirmation(editing ? 'edit' : 'create')\" />",
+    "<t-dialog :confirm-btn=\"dialogButtonProps('off-shelf', operationConfirmation('下架', batch), {loading: true})\" />",
+    '<AdminConfirmDialog action="停用" :batch="true" />',
+  ])
+    assert.deepEqual(confirmationViolations('new.vue', source(template)), []);
 });

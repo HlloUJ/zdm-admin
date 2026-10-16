@@ -22,10 +22,10 @@
                 </t-form-item>
               </div>
               <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch"
+                <t-button :theme="buttonTheme('search')" @click="handleSearch"
                   ><template #icon><t-icon name="search" /></template>查询</t-button
                 >
-                <t-button theme="default" variant="base" @click="handleReset"
+                <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset"
                   ><template #icon><t-icon name="refresh" /></template>重置</t-button
                 >
               </div>
@@ -35,7 +35,7 @@
 
         <section class="table-card">
           <AdminListToolbar :has-actions="canCreate"
-            ><t-button v-if="canCreate" theme="primary" @click="openCreate"
+            ><t-button v-if="canCreate" :theme="buttonTheme('create')" @click="openCreate"
               ><template #icon><t-icon name="add" /></template>新增</t-button
             ></AdminListToolbar
           >
@@ -50,16 +50,24 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="canManageAliases" theme="primary" hover="color" @click="openAliases(row)">别名</t-link>
-                <t-link v-if="canEdit" theme="primary" hover="color" @click="openEdit(row)">编辑</t-link>
+                <t-link v-if="canManageAliases" :theme="buttonTheme('aliases')" hover="color" @click="openAliases(row)"
+                  >别名</t-link
+                >
+                <t-link v-if="canEdit" :theme="buttonTheme('edit')" hover="color" @click="openEdit(row)">编辑</t-link>
                 <t-link
                   v-if="canToggle"
-                  :theme="row.status === 'normal' ? 'warning' : 'success'"
+                  :theme="buttonTheme(row.status === 'normal' ? 'disable' : 'enable')"
                   hover="color"
                   @click="openConfirm(row, row.status === 'normal' ? 'disable' : 'enable')"
                   >{{ row.status === 'normal' ? '停用' : '启用' }}</t-link
                 >
-                <t-link v-if="canDelete" theme="danger" hover="color" @click="openConfirm(row, 'delete')">删除</t-link>
+                <t-link
+                  v-if="canDelete"
+                  :theme="buttonTheme('delete')"
+                  hover="color"
+                  @click="openConfirm(row, 'delete')"
+                  >删除</t-link
+                >
               </div>
             </template>
           </t-table>
@@ -74,9 +82,11 @@
     </div>
 
     <AdminDialog
+      v-model:visible="formVisible"
+      :confirmation="formConfirmation(editingId ? 'edit' : 'create')"
+      confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      v-model:visible="formVisible"
       :header="editingId ? '编辑纹理' : '新增纹理'"
       @confirm="submitTexture"
       @cancel="formVisible = false"
@@ -98,32 +108,35 @@
 
     <AdminDialog
       v-model:visible="aliasesVisible"
+      :confirmation="{ kind: 'close', text: '关闭' }"
+      confirm-function="close"
       :header="`别名管理 - ${activeTexture?.name ?? ''}`"
       width="680px"
-      confirm-btn="关闭"
       :cancel-btn="null"
       @confirm="aliasesVisible = false"
       @close="aliasesVisible = false"
     >
       <div class="table-toolbar">
-        <t-button theme="primary" @click="openAliasForm()"
+        <t-button :theme="buttonTheme('create')" @click="openAliasForm()"
           ><template #icon><t-icon name="add" /></template>新增别名</t-button
         >
       </div>
       <t-table row-key="id" :data="aliases" :columns="aliasColumns" table-layout="fixed">
         <template #operation="{ row }">
           <div class="table-actions">
-            <t-link theme="primary" hover="color" @click="openAliasForm(row)">编辑</t-link>
-            <t-link theme="danger" hover="color" @click="removeAlias(row)">删除</t-link>
+            <t-link :theme="buttonTheme('edit')" hover="color" @click="openAliasForm(row)">编辑</t-link>
+            <t-link :theme="buttonTheme('delete')" hover="color" @click="removeAlias(row)">删除</t-link>
           </div>
         </template>
       </t-table>
     </AdminDialog>
 
     <AdminDialog
+      v-model:visible="aliasFormVisible"
+      :confirmation="formConfirmation(editingAliasId ? 'edit' : 'create')"
+      confirm-function="submit"
       dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       width="480px"
-      v-model:visible="aliasFormVisible"
       :header="editingAliasId ? '编辑别名' : '新增别名'"
       @confirm="submitAlias"
       @cancel="aliasFormVisible = false"
@@ -138,6 +151,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
+      :function="buttonFunctionFor('status', confirmType)"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
       object-type="纹理"
       :object-name="confirmRow?.name"
@@ -153,6 +167,8 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

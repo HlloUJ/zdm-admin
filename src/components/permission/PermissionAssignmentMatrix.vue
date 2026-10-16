@@ -3,10 +3,22 @@
     <div class="permission-section__header">
       <h3>功能权限</h3>
       <div class="permission-shortcuts">
-        <t-button size="small" variant="outline" theme="primary" :disabled="!modules.length" @click="selectAllNodes">
+        <t-button
+          size="small"
+          variant="outline"
+          :theme="buttonTheme('select-all')"
+          :disabled="!modules.length"
+          @click="selectAllNodes"
+        >
           全选全部
         </t-button>
-        <t-button size="small" variant="outline" :disabled="!modules.length" @click="clearAllNodes">
+        <t-button
+          :theme="buttonTheme('clear-selection')"
+          size="small"
+          variant="outline"
+          :disabled="!modules.length"
+          @click="clearAllNodes"
+        >
           清空全部
         </t-button>
       </div>
@@ -122,6 +134,7 @@
 </template>
 
 <script setup lang="ts">
+import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { computed } from 'vue';
 import {
   collectFunctionCatalogRows,

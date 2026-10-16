@@ -11,6 +11,7 @@
                 <t-link
                   v-for="section in formSections"
                   :key="section.key"
+                  data-button-control="section-navigation"
                   :href="`#finished-product-${section.key}`"
                   :theme="activeFormSection === section.key ? 'primary' : 'default'"
                   :aria-current="activeFormSection === section.key ? 'location' : undefined"
@@ -26,7 +27,7 @@
           ><template #auxiliary
             ><t-button
               v-if="canViewOperationLogs"
-              theme="default"
+              :theme="buttonTheme('logs')"
               variant="outline"
               @click="operationLogsVisible = true"
               >操作日志</t-button
@@ -107,10 +108,10 @@
                       </t-form-item>
                     </div>
                     <div class="filter-actions">
-                      <t-button theme="primary" @click="handleSearch()">
+                      <t-button :theme="buttonTheme('search')" @click="handleSearch()">
                         <template #icon><t-icon name="search" /></template>查询
                       </t-button>
-                      <t-button theme="default" variant="base" @click="handleReset()">
+                      <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset()">
                         <template #icon><t-icon name="refresh" /></template>重置
                       </t-button>
                     </div>
@@ -128,7 +129,7 @@
                   ><t-button
                     v-for="action in managementToolbarActions"
                     :key="action.id"
-                    :theme="action.className === 'brown-button' ? 'warning' : action.theme"
+                    :theme="buttonTheme(buttonFunctionFor('stock', action.id))"
                     :variant="action.variant"
                     :class="action.className"
                     :disabled="action.disabled"
@@ -139,7 +140,7 @@
                   ><template #auxiliary
                     ><t-button
                       v-if="canViewOperationLogs"
-                      theme="default"
+                      :theme="buttonTheme('logs')"
                       variant="outline"
                       @click="operationLogsVisible = true"
                       >操作日志</t-button
@@ -238,7 +239,7 @@
                         <t-link
                           v-for="action in managementRowButtons"
                           :key="action.id"
-                          :theme="action.theme"
+                          :theme="buttonTheme(buttonFunctionFor('stock', action.id))"
                           hover="color"
                           @click="handleManagementRowButton(action.id, row)"
                           >{{ action.label }}</t-link
@@ -259,7 +260,7 @@
                     <t-button
                       v-if="hasFinishedAction(['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
                       size="small"
-                      theme="primary"
+                      :theme="buttonTheme('view')"
                       @click="handleRowAction('detail', row)"
                     >
                       详情
@@ -267,7 +268,7 @@
                     <t-button
                       v-if="hasFinishedAction('purge', 'recycle')"
                       size="small"
-                      theme="danger"
+                      :theme="buttonTheme('purge')"
                       variant="base"
                       @click="handleRowAction('purge', row)"
                       >彻底删除</t-button
@@ -297,6 +298,7 @@
                     当前分类：{{ selectedCategoryPath }}
                     <t-button
                       v-if="formPageMode === 'create'"
+                      :theme="buttonTheme('switch-category')"
                       size="small"
                       variant="outline"
                       @click="openCategoryDialog"
@@ -304,7 +306,7 @@
                     >
                   </div>
                 </div>
-                <t-button theme="default" variant="base" @click="closeFormPage">
+                <t-button :theme="buttonTheme('back')" variant="base" @click="closeFormPage">
                   <template #icon><t-icon name="rollback" /></template>
                   返回列表
                 </t-button>
@@ -481,7 +483,7 @@
                 >
                   <t-button
                     v-if="!specRows.length && !isOperationsEdit"
-                    :theme="submitAttempted ? 'danger' : 'primary'"
+                    :theme="buttonTheme('create')"
                     variant="outline"
                     @click="openSpecDialog"
                   >
@@ -667,18 +669,18 @@
                       </template>
                       <template v-if="!isOperationsEdit" #operation="{ row }">
                         <div class="table-actions">
-                          <t-link theme="danger" hover="color" @click="deleteSpec(row.id)">删除</t-link>
+                          <t-link :theme="buttonTheme('delete')" hover="color" @click="deleteSpec(row.id)">删除</t-link>
                         </div>
                       </template>
                     </t-table>
                     <div class="spec-table-actions">
-                      <t-button theme="primary" variant="outline" @click="openPriceDrawer">
+                      <t-button :theme="buttonTheme('batch-fill')" variant="outline" @click="openPriceDrawer">
                         <template #icon><t-icon name="edit" /></template>
                         批量填写
                       </t-button>
                       <t-button
                         v-if="!isOperationsEdit"
-                        theme="primary"
+                        :theme="buttonTheme('edit')"
                         variant="outline"
                         @click="openSpecDialog(true)"
                       >
@@ -706,11 +708,11 @@
             </AdminSectionCard>
 
             <AdminSectionCard class="form-submit-bar">
-              <t-button theme="primary" :loading="saving" @click="submitProductForm">
+              <t-button :theme="buttonTheme('submit')" :loading="saving" @click="submitProductForm">
                 <template #icon><t-icon name="check" /></template>
-                提交商品信息
+                {{ formConfirmationText(formPageMode === 'edit' ? 'edit' : 'create') }}
               </t-button>
-              <t-button theme="default" variant="base" @click="closeFormPage">取消</t-button>
+              <t-button :theme="buttonTheme('cancel')" variant="base" @click="closeFormPage">取消</t-button>
             </AdminSectionCard>
           </section>
         </template>
@@ -718,8 +720,9 @@
     </div>
     <AdminDialog
       v-model:visible="categorySwitchWarningVisible"
+      :confirmation="operationConfirmation('切换分类')"
+      confirm-function="switch-category"
       header="切换分类"
-      confirm-btn="确认切换"
       cancel-btn="取消"
       @confirm="confirmCategorySwitchWarning"
     >
@@ -727,9 +730,10 @@
     </AdminDialog>
     <AdminDialog
       v-model:visible="categoryDialogVisible"
+      :confirmation="{ kind: 'navigation', action: 'select-category' }"
+      confirm-function="switch-category"
       header="选择商品分类"
       width="920px"
-      confirm-btn="确认，下一步"
       cancel-btn="取消"
       @confirm="confirmCategory"
       @cancel="closeCategoryDialog"
@@ -757,6 +761,8 @@
     </AdminDialog>
     <AdminDialog
       v-model:visible="specDialogVisible"
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
       header="创建规格"
       width="920px"
       :footer="false"
@@ -784,13 +790,13 @@
                 "
                 placeholder="请输入商品规格"
               />
-              <t-button shape="square" variant="text" theme="danger" @click="removeSingleSpec(index)">
+              <t-button shape="square" variant="text" :theme="buttonTheme('delete')" @click="removeSingleSpec(index)">
                 <t-icon name="delete" />
               </t-button>
               <t-button
                 :class="{ 'spec-add-hidden': index !== singleSpecs.length - 1 }"
                 shape="square"
-                theme="default"
+                :theme="buttonTheme('create')"
                 variant="outline"
                 title="新增规格项"
                 aria-label="新增规格项"
@@ -889,10 +895,16 @@
                   "
                   :placeholder="controlPlaceholder(group.name, 'input')"
                 />
-                <t-button shape="square" variant="text" theme="danger" @click="removeSpecValue(group.name, index)">
+                <t-button
+                  shape="square"
+                  variant="text"
+                  :theme="buttonTheme('delete')"
+                  @click="removeSpecValue(group.name, index)"
+                >
                   <t-icon name="delete" />
                 </t-button>
                 <t-button
+                  :theme="buttonTheme('create')"
                   :class="{ 'spec-add-hidden': index !== group.values.length - 1 || !canAddSpecValue(group) }"
                   shape="square"
                   variant="outline"
@@ -908,16 +920,19 @@
         </div>
 
         <div class="spec-dialog-footer">
-          <t-button theme="primary" variant="text" @click="resetSpecDialog">重置</t-button>
-          <t-button theme="primary" @click="confirmCreateSpec">确认创建</t-button>
-          <t-button theme="default" variant="base" @click="closeSpecDialog">取消</t-button>
+          <t-button :theme="buttonTheme('reset')" variant="text" @click="resetSpecDialog">重置</t-button>
+          <t-button data-form-submit :theme="buttonTheme('create')" @click="confirmCreateSpec">{{
+            formConfirmationText(specFormMode)
+          }}</t-button>
+          <t-button :theme="buttonTheme('cancel')" variant="base" @click="closeSpecDialog">取消</t-button>
         </div>
       </div>
     </AdminDialog>
     <AdminDialog
       v-model:visible="specModeConfirmVisible"
+      :confirmation="operationConfirmation('切换展示模式')"
+      confirm-function="edit"
       header="切换展示模式"
-      confirm-btn="确认切换"
       cancel-btn="取消"
       @confirm="confirmSpecModeChange"
       @cancel="specModeConfirmVisible = false"
@@ -940,9 +955,9 @@
           <strong>批量填写</strong>
           <span>按规格属性值圈定范围，再填写要覆盖的字段</span>
         </div>
-        <t-button theme="primary" @click="savePriceDrawer">
+        <t-button :theme="buttonTheme('save')" @click="savePriceDrawer">
           <template #icon><t-icon name="save" /></template>
-          保存
+          {{ formConfirmationText('edit') }}
         </t-button>
       </div>
 
@@ -986,8 +1001,8 @@
           <div class="batch-field-grid">
             <t-form-item v-if="!isOperationsEdit" label="成本价">
               <SpecPriceInput
-                form-layout
                 v-model="batchFillForm.cost"
+                form-layout
                 placeholder="请输入价格"
                 label="价格"
                 optional
@@ -998,8 +1013,8 @@
             <t-form-item label="指导价">
               <div class="price-pair wide">
                 <SpecPriceInput
-                  form-layout
                   v-model="batchFillForm.guideCoefficient"
+                  form-layout
                   placeholder="请输入系数"
                   label="系数"
                   optional
@@ -1007,8 +1022,8 @@
                   @change="handleBatchCoefficientChange('guideCoefficient', 'guide', $event)"
                 />
                 <SpecPriceInput
-                  form-layout
                   v-model="batchFillForm.guide"
+                  form-layout
                   placeholder="请输入价格"
                   label="价格"
                   optional
@@ -1024,8 +1039,8 @@
             >
               <div class="price-pair wide">
                 <SpecPriceInput
-                  form-layout
                   v-model="batchMarkupPrices[configuration.id].coefficient"
+                  form-layout
                   placeholder="请输入系数"
                   label="系数"
                   optional
@@ -1033,8 +1048,8 @@
                   @change="handleBatchMarkupChange(configuration.id, 'coefficient', $event)"
                 />
                 <SpecPriceInput
-                  form-layout
                   v-model="batchMarkupPrices[configuration.id].price"
+                  form-layout
                   placeholder="请输入价格"
                   label="价格"
                   optional
@@ -1075,8 +1090,8 @@
       header="下架"
       width="520px"
       placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
+      :confirm-btn="dialogButtonProps('off-shelf', operationConfirmation('下架', reasonState.isBatch))"
+      :cancel-btn="cancelButtonProps('取消')"
       @confirm="submitReason"
       @cancel="closeReasonDialog"
       @close="closeReasonDialog"
@@ -1138,6 +1153,7 @@
     <FinishedOperationLogs v-if="canViewOperationLogs" v-model:visible="operationLogsVisible" />
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('stock', confirmState.type)"
       :action="confirmAction"
       object-type="商品"
       :object-name="confirmState.product?.name"
@@ -1151,6 +1167,9 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
@@ -1910,25 +1929,25 @@ const batchButtons = computed(() => {
     {
       action: BatchAction;
       label: string;
-      theme: string;
+
       icon: string;
       className?: string;
     }[]
   > = {
     warehouse: [
-      { action: 'publish', label: '发布商品', theme: 'primary', icon: 'add' },
-      { action: 'batchShelf', label: '批量上架', theme: 'primary', icon: 'upload' },
+      { action: 'publish', label: '发布商品', icon: 'add' },
+      { action: 'batchShelf', label: '批量上架', icon: 'upload' },
     ],
     selling: [
-      { action: 'publish', label: '发布商品', theme: 'primary', icon: 'add' },
-      { action: 'batchOffShelf', label: '批量下架', theme: 'default', icon: 'download', className: 'brown-button' },
+      { action: 'publish', label: '发布商品', icon: 'add' },
+      { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },
     ],
-    offShelf: [{ action: 'batchRestore', label: '批量放回到仓库', theme: 'primary', icon: 'rollback' }],
+    offShelf: [{ action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' }],
     soldOut: [],
     recycle: [
-      { action: 'batchRestore', label: '批量放回到仓库', theme: 'primary', icon: 'rollback' },
-      { action: 'batchPurge', label: '批量彻底删除', theme: 'danger', icon: 'delete', className: 'deep-danger-button' },
-      { action: 'clearRecycle', label: '清空回收站', theme: 'danger', icon: 'clear' },
+      { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },
+      { action: 'batchPurge', label: '批量彻底删除', icon: 'delete', className: 'deep-danger-button' },
+      { action: 'clearRecycle', label: '清空回收站', icon: 'clear' },
     ],
   };
   const actions = [...map[activeTab.value]];
@@ -1940,9 +1959,10 @@ const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
   batchButtons.value.map((button) => ({
     id: button.action,
     label: button.label,
-    theme: button.theme as FinishedStockToolbarAction['theme'],
+
     icon: button.icon,
     className: button.className,
+    disabled: !['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.value.length,
   })),
 );
 // Fixed pixel widths; update only when the tab action buttons change.
@@ -2070,7 +2090,6 @@ const managementRowButtons = computed<FinishedStockRowAction[]>(() => [
   ...rowActions().map((action) => ({
     id: action.id,
     label: action.label,
-    theme: action.theme as FinishedStockRowAction['theme'],
   })),
 ]);
 const handleManagementRowButton = (action: string, row: StockItem) => {
@@ -2377,6 +2396,7 @@ const {
   handleBatchPriceChange,
 } = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
 const {
+  specFormMode,
   openSpecDialog,
   closeSpecDialog,
   specDraftError,

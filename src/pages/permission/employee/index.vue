@@ -49,11 +49,11 @@
                     </t-form-item>
                   </div>
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="handleSearch">
+                    <t-button :theme="buttonTheme('search')" @click="handleSearch">
                       <template #icon><t-icon name="search" /></template>
                       查询
                     </t-button>
-                    <t-button theme="default" variant="base" @click="handleReset">
+                    <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                       <template #icon><t-icon name="refresh" /></template>
                       重置
                     </t-button>
@@ -61,7 +61,7 @@
                 </div>
               </t-form>
               <AdminListToolbar :has-actions="canCreateEmployee"
-                ><t-button theme="primary" :loading="inviteCreating" @click="openInviteDialog">
+                ><t-button :theme="buttonTheme('create')" :loading="inviteCreating" @click="openInviteDialog">
                   <template #icon><t-icon name="add" /></template>
                   邀请员工
                 </t-button></AdminListToolbar
@@ -93,7 +93,7 @@
                 <div class="table-actions">
                   <t-link
                     v-if="canEditEmployee && !isCurrentEmployee(row)"
-                    theme="primary"
+                    :theme="buttonTheme('edit')"
                     hover="color"
                     @click="openProfileDialog(row)"
                   >
@@ -101,7 +101,7 @@
                   </t-link>
                   <t-link
                     v-if="canConfigureEmployeePermission && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)"
-                    theme="primary"
+                    :theme="buttonTheme('roles')"
                     hover="color"
                     @click="openPermissionDialog(row)"
                   >
@@ -109,7 +109,7 @@
                   </t-link>
                   <t-link
                     v-if="canToggleEmployeeStatus && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)"
-                    :theme="row.status === 'normal' ? 'warning' : 'success'"
+                    :theme="buttonTheme(row.status === 'normal' ? 'disable' : 'enable')"
                     hover="color"
                     @click="openStatusConfirm(row)"
                   >
@@ -117,7 +117,7 @@
                   </t-link>
                   <t-link
                     v-if="canDeleteEmployee && !isSuperAdminEmployee(row) && !isCurrentEmployee(row)"
-                    theme="danger"
+                    :theme="buttonTheme('delete')"
                     hover="color"
                     @click="openDeleteConfirm(row)"
                   >
@@ -152,6 +152,8 @@
 
     <t-dialog
       v-model:visible="inviteDialogVisible"
+      :cancel-btn="cancelButtonProps(undefined)"
+      :confirm-btn="dialogButtonProps('submit', operationConfirmation('邀请员工'))"
       header="邀请员工"
       width="560px"
       placement="center"
@@ -168,22 +170,24 @@
             :autosize="{ minRows: 3, maxRows: 3 }"
             @focus="selectInviteLink"
           />
-          <t-link theme="primary" hover="color" class="copy-link" @click="copyInviteLink">复制链接</t-link>
+          <t-link :theme="buttonTheme('copy-link')" hover="color" class="copy-link" @click="copyInviteLink"
+            >复制链接</t-link
+          >
         </div>
       </div>
       <template #footer>
-        <t-button theme="default" variant="base" @click="closeInviteDialog">关闭</t-button>
+        <t-button :theme="buttonTheme('close')" variant="base" @click="closeInviteDialog">关闭</t-button>
       </template>
     </t-dialog>
 
     <t-dialog
-      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="profileDialogVisible"
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       header="编辑资料"
       width="480px"
       placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
+      :confirm-btn="dialogButtonProps('submit', formConfirmation('edit'))"
+      :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleProfileSubmit"
       @cancel="closeProfileDialog"
       @close="closeProfileDialog"
@@ -214,8 +218,8 @@
       header="配置权限"
       width="560px"
       placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
+      :confirm-btn="dialogButtonProps('permissions', operationConfirmation('配置权限'))"
+      :cancel-btn="cancelButtonProps('取消')"
       @confirm="handlePermissionSubmit"
       @cancel="closePermissionDialog"
       @close="closePermissionDialog"
@@ -242,6 +246,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('status', confirmType)"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
       object-type="员工"
       :object-name="confirmEmployee?.name"
@@ -255,6 +260,12 @@
 </template>
 
 <script setup lang="ts">
+import {
+  operationConfirmation,
+  dialogButtonProps,
+  formConfirmation,
+} from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';

@@ -58,7 +58,9 @@ export function useFinishedStockSpecDialog({
   createBaseSpecRow,
   salesAttributeByKey,
 }: SpecDialogContext) {
+  const specFormMode = ref<'create' | 'edit'>('create');
   const openSpecDialog = async (preserveCurrent = false) => {
+    specFormMode.value = preserveCurrent === true ? 'edit' : 'create';
     validatedSpecDraftIds.value = new Set();
     try {
       await refreshPriceConfigurations();
@@ -448,6 +450,7 @@ export function useFinishedStockSpecDialog({
     level3: row.level3,
   });
   return {
+    specFormMode,
     specModeChanged,
     openSpecDialog,
     closeSpecDialog,

@@ -54,8 +54,10 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
     } else {
       query.eq(Role::getTenantId, scope.tenantId()).eq(Role::getStoreId, scope.storeId());
     }
-    query.eq(!com.zdm.platform.security.DataScope.isAll(identityProvider.require()), Role::getCreatedByAccountId,
-        identityProvider.require().accountId());
+    if (!com.zdm.platform.security.DataScope.isAll(identityProvider.require())) {
+      query.and(owned -> owned.eq(Role::getCreatedByAccountId, identityProvider.require().accountId())
+          .or().eq(Role::getBuiltinKey, StoreBuiltinRoleService.MANAGER_KEY));
+    }
     return query
         .orderByDesc(Role::getCreatedAt)
         .list();
@@ -83,6 +85,11 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
     role.setTenantId(scope.tenantId());
     role.setStoreId(scope.storeId());
     role.setDataScope("all");
+    if (role.getBuiltinKey() != null || StoreBuiltinRoleService.MANAGER_KEY.equals(role.getCode())
+        || role.getCode().startsWith("BUILTIN_STORE_MANAGER_")
+        || (scope.storeId() != null && StoreBuiltinRoleService.MANAGER_NAME.equals(role.getName().trim()))) {
+      throw new IllegalArgumentException("店长是门店内置角色，不可重复创建");
+    }
     normalizeAndValidateRoleName(role, null);
     role.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(role.getFunctionPermissions()));
     requireAllowedRolePermissions(role, scope);
@@ -100,7 +107,24 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
       return false;
     }
     requireAccessibleRole(existing);
-    authorizeUpdate(existing, payload);
+    if (StoreBuiltinRoleService.isManager(existing)) {
+      requireRoleAction("permission", existing.getClientCode());
+      if (!Objects.equals(existing.getName(), payload.getName())
+          || !Objects.equals(text(existing.getRemark()), text(payload.getRemark()))
+          || !Objects.equals(existing.getStatus(), payload.getStatus())
+          || !Objects.equals(existing.getCode(), payload.getCode())
+          || !Objects.equals(existing.getDataScope(), payload.getDataScope())
+          || (payload.getBuiltinKey() != null && !Objects.equals(existing.getBuiltinKey(), payload.getBuiltinKey()))) {
+        throw new IllegalArgumentException("内置店长仅支持配置权限，不可编辑或停用");
+      }
+    } else {
+      if (payload.getBuiltinKey() != null) { throw new IllegalArgumentException("不可将普通角色改为内置角色"); }
+      if (existing.getStoreId() != null && StoreBuiltinRoleService.MANAGER_NAME.equals(payload.getName().trim())) {
+        throw new IllegalArgumentException("店长是门店内置角色，不可重复创建");
+      }
+      authorizeUpdate(existing, payload);
+    }
+    payload.setBuiltinKey(existing.getBuiltinKey());
 
     payload.setClientCode(existing.getClientCode());
     payload.setCreatedByClientCode(existing.getCreatedByClientCode());
@@ -108,7 +132,7 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
     payload.setCode(existing.getCode());
     payload.setTenantId(existing.getTenantId());
     payload.setStoreId(existing.getStoreId());
-    payload.setDataScope("all");
+    payload.setDataScope(StoreBuiltinRoleService.isManager(existing) ? existing.getDataScope() : "all");
     payload.setCreatedByAccountId(existing.getCreatedByAccountId());
     if (isSuperAdminRole(existing)) {
       payload.setCode(SUPER_ADMIN_CODE);
@@ -131,6 +155,7 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
     }
     requireAccessibleRole(existing);
     requireRoleAction("delete",existing.getClientCode());
+    if (StoreBuiltinRoleService.isManager(existing)) { throw new IllegalArgumentException("内置店长角色不可删除"); }
     if (isSuperAdminRole(existing)) {
       throw new IllegalArgumentException("超级管理员角色不可删除");
     }
@@ -138,6 +163,8 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
     removeRoleAssociations(id);
     return removeById(id);
   }
+
+  private static String text(String value) { return value == null ? "" : value; }
 
   private boolean isSuperAdminRole(Role role) {
     return SUPER_ADMIN_CODE.equals(role.getCode());
@@ -166,7 +193,10 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
   }
 
   private void requireAccessibleRole(Role role) {
-    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), role.getCreatedByAccountId());
+    com.zdm.platform.security.DataScope.requireConfigured(identityProvider.require());
+    if (!StoreBuiltinRoleService.isManager(role)) {
+      com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), role.getCreatedByAccountId());
+    }
     RoleScope scope = requireCurrentScope(role.getClientCode());
     if (!Objects.equals(role.getTenantId(), scope.tenantId())
         || !Objects.equals(role.getStoreId(), scope.storeId())) {

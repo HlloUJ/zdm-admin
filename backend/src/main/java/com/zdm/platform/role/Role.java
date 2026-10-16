@@ -15,6 +15,10 @@ public class Role implements com.zdm.platform.security.CreatorOwned, com.zdm.pla
   public String getClientCode() { return clientCode; }
   public void setClientCode(String value) { clientCode = value; }
 
+  private String builtinKey;
+  public String getBuiltinKey() { return builtinKey; }
+  public void setBuiltinKey(String value) { builtinKey = value; }
+
   private String createdByClientCode;
   public String getCreatedByClientCode() { return createdByClientCode; }
   public void setCreatedByClientCode(String value) { createdByClientCode = value; }

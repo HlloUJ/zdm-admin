@@ -54,10 +54,21 @@ for (const route of [
     expect(before.length).toBeGreaterThan(0);
     for (const item of before) expect(Math.abs(item.available - item.width)).toBeLessThanOrEqual(1);
     for (const label of await dialog.locator('.t-form__label').all()) await expect(label).toHaveCSS('width', '100px');
-    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    await dialog
+      .getByRole('button', {
+        name: '确认新增',
+        exact: true,
+      })
+      .click();
     expect(await geometry()).toEqual(before);
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     await expect(dialog).toBeHidden();
+    if (route === '/slab-variety' || route === '/slab-grade') {
+      await page.getByRole('main').getByText('编辑', { exact: true }).first().click();
+      await expect(dialog.getByRole('button', { name: '确认保存', exact: true })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: '确认新增', exact: true })).toHaveCount(0);
+      await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    }
   });
 }
 
@@ -79,7 +90,12 @@ test('store level edit uses the shared dialog standard even without edit in its 
   const request = page.waitForRequest(
     (request) => request.method() === 'PATCH' && request.url().endsWith('/admin/stores/1/level'),
   );
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: '确认调整门店级别',
+      exact: true,
+    })
+    .click();
   expect((await request).postDataJSON()).toEqual({ storeLevelId: 2 });
   await expect(dialog).toBeHidden();
   await expect(page.getByText('已调整门店等级', { exact: true })).toBeVisible();

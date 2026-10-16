@@ -7,6 +7,7 @@
             <t-link
               v-for="section in sections"
               :key="section.key"
+              data-button-control="section-navigation"
               :href="`#slab-product-${section.key}`"
               :theme="activeSection === section.key ? 'primary' : 'default'"
               :aria-current="activeSection === section.key ? 'location' : undefined"
@@ -20,7 +21,9 @@
     <header v-if="!hideBreadcrumb" class="page-header">
       <t-breadcrumb aria-label="页面导航">
         <t-breadcrumb-item
-          ><t-link theme="default" :disabled="loading" @click="emit('close')">大板管理</t-link></t-breadcrumb-item
+          ><t-link :theme="buttonTheme('back')" :disabled="loading" @click="emit('close')"
+            >大板管理</t-link
+          ></t-breadcrumb-item
         >
         <t-breadcrumb-item>{{ title }}</t-breadcrumb-item>
       </t-breadcrumb>
@@ -29,7 +32,7 @@
       <AdminSectionCard class="form-heading-card" aria-label="发布商品信息">
         <div class="form-title-row">
           <h1>{{ title }}</h1>
-          <t-button theme="default" variant="base" :disabled="loading" @click="emit('close')">
+          <t-button :theme="buttonTheme('back')" variant="base" :disabled="loading" @click="emit('close')">
             <template #icon><t-icon name="rollback" /></template>
             返回列表
           </t-button>
@@ -46,11 +49,13 @@
         <slot :name="section.key" />
       </AdminSectionCard>
       <AdminSectionCard class="form-submit-bar">
-        <t-button theme="primary" :loading="loading" @click="emit('confirm')">
+        <t-button :theme="buttonTheme('submit')" :loading="loading" @click="emit('confirm')">
           <template #icon><t-icon name="check" /></template>
-          提交商品信息
+          {{ formConfirmationText(mode === 'edit' ? 'edit' : 'create') }}
         </t-button>
-        <t-button theme="default" variant="base" :disabled="loading" @click="emit('close')">取消</t-button>
+        <t-button :theme="buttonTheme('cancel')" variant="base" :disabled="loading" @click="emit('close')"
+          >取消</t-button
+        >
       </AdminSectionCard>
     </section>
   </section>
@@ -60,8 +65,8 @@
     :header="title"
     width="940px"
     placement="center"
-    :confirm-btn="mode === 'view' ? null : '提交商品信息'"
-    cancel-btn="取消"
+    :confirm-btn="dialogButtonProps('submit', { kind: 'none' }, null)"
+    :cancel-btn="cancelButtonProps('取消')"
     @confirm="emit('confirm')"
     @cancel="emit('close')"
     @close="emit('close')"
@@ -80,6 +85,9 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { nextTick, ref, watch } from 'vue';
 import { AdminSectionCard } from '@/components/foundation';
 const props = defineProps<{

@@ -69,10 +69,10 @@
                     </t-form-item>
                   </div>
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="searchList">
+                    <t-button :theme="buttonTheme('search')" @click="searchList">
                       <template #icon><t-icon name="search" /></template>查询
                     </t-button>
-                    <t-button theme="default" variant="base" @click="resetFilter">
+                    <t-button :theme="buttonTheme('reset')" variant="base" @click="resetFilter">
                       <template #icon><t-icon name="refresh" /></template>重置
                     </t-button>
                   </div>
@@ -86,7 +86,11 @@
                 ><t-button
                   v-for="action in storeToolbarActions"
                   :key="action.id === 'batch' ? batchAction?.kind : action.id"
-                  :theme="action.className === 'brown-button' ? 'warning' : action.theme"
+                  :theme="
+                    buttonTheme(
+                      buttonFunctionFor('store-toolbar', action.id === 'batch' ? batchAction!.kind : action.id),
+                    )
+                  "
                   :variant="action.variant"
                   :class="action.className"
                   :disabled="action.disabled"
@@ -95,7 +99,11 @@
                   <template v-if="action.icon" #icon><t-icon :name="action.icon" /></template>
                   {{ action.label }} </t-button
                 ><template #auxiliary
-                  ><t-button v-if="canGlobal('operation-log.view')" theme="default" variant="outline" @click="openLogs"
+                  ><t-button
+                    v-if="canGlobal('operation-log.view')"
+                    :theme="buttonTheme('logs')"
+                    variant="outline"
+                    @click="openLogs"
                     >操作日志</t-button
                   ></template
                 ></AdminListToolbar
@@ -173,7 +181,7 @@
                       <t-link
                         v-for="action in storeRowButtons"
                         :key="action.id"
-                        :theme="action.theme"
+                        :theme="buttonTheme(buttonFunctionFor('stock', action.id))"
                         hover="color"
                         @click="handleStoreRowButton(action.id, row)"
                         >{{ action.label }}</t-link
@@ -188,11 +196,17 @@
                   ><t-icon name="info-circle" />{{ row.sourceMessage || '上游商品不可用' }}</t-space
                 >
                 <t-space size="small">
-                  <t-button v-if="can(activeScope, 'view')" size="small" @click="openDetail(row)">详情</t-button>
+                  <t-button
+                    v-if="can(activeScope, 'view')"
+                    :theme="buttonTheme('view')"
+                    size="small"
+                    @click="openDetail(row)"
+                    >详情</t-button
+                  >
                   <t-button
                     v-if="can(activeScope, 'view')"
                     size="small"
-                    theme="danger"
+                    :theme="buttonTheme('purge')"
                     @click="prepareAction('purge', row)"
                     >彻底删除</t-button
                   >
@@ -214,7 +228,11 @@
         <template v-else>
           <AdminListToolbar :has-auxiliary="canGlobal('operation-log.view')">
             <template #auxiliary>
-              <t-button v-if="canGlobal('operation-log.view')" theme="default" variant="outline" @click="openLogs"
+              <t-button
+                v-if="canGlobal('operation-log.view')"
+                :theme="buttonTheme('logs')"
+                variant="outline"
+                @click="openLogs"
                 >操作日志</t-button
               >
             </template>
@@ -226,6 +244,8 @@
 
     <AdminDialog
       v-model:visible="poolVisible"
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
       header="商品中心"
       :footer="false"
       width="min(1200px, 94vw)"
@@ -275,17 +295,19 @@
               </t-form-item>
             </div>
             <div class="filter-actions">
-              <t-button theme="primary" @click="searchPool"
+              <t-button :theme="buttonTheme('search')" @click="searchPool"
                 ><template #icon><t-icon name="search" /></template>查询</t-button
               >
-              <t-button theme="default" variant="base" @click="resetPoolFilter"
+              <t-button :theme="buttonTheme('reset')" variant="base" @click="resetPoolFilter"
                 ><template #icon><t-icon name="refresh" /></template>重置</t-button
               >
             </div>
           </div>
         </t-form>
         <AdminListToolbar has-actions>
-          <t-button theme="primary" @click="selectPool">批量选择</t-button>
+          <t-button :theme="buttonTheme('select-product')" :disabled="!poolSelected.length" @click="selectPool"
+            >批量选择</t-button
+          >
         </AdminListToolbar>
         <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
           <template #poolSelectTitle>
@@ -318,7 +340,9 @@
           >
           <template #guidePrice="{ row }">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>
           <template #partnerPrice="{ row }">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>
-          <template #operation="{ row }"><t-link theme="primary" @click="openPoolDetail(row)">详情</t-link></template>
+          <template #operation="{ row }"
+            ><t-link :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
+          >
           <template #empty>暂无可挑选的已上架商品</template>
         </t-table>
         <AdminPagination
@@ -344,11 +368,12 @@
     </t-drawer>
 
     <AdminDialog
+      :confirmation="{ kind: 'close', text: '关闭' }"
+      confirm-function="close"
       :visible="Boolean(logVideoPreview)"
       header="商品视频"
       width="min(960px, 94vw)"
       :cancel-btn="null"
-      confirm-btn="关闭"
       @confirm="logVideoPreview = null"
       @close="logVideoPreview = null"
       @update:visible="!$event && (logVideoPreview = null)"
@@ -360,6 +385,8 @@
     </t-drawer>
 
     <AdminDialog
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
       :visible="Boolean(imagePreview)"
       header="商品主图"
       width="min(960px, 94vw)"
@@ -372,9 +399,10 @@
 
     <AdminDialog
       v-model:visible="offShelfVisible"
+      :confirmation="operationConfirmation('下架', Boolean(pendingOffShelf?.batch))"
+      confirm-function="off-shelf"
       :header="pendingOffShelf?.batch ? '下架' : '下架商品'"
       :width="pendingOffShelf?.batch ? '520px' : '500px'"
-      :confirm-btn="pendingOffShelf?.batch ? '提交' : undefined"
       @confirm="confirmOffShelf"
       @cancel="offShelfVisible = false"
       @close="offShelfVisible = false"
@@ -399,6 +427,7 @@
       </t-form>
     </AdminDialog>
     <AdminConfirmDialog
+      :function="confirm ? buttonFunctionFor('store-confirm', confirm.kind) : 'close'"
       :visible="Boolean(confirm)"
       :action="confirm?.label || ''"
       object-type="商品"
@@ -457,6 +486,8 @@
 </template>
 
 <script setup lang="ts">
+import { operationConfirmation } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
@@ -744,14 +775,15 @@ const batchAction = computed(() => {
 });
 const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
   ...(activeTab.value === 'warehouse' && can('warehouse', 'select')
-    ? [{ id: 'select', label: '商品中心', theme: 'primary' as const, icon: 'add' }]
+    ? [{ id: 'select', label: '商品中心', icon: 'add' }]
     : []),
   ...(batchAction.value
     ? [
         {
           id: 'batch',
           label: batchAction.value.label,
-          theme: batchAction.value.kind === 'off-shelf' ? ('default' as const) : ('primary' as const),
+          disabled: !selected.value.length,
+
           icon:
             batchAction.value.kind === 'off-shelf'
               ? 'download'
@@ -767,7 +799,8 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
         {
           id: 'batch-purge',
           label: '批量彻底删除',
-          theme: 'danger' as const,
+          disabled: !selected.value.length,
+
           variant: 'base' as const,
           icon: 'delete',
           className: 'deep-danger-button',
@@ -775,13 +808,13 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
       ]
     : []),
   ...(activeTab.value === 'recycle' && can('recycle', 'clear')
-    ? [{ id: 'clear', label: '清空回收站', theme: 'danger' as const, variant: 'base' as const, icon: 'clear' }]
+    ? [{ id: 'clear', label: '清空回收站', variant: 'base' as const, icon: 'clear' }]
     : []),
 ]);
 const storeRowButtons = computed<FinishedStockRowAction[]>(() => [
   ...finishedStockActions[activeTab.value]
     .filter((action) => can(activeScope.value, action.permission))
-    .map((action) => ({ id: action.id, label: action.label, theme: action.theme })),
+    .map((action) => ({ id: action.id, label: action.label })),
 ]);
 const handleStoreToolbarAction = (action: string) => {
   if (action === 'select') void openPool();

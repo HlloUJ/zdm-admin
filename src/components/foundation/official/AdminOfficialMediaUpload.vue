@@ -2,6 +2,7 @@
   <t-upload
     :files="files"
     theme="file-input"
+    :trigger-button-props="{ theme: buttonTheme('upload') }"
     :accept="accept"
     :disabled="disabled"
     :max="1"
@@ -14,6 +15,7 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue';
+import { buttonTheme } from '../actions/buttonFunctions';
 import type { UploadProps } from 'tdesign-vue-next';
 import type { AdminMediaValue } from '../AdminMediaUpload.vue';
 import { adminFeedback } from '../feedback/adminFeedback';
@@ -26,7 +28,7 @@ const props = withDefaults(
     disabled?: boolean;
     upload: (file: File) => Promise<AdminMediaValue>;
   }>(),
-  { accept: '', disabled: false },
+  { modelValue: undefined, accept: '', disabled: false },
 );
 const emit = defineEmits<{
   'update:modelValue': [value?: AdminMediaValue];

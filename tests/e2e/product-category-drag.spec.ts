@@ -95,12 +95,12 @@ test('reopens category forms without stale validation after creating or cancelli
     expect(statusTops).toHaveLength(2);
     expect(Math.max(...statusTops) - Math.min(...statusTops)).toBeLessThanOrEqual(1);
     await name.fill(`${scope}连续新增`);
-    await dialog.getByRole('button', { name: '保存', exact: true }).click();
+    await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await page.getByRole('button', { name: '新增一级分类', exact: true }).click();
     await expect(dialog.getByPlaceholder('请输入分类名称')).toHaveValue('');
     await expect(dialog.locator('.t-is-error')).toHaveCount(0);
-    await dialog.getByRole('button', { name: '保存', exact: true }).click();
+    await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
     await expect(dialog.getByText('请输入分类名称', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     await page.getByRole('button', { name: '新增一级分类', exact: true }).click();

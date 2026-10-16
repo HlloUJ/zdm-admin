@@ -92,11 +92,16 @@
                     </t-form-item>
                   </div>
                   <div class="filter-actions">
-                    <t-button theme="primary" @click="handleSearch">
+                    <t-button :theme="buttonTheme('search')" @click="handleSearch">
                       <template #icon><t-icon name="search" /></template>
                       查询
                     </t-button>
-                    <t-button class="reset-filter-button" theme="default" variant="base" @click="handleReset">
+                    <t-button
+                      class="reset-filter-button"
+                      :theme="buttonTheme('reset')"
+                      variant="base"
+                      @click="handleReset"
+                    >
                       <template #icon><t-icon name="refresh" /></template>
                       重置
                     </t-button>
@@ -116,9 +121,9 @@
                 ><t-button
                   v-for="button in batchButtons"
                   :key="button.action"
-                  :theme="button.className === 'brown-button' ? 'warning' : button.theme"
+                  :theme="buttonTheme(buttonFunctionFor('stock', button.action))"
                   :class="button.className"
-                  :disabled="saving"
+                  :disabled="saving || (!['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.length)"
                   @click="handleBatchAction(button.action)"
                 >
                   <template #icon>
@@ -128,7 +133,7 @@
                 ><template #auxiliary
                   ><t-button
                     v-if="canViewOperationLogs"
-                    theme="default"
+                    :theme="buttonTheme('logs')"
                     variant="outline"
                     @click="openOperationLogDrawer"
                     >操作日志</t-button
@@ -215,6 +220,7 @@
                         </t-tooltip>
                         <t-tooltip content="查看历史下架原因">
                           <t-button
+                            :theme="buttonTheme('off-shelf-history')"
                             class="off-shelf-history-trigger"
                             variant="text"
                             shape="square"
@@ -253,7 +259,7 @@
                       <t-link
                         v-for="action in rowActions()"
                         :key="action.action"
-                        :theme="action.theme"
+                        :theme="buttonTheme(buttonFunctionFor('stock', action.action))"
                         hover="color"
                         @click="handleRowAction(action.action, row)"
                       >
@@ -272,14 +278,14 @@
                   <t-button
                     v-if="hasSlabAction(activeTab, ['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
                     size="small"
-                    theme="primary"
+                    :theme="buttonTheme('view')"
                     @click="handleRowAction('detail', row)"
                     >详情</t-button
                   >
                   <t-button
                     v-if="hasSlabAction('recycle', 'purge')"
                     size="small"
-                    theme="danger"
+                    :theme="buttonTheme('purge')"
                     variant="base"
                     @click="handleRowAction('purge', row)"
                     >彻底删除</t-button
@@ -827,17 +833,17 @@
     >
       <div ref="priceDrawerRoot" class="price-drawer-content price-drawer-content--source">
         <div class="drawer-actions">
-          <t-button v-if="!priceDrawerReadonly" theme="primary" block @click="saveBatchPrice">
+          <t-button v-if="!priceDrawerReadonly" :theme="buttonTheme('save')" block @click="saveBatchPrice">
             <template #icon><t-icon name="save" /></template>
-            保存
+            {{ formConfirmationText('edit') }}
           </t-button>
         </div>
         <div class="source-cost-editor">
           <span>成本价<span class="price-required-star">*</span></span>
           <SpecPriceInput
-            form-layout
             v-if="batchPriceRows[0]"
             v-model="batchPriceRows[0].price"
+            form-layout
             label="成本价"
             placeholder="请输入成本价"
             :submitted="drawerPriceSubmitted"
@@ -871,6 +877,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('stock', confirmState.type)"
       :action="confirmAction"
       :title="confirmTitle"
       object-type="大板"
@@ -887,8 +894,13 @@
       :header="reasonDialogTitle"
       width="520px"
       placement="center"
-      confirm-btn="提交"
-      cancel-btn="取消"
+      :confirm-btn="
+        dialogButtonProps(
+          'off-shelf',
+          operationConfirmation(reasonState.type === 'deleteExternal' ? '删除' : '下架', reasonState.isBatch),
+        )
+      "
+      :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleReasonSubmit"
       @cancel="closeReasonDialog"
       @close="closeReasonDialog"
@@ -925,9 +937,10 @@
 
     <AdminDialog
       v-model:visible="offShelfHistoryVisible"
+      :confirmation="{ kind: 'close', text: '关闭' }"
+      confirm-function="close"
       header="历史下架原因"
       width="800px"
-      confirm-btn="关闭"
       :cancel-btn="null"
       @confirm="closeOffShelfHistory"
       @close="closeOffShelfHistory"
@@ -950,6 +963,9 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmationText } from '@/components/foundation/actions/confirmation';
+import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { preventZeroQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
@@ -1054,7 +1070,7 @@ type SalesNumberChangeContext = {
 const activeTab = ref<SlabTab>('warehouse');
 const loginUser = computed(() => getLoginUser());
 const productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);
-const sourceBlocked = (_row: SlabItem) => false;
+const sourceBlocked: (row: SlabItem) => boolean = () => false;
 const slabPermissionScope: Record<SlabTab, string> = {
   warehouse: 'warehouse',
   selling: 'selling',

@@ -7,6 +7,16 @@ import org.junit.jupiter.api.Test;
 
 class FunctionPermissionNormalizerTest {
   @Test
+  void retiredSingleCustomerAssignmentNeverGrantsEditOrDropsBatchAssignment() {
+    assertThat(FunctionPermissionNormalizer.normalize(List.of("store.customer-management.daily.assign",
+        "store.customer-management.archived.assign"))).isEmpty();
+    assertThat(FunctionPermissionNormalizer.normalize(List.of("store.customer-management.daily.assign",
+        "store.customer-management.daily.batch-assign")))
+        .containsExactly("store.customer-management.daily.view", "store.customer-management.daily.batch-assign")
+        .doesNotContain("store.customer-management.daily.edit");
+  }
+
+  @Test
   void categoryMovementGrantsBecomeSortWithoutChangingStoreCategories() {
     for (String scope : List.of("finished", "accessory")) {
       String prefix = "admin.product-data-center.category." + scope;

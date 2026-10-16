@@ -45,7 +45,11 @@ test('manages colors and their categories from one menu page', async ({ page }) 
   expect(await categoryTable.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await categoryDialog.getByRole('button', { name: '新增色系分类', exact: true }).click();
   await page.getByPlaceholder('请输入分类名称').fill('灰色系');
-  await page.locator('.t-dialog').filter({ hasText: '新增色系分类' }).getByRole('button', { name: '提交' }).click();
+  await page
+    .locator('.t-dialog')
+    .filter({ hasText: '新增色系分类' })
+    .getByRole('button', { name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/ })
+    .click();
   await expect(page.getByText('已新增“灰色系”', { exact: true })).toBeVisible();
   await categoryDialog.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(categoryDialog).toBeHidden();
@@ -54,7 +58,11 @@ test('manages colors and their categories from one menu page', async ({ page }) 
   await page.getByPlaceholder('请输入色系名称').fill('浅灰');
   await page.locator('.t-dialog:visible').getByPlaceholder('请选择色系分类').click();
   await page.locator('.t-select-option').filter({ hasText: '白色系' }).click();
-  await page.locator('.t-dialog').filter({ hasText: '新增色系' }).getByRole('button', { name: '提交' }).click();
+  await page
+    .locator('.t-dialog')
+    .filter({ hasText: '新增色系' })
+    .getByRole('button', { name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/ })
+    .click();
   await expect(page.getByText('已新增“浅灰”', { exact: true })).toBeVisible();
 });
 

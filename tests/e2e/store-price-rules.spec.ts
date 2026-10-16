@@ -193,22 +193,22 @@ test('price batch fills selected inputs locally and only Save writes configurati
   const batch = page.getByRole('button', { name: '批量设置', exact: true });
   await expect(page.getByRole('row').filter({ hasText: '本店餐桌' })).toBeVisible();
   await checkDecimalEditing(page.locator('tbody .t-input-number input').first());
-  await batch.click();
-  await expect(page.getByText('请先选择分类', { exact: true })).toBeVisible();
+  await expect(batch).toBeDisabled();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await expect(page.getByRole('row').filter({ hasText: '本店餐桌' }).getByRole('checkbox')).toBeEnabled();
   await page.locator('thead .t-checkbox').click();
+  await expect(batch).toBeEnabled();
   await batch.click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.locator('.t-dialog__header-content')).toHaveText('批量设置');
   await expect(dialog.getByText(/已选分类|已选择.*个分类|留空将/)).toHaveCount(0);
   await checkDecimalEditing(dialog.locator('.t-input-number input'));
   await dialog.locator('.t-input-number input').fill('2.2');
-  await dialog.getByRole('button', { name: '完成', exact: true }).click();
+  await dialog.getByRole('button', { name: '确认批量设置', exact: true }).click();
   await expect(dialog).toBeHidden();
   for (const input of await page.locator('tbody .t-input-number input').all()) await expect(input).toHaveValue('2.20');
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     path: '/api/admin/store-price-rules/price/save',
@@ -289,7 +289,7 @@ test('query and reset preserve drafts; blur never saves and mixed edits save tog
     });
   expect(await inputCenterOffset()).toBeLessThanOrEqual(1);
   await input.fill('1000');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(firstLeaf.getByText('请输入0.01至999之间的系数，最多两位小数')).toBeVisible();
   const feedback = await firstLeaf.evaluate((row) => {
     const tip = [...row.querySelectorAll('*')].find(
@@ -335,7 +335,7 @@ test('query and reset preserve drafts; blur never saves and mixed edits save tog
   await expect(child.locator('input:not([type=checkbox])')).toHaveValue('1.80');
   await parent.getByRole('button', { name: '收起下级分类' }).click();
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     path: '/api/admin/store-price-rules/price/save',
@@ -370,12 +370,12 @@ test('failed save retains draft for retry and product switching preserves unsave
   await input.fill('1.5');
   const checkbox = page.getByRole('row').filter({ hasText: '未配置配件' }).locator('.t-checkbox');
   await checkbox.click();
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(page.getByText('保存失败，请重试', { exact: true })).toBeVisible();
   await expect(checkbox).toHaveClass(/t-is-checked/);
   await expect(input).toHaveValue('1.50');
   await expect(input).toBeEnabled();
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
   await expect(checkbox).not.toHaveClass(/t-is-checked/);
   await expect(page.locator('thead .t-checkbox')).not.toHaveClass(/t-is-checked|t-is-indeterminate/);
@@ -414,7 +414,7 @@ test('blank batch is required and leaves category inputs unchanged; inline clear
   await page.getByRole('button', { name: '批量设置' }).click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.getByText('留空将清除所选分类的价格系数')).toHaveCount(0);
-  await dialog.getByRole('button', { name: '完成', exact: true }).click();
+  await dialog.getByRole('button', { name: '确认批量设置', exact: true }).click();
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.t-input__tips')).toHaveText('请输入价格系数');
   await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
@@ -428,7 +428,7 @@ test('blank batch is required and leaves category inputs unchanged; inline clear
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await categoryInput.fill('');
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     path: '/api/admin/store-price-rules/price/save',
@@ -521,13 +521,13 @@ test('first root expands fully; cascade selection includes collapsed descendants
   await page.getByRole('button', { name: '批量设置', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await dialog.locator('.t-input-number input').fill('2.4');
-  await dialog.getByRole('button', { name: '完成', exact: true }).click();
+  await dialog.getByRole('button', { name: '确认批量设置', exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
   await row('本店餐桌').getByRole('button', { name: '展开下级分类' }).click();
   await expect(row('深层末级分类').locator('input:not([type=checkbox])')).toHaveValue('2.40');
   await expect(row('本店餐桌').locator('.t-input-number')).toHaveCount(0);
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     body: { changes: [12, 14, 16, 23, 24].map((categoryId) => ({ categoryId, coefficient: 2.4 })) },
@@ -559,7 +559,7 @@ test('unconfigured filter uses saved leaf coefficients, preserves paths and draf
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await expect(input).toHaveValue('3.25');
   await expect(page.getByText('另一一级分类', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
   await expect(page.getByText('木质餐桌', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '重置', exact: true }).click();
@@ -607,7 +607,7 @@ test('discounts list configured records only; query is explicit and create valid
       .locator('.t-form__item')
       .evaluateAll((items) => (items[1] as HTMLElement).offsetTop - (items[0] as HTMLElement).offsetTop);
   const initialFieldDistance = await fieldTopDistance();
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(dialog.getByText('请选择角色', { exact: true })).toBeVisible();
   await expect(dialog.getByText('请输入折扣系数', { exact: true })).toBeVisible();
   await expect
@@ -631,12 +631,12 @@ test('discounts list configured records only; query is explicit and create valid
   await dialog.locator('.t-select').click();
   await expect(page.locator('.t-select-option').filter({ hasText: '店长' })).toHaveCount(0);
   await page.locator('.t-select-option').filter({ hasText: '导购' }).click();
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(dialog.getByText('请输入折扣系数', { exact: true })).toBeVisible();
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
   await dialog.locator('.t-input-number input').click();
   await dialog.locator('.t-input-number input').fill('1.01');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const coefficientError = dialog.getByText('请输入0.01至1.00之间的折扣系数，最多两位小数', { exact: true });
   await expect(coefficientError).toBeVisible();
   await expect
@@ -674,7 +674,7 @@ test('discounts list configured records only; query is explicit and create valid
     )
     .toBe(0);
   await dialog.locator('.t-input-number input').fill('0.75');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('row').filter({ hasText: '导购' }).getByText('0.75', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
@@ -705,7 +705,7 @@ test('discount audit fields and permission-controlled edit, disable, enable and 
   await dialog.locator('.t-input-number input').press('Tab');
   await expect(dialog.locator('.t-input-number input')).toHaveValue('0.70');
   await checkDecimalEditing(dialog.locator('.t-input-number input'));
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(requests.find((request) => request.method === 'PUT')).toMatchObject({ body: { coefficient: 0.7, roleId: 7 } });
   await expect(row.getByText('0.70', { exact: true })).toBeVisible();

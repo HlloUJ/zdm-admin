@@ -30,35 +30,37 @@
           @select-change="selectRows"
         >
           <template #name="{ row }"
-            ><t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">{{ row.name }}</t-link
+            ><t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">{{
+              row.name
+            }}</t-link
             ><span v-else>{{ row.name }}</span></template
           >
-          <template #phone="{ row }">{{ row.phone || '-' }}</template>
+          <template #phone="{ row }">{{ displayCustomerPhone(row) }}</template>
           <template #ownerName="{ row }">{{ row.ownerName || '-' }}</template>
-          <template #lastFollowedAt="{ row }">{{ time(row.lastFollowedAt) }}</template>
-          <template #nextFollowAt="{ row }">{{ time(row.nextFollowAt) }}</template>
+          <template #lastFollowedAt="{ row }">{{ time(row.lastFollowedAt).slice(0, 16) }}</template>
+          <template #createdByName="{ row }">{{ row.createdByName || '-' }}</template>
+          <template #createdAt="{ row }">{{ time(row.createdAt).slice(0, 16) }}</template>
           <template #operation="{ row }">
             <t-space break-line size="small">
-              <t-link v-if="can('detail')" theme="primary" @click="openDetail(row.id)">详情</t-link>
-              <t-link v-if="can('edit') && isOwned(row)" theme="primary" @click="openProfile(row)">编辑</t-link>
-              <t-link v-if="can('assign')" theme="primary" @click="prepareAction('assign', [row.id], false)"
-                >调整归属</t-link
+              <t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">详情</t-link>
+              <t-link v-if="can('edit') && isInDataScope(row)" :theme="buttonTheme('edit')" @click="openProfile(row)"
+                >编辑</t-link
               >
               <t-link
-                v-if="status === 'daily' && can('archive') && isOwned(row)"
-                theme="warning"
+                v-if="status === 'daily' && can('archive') && isInDataScope(row)"
+                :theme="buttonTheme('archive')"
                 @click="prepareAction('archive', [row.id], false)"
                 >归档</t-link
               >
               <t-link
-                v-if="status === 'archived' && can('restore') && isOwned(row)"
-                theme="primary"
+                v-if="status === 'archived' && can('restore') && isInDataScope(row)"
+                :theme="buttonTheme('unarchive')"
                 @click="prepareAction('restore', [row.id], false)"
                 >取消归档</t-link
               >
               <t-link
-                v-if="status === 'archived' && can('purge') && isOwned(row)"
-                theme="danger"
+                v-if="status === 'archived' && can('purge') && isInDataScope(row)"
+                :theme="buttonTheme('purge')"
                 @click="prepareAction('purge', [row.id], false)"
                 >彻底删除</t-link
               >
@@ -71,37 +73,68 @@
     </div>
     <AdminFormDialog
       ref="profileDialog"
-      width="480px"
       v-model:visible="profileVisible"
+      :confirmation="formConfirmation(editingId ? 'edit' : 'create')"
+      confirm-function="submit"
+      width="480px"
       :data="profile"
       :header="editingId ? '编辑客户' : '新增客户'"
       :confirm-btn="submitButton"
       @confirm="submitProfile"
     >
+      <t-form-item label="归属人" required-mark v-bind="profileFeedback.field('owner', profile.ownerAccountId)">
+        <t-select
+          v-model="profile.ownerAccountId"
+          filterable
+          clearable
+          placeholder="请选择归属人"
+          :options="profileOwners.map((owner) => ({ value: owner.accountId, label: owner.name }))"
+        />
+      </t-form-item>
       <t-form-item label="客户姓名" required-mark v-bind="fieldFeedback(nameError, nameError)"
         ><t-input v-model="profile.name" :maxlength="80" clearable placeholder="请输入客户姓名"
       /></t-form-item>
-      <t-form-item label="联系电话"
-        ><t-input v-model="profile.phone" :maxlength="80" clearable placeholder="请输入联系电话"
-      /></t-form-item>
+      <t-form-item label="客户国籍">
+        <t-select
+          v-model="profile.nationality"
+          :options="nationalityOptions"
+          filterable
+          clearable
+          placeholder="请选择客户国籍"
+        />
+      </t-form-item>
+      <t-form-item
+        label="号码归属地"
+        :required-mark="Boolean(profile.phone) && !unchangedLegacyPhone"
+        v-bind="profileFeedback.field('phoneRegion', profile.phoneRegion)"
+      >
+        <t-select
+          v-model="profile.phoneRegion"
+          :options="phoneRegionOptions"
+          filterable
+          clearable
+          placeholder="请选择号码归属地"
+        />
+      </t-form-item>
+      <t-form-item label="联系电话" v-bind="profileFeedback.field('phone', profile.phone)">
+        <AdminPhoneInput v-model="profile.phone" :calling-code="phoneCallingCode" />
+      </t-form-item>
       <t-form-item label="微信号"
         ><t-input v-model="profile.wechat" :maxlength="100" clearable placeholder="请输入微信号"
       /></t-form-item>
       <t-form-item label="客户需求"
-        ><t-textarea v-model="profile.requirement" :maxlength="10000" placeholder="请输入客户需求"
+        ><t-textarea v-model="profile.requirement" :maxlength="100" placeholder="请输入客户需求"
       /></t-form-item>
       <t-form-item label="客户备注"
-        ><t-textarea v-model="profile.remark" :maxlength="10000" placeholder="请输入客户备注"
+        ><t-textarea v-model="profile.remark" :maxlength="100" placeholder="请输入客户备注"
       /></t-form-item>
-      <t-form-item label="归属人"
-        ><span>{{ profileOwner }}</span></t-form-item
-      >
     </AdminFormDialog>
     <AdminDialog
       v-model:visible="detailVisible"
+      :confirmation="{ kind: 'close', text: '关闭' }"
+      confirm-function="close"
       header="客户详情"
       width="min(1100px, 94vw)"
-      :confirm-btn="'关闭'"
       :cancel-btn="null"
       @confirm="detailVisible = false"
     >
@@ -111,7 +144,7 @@
           <AdminDetailPage embedded title="客户资料" :items="detailItems">
             <t-space
               ><span>跟进记录</span
-              ><t-button v-if="isOwned(detail.customer)" theme="primary" @click="openFollowup()"
+              ><t-button v-if="isInDataScope(detail.customer)" :theme="buttonTheme('create')" @click="openFollowup()"
                 >新增跟进</t-button
               ></t-space
             >
@@ -127,7 +160,7 @@
                     ><t-link
                       v-for="attachment in record.attachments"
                       :key="attachment.mediaId"
-                      theme="primary"
+                      :theme="buttonTheme('preview')"
                       @click="previewAttachment(record, attachment)"
                       >{{ attachment.name }}</t-link
                     ></t-space
@@ -136,10 +169,12 @@
                     >下次跟进：{{ time(record.nextFollowAt) }} {{ record.nextFollowTask }}</span
                   >
                 </t-space>
-                <template v-if="isOwned(detail.customer)" #action
+                <template v-if="isInDataScope(detail.customer)" #action
                   ><t-space
-                    ><t-link theme="primary" @click="openFollowup(record)">编辑</t-link
-                    ><t-link theme="danger" @click="prepareFollowupDelete(record.id)">删除</t-link></t-space
+                    ><t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link
+                    ><t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)"
+                      >删除</t-link
+                    ></t-space
                   ></template
                 >
               </t-list-item>
@@ -152,6 +187,8 @@
     <AdminFormDialog
       ref="followDialog"
       v-model:visible="followVisible"
+      :confirmation="formConfirmation(followId ? 'edit' : 'create')"
+      confirm-function="submit"
       :data="followForm"
       label-width="calc(7em + var(--td-comp-paddingLR-xl))"
       :header="followId ? '编辑跟进' : '新增跟进'"
@@ -202,6 +239,8 @@
     <AdminFormDialog
       ref="assignDialog"
       v-model:visible="assignVisible"
+      :confirmation="operationConfirmation('调整归属', pending.batch)"
+      confirm-function="assign"
       :data="{ ownerAccountId: newOwner }"
       header="调整归属"
       :confirm-btn="submitButton"
@@ -225,16 +264,20 @@
     </AdminFormDialog>
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
+      :function="deletingFollowId != null ? 'delete' : buttonFunctionFor('customer', pending.action)"
+      :batch="deletingFollowId == null && pending.batch"
       :action="confirmAction"
-      object-type="客户"
+      :object-type="confirmObjectType"
+      :object-name="confirmObjectName"
       :description="confirmDescription"
-      :danger="pending.action === 'purge' || deletingFollowId != null"
       @confirm="confirmOperation"
     />
     <t-image-viewer v-model:visible="imageVisible" :images="previewImages" />
   </div>
 </template>
 <script setup lang="ts">
+import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -244,6 +287,7 @@ import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import {
   AdminListPage,
   AdminFormDialog,
+  AdminPhoneInput,
   AdminDetailPage,
   AdminDialog,
   AdminConfirmDialog,
@@ -257,6 +301,10 @@ import { hasPermission } from '@/services/adminPermissions';
 import {
   listCustomers,
   listCustomerOwners,
+  listCustomerOwnerCandidates,
+  listCustomerContactRegions,
+  displayCustomerPhone,
+  type CustomerContactCatalogue,
   getCustomerDetail,
   saveCustomer,
   actOnCustomers,
@@ -287,7 +335,8 @@ const tabs = computed(() =>
   ].filter((tab) => can('view', tab.value)),
 );
 const allData = computed(() => user.value.dataPermission === 'all' || user.value.roles.includes('SUPER_ADMIN'));
-const isOwned = (row: Customer) => row.ownerAccountId === user.value.id;
+const isInDataScope = (row: Customer) =>
+  allData.value || (user.value.dataPermission === 'self' && row.ownerAccountId === user.value.id);
 const rows = ref<Customer[]>([]);
 const owners = ref<Owner[]>([]);
 const loading = ref(false);
@@ -305,9 +354,10 @@ function changePage(info: PageInfo) {
   page.value = info.current;
   pageSize.value = info.pageSize;
 }
-const selectionOwned = computed(
+const selectionInDataScope = computed(
   () =>
-    selected.value.length > 0 && selected.value.every((id) => rows.value.some((row) => row.id === id && isOwned(row))),
+    selected.value.length > 0 &&
+    selected.value.every((id) => rows.value.some((row) => row.id === id && isInDataScope(row))),
 );
 const filterFields = computed<ListFilter[]>(() => [
   { key: 'name', label: '客户姓名' },
@@ -325,18 +375,52 @@ const filterFields = computed<ListFilter[]>(() => [
     : []),
 ]);
 const toolbarActions = computed<ListAction[]>(() => [
-  ...(status.value === 'daily' && can('create') ? [{ id: 'create', label: '新增', icon: 'add' }] : []),
+  ...(status.value === 'daily' && can('create')
+    ? [{ id: 'create', function: 'create' as const, label: '新增', icon: 'add' }]
+    : []),
   ...(can('batch-assign')
-    ? [{ id: 'assign', batch: true, label: '批量调整归属', disabled: !selected.value.length }]
+    ? [
+        {
+          id: 'assign',
+          function: 'assign' as const,
+          batch: true,
+          label: '批量调整归属',
+          disabled: !selected.value.length,
+        },
+      ]
     : []),
   ...(status.value === 'daily' && can('batch-archive')
-    ? [{ id: 'archive', batch: true, label: '批量归档', disabled: !selectionOwned.value }]
+    ? [
+        {
+          id: 'archive',
+          function: 'archive' as const,
+          batch: true,
+          label: '批量归档',
+          disabled: !selectionInDataScope.value,
+        },
+      ]
     : []),
   ...(status.value === 'archived' && can('batch-restore')
-    ? [{ id: 'restore', batch: true, label: '批量取消归档', disabled: !selectionOwned.value }]
+    ? [
+        {
+          id: 'restore',
+          function: 'unarchive' as const,
+          batch: true,
+          label: '批量取消归档',
+          disabled: !selectionInDataScope.value,
+        },
+      ]
     : []),
   ...(status.value === 'archived' && can('batch-purge')
-    ? [{ id: 'purge', batch: true, label: '批量彻底删除', theme: 'danger' as const, disabled: !selectionOwned.value }]
+    ? [
+        {
+          id: 'purge',
+          function: 'purge' as const,
+          batch: true,
+          label: '批量彻底删除',
+          disabled: !selectionInDataScope.value,
+        },
+      ]
     : []),
 ]);
 function handleToolbarAction(id: string) {
@@ -347,11 +431,12 @@ function handleToolbarAction(id: string) {
 const columns: TableProps['columns'] = [
   { colKey: 'row-select', type: 'multiple', width: 46 },
   { colKey: 'name', title: '客户姓名', width: 90, ellipsis: true },
-  { colKey: 'phone', title: '联系电话', width: 120, ellipsis: true },
+  { colKey: 'phone', title: '联系电话', width: 120, ellipsis: { placement: 'bottom' } },
   { colKey: 'ownerName', title: '归属人', width: 80, ellipsis: true },
-  { colKey: 'requirement', title: '客户需求', width: 120, ellipsis: true },
-  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 130, ellipsis: true },
-  { colKey: 'nextFollowAt', title: '下次跟进时间', width: 130, ellipsis: true },
+  { colKey: 'requirement', title: '客户需求', width: 180, ellipsis: { placement: 'bottom' } },
+  { colKey: 'lastFollowedAt', title: '最近跟进时间', width: 180, ellipsis: true },
+  { colKey: 'createdByName', title: '创建人', width: 90, ellipsis: true },
+  { colKey: 'createdAt', title: '创建时间', width: 180, ellipsis: true },
   { colKey: 'operation', title: '操作', width: 200 },
 ];
 const detailItems = computed(() => {
@@ -359,13 +444,27 @@ const detailItems = computed(() => {
   if (!customer) return [];
   return [
     { label: '客户姓名', value: customer.name },
-    { label: '联系电话', value: customer.phone || '-' },
+    {
+      label: '客户国籍',
+      value:
+        contactCatalogue.value.nationalities.find((item) => item.code === customer.nationality)?.name ||
+        customer.nationality ||
+        '-',
+    },
+    {
+      label: '号码归属地',
+      value:
+        contactCatalogue.value.phoneRegions.find((item) => item.code === customer.phoneRegion)?.name ||
+        customer.phoneRegion ||
+        '-',
+    },
+    { label: '联系电话', value: displayCustomerPhone(customer) },
     { label: '微信号', value: customer.wechat || '-' },
     { label: '归属人', value: customer.ownerName || '-' },
-    { label: '建档人', value: customer.createdByName || '-' },
-    { label: '建档时间', value: time(customer.createdAt) },
     { label: '客户需求', value: customer.requirement || '-', span: 3 },
     { label: '客户备注', value: customer.remark || '-', span: 3 },
+    { label: '建档人', value: customer.createdByName || '-' },
+    { label: '建档时间', value: time(customer.createdAt) },
   ];
 });
 const time = (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-');
@@ -445,31 +544,97 @@ watch(
 const profileVisible = ref(false);
 const editingId = ref<number>();
 const nameError = ref('');
-const profileOwner = ref('');
-const emptyProfile = (): CustomerProfile => ({ name: '', phone: '', wechat: '', requirement: '', remark: '' });
+const profileOwners = ref<Owner[]>([]);
+const profileFeedback = useFormFeedback(profileVisible);
+const emptyProfile = (): CustomerProfile => ({
+  name: '',
+  phone: '',
+  nationality: '',
+  phoneRegion: '',
+  wechat: '',
+  requirement: '',
+  remark: '',
+});
 const profile = ref<CustomerProfile>(emptyProfile());
+const originalContact = ref({ phone: '', phoneRegion: '' });
+const contactCatalogue = ref<CustomerContactCatalogue>({ nationalities: [], phoneRegions: [] });
+const nationalityOptions = computed(() =>
+  contactCatalogue.value.nationalities.map((item) => ({ value: item.code, label: item.name })),
+);
+const phoneRegionOptions = computed(() =>
+  contactCatalogue.value.phoneRegions.map((item) => ({ value: item.code, label: `${item.name} ${item.callingCode}` })),
+);
+const phoneCallingCode = computed(
+  () => contactCatalogue.value.phoneRegions.find((item) => item.code === profile.value.phoneRegion)?.callingCode ?? '',
+);
+const unchangedLegacyPhone = computed(
+  () =>
+    Boolean(editingId.value) &&
+    !originalContact.value.phoneRegion &&
+    !profile.value.phoneRegion &&
+    profile.value.phone === originalContact.value.phone,
+);
+
 const submitting = ref(false);
 const uploading = ref(0);
 const submitButton = computed(() => ({
-  content: '提交',
   loading: submitting.value || uploading.value > 0,
   disabled: submitting.value,
 }));
-function openProfile(row?: Customer) {
+async function openProfile(row?: Customer) {
+  const currentIdentity = user.value;
+  try {
+    const [candidates, catalogue] = await Promise.all([
+      listCustomerOwnerCandidates(row?.id),
+      listCustomerContactRegions(row?.status ?? status.value),
+    ]);
+    if (user.value !== currentIdentity) return;
+    profileOwners.value = candidates.filter((owner) => owner.active);
+    contactCatalogue.value = catalogue;
+  } catch (error) {
+    return fail('查询归属人', error);
+  }
   editingId.value = row?.id;
   profile.value = row
-    ? { name: row.name, phone: row.phone, wechat: row.wechat, requirement: row.requirement, remark: row.remark }
+    ? {
+        name: row.name,
+        phone: row.phone,
+        nationality: row.nationality ?? '',
+        phoneRegion: row.phoneRegion ?? '',
+        wechat: row.wechat,
+        requirement: row.requirement,
+        remark: row.remark,
+      }
     : emptyProfile();
-  profileOwner.value = row?.ownerName ?? user.value.name;
+  profile.value.ownerAccountId =
+    row?.ownerAccountId ??
+    (profileOwners.value.some((owner) => owner.accountId === user.value.id) ? user.value.id : undefined);
+  originalContact.value = { phone: row?.phone ?? '', phoneRegion: row?.phoneRegion ?? '' };
   nameError.value = '';
   profileVisible.value = true;
 }
 async function submitProfile() {
   if (submitting.value) return;
+  let invalid = false;
   if (!profile.value.name.trim()) {
     nameError.value = '请输入客户姓名';
-    return rejectFormSubmission(profileDialog.value);
+    invalid = true;
   }
+  if (!profileOwners.value.some((owner) => owner.accountId === profile.value.ownerAccountId)) {
+    profileFeedback.reject('owner', profile.value.ownerAccountId, '请选择归属人');
+    invalid = true;
+  }
+  if (profile.value.phone && !unchangedLegacyPhone.value) {
+    if (!/^[0-9]+$/.test(profile.value.phone)) {
+      profileFeedback.reject('phone', profile.value.phone, '联系电话仅允许输入数字');
+      invalid = true;
+    }
+    if (!profile.value.phoneRegion) {
+      profileFeedback.reject('phoneRegion', profile.value.phoneRegion, '请选择号码归属地');
+      invalid = true;
+    }
+  }
+  if (invalid) return rejectFormSubmission(profileDialog.value);
   submitting.value = true;
   try {
     await saveCustomer(profile.value, editingId.value);
@@ -492,7 +657,8 @@ async function openDetail(id: number) {
   detailVisible.value = true;
   detailLoading.value = true;
   try {
-    const result = await getCustomerDetail(id);
+    const [result, catalogue] = await Promise.all([getCustomerDetail(id), listCustomerContactRegions(status.value)]);
+    if (version === detailVersion) contactCatalogue.value = catalogue;
     if (version === detailVersion) detail.value = result;
   } catch (error) {
     if (version === detailVersion) {
@@ -521,12 +687,22 @@ const actionLabels = { assign: '调整归属', archive: '归档', restore: '取�
 const confirmAction = computed(() =>
   deletingFollowId.value != null ? '删除跟进记录' : actionLabels[pending.value.action],
 );
+const confirmObjectType = computed(() =>
+  ['archive', 'restore', 'purge'].includes(pending.value.action) && pending.value.batch
+    ? `选中的${pending.value.ids.length}条客户`
+    : '客户',
+);
+const confirmObjectName = computed(() =>
+  ['archive', 'restore', 'purge'].includes(pending.value.action) && !pending.value.batch
+    ? (rows.value.find((row) => row.id === pending.value.ids[0])?.name ?? '')
+    : '',
+);
 const confirmDescription = computed(() =>
   deletingFollowId.value != null
     ? '是否删除该跟进记录？'
     : pending.value.action === 'purge'
-      ? `是否彻底删除选中的${pending.value.ids.length}条客户档案及全部跟进和附件？删除后无法恢复，已有订单不受影响。`
-      : `是否${actionLabels[pending.value.action]}选中的${pending.value.ids.length}条客户档案？`,
+      ? `是否彻底删除${confirmObjectType.value}${confirmObjectName.value ? `“${confirmObjectName.value}”` : ''}？客户的全部跟进记录及附件将一并删除，删除后无法恢复，已有订单不受影响。`
+      : '',
 );
 function prepareAction(action: CustomerAction, ids: number[], batch: boolean) {
   pending.value = { action, ids: [...ids], batch, status: status.value };

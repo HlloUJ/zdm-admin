@@ -471,7 +471,9 @@ test('opens employee invitation and edit dialogs', async ({ page }) => {
   const profileUpdateRequest = page.waitForRequest(
     (request) => request.method() === 'PUT' && request.url().endsWith('/api/admin/employees/1'),
   );
-  await profileDialog.getByRole('button', { name: '提交' }).click();
+  await profileDialog
+    .getByRole('button', { name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/ })
+    .click();
   await expect((await profileUpdateRequest).postDataJSON()).toMatchObject({ phone: '15926626945' });
   await expect(page.getByText('备注最多输入100个字符')).toHaveCount(0);
   await expect(profileDialog).toBeHidden();
@@ -574,7 +576,7 @@ test('platform supply-chain invitation keeps registration steps and enables admi
   await page.getByRole('button', { name: '下一步' }).click();
   await page.getByPlaceholder('请输入姓名').fill('初始管理员');
   await page.locator('.gender-radio').getByText('女').click();
-  await page.getByRole('button', { name: '提交注册' }).click();
+  await page.getByRole('button', { name: '确认提交注册' }).click();
   await expect(page.getByRole('heading', { name: '管理员身份已建立' })).toBeVisible();
   await expect(page.getByText('您已成为供应链协同系统管理员，可使用该手机号登录供应链协同系统。')).toBeVisible();
 });
@@ -591,7 +593,7 @@ test('registers from employee invite link', async ({ page }) => {
 
   await page.getByPlaceholder('请输入姓名').fill('待审核员工');
   await page.locator('.gender-radio').getByText('男').click();
-  await page.getByRole('button', { name: '提交注册' }).click();
+  await page.getByRole('button', { name: '确认提交注册' }).click();
 
   await expect(page.getByRole('heading', { name: '注册信息已提交' })).toBeVisible();
   await expect(
@@ -672,7 +674,12 @@ test('employee permission dialog validates only after submit and clears errors o
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '配置权限' });
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.t-is-error')).toHaveCount(0);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.locator('.t-input__extra').getByText('请选择角色', { exact: true })).toBeVisible();
   await expect(dialog.getByText('请选择数据权限', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -710,7 +717,9 @@ test('opens enable confirmation after employee permissions are configured', asyn
   const permissionUpdateRequest = page.waitForRequest(
     (request) => request.method() === 'PATCH' && request.url().endsWith('/api/admin/employees/2/permissions'),
   );
-  await employeePermissionDialog.getByRole('button', { name: '提交' }).click();
+  await employeePermissionDialog
+    .getByRole('button', { name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/ })
+    .click();
   await expect((await permissionUpdateRequest).postDataJSON()).toEqual({ roleIds: '2', dataPermission: 'self' });
   await expect(employeePermissionDialog).toBeHidden();
 
@@ -1323,7 +1332,6 @@ test('filters terminal allocation to shared and terminal-only modules and persis
         '批量归档',
         '详情',
         '编辑',
-        '调整归属',
         '归档',
         '查看',
         '批量调整归属',
@@ -1331,7 +1339,6 @@ test('filters terminal allocation to shared and terminal-only modules and persis
         '批量彻底删除',
         '详情',
         '编辑',
-        '调整归属',
         '取消归档',
         '彻底删除',
       ]);
@@ -1366,7 +1373,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   const saved = page.waitForRequest(
     (request) => request.method() === 'PUT' && request.url().endsWith('/terminal-function-policies/supplier'),
   );
-  await main.getByRole('button', { name: '保存', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const payload = (await saved).postDataJSON();
   expect(payload.functionPermissions.split(',')).toHaveLength(14);
   expect(
@@ -1402,7 +1409,7 @@ test('assigns supply-chain off-shelf detail rights separately for finished stock
   const saved = page.waitForRequest(
     (request) => request.method() === 'PUT' && request.url().endsWith('/terminal-function-policies/supply-chain'),
   );
-  await main.getByRole('button', { name: '保存', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const permissions = (await saved).postDataJSON().functionPermissions.split(',');
   expect(permissions).toContain('supply-chain.finished-stock-management.off-shelf.detail');
   expect(permissions).toContain('supply-chain.slab-management.off-shelf.detail');
@@ -1484,7 +1491,7 @@ test('allocates supply chain employee and role management and persists selection
   const saved = page.waitForRequest(
     (r) => r.method() === 'PUT' && r.url().endsWith('/terminal-function-policies/supply-chain'),
   );
-  await main.getByRole('button', { name: '保存', exact: true }).click();
+  await main.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const permissions = (await saved).postDataJSON().functionPermissions.split(',');
   expect(permissions).toHaveLength(11);
   expect(
@@ -1641,7 +1648,12 @@ test('platform edits, disables, enables and deletes only the selected supply-cha
   await expect(profile).toBeVisible();
   await profile.locator('input').first().fill('供应链管理员新名');
   await profile.locator('textarea').fill('管理员备注');
-  await profile.getByRole('button', { name: '提交', exact: true }).click();
+  await profile
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(profile).toBeHidden();
   await expect(row).toContainText('供应链管理员新名');
   for (const action of ['停用', '启用']) {
@@ -1746,3 +1758,132 @@ for (const identity of [
     await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
   });
 }
+
+test('builtin store manager exposes permissions only while ordinary roles keep edit and delete', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 7,
+        name: '管理员',
+        clientCode: 'admin',
+        tenantId: 1,
+        storeId: 2,
+        storeType: 'cityPartner',
+        roles: ['STORE_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    );
+  });
+  await page.route('**/api/admin/roles**', async (route) => {
+    if (route.request().url().includes('permission-scope'))
+      return route.fulfill({
+        json: { code: 0, data: { audience: 'store', functionPermissions: 'store.customer-management.daily.view' } },
+      });
+    return route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            id: 701,
+            name: '店长',
+            code: 'OLD_MANAGER',
+            builtinKey: 'STORE_MANAGER',
+            status: 'enabled',
+            dataScope: 'all',
+            functionPermissions: '',
+            createdAt: '2026-10-16T10:00:00',
+          },
+          {
+            id: 702,
+            name: '普通导购',
+            code: 'GUIDE',
+            status: 'enabled',
+            dataScope: 'all',
+            functionPermissions: '',
+            createdAt: '2026-10-16T10:00:00',
+          },
+        ],
+      },
+    });
+  });
+  await page.goto('/role-management');
+  const manager = page.locator('tbody tr').filter({ hasText: '店长' });
+  await expect(manager.locator('.table-actions .t-link')).toHaveText(['权限']);
+  const ordinary = page.locator('tbody tr').filter({ hasText: '普通导购' });
+  await expect(ordinary.locator('.table-actions .t-link')).toHaveText(['编辑', '权限', '删除']);
+  await manager.getByText('权限', { exact: true }).click();
+  await expect(page.getByText('权限配置', { exact: true })).toBeVisible();
+});
+
+test('store role customer matrix retains bulk assignment and removes retired standalone grants', async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 7,
+        name: '管理员',
+        clientCode: 'admin',
+        tenantId: 1,
+        storeId: 2,
+        storeType: 'cityPartner',
+        roles: ['STORE_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    ),
+  );
+  let saved: Record<string, unknown> | undefined;
+  const role = {
+    id: 702,
+    name: '普通导购',
+    code: 'GUIDE',
+    status: 'enabled',
+    dataScope: 'all',
+    functionPermissions: 'store.customer-management.daily.assign,store.customer-management.archived.assign',
+    createdAt: '2026-10-16T10:00:00',
+  };
+  await page.route('**/api/admin/roles**', async (route) => {
+    if (route.request().url().includes('permission-scope'))
+      return route.fulfill({ json: { code: 0, data: { audience: 'store', functionPermissions: 'all' } } });
+    if (route.request().method() === 'PUT') {
+      saved = route.request().postDataJSON();
+      return route.fulfill({ json: { code: 0, data: { ...role, ...saved } } });
+    }
+    return route.fulfill({ json: { code: 0, data: [role] } });
+  });
+  await page.goto('/role-management');
+  await page.locator('tbody tr').filter({ hasText: '普通导购' }).getByText('权限', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
+  await dialog.locator('.permission-module-list').getByText('客户管理', { exact: true }).click();
+  const matrix = dialog.locator('.permission-matrix');
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '查看',
+    '新增',
+    '批量调整归属',
+    '批量归档',
+    '详情',
+    '编辑',
+    '归档',
+    '查看',
+    '批量调整归属',
+    '批量取消归档',
+    '批量彻底删除',
+    '详情',
+    '编辑',
+    '取消归档',
+    '彻底删除',
+  ]);
+  const daily = matrix.locator('tbody tr').filter({ hasText: '日常客户' });
+  await daily
+    .locator('.t-checkbox')
+    .filter({ hasText: /^编辑$/ })
+    .click();
+  await dialog.getByRole('button', { name: '确认配置权限', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(String(saved?.functionPermissions).split(',').sort()).toEqual([
+    'store.customer-management.daily.edit',
+    'store.customer-management.daily.view',
+  ]);
+});

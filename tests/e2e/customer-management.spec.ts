@@ -9,6 +9,9 @@ const customer = (id: number, ownerAccountId: number, status = 'daily') => ({
   storeId: 2,
   name: `王先生${id}`,
   phone: '',
+  nationality: '',
+  phoneRegion: '',
+  callingCode: '',
   wechat: '',
   requirement: '餐桌',
   remark: '',
@@ -60,7 +63,22 @@ async function setup(page: Page, grants: string[], scope = 'all', empty = false)
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
-    if (path.endsWith('/owners'))
+    if (path.endsWith('/contact-regions'))
+      return route.fulfill({
+        json: ok({
+          nationalities: [
+            { code: 'CN', name: '中国' },
+            { code: 'FR', name: '法国' },
+            { code: 'US', name: '美国' },
+          ],
+          phoneRegions: [
+            { code: 'CN', name: '中国', callingCode: '+86' },
+            { code: 'FR', name: '法国', callingCode: '+33' },
+            { code: 'US', name: '美国', callingCode: '+1' },
+          ],
+        }),
+      });
+    if (path.endsWith('/owners') || path.endsWith('/owner-candidates'))
       return route.fulfill({
         json: ok([
           { accountId: 7, name: '导购A', active: true },
@@ -105,11 +123,27 @@ async function setup(page: Page, grants: string[], scope = 'all', empty = false)
       return route.fulfill({ json: ok(true) });
     }
     const id = Number(path.split('/').at(-1));
+    const callingCode = (region: string) => ({ CN: '+86', FR: '+33', US: '+1' })[region] ?? '';
+    if (id && request.method() === 'PUT') {
+      const body = request.postDataJSON();
+      requests.push(body);
+      records = records.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              ...body,
+              callingCode: callingCode(body.phoneRegion),
+              ownerName: body.ownerAccountId === 7 ? '导购A' : '导购B',
+            }
+          : c,
+      );
+      return route.fulfill({ json: ok(records.find((c) => c.id === id)) });
+    }
     if (id) return route.fulfill({ json: ok({ customer: records.find((c) => c.id === id), followups }) });
     if (request.method() === 'POST') {
       const body = request.postDataJSON();
       requests.push(body);
-      const c = { ...customer(4, 7), ...body };
+      const c = { ...customer(4, 7), ...body, callingCode: callingCode(body.phoneRegion) };
       records.push(c);
       return route.fulfill({ json: ok(c) });
     }
@@ -128,7 +162,6 @@ const daily = [
   'daily.create',
   'daily.detail',
   'daily.edit',
-  'daily.assign',
   'daily.archive',
   'daily.batch-assign',
   'daily.batch-archive',
@@ -137,7 +170,6 @@ const archived = [
   'archived.view',
   'archived.detail',
   'archived.edit',
-  'archived.assign',
   'archived.restore',
   'archived.purge',
   'archived.batch-assign',
@@ -155,30 +187,40 @@ test('single authorized tab hides tab bar and self scope hides owner filter', as
     0,
   );
 });
-test('all data without manager role sees others but cannot edit or archive them', async ({ page }) => {
+test('all data with grants allows ordinary staff to maintain other owner customers', async ({ page }) => {
   await setup(page, daily);
   await page.goto('/store/customer-management');
   const row = page.locator('tr').filter({ hasText: '王先生2' });
   await expect(row).toBeVisible();
-  await expect(row.getByText('调整归属', { exact: true })).toBeVisible();
-  await expect(row.getByText('编辑', { exact: true })).toHaveCount(0);
-  await expect(row.getByText('归档', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('调整归属', { exact: true })).toHaveCount(0);
+  await expect(row.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(row.getByText('归档', { exact: true })).toBeVisible();
   await row.getByText('详情', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
-  await expect(dialog.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '新增跟进', exact: true })).toBeVisible();
 });
-test('new customer requires only name and never asks for shipping or source', async ({ page }) => {
+test('new customer requires name and defaults the required owner to self', async ({ page }) => {
   const requests = await setup(page, daily);
   await page.goto('/store/customer-management');
   await page.getByRole('button', { name: '新增', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增客户' });
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请输入客户姓名', { exact: true })).toBeVisible();
   await dialog.locator('.t-form__item').filter({ hasText: '客户姓名' }).locator('input').fill('李女士');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('李女士', { exact: true })).toBeVisible();
   expect(requests.at(-1)).toMatchObject({ name: '李女士', phone: '' });
-  expect(requests.at(-1)).not.toHaveProperty('ownerAccountId');
+  expect(requests.at(-1)).toHaveProperty('ownerAccountId', 7);
 });
 test('current owner edits historical followup without a separate followup grant', async ({ page }) => {
   const requests = await setup(page, ['daily.view', 'daily.detail']);
@@ -189,7 +231,12 @@ test('current owner edits historical followup without a separate followup grant'
   await detail.getByText('编辑', { exact: true }).click();
   const edit = page.locator('.t-dialog:visible').filter({ hasText: '编辑跟进' });
   await edit.locator('textarea').first().fill('接手后补充');
-  await edit.getByRole('button', { name: '提交', exact: true }).click();
+  await edit
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(detail.getByText('接手后补充', { exact: true })).toBeVisible();
   expect(requests.at(-1)).toMatchObject({ content: '接手后补充', mediaIds: [] });
 });
@@ -197,12 +244,18 @@ test('archive assignment is independent of role and returns the customer to dail
   const requests = await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');
   await page.getByText('归档客户', { exact: true }).click();
-  await page.locator('tr').filter({ hasText: '王先生3' }).getByText('调整归属', { exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生3' }).locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '调整归属' });
   await expect(dialog.getByText('调整归属后，客户将自动恢复为日常客户。')).toBeVisible();
   await dialog.locator('.t-select').click();
   await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('王先生3', { exact: true })).toHaveCount(0);
   expect(requests.at(-1)).toMatchObject({ action: 'assign', status: 'archived', ownerAccountId: 8 });
   await page.getByText('日常客户', { exact: true }).click();
@@ -234,7 +287,12 @@ test('followup accepts at most three attachments and blocks files above 5MiB bef
     await expect(dialog.getByText(`note${index}.bin`, { exact: true })).toBeVisible();
   }
   await dialog.locator('textarea').first().fill('三个附件');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.locator('.t-dialog:visible').getByText('三个附件', { exact: true })).toBeVisible();
   expect((requests.at(-1)?.mediaIds as number[]).length).toBe(3);
 });
@@ -262,7 +320,7 @@ test('a delayed old detail response never replaces the newly opened customer', a
   await expect(dialog.getByText('王先生1', { exact: true })).toHaveCount(0);
 });
 
-test('customer list follows standard spacing without clipped columns at the review viewport', async ({
+test('customer list follows standard spacing with bounded horizontal scrolling at the review viewport', async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 1366, height: 858 });
@@ -371,7 +429,7 @@ test('customer list follows standard spacing without clipped columns at the revi
     const dimensions = await page
       .locator('.t-table__content')
       .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
-    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width + 1);
+    expect(dimensions.scroll).toBeGreaterThan(dimensions.width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1366);
     await expect(page.locator('symbol#t-icon-add')).toBeAttached({ timeout: 15000 });
     await page.screenshot({
@@ -386,7 +444,7 @@ test('customer list follows standard spacing without clipped columns at the revi
   const emptyTable = await page
     .locator('.t-table__content')
     .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
-  expect(emptyTable.scroll).toBeLessThanOrEqual(emptyTable.width + 1);
+  expect(emptyTable.scroll).toBeGreaterThanOrEqual(emptyTable.width);
   await expect(page.locator('symbol#t-icon-add')).toBeAttached({ timeout: 15000 });
   await page.screenshot({
     path: testInfo.outputPath('customer-list-empty.png'),
@@ -449,7 +507,12 @@ test('customer profile dialogs retain native component visuals', async ({ page }
   const { reference, checkDialog, native, styleOf } = await nativeDialogVisuals(page, testInfo);
   await page.getByRole('button', { name: '新增', exact: true }).click();
   let dialog = await checkDialog('新增客户', 'profile-create', true);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请输入客户姓名', { exact: true })).toBeVisible();
   expect(await styleOf(dialog.locator('.t-form-item-tips'))).toEqual(
     await styleOf(native.locator('.t-form-item-tips')),
@@ -466,7 +529,7 @@ test('customer profile dialogs retain native component visuals', async ({ page }
 test('customer followup dialogs retain native component visuals', async ({ page }, testInfo) => {
   await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');
-  const { reference, checkDialog, native, styleOf } = await nativeDialogVisuals(page, testInfo);
+  const { reference, checkDialog, styleOf } = await nativeDialogVisuals(page, testInfo);
   const own = page.locator('tr').filter({ hasText: '王先生1' });
   let dialog: ReturnType<Page['locator']>;
   await own.getByText('详情', { exact: true }).click();
@@ -497,9 +560,6 @@ test('daily customer assignment and confirmations retain native component visual
   const { reference, checkDialog } = await nativeDialogVisuals(page, testInfo);
   const own = page.locator('tr').filter({ hasText: '王先生1' });
   let dialog: ReturnType<Page['locator']>;
-  await own.getByText('调整归属', { exact: true }).click();
-  dialog = await checkDialog('调整归属', 'assign-single', true);
-  await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await own.getByText('归档', { exact: true }).click();
   dialog = await checkDialog('是否归档', 'archive-single', false);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -521,7 +581,8 @@ test('archived customer assignment and confirmations retain native component vis
   let dialog: ReturnType<Page['locator']>;
   await page.getByText('归档客户', { exact: true }).click();
   const archivedRow = page.locator('tr').filter({ hasText: '王先生3' });
-  await archivedRow.getByText('调整归属', { exact: true }).click();
+  await archivedRow.locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
   dialog = await checkDialog('调整归属', 'assign-archived', true);
   expect(await styleOf(dialog.locator('.t-alert'))).toEqual(await styleOf(native.locator('.t-alert')));
   const alert = (await dialog.locator('.t-alert').boundingBox())!;
@@ -539,7 +600,6 @@ test('archived customer assignment and confirmations retain native component vis
     await dialog.screenshot({ path: testInfo.outputPath(`archived-${label}.png`), animations: 'disabled' });
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
   }
-  await archivedRow.locator('.t-checkbox').click();
   await expect(archivedRow.getByRole('checkbox')).toBeChecked();
   for (const label of ['批量取消归档', '批量彻底删除']) {
     await page.getByRole('button', { name: label, exact: true }).click();
@@ -589,7 +649,7 @@ test('customer attachments retain native replace, remove and image preview behav
   await page.screenshot({ path: testInfo.outputPath('attachment-image-preview.png'), animations: 'disabled' });
 });
 
-test('customer detail loading, empty followups and read-only states remain visible and bounded', async ({
+test('customer detail loading and authorized other-owner followups remain visible and bounded', async ({
   page,
 }, testInfo) => {
   await setup(page, [...daily, ...archived]);
@@ -612,10 +672,10 @@ test('customer detail loading, empty followups and read-only states remain visib
   await detail.getByRole('button', { name: '关闭', exact: true }).click();
   await page.locator('tr').filter({ hasText: '王先生2' }).getByText('详情', { exact: true }).click();
   await expect(detail.getByText('王先生2', { exact: true })).toBeVisible();
-  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
-  await expect(detail.getByText('编辑', { exact: true })).toHaveCount(0);
-  await expect(detail.getByText('删除', { exact: true })).toHaveCount(0);
-  await detail.screenshot({ path: testInfo.outputPath('detail-readonly.png'), animations: 'disabled' });
+  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toBeVisible();
+  await expect(detail.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(detail.getByText('删除', { exact: true })).toBeVisible();
+  await detail.screenshot({ path: testInfo.outputPath('detail-other-owner.png'), animations: 'disabled' });
 });
 
 test('customer query grid uses the accepted adaptive structure at narrow widths', async ({ page }) => {
@@ -643,7 +703,12 @@ test('followup submission keeps its original rules and displays a field error un
   const dialog = page
     .locator('.t-dialog:visible')
     .filter({ has: page.locator('.t-dialog__header').filter({ hasText: /^新增跟进$/ }) });
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   const field = dialog
     .locator('.t-form__item')
     .filter({ has: page.locator('.t-form__label').filter({ hasText: '跟进内容' }) });
@@ -655,7 +720,12 @@ test('followup submission keeps its original rules and displays a field error un
   expect(requests.some((item) => item.content)).toBe(false);
   await field.locator('textarea').fill('修正后的跟进内容');
   await expect(field.getByText('请输入跟进内容', { exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog).toBeHidden();
   expect(requests.at(-1)).toMatchObject({ content: '修正后的跟进内容', mediaIds: [] });
 });
@@ -663,9 +733,15 @@ test('assignment missing-owner feedback stays at the field and clears after sele
   const requests = await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');
   await page.getByText('归档客户', { exact: true }).click();
-  await page.locator('tr').filter({ hasText: '王先生3' }).getByText('调整归属', { exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生3' }).locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量调整归属', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '调整归属' });
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(dialog.getByText('请选择新归属人', { exact: true })).toBeVisible();
   await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '请选择新归属人' })).toHaveCount(0);
   const errorColor = await dialog
@@ -676,4 +752,368 @@ test('assignment missing-owner feedback stays at the field and clears after sele
   await dialog.locator('.t-select').click();
   await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
   await expect(dialog.getByText('请选择新归属人', { exact: true })).toHaveCount(0);
+});
+
+test('new customer selects a searchable owner and limits both notes to 100 characters', async ({ page }) => {
+  const requests = await setup(page, daily);
+  await page.goto('/store/customer-management');
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增客户' });
+  const owner = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: /^归属人/ }) });
+  const name = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: '客户姓名' }) });
+  await expect(owner.locator('input')).toHaveValue('导购A');
+  const ownerBox = await owner.boundingBox();
+  const nameBox = await name.boundingBox();
+  expect(ownerBox!.y).toBeLessThan(nameBox!.y);
+  await expect(owner.locator('.t-form__label')).toHaveClass(/--required/);
+  await owner.locator('.t-select').hover();
+  await owner.locator('.t-input__clear').click();
+  await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(owner).toContainText('请选择归属人');
+  expect(requests).toHaveLength(0);
+  await owner.locator('input').fill('导购B');
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await name.locator('input').fill('指定归属客户');
+  for (const label of ['客户需求', '客户备注']) {
+    const textarea = dialog
+      .locator('.t-form__item')
+      .filter({ has: page.locator('label', { hasText: label }) })
+      .locator('textarea');
+    await textarea.fill('字'.repeat(101));
+    await expect(textarea).toHaveValue('字'.repeat(100));
+  }
+  await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 8, requirement: '字'.repeat(100), remark: '字'.repeat(100) });
+});
+
+test('edit owner saves the transfer and the new owner sees the persisted selection', async ({ page }) => {
+  const requests = await setup(page, ['daily.view', 'daily.edit']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
+  const owner = dialog.getByPlaceholder('请选择归属人');
+  await expect(owner).toHaveValue('导购A');
+  await owner.fill('导购B');
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 8 });
+  const row = page.locator('tr').filter({ hasText: '王先生1' });
+  await expect(row).toContainText('导购B');
+  await expect(row.getByText('编辑', { exact: true })).toBeVisible();
+  await page.addInitScript(() => {
+    const stored = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    localStorage.setItem('zdm-admin-user', JSON.stringify({ ...stored, id: 8, name: '导购B' }));
+  });
+  await page.reload();
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  await expect(dialog.getByPlaceholder('请选择归属人')).toHaveValue('导购B');
+});
+test('edit permission includes owner transfer without retired assignment permission', async ({ page }) => {
+  const requests = await setup(page, ['daily.view', 'daily.edit']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
+  await expect(dialog.getByPlaceholder('请选择归属人')).toHaveValue('导购A');
+  await expect(dialog.getByPlaceholder('请选择归属人')).toBeEnabled();
+  await dialog.getByPlaceholder('请选择归属人').click();
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await dialog.getByPlaceholder('请输入客户姓名').fill('仍归属本人');
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests.at(-1)).toMatchObject({ ownerAccountId: 8, name: '仍归属本人' });
+});
+test('edit transfer removes the customer from the old owner self scope', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.edit'], 'self');
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑客户' });
+  await dialog.getByPlaceholder('请选择归属人').fill('导购B');
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('暂无客户', { exact: true })).toBeVisible();
+});
+
+test('customer batch buttons use selection and data scope across mixed owners', async ({ page }) => {
+  await setup(page, daily);
+  await page.goto('/store/customer-management');
+  const assign = page.getByRole('button', { name: '批量调整归属', exact: true });
+  const archive = page.getByRole('button', { name: '批量归档', exact: true });
+  await expect(assign).toBeDisabled();
+  await expect(archive).toBeDisabled();
+  const own = page.locator('tr').filter({ hasText: '王先生1' }).locator('.t-checkbox');
+  const other = page.locator('tr').filter({ hasText: '王先生2' }).locator('.t-checkbox');
+  await own.click();
+  await expect(assign).toBeEnabled();
+  await expect(archive).toBeEnabled();
+  await other.click();
+  await expect(assign).toBeEnabled();
+  await expect(archive).toBeEnabled();
+  await own.click();
+  await expect(assign).toBeEnabled();
+  await expect(archive).toBeEnabled();
+  await other.click();
+  await expect(assign).toBeDisabled();
+  await expect(archive).toBeDisabled();
+});
+
+const profileField = (page: Page, label: string) =>
+  page.locator('.t-dialog:visible .t-form__item').filter({ has: page.locator('.t-form__label', { hasText: label }) });
+async function selectContact(page: Page, label: string, option: string) {
+  await profileField(page, label).locator('.t-select').click();
+  await page.locator('.t-select-option:visible').getByText(option, { exact: true }).click();
+}
+test('nationality and phone region are independent and native calling code is read only', async ({ page }) => {
+  const requests = await setup(page, daily);
+  await page.goto('/store/customer-management');
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  await selectContact(page, '客户国籍', '法国');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toBeDisabled();
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeDisabled();
+  await expect(page.getByText('请先选择号码归属地', { exact: true })).toBeVisible();
+  await selectContact(page, '号码归属地', '中国 +86');
+  await expect(page.getByText('请先选择号码归属地', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('+86');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveAttribute('readonly', '');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toBeDisabled();
+  await selectContact(page, '客户国籍', '美国');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('+86');
+  const phone = page.locator('.zdm-admin-phone-input input').last();
+  await expect(phone).toBeEnabled();
+  await phone.fill('000123');
+  await phone.pressSequentially('Ab-+中');
+  await expect(phone).toHaveValue('000123');
+  await profileField(page, '客户姓名').locator('input').fill('国际客户');
+  const sizes = await page.locator('.zdm-admin-phone-input').evaluate((el) => ({
+    group: el.getBoundingClientRect().width,
+    inputs: [...el.querySelectorAll('.t-input__wrap')].map((input) => input.getBoundingClientRect().width),
+  }));
+  expect(sizes.inputs).toHaveLength(2);
+  expect(sizes.inputs[0]).toBe(80);
+  expect(sizes.inputs[1]).toBeGreaterThan(100);
+  expect(sizes.inputs.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(sizes.group);
+  await page.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(page.getByText('国际客户', { exact: true })).toBeVisible();
+  expect(requests.at(-1)).toMatchObject({ nationality: 'US', phoneRegion: 'CN', phone: '000123' });
+  const row = page.locator('tr').filter({ hasText: '国际客户' });
+  await expect(row).toContainText('+86 000123');
+  await row.getByText('编辑', { exact: true }).click();
+  await expect(profileField(page, '客户国籍').locator('input')).toHaveValue('美国');
+  await expect(profileField(page, '号码归属地').locator('input')).toHaveValue('中国 +86');
+  await expect(phone).toHaveValue('000123');
+  await profileField(page, '号码归属地').hover();
+  await profileField(page, '号码归属地').locator('.t-input__clear').click();
+  await expect(phone).toBeDisabled();
+  await expect(page.getByText('请先选择号码归属地', { exact: true })).toBeVisible();
+  await expect(phone).toHaveValue('000123');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveValue('');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toHaveAttribute('readonly', '');
+  await expect(page.locator('.zdm-admin-phone-input input').first()).toBeDisabled();
+  await selectContact(page, '号码归属地', '法国 +33');
+  await expect(phone).toBeEnabled();
+  await expect(phone).toHaveValue('000123');
+});
+test('phone entry requires a selected region but never country specific length', async ({ page }) => {
+  const requests = await setup(page, daily);
+  await page.goto('/store/customer-management');
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  await profileField(page, '客户姓名').locator('input').fill('短号码客户');
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeDisabled();
+  expect(requests).toHaveLength(0);
+  await selectContact(page, '号码归属地', '法国 +33');
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeEnabled();
+  await page.locator('.zdm-admin-phone-input input').last().fill('01');
+  await page.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(page.getByText('短号码客户', { exact: true })).toBeVisible();
+  expect(requests.at(-1)).toMatchObject({ phone: '01', phoneRegion: 'FR' });
+});
+test('store admin and manager with all data can operate other owner while self scope cannot', async ({ page }) => {
+  await setup(page, daily);
+  await page.addInitScript(() => {
+    const u = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    u.roles = ['STORE_MANAGER'];
+    localStorage.setItem('zdm-admin-user', JSON.stringify(u));
+  });
+  await page.goto('/store/customer-management');
+  const other = page.locator('tr').filter({ hasText: '王先生2' });
+  await expect(other.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(other.getByText('归档', { exact: true })).toBeVisible();
+  await other.locator('.t-checkbox').click();
+  await expect(page.getByRole('button', { name: '批量归档', exact: true })).toBeEnabled();
+  await page.evaluate(() => {
+    const u = JSON.parse(localStorage.getItem('zdm-admin-user')!);
+    u.roles = ['STORE_ADMIN'];
+    localStorage.setItem('zdm-admin-user', JSON.stringify(u));
+  });
+  await page.reload();
+  await expect(other.getByText('编辑', { exact: true })).toBeVisible();
+});
+
+test('legacy raw phone remains unchanged when editing unrelated fields', async ({ page }) => {
+  await setup(page, daily);
+  let saved: Record<string, unknown> | undefined;
+  await page.route('**/api/admin/store-customers/1', async (route) => {
+    if (route.request().method() === 'PUT') {
+      saved = route.request().postDataJSON();
+      return route.fulfill({ json: ok({ ...customer(1, 7), ...saved }) });
+    }
+    return route.fulfill({
+      json: ok({ customer: { ...customer(1, 7), phone: ' +1 (020) ABC ext 9 ' }, followups: [] }),
+    });
+  });
+  // The list fixture contains the raw historical value, as the real list API does.
+  await page.route('**/api/admin/store-customers?status=daily**', async (route) =>
+    route.fulfill({ json: ok([{ ...customer(1, 7), phone: ' +1 (020) ABC ext 9 ' }]) }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('编辑', { exact: true }).click();
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toHaveValue(' +1 (020) ABC ext 9 ');
+  await expect(page.locator('.zdm-admin-phone-input input').last()).toBeDisabled();
+  await profileField(page, '客户姓名').locator('input').fill('保留历史号码');
+  await page.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  expect(saved).toMatchObject({ name: '保留历史号码', phone: ' +1 (020) ABC ext 9 ', phoneRegion: '' });
+});
+
+test('all data never grants missing edit or archive functions', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  await page.goto('/store/customer-management');
+  const other = page.locator('tr').filter({ hasText: '王先生2' });
+  await expect(other.getByText('详情', { exact: true })).toBeVisible();
+  await expect(other.getByText('编辑', { exact: true })).toHaveCount(0);
+  await expect(other.getByText('归档', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '批量归档', exact: true })).toHaveCount(0);
+});
+test('ordinary staff archives another owner customer without transferring ownership', async ({ page }) => {
+  const requests = await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生2' }).getByText('归档', { exact: true }).click();
+  await page.getByRole('button', { name: '确认归档', exact: true }).click();
+  await expect(page.getByText('王先生2', { exact: true })).toHaveCount(0);
+  expect(requests.at(-1)).toMatchObject({ action: 'archive', ids: [2] });
+  await page.getByText('归档客户', { exact: true }).click();
+  await expect(page.locator('tr').filter({ hasText: '王先生2' })).toContainText('导购B');
+});
+
+test('row assignment is removed while details and edit owner remain and archive uses shared wording', async ({
+  page,
+}) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  const first = page.locator('tr').filter({ hasText: '王先生1' });
+  await expect(first.getByText('调整归属', { exact: true })).toHaveCount(0);
+  await expect(first.getByText('详情', { exact: true })).toBeVisible();
+  await first.getByText('归档', { exact: true }).click();
+  let dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText('是否归档客户“王先生1”？');
+  await expect(dialog.getByRole('button', { name: '确认归档', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await first.locator('.t-checkbox').click();
+  await page.locator('tr').filter({ hasText: '王先生2' }).locator('.t-checkbox').click();
+  await page.getByRole('button', { name: '批量归档', exact: true }).click();
+  dialog = page.locator('.t-dialog:visible');
+  await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText('是否归档选中的2条客户？');
+  await expect(dialog.getByRole('button', { name: '确认批量归档', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(page.getByRole('button', { name: '批量调整归属', exact: true })).toBeEnabled();
+});
+
+test('restore and purge confirmations name the customer or selected count and retain deletion consequences', async ({
+  page,
+}) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  await page.getByText('归档客户', { exact: true }).click();
+  const row = page.locator('tr').filter({ hasText: '王先生3' });
+  for (const action of ['取消归档', '彻底删除']) {
+    await row.getByText(action, { exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    const consequence =
+      action === '彻底删除' ? '客户的全部跟进记录及附件将一并删除，删除后无法恢复，已有订单不受影响。' : '';
+    await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText(
+      `是否${action}客户“王先生3”？${consequence}`,
+    );
+    await expect(dialog.getByRole('button', { name: `确认${action}`, exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await row.locator('.t-checkbox').click();
+    await page.getByRole('button', { name: `批量${action}`, exact: true }).click();
+    await expect(dialog.locator('.zdm-admin-confirm-dialog__content')).toHaveText(
+      `是否${action}选中的1条客户？${consequence}`,
+    );
+    await expect(dialog.getByRole('button', { name: `确认批量${action}`, exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await row.locator('.t-checkbox').click();
+  }
+});
+
+test('both customer tabs display creator and creation time instead of next follow time', async ({ page }) => {
+  await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  for (const tab of ['日常客户', '归档客户']) {
+    await page.getByText(tab, { exact: true }).click();
+    const table = page.locator('.t-table');
+    await expect(table.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '下次跟进时间', exact: true })).toHaveCount(0);
+    await expect(table.locator('tbody tr').first()).toContainText('2026-10-13 10:00');
+  }
+});
+
+test('customer requirement uses 180px native ellipsis and hover reveals full text while creation time fits', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 858 });
+  await setup(page, [...daily, ...archived]);
+  const requirement = '客户希望定制一张可以容纳十人使用的餐桌，需要进口石材台面，并包含送货安装和后续维护服务。';
+  await page.route('**/api/admin/store-customers**', async (route) => {
+    if (new URL(route.request().url()).pathname === '/api/admin/store-customers' && route.request().method() === 'GET')
+      return route.fulfill({
+        json: ok([
+          {
+            ...customer(1, 7),
+            requirement,
+            phone: '123456789012345678901234567890',
+            lastFollowedAt: '2026-10-16T19:30:45',
+          },
+        ]),
+      });
+    return route.fallback();
+  });
+  await page.goto('/store/customer-management');
+  const row = page.locator('tbody tr').filter({ hasText: '王先生1' });
+  const phoneText = row.getByRole('cell').nth(2).locator('.t-table__ellipsis');
+  await phoneText.hover();
+  const phonePopup = page.locator('.t-popup__content:visible').filter({ hasText: '123456789012345678901234567890' });
+  await expect(phonePopup).toBeVisible();
+  const phoneBox = (await phoneText.boundingBox())!;
+  expect((await phonePopup.boundingBox())!.y).toBeGreaterThanOrEqual(phoneBox.y + phoneBox.height);
+  const cell = row.getByRole('cell').nth(4);
+  await expect(cell).toHaveText(requirement);
+  expect((await cell.boundingBox())!.width).toBeCloseTo(180, 0);
+  const text = cell.locator('.t-table__ellipsis');
+  await expect(text).toHaveCSS('text-overflow', 'ellipsis');
+  await text.hover();
+  await expect(page.locator('.t-popup__content:visible').filter({ hasText: requirement })).toBeVisible();
+  const popupBox = (await page.locator('.t-popup__content:visible').filter({ hasText: requirement }).boundingBox())!;
+  const textBox = (await text.boundingBox())!;
+  expect(popupBox.y).toBeGreaterThanOrEqual(textBox.y + textBox.height);
+  const date = row.getByRole('cell').nth(7);
+  await date.scrollIntoViewIfNeeded();
+  const fits = await date
+    .locator('.t-table__ellipsis')
+    .evaluate((element) => element.scrollWidth <= element.clientWidth);
+  expect(fits).toBe(true);
+  await expect(date).toHaveText('2026-10-13 10:00');
+  await expect(row.getByRole('cell').nth(5)).toHaveText('2026-10-16 19:30');
+  expect(
+    await row
+      .getByRole('cell')
+      .nth(5)
+      .locator('.t-table__ellipsis')
+      .evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1366);
 });

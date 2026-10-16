@@ -16,7 +16,7 @@ import { computed, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ modelValue?: T; value?: T; largeNumber?: boolean; decimalPlaces?: number }>(),
-  { decimalPlaces: 2 },
+  { modelValue: undefined, value: undefined, decimalPlaces: 2 },
 );
 type ChangeContext = { type?: string; e?: Event };
 const emit = defineEmits<{

@@ -35,7 +35,12 @@ test('manages store levels under tenant store base data', async ({ page }) => {
   const dialog = page.locator('.t-dialog').filter({ hasText: '新增门店级别' });
   await expect(dialog.getByText('级别编码', { exact: true })).toHaveCount(0);
   await dialog.getByPlaceholder('请输入级别名称').fill('4级');
-  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await dialog
+    .getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText('已新增“4级”', { exact: true })).toBeVisible();
 
   await main.getByRole('row').filter({ hasText: '1级' }).first().getByText('编辑', { exact: true }).click();

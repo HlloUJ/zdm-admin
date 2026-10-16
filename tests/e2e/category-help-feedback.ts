@@ -24,7 +24,7 @@ export async function checkCategoryHelpFeedback(dialog: Locator) {
   const statusBox = await fields.last().boundingBox();
   expect(statusBox!.y - nameControl!.y - nameControl!.height).toBe(24);
   await name.fill('');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   const error = item.getByText('请输入分类名称', { exact: true });
   await expect(error).toBeVisible();
   await expect(help).toBeHidden();

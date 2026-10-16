@@ -51,11 +51,11 @@
               </div>
 
               <div class="filter-actions">
-                <t-button theme="primary" @click="handleSearch">
+                <t-button :theme="buttonTheme('search')" @click="handleSearch">
                   <template #icon><t-icon name="search" /></template>
                   查询
                 </t-button>
-                <t-button theme="default" variant="base" @click="handleReset">
+                <t-button :theme="buttonTheme('reset')" variant="base" @click="handleReset">
                   <template #icon><t-icon name="refresh" /></template>
                   重置
                 </t-button>
@@ -66,7 +66,7 @@
 
         <section class="table-card">
           <AdminListToolbar :has-actions="canCreateCraft"
-            ><t-button v-if="canCreateCraft" theme="primary" @click="openCreateDialog">
+            ><t-button v-if="canCreateCraft" :theme="buttonTheme('create')" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
             </t-button></AdminListToolbar
@@ -89,16 +89,24 @@
             </template>
             <template #operation="{ row }">
               <div class="table-actions">
-                <t-link v-if="canEditCraft" theme="primary" hover="color" @click="openEditDialog(row)">编辑</t-link>
+                <t-link v-if="canEditCraft" :theme="buttonTheme('edit')" hover="color" @click="openEditDialog(row)"
+                  >编辑</t-link
+                >
                 <t-link
                   v-if="canToggleCraftStatus"
-                  :theme="row.status === 'normal' ? 'warning' : 'success'"
+                  :theme="buttonTheme(row.status === 'normal' ? 'disable' : 'enable')"
                   hover="color"
                   @click="openStatusConfirm(row)"
                 >
                   {{ row.status === 'normal' ? '停用' : '启用' }}
                 </t-link>
-                <t-link v-if="canDeleteCraft" theme="danger" hover="color" @click="openDeleteConfirm(row)">删除</t-link>
+                <t-link
+                  v-if="canDeleteCraft"
+                  :theme="buttonTheme('delete')"
+                  hover="color"
+                  @click="openDeleteConfirm(row)"
+                  >删除</t-link
+                >
                 <span v-if="!canEditCraft && !canToggleCraftStatus && !canDeleteCraft">-</span>
               </div>
             </template>
@@ -115,14 +123,14 @@
     </div>
 
     <t-dialog
-      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
       width="480px"
       placement="center"
       :close-on-overlay-click="true"
-      confirm-btn="提交"
-      cancel-btn="取消"
+      :confirm-btn="dialogButtonProps('submit', formConfirmation(dialogMode))"
+      :cancel-btn="cancelButtonProps('取消')"
       @confirm="handleSubmit"
       @cancel="closeFormDialog"
       @close="closeFormDialog"
@@ -172,6 +180,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
       object-type="成品工艺"
       :object-name="confirmState.row?.name"
@@ -199,6 +208,8 @@
 </template>
 
 <script setup lang="ts">
+import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData, UploadFile } from 'tdesign-vue-next';

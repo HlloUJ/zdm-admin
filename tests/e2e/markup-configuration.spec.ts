@@ -229,7 +229,9 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   const createRequest = page.waitForRequest(
     (request) => request.method() === 'POST' && request.url().endsWith('/api/admin/finished-markup-configurations'),
   );
-  await createDialog.getByRole('button', { name: '提交' }).click();
+  await createDialog
+    .getByRole('button', { name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/ })
+    .click();
   expect((await createRequest).postDataJSON()).toEqual({ storeLevelId: 13, priceCoefficient: 0.5 });
 
   await page.getByText('大板价格配置', { exact: true }).click();
@@ -278,7 +280,7 @@ test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
   await expect(page.locator('.t-tabs')).toHaveCount(0);
   await expect(page.getByText('指导价设置', { exact: true })).toBeVisible();
   await expect(page.locator('.guide-coefficient-input input')).toBeDisabled();
-  await expect(page.getByRole('button', { name: '保存指导价' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '确认保存' })).toHaveCount(0);
 });
 
 test('价格配置无排序和停启权限时隐藏对应操作', async ({ page }) => {
