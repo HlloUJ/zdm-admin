@@ -6,16 +6,6 @@
       <AdminSideMenu />
 
       <main v-if="canSave" class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>权限管理</t-breadcrumb-item>
-              <t-breadcrumb-item>终端功能分配</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <t-tag theme="primary" variant="light">平台统一下放</t-tag>
-        </header>
-
         <section class="allocation-card">
           <t-tabs v-model="activeTerminal" class="terminal-tabs" :list="terminalTabs" @change="handleTerminalChange" />
 

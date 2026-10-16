@@ -33,7 +33,7 @@ test('manages colors and their categories from one menu page', async ({ page }) 
     '等级管理',
   ]);
   await expect(page.locator('[data-menu-path="/slab-color"]')).toBeVisible();
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*色系管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveCount(0);
   await expect(main.getByText('奶白', { exact: true })).toBeVisible();
   await expect(main.locator('tbody tr').filter({ hasText: '奶白' })).toContainText('白色系');
 
@@ -44,7 +44,7 @@ test('manages colors and their categories from one menu page', async ({ page }) 
   await expect(categoryTable).toBeVisible();
   expect(await categoryTable.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await categoryDialog.getByRole('button', { name: '新增色系分类', exact: true }).click();
-  await page.getByPlaceholder('请输入色系分类名称').fill('灰色系');
+  await page.getByPlaceholder('请输入分类名称').fill('灰色系');
   await page.locator('.t-dialog').filter({ hasText: '新增色系分类' }).getByRole('button', { name: '提交' }).click();
   await expect(page.getByText('已新增“灰色系”', { exact: true })).toBeVisible();
   await categoryDialog.getByRole('button', { name: '关闭', exact: true }).click();
@@ -52,7 +52,7 @@ test('manages colors and their categories from one menu page', async ({ page }) 
 
   await main.getByRole('button', { name: '新增', exact: true }).click();
   await page.getByPlaceholder('请输入色系名称').fill('浅灰');
-  await page.getByPlaceholder('请选择色系分类').click();
+  await page.locator('.t-dialog:visible').getByPlaceholder('请选择色系分类').click();
   await page.locator('.t-select-option').filter({ hasText: '白色系' }).click();
   await page.locator('.t-dialog').filter({ hasText: '新增色系' }).getByRole('button', { name: '提交' }).click();
   await expect(page.getByText('已新增“浅灰”', { exact: true })).toBeVisible();

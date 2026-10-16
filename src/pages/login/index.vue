@@ -53,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
 import { adminFeedback } from '@/components/foundation';
 import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue-next';
 import { onBeforeUnmount, reactive, ref } from 'vue';
@@ -117,11 +118,14 @@ const sendCode = async () => {
   const validateResult = await formRef.value?.validate({ fields: ['phone'] });
   if (validateResult === true) {
     startCounter();
+  } else {
+    await rejectFormSubmission(formRef.value);
   }
 };
 
 const onSubmit = async (ctx: SubmitContext) => {
-  if (ctx.validateResult !== true || submitting.value) return;
+  if (submitting.value) return;
+  if (ctx.validateResult !== true) return rejectFormSubmission(formRef.value);
 
   submitting.value = true;
   try {

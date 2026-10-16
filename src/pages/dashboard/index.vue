@@ -6,13 +6,6 @@
       <AdminSideMenu />
 
       <main class="page">
-        <div class="page-header">
-          <div>
-            <h1>工作台</h1>
-            <p>平台运营最高视角，汇总租户、商品、供应商与权限配置状态。</p>
-          </div>
-        </div>
-
         <section class="metric-grid">
           <div v-for="item in metrics" :key="item.label" class="metric-card">
             <span>{{ item.label }}</span>

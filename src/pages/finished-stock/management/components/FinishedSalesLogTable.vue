@@ -1,6 +1,7 @@
 <template>
-  <div>
+  <div ref="layoutHost">
     <t-table
+      ref="logTable"
       class="sales-log-table"
       row-key="rowKey"
       size="small"
@@ -19,7 +20,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, h } from 'vue';
+import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getLoginUser } from '@/services/auth';
 import PriceSourceToggle from './PriceSourceToggle.vue';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
@@ -41,6 +42,23 @@ const props = defineProps<{
   side?: 'before' | 'after';
   deletedRows?: boolean;
 }>();
+// The dialog's zoom transform changes measured widths without resizing the
+// table's layout box. Recalculate native sticky offsets once that zoom ends.
+const layoutHost = ref<HTMLElement>();
+const logTable = ref<{ refreshTable: () => void }>();
+let animationDialog: Element | null = null;
+function refreshAfterDialogAnimation(event: Event) {
+  if (event.target === animationDialog) logTable.value?.refreshTable();
+}
+onMounted(() => {
+  animationDialog = layoutHost.value?.closest('.t-dialog') ?? null;
+  animationDialog?.addEventListener('animationend', refreshAfterDialogAnimation);
+  animationDialog?.addEventListener('animationcancel', refreshAfterDialogAnimation);
+});
+onBeforeUnmount(() => {
+  animationDialog?.removeEventListener('animationend', refreshAfterDialogAnimation);
+  animationDialog?.removeEventListener('animationcancel', refreshAfterDialogAnimation);
+});
 type LoggedVariant = Partial<FinishedProductVariant> & {
   skuId?: number;
   variantKey?: string;

@@ -4,7 +4,6 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <AdminPageHeader :breadcrumbs="['商品管理', '商品公共基础数据', '分类属性模板']" />
         <AdminListLayout class="template-workbench">
           <template #toolbar>
             <div class="list-controls">
@@ -163,10 +162,15 @@
                                 <t-select
                                   v-if="editable"
                                   v-model="row.attributeRole"
-                                  placeholder="请选择"
+                                  placeholder="请选择属性角色"
                                   :status="
                                     validatedAttributeIds.includes(row.attributeId) && !row.attributeRole
                                       ? 'error'
+                                      : undefined
+                                  "
+                                  :tips="
+                                    validatedAttributeIds.includes(row.attributeId) && !row.attributeRole
+                                      ? '请选择属性角色'
                                       : undefined
                                   "
                                   :options="[
@@ -210,18 +214,26 @@
                                   >{{ row.requiredFlag ? '是' : '否' }}</span
                                 ></template
                               >
-                              <template #options="{ row }"
-                                ><t-link
-                                  v-if="row.valueType === 'select'"
-                                  :theme="
-                                    validatedAttributeIds.includes(row.attributeId) && !row.options.length
-                                      ? 'danger'
-                                      : 'primary'
+                              <template #options="{ row }">
+                                <t-form-item
+                                  v-if="
+                                    validatedAttributeIds.includes(row.attributeId) &&
+                                    row.valueType === 'select' &&
+                                    !row.options.length
                                   "
+                                  status="error"
+                                  tips="请选择选项值"
+                                >
+                                  <t-link theme="danger" @click="openValues(row)">{{ row.options.length }}</t-link>
+                                </t-form-item>
+                                <t-link
+                                  v-else-if="row.valueType === 'select'"
+                                  theme="primary"
                                   @click="openValues(row)"
                                   >{{ row.options.length }}</t-link
-                                ><span v-else>—</span></template
-                              >
+                                >
+                                <span v-else>—</span>
+                              </template>
                               <template #operation="{ row }"
                                 ><t-link theme="danger" @click="removeTarget = row">移除</t-link></template
                               >
@@ -249,7 +261,7 @@
       </main>
     </div>
     <AdminDialog v-model:visible="addVisible" header="添加属性" width="720px" @confirm="addAttributes">
-      <t-input v-model="attributeKeyword" placeholder="搜索属性名称" clearable />
+      <t-input v-model="attributeKeyword" placeholder="请输入属性名称" clearable />
       <t-table
         hover
         table-layout="fixed"
@@ -276,7 +288,7 @@
       :footer="editable ? undefined : false"
       @confirm="applyValues"
     >
-      <t-input v-if="editable" v-model="valueKeyword" placeholder="搜索选项值" clearable />
+      <t-input v-if="editable" v-model="valueKeyword" placeholder="请输入选项值" clearable />
       <t-table
         hover
         table-layout="fixed"
@@ -351,6 +363,7 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
 import { toRaw, computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -360,7 +373,6 @@ import {
   AdminConfirmDialog,
   AdminDialog,
   AdminListLayout,
-  AdminPageHeader,
   AdminPagination,
 } from '@/components/foundation';
 import { hasPermission } from '@/services/adminPermissions';
@@ -752,8 +764,7 @@ async function preparePublish() {
       (row) => !row.attributeRole || (row.valueType === 'select' && !row.options.length),
     );
     if (invalidIndex >= 0) attributePage.value = Math.floor(invalidIndex / attributePageSize.value) + 1;
-    adminFeedback.warning('请完善属性角色和选项值后发布');
-    return;
+    return rejectFormSubmission(versionLayout.value);
   }
   publishVisible.value = true;
 }
@@ -930,7 +941,7 @@ onBeforeUnmount(() => {
 .publish-confirm-content {
   color: var(--td-text-color-primary);
   font-size: var(--td-font-size-body-medium);
-  line-height: 22px;
+  line-height: var(--td-line-height-body-medium);
   overflow-wrap: anywhere;
 }
 .list-controls {

@@ -42,8 +42,14 @@ export function businessFingerprint(source) {
 }
 export function contractViolations(file, source, baseline) {
   if (!baseline) return [`${file}: missing pre-refactor business contract`];
-  if (!file.endsWith('.vue')) return digest(source) === baseline.content ? [] : [`${file}: nonvisual source changed`];
   let protectedSource = source;
+  // Reverse explicitly approved placeholder/help migrations before the earlier
+  // visual/business patches, keeping the original protected hashes intact.
+  for (const patch of baseline.approvedPlaceholderPatches ?? []) {
+    if (!patch.reason?.trim() || !patch.after || protectedSource.split(patch.after).length !== 2)
+      return [`${file}: approved placeholder patch changed`];
+    protectedSource = protectedSource.replace(patch.after, patch.before);
+  }
   // Exact, recorded user-approved presentation changes. The original
   // pre-refactor hashes stay intact; any other script/template edit still fails.
   if (baseline.approvedVisualPatches) {
@@ -53,6 +59,15 @@ export function contractViolations(file, source, baseline) {
       protectedSource = protectedSource.replace(patch.after, patch.before);
     }
   }
+  // Later, explicitly approved bug fixes are recorded separately from visual
+  // migration. Restore only their exact bytes before checking the original hashes.
+  for (const patch of baseline.approvedBusinessPatches ?? []) {
+    if (!patch.reason?.trim() || !patch.after || protectedSource.split(patch.after).length !== 2)
+      return [`${file}: approved business patch changed`];
+    protectedSource = protectedSource.replace(patch.after, patch.before);
+  }
+  if (!file.endsWith('.vue'))
+    return digest(protectedSource) === baseline.content ? [] : [`${file}: nonvisual source changed`];
   const current = businessFingerprint(protectedSource);
   return ['script', 'template']
     .filter((key) => current[key] !== baseline[key])

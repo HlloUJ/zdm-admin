@@ -58,14 +58,10 @@ const confirmToggle = () => {
   justify-content: center;
   width: 22px;
   height: 22px;
-  margin-top: 5px;
   padding: 0;
   border: 0;
   border-radius: var(--td-radius-default);
-  font: inherit;
-  font-size: var(--td-font-size-body-small);
-  font-weight: 500;
-  line-height: 1;
+  font: var(--td-font-mark-small);
   cursor: pointer;
   transition: background-color 0.15s;
 }

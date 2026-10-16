@@ -6,24 +6,15 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>权限管理</t-breadcrumb-item>
-              <t-breadcrumb-item>角色管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-        </header>
-
         <AdminListLayout class="role-list-layout">
           <template #toolbar>
             <div class="list-controls">
-              <div v-if="canCreateRole" class="table-toolbar">
-                <t-button theme="primary" @click="openCreateDialog">
+              <AdminListToolbar :has-actions="canCreateRole"
+                ><t-button theme="primary" @click="openCreateDialog">
                   <template #icon><t-icon name="add" /></template>
                   新增
-                </t-button>
-              </div>
+                </t-button></AdminListToolbar
+              >
             </div>
           </template>
           <template #table>
@@ -85,9 +76,10 @@
     </div>
 
     <t-dialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
-      width="520px"
+      width="480px"
       placement="center"
       :close-on-overlay-click="true"
       confirm-btn="提交"
@@ -98,12 +90,12 @@
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="角色名称" name="name" required-mark>
-          <t-input v-model="formData.name" clearable placeholder="请输入" />
+          <t-input v-model="formData.name" clearable placeholder="请输入角色名称" />
         </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="formData.remark"
-            placeholder="请输入"
+            placeholder="请输入备注"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
@@ -145,6 +137,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -368,7 +362,7 @@ const closeFormDialog = () => {
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
 
   const roleName = formData.name.trim();
   const roleRemark = formData.remark.trim().slice(0, 100);

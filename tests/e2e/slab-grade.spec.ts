@@ -37,7 +37,7 @@ test('manages slab grades below color management', async ({ page }) => {
       .locator('[data-menu-path="/slab-grade"]')
       .evaluate((element) => element.previousElementSibling?.getAttribute('data-menu-path')),
   ).toBe('/slab-color');
-  await expect(main.locator('.t-breadcrumb')).toHaveText(/商品管理.*大板基础数据.*等级管理/);
+  await expect(main.locator('.t-breadcrumb')).toHaveCount(0);
   const gradeRows = main.locator('tbody tr');
   await expect(gradeRows.nth(0)).toContainText('A+超精品料');
   await expect(gradeRows.nth(1)).toContainText('A精品料');
@@ -56,7 +56,7 @@ test('manages slab grades below color management', async ({ page }) => {
   await main
     .locator('.t-form__item')
     .filter({ hasText: /^等级：/ })
-    .getByPlaceholder('请输入', { exact: true })
+    .getByPlaceholder('请输入等级', { exact: true })
     .fill('A+');
   await main.getByRole('button', { name: '查询', exact: true }).click();
   await expect(main.getByText('超精品料', { exact: true })).toBeVisible();
@@ -66,7 +66,7 @@ test('manages slab grades below color management', async ({ page }) => {
   await main
     .locator('.t-form__item')
     .filter({ hasText: '等级名称' })
-    .getByPlaceholder('请输入', { exact: true })
+    .getByPlaceholder('请输入等级名称', { exact: true })
     .fill('标准料');
   await main.getByRole('button', { name: '查询', exact: true }).click();
   await expect(main.getByText('标准料', { exact: true })).toBeVisible();

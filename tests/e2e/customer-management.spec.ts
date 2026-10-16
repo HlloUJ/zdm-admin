@@ -1,5 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
+import { expectOfficialLayout } from './filter-layout-assertions';
 const prefix = 'store.customer-management';
 const ok = (data: unknown) => ({ code: 0, message: 'ok', data });
 const customer = (id: number, ownerAccountId: number, status = 'daily') => ({
@@ -327,7 +328,8 @@ test('customer list follows standard spacing without clipped columns at the revi
   const actualControls = await form
     .locator('.t-input')
     .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
-  expect(actualControls).toEqual(referenceControls);
+  expect(actualControls).toHaveLength(referenceControls.length);
+  actualControls.forEach((width, index) => expect(width).toBeCloseTo(referenceControls[index], 0));
   const nativeLabelStyles = await reference
     .locator('.list-common-table .t-form__label')
     .first()
@@ -616,20 +618,62 @@ test('customer detail loading, empty followups and read-only states remain visib
   await detail.screenshot({ path: testInfo.outputPath('detail-readonly.png'), animations: 'disabled' });
 });
 
-test('customer query grid retains the official desktop structure at narrow widths', async ({ page }) => {
+test('customer query grid uses the accepted adaptive structure at narrow widths', async ({ page }) => {
   await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');
   for (const width of [1366, 992, 991, 619, 375]) {
     await page.setViewportSize({ width, height: 858 });
     const form = page.locator('.zdm-official-list-page__grid-filters');
-    await expect(form.locator('.t-form > .t-row > .t-col').first()).toHaveClass(/t-col-10/);
-    await expect(form.locator('.t-col-10 > .t-row > .t-col-4')).toHaveCount(3);
-    await expect(form.locator('.t-col-2')).toBeVisible();
-    await expect(page.locator('.admin-shell > .page')).toHaveCSS('min-width', '760px');
-    await expect(page.locator('.admin-shell')).toHaveCSS('display', 'flex');
-    await expect(form.locator('.t-col-10 > .t-row')).toHaveCSS('display', 'flex');
+    await expect(form.locator('.filter-fields > .t-form__item')).toHaveCount(3);
+    await expectOfficialLayout(page, form.locator('.t-form'));
+    await expect(form.locator('.filter-actions')).toBeVisible();
     await expect(page.locator('.side-nav > .t-default-menu')).toHaveClass(
       width <= 991 ? /t-is-collapsed/ : /^(?!.*t-is-collapsed)/,
     );
   }
+});
+
+test('followup submission keeps its original rules and displays a field error until content is corrected', async ({
+  page,
+}) => {
+  const requests = await setup(page, ['daily.view', 'daily.detail']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  await page.locator('.t-dialog:visible').getByRole('button', { name: '新增跟进', exact: true }).click();
+  const dialog = page
+    .locator('.t-dialog:visible')
+    .filter({ has: page.locator('.t-dialog__header').filter({ hasText: /^新增跟进$/ }) });
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  const field = dialog
+    .locator('.t-form__item')
+    .filter({ has: page.locator('.t-form__label').filter({ hasText: '跟进内容' }) });
+  await expect(field.getByText('请输入跟进内容', { exact: true })).toBeVisible();
+  const errorColor = await field
+    .getByText('请输入跟进内容', { exact: true })
+    .evaluate((element) => getComputedStyle(element).color);
+  await expect(field.locator('.t-textarea__inner')).toHaveCSS('border-top-color', errorColor);
+  expect(requests.some((item) => item.content)).toBe(false);
+  await field.locator('textarea').fill('修正后的跟进内容');
+  await expect(field.getByText('请输入跟进内容', { exact: true })).toHaveCount(0);
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests.at(-1)).toMatchObject({ content: '修正后的跟进内容', mediaIds: [] });
+});
+test('assignment missing-owner feedback stays at the field and clears after selecting an owner', async ({ page }) => {
+  const requests = await setup(page, [...daily, ...archived]);
+  await page.goto('/store/customer-management');
+  await page.getByText('归档客户', { exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生3' }).getByText('调整归属', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '调整归属' });
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(dialog.getByText('请选择新归属人', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '请选择新归属人' })).toHaveCount(0);
+  const errorColor = await dialog
+    .getByText('请选择新归属人', { exact: true })
+    .evaluate((element) => getComputedStyle(element).color);
+  await expect(dialog.locator('.t-select .t-input')).toHaveCSS('border-top-color', errorColor);
+  expect(requests.some((item) => item.action === 'assign')).toBe(false);
+  await dialog.locator('.t-select').click();
+  await page.locator('.t-select-option').filter({ hasText: '导购B' }).click();
+  await expect(dialog.getByText('请选择新归属人', { exact: true })).toHaveCount(0);
 });

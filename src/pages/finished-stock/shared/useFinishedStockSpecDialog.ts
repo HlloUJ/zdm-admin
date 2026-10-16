@@ -17,6 +17,7 @@ import type { buildFinishedStockTemplateFields } from './finishedStockTemplateFi
 
 type SalesField = ReturnType<typeof buildFinishedStockTemplateFields>[number];
 interface SpecDialogContext {
+  onValidationFailed: () => unknown;
   validatedSpecDraftIds: Ref<Set<number>>;
   specRows: Ref<SpecRow[]>;
   specMode: Ref<SpecMode>;
@@ -38,6 +39,7 @@ interface SpecDialogContext {
 
 /** Shared specification draft lifecycle for admin and supply-chain product editors. */
 export function useFinishedStockSpecDialog({
+  onValidationFailed,
   validatedSpecDraftIds,
   specRows,
   specMode,
@@ -75,6 +77,7 @@ export function useFinishedStockSpecDialog({
       layeredSpecDrafts.value = specRows.value.map((row) => createLinkedSpecDraft(row));
       linkedSpecStructure.value = currentSpecStructure();
     }
+    specModeChanged.value = false;
     specOpeningDraft = captureSpecDraft();
     specDialogVisible.value = true;
   };
@@ -122,6 +125,7 @@ export function useFinishedStockSpecDialog({
       valueIds,
     };
   };
+  const specModeChanged = ref(false);
   const specModeConfirmVisible = ref(false);
   const pendingSpecMode = ref<SpecMode>('single');
   const specModeConfirmMessage =
@@ -142,6 +146,7 @@ export function useFinishedStockSpecDialog({
   const handleSpecModeChange = (value: SpecMode) => {
     if (value === specMode.value) return;
     clearSpecDraft(false);
+    specModeChanged.value = true;
     specMode.value = value;
   };
   const materializeSpecDraft = (draft: LayeredSpecDraft): SpecRow =>
@@ -266,6 +271,7 @@ export function useFinishedStockSpecDialog({
     }
   };
   const resetSpecDialog = () => {
+    specModeChanged.value = false;
     if (!specOpeningDraft) {
       clearSpecDraft();
       return;
@@ -321,11 +327,11 @@ export function useFinishedStockSpecDialog({
     );
     if (specMode.value === 'layered' && selectedSpecGroups.value.length > MAX_SPEC_GROUPS) {
       specDraftError.value = '最多选择 3 个销售属性';
-      return;
+      return onValidationFailed();
     }
     if (specMode.value === 'layered' && !selectedSpecGroups.value.length) {
       specDraftError.value = '请选择销售属性并填写规格属性值';
-      return;
+      return onValidationFailed();
     }
     const hasEmptyValue =
       specMode.value === 'single'
@@ -334,18 +340,18 @@ export function useFinishedStockSpecDialog({
     if (hasEmptyValue) {
       specDraftError.value =
         specMode.value === 'single' ? '商品规格不能为空，请填写后再确认创建' : '请填写所有规格属性值后再确认创建';
-      return;
+      return onValidationFailed();
     }
     if (specMode.value === 'single' && singleSpecs.value.some(isDuplicateSingleSpec)) {
       specDraftError.value = '商品规格名称不能重复，请修改后再确认创建';
-      return;
+      return onValidationFailed();
     }
     if (
       specMode.value === 'layered' &&
       selectedSpecGroups.value.some((group) => group.values.some((value) => isDuplicateSpecValue(group, value)))
     ) {
       specDraftError.value = '同一属性的值不能重复，请修改后再确认创建';
-      return;
+      return onValidationFailed();
     }
     const rows =
       specMode.value === 'single'
@@ -360,16 +366,16 @@ export function useFinishedStockSpecDialog({
         : buildLayeredSpecRows();
     if (!rows.length) {
       specDraftError.value = '请至少配置一条商品规格';
-      return;
+      return onValidationFailed();
     }
     const fields = selectedSpecGroups.value.map((group) => group.field);
     if (specMode.value === 'layered' && rows.some((row) => fields.some((field) => !String(row[field] || '').trim()))) {
       specDraftError.value = '请补充每条规格的属性值后再确认创建';
-      return;
+      return onValidationFailed();
     }
     if (specMode.value === 'layered' && new Set(rows.map((row) => specIdentity(row, fields))).size !== rows.length) {
       specDraftError.value = '规格组合不能重复，请修改后再确认创建';
-      return;
+      return onValidationFailed();
     }
     confirmedSpecDimensions.value =
       specMode.value === 'layered'
@@ -442,6 +448,7 @@ export function useFinishedStockSpecDialog({
     level3: row.level3,
   });
   return {
+    specModeChanged,
     openSpecDialog,
     closeSpecDialog,
     specDraftError,

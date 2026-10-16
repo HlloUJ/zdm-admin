@@ -138,7 +138,6 @@ const baseInfoPaths = new Set([
   '/product-attribute',
   '/product-attribute-value',
   '/category-attribute-template',
-  '/unit-management',
   '/finished-stock-category',
   '/accessory-category',
   '/finished-stock-attribute',

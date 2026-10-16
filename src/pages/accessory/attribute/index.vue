@@ -6,29 +6,19 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>基础信息管理</t-breadcrumb-item>
-              <t-breadcrumb-item>配件属性管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <t-tag theme="primary" variant="light">全局标准属性库</t-tag>
-        </header>
-
         <t-alert theme="info" closeable>
           属性和值为全平台标准数据：配件分类只引用属性模板；已经被商品使用的标准选项仅支持停用。
         </t-alert>
 
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="属性" name="name">
-                  <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                  <t-input v-model="searchForm.name" clearable placeholder="请输入属性" />
                 </t-form-item>
                 <t-form-item class="zdm-status-filter" label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                     <t-option label="正常" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
@@ -50,12 +40,12 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
-            <t-button theme="primary" @click="openCreateDialog">
+          <AdminListToolbar :has-actions="true"
+            ><t-button theme="primary" @click="openCreateDialog">
               <template #icon><t-icon name="add" /></template>
               新增
-            </t-button>
-          </div>
+            </t-button></AdminListToolbar
+          >
 
           <t-table row-key="id" :data="pageData" :columns="columns" hover table-layout="fixed">
             <template #index="{ rowIndex }">
@@ -108,9 +98,10 @@
     </div>
 
     <t-dialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formDialogVisible"
       header="新增标准属性"
-      width="560px"
+      width="480px"
       placement="center"
       confirm-btn="提交"
       cancel-btn="取消"
@@ -120,10 +111,10 @@
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="属性" name="name" required-mark>
-          <t-input v-model="formData.name" clearable placeholder="请输入" />
+          <t-input v-model="formData.name" clearable placeholder="请输入属性" />
         </t-form-item>
-        <t-form-item label="属性编码" name="code" required-mark>
-          <t-input v-model="formData.code" clearable placeholder="如：material / finish" />
+        <t-form-item help="如：material / finish" label="属性编码" name="code" required-mark>
+          <t-input v-model="formData.code" clearable placeholder="请输入属性编码" />
         </t-form-item>
         <t-form-item label="控件类型" name="controlType" required-mark>
           <t-radio-group v-model="formData.controlType">
@@ -134,7 +125,7 @@
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="formData.remark"
-            placeholder="请输入"
+            placeholder="请输入备注"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
@@ -151,9 +142,21 @@
       @close="closeOptionDialog"
     >
       <div class="option-panel">
-        <div class="option-toolbar">
-          <t-input v-model="optionCodeInput" clearable placeholder="选项编码，如 polished" />
-          <t-input v-model="optionInput" clearable placeholder="选项名称，如 亮光" />
+        <div ref="optionFormRoot" class="option-toolbar">
+          <t-input
+            v-model="optionCodeInput"
+            :status="optionFeedback.field('code', optionCodeInput).status"
+            :tips="optionFeedback.field('code', optionCodeInput).tips || '选项编码，如 polished'"
+            clearable
+            placeholder="请输入选项编码"
+          />
+          <t-input
+            v-model="optionInput"
+            :status="optionFeedback.field('value', optionInput).status"
+            :tips="optionFeedback.field('value', optionInput).tips || '选项名称，如 亮光'"
+            clearable
+            placeholder="请输入选项名称"
+          />
           <t-button theme="primary" @click="handleAddOption">
             <template #icon><t-icon name="add" /></template>
             添加
@@ -208,6 +211,9 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import { useFormFeedback } from '@/utils/formValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -361,6 +367,8 @@ const formRules: Record<string, FormRule[]> = {
 };
 
 const optionDialogVisible = ref(false);
+const optionFormRoot = ref<HTMLElement>();
+const optionFeedback = useFormFeedback(optionDialogVisible);
 const optionInput = ref('');
 const optionCodeInput = ref('');
 const optionTarget = ref<AttributeItem | null>(null);
@@ -433,7 +441,7 @@ const closeFormDialog = () => {
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
 
   const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;
   tableData.value.unshift({
@@ -471,20 +479,19 @@ const closeOptionDialog = () => {
 const handleAddOption = () => {
   const value = optionInput.value.trim();
   const code = optionCodeInput.value.trim();
-  if (!value) {
-    adminFeedback.warning('请输入选项值');
-    return;
+  const duplicateValue = currentOptions.value.some((item) => item.value === value);
+  const duplicateCode = currentOptions.value.some((item) => item.code === code);
+  if (!value || !code) {
+    if (!value) optionFeedback.reject('value', optionInput.value, '请输入选项值');
+    if (!code) optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');
   }
 
-  if (!code) {
-    adminFeedback.warning('请输入选项编码');
-    return;
+  if (duplicateValue || duplicateCode) {
+    if (duplicateValue) optionFeedback.reject('value', optionInput.value, '选项名称已存在');
+    if (duplicateCode) optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');
   }
 
-  if (currentOptions.value.some((item) => item.value === value || item.code === code)) {
-    adminFeedback.warning('选项名称或编码已存在');
-    return;
-  }
+  if (!value || !code || duplicateValue || duplicateCode) return rejectFormSubmission(optionFormRoot.value);
 
   const nextId = Math.max(...currentOptions.value.map((item) => item.id), 0) + 1;
   optionTarget.value?.options.unshift({ id: nextId, code, value, status: 'normal', sort: 1 });
@@ -569,29 +576,6 @@ const handleConfirm = () => {
   border-radius: var(--td-radius-medium);
 }
 
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.filter-fields :deep(.t-input),
-.filter-fields :deep(.t-select) {
-  width: 220px;
-}
-
-.filter-actions,
 .table-toolbar,
 .table-actions,
 .option-toolbar {

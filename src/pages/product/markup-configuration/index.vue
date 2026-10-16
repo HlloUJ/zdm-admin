@@ -4,15 +4,6 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <header class="page-header">
-          <t-breadcrumb>
-            <t-breadcrumb-item>商品管理</t-breadcrumb-item>
-            <t-breadcrumb-item>商品公共基础数据</t-breadcrumb-item>
-            <t-breadcrumb-item>价格配置</t-breadcrumb-item>
-          </t-breadcrumb>
-          <t-tag theme="primary" variant="light">商品默认价格规则</t-tag>
-        </header>
-
         <AdminListLayout class="pricing-list-layout">
           <template #toolbar>
             <div class="list-controls">
@@ -32,14 +23,14 @@
                       :rules="guidePriceCoefficientRules"
                       :required-mark="false"
                     >
-                      <t-input-number
+                      <DecimalInput
                         v-model="guideForm.priceCoefficient"
                         class="guide-coefficient-input"
                         large-number
                         :disabled="!canEditGuide"
                         :decimal-places="2"
                         theme="normal"
-                        placeholder="请输入"
+                        placeholder="请输入价格系数"
                         @change="handleGuideCoefficientChange"
                         @keydown="handlePriceCoefficientKeydown"
                       />
@@ -50,11 +41,11 @@
                   </t-form>
                 </div>
               </div>
-              <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+              <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
                 <div class="filter-row">
                   <div class="filter-fields">
                     <t-form-item label="门店级别" name="name">
-                      <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                      <t-input v-model="searchForm.name" clearable placeholder="请输入门店级别" />
                     </t-form-item>
                   </div>
                   <div class="filter-actions">
@@ -67,11 +58,11 @@
                   </div>
                 </div>
               </t-form>
-              <div class="table-toolbar">
-                <t-button v-if="canCreate" theme="primary" @click="openCreate">
+              <AdminListToolbar :has-actions="canCreate"
+                ><t-button v-if="canCreate" theme="primary" @click="openCreate">
                   <template #icon><t-icon name="add" /></template>新增
-                </t-button>
-              </div>
+                </t-button></AdminListToolbar
+              >
             </div>
           </template>
           <template #table>
@@ -131,9 +122,10 @@
     </div>
 
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
       v-model:visible="formVisible"
       :header="editingId ? '编辑' : '新增'"
-      width="440px"
+      width="480px"
       @confirm="submitForm"
       @cancel="closeForm"
       @close="closeForm"
@@ -145,7 +137,7 @@
             class="price-level-select"
             :disabled="Boolean(editingId)"
             clearable
-            placeholder="请选择"
+            placeholder="请选择门店级别"
           >
             <t-option
               v-for="level in storeLevels"
@@ -157,13 +149,13 @@
           </t-select>
         </t-form-item>
         <t-form-item label="价格系数" name="priceCoefficient">
-          <t-input-number
+          <DecimalInput
             v-model="formData.priceCoefficient"
             class="price-coefficient-input"
             large-number
             :decimal-places="2"
             theme="normal"
-            placeholder="请输入"
+            placeholder="请输入价格系数"
             @change="handleFormCoefficientChange"
             @keydown="handlePriceCoefficientKeydown"
           />
@@ -193,6 +185,9 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
+import DecimalInput from '@/components/DecimalInput.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -368,7 +363,7 @@ const loadData = async () => {
   }
 };
 const saveGuidePriceSetting = async () => {
-  if ((await guideFormRef.value?.validate()) !== true) return;
+  if ((await guideFormRef.value?.validate()) !== true) return rejectFormSubmission(guideFormRef.value);
   const coefficient = Number(guideForm.priceCoefficient);
   guideSaving.value = true;
   try {
@@ -472,7 +467,7 @@ const handleDragSort = async (context: { current: MarkupConfigurationRecord; tar
   }
 };
 const submitForm = async () => {
-  if ((await formRef.value?.validate()) !== true) return;
+  if ((await formRef.value?.validate()) !== true) return rejectFormSubmission(formRef.value);
   if (formData.storeLevelId == null || formData.priceCoefficient == null) return;
   const name = storeLevels.value.find((level) => level.id === formData.storeLevelId)?.name ?? '门店级别';
   const payload = { storeLevelId: formData.storeLevelId, priceCoefficient: Number(formData.priceCoefficient) };
@@ -555,14 +550,11 @@ onMounted(loadData);
 
 <style scoped>
 .page-header,
-.filter-row,
-.filter-actions,
 .table-actions {
   display: flex;
   align-items: center;
 }
-.page-header,
-.filter-row {
+.page-header {
   justify-content: space-between;
   gap: var(--td-comp-margin-xxl);
 }
@@ -613,20 +605,6 @@ onMounted(loadData);
 }
 .guide-form-item {
   margin-bottom: 0;
-}
-.filter-fields {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-actions {
-  flex-shrink: 0;
-  gap: var(--td-comp-margin-s);
 }
 .table-actions {
   gap: var(--td-comp-margin-m) var(--td-comp-margin-l);

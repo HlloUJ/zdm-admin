@@ -4,27 +4,18 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page">
-        <header class="page-header">
-          <t-breadcrumb>
-            <t-breadcrumb-item>商品管理</t-breadcrumb-item>
-            <t-breadcrumb-item>大板基础数据</t-breadcrumb-item>
-            <t-breadcrumb-item>等级管理</t-breadcrumb-item>
-          </t-breadcrumb>
-          <t-tag theme="primary" variant="light">全平台唯一数据源</t-tag>
-        </header>
-
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="等级" name="code">
-                  <t-input v-model="searchForm.code" clearable placeholder="请输入" />
+                  <t-input v-model="searchForm.code" clearable placeholder="请输入等级" />
                 </t-form-item>
                 <t-form-item label="等级名称" name="name">
-                  <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                  <t-input v-model="searchForm.name" clearable placeholder="请输入等级名称" />
                 </t-form-item>
                 <t-form-item class="zdm-status-filter" label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
@@ -43,11 +34,11 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
-            <t-button v-if="canCreate" theme="primary" @click="openCreate">
+          <AdminListToolbar :has-actions="canCreate"
+            ><t-button v-if="canCreate" theme="primary" @click="openCreate">
               <template #icon><t-icon name="add" /></template>新增
-            </t-button>
-          </div>
+            </t-button></AdminListToolbar
+          >
           <t-table
             row-key="id"
             :data="pageData"
@@ -100,6 +91,8 @@
     </div>
 
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
+      width="480px"
       v-model:visible="formVisible"
       :header="editingId ? '编辑等级' : '新增等级'"
       @confirm="submitGrade"
@@ -137,6 +130,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -295,7 +290,7 @@ const handleDragSort = async (context: { current: GradeItem; target: GradeItem }
   }
 };
 const submitGrade = async () => {
-  if ((await formRef.value?.validate()) !== true || !formData.code) return;
+  if ((await formRef.value?.validate()) !== true || !formData.code) return rejectFormSubmission(formRef.value);
   const payload: SlabGradePayload = {
     code: formData.code.trim(),
     name: formData.name.trim(),
@@ -355,29 +350,10 @@ onMounted(loadGrades);
   padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
   border-radius: var(--td-radius-medium);
 }
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-.filter-actions,
 .table-actions {
   display: flex;
   align-items: center;
   gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
-}
-.filter-actions {
-  justify-content: flex-end;
 }
 .table-toolbar {
   display: flex;

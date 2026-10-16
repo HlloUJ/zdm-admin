@@ -410,7 +410,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   await expect(row).toHaveCount(0);
   await page.getByText('回收站 1', { exact: true }).click();
   await expect(row).toBeVisible();
-  await page.locator('a.t-link').filter({ hasText: '操作日志' }).click();
+  await page.getByRole('main').getByRole('button', { name: '操作日志', exact: true }).click();
   const logDrawer = page.locator('.t-drawer').filter({ hasText: '操作日志' });
   const operationLogRow = logDrawer.getByRole('row', { name: /外部系统大板 09/ });
   await expect(logDrawer.locator('.t-form__label').filter({ hasText: '创建方式' })).toHaveCount(0);
@@ -482,9 +482,9 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
     logDrawer.locator('.operation-log-date-filter').boundingBox(),
     logDrawer.getByRole('button', { name: '查询', exact: true }).boundingBox(),
   ]);
-  expect(dateFilterBox!.y).toBeGreaterThanOrEqual(operatorBox!.y);
-  expect(dateFilterBox?.y).toBe(searchButtonBox?.y);
-  await logDrawer.getByPlaceholder('请输入', { exact: true }).fill('不存在的人员');
+  expect(searchButtonBox!.y).toBeCloseTo(operatorBox!.y, 0);
+  expect(dateFilterBox!.y - operatorBox!.y - operatorBox!.height).toBeCloseTo(24, 0);
+  await logDrawer.getByPlaceholder('请输入操作人', { exact: true }).fill('不存在的人员');
   await logDrawer.getByRole('button', { name: '查询', exact: true }).click();
   await expect(operationLogRow).toHaveCount(0);
   await logDrawer.getByRole('button', { name: '重置', exact: true }).click();
@@ -840,7 +840,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   const filterCard = page.locator('.list-controls');
   await expect(filterCard.getByText('下架原因', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('下架人', { exact: true })).toBeVisible();
-  await expect(filterCard.getByText('下架时间', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('下架时间', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('产地', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('纹理', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('色系', { exact: true })).toHaveCount(0);
@@ -849,7 +849,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   expect((await page.locator('.slab-list-layout thead th').allTextContents()).map((text) => text.trim())).toEqual([
     '',
     '商品主图',
-    '大板名称/ID/大板编号',
+    '大板名称/ID/编号',
     '品种',
     '下架原因/详细说明',
     '下架人',
@@ -872,10 +872,6 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
 
   const personFilter = filterCard.locator('.t-form__item').filter({ hasText: '下架人' });
   await personFilter.locator('input').fill('韩健');
-  const dateInputs = filterCard.locator('.off-shelf-date-filter input');
-  await dateInputs.nth(0).fill('2026-08-23');
-  await dateInputs.nth(1).fill('2026-08-23');
-  await dateInputs.nth(1).press('Tab');
   await filterCard.getByRole('button', { name: '查询', exact: true }).click();
   await expect(offShelfRows).toHaveCount(1);
   await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
@@ -949,7 +945,7 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
 
   const chooserPromise = page.waitForEvent('filechooser');
-  await page.locator('input[type="file"]').first().click();
+  await page.locator('.admin-media-upload .t-upload__image-add').first().click();
   const chooser = await chooserPromise;
   await chooser.setFiles({
     name: 'slab-preview.svg',
@@ -961,7 +957,7 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
 
   await expect(page.getByText('已上传“1:1主图”', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '提交', exact: true })).toHaveCount(0);
-  const preview = page.locator('.admin-media-upload__preview[alt="1:1主图"]');
+  const preview = page.locator('.admin-media-upload[aria-label="1:1主图"] .t-upload__card-image img');
   await expect(preview).toBeVisible();
   await expect(preview).toHaveAttribute('src', previewDataUrl);
   let unexpectedChoosers = 0;
@@ -1202,7 +1198,7 @@ test('shows 已新增加名称 after creating an item', async ({ page }) => {
   await page.goto('/product-attribute');
   await page.getByRole('main').getByRole('button', { name: '新增', exact: true }).click();
 
-  await page.getByPlaceholder('请输入属性名称').fill('E2E 新增属性');
+  await page.locator('.t-dialog:visible').getByPlaceholder('请输入属性名称').fill('E2E 新增属性');
   await page.getByText('文本输入', { exact: true }).click();
   await page.getByRole('button', { name: '提交', exact: true }).click();
 
@@ -1251,7 +1247,11 @@ test('shows the duplicate store name error on the edit form', async ({ page }) =
   const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
   await row.getByText('编辑', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑' });
-  await dialog.locator('.t-form__item').filter({ hasText: '门店名称' }).getByPlaceholder('请输入').fill('已归档门店');
+  await dialog
+    .locator('.t-form__item')
+    .filter({ hasText: '门店名称' })
+    .getByPlaceholder('请输入门店名称')
+    .fill('已归档门店');
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
 
   await expect(dialog.locator('.t-form__item').filter({ hasText: '门店名称' })).toContainText('门店名称已存在');

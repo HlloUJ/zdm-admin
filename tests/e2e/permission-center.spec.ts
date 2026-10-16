@@ -84,6 +84,26 @@ test('allows account 15900000001 to operate the granted attribute tab', async ({
   ]);
   await expect(main.locator('.scope-controls .t-tabs')).toHaveCount(0);
   await expect(main.getByText('E2E 成品现货专属属性', { exact: true })).toHaveCount(0);
+  await main.getByRole('button', { name: '新增', exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  const radioLayout = await dialog.locator('.attribute-value-types').evaluate((group) => {
+    const bounds = group.closest('.t-form__controls')!.getBoundingClientRect();
+    return [...group.querySelectorAll('.t-radio')].map((radio) => ({
+      top: radio.getBoundingClientRect().top,
+      right: radio.getBoundingClientRect().right,
+      availableRight: bounds.right,
+    }));
+  });
+  expect(radioLayout).toHaveLength(3);
+  expect(
+    Math.max(...radioLayout.map((radio) => radio.top)) - Math.min(...radioLayout.map((radio) => radio.top)),
+  ).toBeLessThanOrEqual(1);
+  for (const radio of radioLayout) expect(radio.right).toBeLessThanOrEqual(radio.availableRight);
+  for (const label of ['标准选项', '数值+单位', '文本输入']) {
+    await dialog.getByText(label, { exact: true }).click();
+    await expect(dialog.getByRole('radio', { name: label, exact: true })).toBeChecked();
+  }
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
 });
 
 test('allows account 15900000001 to operate the granted attribute-value tab', async ({ page }) => {
@@ -258,8 +278,9 @@ test('shows only the granted product category tab', async ({ page }) => {
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
-  await expect(main.locator('.zdm-admin-page-header')).toContainText('成品现货分类');
+  await expect(main.locator('.zdm-admin-page-header')).toHaveCount(0);
   await expect(main.getByText('配件分类', { exact: true })).toHaveCount(0);
+  await expect(main.locator('tbody')).toContainText('成品现货');
 });
 
 test('falls back to the only granted product category tab', async ({ page }) => {
@@ -277,12 +298,25 @@ test('falls back to the only granted product category tab', async ({ page }) => 
     );
   });
 
+  await page.route('**/api/admin/product-categories', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          { id: 201, scope: 'finished', name: '不可访问成品分类', sortOrder: 1, status: 'enabled', productCount: 0 },
+          { id: 202, scope: 'accessory', name: '可访问配件分类', sortOrder: 1, status: 'enabled', productCount: 0 },
+        ],
+      },
+    }),
+  );
   await page.goto('/product-category');
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
-  await expect(main.locator('.zdm-admin-page-header')).toContainText('配件分类');
+  await expect(main.locator('.zdm-admin-page-header')).toHaveCount(0);
   await expect(main.getByText('成品现货分类', { exact: true })).toHaveCount(0);
+  await expect(main.getByText('可访问配件分类', { exact: true })).toBeVisible();
+  await expect(main.getByText('不可访问成品分类', { exact: true })).toHaveCount(0);
 });
 
 test('shows slab variety edit without status operation for an edit-only account', async ({ page }) => {
@@ -403,7 +437,7 @@ test('opens employee invitation and edit dialogs', async ({ page }) => {
   await page.goto('/employee-management');
   const main = page.getByRole('main');
 
-  await expect(main.getByText('员工管理')).toBeVisible();
+  await expect(main.locator('.page-header')).toHaveCount(0);
   await expect(main.getByText(/共 \d+ 条数据/)).toBeVisible();
   await expect(main.locator('thead')).toContainText('创建人');
   await expect(main.locator('thead')).toContainText('注册时间');
@@ -639,7 +673,7 @@ test('employee permission dialog validates only after submit and clears errors o
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.t-is-error')).toHaveCount(0);
   await dialog.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(dialog.getByText('请选择角色', { exact: true })).toBeVisible();
+  await expect(dialog.locator('.t-input__extra').getByText('请选择角色', { exact: true })).toBeVisible();
   await expect(dialog.getByText('请选择数据权限', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await row.getByText('角色', { exact: true }).click();
@@ -992,7 +1026,7 @@ test('allows granted role operations for records created by another account', as
 test('opens role permission configuration dialog', async ({ page }) => {
   await page.goto('/role-management');
   const main = page.getByRole('main');
-  await expect(main.getByText('角色管理')).toBeVisible();
+  await expect(main.locator('.page-header')).toHaveCount(0);
   await expect(main.locator('.role-tabs')).toHaveCount(0);
 
   const superAdminRoleRow = page.locator('tbody tr').filter({ hasText: '超级管理员' }).first();
@@ -1657,7 +1691,7 @@ test('shows only granted attribute tabs and falls back to the first accessible t
   await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属属性', '配件专属属性']);
   await expect(main.getByText('E2E 成品现货专属属性', { exact: true })).toBeVisible();
   await expect(main.getByText('E2E 共享属性', { exact: true })).toHaveCount(0);
-  await expect(main.getByText('成品现货属性库', { exact: true })).toBeVisible();
+  await expect(main.locator('.zdm-admin-page-header')).toHaveCount(0);
 });
 
 test('shows only granted attribute-value tabs and falls back to the first accessible tab', async ({ page }) => {

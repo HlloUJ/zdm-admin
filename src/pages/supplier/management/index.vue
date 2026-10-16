@@ -6,29 +6,20 @@
       <AdminSideMenu />
 
       <main class="page">
-        <header class="page-header">
-          <div>
-            <t-breadcrumb>
-              <t-breadcrumb-item>供应商管理</t-breadcrumb-item>
-            </t-breadcrumb>
-          </div>
-          <t-tag theme="primary" variant="light">当前组织：{{ currentOrganizationLabel }}</t-tag>
-        </header>
-
         <section class="filter-card">
-          <t-form class="zdm-admin-filter-form" label-width="80px" :data="searchForm" colon>
+          <t-form class="zdm-admin-filter-form zdm-standard-query" label-width="80px" :data="searchForm" colon>
             <div class="filter-row">
               <div class="filter-fields">
                 <t-form-item label="供应商名称" name="name">
-                  <t-input v-model="searchForm.name" clearable placeholder="请输入" />
+                  <t-input v-model="searchForm.name" clearable placeholder="请输入供应商名称" />
                 </t-form-item>
                 <t-form-item label="供货类型" name="supplyTypeId">
-                  <t-select v-model="searchForm.supplyTypeId" filterable clearable placeholder="请选择">
+                  <t-select v-model="searchForm.supplyTypeId" filterable clearable placeholder="请选择供货类型">
                     <t-option v-for="item in supplyTypes" :key="item.id" :label="item.name" :value="item.id" />
                   </t-select>
                 </t-form-item>
                 <t-form-item class="zdm-status-filter" label="状态" name="status">
-                  <t-select v-model="searchForm.status" clearable placeholder="请选择">
+                  <t-select v-model="searchForm.status" clearable placeholder="请选择状态">
                     <t-option label="启用" value="normal" />
                     <t-option label="停用" value="disabled" />
                   </t-select>
@@ -50,14 +41,14 @@
         </section>
 
         <section class="table-card">
-          <div class="table-toolbar">
-            <div class="toolbar-actions">
+          <AdminListToolbar :has-actions="canCreateSupplier"
+            ><div class="toolbar-actions">
               <t-button v-if="canCreateSupplier" theme="primary" @click="openCreateDialog">
                 <template #icon><t-icon name="add" /></template>
                 新增
               </t-button>
-            </div>
-          </div>
+            </div></AdminListToolbar
+          >
 
           <t-table row-key="id" :data="pageData" :columns="columns" :loading="loading" hover table-layout="fixed">
             <template #index="{ rowIndex }">
@@ -107,6 +98,8 @@
     </div>
 
     <AdminDialog
+      dialog-class-name="zdm-admin-dialog zdm-admin-single-form"
+      width="480px"
       v-model:visible="formDialogVisible"
       :header="dialogMode === 'create' ? '新增' : '编辑'"
       @confirm="handleSubmit"
@@ -115,10 +108,10 @@
     >
       <t-form ref="formRef" :data="formData" :rules="formRules" label-width="100px" colon>
         <t-form-item label="供应商名称" name="name" required-mark>
-          <t-input v-model="formData.name" clearable placeholder="请输入" />
+          <t-input v-model="formData.name" clearable placeholder="请输入供应商名称" />
         </t-form-item>
         <t-form-item label="供货类型" name="supplyTypeIds" required-mark>
-          <t-select v-model="formData.supplyTypeIds" multiple filterable clearable placeholder="请选择">
+          <t-select v-model="formData.supplyTypeIds" multiple filterable clearable placeholder="请选择供货类型">
             <t-option
               v-for="item in selectableSupplyTypes"
               :key="item.id"
@@ -129,15 +122,21 @@
           </t-select>
         </t-form-item>
         <t-form-item label="联系人" name="contact" required-mark>
-          <t-input v-model="formData.contact" clearable placeholder="请输入" />
+          <t-input v-model="formData.contact" clearable placeholder="请输入联系人" />
         </t-form-item>
         <t-form-item label="联系电话" name="phone" required-mark>
-          <t-input v-model="formData.phone" clearable placeholder="请输入" :maxlength="11" @input="handlePhoneInput" />
+          <t-input
+            v-model="formData.phone"
+            clearable
+            placeholder="请输入联系电话"
+            :maxlength="11"
+            @input="handlePhoneInput"
+          />
         </t-form-item>
         <t-form-item label="备注" name="remark">
           <t-textarea
             v-model="formData.remark"
-            placeholder="请输入"
+            placeholder="请输入备注"
             :maxlength="100"
             :autosize="{ minRows: 4, maxRows: 6 }"
           />
@@ -160,6 +159,8 @@
 </template>
 
 <script setup lang="ts">
+import { rejectFormSubmission } from '@/utils/submitValidation';
+import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
@@ -214,9 +215,6 @@ const canToggleSupplierStatus = computed(() =>
   hasPermission(loginUser.value, `${supplierPermissionPrefix}.toggle-status`),
 );
 const canDeleteSupplier = computed(() => hasPermission(loginUser.value, `${supplierPermissionPrefix}.delete`));
-const currentOrganizationLabel = computed(
-  () => loginUser.value.storeName ?? (loginUser.value.tenantId ? loginUser.value.tenantName : '供应链协同系统'),
-);
 const selectableSupplyTypes = computed(() =>
   supplyTypes.value.filter((item) => item.status === 'enabled' || formData.supplyTypeIds.includes(item.id)),
 );
@@ -426,7 +424,7 @@ const closeFormDialog = () => {
 
 const handleSubmit = async () => {
   const result = await formRef.value?.validate();
-  if (result !== true) return;
+  if (result !== true) return rejectFormSubmission(formRef.value);
 
   if (!formData.supplyTypeIds.length) return;
 
@@ -526,30 +524,6 @@ onMounted(async () => {
   border-radius: var(--td-radius-medium);
 }
 
-.filter-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--td-comp-margin-xxl);
-}
-
-.filter-fields :deep(.t-form__item) {
-  margin-bottom: 0;
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--td-comp-margin-s);
-}
-
 .table-toolbar {
   display: flex;
   justify-content: flex-start;
@@ -570,14 +544,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
-  .page-header,
-  .filter-row {
+  .page-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .filter-actions {
-    justify-content: flex-start;
   }
 }
 </style>

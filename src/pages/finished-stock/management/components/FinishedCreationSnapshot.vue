@@ -157,7 +157,6 @@ const text = (value: unknown) => (value == null || value === '' ? '未填写' : 
   background-color: var(--td-bg-color-secondarycontainer);
   color: var(--td-text-color-placeholder);
   font: var(--td-font-body-medium);
-  font-weight: 400;
 }
 .creation-basic-top,
 .creation-basic-attributes {
@@ -201,8 +200,7 @@ const text = (value: unknown) => (value == null || value === '' ? '未填写' : 
   padding: var(--td-comp-paddingTB-s) var(--td-comp-paddingLR-m);
   background: var(--td-bg-color-secondarycontainer);
   color: var(--td-text-color-primary);
-  font: var(--td-font-body-medium);
-  font-weight: 500;
+  font: var(--td-font-mark-medium);
 }
 .creation-media-preview {
   display: flex;

@@ -298,7 +298,6 @@ const clearAllNodes = () => {
 .permission-module-empty small {
   color: var(--td-text-color-placeholder);
   font: var(--td-font-body-small);
-  line-height: 20px;
 }
 
 .permission-matrix {
@@ -403,20 +402,17 @@ const clearAllNodes = () => {
 .permission-page-name {
   color: var(--td-text-color-primary);
   font: var(--td-font-body-medium);
-  font-weight: 400;
 }
 
 .permission-page-note {
   margin-top: var(--td-comp-margin-xs);
   color: var(--td-text-color-secondary);
   font: var(--td-font-body-small);
-  line-height: 20px;
 }
 
 .permission-tab-text {
   color: var(--td-text-color-primary);
   font: var(--td-font-body-medium);
-  line-height: 20px;
 }
 
 .permission-row-toggle {
@@ -444,7 +440,7 @@ const clearAllNodes = () => {
 .permission-action-grid :deep(.t-checkbox__label) {
   white-space: normal;
   word-break: break-word;
-  line-height: 20px;
+  line-height: var(--td-line-height-body-medium);
 }
 
 .permission-matrix__table .permission-matrix-empty-row td {
