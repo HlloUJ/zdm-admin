@@ -139,7 +139,7 @@
       v-model:visible="detailVisible"
       header="客户详情"
       placement="right"
-      size="min(1100px, 94vw)"
+      size="1100px"
       :confirm-btn="null"
       :cancel-btn="cancelButtonProps('关闭')"
       @cancel="detailVisible = false"
@@ -148,31 +148,46 @@
         <t-skeleton v-if="detailLoading" theme="paragraph" />
         <template v-if="detail">
           <AdminDetailPage embedded bordered title="客户资料" :items="detailItems">
-            <span>跟进记录</span>
-            <t-timeline v-if="sortedFollowups.length" mode="same">
-              <t-timeline-item v-for="record in sortedFollowups" :key="record.id" :label="time(record.followedAt)">
-                <t-space direction="vertical">
-                  <span>{{ record.createdByName || '-' }}</span>
-                  <div>{{ record.content }}</div>
-                  <t-space v-if="record.attachments.length" break-line
-                    ><t-link
+            <t-typography-title level="h5">跟进记录</t-typography-title>
+            <t-timeline v-if="sortedFollowups.length" mode="alternate" label-align="left">
+              <t-timeline-item v-for="record in sortedFollowups" :key="record.id">
+                <template #label>
+                  <div>{{ time(record.followedAt).slice(0, 10) }}</div>
+                  <div>{{ time(record.followedAt).slice(11) }}</div>
+                </template>
+                <t-row justify="space-between" align="center">
+                  <t-space align="center">
+                    <t-avatar size="small">{{ (record.createdByName || '-').slice(0, 1) }}</t-avatar>
+                    <t-typography-text strong :content="record.createdByName || '-'" />
+                  </t-space>
+                  <t-space v-if="isInDataScope(detail.customer)">
+                    <t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link>
+                    <t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)">删除</t-link>
+                  </t-space>
+                </t-row>
+                <t-typography-paragraph :content="record.content" />
+                <t-typography-paragraph v-if="record.attachments.length" :key="JSON.stringify(record.attachments)">
+                  <t-space break-line>
+                    <t-link
                       v-for="attachment in record.attachments"
                       :key="attachment.mediaId"
                       :theme="buttonTheme('preview')"
                       @click="previewAttachment(record, attachment)"
                       >{{ attachment.name }}</t-link
-                    ></t-space
-                  >
-                  <span v-if="record.nextFollowAt || record.nextFollowTask"
-                    >下次跟进：{{ time(record.nextFollowAt) }} {{ record.nextFollowTask }}</span
-                  >
-                  <t-space v-if="isInDataScope(detail.customer)"
-                    ><t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link
-                    ><t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)"
-                      >删除</t-link
-                    ></t-space
-                  >
-                </t-space>
+                    >
+                  </t-space>
+                </t-typography-paragraph>
+                <t-typography-paragraph
+                  v-if="record.nextFollowAt || record.nextFollowTask"
+                  :content="
+                    [
+                      '下次跟进：',
+                      time(record.nextFollowAt),
+                      String.fromCharCode(12288),
+                      record.nextFollowTask || '',
+                    ].join('')
+                  "
+                />
               </t-timeline-item>
             </t-timeline>
             <t-empty v-if="!detail.followups.length" description="暂无跟进记录" />
@@ -459,7 +474,7 @@ const detailItems = computed(() => {
     { label: '客户需求', value: customer.requirement || '-', span: 3 },
     { label: '客户备注', value: customer.remark || '-', span: 3 },
     { label: '建档人', value: customer.createdByName || '-' },
-    { label: '建档时间', value: time(customer.createdAt) },
+    { label: '建档时间', value: time(customer.createdAt), span: 2 },
   ];
 });
 const time = (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-');

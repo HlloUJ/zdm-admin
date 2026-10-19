@@ -773,9 +773,15 @@ test('new customer selects a searchable owner and limits both notes to 100 chara
   const owner = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: /^归属人/ }) });
   const name = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: '客户姓名' }) });
   await expect(owner.locator('input')).toHaveValue('导购A');
-  const ownerBox = await owner.boundingBox();
-  const nameBox = await name.boundingBox();
-  expect(ownerBox!.y).toBeLessThan(nameBox!.y);
+  // Measure both fields in the same frame while the native dialog may be animating.
+  const positions = await page.evaluate(
+    ({ owner, name }) => {
+      if (!owner || !name) throw new Error('Missing customer form fields');
+      return { ownerY: owner.getBoundingClientRect().y, nameY: name.getBoundingClientRect().y };
+    },
+    { owner: await owner.elementHandle(), name: await name.elementHandle() },
+  );
+  expect(positions.ownerY).toBeLessThan(positions.nameY);
   await expect(owner.locator('.t-form__label')).toHaveClass(/--required/);
   await owner.locator('.t-select').hover();
   await owner.locator('.t-input__clear').click();
@@ -1181,12 +1187,50 @@ test('followups use the native timeline in followed-time descending order with s
   const drawer = page.locator('.t-drawer__content-wrapper:visible');
   const items = drawer.locator('.t-timeline-item');
   await expect(items).toHaveText([/最新高编号/, /最新低编号/, /中间记录/, /最早记录/]);
-  await expect(items.locator('.t-timeline-item__label')).toHaveText([
-    '2026-10-21 10:00:00',
-    '2026-10-21 10:00:00',
-    '2026-10-20 10:00:00',
-    '2026-10-18 10:00:00',
+  await expect(items.locator('.t-timeline-item__label > div:first-child')).toHaveText([
+    '2026-10-21',
+    '2026-10-21',
+    '2026-10-20',
+    '2026-10-18',
   ]);
+  await expect(items.locator('.t-timeline-item__label > div:last-child')).toHaveText([
+    '10:00:00',
+    '10:00:00',
+    '10:00:00',
+    '10:00:00',
+  ]);
+  const positions = await items.first().evaluate((item) => {
+    const label = item.querySelector('.t-timeline-item__label')!.getBoundingClientRect();
+    const dot = item.querySelector('.t-timeline-item__wrapper')!.getBoundingClientRect();
+    const content = item.querySelector('.t-timeline-item__content')!.getBoundingClientRect();
+    return { labelRight: label.right, dotLeft: dot.left, dotRight: dot.right, contentRight: content.right };
+  });
+  expect(positions.labelRight).toBeLessThanOrEqual(positions.dotLeft);
+  expect(positions.dotRight).toBeLessThan(positions.contentRight);
+  const header = items.first().locator('.t-timeline-item__content > .t-row').first();
+  await expect(header.getByText('导购A', { exact: true })).toBeVisible();
+  await expect(header.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(header.getByText('删除', { exact: true })).toBeVisible();
+  await expect(header.locator('.t-avatar')).toHaveText('导');
+  await expect(drawer).toHaveCSS('width', '1100px');
+  const alignment = await header.evaluate((el) => {
+    const row = el.getBoundingClientRect();
+    const name = el.querySelector('.t-typography')!.getBoundingClientRect();
+    const actions = el.querySelector(':scope > .t-space:last-child')!.getBoundingClientRect();
+    const content = el.closest('.t-timeline-item__content')!.getBoundingClientRect();
+    return {
+      nameTop: name.top,
+      actionsTop: actions.top,
+      rowRight: row.right,
+      contentRight: content.right,
+      actionsRight: actions.right,
+    };
+  });
+  expect(Math.abs(alignment.nameTop - alignment.actionsTop)).toBeLessThanOrEqual(2);
+  expect(Math.abs(alignment.rowRight - alignment.contentRight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(alignment.actionsRight - alignment.rowRight)).toBeLessThanOrEqual(1);
+  await expect(drawer.getByRole('heading', { name: '跟进记录', exact: true })).toBeVisible();
+
   const reference = await page.context().newPage();
   await reference.goto('/tests/fixtures/official-ui/reference.html');
   const style = (locator: ReturnType<Page['locator']>) =>
@@ -1198,6 +1242,101 @@ test('followups use the native timeline in followed-time descending order with s
     expect(await style(items.locator(`.t-timeline-item__${part}`))).toEqual(
       await style(reference.locator(`.native-timeline .t-timeline-item__${part}`)),
     );
+  }
+  await reference.close();
+});
+
+test('customer detail reproduces the exported Scheme One geometry and native visual styles', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1150 });
+  await setup(page, ['daily.view', 'daily.detail']);
+  const profile = {
+    ...customer(1, 7),
+    name: '赵女士',
+    nationality: 'CN',
+    phoneRegion: 'CN',
+    phone: '159****8941',
+    callingCode: '+86',
+    wechat: 'zhao_8941',
+    ownerName: '赵云',
+    requirement: '想选一套浅色系餐桌，偏好简洁款式。',
+    remark: '—',
+    createdByName: '赵云',
+    createdAt: '2026-10-19T09:13:38',
+  };
+  const followups = [
+    {
+      id: 3,
+      followedAt: '2026-10-19T15:20:00',
+      content: '已确认餐桌尺寸为180×90厘米，客户偏好浅灰色岩板。',
+      nextFollowAt: '2026-10-21T14:00',
+      nextFollowTask: '提交选材方案',
+      attachments: [],
+    },
+    {
+      id: 2,
+      followedAt: '2026-10-19T10:30:00',
+      content: '已发送两款餐桌参考图，客户倾向简洁细腿款式。',
+      attachments: [{ mediaId: 42, name: '餐桌参考图.jpg', mediaType: 'image' }],
+    },
+    {
+      id: 1,
+      followedAt: '2026-10-18T07:54:40',
+      content: '客户第一次进店，初步了解客户需求。',
+      nextFollowAt: '2026-10-20T08:00',
+      nextFollowTask: '进一步确认尺寸与预算',
+      attachments: [],
+    },
+  ].map((record) => ({ ...record, createdByName: '赵云', createdByAccountId: 7 }));
+  await page.route('**/api/admin/store-customers/1', (route) =>
+    route.fulfill({ json: ok({ customer: profile, followups }) }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  await expect(drawer.locator('.t-avatar')).toHaveCount(3);
+  const reference = await page.context().newPage();
+  await reference.setViewportSize({ width: 1440, height: 1150 });
+  await reference.goto('/tests/fixtures/official-ui/scheme-one.html');
+  const native = reference.locator('.t-drawer__content-wrapper:visible');
+  await expect(native.locator('.t-avatar')).toHaveCount(3);
+  expect((await drawer.locator('.t-timeline').innerText()).replace(/\s+/g, ' ').trim()).toBe(
+    (await native.locator('.t-timeline').innerText()).replace(/\s+/g, ' ').trim(),
+  );
+  const measure = (root: ReturnType<Page['locator']>, selector: string) =>
+    root
+      .locator(selector)
+      .first()
+      .evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const parent = el.closest('.t-drawer__content-wrapper')!.getBoundingClientRect();
+        const css = getComputedStyle(el);
+        return {
+          x: rect.x - parent.x,
+          y: rect.y - parent.y,
+          width: rect.width,
+          height: rect.height,
+          font: css.font,
+          color: css.color,
+          background: css.backgroundColor,
+          padding: css.padding,
+          border: css.border,
+        };
+      });
+  for (const selector of [
+    '.t-descriptions',
+    'h5.t-typography',
+    '.t-timeline',
+    '.t-timeline-item__label',
+    '.t-timeline-item__dot',
+    '.t-timeline-item__content > .t-row',
+    '.t-avatar',
+    '.t-timeline-item__content p',
+  ]) {
+    const actual = await measure(drawer, selector);
+    const expected = await measure(native, selector);
+    expect({ ...actual, x: 0, y: 0, width: 0, height: 0 }).toEqual({ ...expected, x: 0, y: 0, width: 0, height: 0 });
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(Math.abs(actual[key] - expected[key]), selector + ' ' + key).toBeLessThanOrEqual(1);
   }
   await reference.close();
 });
