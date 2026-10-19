@@ -1164,3 +1164,40 @@ test('followup permission works without loading customer details', async ({ page
   await expect(dialog).not.toBeVisible();
   expect(requests.some((entry) => entry.content === '列表直接跟进')).toBe(true);
 });
+
+test('followups use the native timeline in followed-time descending order with stable ties', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  const records = [
+    { id: 100, followedAt: '2026-10-20T10:00:00', content: '中间记录' },
+    { id: 999, followedAt: '2026-10-18T10:00:00', content: '最早记录' },
+    { id: 2, followedAt: '2026-10-21T10:00:00', content: '最新低编号' },
+    { id: 3, followedAt: '2026-10-21T10:00:00', content: '最新高编号' },
+  ].map((item) => ({ ...item, createdByAccountId: 7, createdByName: '导购A', attachments: [] }));
+  await page.route('**/api/admin/store-customers/1', (route) =>
+    route.fulfill({ json: ok({ customer: customer(1, 7), followups: records }) }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  const items = drawer.locator('.t-timeline-item');
+  await expect(items).toHaveText([/最新高编号/, /最新低编号/, /中间记录/, /最早记录/]);
+  await expect(items.locator('.t-timeline-item__label')).toHaveText([
+    '2026-10-21 10:00:00',
+    '2026-10-21 10:00:00',
+    '2026-10-20 10:00:00',
+    '2026-10-18 10:00:00',
+  ]);
+  const reference = await page.context().newPage();
+  await reference.goto('/tests/fixtures/official-ui/reference.html');
+  const style = (locator: ReturnType<Page['locator']>) =>
+    locator.first().evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { font: s.font, color: s.color, border: s.border, background: s.backgroundColor, padding: s.padding };
+    });
+  for (const part of ['dot', 'label']) {
+    expect(await style(items.locator(`.t-timeline-item__${part}`))).toEqual(
+      await style(reference.locator(`.native-timeline .t-timeline-item__${part}`)),
+    );
+  }
+  await reference.close();
+});

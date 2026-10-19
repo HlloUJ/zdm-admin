@@ -149,13 +149,10 @@
         <template v-if="detail">
           <AdminDetailPage embedded bordered title="客户资料" :items="detailItems">
             <span>跟进记录</span>
-            <t-list :split="true">
-              <t-list-item v-for="record in detail.followups" :key="record.id">
+            <t-timeline v-if="sortedFollowups.length" mode="same">
+              <t-timeline-item v-for="record in sortedFollowups" :key="record.id" :label="time(record.followedAt)">
                 <t-space direction="vertical">
-                  <t-space
-                    ><span>{{ time(record.followedAt) }}</span
-                    ><span>{{ record.createdByName || '-' }}</span></t-space
-                  >
+                  <span>{{ record.createdByName || '-' }}</span>
                   <div>{{ record.content }}</div>
                   <t-space v-if="record.attachments.length" break-line
                     ><t-link
@@ -169,17 +166,15 @@
                   <span v-if="record.nextFollowAt || record.nextFollowTask"
                     >下次跟进：{{ time(record.nextFollowAt) }} {{ record.nextFollowTask }}</span
                   >
-                </t-space>
-                <template v-if="isInDataScope(detail.customer)" #action
-                  ><t-space
+                  <t-space v-if="isInDataScope(detail.customer)"
                     ><t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link
                     ><t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)"
                       >删除</t-link
                     ></t-space
-                  ></template
-                >
-              </t-list-item>
-            </t-list>
+                  >
+                </t-space>
+              </t-timeline-item>
+            </t-timeline>
             <t-empty v-if="!detail.followups.length" description="暂无跟进记录" />
           </AdminDetailPage>
         </template>
@@ -468,6 +463,11 @@ const detailItems = computed(() => {
   ];
 });
 const time = (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-');
+const sortedFollowups = computed(() =>
+  [...(detail.value?.followups ?? [])].sort(
+    (a, b) => time(b.followedAt).localeCompare(time(a.followedAt)) || b.id - a.id,
+  ),
+);
 const ownerLabel = (owner: Owner) => `${owner.name}${owner.active ? '' : '（已离职或停用）'}`;
 let loadVersion = 0;
 async function reload() {
