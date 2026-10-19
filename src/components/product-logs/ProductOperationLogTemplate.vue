@@ -79,7 +79,9 @@
         <template #operationSummary="{ row }">{{ summaryLabel(row) }}</template>
         <template #operatedAt="{ row }">{{ formatTime(row.operatedAt) }}</template>
         <template #operation="{ row }"
-          ><t-link :theme="buttonTheme('view')" @click="emit('open-detail', row.id)">详情</t-link></template
+          ><t-link hover="color" :theme="buttonTheme('view')" @click="emit('open-detail', row.id)"
+            >详情</t-link
+          ></template
         >
         <template #empty>暂无操作日志</template>
       </t-table>

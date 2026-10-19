@@ -271,7 +271,7 @@ public class CustomerService {
   }
   @Transactional
   public void saveFollowup(Long customerId, Long id, CustomerRequests.Followup p) {
-    Customer c=accessible(customerId,true); permission(c.status(),"detail");
+    Customer c=accessible(customerId,true); permission(c.status(),id == null ? "followup" : "detail");
     if (p.mediaIds().stream().distinct().count()!=p.mediaIds().size()) { throw new IllegalArgumentException("附件不能重复"); }
     for (Long mediaId:p.mediaIds()) {
       MediaAsset a=media.requireAvailableForUpdate(mediaId);
@@ -308,7 +308,8 @@ public class CustomerService {
     jdbc.update("DELETE FROM store_customer_followups WHERE id=?",id);
   }
   public void requireUpload(Long customerId) {
-    Customer c=accessible(customerId,false); permission(c.status(),"detail");
+    Customer c=accessible(customerId,false); permission(c.status(),"view");
+    guard.requireAnyPermission(PREFIX+"."+c.status()+".detail", PREFIX+"."+c.status()+".followup");
   }
   @Transactional
   public void releaseUpload(Long customerId,Long mediaId) {

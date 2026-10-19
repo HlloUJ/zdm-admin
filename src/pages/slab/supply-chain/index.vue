@@ -839,7 +839,7 @@
           </t-button>
         </div>
         <div class="source-cost-editor">
-          <span>成本价<span class="price-required-star">*</span></span>
+          <span><span class="price-required-star">*</span>成本价</span>
           <SpecPriceInput
             v-if="batchPriceRows[0]"
             v-model="batchPriceRows[0].price"
@@ -853,13 +853,18 @@
       </div>
     </t-drawer>
 
-    <t-dialog
+    <AdminDialog
       v-model:visible="uploadPreviewDialogVisible"
       :header="uploadPreviewTitle"
-      width="760px"
-      placement="center"
+      :width="uploadPreviewType === 'video' ? '760px' : 'min(960px, 94vw)'"
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
       :prevent-scroll-through="false"
       :footer="false"
+      @close="uploadPreviewDialogVisible = false"
     >
       <video
         v-if="uploadPreviewType === 'video' && uploadPreviewUrl"
@@ -870,10 +875,11 @@
       <img
         v-else-if="uploadPreviewUrl"
         class="upload-large-preview"
+        style="max-width: 100%"
         :src="uploadPreviewUrl"
         :alt="uploadPreviewTitle"
       />
-    </t-dialog>
+    </AdminDialog>
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
@@ -930,7 +936,7 @@
           </t-select>
         </t-form-item>
         <t-form-item name="detail" label="详细说明">
-          <t-textarea v-model="reasonForm.detail" placeholder="请输入详细说明" :autosize="{ minRows: 4, maxRows: 6 }" />
+          <t-textarea v-model="reasonForm.detail" :maxlength="100" placeholder="请输入详细说明" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -1991,7 +1997,7 @@ const handleProductSubmit = async () => {
     pendingUploadedMediaIds.clear();
     closeProductDialog();
     if (productMode.value === 'create') adminFeedback.created(targetName);
-    else adminFeedback.actionSuccess({ action: '保存', target: targetName });
+    else adminFeedback.actionSuccess({ action: '修改', target: targetName });
   } catch (error) {
     adminFeedback.actionError({
       action: productMode.value === 'create' ? '新增' : '保存',
@@ -2282,7 +2288,7 @@ const handleConfirmSubmit = async () => {
     if (type === 'delete' && row) adminFeedback.deleted(row.name);
     else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });
     else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });
-    else if (type === 'savePrice' && row) adminFeedback.success('价格保存成功');
+    else if (type === 'savePrice' && row) adminFeedback.actionSuccess({ action: '修改' });
     else if (type === 'batchRestore') {
       adminFeedback.actionSuccess({ action: '批量放回到仓库', target: `${selectedCount} 个大板` });
     } else if (type === 'purge' && row) {

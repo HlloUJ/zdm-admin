@@ -7,6 +7,17 @@ import org.junit.jupiter.api.Test;
 
 class FunctionPermissionNormalizerTest {
   @Test
+  void retiredStorePricePermissionsNeverExpandIntoNewGrants() {
+    String retired = "store.price-configuration.view,store.price-configuration.create,"
+        + "store.price-configuration.edit,store.price-configuration.toggle-status,store.price-configuration.delete";
+    assertThat(FunctionPermissionNormalizer.normalize(List.of(retired))).isEmpty();
+    assertThat(FunctionPermissionNormalizer.normalize(List.of(retired,
+        "store.price-configuration.discount.finished.edit")))
+        .containsExactly("store.price-configuration.discount.finished.view",
+            "store.price-configuration.discount.finished.edit");
+  }
+
+  @Test
   void retiredSingleCustomerAssignmentNeverGrantsEditOrDropsBatchAssignment() {
     assertThat(FunctionPermissionNormalizer.normalize(List.of("store.customer-management.daily.assign",
         "store.customer-management.archived.assign"))).isEmpty();

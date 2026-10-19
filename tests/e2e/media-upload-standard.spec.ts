@@ -1,3 +1,4 @@
+import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { expect, test } from '@playwright/test';
 import { installAdminApiMocks, setMockBusinessClient } from './admin-api-mocks';
 
@@ -98,8 +99,15 @@ test('craft image retains required validation, preview and cancellation release 
   await expect(dialog.getByText('请上传工艺图片', { exact: true })).toHaveCount(0);
   await upload.click({ position: { x: 8, y: 80 } });
   const preview = page.locator('.t-dialog:visible').filter({ has: page.locator('img.image-preview__img') });
+  await expectStandardImagePreviewAndDismiss(page, preview);
+  await expect(dialog).toBeVisible();
+  await upload.click({ position: { x: 8, y: 80 } });
   await expect(preview).toBeVisible();
-  await preview.locator('.t-dialog__close').click();
+  const originalViewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectStandardImagePreviewAndDismiss(page, preview);
+  await page.setViewportSize(originalViewport);
+  await expect(dialog).toBeVisible();
   const released = page.waitForRequest(
     (request) => request.method() === 'DELETE' && request.url().endsWith('/crafts/images?mediaId=601'),
   );
@@ -141,4 +149,8 @@ test('operations slab retains read-only image/video cards and the stored video c
   await expect(cards.last().locator('.t-upload__card-image img')).toHaveAttribute('src', image);
   await cards.first().click({ position: { x: 8, y: 80 } });
   await expect(page.locator('img.upload-large-preview')).toHaveAttribute('src', image);
+  const preview = page.locator('.t-dialog:visible').filter({ has: page.locator('img.upload-large-preview') });
+  await expectStandardImagePreviewAndDismiss(page, preview);
+  await expect(form).toBeVisible();
+  await expect(cards.locator('input[type="file"]:enabled')).toHaveCount(0);
 });

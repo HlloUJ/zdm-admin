@@ -367,7 +367,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await expect(main.getByText('天然石', { exact: true })).toBeVisible();
   await expect(main.getByRole('columnheader', { name: '指导价', exact: true })).toBeVisible();
   await expect(main.getByRole('columnheader', { name: '区域合作门店价', exact: true })).toBeVisible();
-  await expect(main.getByRole('columnheader', { name: '商品售价*', exact: true })).toBeVisible();
+  await expect(main.getByRole('columnheader', { name: '*商品售价', exact: true })).toBeVisible();
   await expect(main.getByRole('columnheader', { name: '数量', exact: true })).toBeVisible();
   await expect(main.getByRole('columnheader', { name: '库存', exact: true })).toHaveCount(0);
   await expect(main.locator('.spec-table-block input:disabled')).toHaveCount(0);
@@ -1389,4 +1389,47 @@ test('store log-only permission keeps its native toolbar entry without exposing 
   await expect(main.locator('.selection-info')).toHaveCount(0);
   await log.click();
   await expect(page.locator('.t-drawer--open .t-drawer__header')).toContainText('操作日志');
+});
+
+test('single off shelf marks the existing required reason and keeps details optional without optional copy', async ({
+  page,
+}) => {
+  await storeLogin(page);
+  let record = product({ status: 'selling', effectiveStatus: 'selling' });
+  let payload: Record<string, unknown> | undefined;
+  await page.route('**/api/admin/store-finished-products**', (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/41/status') && route.request().method() === 'PUT') {
+      payload = route.request().postDataJSON();
+      record = product({ status: 'offShelf', effectiveStatus: 'offShelf' });
+      return route.fulfill({ json: ok(record) });
+    }
+    if (path.endsWith('/categories')) return route.fulfill({ json: ok([]) });
+    return route.fulfill({ json: ok([record]) });
+  });
+  await page.goto('/store/finished-stock-management');
+  await page.getByRole('main').getByText('已上架（1）', { exact: true }).click();
+  await page.locator('tr').filter({ hasText: '门店测试商品' }).getByText('下架', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  const reason = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: '下架原因' }) });
+  const label = reason.locator('.t-form__label');
+  await expect(label).toHaveClass(/t-form__label--required/);
+  expect(await label.locator('label').evaluate((element) => getComputedStyle(element, '::before').content)).toContain(
+    '*',
+  );
+  await expect(dialog.getByText('选填', { exact: true })).toHaveCount(0);
+  await expect(
+    dialog
+      .locator('.t-form__item')
+      .filter({ has: page.locator('label', { hasText: '详细说明' }) })
+      .locator('.t-form__label'),
+  ).not.toHaveClass(/t-form__label--required/);
+  await dialog.getByRole('button', { name: '确认下架', exact: true }).click();
+  await expect(dialog.getByText('请选择下架原因', { exact: true })).toBeVisible();
+  expect(payload).toBeUndefined();
+  await reason.locator('.t-select').click();
+  await page.getByText('商品暂停售卖', { exact: true }).click();
+  await dialog.getByRole('button', { name: '确认下架', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(payload).toEqual({ target: 'offShelf', reason: '商品暂停售卖', detail: '' });
 });

@@ -203,12 +203,7 @@
           </t-select>
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="profileFormData.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="profileFormData.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -716,7 +711,7 @@ const handleProfileSubmit = async () => {
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
       }
-      adminFeedback.success('资料更新成功');
+      adminFeedback.actionSuccess({ action: '修改' });
     } catch (error) {
       adminFeedback.error(error instanceof Error ? error.message : '更新失败');
       return;
@@ -744,7 +739,7 @@ const handlePermissionSubmit = async () => {
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
       }
-      adminFeedback.success('权限配置成功');
+      adminFeedback.actionSuccess({ action: '修改' });
     } catch (error) {
       adminFeedback.error(error instanceof Error ? error.message : '更新失败');
       return;

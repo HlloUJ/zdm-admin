@@ -1,3 +1,4 @@
+import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
@@ -163,7 +164,7 @@ test('已上传视频点击空白区域打开播放器，删除后才允许重�
   const imagePreview = page.locator('.t-dialog:visible').filter({ has: page.locator('img.upload-large-preview') });
   await expect(imagePreview.locator('img.upload-large-preview')).toHaveAttribute('src', '/test-slab.png');
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforeImagePreview);
-  await imagePreview.locator('.t-dialog__close').click();
+  await expectStandardImagePreviewAndDismiss(page, imagePreview);
   await expect(imagePreview).not.toBeVisible();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforeImagePreview);
   const box = dialog.locator('.admin-media-upload[aria-label="播放商品视频"]');

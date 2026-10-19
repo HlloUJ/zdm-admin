@@ -107,12 +107,7 @@
           <t-input v-model="formData.name" clearable placeholder="请输入品种" />
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="formData.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="formData.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -365,7 +360,7 @@ const handleSubmit = async () => {
     if (dialogMode.value === 'create') {
       adminFeedback.created(target);
     } else {
-      adminFeedback.actionSuccess({ action: '保存', target });
+      adminFeedback.actionSuccess({ action: '修改', target });
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

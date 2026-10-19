@@ -410,11 +410,47 @@ class CustomerApiTest extends SpringContainerTestSupport {
     action(a,"daily","assign",1L).andExpect(status().isBadRequest());
     assertThat(jdbc.queryForObject("SELECT owner_account_id FROM store_customers WHERE id=?",Long.class,a)).isEqualTo(90001);
   }
+  @Test void listFollowupGrantIsIndependentFromDetailAndStillRequiresViewAndDataScope() throws Exception {
+    long a=create();
+    String body="{\"followedAt\":\"2026-10-19T10:00:00\",\"content\":\"列表跟进\",\"mediaIds\":[]}";
+    identity(90001,90001L,"self","daily.view","daily.detail");
+    follow(a,body).andExpect(status().isForbidden());
+    identity(90001,90001L,"self","daily.view","daily.followup");
+    follow(a,body).andExpect(status().isOk());
+    mvc.perform(get(BASE+"/"+a)).andExpect(status().isForbidden());
+    identity(90001,90001L,"self","daily.followup");
+    follow(a,body).andExpect(status().isForbidden());
+    identity(90002,90001L,"self","daily.view","daily.followup");
+    follow(a,body).andExpect(status().isForbidden());
+    identity(90001,90002L,"all","daily.view","daily.followup");
+    follow(a,body).andExpect(status().isForbidden());
+    identity(90001,90001L,"all","all"); action(a,"daily","archive",null).andExpect(status().isOk());
+    identity(90001,90001L,"self","daily.view","daily.followup");
+    follow(a,body).andExpect(status().isForbidden());
+    identity(90001,90001L,"self","archived.view","archived.followup");
+    follow(a,body).andExpect(status().isOk());
+  }
   @Test void followupValidatesRequiredFieldsAndMaximumAttachments() throws Exception {
     long a=create();
     follow(a,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"\",\"mediaIds\":[]}").andExpect(status().isBadRequest());
     follow(a,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"内容\",\"mediaIds\":[1,2,3,4]}").andExpect(status().isBadRequest());
     follow(a,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"内容\",\"mediaIds\":[1,1]}").andExpect(status().isBadRequest());
+  }
+  @Test void followupTextLimitsAreOneHundredCharactersForCreateAndEdit() throws Exception {
+    long customer=create();
+    var accepted=java.util.Map.of("followedAt","2026-10-19T11:04:00",
+        "content","客".repeat(100),"nextFollowTask","需".repeat(100),"mediaIds",List.of());
+    follow(customer,json.writeValueAsString(accepted)).andExpect(status().isOk());
+    long record=data(mvc.perform(get(BASE+"/"+customer))).path("followups").get(0).path("id").asLong();
+    for (String field:List.of("content","nextFollowTask")) {
+      var invalid=new java.util.HashMap<String,Object>(accepted);
+      invalid.put(field,"字".repeat(101));
+      follow(customer,json.writeValueAsString(invalid)).andExpect(status().isBadRequest());
+      mvc.perform(put(BASE+"/"+customer+"/followups/"+record).contentType(MediaType.APPLICATION_JSON)
+          .content(json.writeValueAsString(invalid))).andExpect(status().isBadRequest());
+    }
+    mvc.perform(put(BASE+"/"+customer+"/followups/"+record).contentType(MediaType.APPLICATION_JSON)
+        .content(json.writeValueAsString(accepted))).andExpect(status().isOk());
   }
   @Test void genericAttachmentIsPrivateBoundAndReadThroughAuthorizedCustomer() throws Exception {
     long a=create();

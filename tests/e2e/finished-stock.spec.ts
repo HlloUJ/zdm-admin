@@ -1,3 +1,4 @@
+import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test, type Page } from '@playwright/test';
@@ -261,7 +262,7 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   const preview = page.locator('.t-dialog:visible').filter({ has: page.locator('.image-preview-dialog') });
   await expect(preview).toBeVisible();
   await expect(preview.locator('.image-preview-dialog img')).toHaveAttribute('src', '/test-product.png');
-  await preview.locator('.t-dialog__close').click();
+  await expectStandardImagePreviewAndDismiss(page, preview);
   await expect(preview).not.toBeVisible();
   await images
     .getByRole('button', { name: '商品主图2', exact: true })
@@ -556,7 +557,7 @@ test('source specification editor exposes cost and stock without operations pric
     .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
     .click();
   const table = page.locator('.spec-table-block');
-  await expect(table.getByRole('columnheader', { name: '成本价*', exact: true })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: '*成本价', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader', { name: /指导价/ })).toHaveCount(0);
   await page.getByText('批量填写', { exact: true }).click();
   await expect(page.locator('.batch-field-grid').getByText('成本价', { exact: true })).toBeVisible();
@@ -640,7 +641,7 @@ test('uses only template-bound role attributes and builds dynamic sales specific
     .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
     .click();
   const table = page.locator('.spec-table-block');
-  await expect(table.getByRole('columnheader', { name: '销售测试属性*', exact: true })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: '*销售测试属性', exact: true })).toBeVisible();
   for (const name of ['商品测试属性', '未绑定测试属性', '无角色测试属性', '大理石台面材质', '颜色分类', '尺寸'])
     await expect(table.getByRole('columnheader', { name, exact: true })).toHaveCount(0);
   await page
@@ -826,9 +827,9 @@ test('edits prices in a specification table and preserves product details on sav
   await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(2);
   await expect(editor.locator('.spec-table-block thead th')).toContainText([
     '商品规格',
-    '成本价*',
-    '指导价*',
-    '一级价格*',
+    '*成本价',
+    '*指导价',
+    '*一级价格',
   ]);
   await expect(editor.locator('.t-select')).toHaveCount(0);
   await expect(editor.locator('.spec-table-block tbody tr').nth(1)).toContainText('规格B');
@@ -991,7 +992,7 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
     await preview.locator('.t-dialog__close').click();
   }
   await page.setViewportSize({ width: 1280, height: 720 });
-  await expect(editor.locator('.spec-table-block thead th')).toContainText(['商品规格', '成本价*']);
+  await expect(editor.locator('.spec-table-block thead th')).toContainText(['商品规格', '*成本价']);
   await checkDecimalEditing(
     editor.locator('.spec-table-block tbody tr').first().getByPlaceholder('请输入价格', { exact: true }),
   );
@@ -1090,7 +1091,7 @@ test('supply-chain layered product edit exposes cost for each specification', as
     '销售属性1（共享）',
     '销售属性2（共享）',
     '销售属性3（共享）',
-    '成本价*',
+    '*成本价',
   ]);
   await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(2);
   await expect(
@@ -2457,5 +2458,29 @@ for (const submittedBeforeCreation of [false, true]) {
       }),
     );
     await expectPriceTableStable(table.locator('.t-table'), geometry);
+  });
+}
+
+for (const client of ['supply-chain']) {
+  test(`${client} supplier title has a native required prefix without marking the query supplier`, async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+    await installFinishedMocks(page, client);
+    await page.goto(client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management');
+    const queryLabel = page.locator('.zdm-admin-filter-form .t-form__label').filter({ hasText: '供应商' });
+    await expect(queryLabel).not.toHaveClass(/t-form__label--required/);
+    await page.getByRole('button', { name: '发布商品', exact: true }).click();
+    const picker = page.getByTestId('finished-category-picker');
+    for (const name of ['成品现货', '餐桌', '石材餐桌', '奢石餐桌'])
+      await picker.getByRole('button', { name, exact: true }).click();
+    await page.getByRole('button', { name: '确认，下一步' }).click();
+    const label = page.locator('.supplier-form .t-form__label');
+    await expect(label).toHaveClass(/t-form__label--required/);
+    const mark = await label.locator('label').evaluate((element) => ({
+      content: getComputedStyle(element, '::before').content,
+      color: getComputedStyle(element, '::before').color,
+      expected: getComputedStyle(element).getPropertyValue('--td-error-color'),
+    }));
+    expect(mark.content).toContain('*');
+    expect(mark.color).not.toBe('rgba(0, 0, 0, 0)');
   });
 }

@@ -341,7 +341,7 @@
           <template #guidePrice="{ row }">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>
           <template #partnerPrice="{ row }">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>
           <template #operation="{ row }"
-            ><t-link :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
+            ><t-link hover="color" :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
           >
           <template #empty>暂无可挑选的已上架商品</template>
         </t-table>
@@ -389,6 +389,9 @@
       confirm-function="close"
       :visible="Boolean(imagePreview)"
       header="商品主图"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
       width="min(960px, 94vw)"
       :footer="false"
       @close="imagePreview = null"
@@ -408,7 +411,7 @@
       @close="offShelfVisible = false"
     >
       <t-form ref="offShelfFormRoot" :data="offShelf" label-width="100px" colon>
-        <t-form-item label="下架原因" :required-mark="Boolean(pendingOffShelf?.batch)"
+        <t-form-item label="下架原因" required-mark
           ><t-select
             v-bind="offShelfFeedback.field('reason', offShelf.reason)"
             v-model="offShelf.reason"
@@ -417,12 +420,8 @@
               value="商品信息调整"
               label="商品信息调整" /><t-option value="其他" label="其他" /></t-select
         ></t-form-item>
-        <t-form-item :help="pendingOffShelf?.batch ? undefined : '选填'" label="详细说明"
-          ><t-textarea
-            v-model="offShelf.detail"
-            :maxlength="500"
-            placeholder="请输入详细说明"
-            :autosize="pendingOffShelf?.batch ? { minRows: 4, maxRows: 6 } : undefined"
+        <t-form-item label="详细说明"
+          ><t-textarea v-model="offShelf.detail" :maxlength="100" placeholder="请输入详细说明" :autosize="{}"
         /></t-form-item>
       </t-form>
     </AdminDialog>

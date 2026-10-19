@@ -89,6 +89,7 @@ function showFeedback(theme: FeedbackTheme, input: FeedbackInput) {
 }
 
 export function buildActionSuccessText(action: string, target?: string) {
+  if (action === '修改' || action === '编辑') return '修改成功';
   return target ? `已${action}“${target}”` : `${action}已完成`;
 }
 

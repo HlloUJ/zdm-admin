@@ -226,12 +226,13 @@
                                   status="error"
                                   tips="请选择选项值"
                                 >
-                                  <t-link :theme="buttonTheme('options')" @click="openValues(row)">{{
+                                  <t-link hover="color" :theme="buttonTheme('options')" @click="openValues(row)">{{
                                     row.options.length
                                   }}</t-link>
                                 </t-form-item>
                                 <t-link
                                   v-else-if="row.valueType === 'select'"
+                                  hover="color"
                                   :theme="buttonTheme('options')"
                                   @click="openValues(row)"
                                   >{{ row.options.length }}</t-link
@@ -239,7 +240,7 @@
                                 <span v-else>—</span>
                               </template>
                               <template #operation="{ row }"
-                                ><t-link :theme="buttonTheme('remove')" @click="removeTarget = row"
+                                ><t-link hover="color" :theme="buttonTheme('remove')" @click="removeTarget = row"
                                   >移除</t-link
                                 ></template
                               >
@@ -374,8 +375,13 @@
         <template #publishedAt="{ row }">{{ formatDateTime(row.publishedAt) }}</template>
         <template #operation="{ row }">
           <t-space>
-            <t-link :theme="buttonTheme('view')" @click="viewHistoryVersion(row)">查看</t-link>
-            <t-link v-if="can('create')" :theme="buttonTheme('copy-version')" :disabled="busy" @click="prepareCopy(row)"
+            <t-link hover="color" :theme="buttonTheme('view')" @click="viewHistoryVersion(row)">查看</t-link>
+            <t-link
+              v-if="can('create')"
+              hover="color"
+              :theme="buttonTheme('copy-version')"
+              :disabled="busy"
+              @click="prepareCopy(row)"
               >复制</t-link
             >
           </t-space>
@@ -759,7 +765,7 @@ function save(): Promise<boolean> {
         saved.value = snapshot;
         pendingEdits.delete(draftId);
       }
-      adminFeedback.actionSuccess({ action: '保存', target: '草稿' });
+      adminFeedback.actionSuccess({ action: '修改' });
       return true;
     } catch (e) {
       error(e, '保存', '草稿');

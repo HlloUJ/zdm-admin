@@ -145,12 +145,7 @@
           />
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="formData.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="formData.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -543,7 +538,7 @@ const handleSubmit = async () => {
     if (dialogMode.value === 'create') {
       adminFeedback.created(targetName);
     } else {
-      adminFeedback.actionSuccess({ action, target: targetName });
+      adminFeedback.actionSuccess({ action: '修改', target: targetName });
     }
   } catch (error) {
     adminFeedback.actionError({ action, target: targetName, error });

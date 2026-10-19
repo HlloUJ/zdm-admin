@@ -209,7 +209,7 @@ test('price batch fills selected inputs locally and only Save writes configurati
   for (const input of await page.locator('tbody .t-input-number input').all()) await expect(input).toHaveValue('2.20');
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
   await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
-  await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     path: '/api/admin/store-price-rules/price/save',
     scope: 'finished',
@@ -336,7 +336,7 @@ test('query and reset preserve drafts; blur never saves and mixed edits save tog
   await parent.getByRole('button', { name: '收起下级分类' }).click();
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
   await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
-  await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     path: '/api/admin/store-price-rules/price/save',
     scope: 'finished',
@@ -376,7 +376,7 @@ test('failed save retains draft for retry and product switching preserves unsave
   await expect(input).toHaveValue('1.50');
   await expect(input).toBeEnabled();
   await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
-  await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   await expect(checkbox).not.toHaveClass(/t-is-checked/);
   await expect(page.locator('thead .t-checkbox')).not.toHaveClass(/t-is-checked|t-is-indeterminate/);
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
@@ -429,7 +429,7 @@ test('blank batch is required and leaves category inputs unchanged; inline clear
   await categoryInput.fill('');
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
   await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
-  await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     path: '/api/admin/store-price-rules/price/save',
     scope: 'finished',
@@ -528,7 +528,7 @@ test('first root expands fully; cascade selection includes collapsed descendants
   await expect(row('深层末级分类').locator('input:not([type=checkbox])')).toHaveValue('2.40');
   await expect(row('本店餐桌').locator('.t-input-number')).toHaveCount(0);
   await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
-  await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   expect(requests.find((request) => request.method === 'POST')).toMatchObject({
     body: { changes: [12, 14, 16, 23, 24].map((categoryId) => ({ categoryId, coefficient: 2.4 })) },
   });
@@ -560,7 +560,7 @@ test('unconfigured filter uses saved leaf coefficients, preserves paths and draf
   await expect(input).toHaveValue('3.25');
   await expect(page.getByText('另一一级分类', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
-  await expect(page.getByText('价格配置已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   await expect(page.getByText('木质餐桌', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '重置', exact: true }).click();
   await expect(filter).not.toBeChecked();
