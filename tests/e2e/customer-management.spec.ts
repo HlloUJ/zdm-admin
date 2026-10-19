@@ -180,7 +180,14 @@ const archived = [
 ];
 test('single authorized tab hides tab bar and self scope hides owner filter', async ({ page }) => {
   await setup(page, ['daily.view', 'daily.detail'], 'self');
-  await page.goto('/store/customer-management');
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/admin/store-customers' &&
+        response.request().method() === 'GET',
+    ),
+    page.goto('/store/customer-management'),
+  ]);
   await expect(page.getByText('王先生1', { exact: true })).toBeVisible();
   await expect(page.locator('.t-tabs')).toHaveCount(0);
   await expect(page.getByText('王先生2', { exact: true })).toHaveCount(0);
@@ -191,7 +198,14 @@ test('single authorized tab hides tab bar and self scope hides owner filter', as
 });
 test('all data with grants allows ordinary staff to maintain other owner customers', async ({ page }) => {
   await setup(page, daily);
-  await page.goto('/store/customer-management');
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/admin/store-customers' &&
+        response.request().method() === 'GET',
+    ),
+    page.goto('/store/customer-management'),
+  ]);
   const row = page.locator('tr').filter({ hasText: '王先生2' });
   await expect(row).toBeVisible();
   await expect(row.getByText('调整归属', { exact: true })).toHaveCount(0);
