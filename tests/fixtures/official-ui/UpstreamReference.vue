@@ -89,7 +89,7 @@
       <t-alert theme="info" message="调整归属后，客户将自动恢复为日常客户。" />
     </t-form>
   </t-dialog>
-  <t-descriptions class="native-descriptions" title="客户资料"><t-descriptions-item label="姓名">客户</t-descriptions-item></t-descriptions>
+  <t-descriptions class="native-descriptions" bordered title="客户资料"><t-descriptions-item label="姓名">客户</t-descriptions-item></t-descriptions>
   <t-list class="native-list"><t-list-item>跟进记录</t-list-item></t-list>
 </template>
 <script setup lang="ts">

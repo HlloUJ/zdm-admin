@@ -141,7 +141,7 @@
       <t-loading :loading="detailLoading">
         <t-skeleton v-if="detailLoading" theme="paragraph" />
         <template v-if="detail">
-          <AdminDetailPage embedded title="客户资料" :items="detailItems">
+          <AdminDetailPage embedded bordered title="客户资料" :items="detailItems">
             <t-space
               ><span>跟进记录</span
               ><t-button v-if="isInDataScope(detail.customer)" :theme="buttonTheme('create')" @click="openFollowup()"

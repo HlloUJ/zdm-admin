@@ -664,11 +664,27 @@
     },
     "src/components/foundation/feedback/adminFeedback.test.ts": {
       "content": "5e09c977ea1a539a869509955fc18d0051f8eb3be93eb74eba910b5ab9258b0c",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "\n    expect(buildActionSuccessText('停用', '一级分类3')).toBe('已停用“一级分类3”');\n    expect(buildActionSuccessText('保存')).toBe('保存已完成');\n  });\n\n  it('统一删除成功提示为已删除加名称', async () => {\n",
+          "after": "\n    expect(buildActionSuccessText('停用', '一级分类3')).toBe('已停用“一级分类3”');\n    expect(buildActionSuccessText('保存')).toBe('保存已完成');\n    expect(buildActionSuccessText('修改')).toBe('修改成功');\n    expect(buildActionSuccessText('修改', '客户')).toBe('修改成功');\n    expect(buildActionSuccessText('编辑', '门店')).toBe('修改成功');\n  });\n\n  it('统一删除成功提示为已删除加名称', async () => {\n"
+        }
+      ]
     },
     "src/components/foundation/feedback/adminFeedback.ts": {
       "content": "e90267cc81e1b379f9cae38d24448c5521d76ec1cd90f0534f9e5c5a44cc6ac7",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "}\n\nexport function buildActionSuccessText(action: string, target?: string) {\n  return target ? `已${action}“${target}”` : `${action}已完成`;\n}\n\n",
+          "after": "}\n\nexport function buildActionSuccessText(action: string, target?: string) {\n  if (action === '修改' || action === '编辑') return '修改成功';\n  return target ? `已${action}“${target}”` : `${action}已完成`;\n}\n\n"
+        }
+      ]
     },
     "src/components/foundation/index.ts": {
       "content": "88946c65a9663770825bfb8daca7035223d69016d20b71da31f54cfc02a693f7",
@@ -691,7 +707,24 @@
     "src/components/foundation/official/AdminDetailPage.vue": {
       "script": "475cf799878f5678687b92989335b1382b5fd43f149b835694a51d230d53959c",
       "template": "bb9e409cb732613b540ed614bf902c5e498ab0fd541f66c4e7645c34be58dc6e",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedVisualPatches": [
+        {
+          "reason": "2026-10-19 user requested the customer detail profile region as a TDesign table; expose native Descriptions bordered appearance opt-in, preserve all fields, spans, slots and other consumers.",
+          "before": "<t-descriptions :title=\"title\" :column=\"column\">",
+          "after": "<t-descriptions :title=\"title\" :column=\"column\" :bordered=\"bordered\">"
+        },
+        {
+          "reason": "2026-10-19 user requested the customer detail profile region as a TDesign table; expose native Descriptions bordered appearance opt-in, preserve all fields, spans, slots and other consumers.",
+          "before": "    embedded?: boolean;",
+          "after": "    embedded?: boolean;\n    bordered?: boolean;"
+        },
+        {
+          "reason": "2026-10-19 user requested the customer detail profile region as a TDesign table; expose native Descriptions bordered appearance opt-in, preserve all fields, spans, slots and other consumers.",
+          "before": "{ column: 3, embedded: false }",
+          "after": "{ column: 3, embedded: false, bordered: false }"
+        }
+      ]
     },
     "src/components/foundation/official/AdminFormDialog.vue": {
       "script": "9d0582f0f084127114a3d077e6901a45c209be670aad3710b9a8095bd9457217",
@@ -1387,6 +1420,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(normalizedName);\n    } else {\n      adminFeedback.actionSuccess({ action: '保存', target: normalizedName });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(normalizedName);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改', target: normalizedName });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "      placement=\"center\"\n      :close-on-overlay-click=\"true\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
@@ -1462,6 +1501,11 @@
           "reason": "2026-10-15 user authorized global migration of existing query areas to accepted adaptive-query-grid-v1: layout only; preserve fields, labels, values, conditions, permissions and all handlers.",
           "before": "filter-layout=\"official-grid\"",
           "after": "filter-layout=\"adaptive-grid\""
+        },
+        {
+          "reason": "2026-10-19 user requested the customer detail profile region as a TDesign table; expose native Descriptions bordered appearance opt-in, preserve all fields, spans, slots and other consumers.",
+          "before": "<AdminDetailPage embedded title=\"客户资料\" :items=\"detailItems\">",
+          "after": "<AdminDetailPage embedded bordered title=\"客户资料\" :items=\"detailItems\">"
         }
       ],
       "approvedPlaceholderPatches": [
@@ -3031,6 +3075,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    try {\n      upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));\n      formPageVisible.value = false;\n      adminFeedback.success(`已保存“${editingProduct.value.name}”`);\n    } catch (error) {\n      adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));\n    } finally {\n",
+          "after": "    try {\n      upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));\n      formPageVisible.value = false;\n      adminFeedback.actionSuccess({ action: '修改' });\n    } catch (error) {\n      adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));\n    } finally {\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (isCreate) {\n      adminFeedback.created(payload.name);\n    } else {\n      adminFeedback.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');\n",
+          "after": "    if (isCreate) {\n      adminFeedback.created(payload.name);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改' });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "              <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"submitProductForm\">\n                <template #icon><t-icon name=\"check\" /></template>\n                提交商品信息\n              </t-button>\n              <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeFormPage\">取消</t-button>\n",
@@ -3636,6 +3692,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "        saleCoefficient: drafts[item.skuId].coefficient === '' ? null : Number(drafts[item.skuId].coefficient),\n      })),\n    });\n    adminFeedback.actionSuccess({ action: '保存', target: '商品' });\n    emit('saved', product);\n  } catch (error) {\n    adminFeedback.error(getSafeErrorMessage(error, '保存商品失败'));\n",
+          "after": "        saleCoefficient: drafts[item.skuId].coefficient === '' ? null : Number(drafts[item.skuId].coefficient),\n      })),\n    });\n    adminFeedback.actionSuccess({ action: '修改', target: '商品' });\n    emit('saved', product);\n  } catch (error) {\n    adminFeedback.error(getSafeErrorMessage(error, '保存商品失败'));\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "    <AdminSectionCard class=\"form-submit-bar\">\n      <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"save\"\n        ><template #icon><t-icon name=\"check\" /></template>提交商品信息</t-button\n      >\n      <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"saving\" @click=\"emit('cancel')\">取消</t-button>\n",
@@ -3999,6 +4061,18 @@
       "script": "75d9397a56222144493f74c7f20438b35f39edbce7d3ff0dd146f92645e4a435",
       "template": "ebb4878bc7f0fc8b0b22a500a07cfd0d164e2544418482624da67cf5bf2285d3",
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    rules.value = await saveStoreCategoryPrices(activeScope.value, changes);\n    selectedIds.value = [];\n    draftCache.delete(activeKey.value);\n    adminFeedback.success('价格配置已保存');\n  } catch (error) {\n    adminFeedback.error(getSafeErrorMessage(error, '保存失败，请稍后重试'));\n  } finally {\n",
+          "after": "    rules.value = await saveStoreCategoryPrices(activeScope.value, changes);\n    selectedIds.value = [];\n    draftCache.delete(activeKey.value);\n    adminFeedback.actionSuccess({ action: '修改' });\n  } catch (error) {\n    adminFeedback.error(getSafeErrorMessage(error, '保存失败，请稍后重试'));\n  } finally {\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "            Number(createForm.coefficient),\n          );\n    createVisible.value = false;\n    adminFeedback.actionSuccess({ action: editingDiscountId.value == null ? '新增' : '保存', target: '折扣配置' });\n  } catch (error) {\n    adminFeedback.error(getSafeErrorMessage(error, '新增失败，请稍后重试'));\n  } finally {\n",
+          "after": "            Number(createForm.coefficient),\n          );\n    createVisible.value = false;\n    adminFeedback.actionSuccess({ action: editingDiscountId.value == null ? '新增' : '修改', target: '折扣配置' });\n  } catch (error) {\n    adminFeedback.error(getSafeErrorMessage(error, '新增失败，请稍后重试'));\n  } finally {\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -4836,6 +4910,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    try {\n      upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));\n      formPageVisible.value = false;\n      adminFeedback.success(`已保存“${editingProduct.value.name}”`);\n    } catch (error) {\n      adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));\n    } finally {\n",
+          "after": "    try {\n      upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));\n      formPageVisible.value = false;\n      adminFeedback.actionSuccess({ action: '修改' });\n    } catch (error) {\n      adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));\n    } finally {\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (isCreate) {\n      adminFeedback.created(payload.name);\n    } else {\n      adminFeedback.success('商品信息已保存');\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');\n",
+          "after": "    if (isCreate) {\n      adminFeedback.created(payload.name);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改' });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "              <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"submitProductForm\">\n                <template #icon><t-icon name=\"check\" /></template>\n                提交商品信息\n              </t-button>\n              <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" @click=\"closeFormPage\">取消</t-button>\n",
@@ -5251,6 +5337,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "      if (targetIndex !== -1) {\n        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));\n      }\n      adminFeedback.success('资料更新成功');\n    } catch (error) {\n      adminFeedback.error(error instanceof Error ? error.message : '更新失败');\n      return;\n",
+          "after": "      if (targetIndex !== -1) {\n        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));\n      }\n      adminFeedback.actionSuccess({ action: '修改' });\n    } catch (error) {\n      adminFeedback.error(error instanceof Error ? error.message : '更新失败');\n      return;\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -5765,6 +5857,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "      if (node) {\n        await updateProductCategory(formData.id, toCategoryPayload({ ...node, name, status: formData.status }));\n      }\n      adminFeedback.actionSuccess({ action: '保存', target: name });\n    }\n    await loadCategories();\n    closeFormDialog();\n",
+          "after": "      if (node) {\n        await updateProductCategory(formData.id, toCategoryPayload({ ...node, name, status: formData.status }));\n      }\n      adminFeedback.actionSuccess({ action: '修改', target: name });\n    }\n    await loadCategories();\n    closeFormDialog();\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "      placement=\"center\"\n      :prevent-scroll-through=\"false\"\n      :confirm-btn=\"actionButtonProps('save', '保存', '确认')\"\n      @confirm=\"handleSubmit\"\n      @close=\"closeFormDialog\"\n",
@@ -6057,6 +6155,18 @@
       "template": "5e3c0a78337d9dfc5455d79cd1734fbfacea060c58f3b27362c9647869b2bf52",
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    guideForm.priceCoefficient = formatPriceCoefficientInput(setting.priceCoefficient);\n    guideFormRef.value?.clearValidate();\n    adminFeedback.actionSuccess({\n      action: '保存',\n      target: `${activeType.value === 'finished' ? '成品' : '大板'}指导价设置`,\n    });\n  } catch (error) {\n",
+          "after": "    guideForm.priceCoefficient = formatPriceCoefficientInput(setting.priceCoefficient);\n    guideFormRef.value?.clearValidate();\n    adminFeedback.actionSuccess({\n      action: '修改',\n      target: `${activeType.value === 'finished' ? '成品' : '大板'}指导价设置`,\n    });\n  } catch (error) {\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    const wasEditing = Boolean(editingId.value);\n    await loadData();\n    closeForm();\n    if (wasEditing) adminFeedback.actionSuccess({ action: '保存', target: name });\n    else adminFeedback.created(name);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    const wasEditing = Boolean(editingId.value);\n    await loadData();\n    closeForm();\n    if (wasEditing) adminFeedback.actionSuccess({ action: '修改', target: name });\n    else adminFeedback.created(name);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "                      @click=\"saveGuidePriceSetting\"\n                    >\n                      保存指导价\n                    </t-button>\n                  </t-form>\n",
@@ -6246,6 +6356,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(roleName);\n    } else {\n      adminFeedback.success('已保存角色');\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(roleName);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改' });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
+        {
           "before": "              <template #operation=\"{ row }\">\n                <div class=\"table-actions\">\n                  <t-link v-if=\"canEditRole\" :theme=\"buttonTheme('edit')\" hover=\"color\" @click=\"openEditDialog(row)\"\n                    >编辑</t-link\n                  >\n",
           "after": "              <template #operation=\"{ row }\">\n                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canEditRole && !isStoreManagerRole(row)\"\n                    :theme=\"buttonTheme('edit')\"\n                    hover=\"color\"\n                    @click=\"openEditDialog(row)\"\n                    >编辑</t-link\n                  >\n",
           "reason": "用户确认店长改为门店内置角色，不可编辑删除，独立配置权限入口保留。",
@@ -6425,6 +6541,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    const target = payload.name;\n    await loadColors();\n    closeColorForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    const target = payload.name;\n    await loadColors();\n    closeColorForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '修改', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    else await createSlabColorCategory(payload);\n    await loadCategories();\n    closeCategoryForm();\n    if (editingCategoryId.value) adminFeedback.actionSuccess({ action: '保存', target: payload.name });\n    else adminFeedback.created(payload.name);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    else await createSlabColorCategory(payload);\n    await loadCategories();\n    closeCategoryForm();\n    if (editingCategoryId.value) adminFeedback.actionSuccess({ action: '修改', target: payload.name });\n    else adminFeedback.created(payload.name);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
@@ -6570,6 +6698,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    const target = `${payload.code} ${payload.name}`;\n    await loadGrades();\n    closeForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    const target = `${payload.code} ${payload.name}`;\n    await loadGrades();\n    closeForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '修改', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -6745,6 +6879,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    try {\n      upsertSlabItem(await updateSlab(editingItem.id, payload));\n      closeProductDialog();\n      adminFeedback.actionSuccess({ action: '保存', target: editingItem.name });\n    } catch (error) {\n      adminFeedback.actionError({ action: '保存', error, fallback: '请稍后重试', target: editingItem.name });\n    } finally {\n",
+          "after": "    try {\n      upsertSlabItem(await updateSlab(editingItem.id, payload));\n      closeProductDialog();\n      adminFeedback.actionSuccess({ action: '修改', target: editingItem.name });\n    } catch (error) {\n      adminFeedback.actionError({ action: '保存', error, fallback: '请稍后重试', target: editingItem.name });\n    } finally {\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    pendingUploadedMediaIds.clear();\n    closeProductDialog();\n    if (productMode.value === 'create') adminFeedback.created(targetName);\n    else adminFeedback.actionSuccess({ action: '保存', target: targetName });\n  } catch (error) {\n    adminFeedback.actionError({\n      action: productMode.value === 'create' ? '新增' : '保存',\n",
+          "after": "    pendingUploadedMediaIds.clear();\n    closeProductDialog();\n    if (productMode.value === 'create') adminFeedback.created(targetName);\n    else adminFeedback.actionSuccess({ action: '修改', target: targetName });\n  } catch (error) {\n    adminFeedback.actionError({\n      action: productMode.value === 'create' ? '新增' : '保存',\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (type === 'delete' && row) adminFeedback.deleted(row.name);\n    else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });\n    else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });\n    else if (type === 'savePrice' && row) adminFeedback.success('价格保存成功');\n    else if (type === 'batchRestore') {\n      adminFeedback.actionSuccess({ action: '批量放回到仓库', target: `${selectedCount} 个大板` });\n    } else if (type === 'purge' && row) {\n",
+          "after": "    if (type === 'delete' && row) adminFeedback.deleted(row.name);\n    else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });\n    else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });\n    else if (type === 'savePrice' && row) adminFeedback.actionSuccess({ action: '修改' });\n    else if (type === 'batchRestore') {\n      adminFeedback.actionSuccess({ action: '批量放回到仓库', target: `${selectedCount} 个大板` });\n    } else if (type === 'purge' && row) {\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -7240,6 +7392,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    await loadOrigins();\n    closeFormDialog();\n    if (dialogMode.value === 'create') adminFeedback.created(target);\n    else adminFeedback.actionSuccess({ action: '保存', target });\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n  }\n",
+          "after": "    await loadOrigins();\n    closeFormDialog();\n    if (dialogMode.value === 'create') adminFeedback.created(target);\n    else adminFeedback.actionSuccess({ action: '修改', target });\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n  }\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
@@ -7434,6 +7592,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    pendingUploadedMediaIds.clear();\n    closeProductDialog();\n    if (productMode.value === 'create') adminFeedback.created(targetName);\n    else adminFeedback.actionSuccess({ action: '保存', target: targetName });\n  } catch (error) {\n    adminFeedback.actionError({\n      action: productMode.value === 'create' ? '新增' : '保存',\n",
+          "after": "    pendingUploadedMediaIds.clear();\n    closeProductDialog();\n    if (productMode.value === 'create') adminFeedback.created(targetName);\n    else adminFeedback.actionSuccess({ action: '修改', target: targetName });\n  } catch (error) {\n    adminFeedback.actionError({\n      action: productMode.value === 'create' ? '新增' : '保存',\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (type === 'delete' && row) adminFeedback.deleted(row.name);\n    else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });\n    else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });\n    else if (type === 'savePrice' && row) adminFeedback.success('价格保存成功');\n    else if (type === 'batchRestore') {\n      adminFeedback.actionSuccess({ action: '批量放回到仓库', target: `${selectedCount} 个大板` });\n    } else if (type === 'purge' && row) {\n",
+          "after": "    if (type === 'delete' && row) adminFeedback.deleted(row.name);\n    else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });\n    else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });\n    else if (type === 'savePrice' && row) adminFeedback.actionSuccess({ action: '修改' });\n    else if (type === 'batchRestore') {\n      adminFeedback.actionSuccess({ action: '批量放回到仓库', target: `${selectedCount} 个大板` });\n    } else if (type === 'purge' && row) {\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -7867,6 +8037,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    const payload = { name: formData.name.trim(), remark: formData.remark.trim(), status: 'enabled' as const };\n    if (editingId.value) {\n      await updateSlabTexture(editingId.value, payload);\n      adminFeedback.actionSuccess({ action: '保存', target: payload.name });\n    } else {\n      await createSlabTexture(payload);\n      adminFeedback.created(payload.name);\n",
+          "after": "    const payload = { name: formData.name.trim(), remark: formData.remark.trim(), status: 'enabled' as const };\n    if (editingId.value) {\n      await updateSlabTexture(editingId.value, payload);\n      adminFeedback.actionSuccess({ action: '修改', target: payload.name });\n    } else {\n      await createSlabTexture(payload);\n      adminFeedback.created(payload.name);\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "  try {\n    if (editingAliasId.value) {\n      await updateSlabTextureAlias(activeTexture.value.id, editingAliasId.value, name);\n      adminFeedback.actionSuccess({ action: '保存', target: name });\n    } else {\n      await createSlabTextureAlias(activeTexture.value.id, name);\n      adminFeedback.created(name);\n",
+          "after": "  try {\n    if (editingAliasId.value) {\n      await updateSlabTextureAlias(activeTexture.value.id, editingAliasId.value, name);\n      adminFeedback.actionSuccess({ action: '修改', target: name });\n    } else {\n      await createSlabTextureAlias(activeTexture.value.id, name);\n      adminFeedback.created(name);\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
@@ -8006,6 +8188,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(target);\n    } else {\n      adminFeedback.actionSuccess({ action: '保存', target });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(target);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改', target });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -8158,6 +8346,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (formMode.value === 'create') {\n      adminFeedback.created(name);\n    } else {\n      adminFeedback.actionSuccess({ action: '保存', target: name });\n    }\n  } catch (error) {\n    showError(error, '分类保存失败');\n",
+          "after": "    if (formMode.value === 'create') {\n      adminFeedback.created(name);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改', target: name });\n    }\n  } catch (error) {\n    showError(error, '分类保存失败');\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"save\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
@@ -8298,6 +8492,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    const target = payload.name;\n    await loadLevels();\n    closeForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    const target = payload.name;\n    await loadLevels();\n    closeForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '修改', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "    <AdminDialog\n      v-model:visible=\"formVisible\"\n      confirm-function=\"submit\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n",
@@ -8416,6 +8616,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(formData.name.trim());\n    } else {\n      adminFeedback.success('已保存供应商');\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
+          "after": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(formData.name.trim());\n    } else {\n      adminFeedback.actionSuccess({ action: '修改' });\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -8546,6 +8752,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    else await createSupplierSupplyType(payload);\n    visible.value = false;\n    if (action === '新增') adminFeedback.created(target);\n    else adminFeedback.actionSuccess({ action, target });\n    await load();\n  } catch (error) {\n    adminFeedback.actionError({ action, target, error });\n",
+          "after": "    else await createSupplierSupplyType(payload);\n    visible.value = false;\n    if (action === '新增') adminFeedback.created(target);\n    else adminFeedback.actionSuccess({ action: '修改', target });\n    await load();\n  } catch (error) {\n    adminFeedback.actionError({ action, target, error });\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -8683,6 +8895,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
+          "before": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(targetName);\n    } else {\n      adminFeedback.actionSuccess({ action, target: targetName });\n    }\n  } catch (error) {\n    adminFeedback.actionError({ action, target: targetName, error });\n",
+          "after": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(targetName);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改', target: targetName });\n    }\n  } catch (error) {\n    adminFeedback.actionError({ action, target: targetName, error });\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
