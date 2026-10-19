@@ -161,6 +161,7 @@ const daily = [
   'daily.view',
   'daily.create',
   'daily.detail',
+  'daily.followup',
   'daily.edit',
   'daily.archive',
   'daily.batch-assign',
@@ -169,6 +170,7 @@ const daily = [
 const archived = [
   'archived.view',
   'archived.detail',
+  'archived.followup',
   'archived.edit',
   'archived.restore',
   'archived.purge',
@@ -196,8 +198,9 @@ test('all data with grants allows ordinary staff to maintain other owner custome
   await expect(row.getByText('编辑', { exact: true })).toBeVisible();
   await expect(row.getByText('归档', { exact: true })).toBeVisible();
   await row.getByText('详情', { exact: true }).click();
-  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
-  await expect(dialog.getByRole('button', { name: '新增跟进', exact: true })).toBeVisible();
+  const dialog = page.locator('.t-drawer__content-wrapper:visible').filter({ hasText: '客户详情' });
+  await expect(dialog.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
+  await expect(row.getByText('跟进', { exact: true })).toBeVisible();
 });
 test('new customer requires name and defaults the required owner to self', async ({ page }) => {
   const requests = await setup(page, daily);
@@ -226,8 +229,8 @@ test('current owner edits historical followup without a separate followup grant'
   const requests = await setup(page, ['daily.view', 'daily.detail']);
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
-  const detail = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
-  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toBeVisible();
+  const detail = page.locator('.t-drawer__content-wrapper:visible').filter({ hasText: '客户详情' });
+  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
   await detail.getByText('编辑', { exact: true }).click();
   const edit = page.locator('.t-dialog:visible').filter({ hasText: '编辑跟进' });
   await edit.locator('textarea').first().fill('接手后补充');
@@ -238,6 +241,7 @@ test('current owner edits historical followup without a separate followup grant'
     })
     .click();
   await expect(detail.getByText('接手后补充', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-feedback.t-is-success')).toHaveText('修改成功');
   expect(requests.at(-1)).toMatchObject({ content: '接手后补充', mediaIds: [] });
 });
 test('archive assignment is independent of role and returns the customer to daily', async ({ page }) => {
@@ -265,13 +269,12 @@ test('archive assignment is independent of role and returns the customer to dail
 test('followup accepts at most three attachments and blocks files above 5MiB before upload', async ({
   page,
 }, testInfo) => {
-  const requests = await setup(page, ['daily.view', 'daily.detail']);
+  const requests = await setup(page, ['daily.view', 'daily.followup']);
   await page.goto('/store/customer-management');
-  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
-  await page.locator('.t-dialog:visible').getByRole('button', { name: '新增跟进', exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' }).last();
-  const inputs = dialog.locator('input[type=file]');
-  await expect(inputs).toHaveCount(3);
+  const inputs = dialog.locator('.t-upload input[type=file]');
+  await expect(inputs).toHaveCount(1);
   await inputs.first().setInputFiles({
     name: 'large.bin',
     mimeType: 'application/octet-stream',
@@ -280,12 +283,20 @@ test('followup accepts at most three attachments and blocks files above 5MiB bef
   await expect(page.getByText(/附件不能超过5MiB/)).toBeVisible();
   expect(requests.filter((item) => item.upload)).toHaveLength(0);
   await dialog.screenshot({ path: testInfo.outputPath('attachment-rejected-size.png'), animations: 'disabled' });
-  for (let index = 0; index < 3; index++) {
-    await inputs
-      .nth(index)
-      .setInputFiles({ name: `note${index}.bin`, mimeType: 'application/octet-stream', buffer: Buffer.from('note') });
+  await inputs.first().setInputFiles(
+    [0, 1, 2].map((index) => ({
+      name: `note${index}.bin`,
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from('note'),
+    })),
+  );
+  for (let index = 0; index < 3; index++)
     await expect(dialog.getByText(`note${index}.bin`, { exact: true })).toBeVisible();
-  }
+  await expect(dialog.locator('.customer-followup-file-row')).toHaveCount(3);
+  await inputs
+    .first()
+    .setInputFiles({ name: 'fourth.bin', mimeType: 'application/octet-stream', buffer: Buffer.from('fourth') });
+  expect(requests.filter((item) => item.upload)).toHaveLength(3);
   await dialog.locator('textarea').first().fill('三个附件');
   await dialog
     .getByRole('button', {
@@ -293,7 +304,8 @@ test('followup accepts at most three attachments and blocks files above 5MiB bef
       exact: true,
     })
     .click();
-  await expect(page.locator('.t-dialog:visible').getByText('三个附件', { exact: true })).toBeVisible();
+  await expect(dialog).not.toBeVisible();
+  expect(requests.some((item) => item.content === '三个附件')).toBe(true);
   expect((requests.at(-1)?.mediaIds as number[]).length).toBe(3);
 });
 
@@ -309,9 +321,9 @@ test('a delayed old detail response never replaces the newly opened customer', a
   });
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
-  await page.locator('.t-dialog:visible').getByRole('button', { name: '关闭', exact: true }).click();
+  await page.locator('.t-drawer__content-wrapper:visible').getByRole('button', { name: '关闭', exact: true }).click();
   await page.locator('tr').filter({ hasText: '王先生2' }).getByText('详情', { exact: true }).click();
-  const dialog = page.locator('.t-dialog:visible');
+  const dialog = page.locator('.t-drawer__content-wrapper:visible');
   await expect(dialog.getByText('王先生2', { exact: true })).toBeVisible();
   const response = page.waitForResponse('**/api/admin/store-customers/1');
   release();
@@ -468,7 +480,8 @@ async function nativeDialogVisuals(page: Page, testInfo: TestInfo) {
         font: s.font,
         color: s.color,
         background: s.backgroundColor,
-        padding: s.padding,
+        // Counter placement explicitly reserves bottom padding; all other native edges remain unchanged.
+        padding: element.matches('textarea') ? `${s.paddingTop} ${s.paddingRight} ${s.paddingLeft}` : s.padding,
         border: s.border,
         radius: s.borderRadius,
         lineHeight: s.lineHeight,
@@ -533,15 +546,25 @@ test('customer followup dialogs retain native component visuals', async ({ page 
   const own = page.locator('tr').filter({ hasText: '王先生1' });
   let dialog: ReturnType<Page['locator']>;
   await own.getByText('详情', { exact: true }).click();
-  const detail = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
+  const detail = page.locator('.t-drawer__content-wrapper:visible').filter({ hasText: '客户详情' });
   await expect(detail.getByText('原导购历史跟进', { exact: true })).toBeVisible();
+  const drawerReference = await page.context().newPage();
+  await drawerReference.goto('/tests/fixtures/official-ui/reference.html?mode=drawer');
+  for (const part of ['header', 'body', 'footer']) {
+    expect(await styleOf(detail.locator(`.t-drawer__${part}`))).toEqual(
+      await styleOf(drawerReference.locator(`.t-drawer__${part}`)),
+    );
+  }
+  await drawerReference.close();
   expect(await styleOf(detail.locator('.t-descriptions__label'))).toEqual(
     await styleOf(reference.locator('.native-descriptions .t-descriptions__label')),
   );
   await detail.screenshot({ path: testInfo.outputPath('detail-owned.png'), animations: 'disabled' });
-  await detail.getByRole('button', { name: '新增跟进', exact: true }).click();
+  await detail.getByRole('button', { name: '关闭', exact: true }).click();
+  await own.getByText('跟进', { exact: true }).click();
   dialog = await checkDialog('新增跟进', 'followup-create', true);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await own.getByText('详情', { exact: true }).click();
   await detail.getByText('编辑', { exact: true }).click();
   dialog = await checkDialog('编辑跟进', 'followup-edit', true);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -612,21 +635,23 @@ test('archived customer assignment and confirmations retain native component vis
 });
 
 test('customer attachments retain native replace, remove and image preview behavior', async ({ page }, testInfo) => {
-  await setup(page, ['daily.view', 'daily.detail']);
+  await setup(page, ['daily.view', 'daily.followup']);
   await page.goto('/store/customer-management');
-  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
-  await page.locator('.t-dialog:visible').getByRole('button', { name: '新增跟进', exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' }).last();
-  const input = dialog.locator('input[type=file]').first();
+  const input = dialog.locator('.t-upload input[type=file]');
   await input.setInputFiles({ name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('first') });
   await expect(dialog.getByText('first.txt', { exact: true })).toBeVisible();
-  await input.setInputFiles({ name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('second') });
+  await dialog.locator('.customer-followup-file-row').hover();
+  const chooser = page.waitForEvent('filechooser');
+  await dialog.getByRole('button', { name: /^替换附件：/ }).click();
+  await (await chooser).setFiles({ name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('second') });
   await expect(dialog.getByText('second.txt', { exact: true })).toBeVisible();
   await expect(dialog.getByText('first.txt', { exact: true })).toHaveCount(0);
   const download = page.waitForEvent('download');
   await dialog.getByText('second.txt', { exact: true }).click();
   expect((await download).suggestedFilename()).toBe('second.txt');
-  await dialog.locator('.t-upload__single-input-clear').first().click();
+  await dialog.getByRole('button', { name: '删除附件：second.txt', exact: true }).click();
   await expect(dialog.getByText('second.txt', { exact: true })).toHaveCount(0);
   await input.setInputFiles({
     name: 'preview.png',
@@ -637,15 +662,42 @@ test('customer attachments retain native replace, remove and image preview behav
     ),
   });
   await expect(dialog.getByText('preview.png', { exact: true })).toBeVisible();
-  const names = await dialog
-    .locator('.t-upload__single-input-preview')
-    .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
-  expect(names).toHaveLength(3);
-  for (const width of names) expect(width).toBeGreaterThan(200);
+  await expect(dialog.locator('.customer-followup-file-row')).toHaveCount(1);
 
   await dialog.screenshot({ path: testInfo.outputPath('attachment-uploaded.png'), animations: 'disabled' });
   await dialog.getByText('preview.png', { exact: true }).click();
-  await expect(page.locator('.t-image-viewer')).toBeVisible();
+  const viewer = page.locator('.t-dialog:visible').filter({ hasText: '图片预览' });
+  await expect(viewer).toBeVisible();
+  await expect(viewer.getByRole('img', { name: '附件图片', exact: true })).toBeVisible();
+  await expect(viewer.locator('.t-dialog__close')).toBeVisible();
+  await viewer.locator('.t-dialog__close').click();
+  await expect(viewer).not.toBeVisible();
+  await expect(dialog).toBeVisible();
+  await dialog.getByText('preview.png', { exact: true }).click();
+  await expect(viewer).toBeVisible();
+  const mask = page.locator('.t-dialog__ctx').filter({ has: viewer }).locator('.t-dialog__mask');
+  await expect(mask).toBeVisible();
+  await expect(page.locator('.customer-image-preview-mask')).toHaveCount(0);
+  await expect(page.locator('.t-image-viewer')).toHaveCount(0);
+  await viewer.getByRole('img', { name: '附件图片', exact: true }).click();
+  await expect(viewer).toBeVisible();
+  await page
+    .locator('.t-dialog__ctx')
+    .filter({ has: viewer })
+    .locator('.t-dialog__position')
+    .click({ position: { x: 5, y: 5 } });
+  await expect(viewer).not.toBeVisible();
+  await expect(mask).not.toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('preview.png', { exact: true })).toBeVisible();
+  await dialog.getByText('preview.png', { exact: true }).click();
+  await expect(viewer).toBeVisible();
+  await expect(mask).toBeVisible();
+  await viewer.locator('.t-dialog__close').click();
+  await expect(viewer).not.toBeVisible();
+  await expect(mask).not.toBeVisible();
+  await dialog.getByText('preview.png', { exact: true }).click();
+  await expect(viewer).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('attachment-image-preview.png'), animations: 'disabled' });
 });
 
@@ -663,7 +715,7 @@ test('customer detail loading and authorized other-owner followups remain visibl
   });
   await page.goto('/store/customer-management');
   await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
-  const detail = page.locator('.t-dialog:visible').filter({ hasText: '客户详情' });
+  const detail = page.locator('.t-drawer__content-wrapper:visible').filter({ hasText: '客户详情' });
   await expect(detail.locator('.t-skeleton')).toBeVisible();
   await detail.screenshot({ path: testInfo.outputPath('detail-loading.png'), animations: 'disabled' });
   release();
@@ -672,7 +724,7 @@ test('customer detail loading and authorized other-owner followups remain visibl
   await detail.getByRole('button', { name: '关闭', exact: true }).click();
   await page.locator('tr').filter({ hasText: '王先生2' }).getByText('详情', { exact: true }).click();
   await expect(detail.getByText('王先生2', { exact: true })).toBeVisible();
-  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toBeVisible();
+  await expect(detail.getByRole('button', { name: '新增跟进', exact: true })).toHaveCount(0);
   await expect(detail.getByText('编辑', { exact: true })).toBeVisible();
   await expect(detail.getByText('删除', { exact: true })).toBeVisible();
   await detail.screenshot({ path: testInfo.outputPath('detail-other-owner.png'), animations: 'disabled' });
@@ -696,23 +748,55 @@ test('customer query grid uses the accepted adaptive structure at narrow widths'
 test('followup submission keeps its original rules and displays a field error until content is corrected', async ({
   page,
 }) => {
-  const requests = await setup(page, ['daily.view', 'daily.detail']);
+  const requests = await setup(page, ['daily.view', 'daily.followup']);
   await page.goto('/store/customer-management');
-  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
-  await page.locator('.t-dialog:visible').getByRole('button', { name: '新增跟进', exact: true }).click();
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
   const dialog = page
     .locator('.t-dialog:visible')
     .filter({ has: page.locator('.t-dialog__header').filter({ hasText: /^新增跟进$/ }) });
+  const field = dialog
+    .locator('.t-form__item')
+    .filter({ has: page.locator('.t-form__label').filter({ hasText: '跟进内容' }) });
+  const nextField = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: '下次跟进时间' }) });
+  const measureRows = async () => ({
+    field: await field.boundingBox(),
+    nextField: await nextField.boundingBox(),
+  });
+  await expect(field.locator('textarea')).toBeVisible();
+  await dialog.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+  const beforeError = await measureRows();
+  const fieldSpacing = await field.evaluate((element) => {
+    const input = element.querySelector('textarea')!.getBoundingClientRect();
+    const next = element.nextElementSibling!.getBoundingClientRect();
+    const officialMargin = parseFloat(getComputedStyle(element).getPropertyValue('--td-comp-margin-xxl'));
+    return { gap: next.top - input.bottom, officialMargin };
+  });
+  expect(fieldSpacing.gap).toBe(fieldSpacing.officialMargin);
   await dialog
     .getByRole('button', {
       name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
       exact: true,
     })
     .click();
-  const field = dialog
-    .locator('.t-form__item')
-    .filter({ has: page.locator('.t-form__label').filter({ hasText: '跟进内容' }) });
   await expect(field.getByText('请输入跟进内容', { exact: true })).toBeVisible();
+  await expect(field.locator('.t-form-item-tips')).toHaveCount(0);
+  const nativeFeedback = await field.locator('.t-textarea').evaluate((root) => {
+    const input = root.querySelector('textarea')!;
+    const tips = root.querySelector('.t-textarea__tips')!;
+    const count = root.querySelector('.t-textarea__limit')!;
+    return {
+      counterInside:
+        count.getBoundingClientRect().top >= input.getBoundingClientRect().top &&
+        count.getBoundingClientRect().bottom < input.getBoundingClientRect().bottom,
+      inputGap: tips.getBoundingClientRect().top - input.getBoundingClientRect().bottom,
+      counter: count.textContent,
+    };
+  });
+  expect(nativeFeedback.counterInside).toBe(true);
+  expect(nativeFeedback.inputGap).toBeGreaterThanOrEqual(0);
+  expect(nativeFeedback.inputGap).toBeLessThanOrEqual(1);
+  expect(nativeFeedback.counter).toBe('0/100');
+  expect(await measureRows()).toEqual(beforeError);
   const errorColor = await field
     .getByText('请输入跟进内容', { exact: true })
     .evaluate((element) => getComputedStyle(element).color);
@@ -720,6 +804,7 @@ test('followup submission keeps its original rules and displays a field error un
   expect(requests.some((item) => item.content)).toBe(false);
   await field.locator('textarea').fill('修正后的跟进内容');
   await expect(field.getByText('请输入跟进内容', { exact: true })).toHaveCount(0);
+  expect(await measureRows()).toEqual(beforeError);
   await dialog
     .getByRole('button', {
       name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
@@ -727,6 +812,7 @@ test('followup submission keeps its original rules and displays a field error un
     })
     .click();
   await expect(dialog).toBeHidden();
+  await expect(page.locator('.zdm-admin-feedback.t-is-success')).toHaveText('保存跟进已完成');
   expect(requests.at(-1)).toMatchObject({ content: '修正后的跟进内容', mediaIds: [] });
 });
 test('assignment missing-owner feedback stays at the field and clears after selecting an owner', async ({ page }) => {
@@ -762,9 +848,15 @@ test('new customer selects a searchable owner and limits both notes to 100 chara
   const owner = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: /^归属人/ }) });
   const name = dialog.locator('.t-form__item').filter({ has: page.locator('label', { hasText: '客户姓名' }) });
   await expect(owner.locator('input')).toHaveValue('导购A');
-  const ownerBox = await owner.boundingBox();
-  const nameBox = await name.boundingBox();
-  expect(ownerBox!.y).toBeLessThan(nameBox!.y);
+  // Measure both fields in the same frame while the native dialog may be animating.
+  const positions = await page.evaluate(
+    ({ owner, name }) => {
+      if (!owner || !name) throw new Error('Missing customer form fields');
+      return { ownerY: owner.getBoundingClientRect().y, nameY: name.getBoundingClientRect().y };
+    },
+    { owner: await owner.elementHandle(), name: await name.elementHandle() },
+  );
+  expect(positions.ownerY).toBeLessThan(positions.nameY);
   await expect(owner.locator('.t-form__label')).toHaveClass(/--required/);
   await owner.locator('.t-select').hover();
   await owner.locator('.t-input__clear').click();
@@ -1116,4 +1208,746 @@ test('customer requirement uses 180px native ellipsis and hover reveals full tex
       .evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1366);
+});
+
+test('list followup is independent from details and appears immediately after it', async ({ page }) => {
+  await setup(page, daily);
+  await page.goto('/store/customer-management');
+  const row = page.locator('tr').filter({ hasText: '王先生1' });
+  await expect(row.locator('td').last().locator('.t-link')).toHaveText(['详情', '跟进', '编辑', '归档']);
+  await row.getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText('跟进', { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(drawer).not.toBeVisible();
+  await row.getByText('跟进', { exact: true }).click();
+  await expect(page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' })).toBeVisible();
+});
+
+test('detail permission alone does not grant list followup', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  await page.goto('/store/customer-management');
+  const row = page.locator('tr').filter({ hasText: '王先生1' });
+  await expect(row.getByText('详情', { exact: true })).toBeVisible();
+  await expect(row.getByText('跟进', { exact: true })).toHaveCount(0);
+});
+
+test('followup permission works without loading customer details', async ({ page }) => {
+  const requests = await setup(page, ['daily.view', 'daily.followup']);
+  await page.goto('/store/customer-management');
+  const row = page.locator('tr').filter({ hasText: '王先生1' });
+  await expect(row.getByText('详情', { exact: true })).toHaveCount(0);
+  await row.getByText('跟进', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  await dialog.locator('textarea').first().fill('列表直接跟进');
+  await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(requests.some((entry) => entry.content === '列表直接跟进')).toBe(true);
+});
+
+test('followups use the native timeline in followed-time descending order with stable ties', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  const records = [
+    { id: 100, followedAt: '2026-10-20T10:00:00', content: '中间记录' },
+    { id: 999, followedAt: '2026-10-18T10:00:00', content: '最早记录' },
+    { id: 2, followedAt: '2026-10-21T10:00:00', content: '最新低编号' },
+    { id: 3, followedAt: '2026-10-21T10:00:00', content: '最新高编号' },
+  ].map((item) => ({ ...item, createdByAccountId: 7, createdByName: '导购A', attachments: [] }));
+  await page.route('**/api/admin/store-customers/1', (route) =>
+    route.fulfill({ json: ok({ customer: customer(1, 7), followups: records }) }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  const items = drawer.locator('.t-timeline-item');
+  await expect(items).toHaveText([/最新高编号/, /最新低编号/, /中间记录/, /最早记录/]);
+  await expect(items.locator('.t-timeline-item__label > div:first-child')).toHaveText([
+    '2026-10-21',
+    '2026-10-21',
+    '2026-10-20',
+    '2026-10-18',
+  ]);
+  await expect(items.locator('.t-timeline-item__label > div:last-child')).toHaveText([
+    '10:00',
+    '10:00',
+    '10:00',
+    '10:00',
+  ]);
+  const positions = await items.first().evaluate((item) => {
+    const label = item.querySelector('.t-timeline-item__label')!.getBoundingClientRect();
+    const dot = item.querySelector('.t-timeline-item__wrapper')!.getBoundingClientRect();
+    const content = item.querySelector('.t-timeline-item__content')!.getBoundingClientRect();
+    return { labelRight: label.right, dotLeft: dot.left, dotRight: dot.right, contentRight: content.right };
+  });
+  expect(positions.labelRight).toBeLessThanOrEqual(positions.dotLeft);
+  expect(positions.dotRight).toBeLessThan(positions.contentRight);
+  const header = items.first().locator('.t-timeline-item__content > .t-space > .t-space-item > .t-row').first();
+  await expect(header.getByText('导购A', { exact: true })).toBeVisible();
+  await expect(header.getByText('编辑', { exact: true })).toBeVisible();
+  await expect(header.getByText('删除', { exact: true })).toBeVisible();
+  await expect(header.locator('.t-avatar')).toHaveText('导');
+  await expect(drawer).toHaveCSS('width', '1100px');
+  const alignment = await header.evaluate((el) => {
+    const row = el.getBoundingClientRect();
+    const name = el.querySelector('.t-typography')!.getBoundingClientRect();
+    const actions = el.querySelector(':scope > .t-space:last-child')!.getBoundingClientRect();
+    const content = el.closest('.t-timeline-item__content')!.getBoundingClientRect();
+    return {
+      nameTop: name.top,
+      actionsTop: actions.top,
+      rowRight: row.right,
+      contentRight: content.right,
+      actionsRight: actions.right,
+      nameRight: name.right,
+    };
+  });
+  expect(Math.abs(alignment.nameTop - alignment.actionsTop)).toBeLessThanOrEqual(2);
+  expect(Math.abs(alignment.actionsRight - alignment.contentRight)).toBeLessThanOrEqual(1);
+  await expect(drawer.getByRole('heading', { name: '跟进记录', exact: true })).toBeVisible();
+
+  const reference = await page.context().newPage();
+  await reference.goto('/tests/fixtures/official-ui/reference.html');
+  const style = (locator: ReturnType<Page['locator']>) =>
+    locator.first().evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { font: s.font, color: s.color, border: s.border, background: s.backgroundColor, padding: s.padding };
+    });
+  for (const part of ['dot', 'label']) {
+    expect(await style(items.locator(`.t-timeline-item__${part}`))).toEqual(
+      await style(reference.locator(`.native-timeline .t-timeline-item__${part}`)),
+    );
+  }
+  await reference.close();
+});
+
+test('customer detail follows the approved responsive refinement with native visual styles', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1150 });
+  await setup(page, ['daily.view', 'daily.detail']);
+  const profile = {
+    ...customer(1, 7),
+    name: '赵女士',
+    nationality: 'CN',
+    phoneRegion: 'CN',
+    phone: '159****8941',
+    callingCode: '+86',
+    wechat: 'zhao_8941',
+    ownerName: '赵云',
+    requirement: '想选一套浅色系餐桌，偏好简洁款式。',
+    remark: '—',
+    createdByName: '赵云',
+    createdAt: '2026-10-19T09:13:38',
+  };
+  const followups = [
+    {
+      id: 3,
+      followedAt: '2026-10-19T15:20:00',
+      content: '已确认餐桌尺寸为180×90厘米，客户偏好浅灰色岩板。',
+      nextFollowAt: '2026-10-21T14:00',
+      nextFollowTask: '提交选材方案',
+      attachments: [],
+    },
+    {
+      id: 2,
+      followedAt: '2026-10-19T10:30:00',
+      content: '已发送两款餐桌参考图，客户倾向简洁细腿款式。',
+      attachments: [{ mediaId: 42, name: '餐桌参考图.jpg', mediaType: 'image' }],
+    },
+    {
+      id: 1,
+      followedAt: '2026-10-18T07:54:40',
+      content: '客户第一次进店，初步了解客户需求。',
+      nextFollowAt: '2026-10-20T08:00',
+      nextFollowTask: '进一步确认尺寸与预算',
+      attachments: [],
+    },
+  ].map((record) => ({ ...record, createdByName: '赵云', createdByAccountId: 7 }));
+  await page.route('**/api/admin/store-customers/1', (route) =>
+    route.fulfill({ json: ok({ customer: profile, followups }) }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  await expect(drawer.locator('.t-avatar')).toHaveCount(3);
+  const inlineNext = await drawer.evaluate((element) => {
+    const spans = Array.from(element.querySelectorAll('.t-typography span'));
+    const time = spans.find((span) => span.textContent === '下次跟进：2026-10-21 14:00')!.getBoundingClientRect();
+    const task = spans.find((span) => span.textContent === '提交选材方案')!.getBoundingClientRect();
+    return { timeY: time.y, taskY: task.y, timeRight: time.right, taskLeft: task.left };
+  });
+  expect(inlineNext.timeY).toBe(inlineNext.taskY);
+  expect(inlineNext.taskLeft).toBeGreaterThan(inlineNext.timeRight);
+  const reference = await page.context().newPage();
+  await reference.setViewportSize({ width: 1440, height: 1150 });
+  await reference.goto('/tests/fixtures/official-ui/scheme-one.html');
+  const native = reference.locator('.t-drawer__content-wrapper:visible');
+  await expect(native.locator('.t-avatar')).toHaveCount(3);
+  await expect(native.locator('.t-link')).toHaveCount(7);
+  await expect(native.locator('.t-link').first()).toBeVisible();
+  await expect(native.locator('.t-link').last()).toBeVisible();
+  expect((await drawer.locator('.t-timeline').innerText()).replace(/\s+/g, ' ').trim()).toBe(
+    (await native.locator('.t-timeline').innerText()).replace(/\s+/g, ' ').trim(),
+  );
+  const measure = (root: ReturnType<Page['locator']>, selector: string) =>
+    root
+      .locator(selector)
+      .first()
+      .evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const parent = el.closest('.t-drawer__content-wrapper')!.getBoundingClientRect();
+        const css = getComputedStyle(el);
+        return {
+          x: rect.x - parent.x,
+          y: rect.y - parent.y,
+          width: rect.width,
+          height: rect.height,
+          font: css.font,
+          color: css.color,
+          background: css.backgroundColor,
+          padding: css.padding,
+          border: css.border,
+        };
+      });
+  for (const selector of [
+    '.t-descriptions',
+    'h5.t-typography',
+    '.t-timeline',
+    '.t-timeline-item__label',
+    '.t-timeline-item__dot',
+    '.t-timeline-item__content > .t-space > .t-space-item > .t-row',
+    '.t-avatar',
+    '.t-timeline-item__content > .t-space > .t-space-item > .t-typography',
+  ]) {
+    const actual = await measure(drawer, selector);
+    const expected = await measure(native, selector);
+    expect({ ...actual, x: 0, y: 0, width: 0, height: 0 }).toEqual({ ...expected, x: 0, y: 0, width: 0, height: 0 });
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(Math.abs(actual[key] - expected[key]), selector + ' ' + key).toBeLessThanOrEqual(1);
+  }
+  const recordTextColors = await drawer
+    .locator('.t-timeline .t-typography')
+    .evaluateAll((elements) => elements.map((el) => getComputedStyle(el).color));
+  expect(new Set(recordTextColors).size).toBe(1);
+  await expect(drawer.locator('.t-timeline .t-typography--secondary')).toHaveCount(0);
+  await reference.close();
+});
+
+for (const width of [1440, 800, 600, 390]) {
+  test(`customer detail adapts to ${width}px without overflowing long followup content`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 858 });
+    await setup(page, ['daily.view', 'daily.detail']);
+    await page.route('**/api/admin/store-customers/1', (route) =>
+      route.fulfill({
+        json: ok({
+          customer: { ...customer(1, 7), requirement: '长客户需求'.repeat(20) },
+          followups: [
+            {
+              id: 1,
+              followedAt: '2026-10-19T10:00:00',
+              createdByName: '赵云',
+              createdByAccountId: 7,
+              content: '跟进正文需要完整换行展示。'.repeat(25),
+              nextFollowAt: '2026-10-20T08:00:00',
+              nextFollowTask: '下次跟进事项需要完整展示。'.repeat(15),
+              attachments: [{ mediaId: 42, name: '餐桌参考图.jpg', mediaType: 'image' }],
+            },
+          ],
+        }),
+      }),
+    );
+    await page.goto('/store/customer-management');
+    await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+    const drawer = page.locator('.t-drawer__content-wrapper:visible');
+    await expect(drawer).toHaveCSS('width', `${Math.min(width, 1100)}px`);
+    const body = drawer.locator('.t-drawer__body');
+    await expect.poll(() => body.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    await expect(drawer.locator('.t-timeline-item')).toHaveCount(1);
+    await expect(drawer.getByText('编辑', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('删除', { exact: true })).toBeVisible();
+    const cells = drawer.locator('.t-descriptions__body tr').first().locator('td');
+    await expect(cells).toHaveCount((width < 768 ? 1 : width < 992 ? 2 : 3) * 2);
+    const item = drawer.locator('.t-timeline-item');
+    if (width < 768) {
+      await expect(item.locator('.t-timeline-item__label')).toHaveCount(0);
+      await expect(item.getByText('2026-10-19 10:00', { exact: true })).toBeVisible();
+    }
+    await page.setViewportSize({ width: 1440, height: 858 });
+    await expect(cells).toHaveCount(6);
+    await expect(item.locator('.t-timeline-item__label')).toHaveCount(1);
+    await drawer.getByRole('button', { name: '关闭', exact: true }).click();
+    await expect(drawer).not.toBeVisible();
+  });
+}
+
+test('followup actions appear only on the hovered or keyboard-focused record', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  await page.route('**/api/admin/store-customers/1', (route) =>
+    route.fulfill({
+      json: ok({
+        customer: customer(1, 7),
+        followups: [1, 2].map((id) => ({
+          id,
+          followedAt: `2026-10-19T10:0${id}:00`,
+          content: `跟进记录${id}`,
+          createdByName: '赵云',
+          createdByAccountId: 7,
+          attachments: [],
+        })),
+      }),
+    }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  const records = drawer.locator('.customer-followup-record');
+  const actions = drawer.locator('.customer-followup-actions');
+  await drawer.getByRole('heading', { name: '跟进记录' }).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '0');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '0');
+  const before = await records.nth(0).boundingBox();
+  await records.nth(0).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '1');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '0');
+  expect(await records.nth(0).boundingBox()).toEqual(before);
+  await records.nth(1).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '0');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '1');
+  await drawer.getByRole('heading', { name: '跟进记录' }).hover();
+  await actions.nth(0).getByText('编辑', { exact: true }).focus();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '1');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('编辑跟进', { exact: true })).toBeVisible();
+});
+
+test('touch devices retain followup actions without requiring hover', async ({ browser }) => {
+  const context = await browser.newContext({
+    baseURL: test.info().project.use.baseURL,
+    hasTouch: true,
+    isMobile: false,
+    viewport: { width: 1024, height: 858 },
+  });
+  const page = await context.newPage();
+  try {
+    await setup(page, ['daily.view', 'daily.detail']);
+    await page.goto('/store/customer-management');
+    await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+    const actions = page.locator('.t-drawer__content-wrapper:visible .customer-followup-actions');
+    await expect(actions).toHaveCSS('opacity', '1');
+    await actions.getByText('编辑', { exact: true }).tap();
+    await expect(page.getByText('编辑跟进', { exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+for (const field of ['followedAt', 'nextFollowAt'] as const) {
+  for (const mode of ['create', 'edit'] as const) {
+    test(`followup ${field} uses minute precision in ${mode} and displays historical seconds only to minutes`, async ({
+      page,
+    }) => {
+      const requests = await setup(page, ['daily.view', 'daily.detail', 'daily.followup']);
+      if (mode === 'edit') {
+        await page.route('**/api/admin/store-customers/1', (route) =>
+          route.fulfill({
+            json: ok({
+              customer: customer(1, 7),
+              followups: [
+                {
+                  id: 11,
+                  followedAt: '2026-10-19T10:00:47',
+                  content: '历史跟进',
+                  createdByAccountId: 7,
+                  createdByName: '赵云',
+                  attachments: [],
+                  nextFollowAt: '2026-10-20T08:05:47',
+                  nextFollowTask: '确认需求',
+                },
+              ],
+            }),
+          }),
+        );
+      }
+      await page.goto('/store/customer-management');
+      const row = page.locator('tr').filter({ hasText: '王先生1' });
+      if (mode === 'edit') {
+        await row.getByText('详情', { exact: true }).click();
+        const drawer = page.locator('.t-drawer__content-wrapper:visible');
+        await expect(drawer.getByText('下次跟进：2026-10-20 08:05', { exact: true })).toBeVisible();
+        await drawer.getByText('编辑', { exact: true }).click();
+      } else {
+        await row.getByText('跟进', { exact: true }).click();
+      }
+      const dialog = page.locator('.t-dialog:visible').filter({ hasText: mode === 'edit' ? '编辑跟进' : '新增跟进' });
+      const next = dialog
+        .locator('.t-form__item')
+        .filter({ has: page.locator('label', { hasText: field === 'followedAt' ? /^跟进时间/ : '下次跟进时间' }) });
+      const input = next.locator('input');
+      if (mode === 'edit')
+        await expect(input).toHaveValue(field === 'followedAt' ? '2026-10-19 10:00' : '2026-10-20 08:05');
+      else if (field === 'followedAt') await expect(input).toHaveValue(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+      await input.click();
+      const panel = page.locator('.t-date-picker__panel:visible');
+      const columns = panel.locator('.t-time-picker__panel-body-scroll');
+      await expect(columns).toHaveCount(2);
+      // Native time columns scroll smoothly and debounce changes by 50ms.
+      // Wait for their actual scroll positions to settle before the next action.
+      const settleTimeColumns = () =>
+        columns.evaluateAll(
+          (elements) =>
+            new Promise<void>((resolve) => {
+              let positions = elements.map((el) => el.scrollTop).join(',');
+              let unchangedSince = performance.now();
+              const frame = () => {
+                const current = elements.map((el) => el.scrollTop).join(',');
+                if (current !== positions) {
+                  positions = current;
+                  unchangedSince = performance.now();
+                }
+                if (performance.now() - unchangedSince >= 150) resolve();
+                else requestAnimationFrame(frame);
+              };
+              requestAnimationFrame(frame);
+            }),
+        );
+      await settleTimeColumns();
+      if (mode === 'create') {
+        await panel.locator('.t-date-picker__cell').filter({ hasText: /^15$/ }).first().click();
+      }
+      await columns.nth(0).getByText('08', { exact: true }).click();
+      await settleTimeColumns();
+      await expect(panel.locator('.t-date-picker__panel-time-viewer')).toContainText('08:');
+      await columns.nth(1).getByText('05', { exact: true }).click();
+      await settleTimeColumns();
+      await expect(panel.locator('.t-date-picker__panel-time-viewer')).toContainText('08:05');
+      await panel.getByRole('button', { name: '确定', exact: true }).click();
+      await expect(input).toHaveValue(/^\d{4}-\d{2}-\d{2} 08:05$/);
+      await dialog.locator('textarea').first().fill('分钟精度跟进');
+      await dialog.getByRole('button', { name: mode === 'edit' ? '确认保存' : '确认新增', exact: true }).click();
+      await expect(dialog).not.toBeVisible();
+      expect(requests.at(-1)?.[field]).toMatch(/^\d{4}-\d{2}-\d{2}T08:05:00$/);
+      expect(requests.at(-1)?.followedAt).toMatch(/:\d{2}$/);
+    });
+  }
+}
+
+test('customer text links use native color-only hover without underlines', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail', 'daily.followup', 'daily.edit', 'daily.archive']);
+  await page.goto('/store/customer-management');
+  const row = page.locator('tr').filter({ hasText: '王先生1' });
+  const links = row.locator('.t-link');
+  await expect(links).toHaveCount(5);
+  for (const link of await links.all()) {
+    await expect(link).toHaveClass(/t-link--hover-color/);
+    await expect(link).not.toHaveClass(/t-link--hover-underline/);
+    await page.getByRole('button', { name: '查询', exact: true }).hover();
+    const before = await link.evaluate((el) => getComputedStyle(el).color);
+    await link.hover();
+    await expect(link).not.toHaveCSS('color', before);
+    await expect(link).toHaveCSS('text-decoration-line', 'none');
+    expect(await link.evaluate((el) => getComputedStyle(el, '::after').borderBottomWidth)).toBe('0px');
+  }
+  await row.getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  await drawer.locator('.customer-followup-record').hover();
+  for (const link of await drawer.locator('.customer-followup-actions .t-link').all()) {
+    await link.hover();
+    await expect(link).toHaveClass(/t-link--hover-color/);
+    await expect(link).toHaveCSS('text-decoration-line', 'none');
+    expect(await link.evaluate((el) => getComputedStyle(el, '::after').borderBottomWidth)).toBe('0px');
+  }
+});
+
+for (const mode of ['create', 'edit'] as const) {
+  test(`followup text inputs cap both fields at 100 characters in ${mode}`, async ({ page }) => {
+    const requests = await setup(page, ['daily.view', 'daily.detail', 'daily.followup']);
+    await page.goto('/store/customer-management');
+    const row = page.locator('tr').filter({ hasText: '王先生1' });
+    if (mode === 'create') await row.getByText('跟进', { exact: true }).click();
+    else {
+      await row.getByText('详情', { exact: true }).click();
+      await page.locator('.t-drawer__content-wrapper:visible').getByText('编辑', { exact: true }).click();
+    }
+    const dialog = page.locator('.t-dialog:visible').filter({ hasText: mode === 'create' ? '新增跟进' : '编辑跟进' });
+    const fields = dialog.locator('textarea');
+    await expect(fields).toHaveCount(2);
+    for (const field of await fields.all()) {
+      await expect(field).toHaveAttribute('maxlength', '100');
+      await field.fill('字'.repeat(101));
+      await expect(field).toHaveValue('字'.repeat(100));
+    }
+    await dialog.getByRole('button', { name: mode === 'create' ? '确认新增' : '确认保存', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    expect(requests.at(-1)?.content).toHaveLength(100);
+    expect(requests.at(-1)?.nextFollowTask).toHaveLength(100);
+  });
+}
+
+test('batch attachments keep distinct slots for duplicate names and release unsaved files on cancel', async ({
+  page,
+}) => {
+  await setup(page, ['daily.view', 'daily.followup']);
+  const released: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'DELETE' && /\/store-customers\/1\/attachments\/\d+$/.test(request.url()))
+      released.push(request.url());
+  });
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  await dialog
+    .locator('.t-upload input[type=file]')
+    .setInputFiles(
+      [1, 2, 3].map((index) => ({ name: '同名.txt', mimeType: 'text/plain', buffer: Buffer.from(String(index)) })),
+    );
+  await expect(dialog.locator('.t-upload__single-name.t-link')).toHaveCount(3);
+  const trigger = dialog.locator('.t-upload__trigger button');
+  await expect(trigger).toBeDisabled();
+  const firstRow = dialog.locator('.customer-followup-file-row').first();
+  await firstRow.hover();
+  const chooser = page.waitForEvent('filechooser');
+  await firstRow.getByRole('button', { name: /^替换附件：/ }).click();
+  await (await chooser).setFiles({ name: 'replacement.txt', mimeType: 'text/plain', buffer: Buffer.from('new') });
+  await expect(dialog.locator('.t-upload__single-name.t-link')).toHaveCount(3);
+  await expect(dialog.getByText('replacement.txt', { exact: true })).toBeVisible();
+  await expect(trigger).toBeDisabled();
+  await firstRow.hover();
+  await firstRow.getByRole('button', { name: /^删除附件：/ }).click();
+  await expect(dialog.locator('.customer-followup-file-row')).toHaveCount(2);
+  await expect(trigger).toBeEnabled();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect.poll(() => released.length).toBe(4);
+  expect(new Set(released).size).toBe(4);
+});
+
+test('replacement failure keeps the existing attachment and saving releases only replaced temporary media', async ({
+  page,
+}) => {
+  const requests = await setup(page, ['daily.view', 'daily.followup']);
+  const released: number[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'DELETE' && /\/store-customers\/1\/attachments\/\d+$/.test(request.url()))
+      released.push(Number(request.url().split('/').at(-1)));
+  });
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  await dialog
+    .locator('.t-upload input[type=file]')
+    .setInputFiles({ name: 'old.txt', mimeType: 'text/plain', buffer: Buffer.from('old') });
+  await expect(dialog.getByText('old.txt', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '已上传“old.txt”' })).toBeVisible();
+  const failedRoute = '**/api/admin/store-customers/1/attachments';
+  await page.route(failedRoute, (route) => route.fulfill({ status: 500, json: { message: '上传失败' } }));
+  await dialog.locator('.customer-followup-file-row').hover();
+  let chooser = page.waitForEvent('filechooser');
+  await dialog.getByRole('button', { name: /^替换附件：/ }).click();
+  await (await chooser).setFiles({ name: 'failed.txt', mimeType: 'text/plain', buffer: Buffer.from('failed') });
+  await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '上传“failed.txt”失败：上传失败' })).toBeVisible();
+  await expect(dialog.getByText('old.txt', { exact: true })).toBeVisible();
+  await page.unroute(failedRoute);
+  chooser = page.waitForEvent('filechooser');
+  await dialog.getByRole('button', { name: /^替换附件：/ }).click();
+  await (await chooser).setFiles({ name: 'new.txt', mimeType: 'text/plain', buffer: Buffer.from('new') });
+  await expect(dialog.getByText('new.txt', { exact: true })).toBeVisible();
+  await expect(page.locator('.zdm-admin-feedback').filter({ hasText: '已上传“new.txt”' })).toBeVisible();
+  await expect(dialog.getByText('old.txt', { exact: true })).toHaveCount(0);
+  await dialog.locator('textarea').first().fill('保留新附件');
+  await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(requests.at(-1)?.mediaIds).toEqual([102]);
+  await expect.poll(() => released).toEqual([101]);
+});
+
+test('existing private attachments still preview through the authorized customer endpoint', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  await page.route('**/api/admin/store-customers/1', (route) =>
+    route.fulfill({
+      json: ok({
+        customer: customer(1, 7),
+        followups: [
+          {
+            id: 11,
+            followedAt: '2026-10-19T11:04:00',
+            content: '已有附件',
+            createdByAccountId: 7,
+            createdByName: '赵云',
+            attachments: [{ mediaId: 44, name: '历史.txt', mediaType: 'file' }],
+          },
+        ],
+      }),
+    }),
+  );
+  let authorization = '';
+  await page.route('**/api/admin/store-customers/1/followups/11/attachments/44', (route) => {
+    authorization = route.request().headers().authorization;
+    return route.fulfill({ contentType: 'text/plain', body: 'private attachment' });
+  });
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  await page.locator('.t-drawer__content-wrapper:visible').getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑跟进' });
+  const download = page.waitForEvent('download');
+  await dialog.getByText('历史.txt', { exact: true }).click();
+  expect((await download).suggestedFilename()).toBe('历史.txt');
+  expect(authorization).toBe('Bearer dev-token');
+});
+
+test('scheme two preserves native upload geometry and reveals replacement only for its file row', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.followup']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  await dialog
+    .locator('.t-upload input[type=file]')
+    .setInputFiles(
+      ['first.txt', 'second.txt'].map((name) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(name) })),
+    );
+  await expect(dialog.locator('.customer-followup-file-row')).toHaveCount(2);
+  await expect(dialog.locator('.t-upload__single-name.t-link')).toHaveCount(2);
+  await dialog.locator('label').filter({ hasText: /^附件/ }).hover();
+  const actions = dialog.locator('.customer-followup-file-actions');
+  await expect(dialog.getByRole('button', { name: /^删除附件：/ })).toHaveCount(2);
+  await expect(dialog.getByRole('button', { name: /^替换附件：/ })).toHaveCount(2);
+  await expect(dialog.getByText('替换', { exact: true })).toHaveCount(0);
+  await expect(actions.nth(0)).toHaveCSS('opacity', '0');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '0');
+  const reference = await page.context().newPage();
+  await reference.goto('/tests/fixtures/official-ui/attachment-scheme-two.html');
+  await expect(reference.locator('.t-upload__single-name')).toHaveCount(2);
+  await reference.locator('label').hover();
+  const actual = dialog.locator('.t-upload');
+  const native = reference.locator('.t-upload');
+  const measure = (root: ReturnType<Page['locator']>, selector: string) =>
+    root.locator(selector).evaluateAll((els) =>
+      els.map((el) => {
+        const rect = el.getBoundingClientRect();
+        const parent = el.closest('.t-upload')!.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return {
+          x: rect.x - parent.x,
+          y: rect.y - parent.y,
+          width: rect.width,
+          height: rect.height,
+          font: style.font,
+          color: style.color,
+          padding: style.padding,
+          border: style.border,
+        };
+      }),
+    );
+  for (const selector of [
+    '.t-upload__trigger .t-button',
+    '.t-upload__single-name',
+    '.t-upload__icon-delete:not(.customer-followup-file-replace)',
+    '.t-upload__tips',
+  ]) {
+    const a = await measure(actual, selector);
+    const b = await measure(native, selector);
+    expect(a).toHaveLength(b.length);
+    for (let i = 0; i < a.length; i++) {
+      expect({ ...a[i], x: 0, y: 0, width: 0, height: 0 }).toEqual({ ...b[i], x: 0, y: 0, width: 0, height: 0 });
+      // The approved replacement icon now precedes delete; only its x position changes.
+      const keys = selector.includes('icon-delete')
+        ? (['y', 'width', 'height'] as const)
+        : (['x', 'y', 'width', 'height'] as const);
+      for (const key of keys) expect(Math.abs(a[i][key] - b[i][key]), selector + ' ' + key).toBeLessThanOrEqual(1);
+    }
+  }
+  await reference.close();
+  const iconGeometry = await actions
+    .first()
+    .locator('[role="button"]')
+    .evaluateAll((icons) =>
+      icons.map((icon) => {
+        const svg = icon as SVGGraphicsElement;
+        const rect = svg.getBoundingClientRect();
+        const glyph = svg.getBBox();
+        return {
+          label: icon.getAttribute('aria-label'),
+          x: rect.x,
+          width: rect.width,
+          glyphWidth: (glyph.width * rect.width) / 24,
+          glyphHeight: (glyph.height * rect.height) / 24,
+        };
+      }),
+    );
+  expect(iconGeometry[0].label).toBe('替换附件：first.txt');
+  expect(iconGeometry[1].label).toBe('删除附件：first.txt');
+  expect(iconGeometry[0].x).toBeLessThan(iconGeometry[1].x);
+  expect(iconGeometry[0].width / iconGeometry[1].width).toBeCloseTo(0.6, 1);
+  expect(Math.abs(iconGeometry[0].glyphWidth - iconGeometry[1].glyphWidth)).toBeLessThan(2);
+  expect(Math.abs(iconGeometry[0].glyphHeight - iconGeometry[1].glyphHeight)).toBeLessThan(2);
+  await dialog.locator('.customer-followup-file-row').nth(0).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '1');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '0');
+  await dialog.locator('label').filter({ hasText: /^附件/ }).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '0');
+  const replacement = dialog.getByRole('button', { name: '替换附件：first.txt', exact: true });
+  await dialog.locator('.customer-followup-file-row').nth(0).hover();
+  const pointerChooser = page.waitForEvent('filechooser');
+  await replacement.click();
+  await pointerChooser;
+  await dialog.locator('input[aria-label="替换附件"]').dispatchEvent('cancel');
+  await dialog.locator('label').filter({ hasText: /^附件/ }).hover();
+  await expect(replacement).not.toBeFocused();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '0');
+  await expect(dialog.locator('.t-upload__single-name.t-link')).toHaveCount(2);
+  await replacement.focus();
+  const keyboardChooser = page.waitForEvent('filechooser');
+  await replacement.press('Enter');
+  await keyboardChooser;
+  await dialog.locator('input[aria-label="替换附件"]').dispatchEvent('cancel');
+  await expect(replacement).toBeFocused();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '1');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '0');
+});
+
+test('scheme two accepts an attachment exactly at the 5MiB boundary', async ({ page }) => {
+  const requests = await setup(page, ['daily.view', 'daily.followup']);
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  await dialog.locator('.t-upload input[type=file]').setInputFiles({
+    name: 'exact-5MiB.bin',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.alloc(5 * 1024 * 1024),
+  });
+  await expect(dialog.locator('.t-upload__single-name.t-link')).toHaveText('exact-5MiB.bin');
+  await expect.poll(() => requests.filter((item) => item.upload).length).toBe(1);
+});
+
+test('canceling an in-flight attachment releases its media and never fills another customer dialog', async ({
+  page,
+}) => {
+  await setup(page, ['daily.view', 'daily.followup']);
+  let completeUpload!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    completeUpload = resolve;
+  });
+  let started = false;
+  const released: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'DELETE' && request.url().endsWith('/store-customers/1/attachments/501'))
+      released.push(request.url());
+  });
+  await page.route('**/api/admin/store-customers/1/attachments', async (route) => {
+    started = true;
+    await gate;
+    await route.fulfill({ json: ok({ id: 501, mediaType: 'file', mimeType: 'text/plain' }) });
+  });
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('跟进', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  await dialog
+    .locator('.t-upload input[type=file]')
+    .setInputFiles({ name: 'late.txt', mimeType: 'text/plain', buffer: Buffer.from('late') });
+  await expect.poll(() => started).toBe(true);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  completeUpload();
+  await expect.poll(() => released.length).toBe(1);
+  await page.locator('tr').filter({ hasText: '王先生2' }).getByText('跟进', { exact: true }).click();
+  const next = page.locator('.t-dialog:visible').filter({ hasText: '新增跟进' });
+  await expect(next.locator('.customer-followup-file-row')).toHaveCount(0);
+  await expect(next.getByText('late.txt', { exact: true })).toHaveCount(0);
 });

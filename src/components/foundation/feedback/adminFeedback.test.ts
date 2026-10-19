@@ -58,6 +58,9 @@ describe('adminFeedback', () => {
 
     expect(buildActionSuccessText('停用', '一级分类3')).toBe('已停用“一级分类3”');
     expect(buildActionSuccessText('保存')).toBe('保存已完成');
+    expect(buildActionSuccessText('修改')).toBe('修改成功');
+    expect(buildActionSuccessText('修改', '客户')).toBe('修改成功');
+    expect(buildActionSuccessText('编辑', '门店')).toBe('修改成功');
   });
 
   it('统一删除成功提示为已删除加名称', async () => {

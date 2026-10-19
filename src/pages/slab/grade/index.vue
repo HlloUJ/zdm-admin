@@ -115,12 +115,7 @@
           <t-input v-model="formData.name" clearable placeholder="请输入等级名称" />
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="formData.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="formData.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </AdminDialog>
@@ -314,7 +309,7 @@ const submitGrade = async () => {
     const target = `${payload.code} ${payload.name}`;
     await loadGrades();
     closeForm();
-    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });
+    if (editingId.value) adminFeedback.actionSuccess({ action: '修改', target });
     else adminFeedback.created(target);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

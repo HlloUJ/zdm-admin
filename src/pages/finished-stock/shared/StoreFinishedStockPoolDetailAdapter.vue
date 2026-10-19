@@ -12,6 +12,9 @@
     confirm-function="close"
     :visible="Boolean(preview)"
     header="商品媒体"
+    mode="modal"
+    show-overlay
+    close-on-overlay-click
     attach="body"
     width="min(960px, 94vw)"
     :footer="false"

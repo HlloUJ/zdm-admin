@@ -146,7 +146,7 @@ test('tabs retain automatically saved drafts', async ({ page }) => {
   await expect(page.locator('.exit-edit')).toHaveCount(0);
   await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
   await expect(page.locator('.attribute-table .required-switch').first()).not.toHaveClass(/t-is-checked/);
-  await expect(page.getByText('已保存“草稿”', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   expect(versions.find((v) => v.id === 2)?.versionNo).toBeNull();
   expect((versions.find((v) => v.id === 2)?.content as Record<string, unknown>[])[0]?.requiredFlag).toBe(false);
   await page.getByText('配件模板', { exact: true }).click();
@@ -197,7 +197,7 @@ test('attribute list paginates without dropping draft rows on save', async ({ pa
   await expect(list.locator('tbody tr').first().locator('td').nth(1)).toHaveText('11');
   await expect(list.getByText('分页属性11', { exact: true })).toBeVisible();
   await list.locator('tbody tr').first().locator('.required-switch').click();
-  await expect(page.getByText('已保存“草稿”', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   const saved = draft.content as Record<string, unknown>[];
   expect(saved).toHaveLength(12);
   expect(saved[0]?.requiredFlag).toBe(true);
@@ -558,7 +558,7 @@ test('auto-save failure preserves edits and navigation retries saving before ref
   expect((versions[1]!.content as Array<{ requiredFlag: boolean }>)[0]!.requiredFlag).toBe(true);
   fail = false;
   await page.locator('.exit-edit').click();
-  await expect(page.getByText('已保存“草稿”', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
   await expect(page.locator('.attribute-table .required-switch').first()).not.toHaveClass(/t-is-checked/);

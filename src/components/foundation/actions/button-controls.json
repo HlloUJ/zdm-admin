@@ -60,9 +60,9 @@
     {
       "file": "src/pages/finished-stock/management/index.vue",
       "tag": "t-link",
-      "fingerprint": "acfb74811e20d2ebfec27f1b70ebf68957a03469ad5aaf636a0e30e1cfd9163a",
+      "fingerprint": "0bd78258e28c26c3062e2cc4b645e0644df0e52e29d9af1a43b91d590cc49403",
       "kind": "section-navigation",
-      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互；2026-10-19按用户批准仅增加官方hover=color，保留原控件行为"
     },
     {
       "file": "src/pages/finished-stock/management/index.vue",
@@ -102,9 +102,9 @@
     {
       "file": "src/pages/finished-stock/store/StoreFinishedEditor.vue",
       "tag": "t-link",
-      "fingerprint": "e989d51ab14af88c9ac10d877483de4ccb5570c1b46bc969a9ec23a70d421033",
+      "fingerprint": "f3e43e62392be48eca355751350754f552895eff6a05ecc9288b2ed1e8d056a0",
       "kind": "section-navigation",
-      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互；2026-10-19按用户批准仅增加官方hover=color，保留原控件行为"
     },
     {
       "file": "src/pages/finished-stock/store/index.vue",
@@ -116,9 +116,9 @@
     {
       "file": "src/pages/finished-stock/supply-chain/index.vue",
       "tag": "t-link",
-      "fingerprint": "acfb74811e20d2ebfec27f1b70ebf68957a03469ad5aaf636a0e30e1cfd9163a",
+      "fingerprint": "0bd78258e28c26c3062e2cc4b645e0644df0e52e29d9af1a43b91d590cc49403",
       "kind": "section-navigation",
-      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互；2026-10-19按用户批准仅增加官方hover=color，保留原控件行为"
     },
     {
       "file": "src/pages/finished-stock/supply-chain/index.vue",
@@ -158,9 +158,9 @@
     {
       "file": "src/pages/slab/management/components/SlabProductFormLayout.vue",
       "tag": "t-link",
-      "fingerprint": "c4ecb490a1693504ff30c7dd29e0da520985a9ff743ac5f708ea474c6e737fd1",
+      "fingerprint": "11ed12c45d8662356b69537a1ef29c44d3cf6c3bf0f82a69f385c41dc4e03eac",
       "kind": "section-navigation",
-      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+      "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互；2026-10-19按用户批准仅增加官方hover=color，保留原控件行为"
     },
     {
       "file": "src/pages/slab/management/index.vue",

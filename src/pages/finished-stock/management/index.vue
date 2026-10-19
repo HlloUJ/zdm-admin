@@ -11,6 +11,7 @@
                 <t-link
                   v-for="section in formSections"
                   :key="section.key"
+                  hover="color"
                   data-button-control="section-navigation"
                   :href="`#finished-product-${section.key}`"
                   :theme="activeFormSection === section.key ? 'primary' : 'default'"
@@ -452,7 +453,7 @@
                 </div>
               </section>
               <t-form class="supplier-form" :data="productForm" label-width="100px" colon>
-                <t-form-item label="供应商">
+                <t-form-item label="供应商" required-mark>
                   <t-select
                     v-bind="requiredFieldFeedback(productForm.supplier, '供应商', submitAttempted, true)"
                     v-model="productForm.supplier"
@@ -1107,7 +1108,7 @@
           </t-select>
         </t-form-item>
         <t-form-item label="详细说明">
-          <t-textarea v-model="reasonForm.detail" placeholder="请输入详细说明" :autosize="{ minRows: 4, maxRows: 6 }" />
+          <t-textarea v-model="reasonForm.detail" :maxlength="100" placeholder="请输入详细说明" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -1129,11 +1130,15 @@
         @preview="openProductMediaPreview"
       />
     </t-drawer>
-    <t-dialog
+    <AdminDialog
       v-model:visible="imagePreviewVisible"
       :header="imagePreviewTitle"
-      width="960px"
-      placement="center"
+      :width="productPreviewType === 'video' ? '960px' : 'min(960px, 94vw)'"
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
       :prevent-scroll-through="false"
       :footer="false"
       @close="closeImagePreview"
@@ -1147,9 +1152,9 @@
           playsinline
           aria-label="商品视频播放器"
         />
-        <img v-else-if="imagePreviewVisible" :src="imagePreviewSrc" :alt="imagePreviewTitle" />
+        <img v-else-if="imagePreviewVisible" :src="imagePreviewSrc" :alt="imagePreviewTitle" style="max-width: 100%" />
       </div>
-    </t-dialog>
+    </AdminDialog>
     <FinishedOperationLogs v-if="canViewOperationLogs" v-model:visible="operationLogsVisible" />
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
@@ -1998,7 +2003,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
 const formatReadonlyPrice = (value: unknown) =>
   value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);
 const requiredColumnTitle = (label: string) => () =>
-  h('span', [label, h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*')]);
+  h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);
 const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },
@@ -2657,7 +2662,7 @@ const submitProductForm = async () => {
     try {
       upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));
       formPageVisible.value = false;
-      adminFeedback.success(`已保存“${editingProduct.value.name}”`);
+      adminFeedback.actionSuccess({ action: '修改' });
     } catch (error) {
       adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));
     } finally {
@@ -2696,7 +2701,7 @@ const submitProductForm = async () => {
     if (isCreate) {
       adminFeedback.created(payload.name);
     } else {
-      adminFeedback.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+      adminFeedback.actionSuccess({ action: '修改' });
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');

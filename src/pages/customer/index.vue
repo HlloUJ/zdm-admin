@@ -30,7 +30,7 @@
           @select-change="selectRows"
         >
           <template #name="{ row }"
-            ><t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">{{
+            ><t-link v-if="can('detail')" hover="color" :theme="buttonTheme('view')" @click="openDetail(row.id)">{{
               row.name
             }}</t-link
             ><span v-else>{{ row.name }}</span></template
@@ -42,24 +42,40 @@
           <template #createdAt="{ row }">{{ time(row.createdAt).slice(0, 16) }}</template>
           <template #operation="{ row }">
             <t-space break-line size="small">
-              <t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">详情</t-link>
-              <t-link v-if="can('edit') && isInDataScope(row)" :theme="buttonTheme('edit')" @click="openProfile(row)"
+              <t-link v-if="can('detail')" hover="color" :theme="buttonTheme('view')" @click="openDetail(row.id)"
+                >详情</t-link
+              >
+              <t-link
+                v-if="can('followup') && isInDataScope(row)"
+                hover="color"
+                :theme="buttonTheme('create')"
+                @click="openFollowup(undefined, row)"
+                >跟进</t-link
+              >
+              <t-link
+                v-if="can('edit') && isInDataScope(row)"
+                hover="color"
+                :theme="buttonTheme('edit')"
+                @click="openProfile(row)"
                 >编辑</t-link
               >
               <t-link
                 v-if="status === 'daily' && can('archive') && isInDataScope(row)"
+                hover="color"
                 :theme="buttonTheme('archive')"
                 @click="prepareAction('archive', [row.id], false)"
                 >归档</t-link
               >
               <t-link
                 v-if="status === 'archived' && can('restore') && isInDataScope(row)"
+                hover="color"
                 :theme="buttonTheme('unarchive')"
                 @click="prepareAction('restore', [row.id], false)"
                 >取消归档</t-link
               >
               <t-link
                 v-if="status === 'archived' && can('purge') && isInDataScope(row)"
+                hover="color"
                 :theme="buttonTheme('purge')"
                 @click="prepareAction('purge', [row.id], false)"
                 >彻底删除</t-link
@@ -123,67 +139,82 @@
         ><t-input v-model="profile.wechat" :maxlength="100" clearable placeholder="请输入微信号"
       /></t-form-item>
       <t-form-item label="客户需求"
-        ><t-textarea v-model="profile.requirement" :maxlength="100" placeholder="请输入客户需求"
+        ><t-textarea v-model="profile.requirement" :maxlength="100" :autosize="{}" placeholder="请输入客户需求"
       /></t-form-item>
       <t-form-item label="客户备注"
-        ><t-textarea v-model="profile.remark" :maxlength="100" placeholder="请输入客户备注"
+        ><t-textarea v-model="profile.remark" :maxlength="100" :autosize="{}" placeholder="请输入客户备注"
       /></t-form-item>
     </AdminFormDialog>
-    <AdminDialog
+    <t-drawer
       v-model:visible="detailVisible"
-      :confirmation="{ kind: 'close', text: '关闭' }"
-      confirm-function="close"
       header="客户详情"
-      width="min(1100px, 94vw)"
-      :cancel-btn="null"
-      @confirm="detailVisible = false"
+      placement="right"
+      size="min(1100px, 100vw)"
+      :confirm-btn="null"
+      :cancel-btn="cancelButtonProps('关闭')"
+      @cancel="detailVisible = false"
     >
       <t-loading :loading="detailLoading">
         <t-skeleton v-if="detailLoading" theme="paragraph" />
         <template v-if="detail">
-          <AdminDetailPage embedded title="客户资料" :items="detailItems">
-            <t-space
-              ><span>跟进记录</span
-              ><t-button v-if="isInDataScope(detail.customer)" :theme="buttonTheme('create')" @click="openFollowup()"
-                >新增跟进</t-button
-              ></t-space
-            >
-            <t-list :split="true">
-              <t-list-item v-for="record in detail.followups" :key="record.id">
-                <t-space direction="vertical">
-                  <t-space
-                    ><span>{{ time(record.followedAt) }}</span
-                    ><span>{{ record.createdByName || '-' }}</span></t-space
-                  >
-                  <div>{{ record.content }}</div>
-                  <t-space v-if="record.attachments.length" break-line
-                    ><t-link
+          <AdminDetailPage embedded bordered title="客户资料" :column="detailColumns" :items="detailItems">
+            <t-typography-title level="h5">跟进记录</t-typography-title>
+            <t-timeline v-if="sortedFollowups.length" :mode="compactDetail ? 'same' : 'alternate'" label-align="left">
+              <t-timeline-item v-for="record in sortedFollowups" :key="record.id" class="customer-followup-record">
+                <template v-if="!compactDetail" #label>
+                  <div><t-typography-text :content="time(record.followedAt).slice(0, 10)" /></div>
+                  <div><t-typography-text :content="time(record.followedAt).slice(11, 16)" /></div>
+                </template>
+                <t-space direction="vertical" size="small" :style="{ width: '100%' }">
+                  <t-typography-text v-if="compactDetail" :content="time(record.followedAt).slice(0, 16)" />
+                  <t-row justify="space-between" align="center">
+                    <t-space align="center">
+                      <t-avatar size="small">{{ (record.createdByName || '-').slice(0, 1) }}</t-avatar>
+                      <t-typography-text strong :content="record.createdByName || '-'" />
+                    </t-space>
+                    <t-space v-if="isInDataScope(detail.customer)" class="customer-followup-actions">
+                      <t-link
+                        hover="color"
+                        :theme="buttonTheme('edit')"
+                        tabindex="0"
+                        @keydown.enter.prevent="openFollowup(record)"
+                        @click="openFollowup(record)"
+                        >编辑</t-link
+                      >
+                      <t-link
+                        hover="color"
+                        :theme="buttonTheme('delete')"
+                        tabindex="0"
+                        @keydown.enter.prevent="prepareFollowupDelete(record.id)"
+                        @click="prepareFollowupDelete(record.id)"
+                        >删除</t-link
+                      >
+                    </t-space>
+                  </t-row>
+                  <t-typography-text :content="record.content" />
+                  <t-space v-if="record.attachments.length" :key="JSON.stringify(record.attachments)" break-line>
+                    <t-link
                       v-for="attachment in record.attachments"
                       :key="attachment.mediaId"
+                      hover="color"
                       :theme="buttonTheme('preview')"
                       @click="previewAttachment(record, attachment)"
                       >{{ attachment.name }}</t-link
-                    ></t-space
-                  >
-                  <span v-if="record.nextFollowAt || record.nextFollowTask"
-                    >下次跟进：{{ time(record.nextFollowAt) }} {{ record.nextFollowTask }}</span
-                  >
+                    >
+                  </t-space>
+                  <t-typography-text v-if="record.nextFollowAt || record.nextFollowTask">
+                    <span v-if="record.nextFollowAt">{{ '下次跟进：' + time(record.nextFollowAt).slice(0, 16) }}</span>
+                    <template v-if="record.nextFollowAt && record.nextFollowTask">{{ '\u3000' }}</template>
+                    <span v-if="record.nextFollowTask">{{ record.nextFollowTask }}</span>
+                  </t-typography-text>
                 </t-space>
-                <template v-if="isInDataScope(detail.customer)" #action
-                  ><t-space
-                    ><t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link
-                    ><t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)"
-                      >删除</t-link
-                    ></t-space
-                  ></template
-                >
-              </t-list-item>
-            </t-list>
+              </t-timeline-item>
+            </t-timeline>
             <t-empty v-if="!detail.followups.length" description="暂无跟进记录" />
           </AdminDetailPage>
         </template>
       </t-loading>
-    </AdminDialog>
+    </t-drawer>
     <AdminFormDialog
       ref="followDialog"
       v-model:visible="followVisible"
@@ -203,37 +234,39 @@
           v-model="followForm.followedAt"
           placeholder="请选择日期时间"
           enable-time-picker
-          format="YYYY-MM-DD HH:mm:ss"
+          format="YYYY-MM-DD HH:mm"
+          value-type="YYYY-MM-DD HH:mm"
+          :time-picker-props="{ format: 'HH:mm' }"
       /></t-form-item>
-      <t-form-item label="跟进内容" required-mark v-bind="followFeedback.field('content', followForm.content)"
-        ><t-textarea v-model="followForm.content" :maxlength="10000" placeholder="请输入跟进内容"
-      /></t-form-item>
+      <t-form-item label="跟进内容" required-mark :help="'\u00a0'">
+        <t-textarea
+          v-model="followForm.content"
+          :status="followFeedback.field('content', followForm.content).status"
+          :tips="followFeedback.field('content', followForm.content).tips"
+          :maxlength="100"
+          :autosize="{}"
+          placeholder="请输入跟进内容"
+        />
+      </t-form-item>
       <t-form-item label="下次跟进时间"
         ><t-date-picker
           v-model="followForm.nextFollowAt"
           placeholder="请选择日期时间"
           enable-time-picker
           clearable
-          format="YYYY-MM-DD HH:mm:ss"
+          format="YYYY-MM-DD HH:mm"
+          value-type="YYYY-MM-DD HH:mm"
+          :time-picker-props="{ format: 'HH:mm' }"
       /></t-form-item>
       <t-form-item label="下次跟进事项"
-        ><t-textarea v-model="followForm.nextFollowTask" :maxlength="2000" placeholder="请输入下次跟进事项"
+        ><t-textarea
+          v-model="followForm.nextFollowTask"
+          :maxlength="100"
+          :autosize="{}"
+          placeholder="请输入下次跟进事项"
       /></t-form-item>
-      <t-form-item label="附件" help="最多3个附件，单个不超过5MiB">
-        <t-row :gutter="[16, 16]">
-          <t-col v-for="(_, index) in 3" :key="index" :span="12">
-            <AdminOfficialMediaUpload
-              :model-value="uploads[index]"
-              :title="`附件${index + 1}`"
-              :show-title="false"
-              :accept="''"
-              :media-type="uploadKinds[index] === 'image' ? 'image' : 'file'"
-              :upload="(file) => upload(file, index)"
-              @update:model-value="(value) => (uploads[index] = value)"
-              @preview="(value) => previewUpload(value, index)"
-            />
-          </t-col>
-        </t-row>
+      <t-form-item label="附件">
+        <CustomerFollowupAttachments v-if="followVisible" v-model="uploads" :upload="upload" @preview="previewUpload" />
       </t-form-item>
     </AdminFormDialog>
     <AdminFormDialog
@@ -272,26 +305,39 @@
       :description="confirmDescription"
       @confirm="confirmOperation"
     />
-    <t-image-viewer v-model:visible="imageVisible" :images="previewImages" />
+    <AdminDialog
+      v-model:visible="imageVisible"
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
+      header="图片预览"
+      width="min(960px, 94vw)"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
+      :footer="false"
+      @close="imageVisible = false"
+    >
+      <img v-if="imageVisible" :src="previewImages[0]" alt="附件图片" style="max-width: 100%" />
+    </AdminDialog>
   </div>
 </template>
 <script setup lang="ts">
 import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
-import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PageInfo, TableProps } from 'tdesign-vue-next';
 import AdminTopNav from '@/components/AdminTopNav.vue';
+import CustomerFollowupAttachments from '@/components/customer/CustomerFollowupAttachments.vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
+import AdminDialog from '@/components/foundation/AdminDialog.vue';
 import {
   AdminListPage,
   AdminFormDialog,
   AdminPhoneInput,
   AdminDetailPage,
-  AdminDialog,
   AdminConfirmDialog,
-  AdminOfficialMediaUpload,
 } from '@/components/foundation';
 import type { ListAction, ListFilter } from '@/components/foundation';
 import type { AdminMediaValue } from '@/components/foundation/AdminMediaUpload.vue';
@@ -439,6 +485,14 @@ const columns: TableProps['columns'] = [
   { colKey: 'createdAt', title: '创建时间', width: 180, ellipsis: true },
   { colKey: 'operation', title: '操作', width: 200 },
 ];
+// Match the official Grid sm/md viewport boundaries; only detail presentation responds.
+const detailViewportWidth = ref(window.innerWidth);
+const syncDetailViewport = () => {
+  detailViewportWidth.value = window.innerWidth;
+};
+const compactDetail = computed(() => detailViewportWidth.value < 768);
+const detailColumns = computed(() => (compactDetail.value ? 1 : detailViewportWidth.value < 992 ? 2 : 3));
+onMounted(() => window.addEventListener('resize', syncDetailViewport));
 const detailItems = computed(() => {
   const customer = detail.value?.customer;
   if (!customer) return [];
@@ -461,13 +515,18 @@ const detailItems = computed(() => {
     { label: '联系电话', value: displayCustomerPhone(customer) },
     { label: '微信号', value: customer.wechat || '-' },
     { label: '归属人', value: customer.ownerName || '-' },
-    { label: '客户需求', value: customer.requirement || '-', span: 3 },
-    { label: '客户备注', value: customer.remark || '-', span: 3 },
+    { label: '客户需求', value: customer.requirement || '-', span: detailColumns.value },
+    { label: '客户备注', value: customer.remark || '-', span: detailColumns.value },
     { label: '建档人', value: customer.createdByName || '-' },
-    { label: '建档时间', value: time(customer.createdAt) },
+    { label: '建档时间', value: time(customer.createdAt), span: Math.min(2, detailColumns.value) },
   ];
 });
 const time = (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-');
+const sortedFollowups = computed(() =>
+  [...(detail.value?.followups ?? [])].sort(
+    (a, b) => time(b.followedAt).localeCompare(time(a.followedAt)) || b.id - a.id,
+  ),
+);
 const ownerLabel = (owner: Owner) => `${owner.name}${owner.active ? '' : '（已离职或停用）'}`;
 let loadVersion = 0;
 async function reload() {
@@ -764,6 +823,7 @@ async function confirmOperation() {
 const followVisible = ref(false);
 const followFeedback = useFormFeedback(followVisible);
 const followId = ref<number>();
+const followCustomer = ref<Customer>();
 const localNow = () => {
   const date = new Date();
   const pad = (v: number) => String(v).padStart(2, '0');
@@ -781,15 +841,16 @@ function blobUrl(blob: Blob) {
   blobUrls.add(url);
   return url;
 }
-function openFollowup(record?: Followup) {
-  if (!detail.value) return;
+function openFollowup(record?: Followup, customer = detail.value?.customer) {
+  if (!customer || !isInDataScope(customer) || (!record && !can('followup', customer.status))) return;
+  followCustomer.value = customer;
   ++uploadGeneration;
-  uploadCustomerId = detail.value.customer.id;
+  uploadCustomerId = customer.id;
   followId.value = record?.id;
   followForm.value = {
-    followedAt: record ? time(record.followedAt) : localNow(),
+    followedAt: (record ? time(record.followedAt) : localNow()).slice(0, 16),
     content: record?.content ?? '',
-    nextFollowAt: record?.nextFollowAt ? time(record.nextFollowAt) : '',
+    nextFollowAt: record?.nextFollowAt ? time(record.nextFollowAt).slice(0, 16) : '',
     nextFollowTask: record?.nextFollowTask ?? '',
   };
   uploads.value = record?.attachments.map((a) => ({ name: a.name, mediaId: a.mediaId })) ?? [];
@@ -827,7 +888,7 @@ async function cleanupUploads() {
   uploads.value = [];
 }
 async function submitFollowup() {
-  if (!detail.value || submitting.value || uploading.value > 0) return;
+  if (!followCustomer.value || submitting.value || uploading.value > 0) return;
   if (!followForm.value.followedAt || !followForm.value.content.trim()) {
     if (!followForm.value.followedAt) followFeedback.reject('time', followForm.value.followedAt, '请选择跟进时间');
     if (!followForm.value.content.trim()) followFeedback.reject('content', followForm.value.content, '请输入跟进内容');
@@ -837,20 +898,24 @@ async function submitFollowup() {
   try {
     const ids = uploads.value.flatMap((a) => (a?.mediaId ? [a.mediaId] : []));
     await saveFollowup(
-      detail.value.customer.id,
+      followCustomer.value.id,
       {
         ...followForm.value,
-        followedAt: followForm.value.followedAt.replace(' ', 'T'),
-        nextFollowAt: followForm.value.nextFollowAt ? followForm.value.nextFollowAt.replace(' ', 'T') : null,
+        followedAt: followForm.value.followedAt.slice(0, 16).replace(' ', 'T') + ':00',
+        nextFollowAt: followForm.value.nextFollowAt
+          ? followForm.value.nextFollowAt.slice(0, 16).replace(' ', 'T') + ':00'
+          : null,
         mediaIds: ids,
       },
       followId.value,
     );
     ids.forEach((id) => newUploads.delete(id));
     followVisible.value = false;
-    detail.value = await getCustomerDetail(detail.value.customer.id);
+    if (detail.value?.customer.id === followCustomer.value.id && can('detail', followCustomer.value.status)) {
+      detail.value = await getCustomerDetail(followCustomer.value.id);
+    }
     await reload();
-    adminFeedback.actionSuccess({ action: '保存跟进' });
+    adminFeedback.actionSuccess({ action: followId.value ? '修改' : '保存跟进' });
   } catch (error) {
     fail('保存跟进', error);
   } finally {
@@ -890,6 +955,7 @@ async function previewUpload(value: AdminMediaValue | undefined, index: number) 
   if (record && attachment) await previewAttachment(record, attachment);
 }
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncDetailViewport);
   ++loadVersion;
   ++detailVersion;
   void cleanupUploads();
@@ -898,3 +964,14 @@ onBeforeUnmount(() => {
 status.value = tabs.value[0]?.value ?? 'daily';
 void reload();
 </script>
+
+<style>
+/* Behavior only: preserve the native links and their occupied space.
+   Touch devices keep the actions available; keyboard focus reveals the row. */
+@media (hover: hover) and (pointer: fine) {
+  .customer-followup-record:not(:hover, :focus-within) .customer-followup-actions,
+  .customer-followup-file-row:not(:hover, :focus-within) .customer-followup-file-actions {
+    opacity: 0;
+  }
+}
+</style>

@@ -404,7 +404,7 @@
   max-width: 100%;
 }
 
-.upload-large-preview {
+video.upload-large-preview {
   display: block;
   max-width: 100%;
   max-height: 70vh;

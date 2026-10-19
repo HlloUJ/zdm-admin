@@ -123,7 +123,7 @@ const saveAllocation = async () => {
       parsePermissions(saved.functionPermissions),
     );
     checkedValues.value = [...savedAllocationValues[terminal]];
-    adminFeedback.success('终端功能分配已保存');
+    adminFeedback.actionSuccess({ action: '修改' });
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '保存失败');
   } finally {

@@ -168,12 +168,7 @@
           />
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="formData.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="formData.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -191,23 +186,36 @@
       {{ confirmState.content }}
     </AdminConfirmDialog>
 
-    <t-dialog
+    <AdminDialog
       v-model:visible="imagePreviewVisible"
       :header="previewCraftName"
-      width="560px"
-      placement="center"
+      :prevent-scroll-through="true"
+      width="min(960px, 94vw)"
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
       :footer="false"
+      @close="imagePreviewVisible = false"
     >
       <div class="image-preview">
-        <img v-if="previewImageUrl" class="image-preview__img" :src="previewImageUrl" alt="工艺大图" />
+        <img
+          v-if="previewImageUrl"
+          class="image-preview__img"
+          style="max-width: 100%"
+          :src="previewImageUrl"
+          alt="工艺大图"
+        />
         <div v-else class="image-preview__empty">暂无图片</div>
-        <span>统一3D工艺图</span>
+        <div>统一3D工艺图</div>
       </div>
-    </t-dialog>
+    </AdminDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { AdminDialog } from '@/components/foundation';
 import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -539,7 +547,7 @@ const handleSubmit = async () => {
     if (dialogMode.value === 'create') {
       adminFeedback.created(normalizedName);
     } else {
-      adminFeedback.actionSuccess({ action: '保存', target: normalizedName });
+      adminFeedback.actionSuccess({ action: '修改', target: normalizedName });
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
@@ -689,32 +697,6 @@ onMounted(loadCrafts);
 
 .craft-image__empty {
   font-size: var(--td-font-size-body-small);
-}
-
-.image-preview {
-  height: 360px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--td-comp-margin-s);
-  border-radius: var(--td-radius-medium);
-  color: var(--td-text-color-placeholder);
-  background: var(--td-bg-color-secondarycontainer);
-  border: 1px dashed var(--td-component-border);
-}
-
-.image-preview__img {
-  max-width: 100%;
-  max-height: 300px;
-  display: block;
-  border-radius: var(--td-radius-default);
-  object-fit: contain;
-  border: 1px solid var(--td-component-border);
-}
-
-.image-preview__empty {
-  color: var(--td-text-color-placeholder);
 }
 
 .table-actions {

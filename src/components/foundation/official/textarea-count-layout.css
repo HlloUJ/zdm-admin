@@ -1,0 +1,27 @@
+/* User-approved exception: move only the native counter and reserve content space. */
+.t-textarea:has(> .t-textarea__info_wrapper > .t-textarea__limit) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.t-textarea:has(> .t-textarea__info_wrapper > .t-textarea__limit) > textarea {
+  grid-area: 1 / 1;
+  padding-bottom: calc(var(--td-line-height-body-small) + var(--td-comp-margin-s));
+}
+
+.t-textarea:has(> .t-textarea__info_wrapper > .t-textarea__limit) > .t-textarea__info_wrapper {
+  display: contents;
+}
+
+.t-textarea > .t-textarea__info_wrapper > .t-textarea__limit {
+  grid-area: 1 / 1;
+  place-self: end;
+  margin-right: calc(var(--td-comp-paddingLR-s) + var(--td-comp-margin-s));
+  margin-bottom: var(--td-comp-margin-xs);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.t-textarea:has(> .t-textarea__info_wrapper > .t-textarea__limit) > .t-textarea__info_wrapper > .t-textarea__tips {
+  grid-area: 2 / 1;
+}

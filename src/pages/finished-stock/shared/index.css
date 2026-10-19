@@ -121,7 +121,7 @@
   transition: transform 0.2s ease;
 }
 
-.image-preview-dialog {
+.image-preview-dialog:has(video) {
   display: flex;
   min-height: 620px;
   align-items: center;
@@ -129,7 +129,6 @@
   background: var(--td-bg-color-secondarycontainer);
 }
 
-.image-preview-dialog img,
 .image-preview-dialog video {
   display: block;
   width: min(900px, 100%);

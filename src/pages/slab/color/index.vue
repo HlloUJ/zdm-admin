@@ -113,12 +113,7 @@
           </t-select>
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="formData.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="formData.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </AdminDialog>
@@ -164,12 +159,7 @@
           <t-input v-model="categoryForm.name" clearable placeholder="请输入分类名称" />
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="categoryForm.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="categoryForm.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </AdminDialog>
@@ -382,7 +372,7 @@ const submitColor = async () => {
     const target = payload.name;
     await loadColors();
     closeColorForm();
-    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });
+    if (editingId.value) adminFeedback.actionSuccess({ action: '修改', target });
     else adminFeedback.created(target);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
@@ -443,7 +433,7 @@ const submitCategory = async () => {
     else await createSlabColorCategory(payload);
     await loadCategories();
     closeCategoryForm();
-    if (editingCategoryId.value) adminFeedback.actionSuccess({ action: '保存', target: payload.name });
+    if (editingCategoryId.value) adminFeedback.actionSuccess({ action: '修改', target: payload.name });
     else adminFeedback.created(payload.name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

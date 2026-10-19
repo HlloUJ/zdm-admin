@@ -2,6 +2,7 @@
 @import url('../components/foundation/official/query-layout.css');
 @import url('../components/foundation/official/product-form-layout.css');
 @import url('../components/foundation/official/form-feedback-layout.css');
+@import url('../components/foundation/official/textarea-count-layout.css');
 
 * {
   box-sizing: border-box;
@@ -53,15 +54,6 @@ h5,
 h6,
 p {
   margin: 0;
-}
-
-.t-dialog__mask,
-.t-drawer__mask,
-.t-popup__overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
 }
 
 .admin-layout {

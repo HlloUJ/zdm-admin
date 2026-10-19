@@ -158,17 +158,23 @@
                 <template #createdAt="{ row }">{{ formatStoreRuleDateTime(row.rule?.createdAt) }}</template>
                 <template #operation="{ row }">
                   <t-space size="small">
-                    <t-link v-if="can('edit')" :theme="buttonTheme('edit')" @click="editDiscount(row.rule)"
+                    <t-link
+                      v-if="can('edit')"
+                      hover="color"
+                      :theme="buttonTheme('edit')"
+                      @click="editDiscount(row.rule)"
                       >编辑</t-link
                     >
                     <t-link
                       v-if="can('toggle-status')"
+                      hover="color"
                       :theme="buttonTheme(row.rule.status === 'disabled' ? 'enable' : 'disable')"
                       @click="confirmDiscountAction(row.rule, 'status')"
                       >{{ row.rule.status === 'disabled' ? '启用' : '停用' }}</t-link
                     >
                     <t-link
                       v-if="can('delete')"
+                      hover="color"
                       :theme="buttonTheme('delete')"
                       @click="confirmDiscountAction(row.rule, 'delete')"
                       >删除</t-link
@@ -591,7 +597,7 @@ async function savePrices() {
     rules.value = await saveStoreCategoryPrices(activeScope.value, changes);
     selectedIds.value = [];
     draftCache.delete(activeKey.value);
-    adminFeedback.success('价格配置已保存');
+    adminFeedback.actionSuccess({ action: '修改' });
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '保存失败，请稍后重试'));
   } finally {
@@ -653,7 +659,7 @@ async function saveDiscount() {
             Number(createForm.coefficient),
           );
     createVisible.value = false;
-    adminFeedback.actionSuccess({ action: editingDiscountId.value == null ? '新增' : '保存', target: '折扣配置' });
+    adminFeedback.actionSuccess({ action: editingDiscountId.value == null ? '新增' : '修改', target: '折扣配置' });
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '新增失败，请稍后重试'));
   } finally {

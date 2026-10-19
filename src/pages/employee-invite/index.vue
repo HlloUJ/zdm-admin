@@ -351,7 +351,6 @@ onBeforeUnmount(stopCounter);
 }
 
 .item-container :deep(.t-input),
-.item-container :deep(.t-button),
 .gender-radio :deep(.t-radio-button) {
   border-radius: var(--td-radius-default);
 }
