@@ -42,23 +42,28 @@
     <t-timeline mode="alternate" label-align="left">
       <t-timeline-item v-for="record in records" :key="record.id">
         <template #label>
-          <div><t-typography-text theme="secondary" :content="record.day" /></div>
-          <div><t-typography-text theme="secondary" :content="record.clock" /></div>
+          <div><t-typography-text :content="record.day" /></div>
+          <div><t-typography-text :content="record.clock.slice(0, 5)" /></div>
         </template>
-        <t-space direction="vertical" size="small">
-          <t-space break-line align="center" size="small">
-            <t-avatar size="small">赵</t-avatar>
-            <t-typography-text strong :content="record.author" />
-            <t-space size="small"><t-link theme="primary">编辑</t-link><t-link theme="danger">删除</t-link></t-space>
-          </t-space>
+        <t-space direction="vertical" size="small" :style="{ width: '100%' }">
+          <t-row justify="space-between" align="center">
+            <t-space align="center">
+              <t-avatar size="small">赵</t-avatar>
+              <t-typography-text strong :content="record.author" />
+            </t-space>
+            <t-space
+              ><t-link hover="color" theme="primary">编辑</t-link
+              ><t-link hover="color" theme="danger">删除</t-link></t-space
+            >
+          </t-row>
           <t-typography-text :content="record.content" />
           <t-space v-if="record.attachment" break-line
-            ><t-link theme="primary">{{ record.attachment }}</t-link></t-space
+            ><t-link hover="color" theme="primary">{{ record.attachment }}</t-link></t-space
           >
-          <t-space v-if="record.next" direction="vertical" size="small">
-            <t-typography-text theme="secondary" :content="'下次跟进：' + record.next" />
-            <t-typography-text theme="secondary" :content="record.task" />
-          </t-space>
+          <t-typography-text v-if="record.next">
+            <span>{{ '下次跟进：' + record.next }}</span
+            >{{ '\u3000' }}<span>{{ record.task }}</span>
+          </t-typography-text>
         </t-space>
       </t-timeline-item>
     </t-timeline>

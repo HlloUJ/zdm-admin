@@ -1045,13 +1045,18 @@
       </div>
     </t-drawer>
 
-    <t-dialog
+    <AdminDialog
       v-model:visible="uploadPreviewDialogVisible"
       :header="uploadPreviewTitle"
-      width="760px"
-      placement="center"
+      :width="uploadPreviewType === 'video' ? '760px' : 'min(960px, 94vw)'"
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
       :prevent-scroll-through="false"
       :footer="false"
+      @close="uploadPreviewDialogVisible = false"
     >
       <video
         v-if="uploadPreviewType === 'video' && uploadPreviewUrl"
@@ -1062,10 +1067,11 @@
       <img
         v-else-if="uploadPreviewUrl"
         class="upload-large-preview"
+        style="max-width: 100%"
         :src="uploadPreviewUrl"
         :alt="uploadPreviewTitle"
       />
-    </t-dialog>
+    </AdminDialog>
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
@@ -1122,7 +1128,7 @@
           </t-select>
         </t-form-item>
         <t-form-item name="detail" label="详细说明">
-          <t-textarea v-model="reasonForm.detail" placeholder="请输入详细说明" :autosize="{ minRows: 4, maxRows: 6 }" />
+          <t-textarea v-model="reasonForm.detail" :maxlength="100" placeholder="请输入详细说明" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>

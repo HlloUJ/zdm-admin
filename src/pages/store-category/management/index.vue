@@ -100,20 +100,30 @@
                 <div class="table-actions">
                   <t-link
                     v-if="canCreateChildCategory && row.level < 3"
+                    hover="color"
                     :theme="buttonTheme('create')"
                     @click="openCreateDialog(row.node)"
                     >新增下级</t-link
                   >
-                  <t-link v-if="canEditCategory" :theme="buttonTheme('edit')" @click="openEditDialog(row.node)"
+                  <t-link
+                    v-if="canEditCategory"
+                    hover="color"
+                    :theme="buttonTheme('edit')"
+                    @click="openEditDialog(row.node)"
                     >编辑</t-link
                   >
                   <t-link
                     v-if="canToggleCategoryStatus"
+                    hover="color"
                     :theme="buttonTheme(row.node.status === 'enabled' ? 'disable' : 'enable')"
                     @click="openStatusConfirm(row.node)"
                     >{{ row.node.status === 'enabled' ? '停用' : '启用' }}</t-link
                   >
-                  <t-link v-if="canDeleteCategory" :theme="buttonTheme('delete')" @click="openDeleteDialog(row.node)"
+                  <t-link
+                    v-if="canDeleteCategory"
+                    hover="color"
+                    :theme="buttonTheme('delete')"
+                    @click="openDeleteDialog(row.node)"
                     >删除</t-link
                   >
                   <span v-if="!hasVisibleRowAction(row)">-</span>

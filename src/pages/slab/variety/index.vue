@@ -107,12 +107,7 @@
           <t-input v-model="formData.name" clearable placeholder="请输入品种" />
         </t-form-item>
         <t-form-item label="备注" name="remark">
-          <t-textarea
-            v-model="formData.remark"
-            placeholder="请输入备注"
-            :maxlength="100"
-            :autosize="{ minRows: 4, maxRows: 6 }"
-          />
+          <t-textarea v-model="formData.remark" placeholder="请输入备注" :maxlength="100" :autosize="{}" />
         </t-form-item>
       </t-form>
     </t-dialog>

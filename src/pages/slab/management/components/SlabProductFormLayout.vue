@@ -7,6 +7,7 @@
             <t-link
               v-for="section in sections"
               :key="section.key"
+              hover="color"
               data-button-control="section-navigation"
               :href="`#slab-product-${section.key}`"
               :theme="activeSection === section.key ? 'primary' : 'default'"
@@ -21,7 +22,7 @@
     <header v-if="!hideBreadcrumb" class="page-header">
       <t-breadcrumb aria-label="页面导航">
         <t-breadcrumb-item
-          ><t-link :theme="buttonTheme('back')" :disabled="loading" @click="emit('close')"
+          ><t-link hover="color" :theme="buttonTheme('back')" :disabled="loading" @click="emit('close')"
             >大板管理</t-link
           ></t-breadcrumb-item
         >

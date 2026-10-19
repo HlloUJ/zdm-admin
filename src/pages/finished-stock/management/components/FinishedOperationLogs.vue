@@ -49,6 +49,9 @@
     confirm-function="close"
     :visible="!!preview"
     header="历史媒体"
+    mode="modal"
+    show-overlay
+    close-on-overlay-click
     width="min(960px, 94vw)"
     :footer="false"
     @close="preview = null"
@@ -60,7 +63,7 @@
         v-if="preview.mediaType === 'video'"
         :src="preview.url"
         controls
-        class="history-large-media" /><img v-else :src="preview.url" alt="历史图片" class="history-large-media"
+        class="history-large-media" /><img v-else :src="preview.url" alt="历史图片" style="max-width: 100%"
     /></template>
   </AdminDialog>
 </template>

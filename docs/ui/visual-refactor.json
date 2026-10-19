@@ -81,7 +81,8 @@
     "src/pages/tenant/store/index.vue",
     "src/styles/index.css",
     "src/components/IdentityContextIcon.vue",
-    "src/components/foundation/AdminPhoneInput.vue"
+    "src/components/foundation/AdminPhoneInput.vue",
+    "src/components/foundation/official/textarea-count-layout.css"
   ],
   "contracts": {
     "src/App.vue": {
@@ -1064,6 +1065,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "        <template #operationSummary=\"{ row }\">{{ summaryLabel(row) }}</template>\n        <template #operatedAt=\"{ row }\">{{ formatTime(row.operatedAt) }}</template>\n        <template #operation=\"{ row }\"\n          ><t-link :theme=\"buttonTheme('view')\" @click=\"emit('open-detail', row.id)\">详情</t-link></template\n        >\n        <template #empty>暂无操作日志</template>\n      </t-table>\n",
+          "after": "        <template #operationSummary=\"{ row }\">{{ summaryLabel(row) }}</template>\n        <template #operatedAt=\"{ row }\">{{ formatTime(row.operatedAt) }}</template>\n        <template #operation=\"{ row }\"\n          ><t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"emit('open-detail', row.id)\"\n            >详情</t-link\n          ></template\n        >\n        <template #empty>暂无操作日志</template>\n      </t-table>\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "  </t-drawer>\n  <AdminDialog\n    confirm-function=\"close\"\n    :visible=\"detailVisible\"\n",
@@ -1235,6 +1242,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -1419,6 +1432,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "before": "      {{ confirmState.content }}\n    </AdminConfirmDialog>\n\n    <t-dialog\n      v-model:visible=\"imagePreviewVisible\"\n      :header=\"previewCraftName\"\n      width=\"560px\"\n      placement=\"center\"\n      :footer=\"false\"\n    >\n      <div class=\"image-preview\">\n        <img v-if=\"previewImageUrl\" class=\"image-preview__img\" :src=\"previewImageUrl\" alt=\"工艺大图\" />\n        <div v-else class=\"image-preview__empty\">暂无图片</div>\n        <span>统一3D工艺图</span>\n      </div>\n    </t-dialog>\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "      {{ confirmState.content }}\n    </AdminConfirmDialog>\n\n    <AdminDialog\n      v-model:visible=\"imagePreviewVisible\"\n      :header=\"previewCraftName\"\n      :prevent-scroll-through=\"true\"\n      width=\"min(960px, 94vw)\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      mode=\"modal\"\n      show-overlay\n      close-on-overlay-click\n      :footer=\"false\"\n      @close=\"imagePreviewVisible = false\"\n    >\n      <div class=\"image-preview\">\n        <img\n          v-if=\"previewImageUrl\"\n          class=\"image-preview__img\"\n          style=\"max-width: 100%\"\n          :src=\"previewImageUrl\"\n          alt=\"工艺大图\"\n        />\n        <div v-else class=\"image-preview__empty\">暂无图片</div>\n        <div>统一3D工艺图</div>\n      </div>\n    </AdminDialog>\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { AdminDialog } from '@/components/foundation';\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "  font-size: var(--td-font-size-body-small);\n}\n\n.image-preview {\n  height: 360px;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: var(--td-comp-margin-s);\n  border-radius: var(--td-radius-medium);\n  color: var(--td-text-color-placeholder);\n  background: var(--td-bg-color-secondarycontainer);\n  border: 1px dashed var(--td-component-border);\n}\n\n.image-preview__img {\n  max-width: 100%;\n  max-height: 300px;\n  display: block;\n  border-radius: var(--td-radius-default);\n  object-fit: contain;\n  border: 1px solid var(--td-component-border);\n}\n\n.image-preview__empty {\n  color: var(--td-text-color-placeholder);\n}\n\n.table-actions {\n  display: flex;\n  justify-content: flex-start;\n",
+          "after": "  font-size: var(--td-font-size-body-small);\n}\n\n.table-actions {\n  display: flex;\n  justify-content: flex-start;\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
@@ -1646,6 +1677,222 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户指出编辑跟进成功提示未遵守标准话术；仅将编辑动作接入全局修改成功映射，新增提示、API、权限和保存交互不变。",
+          "stage": "before-migrations",
+          "before": "    adminFeedback.actionSuccess({ action: '保存跟进' });",
+          "after": "    adminFeedback.actionSuccess({ action: followId.value ? '修改' : '保存跟进' });"
+        },
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "        ><t-input v-model=\"profile.wechat\" :maxlength=\"100\" clearable placeholder=\"请输入微信号\"\n      /></t-form-item>\n      <t-form-item label=\"客户需求\"\n        ><t-textarea v-model=\"profile.requirement\" :maxlength=\"100\" placeholder=\"请输入客户需求\"\n      /></t-form-item>\n      <t-form-item label=\"客户备注\"\n        ><t-textarea v-model=\"profile.remark\" :maxlength=\"100\" placeholder=\"请输入客户备注\"\n      /></t-form-item>\n    </AdminFormDialog>\n    <t-drawer\n",
+          "after": "        ><t-input v-model=\"profile.wechat\" :maxlength=\"100\" clearable placeholder=\"请输入微信号\"\n      /></t-form-item>\n      <t-form-item label=\"客户需求\"\n        ><t-textarea v-model=\"profile.requirement\" :maxlength=\"100\" :autosize=\"{}\" placeholder=\"请输入客户需求\"\n      /></t-form-item>\n      <t-form-item label=\"客户备注\"\n        ><t-textarea v-model=\"profile.remark\" :maxlength=\"100\" :autosize=\"{}\" placeholder=\"请输入客户备注\"\n      /></t-form-item>\n    </AdminFormDialog>\n    <t-drawer\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          :status=\"followFeedback.field('content', followForm.content).status\"\n          :tips=\"followFeedback.field('content', followForm.content).tips\"\n          :maxlength=\"100\"\n          placeholder=\"请输入跟进内容\"\n        />\n      </t-form-item>\n",
+          "after": "          :status=\"followFeedback.field('content', followForm.content).status\"\n          :tips=\"followFeedback.field('content', followForm.content).tips\"\n          :maxlength=\"100\"\n          :autosize=\"{}\"\n          placeholder=\"请输入跟进内容\"\n        />\n      </t-form-item>\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"下次跟进事项\"\n        ><t-textarea v-model=\"followForm.nextFollowTask\" :maxlength=\"100\" placeholder=\"请输入下次跟进事项\"\n      /></t-form-item>\n      <t-form-item label=\"附件\">\n        <CustomerFollowupAttachments v-if=\"followVisible\" v-model=\"uploads\" :upload=\"upload\" @preview=\"previewUpload\" />\n",
+          "after": "          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"下次跟进事项\"\n        ><t-textarea\n          v-model=\"followForm.nextFollowTask\"\n          :maxlength=\"100\"\n          :autosize=\"{}\"\n          placeholder=\"请输入下次跟进事项\"\n      /></t-form-item>\n      <t-form-item label=\"附件\">\n        <CustomerFollowupAttachments v-if=\"followVisible\" v-model=\"uploads\" :upload=\"upload\" @preview=\"previewUpload\" />\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求客户详情跟进记录的下次时间和事项同一行展示；使用官方Typography内联内容，长内容自然换行，保留数据、分钟格式和操作。",
+          "stage": "before-migrations",
+          "before": "                      >{{ attachment.name }}</t-link\n                    >\n                  </t-space>\n                  <t-space v-if=\"record.nextFollowAt || record.nextFollowTask\" direction=\"vertical\" size=\"small\">\n                    <t-typography-text\n                      v-if=\"record.nextFollowAt\"\n                      :content=\"'下次跟进：' + time(record.nextFollowAt).slice(0, 16)\"\n                    />\n                    <t-typography-text v-if=\"record.nextFollowTask\" :content=\"record.nextFollowTask\" />\n                  </t-space>\n                </t-space>\n              </t-timeline-item>\n            </t-timeline>\n",
+          "after": "                      >{{ attachment.name }}</t-link\n                    >\n                  </t-space>\n                  <t-typography-text v-if=\"record.nextFollowAt || record.nextFollowTask\">\n                    <span v-if=\"record.nextFollowAt\">{{ '下次跟进：' + time(record.nextFollowAt).slice(0, 16) }}</span>\n                    <template v-if=\"record.nextFollowAt && record.nextFollowTask\">{{ '\\u3000' }}</template>\n                    <span v-if=\"record.nextFollowTask\">{{ record.nextFollowTask }}</span>\n                  </t-typography-text>\n                </t-space>\n              </t-timeline-item>\n            </t-timeline>\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求收紧跟进内容与下次跟进时间间距；复用官方FormItem帮助行和现有公共提示布局，取消Textarea重复空白提示行，保留校验与保存交互。",
+          "stage": "before-migrations",
+          "before": "          value-type=\"YYYY-MM-DD HH:mm\"\n          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"跟进内容\" required-mark>\n        <t-textarea\n          v-model=\"followForm.content\"\n          :status=\"followFeedback.field('content', followForm.content).status\"\n          :tips=\"followFeedback.field('content', followForm.content).tips || '\\u00a0'\"\n          :maxlength=\"100\"\n          placeholder=\"请输入跟进内容\"\n        />\n",
+          "after": "          value-type=\"YYYY-MM-DD HH:mm\"\n          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"跟进内容\" required-mark :help=\"'\\u00a0'\">\n        <t-textarea\n          v-model=\"followForm.content\"\n          :status=\"followFeedback.field('content', followForm.content).status\"\n          :tips=\"followFeedback.field('content', followForm.content).tips\"\n          :maxlength=\"100\"\n          placeholder=\"请输入跟进内容\"\n        />\n"
+        },
+        {
+          "stage": "before-migrations",
+          "before": ":tips=\"followFeedback.field('content', followForm.content).tips\"",
+          "after": ":tips=\"followFeedback.field('content', followForm.content).tips || '\\u00a0'\"",
+          "reason": "2026-10-19 user reported row height changing on native Textarea errors. Keep the native tips row present using nonbreaking-space tips when no error; no CSS, validation, maxlength, timing or save changes."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "      <t-form-item label=\"跟进内容\" required-mark v-bind=\"followFeedback.field('content', followForm.content)\"\n        ><t-textarea v-model=\"followForm.content\" :maxlength=\"100\" placeholder=\"请输入跟进内容\"\n      /></t-form-item>",
+          "after": "      <t-form-item label=\"跟进内容\" required-mark>\n        <t-textarea\n          v-model=\"followForm.content\"\n          :status=\"followFeedback.field('content', followForm.content).status\"\n          :tips=\"followFeedback.field('content', followForm.content).tips\"\n          :maxlength=\"100\"\n          placeholder=\"请输入跟进内容\"\n        />\n      </t-form-item>",
+          "reason": "2026-10-19 user approved using native Textarea status/tips for followup content errors beside the character counter, removing only outer FormItem manual feedback binding. No CSS, validation, trigger, maxlength or save logic changes."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "import AdminSideMenu from '@/components/AdminSideMenu.vue';",
+          "after": "import AdminSideMenu from '@/components/AdminSideMenu.vue';\nimport AdminDialog from '@/components/foundation/AdminDialog.vue';",
+          "reason": "Import native foundation dialog used by the user-approved switch to store product image preview."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "    <Teleport to=\"body\">\n      <div v-if=\"imageVisible\" class=\"t-image-viewer-preview-image\">\n        <div\n          class=\"t-image-viewer__modal-mask customer-image-preview-mask\"\n          aria-hidden=\"true\"\n          @click=\"imageVisible = false\"\n        />\n      </div>\n    </Teleport>\n    <t-image-viewer v-model:visible=\"imageVisible\" :images=\"previewImages\" mode=\"modeless\" :z-index=\"3001\" />",
+          "after": "    <AdminDialog\n      v-model:visible=\"imageVisible\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      header=\"图片预览\"\n      width=\"min(960px, 94vw)\"\n      mode=\"modal\"\n      show-overlay\n      close-on-overlay-click\n      :footer=\"false\"\n      @close=\"imageVisible = false\"\n    >\n      <img v-if=\"imageVisible\" :src=\"previewImages[0]\" alt=\"附件图片\" style=\"max-width: 100%\" />\n    </AdminDialog>",
+          "reason": "2026-10-19 user requested customer image preview to use the same native modal Dialog plus image as store finished stock, after discussion of removing ImageViewer tools. Remove supplemental mask and use public overlay and overlay-dismiss props; preserve authorized media fetches, permissions and non-image downloads."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "<t-image-viewer v-model:visible=\"imageVisible\" :images=\"previewImages\" mode=\"modeless\" />",
+          "after": "<Teleport to=\"body\">\n      <div v-if=\"imageVisible\" class=\"t-image-viewer-preview-image\">\n        <div\n          class=\"t-image-viewer__modal-mask customer-image-preview-mask\"\n          aria-hidden=\"true\"\n          @click=\"imageVisible = false\"\n        />\n      </div>\n    </Teleport>\n    <t-image-viewer v-model:visible=\"imageVisible\" :images=\"previewImages\" mode=\"modeless\" :z-index=\"3001\" />",
+          "reason": "2026-10-19 user explicitly approved supplementing the existing native modeless viewer with an overlay reusing official TDesign mask CSS and click-to-close. Only layer order 3000/3001 is added; all media tools, handlers, authorization and attachment state remain unchanged."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "<t-image-viewer v-model:visible=\"imageVisible\" :images=\"previewImages\" />",
+          "after": "<t-image-viewer v-model:visible=\"imageVisible\" :images=\"previewImages\" mode=\"modeless\" />",
+          "reason": "2026-10-19 user approved switching customer image preview to native TDesign modeless window mode; keep native styles, image sources, preview controls, authorized media endpoints and permission checks unchanged."
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved native replace icon and hover-only delete/replace action group per file; preserve keyboard/touch access, position and attachment handlers. Opacity behavior only, no skin changes.",
+          "before": "   Touch devices keep the actions available; keyboard focus reveals the row. */\n@media (hover: hover) and (pointer: fine) {\n  .customer-followup-record:not(:hover, :focus-within) .customer-followup-actions,\n  .customer-followup-file-row:not(:hover, :focus-within) .customer-followup-file-replace {\n    opacity: 0;\n  }\n}\n",
+          "after": "   Touch devices keep the actions available; keyboard focus reveals the row. */\n@media (hover: hover) and (pointer: fine) {\n  .customer-followup-record:not(:hover, :focus-within) .customer-followup-actions,\n  .customer-followup-file-row:not(:hover, :focus-within) .customer-followup-file-actions {\n    opacity: 0;\n  }\n}\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user selected Scheme Two native file Upload list and explicitly approved hover-only replace link. Reuse existing upload/preview/cancel cleanup callbacks, media slots, permissions and 3 files / 5MiB limits. Replace only attachment presentation; no backend or scope change.",
+          "before": "      <t-form-item label=\"下次跟进事项\"\n        ><t-textarea v-model=\"followForm.nextFollowTask\" :maxlength=\"100\" placeholder=\"请输入下次跟进事项\"\n      /></t-form-item>\n      <t-form-item label=\"附件\" help=\"最多3个附件，单个不超过5MiB\">\n        <t-row :gutter=\"[16, 16]\">\n          <t-col v-for=\"(_, index) in 3\" :key=\"index\" :span=\"12\">\n            <AdminOfficialMediaUpload\n              :model-value=\"uploads[index]\"\n              :title=\"`附件${index + 1}`\"\n              :show-title=\"false\"\n              :accept=\"''\"\n              :media-type=\"uploadKinds[index] === 'image' ? 'image' : 'file'\"\n              :upload=\"(file) => upload(file, index)\"\n              @update:model-value=\"(value) => (uploads[index] = value)\"\n              @preview=\"(value) => previewUpload(value, index)\"\n            />\n          </t-col>\n        </t-row>\n      </t-form-item>\n    </AdminFormDialog>\n    <AdminFormDialog\n",
+          "after": "      <t-form-item label=\"下次跟进事项\"\n        ><t-textarea v-model=\"followForm.nextFollowTask\" :maxlength=\"100\" placeholder=\"请输入下次跟进事项\"\n      /></t-form-item>\n      <t-form-item label=\"附件\">\n        <CustomerFollowupAttachments v-if=\"followVisible\" v-model=\"uploads\" :upload=\"upload\" @preview=\"previewUpload\" />\n      </t-form-item>\n    </AdminFormDialog>\n    <AdminFormDialog\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user selected Scheme Two native file Upload list and explicitly approved hover-only replace link. Reuse existing upload/preview/cancel cleanup callbacks, media slots, permissions and 3 files / 5MiB limits. Replace only attachment presentation; no backend or scope change.",
+          "before": "import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';\nimport type { PageInfo, TableProps } from 'tdesign-vue-next';\nimport AdminTopNav from '@/components/AdminTopNav.vue';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\nimport {\n  AdminListPage,\n",
+          "after": "import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';\nimport type { PageInfo, TableProps } from 'tdesign-vue-next';\nimport AdminTopNav from '@/components/AdminTopNav.vue';\nimport CustomerFollowupAttachments from '@/components/customer/CustomerFollowupAttachments.vue';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\nimport {\n  AdminListPage,\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user selected Scheme Two native file Upload list and explicitly approved hover-only replace link. Reuse existing upload/preview/cancel cleanup callbacks, media slots, permissions and 3 files / 5MiB limits. Replace only attachment presentation; no backend or scope change.",
+          "before": "  AdminPhoneInput,\n  AdminDetailPage,\n  AdminConfirmDialog,\n  AdminOfficialMediaUpload,\n} from '@/components/foundation';\nimport type { ListAction, ListFilter } from '@/components/foundation';\nimport type { AdminMediaValue } from '@/components/foundation/AdminMediaUpload.vue';\n",
+          "after": "  AdminPhoneInput,\n  AdminDetailPage,\n  AdminConfirmDialog,\n} from '@/components/foundation';\nimport type { ListAction, ListFilter } from '@/components/foundation';\nimport type { AdminMediaValue } from '@/components/foundation/AdminMediaUpload.vue';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user selected Scheme Two native file Upload list and explicitly approved hover-only replace link. Reuse existing upload/preview/cancel cleanup callbacks, media slots, permissions and 3 files / 5MiB limits. Replace only attachment presentation; no backend or scope change.",
+          "before": "/* Behavior only: preserve the native links and their occupied space.\n   Touch devices keep the actions available; keyboard focus reveals the row. */\n@media (hover: hover) and (pointer: fine) {\n  .customer-followup-record:not(:hover, :focus-within) .customer-followup-actions {\n    opacity: 0;\n  }\n}\n",
+          "after": "/* Behavior only: preserve the native links and their occupied space.\n   Touch devices keep the actions available; keyboard focus reveals the row. */\n@media (hover: hover) and (pointer: fine) {\n  .customer-followup-record:not(:hover, :focus-within) .customer-followup-actions,\n  .customer-followup-file-row:not(:hover, :focus-within) .customer-followup-file-replace {\n    opacity: 0;\n  }\n}\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly capped followup content and next followup task at 100 characters for create/edit; only native Textarea maxlength changes, retaining all other behavior.",
+          "before": "          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"跟进内容\" required-mark v-bind=\"followFeedback.field('content', followForm.content)\"\n        ><t-textarea v-model=\"followForm.content\" :maxlength=\"10000\" placeholder=\"请输入跟进内容\"\n      /></t-form-item>\n      <t-form-item label=\"下次跟进时间\"\n        ><t-date-picker\n",
+          "after": "          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"跟进内容\" required-mark v-bind=\"followFeedback.field('content', followForm.content)\"\n        ><t-textarea v-model=\"followForm.content\" :maxlength=\"100\" placeholder=\"请输入跟进内容\"\n      /></t-form-item>\n      <t-form-item label=\"下次跟进时间\"\n        ><t-date-picker\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly capped followup content and next followup task at 100 characters for create/edit; only native Textarea maxlength changes, retaining all other behavior.",
+          "before": "          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"下次跟进事项\"\n        ><t-textarea v-model=\"followForm.nextFollowTask\" :maxlength=\"2000\" placeholder=\"请输入下次跟进事项\"\n      /></t-form-item>\n      <t-form-item label=\"附件\" help=\"最多3个附件，单个不超过5MiB\">\n        <t-row :gutter=\"[16, 16]\">\n",
+          "after": "          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"下次跟进事项\"\n        ><t-textarea v-model=\"followForm.nextFollowTask\" :maxlength=\"100\" placeholder=\"请输入下次跟进事项\"\n      /></t-form-item>\n      <t-form-item label=\"附件\" help=\"最多3个附件，单个不超过5MiB\">\n        <t-row :gutter=\"[16, 16]\">\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved followup time display/create/edit at minute precision using native DatePicker HH:mm controls; seconds zeroed on API transport. Preserve underlying historical timestamp sorting, scope, permissions and existing interactions.",
+          "before": "              <t-timeline-item v-for=\"record in sortedFollowups\" :key=\"record.id\" class=\"customer-followup-record\">\n                <template v-if=\"!compactDetail\" #label>\n                  <div><t-typography-text :content=\"time(record.followedAt).slice(0, 10)\" /></div>\n                  <div><t-typography-text :content=\"time(record.followedAt).slice(11)\" /></div>\n                </template>\n                <t-space direction=\"vertical\" size=\"small\" :style=\"{ width: '100%' }\">\n                  <t-typography-text v-if=\"compactDetail\" :content=\"time(record.followedAt)\" />\n                  <t-row justify=\"space-between\" align=\"center\">\n                    <t-space align=\"center\">\n                      <t-avatar size=\"small\">{{ (record.createdByName || '-').slice(0, 1) }}</t-avatar>\n",
+          "after": "              <t-timeline-item v-for=\"record in sortedFollowups\" :key=\"record.id\" class=\"customer-followup-record\">\n                <template v-if=\"!compactDetail\" #label>\n                  <div><t-typography-text :content=\"time(record.followedAt).slice(0, 10)\" /></div>\n                  <div><t-typography-text :content=\"time(record.followedAt).slice(11, 16)\" /></div>\n                </template>\n                <t-space direction=\"vertical\" size=\"small\" :style=\"{ width: '100%' }\">\n                  <t-typography-text v-if=\"compactDetail\" :content=\"time(record.followedAt).slice(0, 16)\" />\n                  <t-row justify=\"space-between\" align=\"center\">\n                    <t-space align=\"center\">\n                      <t-avatar size=\"small\">{{ (record.createdByName || '-').slice(0, 1) }}</t-avatar>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved followup time display/create/edit at minute precision using native DatePicker HH:mm controls; seconds zeroed on API transport. Preserve underlying historical timestamp sorting, scope, permissions and existing interactions.",
+          "before": "          v-model=\"followForm.followedAt\"\n          placeholder=\"请选择日期时间\"\n          enable-time-picker\n          format=\"YYYY-MM-DD HH:mm:ss\"\n      /></t-form-item>\n      <t-form-item label=\"跟进内容\" required-mark v-bind=\"followFeedback.field('content', followForm.content)\"\n        ><t-textarea v-model=\"followForm.content\" :maxlength=\"10000\" placeholder=\"请输入跟进内容\"\n",
+          "after": "          v-model=\"followForm.followedAt\"\n          placeholder=\"请选择日期时间\"\n          enable-time-picker\n          format=\"YYYY-MM-DD HH:mm\"\n          value-type=\"YYYY-MM-DD HH:mm\"\n          :time-picker-props=\"{ format: 'HH:mm' }\"\n      /></t-form-item>\n      <t-form-item label=\"跟进内容\" required-mark v-bind=\"followFeedback.field('content', followForm.content)\"\n        ><t-textarea v-model=\"followForm.content\" :maxlength=\"10000\" placeholder=\"请输入跟进内容\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved followup time display/create/edit at minute precision using native DatePicker HH:mm controls; seconds zeroed on API transport. Preserve underlying historical timestamp sorting, scope, permissions and existing interactions.",
+          "before": "  uploadCustomerId = customer.id;\n  followId.value = record?.id;\n  followForm.value = {\n    followedAt: record ? time(record.followedAt) : localNow(),\n    content: record?.content ?? '',\n    nextFollowAt: record?.nextFollowAt ? time(record.nextFollowAt).slice(0, 16) : '',\n    nextFollowTask: record?.nextFollowTask ?? '',\n",
+          "after": "  uploadCustomerId = customer.id;\n  followId.value = record?.id;\n  followForm.value = {\n    followedAt: (record ? time(record.followedAt) : localNow()).slice(0, 16),\n    content: record?.content ?? '',\n    nextFollowAt: record?.nextFollowAt ? time(record.nextFollowAt).slice(0, 16) : '',\n    nextFollowTask: record?.nextFollowTask ?? '',\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved followup time display/create/edit at minute precision using native DatePicker HH:mm controls; seconds zeroed on API transport. Preserve underlying historical timestamp sorting, scope, permissions and existing interactions.",
+          "before": "      followCustomer.value.id,\n      {\n        ...followForm.value,\n        followedAt: followForm.value.followedAt.replace(' ', 'T'),\n        nextFollowAt: followForm.value.nextFollowAt\n          ? followForm.value.nextFollowAt.slice(0, 16).replace(' ', 'T') + ':00'\n          : null,\n",
+          "after": "      followCustomer.value.id,\n      {\n        ...followForm.value,\n        followedAt: followForm.value.followedAt.slice(0, 16).replace(' ', 'T') + ':00',\n        nextFollowAt: followForm.value.nextFollowAt\n          ? followForm.value.nextFollowAt.slice(0, 16).replace(' ', 'T') + ':00'\n          : null,\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "          @select-change=\"selectRows\"\n        >\n          <template #name=\"{ row }\"\n            ><t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">{{\n              row.name\n            }}</t-link\n            ><span v-else>{{ row.name }}</span></template\n",
+          "after": "          @select-change=\"selectRows\"\n        >\n          <template #name=\"{ row }\"\n            ><t-link v-if=\"can('detail')\" hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">{{\n              row.name\n            }}</t-link\n            ><span v-else>{{ row.name }}</span></template\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "          <template #createdAt=\"{ row }\">{{ time(row.createdAt).slice(0, 16) }}</template>\n          <template #operation=\"{ row }\">\n            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n              <t-link\n                v-if=\"can('followup') && isInDataScope(row)\"\n                :theme=\"buttonTheme('create')\"\n                @click=\"openFollowup(undefined, row)\"\n                >跟进</t-link\n              >\n              <t-link v-if=\"can('edit') && isInDataScope(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n              <t-link\n                v-if=\"status === 'daily' && can('archive') && isInDataScope(row)\"\n                :theme=\"buttonTheme('archive')\"\n                @click=\"prepareAction('archive', [row.id], false)\"\n                >归档</t-link\n              >\n              <t-link\n                v-if=\"status === 'archived' && can('restore') && isInDataScope(row)\"\n                :theme=\"buttonTheme('unarchive')\"\n                @click=\"prepareAction('restore', [row.id], false)\"\n                >取消归档</t-link\n              >\n              <t-link\n                v-if=\"status === 'archived' && can('purge') && isInDataScope(row)\"\n                :theme=\"buttonTheme('purge')\"\n                @click=\"prepareAction('purge', [row.id], false)\"\n                >彻底删除</t-link\n",
+          "after": "          <template #createdAt=\"{ row }\">{{ time(row.createdAt).slice(0, 16) }}</template>\n          <template #operation=\"{ row }\">\n            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\"\n                >详情</t-link\n              >\n              <t-link\n                v-if=\"can('followup') && isInDataScope(row)\"\n                hover=\"color\"\n                :theme=\"buttonTheme('create')\"\n                @click=\"openFollowup(undefined, row)\"\n                >跟进</t-link\n              >\n              <t-link\n                v-if=\"can('edit') && isInDataScope(row)\"\n                hover=\"color\"\n                :theme=\"buttonTheme('edit')\"\n                @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n              <t-link\n                v-if=\"status === 'daily' && can('archive') && isInDataScope(row)\"\n                hover=\"color\"\n                :theme=\"buttonTheme('archive')\"\n                @click=\"prepareAction('archive', [row.id], false)\"\n                >归档</t-link\n              >\n              <t-link\n                v-if=\"status === 'archived' && can('restore') && isInDataScope(row)\"\n                hover=\"color\"\n                :theme=\"buttonTheme('unarchive')\"\n                @click=\"prepareAction('restore', [row.id], false)\"\n                >取消归档</t-link\n              >\n              <t-link\n                v-if=\"status === 'archived' && can('purge') && isInDataScope(row)\"\n                hover=\"color\"\n                :theme=\"buttonTheme('purge')\"\n                @click=\"prepareAction('purge', [row.id], false)\"\n                >彻底删除</t-link\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                    </t-space>\n                    <t-space v-if=\"isInDataScope(detail.customer)\" class=\"customer-followup-actions\">\n                      <t-link\n                        :theme=\"buttonTheme('edit')\"\n                        tabindex=\"0\"\n                        @keydown.enter.prevent=\"openFollowup(record)\"\n",
+          "after": "                    </t-space>\n                    <t-space v-if=\"isInDataScope(detail.customer)\" class=\"customer-followup-actions\">\n                      <t-link\n                        hover=\"color\"\n                        :theme=\"buttonTheme('edit')\"\n                        tabindex=\"0\"\n                        @keydown.enter.prevent=\"openFollowup(record)\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                        >编辑</t-link\n                      >\n                      <t-link\n                        :theme=\"buttonTheme('delete')\"\n                        tabindex=\"0\"\n                        @keydown.enter.prevent=\"prepareFollowupDelete(record.id)\"\n",
+          "after": "                        >编辑</t-link\n                      >\n                      <t-link\n                        hover=\"color\"\n                        :theme=\"buttonTheme('delete')\"\n                        tabindex=\"0\"\n                        @keydown.enter.prevent=\"prepareFollowupDelete(record.id)\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                    <t-link\n                      v-for=\"attachment in record.attachments\"\n                      :key=\"attachment.mediaId\"\n                      :theme=\"buttonTheme('preview')\"\n                      @click=\"previewAttachment(record, attachment)\"\n                      >{{ attachment.name }}</t-link\n",
+          "after": "                    <t-link\n                      v-for=\"attachment in record.attachments\"\n                      :key=\"attachment.mediaId\"\n                      hover=\"color\"\n                      :theme=\"buttonTheme('preview')\"\n                      @click=\"previewAttachment(record, attachment)\"\n                      >{{ attachment.name }}</t-link\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "                  <div><t-typography-text theme=\"secondary\" :content=\"time(record.followedAt).slice(0, 10)\" /></div>\n                  <div><t-typography-text theme=\"secondary\" :content=\"time(record.followedAt).slice(11)\" /></div>\n",
+          "after": "                  <div><t-typography-text :content=\"time(record.followedAt).slice(0, 10)\" /></div>\n                  <div><t-typography-text :content=\"time(record.followedAt).slice(11)\" /></div>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "                <t-space direction=\"vertical\" size=\"small\">\n                  <t-typography-text v-if=\"compactDetail\" theme=\"secondary\" :content=\"time(record.followedAt)\" />\n                  <t-space break-line align=\"center\" size=\"small\">\n                    <t-avatar size=\"small\">{{ (record.createdByName || '-').slice(0, 1) }}</t-avatar>\n                    <t-typography-text strong :content=\"record.createdByName || '-'\" />\n                    <t-space v-if=\"isInDataScope(detail.customer)\" class=\"customer-followup-actions\" size=\"small\">\n",
+          "after": "                <t-space direction=\"vertical\" size=\"small\" :style=\"{ width: '100%' }\">\n                  <t-typography-text v-if=\"compactDetail\" :content=\"time(record.followedAt)\" />\n                  <t-row justify=\"space-between\" align=\"center\">\n                    <t-space align=\"center\">\n                      <t-avatar size=\"small\">{{ (record.createdByName || '-').slice(0, 1) }}</t-avatar>\n                      <t-typography-text strong :content=\"record.createdByName || '-'\" />\n                    </t-space>\n                    <t-space v-if=\"isInDataScope(detail.customer)\" class=\"customer-followup-actions\">\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "                  </t-space>\n",
+          "after": "                  </t-row>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "                      theme=\"secondary\"\n                      :content=\"'下次跟进：' + time(record.nextFollowAt)\"\n",
+          "after": "                      :content=\"'下次跟进：' + time(record.nextFollowAt).slice(0, 16)\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "                    <t-typography-text\n                      v-if=\"record.nextFollowTask\"\n                      theme=\"secondary\"\n                      :content=\"record.nextFollowTask\"\n                    />\n",
+          "after": "                    <t-typography-text v-if=\"record.nextFollowTask\" :content=\"record.nextFollowTask\" />\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "          format=\"YYYY-MM-DD HH:mm:ss\"\n",
+          "after": "          format=\"YYYY-MM-DD HH:mm\"\n          value-type=\"YYYY-MM-DD HH:mm\"\n          :time-picker-props=\"{ format: 'HH:mm' }\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "    nextFollowAt: record?.nextFollowAt ? time(record.nextFollowAt) : '',\n",
+          "after": "    nextFollowAt: record?.nextFollowAt ? time(record.nextFollowAt).slice(0, 16) : '',\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved minute precision for next followup display/create/edit, zero-second API transport, original Scheme One top-right edit/delete links with default Space, and native primary text for all followup dates/next details instead of gray. Preserve hover, keyboard, touch, permission and events. Width-only header layout; no skin overrides.",
+          "before": "        nextFollowAt: followForm.value.nextFollowAt ? followForm.value.nextFollowAt.replace(' ', 'T') : null,\n",
+          "after": "        nextFollowAt: followForm.value.nextFollowAt\n          ? followForm.value.nextFollowAt.slice(0, 16).replace(' ', 'T') + ':00'\n          : null,\n"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
@@ -2346,6 +2593,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "before": ".item-container :deep(.t-input),\n.item-container :deep(.t-button),\n.gender-radio :deep(.t-radio-button) {\n  border-radius: var(--td-radius-default);\n}",
+          "after": ".item-container :deep(.t-input),\n.gender-radio :deep(.t-radio-button) {\n  border-radius: var(--td-radius-default);\n}",
+          "reason": "2026-10-19 user approved platform-wide outline button conformance: remove the invitation page button radius override and let native TDesign provide normal/disabled appearance. Keep input/radio styles, button width/theme, disabled/countdown expressions, permissions and all handlers."
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "                >上一步</t-button\n              >\n              <t-button :theme=\"buttonTheme('submit')\" size=\"large\" type=\"submit\" :loading=\"submitting\"\n                >提交注册</t-button\n              >\n            </div>\n          </t-form-item>\n",
@@ -2502,6 +2755,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
@@ -2649,6 +2908,18 @@
       "template": "0226fd57225b2078eec996ce39bc88ffb3d63a4d39fc6975499848203db19073",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "before": "    confirm-function=\"close\"\n    :visible=\"!!preview\"\n    header=\"历史媒体\"\n    width=\"min(960px, 94vw)\"\n    :footer=\"false\"\n    @close=\"preview = null\"\n",
+          "after": "    confirm-function=\"close\"\n    :visible=\"!!preview\"\n    header=\"历史媒体\"\n    mode=\"modal\"\n    show-overlay\n    close-on-overlay-click\n    width=\"min(960px, 94vw)\"\n    :footer=\"false\"\n    @close=\"preview = null\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "        v-if=\"preview.mediaType === 'video'\"\n        :src=\"preview.url\"\n        controls\n        class=\"history-large-media\" /><img v-else :src=\"preview.url\" alt=\"历史图片\" class=\"history-large-media\"\n    /></template>\n  </AdminDialog>\n</template>\n",
+          "after": "        v-if=\"preview.mediaType === 'video'\"\n        :src=\"preview.url\"\n        controls\n        class=\"history-large-media\" /><img v-else :src=\"preview.url\" alt=\"历史图片\" style=\"max-width: 100%\"\n    /></template>\n  </AdminDialog>\n</template>\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -3249,6 +3520,48 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" :maxlength=\"100\" placeholder=\"请输入详细说明\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求删除门店下架选填提示，全平台必填标题前补齐红色星号；补门店单条下架原因和运营供应商原生标记，将既有表格星号前置，所有校验、数据、权限及保存交互不变。",
+          "stage": "before-migrations",
+          "before": "                </div>\n              </section>\n              <t-form class=\"supplier-form\" :data=\"productForm\" label-width=\"100px\" colon>\n                <t-form-item label=\"供应商\">\n                  <t-select\n                    v-bind=\"requiredFieldFeedback(productForm.supplier, '供应商', submitAttempted, true)\"\n                    v-model=\"productForm.supplier\"\n",
+          "after": "                </div>\n              </section>\n              <t-form class=\"supplier-form\" :data=\"productForm\" label-width=\"100px\" colon>\n                <t-form-item label=\"供应商\" required-mark>\n                  <t-select\n                    v-bind=\"requiredFieldFeedback(productForm.supplier, '供应商', submitAttempted, true)\"\n                    v-model=\"productForm.supplier\"\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求删除门店下架选填提示，全平台必填标题前补齐红色星号；补门店单条下架原因和运营供应商原生标记，将既有表格星号前置，所有校验、数据、权限及保存交互不变。",
+          "stage": "before-migrations",
+          "before": "const formatReadonlyPrice = (value: unknown) =>\n  value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);\nconst requiredColumnTitle = (label: string) => () =>\n  h('span', [label, h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*')]);\nconst specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },\n",
+          "after": "const formatReadonlyPrice = (value: unknown) =>\n  value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);\nconst requiredColumnTitle = (label: string) => () =>\n  h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);\nconst specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准新增和存量可编辑多行文本框默认统一100字符并显示官方统计；只调整输入上限，保留脚本、校验事件、权限和保存逻辑。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" placeholder=\"请输入详细说明\" :autosize=\"{ minRows: 4, maxRows: 6 }\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "before": "        @preview=\"openProductMediaPreview\"\n      />\n    </t-drawer>\n    <t-dialog\n      v-model:visible=\"imagePreviewVisible\"\n      :header=\"imagePreviewTitle\"\n      width=\"960px\"\n      placement=\"center\"\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n      @close=\"closeImagePreview\"\n",
+          "after": "        @preview=\"openProductMediaPreview\"\n      />\n    </t-drawer>\n    <AdminDialog\n      v-model:visible=\"imagePreviewVisible\"\n      :header=\"imagePreviewTitle\"\n      :width=\"productPreviewType === 'video' ? '960px' : 'min(960px, 94vw)'\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      mode=\"modal\"\n      show-overlay\n      close-on-overlay-click\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n      @close=\"closeImagePreview\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "          playsinline\n          aria-label=\"商品视频播放器\"\n        />\n        <img v-else-if=\"imagePreviewVisible\" :src=\"imagePreviewSrc\" :alt=\"imagePreviewTitle\" />\n      </div>\n    </t-dialog>\n    <FinishedOperationLogs v-if=\"canViewOperationLogs\" v-model:visible=\"operationLogsVisible\" />\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "after": "          playsinline\n          aria-label=\"商品视频播放器\"\n        />\n        <img v-else-if=\"imagePreviewVisible\" :src=\"imagePreviewSrc\" :alt=\"imagePreviewTitle\" style=\"max-width: 100%\" />\n      </div>\n    </AdminDialog>\n    <FinishedOperationLogs v-if=\"canViewOperationLogs\" v-model:visible=\"operationLogsVisible\" />\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                <t-link\n                  v-for=\"section in formSections\"\n                  :key=\"section.key\"\n                  data-button-control=\"section-navigation\"\n                  :href=\"`#finished-product-${section.key}`\"\n                  :theme=\"activeFormSection === section.key ? 'primary' : 'default'\"\n",
+          "after": "                <t-link\n                  v-for=\"section in formSections\"\n                  :key=\"section.key\"\n                  hover=\"color\"\n                  data-button-control=\"section-navigation\"\n                  :href=\"`#finished-product-${section.key}`\"\n                  :theme=\"activeFormSection === section.key ? 'primary' : 'default'\"\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    try {\n      upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));\n      formPageVisible.value = false;\n      adminFeedback.success(`已保存“${editingProduct.value.name}”`);\n    } catch (error) {\n      adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));\n    } finally {\n",
@@ -3602,6 +3915,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "before": "    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n    header=\"商品媒体\"\n    attach=\"body\"\n    width=\"min(960px, 94vw)\"\n    :footer=\"false\"\n",
+          "after": "    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n    header=\"商品媒体\"\n    mode=\"modal\"\n    show-overlay\n    close-on-overlay-click\n    attach=\"body\"\n    width=\"min(960px, 94vw)\"\n    :footer=\"false\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "  </ProductDetail>\n  <AdminDialog\n    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n",
@@ -3620,6 +3939,12 @@
       "template": "1929b9d23c12c448f2ad0b5ba772fb61bd8ddafc2f37d5bd4ef5dcf788cb0691",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "before": "    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n    header=\"商品媒体\"\n    attach=\"body\"\n    width=\"min(960px, 94vw)\"\n    :footer=\"false\"\n",
+          "after": "    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n    header=\"商品媒体\"\n    mode=\"modal\"\n    show-overlay\n    close-on-overlay-click\n    attach=\"body\"\n    width=\"min(960px, 94vw)\"\n    :footer=\"false\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -3866,6 +4191,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户要求删除门店下架选填提示，全平台必填标题前补齐红色星号；补门店单条下架原因和运营供应商原生标记，将既有表格星号前置，所有校验、数据、权限及保存交互不变。",
+          "stage": "before-migrations",
+          "before": "        minWidth: 176,\n        title: () =>\n          h('span', [\n            '商品售价',\n            h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'),\n          ]),\n      };\n    return column;\n",
+          "after": "        minWidth: 176,\n        title: () =>\n          h('span', [\n            h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'),\n            '商品售价',\n          ]),\n      };\n    return column;\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "          <t-link\n            v-for=\"section in formSections\"\n            :key=\"section.key\"\n            data-button-control=\"section-navigation\"\n            :href=\"`#store-finished-product-${section.key}`\"\n            :theme=\"activeFormSection === section.key ? 'primary' : 'default'\"\n",
+          "after": "          <t-link\n            v-for=\"section in formSections\"\n            :key=\"section.key\"\n            hover=\"color\"\n            data-button-control=\"section-navigation\"\n            :href=\"`#store-finished-product-${section.key}`\"\n            :theme=\"activeFormSection === section.key ? 'primary' : 'default'\"\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "        saleCoefficient: drafts[item.skuId].coefficient === '' ? null : Number(drafts[item.skuId].coefficient),\n      })),\n    });\n    adminFeedback.actionSuccess({ action: '保存', target: '商品' });\n    emit('saved', product);\n  } catch (error) {\n    adminFeedback.error(getSafeErrorMessage(error, '保存商品失败'));\n",
@@ -4049,6 +4386,42 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "              label=\"商品信息调整\" /><t-option value=\"其他\" label=\"其他\" /></t-select\n        ></t-form-item>\n        <t-form-item label=\"详细说明\"\n          ><t-textarea\n            v-model=\"offShelf.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"pendingOffShelf?.batch ? { minRows: 4, maxRows: 6 } : undefined\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "              label=\"商品信息调整\" /><t-option value=\"其他\" label=\"其他\" /></t-select\n        ></t-form-item>\n        <t-form-item label=\"详细说明\"\n          ><t-textarea v-model=\"offShelf.detail\" :maxlength=\"100\" placeholder=\"请输入详细说明\" :autosize=\"{}\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求删除门店下架选填提示，全平台必填标题前补齐红色星号；补门店单条下架原因和运营供应商原生标记，将既有表格星号前置，所有校验、数据、权限及保存交互不变。",
+          "stage": "before-migrations",
+          "before": "      @close=\"offShelfVisible = false\"\n    >\n      <t-form ref=\"offShelfFormRoot\" :data=\"offShelf\" label-width=\"100px\" colon>\n        <t-form-item label=\"下架原因\" :required-mark=\"Boolean(pendingOffShelf?.batch)\"\n          ><t-select\n            v-bind=\"offShelfFeedback.field('reason', offShelf.reason)\"\n            v-model=\"offShelf.reason\"\n",
+          "after": "      @close=\"offShelfVisible = false\"\n    >\n      <t-form ref=\"offShelfFormRoot\" :data=\"offShelf\" label-width=\"100px\" colon>\n        <t-form-item label=\"下架原因\" required-mark\n          ><t-select\n            v-bind=\"offShelfFeedback.field('reason', offShelf.reason)\"\n            v-model=\"offShelf.reason\"\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求删除门店下架选填提示，全平台必填标题前补齐红色星号；补门店单条下架原因和运营供应商原生标记，将既有表格星号前置，所有校验、数据、权限及保存交互不变。",
+          "stage": "before-migrations",
+          "before": "              value=\"商品信息调整\"\n              label=\"商品信息调整\" /><t-option value=\"其他\" label=\"其他\" /></t-select\n        ></t-form-item>\n        <t-form-item :help=\"pendingOffShelf?.batch ? undefined : '选填'\" label=\"详细说明\"\n          ><t-textarea\n            v-model=\"offShelf.detail\"\n            :maxlength=\"100\"\n",
+          "after": "              value=\"商品信息调整\"\n              label=\"商品信息调整\" /><t-option value=\"其他\" label=\"其他\" /></t-select\n        ></t-form-item>\n        <t-form-item label=\"详细说明\"\n          ><t-textarea\n            v-model=\"offShelf.detail\"\n            :maxlength=\"100\"\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准新增和存量可编辑多行文本框默认统一100字符并显示官方统计；只调整输入上限，保留脚本、校验事件、权限和保存逻辑。",
+          "stage": "before-migrations",
+          "before": "        <t-form-item :help=\"pendingOffShelf?.batch ? undefined : '选填'\" label=\"详细说明\"\n          ><t-textarea\n            v-model=\"offShelf.detail\"\n            :maxlength=\"500\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"pendingOffShelf?.batch ? { minRows: 4, maxRows: 6 } : undefined\"\n        /></t-form-item>\n",
+          "after": "        <t-form-item :help=\"pendingOffShelf?.batch ? undefined : '选填'\" label=\"详细说明\"\n          ><t-textarea\n            v-model=\"offShelf.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"pendingOffShelf?.batch ? { minRows: 4, maxRows: 6 } : undefined\"\n        /></t-form-item>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "before": "      confirm-function=\"close\"\n      :visible=\"Boolean(imagePreview)\"\n      header=\"商品主图\"\n      width=\"min(960px, 94vw)\"\n      :footer=\"false\"\n      @close=\"imagePreview = null\"\n",
+          "after": "      confirm-function=\"close\"\n      :visible=\"Boolean(imagePreview)\"\n      header=\"商品主图\"\n      mode=\"modal\"\n      show-overlay\n      close-on-overlay-click\n      width=\"min(960px, 94vw)\"\n      :footer=\"false\"\n      @close=\"imagePreview = null\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "          <template #guidePrice=\"{ row }\">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>\n          <template #partnerPrice=\"{ row }\">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>\n          <template #operation=\"{ row }\"\n            ><t-link :theme=\"buttonTheme('view')\" @click=\"openPoolDetail(row)\">详情</t-link></template\n          >\n          <template #empty>暂无可挑选的已上架商品</template>\n        </t-table>\n",
+          "after": "          <template #guidePrice=\"{ row }\">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>\n          <template #partnerPrice=\"{ row }\">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>\n          <template #operation=\"{ row }\"\n            ><t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"openPoolDetail(row)\">详情</t-link></template\n          >\n          <template #empty>暂无可挑选的已上架商品</template>\n        </t-table>\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -4235,6 +4608,12 @@
       "script": "75d9397a56222144493f74c7f20438b35f39edbce7d3ff0dd146f92645e4a435",
       "template": "ebb4878bc7f0fc8b0b22a500a07cfd0d164e2544418482624da67cf5bf2285d3",
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                <template #createdAt=\"{ row }\">{{ formatStoreRuleDateTime(row.rule?.createdAt) }}</template>\n                <template #operation=\"{ row }\">\n                  <t-space size=\"small\">\n                    <t-link v-if=\"can('edit')\" :theme=\"buttonTheme('edit')\" @click=\"editDiscount(row.rule)\"\n                      >编辑</t-link\n                    >\n                    <t-link\n                      v-if=\"can('toggle-status')\"\n                      :theme=\"buttonTheme(row.rule.status === 'disabled' ? 'enable' : 'disable')\"\n                      @click=\"confirmDiscountAction(row.rule, 'status')\"\n                      >{{ row.rule.status === 'disabled' ? '启用' : '停用' }}</t-link\n                    >\n                    <t-link\n                      v-if=\"can('delete')\"\n                      :theme=\"buttonTheme('delete')\"\n                      @click=\"confirmDiscountAction(row.rule, 'delete')\"\n                      >删除</t-link\n",
+          "after": "                <template #createdAt=\"{ row }\">{{ formatStoreRuleDateTime(row.rule?.createdAt) }}</template>\n                <template #operation=\"{ row }\">\n                  <t-space size=\"small\">\n                    <t-link\n                      v-if=\"can('edit')\"\n                      hover=\"color\"\n                      :theme=\"buttonTheme('edit')\"\n                      @click=\"editDiscount(row.rule)\"\n                      >编辑</t-link\n                    >\n                    <t-link\n                      v-if=\"can('toggle-status')\"\n                      hover=\"color\"\n                      :theme=\"buttonTheme(row.rule.status === 'disabled' ? 'enable' : 'disable')\"\n                      @click=\"confirmDiscountAction(row.rule, 'status')\"\n                      >{{ row.rule.status === 'disabled' ? '启用' : '停用' }}</t-link\n                    >\n                    <t-link\n                      v-if=\"can('delete')\"\n                      hover=\"color\"\n                      :theme=\"buttonTheme('delete')\"\n                      @click=\"confirmDiscountAction(row.rule, 'delete')\"\n                      >删除</t-link\n"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
@@ -5084,6 +5463,42 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" :maxlength=\"100\" placeholder=\"请输入详细说明\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求删除门店下架选填提示，全平台必填标题前补齐红色星号；补门店单条下架原因和运营供应商原生标记，将既有表格星号前置，所有校验、数据、权限及保存交互不变。",
+          "stage": "before-migrations",
+          "before": "  return base;\n});\nconst requiredColumnTitle = (label: string) => () =>\n  h('span', [label, h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*')]);\nconst specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },\n",
+          "after": "  return base;\n});\nconst requiredColumnTitle = (label: string) => () =>\n  h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);\nconst specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准新增和存量可编辑多行文本框默认统一100字符并显示官方统计；只调整输入上限，保留脚本、校验事件、权限和保存逻辑。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" placeholder=\"请输入详细说明\" :autosize=\"{ minRows: 4, maxRows: 6 }\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "before": "        @preview=\"openProductMediaPreview\"\n      />\n    </t-drawer>\n    <t-dialog\n      v-model:visible=\"imagePreviewVisible\"\n      :header=\"imagePreviewTitle\"\n      width=\"960px\"\n      placement=\"center\"\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n      @close=\"closeImagePreview\"\n",
+          "after": "        @preview=\"openProductMediaPreview\"\n      />\n    </t-drawer>\n    <AdminDialog\n      v-model:visible=\"imagePreviewVisible\"\n      :header=\"imagePreviewTitle\"\n      :width=\"productPreviewType === 'video' ? '960px' : 'min(960px, 94vw)'\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      mode=\"modal\"\n      show-overlay\n      close-on-overlay-click\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n      @close=\"closeImagePreview\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "          playsinline\n          aria-label=\"商品视频播放器\"\n        />\n        <img v-else-if=\"imagePreviewVisible\" :src=\"imagePreviewSrc\" :alt=\"imagePreviewTitle\" />\n      </div>\n    </t-dialog>\n    <FinishedOperationLogs v-if=\"canViewOperationLogs\" v-model:visible=\"operationLogsVisible\" />\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "after": "          playsinline\n          aria-label=\"商品视频播放器\"\n        />\n        <img v-else-if=\"imagePreviewVisible\" :src=\"imagePreviewSrc\" :alt=\"imagePreviewTitle\" style=\"max-width: 100%\" />\n      </div>\n    </AdminDialog>\n    <FinishedOperationLogs v-if=\"canViewOperationLogs\" v-model:visible=\"operationLogsVisible\" />\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                <t-link\n                  v-for=\"section in formSections\"\n                  :key=\"section.key\"\n                  data-button-control=\"section-navigation\"\n                  :href=\"`#finished-product-${section.key}`\"\n                  :theme=\"activeFormSection === section.key ? 'primary' : 'default'\"\n",
+          "after": "                <t-link\n                  v-for=\"section in formSections\"\n                  :key=\"section.key\"\n                  hover=\"color\"\n                  data-button-control=\"section-navigation\"\n                  :href=\"`#finished-product-${section.key}`\"\n                  :theme=\"activeFormSection === section.key ? 'primary' : 'default'\"\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    try {\n      upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));\n      formPageVisible.value = false;\n      adminFeedback.success(`已保存“${editingProduct.value.name}”`);\n    } catch (error) {\n      adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));\n    } finally {\n",
@@ -5512,6 +5927,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户要求全平台编辑保存成功Toast统一修改成功；仅将既有保存成功提示接入全局修改动作映射，权限、请求、触发、草稿自动保存、失败反馈和其他操作话术不变。",
+          "stage": "before-migrations",
+          "before": "const handlePermissionSubmit = async () => {\n  if ((await permissionFormRef.value?.validate()) !== true) return rejectFormSubmission(permissionFormRef.value);\n  if (!permissionFormData.roleIds.length) {\n    return;\n  }\n  if (!permissionFormData.dataPermission) {\n    return;\n  }\n  if (activeEmployee.value) {\n    try {\n      const updated = await updateEmployeePermissions(activeEmployee.value.id, {\n        roleIds: permissionFormData.roleIds.join(','),\n        dataPermission: permissionFormData.dataPermission,\n      });\n      const targetIndex = employees.value.findIndex((employee) => employee.id === activeEmployee.value?.id);\n      if (targetIndex !== -1) {\n        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));\n      }\n      adminFeedback.success('权限配置成功');\n    } catch (error) {\n      adminFeedback.error(error instanceof Error ? error.message : '更新失败');\n      return;\n    }\n  }\n\n  closePermissionDialog();\n};",
+          "after": "const handlePermissionSubmit = async () => {\n  if ((await permissionFormRef.value?.validate()) !== true) return rejectFormSubmission(permissionFormRef.value);\n  if (!permissionFormData.roleIds.length) {\n    return;\n  }\n  if (!permissionFormData.dataPermission) {\n    return;\n  }\n  if (activeEmployee.value) {\n    try {\n      const updated = await updateEmployeePermissions(activeEmployee.value.id, {\n        roleIds: permissionFormData.roleIds.join(','),\n        dataPermission: permissionFormData.dataPermission,\n      });\n      const targetIndex = employees.value.findIndex((employee) => employee.id === activeEmployee.value?.id);\n      if (targetIndex !== -1) {\n        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));\n      }\n      adminFeedback.actionSuccess({ action: '修改' });\n    } catch (error) {\n      adminFeedback.error(error instanceof Error ? error.message : '更新失败');\n      return;\n    }\n  }\n\n  closePermissionDialog();\n};"
+        },
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"profileFormData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"profileFormData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "      if (targetIndex !== -1) {\n        employees.value.splice(targetIndex, 1, toEmployeeItem(updated));\n      }\n      adminFeedback.success('资料更新成功');\n    } catch (error) {\n      adminFeedback.error(error instanceof Error ? error.message : '更新失败');\n      return;\n",
@@ -5644,6 +6071,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户要求全平台编辑保存成功Toast统一修改成功；仅将既有保存成功提示接入全局修改动作映射，权限、请求、触发、草稿自动保存、失败反馈和其他操作话术不变。",
+          "stage": "before-migrations",
+          "before": "adminFeedback.success('终端功能分配已保存');",
+          "after": "adminFeedback.actionSuccess({ action: '修改' });"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -6032,6 +6465,12 @@
       "approvedBusinessPatches": [
         {
           "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canCreateChildCategory && row.level < maxCategoryLevel\"\n                    :theme=\"buttonTheme('create')\"\n                    @click=\"openCreateDialog(row)\"\n                    >新增下级</t-link\n                  >\n                  <t-link v-if=\"canEditCategory\" :theme=\"buttonTheme('edit')\" @click=\"openEditDialog(row)\">编辑</t-link>\n                  <t-link\n                    v-if=\"canToggleCategoryStatus\"\n                    :theme=\"buttonTheme(row.status === 'enabled' ? 'disable' : 'enable')\"\n                    @click=\"openStatusConfirm(row.node)\"\n                    >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link\n                  >\n                  <t-link v-if=\"canDeleteCategory\" :theme=\"buttonTheme('delete')\" @click=\"openDeleteDialog(row.node)\"\n                    >删除</t-link\n                  >\n                  <span v-if=\"!hasVisibleRowAction(row)\">-</span>\n",
+          "after": "                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canCreateChildCategory && row.level < maxCategoryLevel\"\n                    hover=\"color\"\n                    :theme=\"buttonTheme('create')\"\n                    @click=\"openCreateDialog(row)\"\n                    >新增下级</t-link\n                  >\n                  <t-link v-if=\"canEditCategory\" hover=\"color\" :theme=\"buttonTheme('edit')\" @click=\"openEditDialog(row)\"\n                    >编辑</t-link\n                  >\n                  <t-link\n                    v-if=\"canToggleCategoryStatus\"\n                    hover=\"color\"\n                    :theme=\"buttonTheme(row.status === 'enabled' ? 'disable' : 'enable')\"\n                    @click=\"openStatusConfirm(row.node)\"\n                    >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link\n                  >\n                  <t-link\n                    v-if=\"canDeleteCategory\"\n                    hover=\"color\"\n                    :theme=\"buttonTheme('delete')\"\n                    @click=\"openDeleteDialog(row.node)\"\n                    >删除</t-link\n                  >\n                  <span v-if=\"!hasVisibleRowAction(row)\">-</span>\n"
+        },
+        {
+          "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "      if (node) {\n        await updateProductCategory(formData.id, toCategoryPayload({ ...node, name, status: formData.status }));\n      }\n      adminFeedback.actionSuccess({ action: '保存', target: name });\n    }\n    await loadCategories();\n    closeFormDialog();\n",
           "after": "      if (node) {\n        await updateProductCategory(formData.id, toCategoryPayload({ ...node, name, status: formData.status }));\n      }\n      adminFeedback.actionSuccess({ action: '修改', target: name });\n    }\n    await loadCategories();\n    closeFormDialog();\n"
@@ -6184,6 +6623,30 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户要求全平台编辑保存成功Toast统一修改成功；仅将既有保存成功提示接入全局修改动作映射，权限、请求、触发、草稿自动保存、失败反馈和其他操作话术不变。",
+          "stage": "before-migrations",
+          "before": "adminFeedback.actionSuccess({ action: '保存', target: '草稿' });",
+          "after": "adminFeedback.actionSuccess({ action: '修改' });"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                                  status=\"error\"\n                                  tips=\"请选择选项值\"\n                                >\n                                  <t-link :theme=\"buttonTheme('options')\" @click=\"openValues(row)\">{{\n                                    row.options.length\n                                  }}</t-link>\n                                </t-form-item>\n                                <t-link\n                                  v-else-if=\"row.valueType === 'select'\"\n                                  :theme=\"buttonTheme('options')\"\n                                  @click=\"openValues(row)\"\n                                  >{{ row.options.length }}</t-link\n",
+          "after": "                                  status=\"error\"\n                                  tips=\"请选择选项值\"\n                                >\n                                  <t-link hover=\"color\" :theme=\"buttonTheme('options')\" @click=\"openValues(row)\">{{\n                                    row.options.length\n                                  }}</t-link>\n                                </t-form-item>\n                                <t-link\n                                  v-else-if=\"row.valueType === 'select'\"\n                                  hover=\"color\"\n                                  :theme=\"buttonTheme('options')\"\n                                  @click=\"openValues(row)\"\n                                  >{{ row.options.length }}</t-link\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                                <span v-else>—</span>\n                              </template>\n                              <template #operation=\"{ row }\"\n                                ><t-link :theme=\"buttonTheme('remove')\" @click=\"removeTarget = row\"\n                                  >移除</t-link\n                                ></template\n                              >\n",
+          "after": "                                <span v-else>—</span>\n                              </template>\n                              <template #operation=\"{ row }\"\n                                ><t-link hover=\"color\" :theme=\"buttonTheme('remove')\" @click=\"removeTarget = row\"\n                                  >移除</t-link\n                                ></template\n                              >\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "        <template #publishedAt=\"{ row }\">{{ formatDateTime(row.publishedAt) }}</template>\n        <template #operation=\"{ row }\">\n          <t-space>\n            <t-link :theme=\"buttonTheme('view')\" @click=\"viewHistoryVersion(row)\">查看</t-link>\n            <t-link v-if=\"can('create')\" :theme=\"buttonTheme('copy-version')\" :disabled=\"busy\" @click=\"prepareCopy(row)\"\n              >复制</t-link\n            >\n          </t-space>\n",
+          "after": "        <template #publishedAt=\"{ row }\">{{ formatDateTime(row.publishedAt) }}</template>\n        <template #operation=\"{ row }\">\n          <t-space>\n            <t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"viewHistoryVersion(row)\">查看</t-link>\n            <t-link\n              v-if=\"can('create')\"\n              hover=\"color\"\n              :theme=\"buttonTheme('copy-version')\"\n              :disabled=\"busy\"\n              @click=\"prepareCopy(row)\"\n              >复制</t-link\n            >\n          </t-space>\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -6530,6 +6993,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户要求全平台编辑保存成功Toast统一修改成功；仅将既有保存成功提示接入全局修改动作映射，权限、请求、触发、草稿自动保存、失败反馈和其他操作话术不变。",
+          "stage": "before-migrations",
+          "before": "const handlePermissionSave = async () => {\n  if (!permissionRole.value) return;\n  if (!permissionModules.value.length) {\n    adminFeedback.warning('全量功能目录暂未发布，无法保存功能权限');\n    return;\n  }\n\n  try {\n    const updated = await updateRole(\n      permissionRole.value.id,\n      toRolePayload({ ...permissionRole.value, functionPermissions: [...permissionDraft.functionPermissions] }),\n    );\n    const targetIndex = roles.value.findIndex((item) => item.id === permissionRole.value?.id);\n    if (targetIndex !== -1) {\n      roles.value.splice(targetIndex, 1, toRoleItem(updated));\n    }\n    closePermissionDialog();\n    adminFeedback.success('角色功能权限已保存');\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '保存失败');\n  }\n};",
+          "after": "const handlePermissionSave = async () => {\n  if (!permissionRole.value) return;\n  if (!permissionModules.value.length) {\n    adminFeedback.warning('全量功能目录暂未发布，无法保存功能权限');\n    return;\n  }\n\n  try {\n    const updated = await updateRole(\n      permissionRole.value.id,\n      toRolePayload({ ...permissionRole.value, functionPermissions: [...permissionDraft.functionPermissions] }),\n    );\n    const targetIndex = roles.value.findIndex((item) => item.id === permissionRole.value?.id);\n    if (targetIndex !== -1) {\n      roles.value.splice(targetIndex, 1, toRoleItem(updated));\n    }\n    closePermissionDialog();\n    adminFeedback.actionSuccess({ action: '修改' });\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '保存失败');\n  }\n};"
+        },
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入角色名称\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入角色名称\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(roleName);\n    } else {\n      adminFeedback.success('已保存角色');\n    }\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
@@ -6715,6 +7190,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          <t-input v-model=\"categoryForm.name\" clearable placeholder=\"请输入分类名称\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"categoryForm.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "          <t-input v-model=\"categoryForm.name\" clearable placeholder=\"请输入分类名称\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"categoryForm.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    const target = payload.name;\n    await loadColors();\n    closeColorForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
@@ -6873,6 +7360,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入等级名称\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入等级名称\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    const target = `${payload.code} ${payload.name}`;\n    await loadGrades();\n    closeForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
@@ -6966,6 +7459,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "            <t-link\n              v-for=\"section in sections\"\n              :key=\"section.key\"\n              data-button-control=\"section-navigation\"\n              :href=\"`#slab-product-${section.key}`\"\n              :theme=\"activeSection === section.key ? 'primary' : 'default'\"\n",
+          "after": "            <t-link\n              v-for=\"section in sections\"\n              :key=\"section.key\"\n              hover=\"color\"\n              data-button-control=\"section-navigation\"\n              :href=\"`#slab-product-${section.key}`\"\n              :theme=\"activeSection === section.key ? 'primary' : 'default'\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "    <header v-if=\"!hideBreadcrumb\" class=\"page-header\">\n      <t-breadcrumb aria-label=\"页面导航\">\n        <t-breadcrumb-item\n          ><t-link :theme=\"buttonTheme('back')\" :disabled=\"loading\" @click=\"emit('close')\"\n            >大板管理</t-link\n          ></t-breadcrumb-item\n        >\n",
+          "after": "    <header v-if=\"!hideBreadcrumb\" class=\"page-header\">\n      <t-breadcrumb aria-label=\"页面导航\">\n        <t-breadcrumb-item\n          ><t-link hover=\"color\" :theme=\"buttonTheme('back')\" :disabled=\"loading\" @click=\"emit('close')\"\n            >大板管理</t-link\n          ></t-breadcrumb-item\n        >\n"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "        <t-button :theme=\"buttonTheme('submit')\" :loading=\"loading\" @click=\"emit('confirm')\">\n          <template #icon><t-icon name=\"check\" /></template>\n          提交商品信息\n        </t-button>\n        <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"loading\" @click=\"emit('close')\"\n",
@@ -7053,6 +7558,30 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" :maxlength=\"100\" placeholder=\"请输入详细说明\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准新增和存量可编辑多行文本框默认统一100字符并显示官方统计；只调整输入上限，保留脚本、校验事件、权限和保存逻辑。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" placeholder=\"请输入详细说明\" :autosize=\"{ minRows: 4, maxRows: 6 }\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "before": "      </div>\n    </t-drawer>\n\n    <t-dialog\n      v-model:visible=\"uploadPreviewDialogVisible\"\n      :header=\"uploadPreviewTitle\"\n      width=\"760px\"\n      placement=\"center\"\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n    >\n      <video\n        v-if=\"uploadPreviewType === 'video' && uploadPreviewUrl\"\n",
+          "after": "      </div>\n    </t-drawer>\n\n    <AdminDialog\n      v-model:visible=\"uploadPreviewDialogVisible\"\n      :header=\"uploadPreviewTitle\"\n      :width=\"uploadPreviewType === 'video' ? '760px' : 'min(960px, 94vw)'\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      mode=\"modal\"\n      show-overlay\n      close-on-overlay-click\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n      @close=\"uploadPreviewDialogVisible = false\"\n    >\n      <video\n        v-if=\"uploadPreviewType === 'video' && uploadPreviewUrl\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "      <img\n        v-else-if=\"uploadPreviewUrl\"\n        class=\"upload-large-preview\"\n        :src=\"uploadPreviewUrl\"\n        :alt=\"uploadPreviewTitle\"\n      />\n    </t-dialog>\n\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "after": "      <img\n        v-else-if=\"uploadPreviewUrl\"\n        class=\"upload-large-preview\"\n        style=\"max-width: 100%\"\n        :src=\"uploadPreviewUrl\"\n        :alt=\"uploadPreviewTitle\"\n      />\n    </AdminDialog>\n\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
@@ -7566,6 +8095,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入产地\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入产地\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    await loadOrigins();\n    closeFormDialog();\n    if (dialogMode.value === 'create') adminFeedback.created(target);\n    else adminFeedback.actionSuccess({ action: '保存', target });\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n  }\n",
@@ -7766,6 +8301,36 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" :maxlength=\"100\" placeholder=\"请输入详细说明\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "reason": "2026-10-19 用户要求删除门店下架选填提示，全平台必填标题前补齐红色星号；补门店单条下架原因和运营供应商原生标记，将既有表格星号前置，所有校验、数据、权限及保存交互不变。",
+          "stage": "before-migrations",
+          "before": "          </t-button>\n        </div>\n        <div class=\"source-cost-editor\">\n          <span>成本价<span class=\"price-required-star\">*</span></span>\n          <SpecPriceInput\n            v-if=\"batchPriceRows[0]\"\n            v-model=\"batchPriceRows[0].price\"\n",
+          "after": "          </t-button>\n        </div>\n        <div class=\"source-cost-editor\">\n          <span><span class=\"price-required-star\">*</span>成本价</span>\n          <SpecPriceInput\n            v-if=\"batchPriceRows[0]\"\n            v-model=\"batchPriceRows[0].price\"\n"
+        },
+        {
+          "reason": "2026-10-19 用户批准新增和存量可编辑多行文本框默认统一100字符并显示官方统计；只调整输入上限，保留脚本、校验事件、权限和保存逻辑。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea v-model=\"reasonForm.detail\" placeholder=\"请输入详细说明\" :autosize=\"{ minRows: 4, maxRows: 6 }\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "before": "      </div>\n    </t-drawer>\n\n    <t-dialog\n      v-model:visible=\"uploadPreviewDialogVisible\"\n      :header=\"uploadPreviewTitle\"\n      width=\"760px\"\n      placement=\"center\"\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n    >\n      <video\n        v-if=\"uploadPreviewType === 'video' && uploadPreviewUrl\"\n",
+          "after": "      </div>\n    </t-drawer>\n\n    <AdminDialog\n      v-model:visible=\"uploadPreviewDialogVisible\"\n      :header=\"uploadPreviewTitle\"\n      :width=\"uploadPreviewType === 'video' ? '760px' : 'min(960px, 94vw)'\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      mode=\"modal\"\n      show-overlay\n      close-on-overlay-click\n      :prevent-scroll-through=\"false\"\n      :footer=\"false\"\n      @close=\"uploadPreviewDialogVisible = false\"\n    >\n      <video\n        v-if=\"uploadPreviewType === 'video' && uploadPreviewUrl\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
+        {
+          "stage": "before-migrations",
+          "before": "      <img\n        v-else-if=\"uploadPreviewUrl\"\n        class=\"upload-large-preview\"\n        :src=\"uploadPreviewUrl\"\n        :alt=\"uploadPreviewTitle\"\n      />\n    </t-dialog>\n\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "after": "      <img\n        v-else-if=\"uploadPreviewUrl\"\n        class=\"upload-large-preview\"\n        style=\"max-width: 100%\"\n        :src=\"uploadPreviewUrl\"\n        :alt=\"uploadPreviewTitle\"\n      />\n    </AdminDialog>\n\n    <AdminConfirmDialog\n      v-model:visible=\"confirmDialogVisible\"\n",
+          "reason": "2026-10-19 user authorized platform-wide ordinary image preview alignment to the global native Dialog plus image standard: public modal/overlay/dismiss properties and responsive width, remove image-only skin; preserve labels, empty states, media sources, permissions, handlers and video appearance/controls."
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
@@ -8211,6 +8776,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          ><t-input v-model=\"formData.name\" clearable placeholder=\"请输入标准纹理\"\n        /></t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\"\n          ><t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "          ><t-input v-model=\"formData.name\" clearable placeholder=\"请输入标准纹理\"\n        /></t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\"\n          ><t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    const payload = { name: formData.name.trim(), remark: formData.remark.trim(), status: 'enabled' as const };\n    if (editingId.value) {\n      await updateSlabTexture(editingId.value, payload);\n      adminFeedback.actionSuccess({ action: '保存', target: payload.name });\n    } else {\n      await createSlabTexture(payload);\n      adminFeedback.created(payload.name);\n",
@@ -8362,6 +8933,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入品种\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入品种\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
@@ -8521,6 +9098,12 @@
       "approvedBusinessPatches": [
         {
           "stage": "before-migrations",
+          "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
+          "before": "                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canCreateChildCategory && row.level < 3\"\n                    :theme=\"buttonTheme('create')\"\n                    @click=\"openCreateDialog(row.node)\"\n                    >新增下级</t-link\n                  >\n                  <t-link v-if=\"canEditCategory\" :theme=\"buttonTheme('edit')\" @click=\"openEditDialog(row.node)\"\n                    >编辑</t-link\n                  >\n                  <t-link\n                    v-if=\"canToggleCategoryStatus\"\n                    :theme=\"buttonTheme(row.node.status === 'enabled' ? 'disable' : 'enable')\"\n                    @click=\"openStatusConfirm(row.node)\"\n                    >{{ row.node.status === 'enabled' ? '停用' : '启用' }}</t-link\n                  >\n                  <t-link v-if=\"canDeleteCategory\" :theme=\"buttonTheme('delete')\" @click=\"openDeleteDialog(row.node)\"\n                    >删除</t-link\n                  >\n                  <span v-if=\"!hasVisibleRowAction(row)\">-</span>\n",
+          "after": "                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canCreateChildCategory && row.level < 3\"\n                    hover=\"color\"\n                    :theme=\"buttonTheme('create')\"\n                    @click=\"openCreateDialog(row.node)\"\n                    >新增下级</t-link\n                  >\n                  <t-link\n                    v-if=\"canEditCategory\"\n                    hover=\"color\"\n                    :theme=\"buttonTheme('edit')\"\n                    @click=\"openEditDialog(row.node)\"\n                    >编辑</t-link\n                  >\n                  <t-link\n                    v-if=\"canToggleCategoryStatus\"\n                    hover=\"color\"\n                    :theme=\"buttonTheme(row.node.status === 'enabled' ? 'disable' : 'enable')\"\n                    @click=\"openStatusConfirm(row.node)\"\n                    >{{ row.node.status === 'enabled' ? '停用' : '启用' }}</t-link\n                  >\n                  <t-link\n                    v-if=\"canDeleteCategory\"\n                    hover=\"color\"\n                    :theme=\"buttonTheme('delete')\"\n                    @click=\"openDeleteDialog(row.node)\"\n                    >删除</t-link\n                  >\n                  <span v-if=\"!hasVisibleRowAction(row)\">-</span>\n"
+        },
+        {
+          "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    if (formMode.value === 'create') {\n      adminFeedback.created(name);\n    } else {\n      adminFeedback.actionSuccess({ action: '保存', target: name });\n    }\n  } catch (error) {\n    showError(error, '分类保存失败');\n",
           "after": "    if (formMode.value === 'create') {\n      adminFeedback.created(name);\n    } else {\n      adminFeedback.actionSuccess({ action: '修改', target: name });\n    }\n  } catch (error) {\n    showError(error, '分类保存失败');\n"
@@ -8666,6 +9249,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          ><t-input v-model=\"formData.name\" clearable placeholder=\"请输入级别名称\"\n        /></t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\"\n          ><t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "          ><t-input v-model=\"formData.name\" clearable placeholder=\"请输入级别名称\"\n        /></t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\"\n          ><t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    const target = payload.name;\n    await loadLevels();\n    closeForm();\n    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });\n    else adminFeedback.created(target);\n  } catch (error) {\n    adminFeedback.error(error instanceof Error ? error.message : '操作失败');\n",
@@ -8790,6 +9379,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "          />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
@@ -9070,6 +9665,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
+          "after": "          />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    if (dialogMode.value === 'create') {\n      adminFeedback.created(targetName);\n    } else {\n      adminFeedback.actionSuccess({ action, target: targetName });\n    }\n  } catch (error) {\n    adminFeedback.actionError({ action, target: targetName, error });\n",
@@ -9283,6 +9884,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
+          "stage": "before-migrations",
+          "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n",
+          "after": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",

@@ -471,7 +471,12 @@ test('all independent image/video uploads share native Upload and leave rich tex
   );
   assert.doesNotMatch(read('src/components/foundation/official/AdminOfficialMediaUpload.vue'), /<AdminMediaUpload/);
   assert.doesNotMatch(read('src/components/ProductRichEditor.vue'), /<AdminMediaUpload|<t-upload/);
-  assert.match(read('src/pages/customer/index.vue'), /<AdminOfficialMediaUpload/);
+  assert.match(read('src/pages/customer/index.vue'), /<CustomerFollowupAttachments/);
+  const attachments = read('src/components/customer/CustomerFollowupAttachments.vue');
+  assert.match(attachments, /theme="file"/);
+  assert.match(attachments, /:max="3"/);
+  assert.match(attachments, /#file-list-display/);
+  assert.doesNotMatch(attachments, /<AdminMediaUpload|<style/);
   assert.match(read('src/pages/finished-stock/supply-chain/index.vue'), /<ProductRichEditor/);
   assert.match(read('src/pages/finished-stock/management/index.vue'), /<ProductRichEditor/);
 });
@@ -869,4 +874,77 @@ test('confirmation naming rejects missing registration, unknown actions and manu
     '<AdminConfirmDialog action="停用" :batch="true" />',
   ])
     assert.deepEqual(confirmationViolations('new.vue', source(template)), []);
+});
+
+test('all business text links use explicit official color hover without forced underlines', () => {
+  const problems = [];
+  let count = 0;
+  for (const file of files('src').filter((file) => file.endsWith('.vue'))) {
+    const { descriptor } = parseSfc(read(file));
+    if (!descriptor.template) continue;
+    function visit(node) {
+      if (node.type === NodeTypes.ELEMENT && node.tag.toLowerCase().replaceAll('-', '') === 'tlink') {
+        count++;
+        const hover = node.props.find((prop) => prop.type === NodeTypes.ATTRIBUTE && prop.name === 'hover');
+        if (hover?.value?.content !== 'color') problems.push(`${file}: Link must use hover="color"`);
+        for (const prop of node.props) {
+          if (prop.type === NodeTypes.DIRECTIVE && prop.name === 'bind' && prop.arg?.content === 'hover')
+            problems.push(`${file}: dynamic hover overrides are not allowed`);
+          if (prop.type === NodeTypes.ATTRIBUTE && prop.name === 'underline')
+            problems.push(`${file}: forced underline is not allowed`);
+          if (
+            prop.type === NodeTypes.DIRECTIVE &&
+            prop.name === 'bind' &&
+            prop.arg?.content === 'underline' &&
+            prop.exp?.content !== 'false'
+          )
+            problems.push(`${file}: underline must remain false`);
+        }
+      }
+      for (const child of node.children ?? []) visit(child);
+      // Native template AST also contains branches only after transforms; parseTemplate keeps v-if/v-for as elements.
+    }
+    visit(parseTemplate(descriptor.template.content));
+  }
+  assert.ok(count > 0, 'The policy must inspect existing Link components');
+  assert.deepEqual(problems, []);
+});
+
+test('runtime styles retain native overlay geometry and never override internal mask selectors', () => {
+  const violations = [];
+  for (const file of files('src')) {
+    const styles = /\.(css|less|scss)$/.test(file)
+      ? [read(file)]
+      : file.endsWith('.vue')
+        ? inspectPage(read(file)).styles.map((style) => style.content)
+        : [];
+    for (const css of styles) {
+      postcss.parse(css).walkRules((rule) => {
+        if (/\.t-(?:dialog__mask|drawer__mask|popup__overlay|image-viewer__modal-mask)\b/.test(rule.selector))
+          violations.push(`${file}: ${rule.selector}`);
+      });
+    }
+  }
+  assert.deepEqual(violations, [], 'Use public overlay properties; do not override native mask styles');
+});
+
+test('native button appearance and disabled states have no internal-selector skin overrides', () => {
+  const violations = [];
+  for (const file of files('src')) {
+    const styles = /\.(css|less|scss)$/.test(file)
+      ? [read(file)]
+      : file.endsWith('.vue')
+        ? inspectPage(read(file)).styles.map((style) => style.content)
+        : [];
+    for (const css of styles) {
+      postcss.parse(css).walkRules((rule) => {
+        if (!/\.t-button(?:--[\w-]+)?\b/.test(rule.selector)) return;
+        rule.walkDecls((declaration) => {
+          if (/^(?:color|background(?:-[\w-]+)?|border(?:-[\w-]+)?|opacity|filter|box-shadow)$/.test(declaration.prop))
+            violations.push(`${file}: ${rule.selector} overrides ${declaration.prop}`);
+        });
+      });
+    }
+  }
+  assert.deepEqual(violations, [], 'Keep native button themes, shapes and disabled states; preserve business layout');
 });

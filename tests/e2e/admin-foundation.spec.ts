@@ -478,28 +478,28 @@ test('opens supplier create and edit dialogs', async ({ page }) => {
   await expect(editDialog).toBeHidden();
 });
 
-test('uses consistent label and condition spacing across list filters', async ({ page }) => {
-  await page.setViewportSize({ width: 1393, height: 868 });
-  for (const route of [
-    '/employee-management',
-    '/finished-stock-craft',
-    '/product-category',
-    '/product-attribute',
-    '/product-attribute-value',
-    '/markup-configuration',
-    '/tenant-management',
-    '/tenant-store-management',
-    '/store-level-management',
-    '/slab-management',
-    '/finished-stock-management',
-    '/supplier-supply-type-management',
-    '/supplier-management',
-    '/slab-variety',
-    '/slab-origin',
-    '/slab-texture',
-    '/slab-color',
-    '/slab-grade',
-  ]) {
+for (const route of [
+  '/employee-management',
+  '/finished-stock-craft',
+  '/product-category',
+  '/product-attribute',
+  '/product-attribute-value',
+  '/markup-configuration',
+  '/tenant-management',
+  '/tenant-store-management',
+  '/store-level-management',
+  '/slab-management',
+  '/finished-stock-management',
+  '/supplier-supply-type-management',
+  '/supplier-management',
+  '/slab-variety',
+  '/slab-origin',
+  '/slab-texture',
+  '/slab-color',
+  '/slab-grade',
+]) {
+  test(`uses consistent label and condition spacing across list filters: ${route}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1393, height: 868 });
     await setMockBusinessClient(page, route === '/supplier-management' ? 'supply-chain' : 'admin');
     await page.goto(route);
     const fields = page
@@ -529,8 +529,8 @@ test('uses consistent label and condition spacing across list filters', async ({
       expect(item.width, route).toBeGreaterThan(40);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), route).toBe(true);
-  }
-});
+  });
+}
 
 test('resets category browsing and keeps the four-level filter popup stable', async ({ page }) => {
   await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>

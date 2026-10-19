@@ -722,6 +722,7 @@ test('opens enable confirmation after employee permissions are configured', asyn
     .click();
   await expect((await permissionUpdateRequest).postDataJSON()).toEqual({ roleIds: '2', dataPermission: 'self' });
   await expect(employeePermissionDialog).toBeHidden();
+  await expect(page.locator('.zdm-admin-feedback.t-is-success')).toHaveText('修改成功');
 
   await pendingEmployeeRow.getByText('启用', { exact: true }).click();
 
@@ -1331,6 +1332,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
         '批量调整归属',
         '批量归档',
         '详情',
+        '跟进',
         '编辑',
         '归档',
         '查看',
@@ -1338,6 +1340,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
         '批量取消归档',
         '批量彻底删除',
         '详情',
+        '跟进',
         '编辑',
         '取消归档',
         '彻底删除',
@@ -1381,7 +1384,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       .split(',')
       .every((value: string) => value.startsWith('admin.tenant.store-category-management.')),
   ).toBe(true);
-  await expect(page.getByText('终端功能分配已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   await page.reload();
   await main.locator('.terminal-tabs').getByText('大板供应商门店管理后台', { exact: true }).click();
   await moduleList.getByText('门店分类管理', { exact: true }).click();
@@ -1497,7 +1500,7 @@ test('allocates supply chain employee and role management and persists selection
   expect(
     permissions.every((p: string) => /^(admin.permission-management.(employee|role)-management.supply-chain.)/.test(p)),
   ).toBe(true);
-  await expect(page.getByText('终端功能分配已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText('修改成功', { exact: true })).toBeVisible();
   await page.reload();
   await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
   await main.locator('.permission-module-list').getByText('权限管理', { exact: true }).click();
@@ -1864,6 +1867,7 @@ test('store role customer matrix retains bulk assignment and removes retired sta
     '批量调整归属',
     '批量归档',
     '详情',
+    '跟进',
     '编辑',
     '归档',
     '查看',
@@ -1871,6 +1875,7 @@ test('store role customer matrix retains bulk assignment and removes retired sta
     '批量取消归档',
     '批量彻底删除',
     '详情',
+    '跟进',
     '编辑',
     '取消归档',
     '彻底删除',
@@ -1882,6 +1887,7 @@ test('store role customer matrix retains bulk assignment and removes retired sta
     .click();
   await dialog.getByRole('button', { name: '确认配置权限', exact: true }).click();
   await expect(dialog).toBeHidden();
+  await expect(page.locator('.zdm-admin-feedback.t-is-success')).toHaveText('修改成功');
   expect(String(saved?.functionPermissions).split(',').sort()).toEqual([
     'store.customer-management.daily.edit',
     'store.customer-management.daily.view',

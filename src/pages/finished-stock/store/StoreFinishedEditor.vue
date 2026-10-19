@@ -6,6 +6,7 @@
           <t-link
             v-for="section in formSections"
             :key="section.key"
+            hover="color"
             data-button-control="section-navigation"
             :href="`#store-finished-product-${section.key}`"
             :theme="activeFormSection === section.key ? 'primary' : 'default'"
@@ -217,8 +218,8 @@ function editorColumns(columns: PrimaryTableCol[]): PrimaryTableCol[] {
         minWidth: 176,
         title: () =>
           h('span', [
-            '商品售价',
             h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'),
+            '商品售价',
           ]),
       };
     return column;

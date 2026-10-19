@@ -158,17 +158,23 @@
                 <template #createdAt="{ row }">{{ formatStoreRuleDateTime(row.rule?.createdAt) }}</template>
                 <template #operation="{ row }">
                   <t-space size="small">
-                    <t-link v-if="can('edit')" :theme="buttonTheme('edit')" @click="editDiscount(row.rule)"
+                    <t-link
+                      v-if="can('edit')"
+                      hover="color"
+                      :theme="buttonTheme('edit')"
+                      @click="editDiscount(row.rule)"
                       >编辑</t-link
                     >
                     <t-link
                       v-if="can('toggle-status')"
+                      hover="color"
                       :theme="buttonTheme(row.rule.status === 'disabled' ? 'enable' : 'disable')"
                       @click="confirmDiscountAction(row.rule, 'status')"
                       >{{ row.rule.status === 'disabled' ? '启用' : '停用' }}</t-link
                     >
                     <t-link
                       v-if="can('delete')"
+                      hover="color"
                       :theme="buttonTheme('delete')"
                       @click="confirmDiscountAction(row.rule, 'delete')"
                       >删除</t-link
