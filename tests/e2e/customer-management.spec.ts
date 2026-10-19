@@ -1306,15 +1306,15 @@ test('followups use the native timeline in followed-time descending order with s
     const actions = el.querySelector(':scope > .t-space:last-child')!.getBoundingClientRect();
     const content = el.closest('.t-timeline-item__content')!.getBoundingClientRect();
     return {
-      nameTop: name.top,
-      actionsTop: actions.top,
+      nameCenter: name.top + name.height / 2,
+      actionsCenter: actions.top + actions.height / 2,
       rowRight: row.right,
       contentRight: content.right,
       actionsRight: actions.right,
       nameRight: name.right,
     };
   });
-  expect(Math.abs(alignment.nameTop - alignment.actionsTop)).toBeLessThanOrEqual(2);
+  expect(Math.abs(alignment.nameCenter - alignment.actionsCenter)).toBeLessThanOrEqual(2);
   expect(Math.abs(alignment.actionsRight - alignment.contentRight)).toBeLessThanOrEqual(1);
   await expect(drawer.getByRole('heading', { name: '跟进记录', exact: true })).toBeVisible();
 
@@ -1858,14 +1858,29 @@ test('scheme two preserves native upload geometry and reveals replacement only f
     expect(a).toHaveLength(b.length);
     for (let i = 0; i < a.length; i++) {
       expect({ ...a[i], x: 0, y: 0, width: 0, height: 0 }).toEqual({ ...b[i], x: 0, y: 0, width: 0, height: 0 });
-      // The approved replacement icon now precedes delete; only its x position changes.
+      // Two actions use native Space alignment; compare size here and their centered layout below.
       const keys = selector.includes('icon-delete')
-        ? (['y', 'width', 'height'] as const)
+        ? (['width', 'height'] as const)
         : (['x', 'y', 'width', 'height'] as const);
       for (const key of keys) expect(Math.abs(a[i][key] - b[i][key]), selector + ' ' + key).toBeLessThanOrEqual(1);
     }
   }
   await reference.close();
+  const actionAlignment = await actions.first().evaluate((el) => {
+    const row = el.closest('.customer-followup-file-row')!.getBoundingClientRect();
+    const group = el.getBoundingClientRect();
+    return {
+      rowCenter: row.top + row.height / 2,
+      groupCenter: group.top + group.height / 2,
+      itemCenters: Array.from(el.children).map((item) => {
+        const rect = item.getBoundingClientRect();
+        return rect.top + rect.height / 2;
+      }),
+    };
+  });
+  expect(Math.abs(actionAlignment.groupCenter - actionAlignment.rowCenter)).toBeLessThanOrEqual(1);
+  for (const center of actionAlignment.itemCenters)
+    expect(Math.abs(center - actionAlignment.groupCenter)).toBeLessThanOrEqual(1);
   const iconGeometry = await actions
     .first()
     .locator('[role="button"]')
