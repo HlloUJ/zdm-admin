@@ -89,6 +89,7 @@
       <t-alert theme="info" message="调整归属后，客户将自动恢复为日常客户。" />
     </t-form>
   </t-dialog>
+  <t-drawer :visible="mode === 'drawer'" header="客户详情" placement="right" size="min(1100px, 94vw)" :confirm-btn="null" cancel-btn="关闭"><span>客户资料</span></t-drawer>
   <t-descriptions class="native-descriptions" bordered title="客户资料"><t-descriptions-item label="姓名">客户</t-descriptions-item></t-descriptions>
   <t-list class="native-list"><t-list-item>跟进记录</t-list-item></t-list>
 </template>

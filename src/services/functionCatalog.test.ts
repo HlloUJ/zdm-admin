@@ -56,13 +56,13 @@ describe('full function catalog', () => {
     expect(page.actions).toEqual([]);
     expect(page.tabs.map((tab) => tab.label)).toEqual(['日常客户', '归档客户']);
     const codes = [
-      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'edit', 'archive'],
-      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'edit', 'restore', 'purge'],
+      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'followup', 'edit', 'archive'],
+      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'followup', 'edit', 'restore', 'purge'],
     ];
     page.tabs.forEach((tab, index) =>
       expect(tab.actions.map((action) => action.value)).toEqual(codes[index].map((code) => `${tab.value}.${code}`)),
     );
-    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(15);
+    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(17);
     expect(
       normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.assign`, `${prefix}.archived.assign`]),
     ).toEqual([]);

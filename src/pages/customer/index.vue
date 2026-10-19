@@ -43,6 +43,12 @@
           <template #operation="{ row }">
             <t-space break-line size="small">
               <t-link v-if="can('detail')" :theme="buttonTheme('view')" @click="openDetail(row.id)">详情</t-link>
+              <t-link
+                v-if="can('followup') && isInDataScope(row)"
+                :theme="buttonTheme('create')"
+                @click="openFollowup(undefined, row)"
+                >跟进</t-link
+              >
               <t-link v-if="can('edit') && isInDataScope(row)" :theme="buttonTheme('edit')" @click="openProfile(row)"
                 >编辑</t-link
               >
@@ -129,25 +135,20 @@
         ><t-textarea v-model="profile.remark" :maxlength="100" placeholder="请输入客户备注"
       /></t-form-item>
     </AdminFormDialog>
-    <AdminDialog
+    <t-drawer
       v-model:visible="detailVisible"
-      :confirmation="{ kind: 'close', text: '关闭' }"
-      confirm-function="close"
       header="客户详情"
-      width="min(1100px, 94vw)"
-      :cancel-btn="null"
-      @confirm="detailVisible = false"
+      placement="right"
+      size="min(1100px, 94vw)"
+      :confirm-btn="null"
+      :cancel-btn="cancelButtonProps('关闭')"
+      @cancel="detailVisible = false"
     >
       <t-loading :loading="detailLoading">
         <t-skeleton v-if="detailLoading" theme="paragraph" />
         <template v-if="detail">
           <AdminDetailPage embedded bordered title="客户资料" :items="detailItems">
-            <t-space
-              ><span>跟进记录</span
-              ><t-button v-if="isInDataScope(detail.customer)" :theme="buttonTheme('create')" @click="openFollowup()"
-                >新增跟进</t-button
-              ></t-space
-            >
+            <span>跟进记录</span>
             <t-list :split="true">
               <t-list-item v-for="record in detail.followups" :key="record.id">
                 <t-space direction="vertical">
@@ -183,7 +184,7 @@
           </AdminDetailPage>
         </template>
       </t-loading>
-    </AdminDialog>
+    </t-drawer>
     <AdminFormDialog
       ref="followDialog"
       v-model:visible="followVisible"
@@ -277,7 +278,7 @@
 </template>
 <script setup lang="ts">
 import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
-import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
+import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -289,7 +290,6 @@ import {
   AdminFormDialog,
   AdminPhoneInput,
   AdminDetailPage,
-  AdminDialog,
   AdminConfirmDialog,
   AdminOfficialMediaUpload,
 } from '@/components/foundation';
@@ -764,6 +764,7 @@ async function confirmOperation() {
 const followVisible = ref(false);
 const followFeedback = useFormFeedback(followVisible);
 const followId = ref<number>();
+const followCustomer = ref<Customer>();
 const localNow = () => {
   const date = new Date();
   const pad = (v: number) => String(v).padStart(2, '0');
@@ -781,10 +782,11 @@ function blobUrl(blob: Blob) {
   blobUrls.add(url);
   return url;
 }
-function openFollowup(record?: Followup) {
-  if (!detail.value) return;
+function openFollowup(record?: Followup, customer = detail.value?.customer) {
+  if (!customer || !isInDataScope(customer) || (!record && !can('followup', customer.status))) return;
+  followCustomer.value = customer;
   ++uploadGeneration;
-  uploadCustomerId = detail.value.customer.id;
+  uploadCustomerId = customer.id;
   followId.value = record?.id;
   followForm.value = {
     followedAt: record ? time(record.followedAt) : localNow(),
@@ -827,7 +829,7 @@ async function cleanupUploads() {
   uploads.value = [];
 }
 async function submitFollowup() {
-  if (!detail.value || submitting.value || uploading.value > 0) return;
+  if (!followCustomer.value || submitting.value || uploading.value > 0) return;
   if (!followForm.value.followedAt || !followForm.value.content.trim()) {
     if (!followForm.value.followedAt) followFeedback.reject('time', followForm.value.followedAt, '请选择跟进时间');
     if (!followForm.value.content.trim()) followFeedback.reject('content', followForm.value.content, '请输入跟进内容');
@@ -837,7 +839,7 @@ async function submitFollowup() {
   try {
     const ids = uploads.value.flatMap((a) => (a?.mediaId ? [a.mediaId] : []));
     await saveFollowup(
-      detail.value.customer.id,
+      followCustomer.value.id,
       {
         ...followForm.value,
         followedAt: followForm.value.followedAt.replace(' ', 'T'),
@@ -848,7 +850,9 @@ async function submitFollowup() {
     );
     ids.forEach((id) => newUploads.delete(id));
     followVisible.value = false;
-    detail.value = await getCustomerDetail(detail.value.customer.id);
+    if (detail.value?.customer.id === followCustomer.value.id && can('detail', followCustomer.value.status)) {
+      detail.value = await getCustomerDetail(followCustomer.value.id);
+    }
     await reload();
     adminFeedback.actionSuccess({ action: '保存跟进' });
   } catch (error) {

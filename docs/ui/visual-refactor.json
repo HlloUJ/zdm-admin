@@ -1647,6 +1647,66 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "          <template #operation=\"{ row }\">\n            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n              <t-link v-if=\"can('edit') && isInDataScope(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n",
+          "after": "          <template #operation=\"{ row }\">\n            <t-space break-line size=\"small\">\n              <t-link v-if=\"can('detail')\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">详情</t-link>\n              <t-link\n                v-if=\"can('followup') && isInDataScope(row)\"\n                :theme=\"buttonTheme('create')\"\n                @click=\"openFollowup(undefined, row)\"\n                >跟进</t-link\n              >\n              <t-link v-if=\"can('edit') && isInDataScope(row)\" :theme=\"buttonTheme('edit')\" @click=\"openProfile(row)\"\n                >编辑</t-link\n              >\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "        ><t-textarea v-model=\"profile.remark\" :maxlength=\"100\" placeholder=\"请输入客户备注\"\n      /></t-form-item>\n    </AdminFormDialog>\n    <AdminDialog\n      v-model:visible=\"detailVisible\"\n      :confirmation=\"{ kind: 'close', text: '关闭' }\"\n      confirm-function=\"close\"\n      header=\"客户详情\"\n      width=\"min(1100px, 94vw)\"\n      :cancel-btn=\"null\"\n      @confirm=\"detailVisible = false\"\n    >\n      <t-loading :loading=\"detailLoading\">\n        <t-skeleton v-if=\"detailLoading\" theme=\"paragraph\" />\n        <template v-if=\"detail\">\n          <AdminDetailPage embedded bordered title=\"客户资料\" :items=\"detailItems\">\n            <t-space\n              ><span>跟进记录</span\n              ><t-button v-if=\"isInDataScope(detail.customer)\" :theme=\"buttonTheme('create')\" @click=\"openFollowup()\"\n                >新增跟进</t-button\n              ></t-space\n            >\n            <t-list :split=\"true\">\n              <t-list-item v-for=\"record in detail.followups\" :key=\"record.id\">\n                <t-space direction=\"vertical\">\n",
+          "after": "        ><t-textarea v-model=\"profile.remark\" :maxlength=\"100\" placeholder=\"请输入客户备注\"\n      /></t-form-item>\n    </AdminFormDialog>\n    <t-drawer\n      v-model:visible=\"detailVisible\"\n      header=\"客户详情\"\n      placement=\"right\"\n      size=\"min(1100px, 94vw)\"\n      :confirm-btn=\"null\"\n      :cancel-btn=\"cancelButtonProps('关闭')\"\n      @cancel=\"detailVisible = false\"\n    >\n      <t-loading :loading=\"detailLoading\">\n        <t-skeleton v-if=\"detailLoading\" theme=\"paragraph\" />\n        <template v-if=\"detail\">\n          <AdminDetailPage embedded bordered title=\"客户资料\" :items=\"detailItems\">\n            <span>跟进记录</span>\n            <t-list :split=\"true\">\n              <t-list-item v-for=\"record in detail.followups\" :key=\"record.id\">\n                <t-space direction=\"vertical\">\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "          </AdminDetailPage>\n        </template>\n      </t-loading>\n    </AdminDialog>\n    <AdminFormDialog\n      ref=\"followDialog\"\n      v-model:visible=\"followVisible\"\n",
+          "after": "          </AdminDetailPage>\n        </template>\n      </t-loading>\n    </t-drawer>\n    <AdminFormDialog\n      ref=\"followDialog\"\n      v-model:visible=\"followVisible\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "</template>\n<script setup lang=\"ts\">\nimport { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { fieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport { computed, onBeforeUnmount, ref, watch } from 'vue';\n",
+          "after": "</template>\n<script setup lang=\"ts\">\nimport { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { fieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport { computed, onBeforeUnmount, ref, watch } from 'vue';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "  AdminFormDialog,\n  AdminPhoneInput,\n  AdminDetailPage,\n  AdminDialog,\n  AdminConfirmDialog,\n  AdminOfficialMediaUpload,\n} from '@/components/foundation';\n",
+          "after": "  AdminFormDialog,\n  AdminPhoneInput,\n  AdminDetailPage,\n  AdminConfirmDialog,\n  AdminOfficialMediaUpload,\n} from '@/components/foundation';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "const followVisible = ref(false);\nconst followFeedback = useFormFeedback(followVisible);\nconst followId = ref<number>();\nconst localNow = () => {\n  const date = new Date();\n  const pad = (v: number) => String(v).padStart(2, '0');\n",
+          "after": "const followVisible = ref(false);\nconst followFeedback = useFormFeedback(followVisible);\nconst followId = ref<number>();\nconst followCustomer = ref<Customer>();\nconst localNow = () => {\n  const date = new Date();\n  const pad = (v: number) => String(v).padStart(2, '0');\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "  blobUrls.add(url);\n  return url;\n}\nfunction openFollowup(record?: Followup) {\n  if (!detail.value) return;\n  ++uploadGeneration;\n  uploadCustomerId = detail.value.customer.id;\n  followId.value = record?.id;\n  followForm.value = {\n    followedAt: record ? time(record.followedAt) : localNow(),\n",
+          "after": "  blobUrls.add(url);\n  return url;\n}\nfunction openFollowup(record?: Followup, customer = detail.value?.customer) {\n  if (!customer || !isInDataScope(customer) || (!record && !can('followup', customer.status))) return;\n  followCustomer.value = customer;\n  ++uploadGeneration;\n  uploadCustomerId = customer.id;\n  followId.value = record?.id;\n  followForm.value = {\n    followedAt: record ? time(record.followedAt) : localNow(),\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "  uploads.value = [];\n}\nasync function submitFollowup() {\n  if (!detail.value || submitting.value || uploading.value > 0) return;\n  if (!followForm.value.followedAt || !followForm.value.content.trim()) {\n    if (!followForm.value.followedAt) followFeedback.reject('time', followForm.value.followedAt, '请选择跟进时间');\n    if (!followForm.value.content.trim()) followFeedback.reject('content', followForm.value.content, '请输入跟进内容');\n",
+          "after": "  uploads.value = [];\n}\nasync function submitFollowup() {\n  if (!followCustomer.value || submitting.value || uploading.value > 0) return;\n  if (!followForm.value.followedAt || !followForm.value.content.trim()) {\n    if (!followForm.value.followedAt) followFeedback.reject('time', followForm.value.followedAt, '请选择跟进时间');\n    if (!followForm.value.content.trim()) followFeedback.reject('content', followForm.value.content, '请输入跟进内容');\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "  try {\n    const ids = uploads.value.flatMap((a) => (a?.mediaId ? [a.mediaId] : []));\n    await saveFollowup(\n      detail.value.customer.id,\n      {\n        ...followForm.value,\n        followedAt: followForm.value.followedAt.replace(' ', 'T'),\n",
+          "after": "  try {\n    const ids = uploads.value.flatMap((a) => (a?.mediaId ? [a.mediaId] : []));\n    await saveFollowup(\n      followCustomer.value.id,\n      {\n        ...followForm.value,\n        followedAt: followForm.value.followedAt.replace(' ', 'T'),\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "    );\n    ids.forEach((id) => newUploads.delete(id));\n    followVisible.value = false;\n    detail.value = await getCustomerDetail(detail.value.customer.id);\n    await reload();\n    adminFeedback.actionSuccess({ action: '保存跟进' });\n  } catch (error) {\n",
+          "after": "    );\n    ids.forEach((id) => newUploads.delete(id));\n    followVisible.value = false;\n    if (detail.value?.customer.id === followCustomer.value.id && can('detail', followCustomer.value.status)) {\n      detail.value = await getCustomerDetail(followCustomer.value.id);\n    }\n    await reload();\n    adminFeedback.actionSuccess({ action: '保存跟进' });\n  } catch (error) {\n"
+        },
+        {
           "before": "{ colKey: 'phone', title: '联系电话', width: 120, ellipsis: true }",
           "after": "{ colKey: 'phone', title: '联系电话', width: 120, ellipsis: { placement: 'bottom' } }",
           "stage": "before-migrations",
@@ -9214,6 +9274,24 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "import { adminMenuEntries } from './adminPermissions';\n\ndescribe('customer catalog', () => {\n  it('publishes exactly the confirmed two tabs and 15 grants on store only', () => {\n    const module = terminalFunctionTrees.store.find((item) => item.value === 'store.customer-management')!;\n    expect(module.label).toBe('客户管理');\n    const tabs = module.menus[0].pages[0].tabs;\n",
+          "after": "import { adminMenuEntries } from './adminPermissions';\n\ndescribe('customer catalog', () => {\n  it('publishes exactly the confirmed two tabs and 17 grants on store only', () => {\n    const module = terminalFunctionTrees.store.find((item) => item.value === 'store.customer-management')!;\n    expect(module.label).toBe('客户管理');\n    const tabs = module.menus[0].pages[0].tabs;\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "      '批量调整归属',\n      '批量归档',\n      '详情',\n      '编辑',\n      '归档',\n    ]);\n",
+          "after": "      '批量调整归属',\n      '批量归档',\n      '详情',\n      '跟进',\n      '编辑',\n      '归档',\n    ]);\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "      '批量取消归档',\n      '批量彻底删除',\n      '详情',\n      '编辑',\n      '取消归档',\n      '彻底删除',\n    ]);\n    const grants = getFunctionModulePermissionValues(module);\n    expect(grants).toHaveLength(15);\n    expect(new Set(grants).size).toBe(15);\n    expect(grants.some((value) => /followup|query|reset|operation-log|delegate/.test(value))).toBe(false);\n    for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {\n      expect(getRuntimeFunctionCatalog(audience).some((item) => item.value === module.value)).toBe(false);\n    }\n",
+          "after": "      '批量取消归档',\n      '批量彻底删除',\n      '详情',\n      '跟进',\n      '编辑',\n      '取消归档',\n      '彻底删除',\n    ]);\n    const grants = getFunctionModulePermissionValues(module);\n    expect(grants).toHaveLength(17);\n    expect(new Set(grants).size).toBe(17);\n    expect(grants.some((value) => /query|reset|operation-log|delegate/.test(value))).toBe(false);\n    for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {\n      expect(getRuntimeFunctionCatalog(audience).some((item) => item.value === module.value)).toBe(false);\n    }\n"
+        },
+        {
           "before": "expect(new Set(grants).size).toBe(17)",
           "after": "expect(new Set(grants).size).toBe(15)",
           "stage": "before-migrations",
@@ -9310,6 +9388,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "    expect(page.actions).toEqual([]);\n    expect(page.tabs.map((tab) => tab.label)).toEqual(['日常客户', '归档客户']);\n    const codes = [\n      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'edit', 'archive'],\n      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'edit', 'restore', 'purge'],\n    ];\n    page.tabs.forEach((tab, index) =>\n      expect(tab.actions.map((action) => action.value)).toEqual(codes[index].map((code) => `${tab.value}.${code}`)),\n    );\n    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(15);\n    expect(\n      normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.assign`, `${prefix}.archived.assign`]),\n    ).toEqual([]);\n",
+          "after": "    expect(page.actions).toEqual([]);\n    expect(page.tabs.map((tab) => tab.label)).toEqual(['日常客户', '归档客户']);\n    const codes = [\n      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'followup', 'edit', 'archive'],\n      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'followup', 'edit', 'restore', 'purge'],\n    ];\n    page.tabs.forEach((tab, index) =>\n      expect(tab.actions.map((action) => action.value)).toEqual(codes[index].map((code) => `${tab.value}.${code}`)),\n    );\n    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(17);\n    expect(\n      normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.assign`, `${prefix}.archived.assign`]),\n    ).toEqual([]);\n"
+        },
+        {
           "before": "];\n\ndescribe('full function catalog', () => {\n  it('registers two independent store category tabs with scoped maintenance actions', () => {\n    const prefix = 'admin.tenant.store-category-management';\n    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;\n",
           "after": "];\n\ndescribe('full function catalog', () => {\n  it('registers the actual customer operations and retires only standalone assignment', () => {\n    const prefix = 'store.customer-management';\n    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;\n    expect(module.menus[0].direct).toBe(true);\n    const page = module.menus[0].pages[0];\n    expect(page.actions).toEqual([]);\n    expect(page.tabs.map((tab) => tab.label)).toEqual(['日常客户', '归档客户']);\n    const codes = [\n      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'edit', 'archive'],\n      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'edit', 'restore', 'purge'],\n    ];\n    page.tabs.forEach((tab, index) =>\n      expect(tab.actions.map((action) => action.value)).toEqual(codes[index].map((code) => `${tab.value}.${code}`)),\n    );\n    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(15);\n    expect(\n      normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.assign`, `${prefix}.archived.assign`]),\n    ).toEqual([]);\n    const bulk = normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.batch-assign`]);\n    expect(bulk).toContain(`${prefix}.daily.batch-assign`);\n    expect(bulk).toContain(`${prefix}.daily.view`);\n    expect(bulk).not.toContain(`${prefix}.daily.edit`);\n  });\n\n  it('registers two independent store category tabs with scoped maintenance actions', () => {\n    const prefix = 'admin.tenant.store-category-management';\n    const module = terminalFunctionTrees.store.find((entry) => entry.value === prefix)!;\n",
           "stage": "before-migrations",
@@ -9329,6 +9413,18 @@
       "content": "39a9ce84ce5c5bedd35582287c540670fbd8ffb0774b8545fdaa553452199a08",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "                ['batch-assign', '批量调整归属'],\n                ['batch-archive', '批量归档'],\n                ['detail', '详情'],\n                ['edit', '编辑'],\n                ['archive', '归档'],\n              ].map(([code, label]) => ({ label, value: `store.customer-management.daily.${code}` })),\n",
+          "after": "                ['batch-assign', '批量调整归属'],\n                ['batch-archive', '批量归档'],\n                ['detail', '详情'],\n                ['followup', '跟进'],\n                ['edit', '编辑'],\n                ['archive', '归档'],\n              ].map(([code, label]) => ({ label, value: `store.customer-management.daily.${code}` })),\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
+          "before": "                ['batch-restore', '批量取消归档'],\n                ['batch-purge', '批量彻底删除'],\n                ['detail', '详情'],\n                ['edit', '编辑'],\n                ['restore', '取消归档'],\n                ['purge', '彻底删除'],\n",
+          "after": "                ['batch-restore', '批量取消归档'],\n                ['batch-purge', '批量彻底删除'],\n                ['detail', '详情'],\n                ['followup', '跟进'],\n                ['edit', '编辑'],\n                ['restore', '取消归档'],\n                ['purge', '彻底删除'],\n"
+        },
         {
           "reason": "User approved retiring standalone customer assignment, retaining batch assignment, editing includes owner, and shared archive/restore/purge confirmation wording with deletion consequences preserved.",
           "stage": "before-migrations",
