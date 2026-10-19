@@ -103,6 +103,29 @@ class StoreManagerRoleApiTest extends SpringContainerTestSupport {
     identity("admin",1L,991701L,"","all");
     mvc.perform(get("/api/admin/roles")).andExpect(status().isForbidden());
   }
+  @Test void ordinaryProfileEditRetainsUnchangedGrantsOutsideReducedTerminalScope() throws Exception {
+    jdbc.update("INSERT INTO roles(id,name,code,client_code,tenant_id,store_id,created_by_account_id,function_permissions) VALUES(991799,'普通角色','PROFILE_TEST','admin',1,991701,1,'store.customer-management.daily.view')");
+    id=991799L;
+    jdbc.update("UPDATE terminal_function_policies SET function_permissions='' WHERE terminal='store'");
+    identity("admin",1L,991701L,"all","admin.permission-management.role-management.edit");
+    var p=payload();p.setName("修改名称");p.setRemark("修改备注");
+    mvc.perform(put("/api/admin/roles/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p)))
+        .andExpect(status().isOk());
+    assertThat(payload().getName()).isEqualTo("修改名称");
+    assertThat(payload().getFunctionPermissions()).isEqualTo("store.customer-management.daily.view");
+    p=payload();p.setFunctionPermissions("store.customer-management.archived.view");
+    mvc.perform(put("/api/admin/roles/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p)))
+        .andExpect(status().isForbidden());
+    identity("admin",1L,991701L,"all","admin.permission-management.role-management.permission");
+    mvc.perform(put("/api/admin/roles/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p)))
+        .andExpect(status().isForbidden());
+    p=payload();p.setRemark("没有编辑权限");
+    mvc.perform(put("/api/admin/roles/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p)))
+        .andExpect(status().isForbidden());
+    identity("admin",1L,991702L,"all","all");
+    mvc.perform(put("/api/admin/roles/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p)))
+        .andExpect(status().isForbidden());
+  }
   @Test void systemRoleIsVisibleInsideItsOrganizationEvenWithSelfDataScope() {
     identity("admin",1L,991701L,"self","all");
     jdbc.update("UPDATE roles SET created_by_account_id=2 WHERE id=?",id);

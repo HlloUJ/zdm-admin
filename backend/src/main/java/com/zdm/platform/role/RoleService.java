@@ -141,7 +141,10 @@ public class RoleService extends CreatorAwareService<RoleMapper, Role> {
       payload.setFunctionPermissions("all");
     } else {
       payload.setFunctionPermissions(FunctionPermissionNormalizer.normalizeCsv(payload.getFunctionPermissions()));
-      requireAllowedRolePermissions(payload, requireCurrentScope(existing.getClientCode()));
+      if (!Objects.equals(FunctionPermissionNormalizer.normalizeCsv(existing.getFunctionPermissions()),
+          payload.getFunctionPermissions())) {
+        requireAllowedRolePermissions(payload, requireCurrentScope(existing.getClientCode()));
+      }
     }
     normalizeAndValidateRoleName(payload, id);
     return updateById(payload);
