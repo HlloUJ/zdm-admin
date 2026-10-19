@@ -1991,7 +1991,7 @@ const handleProductSubmit = async () => {
     pendingUploadedMediaIds.clear();
     closeProductDialog();
     if (productMode.value === 'create') adminFeedback.created(targetName);
-    else adminFeedback.actionSuccess({ action: '保存', target: targetName });
+    else adminFeedback.actionSuccess({ action: '修改', target: targetName });
   } catch (error) {
     adminFeedback.actionError({
       action: productMode.value === 'create' ? '新增' : '保存',
@@ -2282,7 +2282,7 @@ const handleConfirmSubmit = async () => {
     if (type === 'delete' && row) adminFeedback.deleted(row.name);
     else if (type === 'shelf' && row) adminFeedback.actionSuccess({ action: '上架', target: row.name });
     else if (type === 'restore' && row) adminFeedback.actionSuccess({ action: '放回仓库', target: row.name });
-    else if (type === 'savePrice' && row) adminFeedback.success('价格保存成功');
+    else if (type === 'savePrice' && row) adminFeedback.actionSuccess({ action: '修改' });
     else if (type === 'batchRestore') {
       adminFeedback.actionSuccess({ action: '批量放回到仓库', target: `${selectedCount} 个大板` });
     } else if (type === 'purge' && row) {

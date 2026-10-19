@@ -716,7 +716,7 @@ const handleProfileSubmit = async () => {
       if (targetIndex !== -1) {
         employees.value.splice(targetIndex, 1, toEmployeeItem(updated));
       }
-      adminFeedback.success('资料更新成功');
+      adminFeedback.actionSuccess({ action: '修改' });
     } catch (error) {
       adminFeedback.error(error instanceof Error ? error.message : '更新失败');
       return;

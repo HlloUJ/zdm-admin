@@ -455,7 +455,7 @@ const handleSubmit = async () => {
     if (dialogMode.value === 'create') {
       adminFeedback.created(formData.name.trim());
     } else {
-      adminFeedback.success('已保存供应商');
+      adminFeedback.actionSuccess({ action: '修改' });
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

@@ -295,7 +295,7 @@ const submitTexture = async () => {
     const payload = { name: formData.name.trim(), remark: formData.remark.trim(), status: 'enabled' as const };
     if (editingId.value) {
       await updateSlabTexture(editingId.value, payload);
-      adminFeedback.actionSuccess({ action: '保存', target: payload.name });
+      adminFeedback.actionSuccess({ action: '修改', target: payload.name });
     } else {
       await createSlabTexture(payload);
       adminFeedback.created(payload.name);
@@ -332,7 +332,7 @@ const submitAlias = async () => {
   try {
     if (editingAliasId.value) {
       await updateSlabTextureAlias(activeTexture.value.id, editingAliasId.value, name);
-      adminFeedback.actionSuccess({ action: '保存', target: name });
+      adminFeedback.actionSuccess({ action: '修改', target: name });
     } else {
       await createSlabTextureAlias(activeTexture.value.id, name);
       adminFeedback.created(name);

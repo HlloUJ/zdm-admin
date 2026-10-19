@@ -289,7 +289,7 @@ const submitLevel = async () => {
     const target = payload.name;
     await loadLevels();
     closeForm();
-    if (editingId.value) adminFeedback.actionSuccess({ action: '保存', target });
+    if (editingId.value) adminFeedback.actionSuccess({ action: '修改', target });
     else adminFeedback.created(target);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

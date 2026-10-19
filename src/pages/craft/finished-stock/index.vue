@@ -539,7 +539,7 @@ const handleSubmit = async () => {
     if (dialogMode.value === 'create') {
       adminFeedback.created(normalizedName);
     } else {
-      adminFeedback.actionSuccess({ action: '保存', target: normalizedName });
+      adminFeedback.actionSuccess({ action: '修改', target: normalizedName });
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

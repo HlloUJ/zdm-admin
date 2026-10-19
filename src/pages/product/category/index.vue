@@ -573,7 +573,7 @@ async function handleSubmit() {
       if (node) {
         await updateProductCategory(formData.id, toCategoryPayload({ ...node, name, status: formData.status }));
       }
-      adminFeedback.actionSuccess({ action: '保存', target: name });
+      adminFeedback.actionSuccess({ action: '修改', target: name });
     }
     await loadCategories();
     closeFormDialog();

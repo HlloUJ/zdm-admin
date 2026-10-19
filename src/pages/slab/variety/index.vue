@@ -365,7 +365,7 @@ const handleSubmit = async () => {
     if (dialogMode.value === 'create') {
       adminFeedback.created(target);
     } else {
-      adminFeedback.actionSuccess({ action: '保存', target });
+      adminFeedback.actionSuccess({ action: '修改', target });
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

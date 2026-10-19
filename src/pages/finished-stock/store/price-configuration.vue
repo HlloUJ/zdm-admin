@@ -591,7 +591,7 @@ async function savePrices() {
     rules.value = await saveStoreCategoryPrices(activeScope.value, changes);
     selectedIds.value = [];
     draftCache.delete(activeKey.value);
-    adminFeedback.success('价格配置已保存');
+    adminFeedback.actionSuccess({ action: '修改' });
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '保存失败，请稍后重试'));
   } finally {
@@ -653,7 +653,7 @@ async function saveDiscount() {
             Number(createForm.coefficient),
           );
     createVisible.value = false;
-    adminFeedback.actionSuccess({ action: editingDiscountId.value == null ? '新增' : '保存', target: '折扣配置' });
+    adminFeedback.actionSuccess({ action: editingDiscountId.value == null ? '新增' : '修改', target: '折扣配置' });
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '新增失败，请稍后重试'));
   } finally {

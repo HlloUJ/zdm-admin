@@ -254,7 +254,7 @@ const save = async () => {
     else await createSupplierSupplyType(payload);
     visible.value = false;
     if (action === '新增') adminFeedback.created(target);
-    else adminFeedback.actionSuccess({ action, target });
+    else adminFeedback.actionSuccess({ action: '修改', target });
     await load();
   } catch (error) {
     adminFeedback.actionError({ action, target, error });

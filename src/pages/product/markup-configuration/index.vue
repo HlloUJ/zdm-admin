@@ -390,7 +390,7 @@ const saveGuidePriceSetting = async () => {
     guideForm.priceCoefficient = formatPriceCoefficientInput(setting.priceCoefficient);
     guideFormRef.value?.clearValidate();
     adminFeedback.actionSuccess({
-      action: '保存',
+      action: '修改',
       target: `${activeType.value === 'finished' ? '成品' : '大板'}指导价设置`,
     });
   } catch (error) {
@@ -502,7 +502,7 @@ const submitForm = async () => {
     const wasEditing = Boolean(editingId.value);
     await loadData();
     closeForm();
-    if (wasEditing) adminFeedback.actionSuccess({ action: '保存', target: name });
+    if (wasEditing) adminFeedback.actionSuccess({ action: '修改', target: name });
     else adminFeedback.created(name);
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');

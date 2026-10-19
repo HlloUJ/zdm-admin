@@ -557,7 +557,7 @@ const handleSubmit = async (confirmPriceRemoval = false) => {
     if (formMode.value === 'create') {
       adminFeedback.created(name);
     } else {
-      adminFeedback.actionSuccess({ action: '保存', target: name });
+      adminFeedback.actionSuccess({ action: '修改', target: name });
     }
   } catch (error) {
     showError(error, '分类保存失败');

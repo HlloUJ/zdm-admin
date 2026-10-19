@@ -2657,7 +2657,7 @@ const submitProductForm = async () => {
     try {
       upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));
       formPageVisible.value = false;
-      adminFeedback.success(`已保存“${editingProduct.value.name}”`);
+      adminFeedback.actionSuccess({ action: '修改' });
     } catch (error) {
       adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));
     } finally {
@@ -2696,7 +2696,7 @@ const submitProductForm = async () => {
     if (isCreate) {
       adminFeedback.created(payload.name);
     } else {
-      adminFeedback.success(productForm.shelfNow === 'now' ? '商品信息已提交并上架' : '商品信息已提交，暂存仓库中');
+      adminFeedback.actionSuccess({ action: '修改' });
     }
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');
