@@ -183,8 +183,7 @@ test('single authorized tab hides tab bar and self scope hides owner filter', as
   await Promise.all([
     page.waitForResponse(
       (response) =>
-        new URL(response.url()).pathname === '/api/admin/store-customers' &&
-        response.request().method() === 'GET',
+        new URL(response.url()).pathname === '/api/admin/store-customers' && response.request().method() === 'GET',
     ),
     page.goto('/store/customer-management'),
   ]);
@@ -201,8 +200,7 @@ test('all data with grants allows ordinary staff to maintain other owner custome
   await Promise.all([
     page.waitForResponse(
       (response) =>
-        new URL(response.url()).pathname === '/api/admin/store-customers' &&
-        response.request().method() === 'GET',
+        new URL(response.url()).pathname === '/api/admin/store-customers' && response.request().method() === 'GET',
     ),
     page.goto('/store/customer-management'),
   ]);
