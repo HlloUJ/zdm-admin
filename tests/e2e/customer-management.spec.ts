@@ -1207,7 +1207,7 @@ test('followups use the native timeline in followed-time descending order with s
   });
   expect(positions.labelRight).toBeLessThanOrEqual(positions.dotLeft);
   expect(positions.dotRight).toBeLessThan(positions.contentRight);
-  const header = items.first().locator('.t-timeline-item__content > .t-row').first();
+  const header = items.first().locator('.t-timeline-item__content > .t-space > .t-space-item > .t-space').first();
   await expect(header.getByText('导购A', { exact: true })).toBeVisible();
   await expect(header.getByText('编辑', { exact: true })).toBeVisible();
   await expect(header.getByText('删除', { exact: true })).toBeVisible();
@@ -1216,7 +1216,7 @@ test('followups use the native timeline in followed-time descending order with s
   const alignment = await header.evaluate((el) => {
     const row = el.getBoundingClientRect();
     const name = el.querySelector('.t-typography')!.getBoundingClientRect();
-    const actions = el.querySelector(':scope > .t-space:last-child')!.getBoundingClientRect();
+    const actions = el.querySelector(':scope > .t-space-item:last-child')!.getBoundingClientRect();
     const content = el.closest('.t-timeline-item__content')!.getBoundingClientRect();
     return {
       nameTop: name.top,
@@ -1224,11 +1224,11 @@ test('followups use the native timeline in followed-time descending order with s
       rowRight: row.right,
       contentRight: content.right,
       actionsRight: actions.right,
+      nameRight: name.right,
     };
   });
   expect(Math.abs(alignment.nameTop - alignment.actionsTop)).toBeLessThanOrEqual(2);
-  expect(Math.abs(alignment.rowRight - alignment.contentRight)).toBeLessThanOrEqual(1);
-  expect(Math.abs(alignment.actionsRight - alignment.rowRight)).toBeLessThanOrEqual(1);
+  expect(alignment.actionsRight - alignment.nameRight).toBeLessThan(140);
   await expect(drawer.getByRole('heading', { name: '跟进记录', exact: true })).toBeVisible();
 
   const reference = await page.context().newPage();
@@ -1246,7 +1246,7 @@ test('followups use the native timeline in followed-time descending order with s
   await reference.close();
 });
 
-test('customer detail reproduces the exported Scheme One geometry and native visual styles', async ({ page }) => {
+test('customer detail follows the approved responsive refinement with native visual styles', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1150 });
   await setup(page, ['daily.view', 'daily.detail']);
   const profile = {
@@ -1299,6 +1299,7 @@ test('customer detail reproduces the exported Scheme One geometry and native vis
   await reference.goto('/tests/fixtures/official-ui/scheme-one.html');
   const native = reference.locator('.t-drawer__content-wrapper:visible');
   await expect(native.locator('.t-avatar')).toHaveCount(3);
+  await expect(native.locator('.t-link')).toHaveCount(7);
   expect((await drawer.locator('.t-timeline').innerText()).replace(/\s+/g, ' ').trim()).toBe(
     (await native.locator('.t-timeline').innerText()).replace(/\s+/g, ' ').trim(),
   );
@@ -1328,9 +1329,9 @@ test('customer detail reproduces the exported Scheme One geometry and native vis
     '.t-timeline',
     '.t-timeline-item__label',
     '.t-timeline-item__dot',
-    '.t-timeline-item__content > .t-row',
+    '.t-timeline-item__content > .t-space > .t-space-item > .t-space',
     '.t-avatar',
-    '.t-timeline-item__content p',
+    '.t-timeline-item__content > .t-space > .t-space-item > .t-typography',
   ]) {
     const actual = await measure(drawer, selector);
     const expected = await measure(native, selector);
@@ -1339,4 +1340,112 @@ test('customer detail reproduces the exported Scheme One geometry and native vis
       expect(Math.abs(actual[key] - expected[key]), selector + ' ' + key).toBeLessThanOrEqual(1);
   }
   await reference.close();
+});
+
+for (const width of [1440, 800, 600, 390]) {
+  test(`customer detail adapts to ${width}px without overflowing long followup content`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 858 });
+    await setup(page, ['daily.view', 'daily.detail']);
+    await page.route('**/api/admin/store-customers/1', (route) =>
+      route.fulfill({
+        json: ok({
+          customer: { ...customer(1, 7), requirement: '长客户需求'.repeat(20) },
+          followups: [
+            {
+              id: 1,
+              followedAt: '2026-10-19T10:00:00',
+              createdByName: '赵云',
+              createdByAccountId: 7,
+              content: '跟进正文需要完整换行展示。'.repeat(25),
+              nextFollowAt: '2026-10-20T08:00:00',
+              nextFollowTask: '下次跟进事项需要完整展示。'.repeat(15),
+              attachments: [{ mediaId: 42, name: '餐桌参考图.jpg', mediaType: 'image' }],
+            },
+          ],
+        }),
+      }),
+    );
+    await page.goto('/store/customer-management');
+    await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+    const drawer = page.locator('.t-drawer__content-wrapper:visible');
+    await expect(drawer).toHaveCSS('width', `${Math.min(width, 1100)}px`);
+    const body = drawer.locator('.t-drawer__body');
+    await expect.poll(() => body.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    await expect(drawer.locator('.t-timeline-item')).toHaveCount(1);
+    await expect(drawer.getByText('编辑', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('删除', { exact: true })).toBeVisible();
+    const cells = drawer.locator('.t-descriptions__body tr').first().locator('td');
+    await expect(cells).toHaveCount((width < 768 ? 1 : width < 992 ? 2 : 3) * 2);
+    const item = drawer.locator('.t-timeline-item');
+    if (width < 768) {
+      await expect(item.locator('.t-timeline-item__label')).toHaveCount(0);
+      await expect(item.getByText('2026-10-19 10:00:00', { exact: true })).toBeVisible();
+    }
+    await page.setViewportSize({ width: 1440, height: 858 });
+    await expect(cells).toHaveCount(6);
+    await expect(item.locator('.t-timeline-item__label')).toHaveCount(1);
+    await drawer.getByRole('button', { name: '关闭', exact: true }).click();
+    await expect(drawer).not.toBeVisible();
+  });
+}
+
+test('followup actions appear only on the hovered or keyboard-focused record', async ({ page }) => {
+  await setup(page, ['daily.view', 'daily.detail']);
+  await page.route('**/api/admin/store-customers/1', (route) =>
+    route.fulfill({
+      json: ok({
+        customer: customer(1, 7),
+        followups: [1, 2].map((id) => ({
+          id,
+          followedAt: `2026-10-19T10:0${id}:00`,
+          content: `跟进记录${id}`,
+          createdByName: '赵云',
+          createdByAccountId: 7,
+          attachments: [],
+        })),
+      }),
+    }),
+  );
+  await page.goto('/store/customer-management');
+  await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+  const drawer = page.locator('.t-drawer__content-wrapper:visible');
+  const records = drawer.locator('.customer-followup-record');
+  const actions = drawer.locator('.customer-followup-actions');
+  await drawer.getByRole('heading', { name: '跟进记录' }).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '0');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '0');
+  const before = await records.nth(0).boundingBox();
+  await records.nth(0).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '1');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '0');
+  expect(await records.nth(0).boundingBox()).toEqual(before);
+  await records.nth(1).hover();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '0');
+  await expect(actions.nth(1)).toHaveCSS('opacity', '1');
+  await drawer.getByRole('heading', { name: '跟进记录' }).hover();
+  await actions.nth(0).getByText('编辑', { exact: true }).focus();
+  await expect(actions.nth(0)).toHaveCSS('opacity', '1');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('编辑跟进', { exact: true })).toBeVisible();
+});
+
+test('touch devices retain followup actions without requiring hover', async ({ browser }) => {
+  const context = await browser.newContext({
+    baseURL: test.info().project.use.baseURL,
+    hasTouch: true,
+    isMobile: false,
+    viewport: { width: 1024, height: 858 },
+  });
+  const page = await context.newPage();
+  try {
+    await setup(page, ['daily.view', 'daily.detail']);
+    await page.goto('/store/customer-management');
+    await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
+    const actions = page.locator('.t-drawer__content-wrapper:visible .customer-followup-actions');
+    await expect(actions).toHaveCSS('opacity', '1');
+    await actions.getByText('编辑', { exact: true }).tap();
+    await expect(page.getByText('编辑跟进', { exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });

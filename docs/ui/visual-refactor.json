@@ -1648,6 +1648,84 @@
       "approvedBusinessPatches": [
         {
           "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "      size=\"1100px\"\n",
+          "after": "      size=\"min(1100px, 100vw)\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "          <AdminDetailPage embedded bordered title=\"客户资料\" :items=\"detailItems\">\n",
+          "after": "          <AdminDetailPage embedded bordered title=\"客户资料\" :column=\"detailColumns\" :items=\"detailItems\">\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "            <t-timeline v-if=\"sortedFollowups.length\" mode=\"alternate\" label-align=\"left\">\n              <t-timeline-item v-for=\"record in sortedFollowups\" :key=\"record.id\">\n                <template #label>\n                  <div>{{ time(record.followedAt).slice(0, 10) }}</div>\n                  <div>{{ time(record.followedAt).slice(11) }}</div>\n",
+          "after": "            <t-timeline v-if=\"sortedFollowups.length\" :mode=\"compactDetail ? 'same' : 'alternate'\" label-align=\"left\">\n              <t-timeline-item v-for=\"record in sortedFollowups\" :key=\"record.id\" class=\"customer-followup-record\">\n                <template v-if=\"!compactDetail\" #label>\n                  <div><t-typography-text theme=\"secondary\" :content=\"time(record.followedAt).slice(0, 10)\" /></div>\n                  <div><t-typography-text theme=\"secondary\" :content=\"time(record.followedAt).slice(11)\" /></div>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "                <t-row justify=\"space-between\" align=\"center\">\n                  <t-space align=\"center\">\n",
+          "after": "                <t-space direction=\"vertical\" size=\"small\">\n                  <t-typography-text v-if=\"compactDetail\" theme=\"secondary\" :content=\"time(record.followedAt)\" />\n                  <t-space break-line align=\"center\" size=\"small\">\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "                    <t-typography-text strong :content=\"record.createdByName || '-'\" />\n",
+          "after": "                    <t-typography-text strong :content=\"record.createdByName || '-'\" />\n                    <t-space v-if=\"isInDataScope(detail.customer)\" class=\"customer-followup-actions\" size=\"small\">\n                      <t-link\n                        :theme=\"buttonTheme('edit')\"\n                        tabindex=\"0\"\n                        @keydown.enter.prevent=\"openFollowup(record)\"\n                        @click=\"openFollowup(record)\"\n                        >编辑</t-link\n                      >\n                      <t-link\n                        :theme=\"buttonTheme('delete')\"\n                        tabindex=\"0\"\n                        @keydown.enter.prevent=\"prepareFollowupDelete(record.id)\"\n                        @click=\"prepareFollowupDelete(record.id)\"\n                        >删除</t-link\n                      >\n                    </t-space>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "                  <t-space v-if=\"isInDataScope(detail.customer)\">\n                    <t-link :theme=\"buttonTheme('edit')\" @click=\"openFollowup(record)\">编辑</t-link>\n                    <t-link :theme=\"buttonTheme('delete')\" @click=\"prepareFollowupDelete(record.id)\">删除</t-link>\n                  </t-space>\n                </t-row>\n                <t-typography-paragraph :content=\"record.content\" />\n                <t-typography-paragraph v-if=\"record.attachments.length\" :key=\"JSON.stringify(record.attachments)\">\n                  <t-space break-line>\n",
+          "after": "                  <t-typography-text :content=\"record.content\" />\n                  <t-space v-if=\"record.attachments.length\" :key=\"JSON.stringify(record.attachments)\" break-line>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "                </t-typography-paragraph>\n                <t-typography-paragraph\n                  v-if=\"record.nextFollowAt || record.nextFollowTask\"\n                  :content=\"\n                    [\n                      '下次跟进：',\n                      time(record.nextFollowAt),\n                      String.fromCharCode(12288),\n                      record.nextFollowTask || '',\n                    ].join('')\n                  \"\n                />\n",
+          "after": "                  <t-space v-if=\"record.nextFollowAt || record.nextFollowTask\" direction=\"vertical\" size=\"small\">\n                    <t-typography-text\n                      v-if=\"record.nextFollowAt\"\n                      theme=\"secondary\"\n                      :content=\"'下次跟进：' + time(record.nextFollowAt)\"\n                    />\n                    <t-typography-text\n                      v-if=\"record.nextFollowTask\"\n                      theme=\"secondary\"\n                      :content=\"record.nextFollowTask\"\n                    />\n                  </t-space>\n                </t-space>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "import { computed, onBeforeUnmount, ref, watch } from 'vue';\n",
+          "after": "import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "];\n",
+          "after": "];\n// Match the official Grid sm/md viewport boundaries; only detail presentation responds.\nconst detailViewportWidth = ref(window.innerWidth);\nconst syncDetailViewport = () => {\n  detailViewportWidth.value = window.innerWidth;\n};\nconst compactDetail = computed(() => detailViewportWidth.value < 768);\nconst detailColumns = computed(() => (compactDetail.value ? 1 : detailViewportWidth.value < 992 ? 2 : 3));\nonMounted(() => window.addEventListener('resize', syncDetailViewport));\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "    { label: '客户需求', value: customer.requirement || '-', span: 3 },\n    { label: '客户备注', value: customer.remark || '-', span: 3 },\n",
+          "after": "    { label: '客户需求', value: customer.requirement || '-', span: detailColumns.value },\n    { label: '客户备注', value: customer.remark || '-', span: detailColumns.value },\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "    { label: '建档时间', value: time(customer.createdAt), span: 2 },\n",
+          "after": "    { label: '建档时间', value: time(customer.createdAt), span: Math.min(2, detailColumns.value) },\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "onBeforeUnmount(() => {\n",
+          "after": "onBeforeUnmount(() => {\n  window.removeEventListener('resize', syncDetailViewport);\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-19 user approved responsive customer detail refinement and per-record hover actions: native Typography/Space, official Grid viewport boundaries, responsive columns/timeline and behavior-only opacity with keyboard/touch access. Preserve permissions, scope, data, sorting and handlers.",
+          "before": "</script>\n",
+          "after": "</script>\n\n<style>\n/* Behavior only: preserve the native links and their occupied space.\n   Touch devices keep the actions available; keyboard focus reveals the row. */\n@media (hover: hover) and (pointer: fine) {\n  .customer-followup-record:not(:hover, :focus-within) .customer-followup-actions {\n    opacity: 0;\n  }\n}\n</style>\n"
+        },
+        {
+          "stage": "before-migrations",
           "reason": "2026-10-19 user explicitly selected exported Scheme One as exact visual source: 1100px native drawer, creation time spans two columns, h5 followup title, small text avatar and strong author at left, actions flush right using native Row, native Paragraph blocks. Preserve existing events, scope, sorting, loading, empty and multiple attachments; no CSS. Supersedes uncommitted layout feedback.",
           "before": "      v-model:visible=\"detailVisible\"\n      header=\"客户详情\"\n      placement=\"right\"\n      size=\"min(1100px, 94vw)\"\n      :confirm-btn=\"null\"\n      :cancel-btn=\"cancelButtonProps('关闭')\"\n      @cancel=\"detailVisible = false\"\n",
           "after": "      v-model:visible=\"detailVisible\"\n      header=\"客户详情\"\n      placement=\"right\"\n      size=\"1100px\"\n      :confirm-btn=\"null\"\n      :cancel-btn=\"cancelButtonProps('关闭')\"\n      @cancel=\"detailVisible = false\"\n"

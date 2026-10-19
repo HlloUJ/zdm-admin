@@ -139,7 +139,7 @@
       v-model:visible="detailVisible"
       header="客户详情"
       placement="right"
-      size="1100px"
+      size="min(1100px, 100vw)"
       :confirm-btn="null"
       :cancel-btn="cancelButtonProps('关闭')"
       @cancel="detailVisible = false"
@@ -147,27 +147,38 @@
       <t-loading :loading="detailLoading">
         <t-skeleton v-if="detailLoading" theme="paragraph" />
         <template v-if="detail">
-          <AdminDetailPage embedded bordered title="客户资料" :items="detailItems">
+          <AdminDetailPage embedded bordered title="客户资料" :column="detailColumns" :items="detailItems">
             <t-typography-title level="h5">跟进记录</t-typography-title>
-            <t-timeline v-if="sortedFollowups.length" mode="alternate" label-align="left">
-              <t-timeline-item v-for="record in sortedFollowups" :key="record.id">
-                <template #label>
-                  <div>{{ time(record.followedAt).slice(0, 10) }}</div>
-                  <div>{{ time(record.followedAt).slice(11) }}</div>
+            <t-timeline v-if="sortedFollowups.length" :mode="compactDetail ? 'same' : 'alternate'" label-align="left">
+              <t-timeline-item v-for="record in sortedFollowups" :key="record.id" class="customer-followup-record">
+                <template v-if="!compactDetail" #label>
+                  <div><t-typography-text theme="secondary" :content="time(record.followedAt).slice(0, 10)" /></div>
+                  <div><t-typography-text theme="secondary" :content="time(record.followedAt).slice(11)" /></div>
                 </template>
-                <t-row justify="space-between" align="center">
-                  <t-space align="center">
+                <t-space direction="vertical" size="small">
+                  <t-typography-text v-if="compactDetail" theme="secondary" :content="time(record.followedAt)" />
+                  <t-space break-line align="center" size="small">
                     <t-avatar size="small">{{ (record.createdByName || '-').slice(0, 1) }}</t-avatar>
                     <t-typography-text strong :content="record.createdByName || '-'" />
+                    <t-space v-if="isInDataScope(detail.customer)" class="customer-followup-actions" size="small">
+                      <t-link
+                        :theme="buttonTheme('edit')"
+                        tabindex="0"
+                        @keydown.enter.prevent="openFollowup(record)"
+                        @click="openFollowup(record)"
+                        >编辑</t-link
+                      >
+                      <t-link
+                        :theme="buttonTheme('delete')"
+                        tabindex="0"
+                        @keydown.enter.prevent="prepareFollowupDelete(record.id)"
+                        @click="prepareFollowupDelete(record.id)"
+                        >删除</t-link
+                      >
+                    </t-space>
                   </t-space>
-                  <t-space v-if="isInDataScope(detail.customer)">
-                    <t-link :theme="buttonTheme('edit')" @click="openFollowup(record)">编辑</t-link>
-                    <t-link :theme="buttonTheme('delete')" @click="prepareFollowupDelete(record.id)">删除</t-link>
-                  </t-space>
-                </t-row>
-                <t-typography-paragraph :content="record.content" />
-                <t-typography-paragraph v-if="record.attachments.length" :key="JSON.stringify(record.attachments)">
-                  <t-space break-line>
+                  <t-typography-text :content="record.content" />
+                  <t-space v-if="record.attachments.length" :key="JSON.stringify(record.attachments)" break-line>
                     <t-link
                       v-for="attachment in record.attachments"
                       :key="attachment.mediaId"
@@ -176,18 +187,19 @@
                       >{{ attachment.name }}</t-link
                     >
                   </t-space>
-                </t-typography-paragraph>
-                <t-typography-paragraph
-                  v-if="record.nextFollowAt || record.nextFollowTask"
-                  :content="
-                    [
-                      '下次跟进：',
-                      time(record.nextFollowAt),
-                      String.fromCharCode(12288),
-                      record.nextFollowTask || '',
-                    ].join('')
-                  "
-                />
+                  <t-space v-if="record.nextFollowAt || record.nextFollowTask" direction="vertical" size="small">
+                    <t-typography-text
+                      v-if="record.nextFollowAt"
+                      theme="secondary"
+                      :content="'下次跟进：' + time(record.nextFollowAt)"
+                    />
+                    <t-typography-text
+                      v-if="record.nextFollowTask"
+                      theme="secondary"
+                      :content="record.nextFollowTask"
+                    />
+                  </t-space>
+                </t-space>
               </t-timeline-item>
             </t-timeline>
             <t-empty v-if="!detail.followups.length" description="暂无跟进记录" />
@@ -291,7 +303,7 @@ import { formConfirmation, operationConfirmation } from '@/components/foundation
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PageInfo, TableProps } from 'tdesign-vue-next';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -449,6 +461,14 @@ const columns: TableProps['columns'] = [
   { colKey: 'createdAt', title: '创建时间', width: 180, ellipsis: true },
   { colKey: 'operation', title: '操作', width: 200 },
 ];
+// Match the official Grid sm/md viewport boundaries; only detail presentation responds.
+const detailViewportWidth = ref(window.innerWidth);
+const syncDetailViewport = () => {
+  detailViewportWidth.value = window.innerWidth;
+};
+const compactDetail = computed(() => detailViewportWidth.value < 768);
+const detailColumns = computed(() => (compactDetail.value ? 1 : detailViewportWidth.value < 992 ? 2 : 3));
+onMounted(() => window.addEventListener('resize', syncDetailViewport));
 const detailItems = computed(() => {
   const customer = detail.value?.customer;
   if (!customer) return [];
@@ -471,10 +491,10 @@ const detailItems = computed(() => {
     { label: '联系电话', value: displayCustomerPhone(customer) },
     { label: '微信号', value: customer.wechat || '-' },
     { label: '归属人', value: customer.ownerName || '-' },
-    { label: '客户需求', value: customer.requirement || '-', span: 3 },
-    { label: '客户备注', value: customer.remark || '-', span: 3 },
+    { label: '客户需求', value: customer.requirement || '-', span: detailColumns.value },
+    { label: '客户备注', value: customer.remark || '-', span: detailColumns.value },
     { label: '建档人', value: customer.createdByName || '-' },
-    { label: '建档时间', value: time(customer.createdAt), span: 2 },
+    { label: '建档时间', value: time(customer.createdAt), span: Math.min(2, detailColumns.value) },
   ];
 });
 const time = (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-');
@@ -909,6 +929,7 @@ async function previewUpload(value: AdminMediaValue | undefined, index: number) 
   if (record && attachment) await previewAttachment(record, attachment);
 }
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncDetailViewport);
   ++loadVersion;
   ++detailVersion;
   void cleanupUploads();
@@ -917,3 +938,13 @@ onBeforeUnmount(() => {
 status.value = tabs.value[0]?.value ?? 'daily';
 void reload();
 </script>
+
+<style>
+/* Behavior only: preserve the native links and their occupied space.
+   Touch devices keep the actions available; keyboard focus reveals the row. */
+@media (hover: hover) and (pointer: fine) {
+  .customer-followup-record:not(:hover, :focus-within) .customer-followup-actions {
+    opacity: 0;
+  }
+}
+</style>

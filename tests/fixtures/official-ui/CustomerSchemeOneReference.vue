@@ -41,23 +41,25 @@
 
     <t-timeline mode="alternate" label-align="left">
       <t-timeline-item v-for="record in records" :key="record.id">
-        <template #label
-          ><div>{{ record.day }}</div>
-          <div>{{ record.clock }}</div></template
-        >
-        <t-row justify="space-between" align="center"
-          ><t-space align="center"
-            ><t-avatar size="small">赵</t-avatar
-            ><t-typography-text strong>{{ record.author }}</t-typography-text></t-space
-          ><t-space><t-link theme="primary">编辑</t-link><t-link theme="danger">删除</t-link></t-space></t-row
-        >
-        <t-typography-paragraph>{{ record.content }}</t-typography-paragraph>
-        <t-typography-paragraph v-if="record.attachment"
-          ><t-link theme="primary">{{ record.attachment }}</t-link></t-typography-paragraph
-        >
-        <t-typography-paragraph v-if="record.next"
-          >下次跟进：{{ record.next }}&#12288;{{ record.task }}</t-typography-paragraph
-        >
+        <template #label>
+          <div><t-typography-text theme="secondary" :content="record.day" /></div>
+          <div><t-typography-text theme="secondary" :content="record.clock" /></div>
+        </template>
+        <t-space direction="vertical" size="small">
+          <t-space break-line align="center" size="small">
+            <t-avatar size="small">赵</t-avatar>
+            <t-typography-text strong :content="record.author" />
+            <t-space size="small"><t-link theme="primary">编辑</t-link><t-link theme="danger">删除</t-link></t-space>
+          </t-space>
+          <t-typography-text :content="record.content" />
+          <t-space v-if="record.attachment" break-line
+            ><t-link theme="primary">{{ record.attachment }}</t-link></t-space
+          >
+          <t-space v-if="record.next" direction="vertical" size="small">
+            <t-typography-text theme="secondary" :content="'下次跟进：' + record.next" />
+            <t-typography-text theme="secondary" :content="record.task" />
+          </t-space>
+        </t-space>
       </t-timeline-item>
     </t-timeline>
   </t-drawer>
