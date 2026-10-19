@@ -557,6 +557,20 @@ test('customer followup dialogs retain native component visuals', async ({ page 
   const { reference, checkDialog, styleOf } = await nativeDialogVisuals(page, testInfo);
   const own = page.locator('tr').filter({ hasText: '王先生1' });
   let dialog: ReturnType<Page['locator']>;
+  const checkSingleColumnWidth = async (form: ReturnType<Page['locator']>) => {
+    await expect(form).toHaveClass(/zdm-admin-single-form/);
+    await expect(form).toHaveCSS('width', '480px');
+    await expect(form.locator('.t-form__label').first()).toHaveCSS('width', '100px');
+    const controls = form.locator('.t-date-picker, .t-textarea');
+    await expect(controls).toHaveCount(4);
+    for (const control of await controls.all()) {
+      const widths = await control.evaluate((el) => ({
+        control: el.getBoundingClientRect().width,
+        field: el.closest('.t-form__controls-content')!.getBoundingClientRect().width,
+      }));
+      expect(Math.abs(widths.control - widths.field)).toBeLessThanOrEqual(1);
+    }
+  };
   await own.getByText('详情', { exact: true }).click();
   const detail = page.locator('.t-drawer__content-wrapper:visible').filter({ hasText: '客户详情' });
   await expect(detail.getByText('原导购历史跟进', { exact: true })).toBeVisible();
@@ -575,10 +589,12 @@ test('customer followup dialogs retain native component visuals', async ({ page 
   await detail.getByRole('button', { name: '关闭', exact: true }).click();
   await own.getByText('跟进', { exact: true }).click();
   dialog = await checkDialog('新增跟进', 'followup-create', true);
+  await checkSingleColumnWidth(dialog);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await own.getByText('详情', { exact: true }).click();
   await detail.getByText('编辑', { exact: true }).click();
   dialog = await checkDialog('编辑跟进', 'followup-edit', true);
+  await checkSingleColumnWidth(dialog);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await detail.getByText('删除', { exact: true }).click();
   dialog = page.locator('.t-dialog:visible').filter({ hasText: '是否删除跟进记录' });

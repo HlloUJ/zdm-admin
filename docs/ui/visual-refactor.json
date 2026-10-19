@@ -1678,6 +1678,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-19 用户批准客户新增及编辑跟进取消过时两列附件custom例外，接入公共单列480px弹窗、100px标签及控件满宽；仅布局，业务、权限、附件交互不变。",
+          "stage": "before-migrations",
+          "before": "      label-width=\"calc(7em + var(--td-comp-paddingLR-xl))\"\n      :header=\"followId ? '编辑跟进' : '新增跟进'\"\n      width=\"720px\"\n      form-layout=\"custom\"\n",
+          "after": "      label-width=\"100px\"\n      :header=\"followId ? '编辑跟进' : '新增跟进'\"\n      width=\"480px\"\n"
+        },
+        {
           "reason": "2026-10-19 用户指出编辑跟进成功提示未遵守标准话术；仅将编辑动作接入全局修改成功映射，新增提示、API、权限和保存交互不变。",
           "stage": "before-migrations",
           "before": "    adminFeedback.actionSuccess({ action: '保存跟进' });",

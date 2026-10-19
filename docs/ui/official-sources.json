@@ -181,6 +181,11 @@
         "tag": "AdminFormDialog"
       },
       {
+        "file": "src/pages/customer/index.vue",
+        "visible": "followVisible",
+        "tag": "AdminFormDialog"
+      },
+      {
         "file": "src/pages/finished-stock/attribute/index.vue",
         "visible": "formDialogVisible",
         "tag": "t-dialog"
@@ -297,19 +302,13 @@
       "SKU/price/permission matrices",
       "batch actions",
       "option lists",
-      "previews and details",
-      "customer followup form with two-column attachments"
+      "previews and details"
     ],
     "excludedForms": [
       {
         "file": "src/pages/accessory/attribute/index.vue",
         "visible": "optionDialogVisible",
         "reason": "选项列表管理"
-      },
-      {
-        "file": "src/pages/customer/index.vue",
-        "visible": "followVisible",
-        "reason": "客户跟进含两列附件，已确认保留custom布局"
       },
       {
         "file": "src/pages/finished-stock/attribute/index.vue",
