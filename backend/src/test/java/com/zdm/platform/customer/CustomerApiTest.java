@@ -436,6 +436,22 @@ class CustomerApiTest extends SpringContainerTestSupport {
     follow(a,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"内容\",\"mediaIds\":[1,2,3,4]}").andExpect(status().isBadRequest());
     follow(a,"{\"followedAt\":\"2026-10-13T10:00:00\",\"content\":\"内容\",\"mediaIds\":[1,1]}").andExpect(status().isBadRequest());
   }
+  @Test void followupTextLimitsAreOneHundredCharactersForCreateAndEdit() throws Exception {
+    long customer=create();
+    var accepted=java.util.Map.of("followedAt","2026-10-19T11:04:00",
+        "content","客".repeat(100),"nextFollowTask","需".repeat(100),"mediaIds",List.of());
+    follow(customer,json.writeValueAsString(accepted)).andExpect(status().isOk());
+    long record=data(mvc.perform(get(BASE+"/"+customer))).path("followups").get(0).path("id").asLong();
+    for (String field:List.of("content","nextFollowTask")) {
+      var invalid=new java.util.HashMap<String,Object>(accepted);
+      invalid.put(field,"字".repeat(101));
+      follow(customer,json.writeValueAsString(invalid)).andExpect(status().isBadRequest());
+      mvc.perform(put(BASE+"/"+customer+"/followups/"+record).contentType(MediaType.APPLICATION_JSON)
+          .content(json.writeValueAsString(invalid))).andExpect(status().isBadRequest());
+    }
+    mvc.perform(put(BASE+"/"+customer+"/followups/"+record).contentType(MediaType.APPLICATION_JSON)
+        .content(json.writeValueAsString(accepted))).andExpect(status().isOk());
+  }
   @Test void genericAttachmentIsPrivateBoundAndReadThroughAuthorizedCustomer() throws Exception {
     long a=create();
     var file=new MockMultipartFile("file","说明.html","text/html","<script>alert(1)</script>".getBytes(java.nio.charset.StandardCharsets.UTF_8));

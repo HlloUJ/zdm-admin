@@ -20,8 +20,8 @@ public final class CustomerRequests {
     public Action { ids = ids == null ? null : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(ids)); }
   }
   public record Followup(@NotNull LocalDateTime followedAt,
-      @NotBlank @Size(max = 10000) String content, LocalDateTime nextFollowAt,
-      @Size(max = 2000) String nextFollowTask, @NotNull @Size(max = 3) List<@NotNull Long> mediaIds) {
+      @NotBlank @Size(max = 100) String content, LocalDateTime nextFollowAt,
+      @Size(max = 100) String nextFollowTask, @NotNull @Size(max = 3) List<@NotNull Long> mediaIds) {
     public Followup { mediaIds = mediaIds == null ? null : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(mediaIds)); }
   }
 }
