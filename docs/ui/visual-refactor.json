@@ -9978,6 +9978,14 @@
           "after": "      path: '/product-attribute',\n      name: 'productAttribute',\n      component: () => import('@/pages/product/attribute/index.vue'),\n    },\n    {\n      path: '/slab-variety',\n",
           "reason": "User explicitly requested complete measurement-unit module retirement, including its page, route, service and sidebar residue, preserving all other modules."
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "      name: 'storeCustomerManagement',\n      component: () => import('@/pages/customer/index.vue'),\n    },\n    {\n      path: '/store/price-configuration',\n      name: 'storeFinishedPriceConfiguration',\n",
+          "after": "      name: 'storeCustomerManagement',\n      component: () => import('@/pages/customer/index.vue'),\n    },\n    { path: '/store/order-management', redirect: '/store/order-management/sales' },\n    ...(['sales', 'fulfillment', 'settings'] as const).map((part) => ({\n      path: `/store/order-management/${part}`,\n      name: `storeOrder-${part}`,\n      component: () => import('@/pages/order/prototype/index.vue'),\n      meta: { permissionPrefix: `store.order-management.${part}` },\n    })),\n    {\n      path: '/store/price-configuration',\n      name: 'storeFinishedPriceConfiguration',\n"
+        }
       ]
     },
     "src/services/adminPermissions.test.ts": {
@@ -9986,7 +9994,15 @@
     },
     "src/services/adminPermissions.ts": {
       "content": "7e7603f317a8814cb9c6872c2d0bb220ee7d034c8bdb4a2655e2ffb9f4e48edf",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '价格配置',\n",
+          "after": "    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '订单管理',\n    value: 'store-order-management',\n    icon: 'order-adjustment',\n    children: [\n      { label: '销售订单', path: '/store/order-management/sales', permissionPrefix: 'store.order-management.sales' },\n      {\n        label: '履约任务',\n        path: '/store/order-management/fulfillment',\n        permissionPrefix: 'store.order-management.fulfillment',\n      },\n      {\n        label: '订单配置',\n        path: '/store/order-management/settings',\n        permissionPrefix: 'store.order-management.settings',\n      },\n    ],\n  },\n  {\n    label: '价格配置',\n"
+        }
+      ]
     },
     "src/services/auth.ts": {
       "content": "134279d1224efab5afba09d5036dd764dca7e8962ccf694c9a74cb736b212263",
@@ -10108,12 +10124,32 @@
     },
     "src/services/functionAudience.ts": {
       "content": "72a32d99048b4e9a37151a2267c98a9803a164c9b11ec80e5df89b2497db3068",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "\nexport function isFunctionAllowedForAudience(permission: string, audience: string) {\n  if (!['admin', 'store', 'supplier', 'supply-chain'].includes(audience)) return false;\n  const rule = rules\n    .filter(({ prefix }) => permission === prefix || permission.startsWith(`${prefix}.`))\n    .sort((a, b) => b.prefix.length - a.prefix.length)[0];\n",
+          "after": "\nexport function isFunctionAllowedForAudience(permission: string, audience: string) {\n  if (!['admin', 'store', 'supplier', 'supply-chain'].includes(audience)) return false;\n  // Front-end prototype only; backend authorization is not changed.\n  if (permission === 'store.order-management' || permission.startsWith('store.order-management.'))\n    return audience === 'store';\n  const rule = rules\n    .filter(({ prefix }) => permission === prefix || permission.startsWith(`${prefix}.`))\n    .sort((a, b) => b.prefix.length - a.prefix.length)[0];\n"
+        }
+      ]
     },
     "src/services/functionCatalog.test.ts": {
       "content": "74ccb48297c3d1c6b680750b1e260a63db93b4fe16c97d1d9001ae759868ac67",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n      'admin.supplier-supply-type-management',\n",
+          "after": "      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n      'admin.supplier-supply-type-management',\n"
+        },
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n",
+          "after": "    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
@@ -10130,7 +10166,27 @@
     },
     "src/services/functionCatalog.ts": {
       "content": "1209bc105a9465acd24974c6fd642993f1463bc39659f30d418a2eae55f6f190",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "import { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n",
+          "after": "import { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n"
+        },
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "  'admin.tenant',\n  'store.finished-stock-management',\n  'store.customer-management',\n  'store.price-configuration',\n  'admin.product-data-center',\n  'admin.supplier-supply-type-management',\n",
+          "after": "  'admin.tenant',\n  'store.finished-stock-management',\n  'store.customer-management',\n  'store.order-management',\n  'store.price-configuration',\n  'admin.product-data-center',\n  'admin.supplier-supply-type-management',\n"
+        },
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "        storeLevelModule,\n        storeFinishedStock,\n        storeCustomerManagement,\n        storePriceConfiguration,\n        ...verifiedFunctionCatalog,\n        supplyChainProducts,\n",
+          "after": "        storeLevelModule,\n        storeFinishedStock,\n        storeCustomerManagement,\n        storeOrderPrototype,\n        storePriceConfiguration,\n        ...verifiedFunctionCatalog,\n        supplyChainProducts,\n"
+        }
+      ]
     },
     "src/services/functionCatalogAdminData.ts": {
       "content": "f9b8d99e939bd6e5da1ee6e529b82ad8e6c2d5e1ec028d4277dcc1ec301d057a",

@@ -40,6 +40,24 @@ export const adminMenuEntries: AdminMenuEntry[] = [
     permissionPrefix: 'store.customer-management',
   },
   {
+    label: '订单管理',
+    value: 'store-order-management',
+    icon: 'order-adjustment',
+    children: [
+      { label: '销售订单', path: '/store/order-management/sales', permissionPrefix: 'store.order-management.sales' },
+      {
+        label: '履约任务',
+        path: '/store/order-management/fulfillment',
+        permissionPrefix: 'store.order-management.fulfillment',
+      },
+      {
+        label: '订单配置',
+        path: '/store/order-management/settings',
+        permissionPrefix: 'store.order-management.settings',
+      },
+    ],
+  },
+  {
     label: '价格配置',
     path: '/store/price-configuration',
     icon: 'money',

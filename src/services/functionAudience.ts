@@ -3,6 +3,9 @@ import type { LoginUser } from './auth';
 
 export function isFunctionAllowedForAudience(permission: string, audience: string) {
   if (!['admin', 'store', 'supplier', 'supply-chain'].includes(audience)) return false;
+  // Front-end prototype only; backend authorization is not changed.
+  if (permission === 'store.order-management' || permission.startsWith('store.order-management.'))
+    return audience === 'store';
   const rule = rules
     .filter(({ prefix }) => permission === prefix || permission.startsWith(`${prefix}.`))
     .sort((a, b) => b.prefix.length - a.prefix.length)[0];

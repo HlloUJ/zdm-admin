@@ -384,6 +384,16 @@
         "file": "src/pages/tenant/management/index.vue",
         "visible": "purgeDialogVisible",
         "reason": "高风险删除确认流程"
+      },
+      {
+        "file": "src/pages/order/prototype/OrderEditor.vue",
+        "visible": "visible",
+        "reason": "用户批准：订单 SKU 和价格多列表单，复用公共页面与表单组件。"
+      },
+      {
+        "file": "src/pages/order/prototype/OrderActionDialog.vue",
+        "visible": "visible",
+        "reason": "用户批准：取消结算需要商品、数量与优惠矩阵；其他普通操作保留 480px 单列表单。"
       }
     ]
   }
