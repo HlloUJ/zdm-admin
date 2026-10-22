@@ -1,6 +1,6 @@
 <template>
   <t-space direction="vertical" size="large" style="width: 100%">
-    <t-space
+    <t-space break-line
       ><t-button @click="mode = 'base'">基础列表</t-button><t-button @click="mode = 'filter'">筛选列表</t-button
       ><t-button @click="mode = 'tabs'">带Tab列表</t-button
       ><t-button @click="visible = true">表单弹窗</t-button></t-space

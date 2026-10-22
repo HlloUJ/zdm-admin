@@ -6,9 +6,7 @@
 
 | 页面或共用入口                                                | 查询区域数 |
 | ------------------------------------------------------------- | ---------- |
-| `src/pages/accessory/attribute/index.vue`                     | 1          |
 | `src/pages/craft/finished-stock/index.vue`                    | 1          |
-| `src/pages/finished-stock/attribute/index.vue`                | 1          |
 | `src/pages/finished-stock/management/index.vue`               | 1          |
 | `src/pages/finished-stock/store/index.vue`                    | 2          |
 | `src/pages/finished-stock/store/price-configuration.vue`      | 1          |
@@ -34,8 +32,10 @@
 | `src/pages/customer/index.vue`                                | 1          |
 | `src/components/product-logs/ProductOperationLogTemplate.vue` | 1          |
 
-合计 28 个页面或共用入口、29 个查询区域；同一页面可由多个业务端或路由复用，共用日志入口覆盖成品现货和大板各端。
+合计 25 个页面或共用入口、26 个查询区域；同一页面可由多个业务端或路由复用，共用日志入口覆盖成品现货和大板各端。
 
 未套用查询栅格：编辑／发布表单、价格和SKU矩阵、分类属性模板“添加属性”弹窗的即时搜索、下拉组件自身搜索。它们保持原有交互，不新增查询／重置按钮。
 
 验收：每个列表路由在多种视口下校验列数、10:2及不溢出；公共入口覆盖1/2/3/4/7个字段；业务回归覆盖查询、重置、日志日期输入和编辑提交。
+
+2026-10-22：按确认清理两个无业务入口的旧属性页面，本表同步移除对应条目；在用查询区与公共样式未改变。

@@ -3,7 +3,7 @@
     <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
-      <main class="page" :class="{ 'page--form': editingId }">
+      <main class="page zdm-admin-responsive-page" :class="{ 'page--form': editingId }">
         <StoreFinishedEditor
           v-if="editingId && current && current.id === editingId && priceEditable"
           :key="editingId"
@@ -309,50 +309,52 @@
             >批量选择</t-button
           >
         </AdminListToolbar>
-        <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
-          <template #poolSelectTitle>
-            <t-checkbox
-              :checked="poolPageAllSelected"
-              :indeterminate="poolPagePartlySelected"
-              :disabled="!poolPageRows.length"
-              @change="togglePoolPage"
-            />
-          </template>
-          <template #select="{ row }"
-            ><t-checkbox
-              :checked="poolSelected.includes(row.id)"
-              @change="
-                (checked: boolean) =>
-                  (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))
-              "
-          /></template>
-          <template #imageUrl="{ row }"
-            ><t-image
-              v-if="row.imageUrl"
-              :src="row.imageUrl"
-              fit="cover"
-              :style="{ width: '48px', height: '48px' }"
-              @click="imagePreview = row.imageUrl"
-          /></template>
-          <template #product="{ row }"
-            >{{ row.name }}
-            <div>ID：{{ row.id }}</div></template
-          >
-          <template #guidePrice="{ row }">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>
-          <template #partnerPrice="{ row }">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>
-          <template #operation="{ row }"
-            ><t-link hover="color" :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
-          >
-          <template #empty>暂无可挑选的已上架商品</template>
-        </t-table>
-        <AdminPagination
-          :current="poolPage"
-          :page-size="poolPageSize"
-          :total="filteredPool.length"
-          :page-size-options="[10, 20, 50]"
-          @update:current="poolPage = $event"
-          @update:page-size="poolPageSize = $event"
-        />
+        <div>
+          <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
+            <template #poolSelectTitle>
+              <t-checkbox
+                :checked="poolPageAllSelected"
+                :indeterminate="poolPagePartlySelected"
+                :disabled="!poolPageRows.length"
+                @change="togglePoolPage"
+              />
+            </template>
+            <template #select="{ row }"
+              ><t-checkbox
+                :checked="poolSelected.includes(row.id)"
+                @change="
+                  (checked: boolean) =>
+                    (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))
+                "
+            /></template>
+            <template #imageUrl="{ row }"
+              ><t-image
+                v-if="row.imageUrl"
+                :src="row.imageUrl"
+                fit="cover"
+                :style="{ width: '48px', height: '48px' }"
+                @click="imagePreview = row.imageUrl"
+            /></template>
+            <template #product="{ row }"
+              >{{ row.name }}
+              <div>ID：{{ row.id }}</div></template
+            >
+            <template #guidePrice="{ row }">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>
+            <template #partnerPrice="{ row }">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>
+            <template #operation="{ row }"
+              ><t-link hover="color" :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
+            >
+            <template #empty>暂无可挑选的已上架商品</template>
+          </t-table>
+          <AdminPagination
+            :current="poolPage"
+            :page-size="poolPageSize"
+            :total="filteredPool.length"
+            :page-size-options="[10, 20, 50]"
+            @update:current="poolPage = $event"
+            @update:page-size="poolPageSize = $event"
+          />
+        </div>
       </t-space>
     </AdminDialog>
 
@@ -367,38 +369,9 @@
       <StorePoolProductDetail v-if="poolDetail" :product="poolDetail" />
     </t-drawer>
 
-    <AdminDialog
-      :confirmation="{ kind: 'close', text: '关闭' }"
-      confirm-function="close"
-      :visible="Boolean(logVideoPreview)"
-      header="商品视频"
-      width="min(960px, 94vw)"
-      :cancel-btn="null"
-      @confirm="logVideoPreview = null"
-      @close="logVideoPreview = null"
-      @update:visible="!$event && (logVideoPreview = null)"
-    >
-      <video v-if="logVideoPreview" :src="logVideoPreview" controls autoplay playsinline class="log-video-preview" />
-    </AdminDialog>
     <t-drawer v-model:visible="detailVisible" header="商品详情" size="min(1200px, 100vw)" :footer="false">
       <StoreProductDetail v-if="current" :product="current" />
     </t-drawer>
-
-    <AdminDialog
-      :confirmation="{ kind: 'none' }"
-      confirm-function="close"
-      :visible="Boolean(imagePreview)"
-      header="商品主图"
-      mode="modal"
-      show-overlay
-      close-on-overlay-click
-      width="min(960px, 94vw)"
-      :footer="false"
-      @close="imagePreview = null"
-      @update:visible="!$event && (imagePreview = null)"
-    >
-      <img v-if="imagePreview" :src="imagePreview" alt="商品主图" style="max-width: 100%" />
-    </AdminDialog>
 
     <AdminDialog
       v-model:visible="offShelfVisible"
@@ -481,6 +454,34 @@
         />
       </template>
     </ProductOperationLogTemplate>
+    <AdminDialog
+      :confirmation="{ kind: 'close', text: '关闭' }"
+      confirm-function="close"
+      :visible="Boolean(logVideoPreview)"
+      header="商品视频"
+      width="min(960px, 94vw)"
+      :cancel-btn="null"
+      @confirm="logVideoPreview = null"
+      @close="logVideoPreview = null"
+      @update:visible="!$event && (logVideoPreview = null)"
+    >
+      <video v-if="logVideoPreview" :src="logVideoPreview" controls autoplay playsinline class="log-video-preview" />
+    </AdminDialog>
+    <AdminDialog
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
+      :visible="Boolean(imagePreview)"
+      header="商品主图"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
+      width="min(960px, 94vw)"
+      :footer="false"
+      @close="imagePreview = null"
+      @update:visible="!$event && (imagePreview = null)"
+    >
+      <img v-if="imagePreview" :src="imagePreview" alt="商品主图" style="max-width: 100%" />
+    </AdminDialog>
   </div>
 </template>
 

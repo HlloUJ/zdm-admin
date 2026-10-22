@@ -123,6 +123,7 @@
       :confirmation="{ kind: 'close', text: '关闭' }"
       confirm-function="close"
       header="色系分类管理"
+      dialog-class-name="zdm-admin-responsive-dialog"
       width="980px"
       :cancel-btn="null"
       @confirm="categoryManagementVisible = false"
@@ -488,8 +489,5 @@ onMounted(async () => {
 }
 .table-actions {
   gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
-}
-.zdm-admin-pagination {
-  margin-top: var(--td-comp-margin-xxl);
 }
 </style>

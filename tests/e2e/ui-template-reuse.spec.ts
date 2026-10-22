@@ -47,27 +47,30 @@ test('whole page examples reuse all list modes and native client pagination with
   });
 });
 
-test('registered extension wraps predictably and contains long labels without clipping at narrower widths', async ({
+test('registered query extension contains labels controls and actions at desktop and narrow widths', async ({
   page,
 }) => {
-  for (const width of [1366, 1024, 768]) {
+  for (const width of [1366, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 858 });
     await page.goto('/tests/fixtures/official-ui/examples.html');
     const form = page.locator('.zdm-official-list-page__grid-filters');
     await expect(form.getByRole('button', { name: '查询', exact: true })).toBeVisible();
     const geometry = await form.evaluate((element) => {
       const host = element.getBoundingClientRect();
-      const fields = [...element.querySelectorAll('.t-form__item, .t-space')].map((child) =>
-        child.getBoundingClientRect(),
+      const fields = [...element.querySelectorAll('.t-form__label, .t-form__controls, .filter-actions button')].map(
+        (child) => child.getBoundingClientRect(),
       );
       return {
+        hostLeft: host.left,
         hostRight: host.right,
+        leftEdges: fields.map((rect) => rect.left),
         rightEdges: fields.map((rect) => rect.right),
         scroll: document.documentElement.scrollWidth,
         viewport: innerWidth,
       };
     });
     expect(geometry.scroll).toBeLessThanOrEqual(geometry.viewport);
+    for (const left of geometry.leftEdges) expect(left).toBeGreaterThanOrEqual(geometry.hostLeft - 1);
     for (const right of geometry.rightEdges) expect(right).toBeLessThanOrEqual(geometry.hostRight + 1);
   }
 });
@@ -80,7 +83,7 @@ for (const count of [1, 2, 3, 4, 7]) {
     const fields = form.locator('.filter-fields');
     await expect(fields.locator('.t-form__item')).toHaveCount(count);
     await host.getByPlaceholder('请输入姓名').fill('保留条件');
-    for (const width of [1689, 1024, 768]) {
+    for (const width of [1689, 1366, 1024, 992, 991, 768, 390]) {
       await page.setViewportSize({ width, height: 858 });
       const metrics = await form.evaluate((el) => {
         const grid = el.querySelector('.filter-fields')!;
@@ -92,11 +95,31 @@ for (const count of [1, 2, 3, 4, 7]) {
           return { x, y, width, bottom, height };
         });
         const labels = [...grid.querySelectorAll('.t-form__label')].map((label) => label.getBoundingClientRect().width);
-        return { columns, division, controls, labels, width: grid.getBoundingClientRect().width };
+        const actions = el.querySelector('.filter-actions')!.getBoundingClientRect();
+        const areaBox = area.getBoundingClientRect();
+        const gridBox = grid.getBoundingClientRect();
+        return {
+          columns,
+          division,
+          controls,
+          labels,
+          width: gridBox.width,
+          fieldsBottom: gridBox.bottom,
+          actions: { y: actions.y, bottom: actions.bottom, right: actions.right },
+          areaRight: areaBox.right,
+        };
       });
       const maxColumns = count >= 4 ? 4 : 3;
       expect(metrics.columns).toBe(Math.max(1, Math.min(maxColumns, Math.floor(metrics.width / 238))));
-      expect(metrics.division[0] / metrics.division[1]).toBeCloseTo(5, 1);
+      if (width > 991) {
+        expect(metrics.division).toHaveLength(2);
+        expect(metrics.division[0] / metrics.division[1]).toBeCloseTo(5, 1);
+      } else {
+        // docs/ui/query-standard.md: narrow layouts stack actions below the fields.
+        expect(metrics.division).toHaveLength(1);
+        expect(metrics.actions.y - metrics.fieldsBottom).toBeCloseTo(24, 0);
+        expect(metrics.actions.right).toBeCloseTo(metrics.areaRight, 0);
+      }
       for (const labelWidth of metrics.labels) expect(labelWidth).toBeCloseTo(80, 0);
       for (let index = 0; index < count; index++) {
         const control = metrics.controls[index];
@@ -108,7 +131,7 @@ for (const count of [1, 2, 3, 4, 7]) {
       }
       const lastBottom = Math.max(...metrics.controls.map((control) => control.bottom));
       const operations = (await host.locator('.zdm-official-list-page__operations').boundingBox())!;
-      expect(operations.y - lastBottom).toBeCloseTo(24, 0);
+      expect(operations.y - Math.max(lastBottom, metrics.actions.bottom)).toBeCloseTo(24, 0);
       await expect(host.getByPlaceholder('请输入姓名')).toHaveValue('保留条件');
       await expect(page.getByText('查询次数：0')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

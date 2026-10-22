@@ -1,3 +1,4 @@
+import { canPreviewStoreOrders } from './orderPrototypePreview';
 import { getUserFunctionAudience, isFunctionAllowedForAudience } from './functionAudience';
 import type { LoginUser } from './auth';
 
@@ -38,6 +39,24 @@ export const adminMenuEntries: AdminMenuEntry[] = [
     path: '/store/customer-management',
     icon: 'address-book',
     permissionPrefix: 'store.customer-management',
+  },
+  {
+    label: '订单管理',
+    value: 'store-order-management',
+    icon: 'assignment',
+    children: [
+      { label: '销售订单', path: '/store/order-management/sales', permissionPrefix: 'store.order-management.sales' },
+      {
+        label: '履约任务',
+        path: '/store/order-management/fulfillment',
+        permissionPrefix: 'store.order-management.fulfillment',
+      },
+      {
+        label: '款项配置',
+        path: '/store/order-management/settings',
+        permissionPrefix: 'store.order-management.settings',
+      },
+    ],
   },
   {
     label: '价格配置',
@@ -196,6 +215,7 @@ export function isSuperAdmin(user: LoginUser) {
 }
 
 export function hasPermission(user: LoginUser, permission: string) {
+  if (canPreviewStoreOrders(user, permission)) return true;
   if (!isFunctionAllowedForAudience(permission, getUserFunctionAudience(user))) return false;
   return (
     isSuperAdmin(user) ||
@@ -209,6 +229,7 @@ export function hasAnyPermission(user: LoginUser, permissions: string[]) {
 }
 
 export function hasPermissionPrefix(user: LoginUser, prefix?: string) {
+  if (canPreviewStoreOrders(user, prefix)) return true;
   if (!prefix) return true;
   if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;
   if (isSuperAdmin(user) || user.permissions.includes('all')) return true;
@@ -225,6 +246,7 @@ export function isPlatformSuperAdmin(user: LoginUser) {
 }
 
 export function hasMenuPermission(user: LoginUser, prefix?: string) {
+  if (canPreviewStoreOrders(user, prefix)) return true;
   if (prefix === 'admin.permission-management.terminal-function-allocation') return isPlatformSuperAdmin(user);
   if (!prefix) return isSuperAdmin(user) || user.permissions.includes('all');
   if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;

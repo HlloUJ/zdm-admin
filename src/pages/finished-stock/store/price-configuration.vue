@@ -4,7 +4,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main ref="priceFormRoot" class="page">
-        <div class="price-workspace">
+        <div class="price-workspace zdm-admin-responsive-panels">
           <t-card size="small" class="price-navigation">
             <t-menu width="160px" class="price-menu" :value="activeKey" @change="selectMenu">
               <t-menu-group v-for="group in menuGroups" :key="group.kind" :title="group.label">

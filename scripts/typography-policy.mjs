@@ -29,6 +29,15 @@ export function typographyViolations(file, source, officialTokens, richTextExclu
         ['src/styles/index.css', 'src/components/foundation/official/AdminListPage.vue'].includes(file)
       )
         return;
+      // User-selected scheme 1 retains the standalone design's existing system-font stack.
+      // This approval is limited to the sales-order surface and its outer table cell boundary.
+      if (
+        file === 'src/pages/order/prototype/SalesOrderList.vue' &&
+        prop === 'font-family' &&
+        value === '-apple-system, BlinkMacSystemFont, var(--td-font-family)' &&
+        ['.sales-order-list', '.order-card'].includes(parent.selector)
+      )
+        return;
       if (prop === 'font-weight' && value === '400' && parent.selector === '.form-section-title') {
         const declarations = parent.nodes.filter((node) => node.type === 'decl');
         const font = declarations.find((node) => node.prop === 'font');

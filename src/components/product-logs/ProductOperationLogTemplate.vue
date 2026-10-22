@@ -69,28 +69,30 @@
           </div>
         </div>
       </t-form>
-      <t-table row-key="id" :data="records" :columns="columns" :loading="loading" hover>
-        <template #subjectName="{ row }">
-          <div>{{ row.subjectName }}</div>
-          <div>ID：{{ row.subjectId }}</div>
-          <div v-if="row.subjectCode && subjectCodeLabel">{{ subjectCodeLabel }}：{{ row.subjectCode }}</div>
-        </template>
-        <template #operationType="{ row }">{{ productOperationTypeLabel(row.operationType) }}</template>
-        <template #operationSummary="{ row }">{{ summaryLabel(row) }}</template>
-        <template #operatedAt="{ row }">{{ formatTime(row.operatedAt) }}</template>
-        <template #operation="{ row }"
-          ><t-link hover="color" :theme="buttonTheme('view')" @click="emit('open-detail', row.id)"
-            >详情</t-link
-          ></template
-        >
-        <template #empty>暂无操作日志</template>
-      </t-table>
-      <AdminPagination
-        :current="pagination.current"
-        :page-size="pagination.pageSize"
-        :total="total"
-        @change="emit('page-change', $event)"
-      />
+      <div>
+        <t-table row-key="id" :data="records" :columns="columns" :loading="loading" hover>
+          <template #subjectName="{ row }">
+            <div>{{ row.subjectName }}</div>
+            <div>ID：{{ row.subjectId }}</div>
+            <div v-if="row.subjectCode && subjectCodeLabel">{{ subjectCodeLabel }}：{{ row.subjectCode }}</div>
+          </template>
+          <template #operationType="{ row }">{{ productOperationTypeLabel(row.operationType) }}</template>
+          <template #operationSummary="{ row }">{{ summaryLabel(row) }}</template>
+          <template #operatedAt="{ row }">{{ formatTime(row.operatedAt) }}</template>
+          <template #operation="{ row }"
+            ><t-link hover="color" :theme="buttonTheme('view')" @click="emit('open-detail', row.id)"
+              >详情</t-link
+            ></template
+          >
+          <template #empty>暂无操作日志</template>
+        </t-table>
+        <AdminPagination
+          :current="pagination.current"
+          :page-size="pagination.pageSize"
+          :total="total"
+          @change="emit('page-change', $event)"
+        />
+      </div>
     </t-space>
   </t-drawer>
   <AdminDialog

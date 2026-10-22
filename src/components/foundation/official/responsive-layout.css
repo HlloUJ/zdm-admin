@@ -1,0 +1,21 @@
+/* Shared opt-in containment for accepted legacy business layouts.
+   Desktop geometry and native component appearance remain unchanged. */
+@media (max-width: 991px) {
+  .admin-layout > .admin-shell > .page.page.zdm-admin-responsive-page {
+    min-width: 0;
+  }
+
+  .zdm-admin-responsive-page .zdm-admin-responsive-panels,
+  .zdm-admin-responsive-page .form-shell {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zdm-admin-responsive-dialog.t-dialog {
+    max-width: calc(100vw - 32px);
+  }
+
+  .zdm-admin-responsive-drawer .t-drawer__content-wrapper {
+    max-width: 100vw;
+  }
+}

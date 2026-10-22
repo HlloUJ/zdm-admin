@@ -5,7 +5,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
 
-      <main v-if="canSave" class="page">
+      <main v-if="canSave" class="page zdm-admin-responsive-page">
         <section class="allocation-card">
           <t-tabs v-model="activeTerminal" class="terminal-tabs" :list="terminalTabs" @change="handleTerminalChange" />
 
