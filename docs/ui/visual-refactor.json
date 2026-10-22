@@ -6503,6 +6503,60 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "                        <t-button\n                          v-if=\"can('create')\"\n                          :theme=\"buttonTheme('delete')\"\n                          :disabled=\"busy || loading\"\n                          @click=\"discardTarget = selected\"\n                          >删除草稿</t-button\n                        >\n                        <t-button\n                          v-if=\"can('create')\"\n                          :theme=\"buttonTheme('publish-version')\"\n                          class=\"publish-draft\"\n                          :disabled=\"busy || (dirty && !can('create'))\"\n                          @click=\"preparePublish\"\n                          >发布新版本</t-button\n                        >\n                        <t-button\n                          v-if=\"editable\"\n                          class=\"add-attribute\"\n                          :theme=\"buttonTheme('create')\"\n                          variant=\"outline\"\n                          @click=\"openAdd\"\n                          ><template #icon><t-icon name=\"add\" /></template>添加属性</t-button\n                        >\n",
+          "after": "                        <t-button\n                          v-if=\"editable\"\n                          class=\"add-attribute\"\n                          :theme=\"buttonTheme('create')\"\n                          variant=\"outline\"\n                          @click=\"openAdd\"\n                          ><template #icon><t-icon name=\"add\" /></template>添加属性</t-button\n                        >\n                        <t-button\n                          v-if=\"can('create')\"\n                          :theme=\"buttonTheme('publish-version')\"\n                          class=\"publish-draft\"\n                          :disabled=\"busy || (dirty && !can('create'))\"\n                          @click=\"preparePublish\"\n                          >发布新版本</t-button\n                        >\n                        <t-button\n                          v-if=\"can('create')\"\n                          :theme=\"buttonTheme('delete')\"\n                          :disabled=\"busy || loading\"\n                          @click=\"discardTarget = selected\"\n                          >删除草稿</t-button\n                        >\n",
+          "reason": "2026-10-22 用户要求删除草稿位于发布新版本之后；保持添加属性、发布新版本、删除草稿的视觉及键盘顺序",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "                            >待发布版本 <span class=\"metadata-value\">V{{ nextAttributeVersion }}</span></span\n                          >\n                        </t-space>\n                        <t-button\n                          v-if=\"can('create')\"\n                          :theme=\"buttonTheme('publish-version')\"\n",
+          "after": "                            >待发布版本 <span class=\"metadata-value\">V{{ nextAttributeVersion }}</span></span\n                          >\n                        </t-space>\n                        <t-button\n                          v-if=\"can('create')\"\n                          :theme=\"buttonTheme('delete')\"\n                          :disabled=\"busy || loading\"\n                          @click=\"discardTarget = selected\"\n                          >删除草稿</t-button\n                        >\n                        <t-button\n                          v-if=\"can('create')\"\n                          :theme=\"buttonTheme('publish-version')\"\n",
+          "reason": "2026-10-22 用户确认双模板删除草稿、草稿箱全部功能沿用创建权限；复用全局按钮弹框和反馈，协调自动保存并保留已发布排序权限",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "      />\n    </AdminDialog>\n    <AdminConfirmDialog\n      function=\"remove\"\n      :visible=\"!!removeTarget\"\n      action=\"移除\"\n",
+          "after": "      />\n    </AdminDialog>\n    <AdminConfirmDialog\n      function=\"delete\"\n      action=\"删除\"\n      :visible=\"!!discardTarget\"\n      object-type=\"模板草稿\"\n      :object-name=\"discardCategoryName\"\n      :confirm-btn=\"{ loading: busy }\"\n      :close-on-overlay-click=\"!busy\"\n      :close-on-esc-keydown=\"!busy\"\n      @confirm=\"discardDraft\"\n      @close=\"!busy && (discardTarget = undefined)\"\n      @cancel=\"!busy && (discardTarget = undefined)\"\n    />\n    <AdminConfirmDialog\n      function=\"remove\"\n      :visible=\"!!removeTarget\"\n      action=\"移除\"\n",
+          "reason": "2026-10-22 用户确认双模板删除草稿、草稿箱全部功能沿用创建权限；复用全局按钮弹框和反馈，协调自动保存并保留已发布排序权限",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  saveTemplateDraft,\n  saveTemplateDisplayOrder,\n  publishTemplateDraft,\n  versionLabel,\n  type TemplateScope,\n  type TemplateVersion,\n",
+          "after": "  saveTemplateDraft,\n  saveTemplateDisplayOrder,\n  publishTemplateDraft,\n  discardTemplateDraft,\n  versionLabel,\n  type TemplateScope,\n  type TemplateVersion,\n",
+          "reason": "2026-10-22 用户确认双模板删除草稿、草稿箱全部功能沿用创建权限；复用全局按钮弹框和反馈，协调自动保存并保留已发布排序权限",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "const saved = ref('');\nconst loading = ref(false);\nconst busy = ref(false);\nlet savePromise: Promise<boolean> | undefined;\nconst validatedAttributeIds = ref<number[]>([]);\nlet loadSequence = 0;\n",
+          "after": "const saved = ref('');\nconst loading = ref(false);\nconst busy = ref(false);\nconst discarding = ref(false);\nlet savePromise: Promise<boolean> | undefined;\nconst validatedAttributeIds = ref<number[]>([]);\nlet loadSequence = 0;\n",
+          "reason": "2026-10-22 用户确认双模板删除草稿、草稿箱全部功能沿用创建权限；复用全局按钮弹框和反馈，协调自动保存并保留已发布排序权限",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "const isDraft = computed(() => selected.value?.state === 'draft');\nconst editable = computed(() => isDraft.value && can('create') && !busy.value);\nconst canSortAttributes = computed(\n  () => !!selected.value && can('sort') && (!isDraft.value || editable.value) && !busy.value && !loading.value,\n);\nconst specificationCount = computed(\n  () => rows.value.filter((row) => row.attributeRole === 'sales' && row.skuFlag).length,\n",
+          "after": "const isDraft = computed(() => selected.value?.state === 'draft');\nconst editable = computed(() => isDraft.value && can('create') && !busy.value);\nconst canSortAttributes = computed(\n  () => !!selected.value && (isDraft.value ? editable.value : can('sort')) && !busy.value && !loading.value,\n);\nconst specificationCount = computed(\n  () => rows.value.filter((row) => row.attributeRole === 'sales' && row.skuFlag).length,\n",
+          "reason": "2026-10-22 用户确认双模板删除草稿、草稿箱全部功能沿用创建权限；复用全局按钮弹框和反馈，协调自动保存并保留已发布排序权限",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  savePromise = (async () => {\n    try {\n      // Serialize saves so rapid edits always use the latest server revision.\n      while (selected.value?.id === draftId && isDraft.value && dirty.value) {\n        const snapshot = JSON.stringify([content(), note.value]);\n        const [draftContent, draftNote] = JSON.parse(snapshot) as [TemplateVersion['content'], string];\n        const updated = await saveTemplateDraft(draftId, selected.value.revision, draftContent, draftNote);\n",
+          "after": "  savePromise = (async () => {\n    try {\n      // Serialize saves so rapid edits always use the latest server revision.\n      while (selected.value?.id === draftId && isDraft.value && dirty.value && !discarding.value) {\n        const snapshot = JSON.stringify([content(), note.value]);\n        const [draftContent, draftNote] = JSON.parse(snapshot) as [TemplateVersion['content'], string];\n        const updated = await saveTemplateDraft(draftId, selected.value.revision, draftContent, draftNote);\n",
+          "reason": "2026-10-22 用户确认双模板删除草稿、草稿箱全部功能沿用创建权限；复用全局按钮弹框和反馈，协调自动保存并保留已发布排序权限",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "watch(\n  () => JSON.stringify([selectedId.value, content(), note.value]),\n  () => {\n    if (isDraft.value && can('create') && !loading.value && dirty.value) void save();\n  },\n  { flush: 'post' },\n);\nconst publishVisible = ref(false);\nasync function preparePublish() {\n  if (!(await save())) return;\n",
+          "after": "watch(\n  () => JSON.stringify([selectedId.value, content(), note.value]),\n  () => {\n    if (isDraft.value && can('create') && !loading.value && !discarding.value && dirty.value) void save();\n  },\n  { flush: 'post' },\n);\nconst discardTarget = ref<TemplateVersion>();\nconst discardCategoryName = computed(\n  () => categories.value.find((c) => c.id === discardTarget.value?.categoryId)?.name || '',\n);\nasync function discardDraft() {\n  const target = discardTarget.value;\n  if (!target || busy.value || loading.value || !can('create') || !isDraft.value || selectedId.value !== target.id)\n    return;\n  const targetName = discardCategoryName.value;\n  busy.value = true;\n  discarding.value = true;\n  try {\n    if (savePromise && !(await savePromise)) return;\n    const current = versions.value.find((v) => v.id === target.id);\n    if (!current || current.state !== 'draft') return;\n    await discardTemplateDraft(current.id, current.revision);\n    pendingEdits.delete(current.id);\n    versions.value = versions.value.filter((v) => v.id !== current.id);\n    const published = versions.value.find((v) => v.state === 'published');\n    viewSelections.set(viewKey(), published?.id);\n    choose(published);\n    discardTarget.value = undefined;\n    adminFeedback.actionSuccess({ action: '删除', target: targetName });\n  } catch (e) {\n    error(e, '删除', targetName);\n  } finally {\n    busy.value = false;\n    discarding.value = false;\n  }\n}\nconst publishVisible = ref(false);\nasync function preparePublish() {\n  if (!(await save())) return;\n",
+          "reason": "2026-10-22 用户确认双模板删除草稿、草稿箱全部功能沿用创建权限；复用全局按钮弹框和反馈，协调自动保存并保留已发布排序权限",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "      .filter((c) => (c.parentId || undefined) === parentId)\n",
+          "after": "      .filter((c) => (c.parentId || undefined) === parentId)\n      .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0))\n",
+          "reason": "2026-10-22 用户要求分类属性模板分类树与商品分类管理排序一致：各层优先排序值升序，同值保留创建时间及ID倒序；不改变默认选中与模板交互",
+          "stage": "before-migrations"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
           "before": "<t-drawer v-model:visible=\"historyVisible\" header=\"版本记录\" size=\"760px\" :footer=\"false\">",

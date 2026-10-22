@@ -125,6 +125,52 @@ async function expectAccessoryCategorySelected(page: Page) {
   await expect(page.locator('.category-content .t-tree__item[data-value="3"]')).toHaveCount(0);
 }
 
+test('both template trees follow configured sibling order with creation-time and id tie breaks', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/admin/template-versions/categories?*', async (route) => {
+    const scope = new URL(route.request().url()).searchParams.get('scope');
+    const nodes = [
+      { id: 10, name: '根分类后', sortOrder: 2 },
+      { id: 20, name: '根分类前', sortOrder: 1 },
+      { id: 21, parentId: 20, name: '二级后', sortOrder: 2 },
+      { id: 22, parentId: 20, name: '二级前', sortOrder: 1 },
+      { id: 31, parentId: 22, name: '三级后', sortOrder: 2 },
+      { id: 32, parentId: 22, name: '三级前', sortOrder: 1 },
+      { id: 41, parentId: 32, name: '四级后', sortOrder: 2 },
+      { id: 42, parentId: 32, name: '四级较旧', sortOrder: 1, createdAt: '2026-10-20T09:00:00' },
+      { id: 43, parentId: 32, name: '四级同时间小ID', sortOrder: 1 },
+      { id: 44, parentId: 32, name: '四级同时间大ID', sortOrder: 1 },
+    ];
+    await route.fulfill({
+      json: {
+        code: 0,
+        data: nodes.map((node) => ({
+          status: 'enabled',
+          createdAt: '2026-10-21T09:00:00',
+          ...node,
+          scope,
+        })),
+      },
+    });
+  });
+  await page.goto('/category-attribute-template');
+  for (const tab of ['成品现货模板', '配件模板']) {
+    await page.getByText(tab, { exact: true }).click();
+    await expect(page.locator('.category-content .t-tree__label')).toHaveText([
+      '根分类前',
+      '二级前',
+      '三级前',
+      '四级同时间大ID',
+      '四级同时间小ID',
+      '四级较旧',
+      '四级后',
+      '三级后',
+      '二级后',
+      '根分类后',
+    ]);
+  }
+});
+
 test('tabs retain automatically saved drafts', async ({ page }) => {
   const versions = await setup(page);
   await page.goto('/category-attribute-template');
@@ -657,6 +703,8 @@ test('create permission includes continuing and all draft controls without histo
   await expect(page.getByRole('button', { name: '发布新版本', exact: true })).toBeVisible();
   await expect(page.getByText('移除', { exact: true })).toBeVisible();
   await expect(page.locator('.attribute-table .required-switch')).toBeVisible();
+  await expect(page.locator('.attribute-table .t-icon-move')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '删除草稿', exact: true })).toBeVisible();
 });
 
 test('history permission gives version records but no draft access', async ({ page }) => {
@@ -664,6 +712,7 @@ test('history permission gives version records but no draft access', async ({ pa
   await setup(page, [prefix + 'view', prefix + 'history']);
   await page.goto('/category-attribute-template');
   await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '删除草稿', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '版本记录', exact: true }).click();
   await expect(page.locator('.t-drawer')).toBeVisible();
   await expect(page.locator('.t-drawer').getByText('复制', { exact: true })).toHaveCount(0);
@@ -724,3 +773,121 @@ for (const action of ['create', 'sort']) {
     await expect(page.locator('.attribute-table .t-icon-move')).toHaveCount(action === 'sort' ? 1 : 0);
   });
 }
+
+for (const scope of ['finished', 'accessory']) {
+  for (const hasPublished of [true, false]) {
+    test(`${scope} deletes only its draft with create permission and ${hasPublished ? 'returns to published version' : 'returns to empty state'}`, async ({
+      page,
+    }) => {
+      const prefix = `admin.product-data-center.category-attribute-template.${scope}.attributes.`;
+      const versions = await setup(page, [prefix + 'view', prefix + 'create']);
+      const categoryId = scope === 'finished' ? 3 : 4;
+      versions.forEach((v) => {
+        v.categoryId = categoryId;
+      });
+      if (!hasPublished) {
+        versions.splice(0, 1);
+        versions[0]!.content = [];
+      }
+      await page.goto('/category-attribute-template');
+      await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+      const entry = page.getByRole('button', { name: '删除草稿', exact: true });
+      await expect(entry).toHaveClass(/t-button--theme-danger/);
+      await expect(entry).not.toHaveClass(/t-button--variant-outline/);
+      await entry.click();
+      const dialog = page.locator('.t-dialog:visible');
+      const name = scope === 'finished' ? '岩板餐桌' : '桌腿';
+      await expect(dialog.locator('.t-dialog__header')).toHaveText('是否删除');
+      await expect(dialog).toContainText(`是否删除模板草稿“${name}”？`);
+      await expect(dialog).toHaveCSS('width', '480px');
+      await dialog.getByRole('button', { name: '取消', exact: true }).click();
+      expect(versions.some((v) => v.state === 'draft')).toBe(true);
+      await expect(entry).toBeVisible();
+      await entry.click();
+      const deletion = page.waitForRequest(
+        (r) => r.method() === 'DELETE' && r.url().includes('/template-versions/2?revision=0'),
+      );
+      await dialog.getByRole('button', { name: '确认删除', exact: true }).click();
+      await deletion;
+      await expect(page.getByText(`已删除“${name}”`, { exact: true })).toBeVisible();
+      expect(versions.some((v) => v.state === 'draft')).toBe(false);
+      await expect(entry).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '创建新版本草稿', exact: true })).toBeVisible();
+      if (hasPublished) {
+        await expect(page.locator('.template-metadata')).toContainText('V1');
+        expect(versions[0]!.versionNo).toBe(1);
+      } else {
+        await expect(page.getByText('当前分类暂无版本，请创建草稿', { exact: true })).toBeVisible();
+      }
+      await expect(
+        page.locator(`.category-content .t-tree__item[data-value="${categoryId}"].t-is-active`),
+      ).toBeVisible();
+      await page.reload();
+      await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '创建新版本草稿', exact: true })).toBeVisible();
+    });
+  }
+}
+
+test('deleting a draft waits for in-flight auto-save and uses its new revision without writing it back', async ({
+  page,
+}) => {
+  const prefix = 'admin.product-data-center.category-attribute-template.finished.attributes.';
+  const versions = await setup(page, [prefix + 'view', prefix + 'create']);
+  let releaseSave!: () => void;
+  const saveGate = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  let writes = 0;
+  const events: string[] = [];
+  await page.route('**/api/admin/template-versions/2**', async (route) => {
+    if (route.request().method() === 'PUT') {
+      writes++;
+      await saveGate;
+      events.push('saved');
+    } else if (route.request().method() === 'DELETE') {
+      events.push('deleted');
+      expect(new URL(route.request().url()).searchParams.get('revision')).toBe('1');
+    }
+    await route.fallback();
+  });
+  await page.goto('/category-attribute-template');
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  const saving = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/template-versions/2'));
+  await page.locator('.attribute-table .required-switch').click();
+  await saving;
+  // Queue a newer local edit while the first save is still pending.
+  await page.locator('.attribute-table .required-switch').click();
+  await page.getByRole('button', { name: '删除草稿', exact: true }).click();
+  await page.getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(page.getByRole('button', { name: '确认删除', exact: true })).toHaveClass(/t-is-loading/);
+  releaseSave();
+  await expect(page.getByText('已删除“岩板餐桌”', { exact: true })).toBeVisible();
+  expect(events).toEqual(['saved', 'deleted']);
+  expect(writes).toBe(1);
+  expect(versions.some((v) => v.id === 2)).toBe(false);
+  await page.reload();
+  await expect(page.getByRole('button', { name: '创建新版本草稿', exact: true })).toBeVisible();
+  expect(writes).toBe(1);
+});
+
+test('failed draft deletion preserves editor data and allows retry', async ({ page }) => {
+  const versions = await setup(page);
+  let fail = true;
+  await page.route('**/api/admin/template-versions/2?*', async (route) => {
+    if (route.request().method() === 'DELETE' && fail) {
+      await route.fulfill({ status: 400, json: { code: 1, message: '草稿已被其他操作更新，请刷新后重试' } });
+    } else await route.fallback();
+  });
+  await page.goto('/category-attribute-template');
+  await page.getByRole('button', { name: '继续编辑草稿', exact: true }).click();
+  await page.getByRole('button', { name: '删除草稿', exact: true }).click();
+  const confirm = page.getByRole('button', { name: '确认删除', exact: true });
+  await confirm.click();
+  await expect(page.getByText('删除“岩板餐桌”失败：草稿已被其他操作更新，请刷新后重试', { exact: true })).toBeVisible();
+  await expect(page.locator('.attribute-table')).toContainText('颜色');
+  expect(versions.some((v) => v.id === 2)).toBe(true);
+  fail = false;
+  await confirm.click();
+  await expect(page.getByText('已删除“岩板餐桌”', { exact: true })).toBeVisible();
+});
