@@ -10483,6 +10483,13 @@
       "property": "box-shadow",
       "value": "0 4px 12px rgb(0 0 0 / 10%)",
       "reason": "2026-10-16 user explicitly requires approved proposal C shadow instead of the official default; identity popup only."
+    },
+    {
+      "file": "src/pages/order/prototype/SalesOrderList.vue",
+      "selector": ".order-card",
+      "property": "--order-identity-color",
+      "value": "#5b75a6",
+      "reason": "2026-10-22 用户最终确认销售订单号与前置竖条采用雾蓝色 #5b75a6，保持普通文本语义、字号及业务布局。"
     }
   ]
 }

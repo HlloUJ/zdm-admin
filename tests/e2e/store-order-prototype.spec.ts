@@ -50,10 +50,8 @@ test('store order prototype has five status views and drill-down without busines
   const number = page.getByText(/^XS\d{13}$/);
   await expect(number).not.toHaveAttribute('role');
   await expect(number).not.toHaveAttribute('tabindex');
-  await expect(number.locator('..')).toHaveCSS(
-    'color',
-    await number.evaluate((element) => getComputedStyle(element).getPropertyValue('--td-text-color-primary').trim()),
-  );
+  await expect(number.locator('..')).toHaveCSS('color', 'rgb(91, 117, 166)');
+  await expect(number.locator('xpath=ancestor::header')).toHaveCSS('border-left-color', 'rgb(91, 117, 166)');
   await expect(number.locator('..')).toHaveCSS('font-weight', '600');
   await number.click();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
