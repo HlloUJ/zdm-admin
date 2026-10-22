@@ -96,6 +96,7 @@ describe('full function catalog', () => {
       'admin.tenant',
       'store.finished-stock-management',
       'store.customer-management',
+      'store.accessory-management',
       'store.order-management',
       'store.price-configuration',
       'admin.product-data-center',
@@ -108,6 +109,7 @@ describe('full function catalog', () => {
     expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([
       'store.finished-stock-management',
       'store.customer-management',
+      'store.accessory-management',
       'store.order-management',
       'store.price-configuration',
       'admin.supplier-management',

@@ -1,8 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
+import { installAdminApiMocks as installAccessoryApiMocks } from './accessory-api-mocks';
 import { expectOfficialLayout } from './filter-layout-assertions';
 
+// Accessory route wrappers reuse these exact existing query implementations.
+// Include all three new routes in the same viewport/overlap assertions.
+const sharedQuerySources: Record<string, string> = {
+  '/accessory-management': 'src/pages/finished-stock/management/index.vue',
+  '/supply-chain/accessory-management': 'src/pages/finished-stock/supply-chain/index.vue',
+  '/store/accessory-management': 'src/pages/finished-stock/store/index.vue',
+};
 const routes = [
   ...readFileSync('src/router/index.ts', 'utf8').matchAll(
     /path: '([^']+)'[\s\S]*?component: \(\) => import\('([^']+)'\)/g,
@@ -12,7 +20,7 @@ const routes = [
     ([, route, file]) =>
       !route.includes(':') &&
       route !== '/store/customer-management' &&
-      readFileSync(file.replace('@/', 'src/'), 'utf8').includes('zdm-admin-filter-form'),
+      readFileSync(sharedQuerySources[route] ?? file.replace('@/', 'src/'), 'utf8').includes('zdm-admin-filter-form'),
   )
   .map(([, route]) => route);
 
@@ -35,7 +43,8 @@ for (const route of routes) {
         }),
       );
     }, route);
-    await installAdminApiMocks(page);
+    if (route.includes('accessory-management')) await installAccessoryApiMocks(page);
+    else await installAdminApiMocks(page);
     await page.goto(route);
     const forms = page.locator('.t-form.zdm-admin-filter-form:visible');
     await expect(forms.first()).toBeVisible();

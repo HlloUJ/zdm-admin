@@ -164,6 +164,78 @@ export const storeFinishedStock: FunctionModule = {
   ],
 };
 
+export const storeAccessoryStock: FunctionModule = {
+  label: '配件管理',
+  value: 'store.accessory-management',
+  audiences: ['store'],
+  menus: [
+    {
+      label: '配件管理',
+      value: 'store.accessory-management.menu',
+      direct: true,
+      pages: [
+        {
+          label: '配件管理页',
+          value: 'store.accessory-management',
+          actions: [{ label: '操作日志', value: 'store.accessory-management.operation-log.view' }],
+          tabs: [
+            {
+              label: '仓库中',
+              value: 'store.accessory-management.warehouse',
+              actions: [
+                ['select', '商品中心'],
+                ['batch-shelf', '批量上架'],
+                ['shelf', '上架'],
+                ['edit', '编辑'],
+                ['delete', '删除'],
+              ].map(([code, label]) => ({ label, value: `store.accessory-management.warehouse.${code}` })),
+            },
+            {
+              label: '已上架',
+              value: 'store.accessory-management.selling',
+              actions: [
+                ['batch-off-shelf', '批量下架'],
+                ['off-shelf', '下架'],
+                ['edit', '编辑'],
+              ].map(([code, label]) => ({ label, value: `store.accessory-management.selling.${code}` })),
+            },
+            {
+              label: '已下架',
+              value: 'store.accessory-management.off-shelf',
+              actions: [
+                ['batch-restore', '批量放回到仓库'],
+                ['detail', '详情'],
+                ['restore', '放回仓库'],
+                ['delete', '删除'],
+              ].map(([code, label]) => ({ label, value: `store.accessory-management.off-shelf.${code}` })),
+            },
+            {
+              label: '已售完',
+              value: 'store.accessory-management.sold-out',
+              actions: [['detail', '详情']].map(([code, label]) => ({
+                label,
+                value: `store.accessory-management.sold-out.${code}`,
+              })),
+            },
+            {
+              label: '回收站',
+              value: 'store.accessory-management.recycle',
+              actions: [
+                ['batch-restore', '批量放回到仓库'],
+                ['batch-purge', '批量彻底删除'],
+                ['clear', '清空回收站'],
+                ['detail', '详情'],
+                ['restore', '放回仓库'],
+                ['purge', '彻底删除'],
+              ].map(([code, label]) => ({ label, value: `store.accessory-management.recycle.${code}` })),
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 export const storePriceConfiguration: FunctionModule = {
   label: '价格配置',
   value: 'store.price-configuration',

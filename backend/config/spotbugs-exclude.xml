@@ -20,7 +20,9 @@
     <Or>
       <Class name="com.zdm.platform.inventory.CityPartnerStoreScope"/>
       <Class name="com.zdm.platform.inventory.FinishedInvalidationMedia"/>
+      <Class name="com.zdm.platform.inventory.AccessoryInvalidationMedia"/>
       <Class name="com.zdm.platform.inventory.StoreFinishedSelectionSnapshot"/>
+      <Class name="com.zdm.platform.inventory.StoreAccessorySelectionSnapshot"/>
     </Or>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>

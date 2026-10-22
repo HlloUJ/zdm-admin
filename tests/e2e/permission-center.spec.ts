@@ -5,7 +5,7 @@ import { installAdminApiMocks } from './admin-api-mocks';
 const storeCategoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '排序', '停用/启用', '删除'];
 const categoryCatalogActionLabels = ['查看', '新增一级分类', '新增下级', '编辑', '排序', '停用/启用', '删除'];
 const productSecondMenuLabels = ['商品公共基础数据', '成品现货基础数据', '大板基础数据'];
-const adminProductSecondMenuLabels = ['成品现货管理', '大板管理', ...productSecondMenuLabels];
+const adminProductSecondMenuLabels = ['成品现货管理', '配件管理', '大板管理', ...productSecondMenuLabels];
 const productThirdMenuLabels = [
   '商品分类管理',
   '属性库管理',
@@ -19,6 +19,7 @@ const productThirdMenuLabels = [
   '等级管理',
 ];
 const adminProductThirdMenuLabels = [
+  '—',
   '—',
   '—',
   ...productThirdMenuLabels.slice(0, 4),
@@ -1114,7 +1115,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('商品管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(30);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(37);
   const finishedRows = roleMatrix.locator('tbody tr');
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
@@ -1128,11 +1129,15 @@ test('opens role permission configuration dialog', async ({ page }) => {
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
   }
+  await expect(finishedRows.nth(6)).toContainText('配件管理页');
+  for (const [index, labels] of expectedFinishedActions.entries()) {
+    await expect(finishedRows.nth(index + 6).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
+  }
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
   const slabGlobalPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '页面全局' }).last();
   await expect(slabGlobalPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(['操作日志']);
-  await expect(roleMatrix.getByText('操作日志', { exact: true })).toHaveCount(2);
+  await expect(roleMatrix.getByText('操作日志', { exact: true })).toHaveCount(3);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
   const finishedCategoryPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品现货分类' });
@@ -1177,6 +1182,10 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const markupActionLabels = ['查看', '保存指导价', '新增', '编辑', '停用/启用', '排序', '删除'];
   const finishedMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '成品价格配置' });
   const slabMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '大板价格配置' });
+  const accessoryMarkupPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '配件价格配置' });
+  await expect(accessoryMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
+    markupActionLabels,
+  );
   await expect(finishedMarkupPermissionRow.getByText('价格配置', { exact: true })).toBeVisible();
   await expect(finishedMarkupPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(
     markupActionLabels,
@@ -1311,7 +1320,9 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {
     await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
     await expect(moduleList.locator('.permission-module-item > span:first-child')).toHaveText([
-      ...(terminal === '城市合伙人门店管理后台' ? ['成品现货管理', '客户管理', '订单管理', '价格配置'] : []),
+      ...(terminal === '城市合伙人门店管理后台'
+        ? ['成品现货管理', '客户管理', '配件管理', '订单管理', '价格配置']
+        : []),
       '供应商管理',
       '门店分类管理',
       '权限管理',
@@ -1320,6 +1331,11 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       await moduleList.getByText('成品现货管理', { exact: true }).click();
       await expect(matrix.getByText('一级菜单直达')).toBeVisible();
       await expect(matrix.locator('tbody .permission-menu-cell').first()).toHaveText('一级菜单直达');
+      for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
+        await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
+      }
+      await moduleList.getByText('配件管理', { exact: true }).click();
+      await expect(matrix.getByText('配件管理页', { exact: true })).toBeVisible();
       for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
         await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
       }
@@ -1391,7 +1407,9 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   await expect(matrix.locator('.module-allocation-count')).toHaveText('已下放 14 / 14');
 });
 
-test('assigns supply-chain off-shelf detail rights separately for finished stock and slabs', async ({ page }) => {
+test('assigns supply-chain off-shelf detail rights separately for finished stock, accessories and slabs', async ({
+  page,
+}) => {
   await page.goto('/terminal-function-allocation');
   const main = page.getByRole('main');
   await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
@@ -1402,8 +1420,8 @@ test('assigns supply-chain off-shelf detail rights separately for finished stock
   const offShelf = matrix.locator('tbody tr').filter({
     has: page.locator('.permission-tab-cell').getByText('已下架', { exact: true }),
   });
-  await expect(offShelf).toHaveCount(2);
-  for (let index = 0; index < 2; index += 1) {
+  await expect(offShelf).toHaveCount(3);
+  for (let index = 0; index < 3; index += 1) {
     const detail = offShelf.nth(index).getByRole('checkbox', { name: '详情', exact: true });
     await expect(detail).toBeEnabled();
     await offShelf.nth(index).getByText('详情', { exact: true }).click();
@@ -1415,6 +1433,7 @@ test('assigns supply-chain off-shelf detail rights separately for finished stock
   await main.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const permissions = (await saved).postDataJSON().functionPermissions.split(',');
   expect(permissions).toContain('supply-chain.finished-stock-management.off-shelf.detail');
+  expect(permissions).toContain('supply-chain.accessory-management.off-shelf.detail');
   expect(permissions).toContain('supply-chain.slab-management.off-shelf.detail');
 });
 

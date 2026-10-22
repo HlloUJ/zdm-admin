@@ -1,7 +1,8 @@
+import { useCommodityModule } from '@/composables/useCommodityModule';
 import { computed, reactive, ref } from 'vue';
 import { adminFeedback, getSafeErrorMessage } from '@/components/foundation';
 import { productLogFilterOptions } from '@/services/productOperationLog';
-import { getStoreFinishedLog, listStoreFinishedLogs, type StoreFinishedLog } from '@/services/storeFinishedStock';
+import { type StoreFinishedLog } from '@/services/storeFinishedStock';
 import {
   isStoreStatusOperation,
   parseStoreOperationLogChanges,
@@ -10,6 +11,8 @@ import {
 
 /** State and requests for the store-owned operation log, independent of the public product log. */
 export function useStoreFinishedLogs(stateLabel: (value?: string | null) => string) {
+  const commodity = useCommodityModule();
+  const { getStoreFinishedLog, listStoreFinishedLogs } = commodity.store;
   const logsVisible = ref(false);
   const logs = ref<StoreFinishedLog[]>([]);
   const logTotal = ref(0);

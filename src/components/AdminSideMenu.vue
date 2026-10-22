@@ -106,7 +106,11 @@ onMounted(async () => {
 onBeforeUnmount(rememberScroll);
 
 const activeMenu = computed(() =>
-  route.name === 'storeFinishedStockEdit' ? '/store/finished-stock-management' : route.path,
+  route.name === 'storeAccessoryEdit'
+    ? '/store/accessory-management'
+    : route.name === 'storeFinishedStockEdit'
+      ? '/store/finished-stock-management'
+      : route.path,
 );
 const loginUser = computed(() => getLoginUser());
 const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
@@ -133,6 +137,7 @@ const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
 
 const baseInfoPaths = new Set([
   '/finished-stock-management',
+  '/accessory-management',
   '/slab-management',
   '/product-category',
   '/product-attribute',

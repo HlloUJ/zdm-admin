@@ -1,0 +1,869 @@
+import type { Page, Route } from '@playwright/test';
+
+const apiOk = (data: unknown) => ({
+  code: 0,
+  message: 'ok',
+  data,
+});
+
+const fulfillJson = (route: Route, data: unknown) =>
+  route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(apiOk(data)),
+  });
+
+const tenants = [
+  {
+    id: 1,
+    name: '装点猫直营租户',
+    contactPhone: '15926626945',
+    status: 'enabled',
+    businessTypes: 'cityPartner,slabSupplier,finishedSupplier,factory',
+    remark: '系统内置平台租户',
+    createdAt: '2026-07-27T09:00:00',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+  },
+  {
+    id: 2,
+    name: '临时归档租户',
+    contactPhone: '15926626949',
+    status: 'disabled',
+    businessTypes: 'cityPartner',
+    remark: '用于租户生命周期交互验证',
+    createdAt: '2026-07-26T09:00:00',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+  },
+];
+
+const stores = [
+  {
+    id: 1,
+    tenantId: 1,
+    name: '杭州体验门店',
+    type: 'cityPartner',
+    storeLevelId: 1,
+    manager: '超级管理员',
+    region: 'zhejiang/hangzhou/xihu',
+    detailAddress: '样例地址 1 号',
+    address: '浙江省杭州市西湖区样例地址 1 号',
+    status: 'enabled',
+    remark: '系统内置门店',
+    createdAt: '2026-07-27T09:00:00',
+    createdBy: '韩健',
+  },
+];
+
+const archivedStores = [
+  {
+    ...stores[0],
+    id: 2,
+    name: '已归档门店',
+    status: 'disabled',
+    createdAt: '2026-07-26T09:00:00',
+  },
+];
+
+const storeLevels = [
+  {
+    id: 1,
+    name: '1级',
+    sortOrder: 1,
+    priceComplete: true,
+    status: 'enabled',
+    createdByName: '韩健',
+    remark: '历史店铺级别迁移',
+    createdAt: '2026-08-17T08:00:00',
+  },
+  {
+    id: 2,
+    name: '2级',
+    sortOrder: 2,
+    priceComplete: true,
+    status: 'enabled',
+    createdByName: '韩健',
+    remark: '历史店铺级别迁移',
+    createdAt: '2026-08-17T07:00:00',
+  },
+  {
+    id: 3,
+    name: '3级',
+    sortOrder: 3,
+    priceComplete: false,
+    status: 'disabled',
+    createdByName: '韩健',
+    remark: '已停用级别',
+    createdAt: '2026-08-17T06:00:00',
+  },
+];
+
+const suppliers = [
+  {
+    id: 1,
+    name: '装点猫大板供应商',
+    supplyTypeIds: [1],
+    supplyTypes: [{ id: 1, code: 'slab', name: '大板', status: 'enabled' }],
+    contactName: '供应商联系人',
+    contactPhone: '15926626946',
+    qualificationStatus: 'approved',
+    status: 'enabled',
+    remark: '系统内置供应商',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 2,
+    name: '装点猫成品供应商',
+    supplyTypeIds: [2],
+    supplyTypes: [{ id: 2, code: 'accessory', name: '配件', status: 'enabled' }],
+    contactName: '成品联系人',
+    contactPhone: '15926626947',
+    qualificationStatus: 'approved',
+    status: 'enabled',
+    remark: 'E2E 成品供应商',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const supplierSupplyTypes = [
+  {
+    id: 2,
+    code: 'accessory',
+    name: '配件',
+    status: 'enabled',
+    referenced: true,
+    createdByName: '系统初始化',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 1,
+    code: 'slab',
+    name: '大板',
+    status: 'enabled',
+    referenced: true,
+    createdByName: '系统初始化',
+    createdAt: '2026-07-27T08:00:00',
+  },
+];
+
+const roles = [
+  {
+    id: 1,
+    name: '超级管理员',
+    code: 'SUPER_ADMIN',
+    dataScope: 'all',
+    status: 'enabled',
+    remark: '系统内置角色',
+    functionPermissions: 'all',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 2,
+    name: '运营管理平台角色',
+    code: 'OPERATION_MANAGER',
+    dataScope: 'all',
+    status: 'enabled',
+    remark: 'E2E 运营角色',
+    functionPermissions: 'admin.permission-management.role-management.view',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 3,
+    name: '未配置权限角色',
+    code: 'EMPTY_PERMISSION_ROLE',
+    dataScope: 'all',
+    status: 'enabled',
+    remark: 'E2E 未配置权限角色',
+    functionPermissions: '',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const terminalFunctionPolicies = [
+  { id: 1, terminal: 'store', functionPermissions: '' },
+  { id: 2, terminal: 'supplier', functionPermissions: '' },
+];
+
+const employees = [
+  {
+    id: 1,
+    tenantId: 1,
+    storeId: 1,
+    name: '超级管理员',
+    gender: 'male',
+    phone: '15926626945',
+    status: 'enabled',
+    roleIds: '1,2',
+    dataPermission: 'all',
+    remark: '系统内置超管，负责平台权限、员工账号、租户门店等后台核心管理事项',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 2,
+    tenantId: 1,
+    storeId: 1,
+    name: '待启用员工',
+    gender: 'female',
+    phone: '15926628888',
+    status: 'disabled',
+    roleIds: '',
+    dataPermission: '',
+    remark: '待超级管理员补齐权限',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 3,
+    tenantId: 1,
+    storeId: 1,
+    name: '测试员工',
+    gender: 'male',
+    phone: '15926627777',
+    status: 'enabled',
+    roleIds: '2',
+    dataPermission: 'all',
+    remark: '统一提示验收数据',
+    createdByAccountId: 1,
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:00:00',
+  },
+];
+
+const productCategories = [
+  {
+    id: 1,
+    scope: 'accessory',
+    name: '配件',
+    sortOrder: 1,
+    productCount: 1,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 2,
+    parentId: 1,
+    scope: 'accessory',
+    name: '岩板餐桌',
+    sortOrder: 1,
+    productCount: 1,
+    status: 'disabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 3,
+    parentId: 1,
+    scope: 'accessory',
+    name: '餐桌',
+    sortOrder: 2,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:01:00',
+  },
+  {
+    id: 4,
+    parentId: 3,
+    scope: 'accessory',
+    name: '石材餐桌',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:02:00',
+  },
+  {
+    id: 5,
+    parentId: 4,
+    scope: 'accessory',
+    name: '奢石餐桌',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:03:00',
+  },
+];
+
+const storeCategories = [
+  {
+    id: 1,
+    parentId: null,
+    name: '石材',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:00:00',
+  },
+  {
+    id: 2,
+    parentId: 1,
+    name: '大理石',
+    sortOrder: 1,
+    productCount: 0,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-07T09:10:00',
+  },
+];
+
+const productAttributes = [
+  {
+    id: 1,
+    scope: 'shared',
+    name: 'E2E 共享属性',
+    valueType: 'select',
+    attributeRole: 'basic',
+    templateCount: 2,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-04T09:00:00',
+  },
+  {
+    id: 2,
+    scope: 'accessory',
+    name: 'E2E 配件专属属性',
+    valueType: 'select',
+    attributeRole: 'basic',
+    templateCount: 1,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-04T09:10:00',
+  },
+];
+
+const productAttributeValues = [
+  {
+    id: 1,
+    attributeId: 1,
+    scope: 'shared',
+    value: 'E2E 共享属性值',
+    code: 'e2e-shared-value',
+    useCount: 2,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-04T09:20:00',
+  },
+  {
+    id: 2,
+    attributeId: 2,
+    scope: 'accessory',
+    value: 'E2E 配件专属值',
+    code: 'e2e-finished-value',
+    useCount: 1,
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-04T09:30:00',
+  },
+];
+
+const finishedProducts = [
+  {
+    id: 1,
+    categoryId: 2,
+    supplierId: 2,
+    name: '意式轻奢岩板餐桌',
+    sku: 'FP-20260727-001',
+    publisherType: 'platform',
+    totalStock: 12,
+    guidePrice: 2999,
+    status: 'warehouse',
+    createdByName: '韩健',
+    createdByAccountId: 1,
+    createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const crafts = [
+  {
+    id: 1,
+    name: 'E2E 边工艺',
+    type: '边工艺',
+    width: '12',
+    imageUrl: '',
+    remark: '按钮权限测试数据',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-31T09:00:00',
+  },
+];
+
+const slabVarieties = [
+  {
+    id: 1,
+    name: '潘多拉',
+    code: 'pandora',
+    remark: '按钮权限测试数据',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const slabs = [
+  {
+    id: 6,
+    supplierId: 1,
+    varietyId: 1,
+    name: '雪花白大板 06',
+    serialNo: 'SLAB-E2E-006',
+    warehouse: '云浮仓',
+    publisherType: '平台发布',
+    lengthMm: 3200,
+    widthMm: 1800,
+    thicknessMm: 18,
+    areaSquareMeter: 5.76,
+    costPrice: 6800,
+    guidePrice: 9800,
+    status: 'warehouse',
+    createdAt: '2026-07-27T09:00:00',
+  },
+  {
+    id: 7,
+    supplierId: 1,
+    varietyId: 1,
+    name: '回收站大板 07',
+    serialNo: 'SLAB-E2E-007',
+    warehouse: '云浮仓',
+    publisherType: '平台发布',
+    lengthMm: 3000,
+    widthMm: 1700,
+    thicknessMm: 18,
+    areaSquareMeter: 5.1,
+    costPrice: 6200,
+    guidePrice: 9000,
+    status: 'recycle',
+    createdAt: '2026-07-27T09:10:00',
+  },
+  {
+    id: 8,
+    supplierId: 1,
+    varietyId: 1,
+    name: '回收站大板 08',
+    serialNo: 'SLAB-E2E-008',
+    warehouse: '云浮仓',
+    publisherType: '平台发布',
+    lengthMm: 2800,
+    widthMm: 1600,
+    thicknessMm: 18,
+    areaSquareMeter: 4.48,
+    costPrice: 5800,
+    guidePrice: 8500,
+    status: 'recycle',
+    createdAt: '2026-07-27T09:20:00',
+  },
+];
+
+const slabOrigins = [
+  {
+    id: 1,
+    name: '巴西',
+    remark: '从现有大板品种迁移',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-07-27T09:00:00',
+  },
+];
+
+const slabTextures = [
+  { id: 1, name: '细纹', remark: '', status: 'enabled', createdByName: '韩健', createdAt: '2026-08-12T09:00:00' },
+  { id: 2, name: '直纹', remark: '', status: 'enabled', createdByName: '韩健', createdAt: '2026-08-12T08:00:00' },
+];
+
+const slabColorCategories = [
+  {
+    id: 1,
+    name: '白色系',
+    remark: '白色及浅灰色',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T09:00:00',
+  },
+];
+
+const slabColors = [
+  {
+    id: 1,
+    categoryId: 1,
+    categoryName: '白色系',
+    name: '奶白',
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T09:10:00',
+  },
+  {
+    id: 2,
+    categoryId: 1,
+    categoryName: '白色系',
+    name: '冷白',
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T09:05:00',
+  },
+];
+
+const slabGrades = [
+  {
+    id: 1,
+    code: 'A+',
+    name: '超精品料',
+    sortOrder: 1,
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T10:10:00',
+  },
+  {
+    id: 2,
+    code: 'A',
+    name: '精品料',
+    sortOrder: 2,
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T10:05:00',
+  },
+  {
+    id: 3,
+    code: 'B',
+    name: '标准料',
+    sortOrder: 3,
+    remark: '',
+    status: 'enabled',
+    createdByName: '韩健',
+    createdAt: '2026-08-13T10:00:00',
+  },
+];
+
+const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
+  1: [{ id: 1, textureId: 1, name: '幼纹', status: 'enabled', createdAt: '2026-08-12T09:10:00' }],
+  2: [],
+};
+
+export async function setMockBusinessClient(page: Page, clientCode: 'admin' | 'supply-chain') {
+  if (page.url() === 'about:blank') await page.goto('/login');
+  await page.evaluate((client) => {
+    localStorage.setItem('zdm-e2e-client', client);
+    const user = JSON.parse(localStorage.getItem('zdm-admin-user') ?? '{}');
+    delete user.tenantId;
+    delete user.storeId;
+    delete user.storeType;
+    localStorage.setItem('zdm-admin-user', JSON.stringify({ ...user, clientCode: client }));
+  }, clientCode);
+}
+
+export async function installAdminApiMocks(page: Page) {
+  await mockEmployeeInvites(page);
+  await page.route('**/api/admin/auth/contexts', async (route) => {
+    await fulfillJson(route, [
+      {
+        identityId: 1,
+        identityType: 'platform_admin',
+        tenantId: null,
+        storeId: null,
+        tenantName: null,
+        storeName: null,
+        storeType: null,
+      },
+    ]);
+  });
+  await mockCollection(page, '**/api/admin/tenants', tenants);
+  await page.route('**/api/admin/tenants/*/purge-preview', async (route) => {
+    const pathParts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
+    const id = Number(pathParts.at(-2));
+    const tenant = tenants.find((item) => item.id === id) ?? tenants[0];
+    await fulfillJson(route, {
+      eligible: tenant.status === 'disabled',
+      tenantName: tenant.name,
+      storeCount: 2,
+      employeeCount: 5,
+      roleCount: 3,
+      accountDeleteCount: 4,
+      accountRetainCount: 1,
+      phoneReleaseCount: 4,
+      blockers: tenant.status === 'disabled' ? [] : ['请先归档租户'],
+    });
+  });
+  await page.route('**/api/admin/tenants/*/purge', async (route) => {
+    await fulfillJson(route, {
+      tenantDeleteCount: 1,
+      storeDeleteCount: 2,
+      employeeDeleteCount: 5,
+      roleDeleteCount: 3,
+      accountDeleteCount: 4,
+      accountRetainCount: 1,
+      phoneReleaseCount: 4,
+    });
+  });
+  await mockCollection(page, '**/api/admin/stores', stores);
+  await page.route('**/api/admin/stores?scope=*', async (route) => {
+    const scope = new URL(route.request().url()).searchParams.get('scope');
+    await fulfillJson(route, scope === 'archived' ? archivedStores : stores);
+  });
+  await mockCollection(page, '**/api/admin/store-levels', storeLevels);
+  await page.route('**/api/admin/stores/level-options', async (route) => {
+    await fulfillJson(
+      route,
+      storeLevels.filter((level) => level.status === 'enabled'),
+    );
+  });
+  await mockCollection(page, '**/api/admin/suppliers', suppliers);
+  await mockCollection(page, '**/api/admin/supplier-supply-types', supplierSupplyTypes);
+  await mockCollection(page, '**/api/admin/roles', roles);
+  await page.route(/\/api\/admin\/roles\/permission-scope(?:\?.*)?$/, async (route) => {
+    await fulfillJson(route, { audience: 'admin', functionPermissions: 'all' });
+  });
+  const policies = structuredClone(terminalFunctionPolicies);
+  if (!policies.some((p) => p.terminal === 'supply-chain'))
+    policies.push({ id: 3, terminal: 'supply-chain', functionPermissions: '' });
+  await page.route('**/api/admin/terminal-function-policies', (route) => fulfillJson(route, policies));
+  await page.route('**/api/admin/terminal-function-policies/*', async (route) => {
+    const terminal = new URL(route.request().url()).pathname.split('/').at(-1);
+    const policy = policies.find((item) => item.terminal === terminal);
+    if (policy && route.request().method() === 'PUT') Object.assign(policy, route.request().postDataJSON());
+    await fulfillJson(route, policy);
+  });
+  await mockCollection(page, '**/api/admin/employees', employees);
+  await mockCollection(page, '**/api/admin/store-categories', storeCategories);
+  await mockCollection(page, '**/api/admin/product-categories', productCategories);
+  await mockCollection(page, '**/api/admin/product-attributes', productAttributes);
+  await page.route('**/api/admin/product-attributes/*/delete-preview', async (route) => {
+    await fulfillJson(route, {
+      deletionMode: 'physical',
+      attributeValueCount: 0,
+      unfinishedProductCount: 0,
+      soldOutProductCount: 0,
+      templateScopes: [],
+    });
+  });
+  await page.route(/\/api\/admin\/product-attributes\/\d+$/, async (route) => {
+    if (route.request().method() !== 'DELETE') {
+      await route.fallback();
+      return;
+    }
+    await fulfillJson(route, { deletionMode: 'physical', attributeValueCount: 0 });
+  });
+  await mockCollection(page, '**/api/admin/product-attribute-values', productAttributeValues);
+  await page.route('**/api/admin/product-attribute-values/attribute-options', async (route) => {
+    await fulfillJson(
+      route,
+      productAttributes.filter((attribute) => attribute.valueType === 'select'),
+    );
+  });
+  await mockCollection(page, '**/api/admin/accessory-products', finishedProducts);
+  await page.route('**/api/admin/accessory-products/form-options', async (route) => {
+    // Resolve through the existing mocked collections so per-test overrides still apply.
+    const options = await page.evaluate(async () => {
+      const read = async (path: string) => (await (await fetch(`/api/admin/${path}`)).json()).data;
+      const [categories, attributes, suppliers] = await Promise.all([
+        read('product-categories'),
+        read('product-attributes'),
+        read('suppliers'),
+      ]);
+      return { categories, attributes, suppliers };
+    });
+    await fulfillJson(route, options);
+  });
+  await mockCollection(page, '**/api/admin/crafts', crafts);
+  await mockCollection(page, '**/api/admin/slab-varieties', slabVarieties);
+  await mockCollection(
+    page,
+    '**/api/admin/slabs',
+    slabs.map((slab) => ({ ...slab, sourceStatus: slab.status })),
+  );
+  await mockCollection(page, '**/api/admin/slab-origins', slabOrigins);
+  await mockCollection(page, '**/api/admin/slab-textures', slabTextures);
+  await mockCollection(page, '**/api/admin/slab-colors', slabColors);
+  await mockCollection(page, '**/api/admin/slab-colors/categories', slabColorCategories);
+  await mockCollection(page, '**/api/admin/slab-grades', slabGrades);
+  await page.route('**/api/admin/slabs/form-options', async (route) => {
+    await fulfillJson(route, {
+      varieties: slabVarieties
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      origins: slabOrigins
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      textures: slabTextures
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      colorCategories: slabColorCategories
+        .filter((category) => category.status === 'enabled')
+        .map((category) => ({
+          id: category.id,
+          label: category.name,
+          status: category.status,
+          children: slabColors
+            .filter((color) => color.categoryId === category.id && color.status === 'enabled')
+            .map((color) => ({ id: color.id, label: color.name, status: color.status })),
+        })),
+      grades: slabGrades
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({
+          id: item.id,
+          label: item.code,
+          description: item.name,
+          status: item.status,
+        })),
+      suppliers: suppliers
+        .filter(
+          (item) =>
+            item.status === 'enabled' &&
+            item.supplyTypes.some(
+              (type) => type.status === 'enabled' && (type.code === 'slab' || type.name.trim() === '大板'),
+            ),
+        )
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+      storeLevels: storeLevels
+        .filter((item) => item.status === 'enabled')
+        .map((item) => ({ id: item.id, label: item.name, status: item.status })),
+    });
+  });
+  await page.route('**/api/admin/slab-markup-configurations/options', async (route) => {
+    await fulfillJson(route, []);
+  });
+  await page.route('**/api/admin/slab-guide-price-setting', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON() as { priceCoefficient: number };
+      return fulfillJson(route, { id: 1, priceCoefficient: payload.priceCoefficient });
+    }
+    return fulfillJson(route, { id: 1, priceCoefficient: 1.6 });
+  });
+  await page.route('**/api/admin/accessory-markup-configurations/options', async (route) => {
+    await fulfillJson(route, []);
+  });
+  await page.route('**/api/admin/accessory-guide-price-setting', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON() as { priceCoefficient: number };
+      return fulfillJson(route, { id: 1, priceCoefficient: payload.priceCoefficient });
+    }
+    return fulfillJson(route, { id: 1, priceCoefficient: 1.2 });
+  });
+  await page.route('**/api/admin/slab-textures/*/aliases**', async (route) => {
+    const parts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
+    const textureId = Number(parts[3]);
+    const aliasId = parts.length > 5 ? Number(parts[5]) : null;
+    const records = slabTextureAliases[textureId] ?? (slabTextureAliases[textureId] = []);
+    if (route.request().method() === 'GET') return fulfillJson(route, records);
+    if (route.request().method() === 'DELETE' && aliasId) {
+      const index = records.findIndex((item) => Number(item.id) === aliasId);
+      if (index >= 0) records.splice(index, 1);
+      return fulfillJson(route, true);
+    }
+    const payload = route.request().postDataJSON() as { name: string };
+    if (route.request().method() === 'POST') {
+      const record = { id: Date.now(), textureId, name: payload.name, status: 'enabled' };
+      records.push(record);
+      return fulfillJson(route, record);
+    }
+    const record = records.find((item) => Number(item.id) === aliasId);
+    if (record) record.name = payload.name;
+    return fulfillJson(route, record ?? {});
+  });
+}
+
+async function mockEmployeeInvites(page: Page) {
+  await page.route('**/api/open/employee-invites/e2e-invite-token/request-code', async (route) => {
+    await fulfillJson(route, true);
+  });
+
+  await page.route('**/api/admin/employee-invites?*', async (route) => {
+    await fulfillJson(route, {
+      token: 'e2e-invite-token',
+      expiresAt: '2026-08-04T09:00:00',
+      clientCode: 'admin',
+    });
+  });
+
+  await page.route('**/api/open/employee-invites/e2e-invite-token', async (route) => {
+    await fulfillJson(route, {
+      token: 'e2e-invite-token',
+      expiresAt: '2026-08-04T09:00:00',
+      clientCode: 'admin',
+    });
+  });
+
+  await page.route('**/api/open/employee-invites/e2e-invite-token/verify-code', async (route) => {
+    let payload: { verifyCode?: string };
+    try {
+      payload = route.request().postDataJSON() as { verifyCode?: string };
+    } catch {
+      payload = {};
+    }
+    if (payload.verifyCode !== '888888') {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 400, message: '验证码错误', data: null }),
+      });
+      return;
+    }
+    await fulfillJson(route, { requiresProfile: true, registration: null });
+  });
+
+  await page.route('**/api/open/employee-invites/e2e-invite-token/register', async (route) => {
+    await fulfillJson(route, {
+      employeeId: 2,
+      status: 'disabled',
+      existingAccount: false,
+      existingEmployee: false,
+      canLogin: false,
+    });
+  });
+}
+
+async function mockCollection(page: Page, pattern: string, records: unknown[]) {
+  const collection = structuredClone(records);
+  await page.route(
+    (url) => url.pathname === pattern.replace('**', ''),
+    async (route) => {
+      if (route.request().method() === 'GET') {
+        await fulfillJson(route, collection);
+        return;
+      }
+      await fulfillJson(route, collection[0] ?? {});
+    },
+  );
+
+  await page.route(`${pattern}/**`, async (route) => {
+    if (route.request().method() === 'DELETE') {
+      await fulfillJson(route, true);
+      return;
+    }
+    if (route.request().method() === 'PUT' || route.request().method() === 'PATCH') {
+      const pathParts = new URL(route.request().url()).pathname.split('/').filter(Boolean);
+      const id = Number(
+        ['permissions', 'status'].includes(pathParts.at(-1) ?? '') ? pathParts.at(-2) : pathParts.at(-1),
+      );
+      const targetIndex = collection.findIndex((record) => {
+        if (!record || typeof record !== 'object' || !('id' in record)) return false;
+        return Number(record.id) === id;
+      });
+      if (targetIndex !== -1) {
+        const payload = route.request().postDataJSON() as Record<string, unknown>;
+        collection[targetIndex] = { ...(collection[targetIndex] as Record<string, unknown>), ...payload };
+        await fulfillJson(route, collection[targetIndex]);
+        return;
+      }
+    }
+    await fulfillJson(route, collection[0] ?? {});
+  });
+}
