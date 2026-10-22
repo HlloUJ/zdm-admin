@@ -350,13 +350,9 @@ test('edits an initially empty rich product description with real toolbar action
   await expect(editable).toHaveText('');
   await expect(rich.locator('img, video')).toHaveCount(0);
   await editable.fill('商品详情测试');
-  await editable.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  });
+  // Use the editor's native select-all key handling, not a DOM Range that can
+  // race wangEditor's throttled selectionchange -> Slate synchronization.
+  await editable.press('ControlOrMeta+A');
   await rich.locator('.w-e-toolbar button[data-menu-key="bold"]').click();
   await expect(editable.locator('strong')).toHaveText('商品详情测试');
   await rich.locator('.w-e-toolbar button[data-menu-key="fontFamily"]').click();

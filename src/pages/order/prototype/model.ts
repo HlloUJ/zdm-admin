@@ -1,3 +1,4 @@
+import { generateOrderNumber } from './orderNumber';
 /** Front-end prototype only. No business API calls or production inventory. */
 export const statuses = [
   { value: 'pending', label: '待确认' },
@@ -17,6 +18,7 @@ export interface Context {
 export interface Product {
   sku: string;
   name: string;
+  imageUrl?: string;
   specification: string;
   material: string;
   unit: string;
@@ -29,6 +31,7 @@ export interface Product {
 export interface Line {
   sku: string;
   name: string;
+  imageUrl?: string;
   specification: string;
   material: string;
   unit: string;
@@ -126,6 +129,9 @@ export interface Setting {
   group: 'nature' | 'method';
   name: string;
   enabled: boolean;
+  createdBy?: number;
+  createdByName?: string;
+  createdAt?: string;
 }
 export interface State {
   version: 1;
@@ -234,10 +240,10 @@ export function allocate(state: State) {
   for (const o of orders)
     for (const l of o.lines) l.reserved += Math.min(Math.max(0, remaining(l) - l.reserved), freeStock(state, l.sku));
 }
-export function blankOrder(c: Context): Order {
+export function blankOrder(c: Context, existing: Order[] = []): Order {
   const t = now();
   return {
-    id: `XS${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${uid().slice(-6).toUpperCase()}`,
+    id: generateOrderNumber(existing.map((o) => o.id)),
     tenantId: c.tenantId,
     storeId: c.storeId,
     customerId: '',
@@ -277,6 +283,7 @@ export function addProduct(o: Order, p: Product) {
     o.lines.push({
       sku: p.sku,
       name: p.name,
+      imageUrl: p.imageUrl,
       specification: p.specification,
       material: p.material,
       unit: p.unit,
@@ -354,7 +361,7 @@ export function confirmOrder(state: State, o: Order, c: Context) {
   audit(o, c, '确认订单', before, o.status);
 }
 export function copyOrder(state: State, source: Order, c: Context) {
-  const o = blankOrder(c);
+  const o = blankOrder(c, state.orders);
   o.customerId = source.customerId;
   o.customerName = source.customerName;
   o.phone = source.phone;
@@ -369,10 +376,10 @@ export function copyOrder(state: State, source: Order, c: Context) {
   return o;
 }
 export function recordPayment(o: Order, p: Payment, c: Context, replaceId?: string) {
-  demand(p.amount > 0 && p.method && p.at, '请填写金额、方式和实际时间');
+  demand(p.amount > 0 && p.method && p.at, '请填写金额、收退款渠道和实际时间');
   if (p.kind === 'receipt') {
     demand(o.status !== 'cancelled' || replaceId, '已取消订单不能新增收款');
-    demand(p.nature, '请选择款项性质');
+    demand(p.nature, '请选择款项名称');
   } else demand(p.reason.trim(), '请输入退款原因');
   const before = clone(o.payments),
     next = clone(o.payments).filter((x) => x.id !== replaceId);
@@ -623,25 +630,11 @@ export function createState(c: Context): State {
     ],
     customers: [{ id: 'customer-1', name: '小李（示例）', phone: '13800000001', ownerId: c.accountId, reason: '' }],
     orders: [],
-    settings: [
-      ...['首付款', '定金', '尾款', '全款', '意向金'].map((name, i) => ({
-        id: `nature-${i}`,
-        group: 'nature' as const,
-        name,
-        enabled: true,
-      })),
-      ...['微信', '支付宝', '现金', '银行转账'].map((name, i) => ({
-        id: `method-${i}`,
-        group: 'method' as const,
-        name,
-        enabled: true,
-      })),
-    ],
+    settings: [],
   };
   for (const [i, entry] of statuses.entries()) {
     const status = entry.value;
-    const o = blankOrder(c);
-    o.id = `XS-DEMO-00${i + 1}`;
+    const o = blankOrder(c, state.orders);
     o.customerId = 'customer-1';
     o.customerName = ['小李（示例）', '王女士（示例）', '陈先生（示例）', '刘女士（示例）', '周先生（示例）'][i]!;
     o.phone = `1380000000${i + 1}`;
@@ -676,5 +669,19 @@ export function createState(c: Context): State {
     state.orders.push(o);
   }
   allocate(state);
+  return state;
+}
+
+/** Remove old setting fixtures and update only legacy demo numbers; preserve user-created data. */
+export function removeDefaultSettings(state: State) {
+  state.settings = state.settings.filter((s) => !/^(nature-[0-4]|method-[0-3])$/.test(s.id));
+  for (const order of state.orders) {
+    if (
+      /^XS-DEMO-00[1-5]$/.test(order.id) ||
+      (/^(xs\d{17}|XS\d{10}|XS\d{12}|XS\d{14})$/.test(order.id) &&
+        order.logs.some((log) => log.action === '载入示例订单'))
+    )
+      order.id = generateOrderNumber(state.orders.map((existing) => existing.id));
+  }
   return state;
 }

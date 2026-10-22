@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createState,
+  removeDefaultSettings,
   blankOrder,
   addProduct,
   saveDraft,
@@ -368,5 +369,26 @@ describe('prototype audience and catalog', () => {
     );
     expect(values.filter((p) => p.endsWith('.view'))).toHaveLength(5);
     expect(values.some((p) => p.endsWith('.query') || p.endsWith('.reset'))).toBe(false);
+  });
+});
+
+describe('demo order number migration', () => {
+  it('uses the new format for samples and replaces only old demo identifiers without changing order content', () => {
+    const state = createState(c);
+    expect(state.orders.every((o) => /^XS\d{13}$/.test(o.id))).toBe(true);
+    state.orders[0]!.id = 'XS-DEMO-001';
+    state.orders[1]!.id = 'KEEP-EXISTING-ORDER';
+    state.orders[2]!.id = 'xs10210902030040007';
+    state.orders[3]!.id = 'XS261021004007';
+    state.orders[4]!.id = 'XS20261021004007';
+    const before = clone(state.orders);
+    removeDefaultSettings(state);
+    expect(state.orders[0]!.id).toMatch(/^XS\d{13}$/);
+    expect(state.orders[1]!.id).toBe('KEEP-EXISTING-ORDER');
+    expect(state.orders[2]!.id).toMatch(/^XS\d{13}$/);
+    expect(state.orders[3]!.id).toMatch(/^XS\d{13}$/);
+    expect(state.orders[4]!.id).toMatch(/^XS\d{13}$/);
+    expect(new Set(state.orders.map((o) => o.id)).size).toBe(state.orders.length);
+    expect(state.orders.map((o, i) => ({ ...o, id: before[i]!.id }))).toEqual(before);
   });
 });

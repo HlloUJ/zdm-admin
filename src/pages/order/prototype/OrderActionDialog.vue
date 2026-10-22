@@ -21,11 +21,11 @@
       <t-form-item label="金额" required v-bind="fb.field('amount', form.amount)"
         ><t-input-number v-model="form.amount" placeholder="请输入金额" :min="0.01" :decimal-places="2" suffix="元"
       /></t-form-item>
-      <t-form-item v-if="paymentKind === 'receipt'" label="款项性质" required v-bind="fb.field('nature', form.nature)"
-        ><t-select v-model="form.nature" :options="options('nature')" placeholder="请选择款项性质"
+      <t-form-item v-if="paymentKind === 'receipt'" label="款项名称" required v-bind="fb.field('nature', form.nature)"
+        ><t-select v-model="form.nature" :options="options('nature')" placeholder="请选择款项名称"
       /></t-form-item>
-      <t-form-item label="方式" required v-bind="fb.field('method', form.method)"
-        ><t-select v-model="form.method" :options="options('method')" placeholder="请选择方式"
+      <t-form-item label="收退款渠道" required v-bind="fb.field('method', form.method)"
+        ><t-select v-model="form.method" :options="options('method')" placeholder="请选择收退款渠道"
       /></t-form-item>
       <t-form-item label="实际时间" required v-bind="fb.field('at', form.at)"
         ><t-date-picker v-model="form.at" enable-time-picker format="YYYY-MM-DD HH:mm:ss" placeholder="请选择日期时间"
@@ -280,7 +280,9 @@ const needsReason = computed(() =>
   ['cancel', 'terms', 'void-payment', 'revoke-plan', 'correct-shipment'].includes(props.action),
 );
 const options = (group: string) =>
-  props.state.settings.filter((s) => s.group === group && s.enabled).map((s) => ({ label: s.name, value: s.name }));
+  group === 'method'
+    ? ['现金', '银行转账', '微信', '支付宝'].map((name) => ({ label: name, value: name }))
+    : props.state.settings.filter((s) => s.group === group && s.enabled).map((s) => ({ label: s.name, value: s.name }));
 watch(visible, (v) => {
   if (!v) return;
   form.value = initial();

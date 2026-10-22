@@ -3,7 +3,7 @@
     <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
-      <main class="page" :class="{ 'page--form': editingId }">
+      <main class="page zdm-admin-responsive-page" :class="{ 'page--form': editingId }">
         <StoreFinishedEditor
           v-if="editingId && current && current.id === editingId && priceEditable"
           :key="editingId"
@@ -369,38 +369,9 @@
       <StorePoolProductDetail v-if="poolDetail" :product="poolDetail" />
     </t-drawer>
 
-    <AdminDialog
-      :confirmation="{ kind: 'close', text: '关闭' }"
-      confirm-function="close"
-      :visible="Boolean(logVideoPreview)"
-      header="商品视频"
-      width="min(960px, 94vw)"
-      :cancel-btn="null"
-      @confirm="logVideoPreview = null"
-      @close="logVideoPreview = null"
-      @update:visible="!$event && (logVideoPreview = null)"
-    >
-      <video v-if="logVideoPreview" :src="logVideoPreview" controls autoplay playsinline class="log-video-preview" />
-    </AdminDialog>
     <t-drawer v-model:visible="detailVisible" header="商品详情" size="min(1200px, 100vw)" :footer="false">
       <StoreProductDetail v-if="current" :product="current" />
     </t-drawer>
-
-    <AdminDialog
-      :confirmation="{ kind: 'none' }"
-      confirm-function="close"
-      :visible="Boolean(imagePreview)"
-      header="商品主图"
-      mode="modal"
-      show-overlay
-      close-on-overlay-click
-      width="min(960px, 94vw)"
-      :footer="false"
-      @close="imagePreview = null"
-      @update:visible="!$event && (imagePreview = null)"
-    >
-      <img v-if="imagePreview" :src="imagePreview" alt="商品主图" style="max-width: 100%" />
-    </AdminDialog>
 
     <AdminDialog
       v-model:visible="offShelfVisible"
@@ -483,6 +454,34 @@
         />
       </template>
     </ProductOperationLogTemplate>
+    <AdminDialog
+      :confirmation="{ kind: 'close', text: '关闭' }"
+      confirm-function="close"
+      :visible="Boolean(logVideoPreview)"
+      header="商品视频"
+      width="min(960px, 94vw)"
+      :cancel-btn="null"
+      @confirm="logVideoPreview = null"
+      @close="logVideoPreview = null"
+      @update:visible="!$event && (logVideoPreview = null)"
+    >
+      <video v-if="logVideoPreview" :src="logVideoPreview" controls autoplay playsinline class="log-video-preview" />
+    </AdminDialog>
+    <AdminDialog
+      :confirmation="{ kind: 'none' }"
+      confirm-function="close"
+      :visible="Boolean(imagePreview)"
+      header="商品主图"
+      mode="modal"
+      show-overlay
+      close-on-overlay-click
+      width="min(960px, 94vw)"
+      :footer="false"
+      @close="imagePreview = null"
+      @update:visible="!$event && (imagePreview = null)"
+    >
+      <img v-if="imagePreview" :src="imagePreview" alt="商品主图" style="max-width: 100%" />
+    </AdminDialog>
   </div>
 </template>
 

@@ -2,6 +2,7 @@ import { parse } from '@vue/compiler-sfc';
 import { parse as parseTemplate } from '@vue/compiler-dom';
 import ts from 'typescript';
 import postcss from 'postcss';
+import visualApprovals from '../docs/ui/visual-refactor.json' with { type: 'json' };
 import { createHash } from 'node:crypto';
 import registry from '../src/components/foundation/actions/button-functions.json' with { type: 'json' };
 import controlRegistry from '../src/components/foundation/actions/button-controls.json' with { type: 'json' };
@@ -182,6 +183,25 @@ export function buttonClasses(source) {
   if (descriptor.template) walk(parseTemplate(descriptor.template.content));
   return classes;
 }
+// Only the explicitly selected card reference's detail-button border. No
+// disabled state, other theme, selector, value or page inherits this approval.
+export function isApprovedOrderReferenceBorder(file, declaration) {
+  return (
+    file === 'src/pages/order/prototype/SalesOrderList.vue' &&
+    declaration.parent.selector === '.order-card__actions :deep(.t-button--variant-outline.t-button--theme-primary)' &&
+    declaration.prop === 'border' &&
+    declaration.value === '1px solid #bfd1f6' &&
+    visualApprovals.contracts[file]?.designReference === 'store-order-partition-card-2026-10-21' &&
+    visualApprovals.approvedVisualDeclarations.some(
+      (entry) =>
+        entry.file === file &&
+        entry.selector === declaration.parent.selector &&
+        entry.property === declaration.prop &&
+        entry.value === declaration.value &&
+        entry.reason?.trim(),
+    )
+  );
+}
 export function buttonStyleViolations(file, css, classes = new Set(['t-button', 't-link'])) {
   const errors = [];
   const root = postcss.parse(css);
@@ -198,6 +218,7 @@ export function buttonStyleViolations(file, css, classes = new Set(['t-button', 
       )
         continue;
       rule.walkDecls((declaration) => {
+        if (isApprovedOrderReferenceBorder(file, declaration)) return;
         if (/^(?:color|background(?:-color)?|border(?:-(?:top|right|bottom|left))?(?:-color)?)$/.test(declaration.prop))
           errors.push(`${file}: button colors cannot be overridden by ${selector}`);
       });

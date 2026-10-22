@@ -166,11 +166,6 @@
     "controlWidth": "100% of available field content",
     "forms": [
       {
-        "file": "src/pages/accessory/attribute/index.vue",
-        "visible": "formDialogVisible",
-        "tag": "t-dialog"
-      },
-      {
         "file": "src/pages/craft/finished-stock/index.vue",
         "visible": "formDialogVisible",
         "tag": "t-dialog"
@@ -184,11 +179,6 @@
         "file": "src/pages/customer/index.vue",
         "visible": "followVisible",
         "tag": "AdminFormDialog"
-      },
-      {
-        "file": "src/pages/finished-stock/attribute/index.vue",
-        "visible": "formDialogVisible",
-        "tag": "t-dialog"
       },
       {
         "file": "src/pages/finished-stock/store/price-configuration.vue",
@@ -305,16 +295,6 @@
       "previews and details"
     ],
     "excludedForms": [
-      {
-        "file": "src/pages/accessory/attribute/index.vue",
-        "visible": "optionDialogVisible",
-        "reason": "选项列表管理"
-      },
-      {
-        "file": "src/pages/finished-stock/attribute/index.vue",
-        "visible": "optionDialogVisible",
-        "reason": "选项列表管理"
-      },
       {
         "file": "src/pages/finished-stock/management/index.vue",
         "visible": "specDialogVisible",

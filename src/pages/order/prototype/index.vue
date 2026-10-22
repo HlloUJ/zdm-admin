@@ -3,13 +3,8 @@
     <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
-      <main class="page">
+      <main class="page" :class="{ 'sales-order-page': page === 'sales' && !selected }">
         <div>
-          <t-alert
-            theme="warning"
-            title="订单管理前端原型"
-            message="当前为浏览器隔离的模拟数据，可体验页面和交互；不会生成真实订单、扣减真实库存或收退款。供应链进度为演示，不连接供应链。"
-          />
           <template v-if="selected">
             <AdminDetailPage :title="selected.id" :items="detailItems">
               <t-space break-line
@@ -135,7 +130,13 @@
               </AdminListPage>
               <h3 class="form-section-title">操作记录</h3>
               <AdminListPage
-                :table-props="{ rowKey: 'id', data: selected.logs, columns: logColumns, pagination: { pageSize: 5 } }"
+                :table-props="{
+                  rowKey: 'id',
+                  data: selected.logs,
+                  columns: logColumns,
+                  pagination: { ...detailPagination, total: selected.logs.length },
+                }"
+                @page-change="updateListPagination(detailPagination, $event)"
               >
                 <template #at="{ row }">{{ time(row.at) }}</template
                 ><template #change="{ row }"
@@ -146,108 +147,39 @@
               </AdminListPage>
             </AdminDetailPage>
           </template>
-          <AdminListPage
+          <SalesOrderList
             v-else-if="page === 'sales'"
             v-model:filter-values="filterDraft"
             :tabs="tabs"
             :active-tab="status"
             :filters="filters"
             :actions="toolbarActions"
-            :table-props="{
-              rowKey: 'id',
-              data: rows,
-              columns: salesColumns,
-              hover: true,
-              pagination: {
-                current: pageNumber,
-                pageSize,
-                total: filtered.length,
-                showJumper: true,
-                showPageSize: true,
-              },
+            :rows="rows"
+            :can="can"
+            :expanded-order-ids="expandedOrderIds"
+            :pagination="{
+              current: pageNumber,
+              pageSize,
+              total: filtered.length,
+              showJumper: true,
+              showPageSize: true,
             }"
+            @expand-change="updateOrderExpansion"
             @tab-change="switchTab"
             @search="search"
             @reset="reset"
-            @action="openAction($event)"
+            @action="openAction"
             @page-change="changePage"
-          >
-            <template #filter-start
-              ><t-date-picker v-model="filterDraft.start" clearable placeholder="请选择日期" /></template
-            ><template #filter-end
-              ><t-date-picker v-model="filterDraft.end" clearable placeholder="请选择日期"
-            /></template>
-            <template #id="{ row }"
-              ><t-link
-                v-if="can('detail', row)"
-                :theme="buttonTheme('view')"
-                hover="color"
-                @click="selectedId = row.id"
-                >{{ row.id }}</t-link
-              ><span v-else>{{ row.id }}</span></template
-            >
-            <template #customer="{ row }"
-              ><div>{{ row.customerName }}</div>
-              <div>{{ row.phone }}</div></template
-            >
-            <template #goods="{ row }">{{
-              row.lines.map((l: Line) => `${l.name} × ${l.quantity - l.cancelled}`).join('；')
-            }}</template>
-            <template #total="{ row }">{{ money(pricing(row).total) }}</template>
-            <template #payment="{ row }"
-              ><t-tag :theme="paymentStatus(row) === '已收齐' ? 'success' : 'warning'" variant="light">{{
-                paymentStatus(row)
-              }}</t-tag>
-              <div>净收 {{ money(pricing(row).net) }}</div>
-              <div v-if="pricing(row).outstanding">未收 {{ money(pricing(row).outstanding) }}</div>
-              <div v-if="pricing(row).refund">待退 {{ money(pricing(row).refund) }}</div></template
-            >
-            <template #shipment="{ row }"
-              ><t-tag :theme="shipmentProgress(row).pending === 0 ? 'success' : 'primary'" variant="light">{{
-                shipmentProgress(row).label
-              }}</t-tag>
-              <div>已发 {{ shipmentProgress(row).shipped }} / 待发 {{ shipmentProgress(row).pending }}</div></template
-            >
-            <template #warnings="{ row }"
-              ><t-space break-line size="small"
-                ><t-tag v-for="w in warnings(row)" :key="w" theme="warning" variant="light">{{ w }}</t-tag
-                ><span v-if="!warnings(row).length">—</span></t-space
-              ></template
-            >
-            <template #statusAt="{ row }">{{ time(row.statusAt) }}</template>
-            <template #operation="{ row }"
-              ><t-space break-line size="small"
-                ><t-link
-                  v-if="can('detail', row)"
-                  :theme="buttonTheme('view')"
-                  hover="color"
-                  @click="selectedId = row.id"
-                  >详情</t-link
-                ><t-link
-                  v-if="row.status === 'pending' && can('edit', row)"
-                  :theme="buttonTheme('view')"
-                  hover="color"
-                  @click="openAction('edit', row)"
-                  >编辑</t-link
-                ><t-link
-                  v-if="row.status === 'pending' && can('confirm', row)"
-                  :theme="buttonTheme('view')"
-                  hover="color"
-                  @click="openAction('confirm', row)"
-                  >确认订单</t-link
-                ><t-link
-                  v-if="can('copy', row)"
-                  :theme="buttonTheme('view')"
-                  hover="color"
-                  @click="openAction('copy', row)"
-                  >复制开单</t-link
-                ></t-space
-              ></template
-            >
-          </AdminListPage>
+          />
           <AdminListPage
             v-else-if="page === 'fulfillment'"
-            :table-props="{ rowKey: 'id', data: tasks, columns: taskColumns, pagination: { pageSize: 10 } }"
+            :table-props="{
+              rowKey: 'id',
+              data: tasks,
+              columns: taskColumns,
+              pagination: { ...fulfillmentPagination, total: tasks.length },
+            }"
+            @page-change="updateListPagination(fulfillmentPagination, $event)"
           >
             <template #orderId="{ row }"
               ><span>{{ row.orderId }}</span>
@@ -281,22 +213,46 @@
             :tabs="configTabs"
             :active-tab="settingGroup"
             :actions="configActions"
-            :table-props="{ rowKey: 'id', data: settingsRows, columns: settingColumns, pagination: { pageSize: 10 } }"
-            @tab-change="settingGroup = String($event)"
-            @action="settingVisible = true"
+            :table-props="{
+              rowKey: 'id',
+              data: settingsRows,
+              columns: settingColumns,
+              pagination: { ...settingsPagination, total: settingsRows.length },
+            }"
+            @page-change="updateListPagination(settingsPagination, $event)"
+            @action="openSetting()"
           >
+            <template #createdByName="{ row }">{{
+              row.createdBy === context.accountId ? context.name : row.createdByName || '—'
+            }}</template>
+            <template #createdAt="{ row }">{{ time(row.createdAt) }}</template>
             <template #enabled="{ row }"
               ><t-tag :theme="row.enabled ? 'success' : 'default'" variant="light">{{
                 row.enabled ? '启用' : '停用'
               }}</t-tag></template
             ><template #operation="{ row }"
-              ><t-link
-                v-if="canSetting('toggle-status')"
-                hover="color"
-                :theme="buttonTheme(row.enabled ? 'disable' : 'enable')"
-                @click="toggleSetting(row)"
-                >{{ row.enabled ? '停用' : '启用' }}</t-link
-              ></template
+              ><t-space>
+                <t-link v-if="canSetting('edit')" hover="color" :theme="buttonTheme('edit')" @click="openSetting(row)"
+                  >编辑</t-link
+                >
+                <t-link
+                  v-if="canSetting('toggle-status')"
+                  hover="color"
+                  :theme="buttonTheme(row.enabled ? 'disable' : 'enable')"
+                  @click="openToggleSetting(row)"
+                  >{{ row.enabled ? '停用' : '启用' }}</t-link
+                >
+                <t-link
+                  v-if="canSetting('delete')"
+                  hover="color"
+                  :theme="buttonTheme('delete')"
+                  @click="
+                    deletingSetting = row;
+                    deleteSettingVisible = true;
+                  "
+                  >删除</t-link
+                >
+              </t-space></template
             >
           </AdminListPage>
         </div>
@@ -322,14 +278,30 @@
     <AdminFormDialog
       ref="settingDialog"
       v-model:visible="settingVisible"
-      :header="settingGroup === 'nature' ? '新增款项性质' : '新增收退款方式'"
+      :header="`${editingSettingId ? '编辑' : '新增'}款项名称`"
       :data="{ name: settingName }"
-      confirm-function="create"
-      :confirmation="formConfirmation('create')"
+      :confirm-function="editingSettingId ? 'edit' : 'create'"
+      :confirmation="formConfirmation(editingSettingId ? 'edit' : 'create')"
       @confirm="addSetting"
       ><t-form-item label="名称" required v-bind="settingFeedback.field('name', settingName)"
         ><t-input v-model="settingName" placeholder="请输入名称" /></t-form-item
     ></AdminFormDialog>
+    <AdminConfirmDialog
+      v-model:visible="toggleSettingVisible"
+      :function="pendingToggleSetting?.enabled ? 'disable' : 'enable'"
+      :action="pendingToggleSetting?.enabled ? '停用' : '启用'"
+      object-type="款项名称"
+      :object-name="pendingToggleSetting?.name"
+      @confirm="confirmToggleSetting"
+    />
+    <AdminConfirmDialog
+      v-model:visible="deleteSettingVisible"
+      function="delete"
+      action="删除"
+      object-type="款项名称"
+      :object-name="deletingSetting?.name"
+      @confirm="deleteSetting"
+    />
     <AdminDialog
       :visible="Boolean(proofUrl)"
       header="收退款凭证"
@@ -371,6 +343,7 @@ import {
   AdminListPage,
   AdminDetailPage,
   AdminFormDialog,
+  AdminConfirmDialog,
   AdminDialog,
   adminFeedback,
   type ListAction,
@@ -385,7 +358,9 @@ import { getUserFunctionAudience } from '@/services/functionAudience';
 import { useFormFeedback } from '@/utils/formValidation';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import OrderEditor from './OrderEditor.vue';
+import SalesOrderList from './SalesOrderList.vue';
 import OrderActionDialog, { type ActionForm } from './OrderActionDialog.vue';
+import { generateOrderNumber } from './orderNumber';
 import { prefix, salesActions, taskActions, settingTabs, type SalesAction } from './resources';
 import {
   statuses,
@@ -399,6 +374,7 @@ import {
   warnings,
   scopeKey,
   createState,
+  removeDefaultSettings,
   blankOrder,
   saveDraft,
   copyOrder,
@@ -416,7 +392,6 @@ import {
   type Context,
   type State,
   type Order,
-  type Line,
   type Log,
   type Setting,
   type Status,
@@ -442,7 +417,10 @@ watch(
     try {
       const raw = localStorage.getItem(key.value);
       const saved = raw ? (JSON.parse(raw) as State) : null;
-      state.value = saved?.version === 1 && scopeKey(saved.context) === key.value ? saved : createState(context.value);
+      state.value =
+        saved?.version === 1 && scopeKey(saved.context) === key.value
+          ? removeDefaultSettings(saved)
+          : createState(context.value);
     } catch {
       state.value = createState(context.value);
     }
@@ -453,7 +431,7 @@ try {
   const raw = localStorage.getItem(key.value);
   if (raw) {
     const saved = JSON.parse(raw) as State;
-    if (saved.version === 1 && scopeKey(saved.context) === key.value) state.value = saved;
+    if (saved.version === 1 && scopeKey(saved.context) === key.value) state.value = removeDefaultSettings(saved);
   }
 } catch {
   /* Invalid prototype storage is replaced by isolated fixtures. */
@@ -470,7 +448,7 @@ watch(
       }
     }
   },
-  { deep: true },
+  { deep: true, immediate: true },
 );
 const page = computed(() =>
   route.path.endsWith('/fulfillment') ? 'fulfillment' : route.path.endsWith('/settings') ? 'settings' : 'sales',
@@ -489,6 +467,10 @@ const scopedOrders = computed(() =>
         (user.value.dataPermission === 'self' && o.ownerId === user.value.id)),
   ),
 );
+const expandedOrderIds = ref<Array<string | number>>([]);
+function updateOrderExpansion(keys: Array<string | number>) {
+  expandedOrderIds.value = keys;
+}
 const status = ref<Status>('pending'),
   selectedId = ref('');
 const selected = computed(() => scopedOrders.value.find((o) => o.id === selectedId.value));
@@ -496,7 +478,14 @@ const can = (a: string, o?: Order) => hasPermission(user.value, `${prefix}.sales
 const canTask = (a: string) => hasPermission(user.value, `${prefix}.fulfillment.${a}`);
 const settingGroup = ref('nature');
 const canSetting = (a: string) => hasPermission(user.value, `${prefix}.settings.${settingGroup.value}.${a}`);
-const tabs = computed(() => statuses.filter((s) => hasPermission(user.value, `${prefix}.sales.${s.value}.view`)));
+const tabs = computed(() =>
+  statuses
+    .filter((s) => hasPermission(user.value, `${prefix}.sales.${s.value}.view`))
+    .map((s) => ({
+      ...s,
+      label: `${s.label}（${scopedOrders.value.filter((order) => order.status === s.value).length}）`,
+    })),
+);
 const configTabs = computed(() =>
   settingTabs.filter((s) => hasPermission(user.value, `${prefix}.settings.${s.value}.view`)),
 );
@@ -518,6 +507,26 @@ const filterDraft = ref<FilterValues>({}),
   applied = ref<FilterValues>({}),
   pageNumber = ref(1),
   pageSize = ref(10);
+const detailPagination = ref({ current: 1, pageSize: 5 });
+const fulfillmentPagination = ref({ current: 1, pageSize: 10 });
+const settingsPagination = ref({ current: 1, pageSize: 10 });
+function updateListPagination(pagination: { current: number; pageSize: number }, info: PageInfo) {
+  pagination.current = info.current;
+  pagination.pageSize = info.pageSize;
+}
+function clampListPage(pagination: { current: number; pageSize: number }, total: number) {
+  pagination.current = Math.min(pagination.current, Math.max(1, Math.ceil(total / pagination.pageSize)));
+}
+watch(selectedId, () => {
+  detailPagination.value.current = 1;
+});
+watch(settingGroup, () => {
+  settingsPagination.value.current = 1;
+});
+watch(
+  () => selected.value?.logs.length ?? 0,
+  (total) => clampListPage(detailPagination.value, total),
+);
 const filters = computed<ListFilter[]>(() => [
   { key: 'keyword', label: '订单', searchScope: '订单号/客户姓名/联系电话' },
   {
@@ -550,8 +559,8 @@ const filters = computed<ListFilter[]>(() => [
     kind: 'select',
     options: ['缺货待补', '延期', '待退款', '发货异常', '收款异常'].map((x) => ({ label: x, value: x })),
   },
-  { key: 'start', label: '成交开始日期' },
-  { key: 'end', label: '成交结束日期' },
+  { key: 'start', label: '创建开始日期' },
+  { key: 'end', label: '创建结束日期' },
 ]);
 const paymentStatus = (o: Order) =>
   pricing(o).outstanding === 0 ? '已收齐' : pricing(o).net > 0 ? '部分收款' : '未收款';
@@ -569,8 +578,8 @@ const filtered = computed(() =>
         (!f.payment || paymentStatus(o) === f.payment) &&
         (!f.shipment || shipmentProgress(o).label === f.shipment) &&
         (!f.warning || warnings(o).includes(String(f.warning))) &&
-        (!f.start || (Boolean(o.confirmedAt) && dateOnly(o.confirmedAt) >= String(f.start))) &&
-        (!f.end || (Boolean(o.confirmedAt) && dateOnly(o.confirmedAt) <= String(f.end)))
+        (!f.start || (Boolean(o.createdAt) && dateOnly(o.createdAt) >= String(f.start))) &&
+        (!f.end || (Boolean(o.createdAt) && dateOnly(o.createdAt) <= String(f.end)))
       );
     })
     .sort((a, b) => b.statusAt.localeCompare(a.statusAt)),
@@ -579,6 +588,7 @@ const rows = computed(() =>
   filtered.value.slice((pageNumber.value - 1) * pageSize.value, pageNumber.value * pageSize.value),
 );
 function search() {
+  expandedOrderIds.value = [];
   applied.value = { ...filterDraft.value };
   pageNumber.value = 1;
 }
@@ -591,13 +601,15 @@ function switchTab(v: string | number) {
   reset();
 }
 function changePage(info: PageInfo) {
+  if (info.current === pageNumber.value && info.pageSize === pageSize.value) return;
+  expandedOrderIds.value = [];
   pageNumber.value = info.current;
   pageSize.value = info.pageSize;
 }
 const toolbarActions = computed<ListAction[]>(() =>
   can('create') ? [{ id: 'create', label: '新增订单', function: 'create', icon: 'add' }] : [],
 );
-const editingOrder = ref(blankOrder(context.value)),
+const editingOrder = ref(blankOrder(context.value, state.value.orders)),
   editing = ref(false),
   editorVisible = ref(false);
 const actionVisible = ref(false),
@@ -642,7 +654,7 @@ function openAction(id: string, o?: Order, rid = '') {
       editing.value = id === 'edit';
       editingOrder.value =
         id === 'create'
-          ? blankOrder(context.value)
+          ? blankOrder(context.value, state.value.orders)
           : id === 'copy'
             ? copyOrder(state.value, o!, context.value)
             : clone(o!);
@@ -665,6 +677,8 @@ function openAction(id: string, o?: Order, rid = '') {
 function saveEditor(o: Order, reason: string) {
   try {
     demand(can(editing.value ? 'edit' : 'create', o), '没有保存权限');
+    if (!editing.value && state.value.orders.some((existing) => existing.id === o.id))
+      o.id = generateOrderNumber(state.value.orders.map((existing) => existing.id));
     saveDraft(state.value, o, context.value, reason);
     editorVisible.value = false;
     selectedId.value = o.id;
@@ -769,30 +783,88 @@ const tasks = computed(() =>
   ),
 );
 const settingsFilters = ref<FilterValues>({});
-const settingsRows = computed(() => state.value.settings.filter((s) => s.group === settingGroup.value));
+const settingsRows = computed(() =>
+  state.value.settings
+    .filter((s) => s.group === settingGroup.value)
+    .sort((a, b) => (b.createdAt ? Date.parse(b.createdAt) : 0) - (a.createdAt ? Date.parse(a.createdAt) : 0)),
+);
+watch(
+  () => tasks.value.length,
+  (total) => clampListPage(fulfillmentPagination.value, total),
+);
+watch(
+  () => settingsRows.value.length,
+  (total) => clampListPage(settingsPagination.value, total),
+);
 const configActions = computed<ListAction[]>(() =>
   canSetting('create') ? [{ id: 'create', label: '新增', function: 'create' }] : [],
 );
 const settingVisible = ref(false),
-  settingName = ref('');
+  settingName = ref(''),
+  editingSettingId = ref('');
+const deletingSetting = ref<Setting | null>(null),
+  deleteSettingVisible = ref(false);
+const pendingToggleSetting = ref<Setting | null>(null),
+  toggleSettingVisible = ref(false);
 const settingDialog = ref<InstanceType<typeof AdminFormDialog>>();
 const settingFeedback = useFormFeedback(settingVisible);
-watch(settingVisible, () => {
-  settingName.value = '';
-});
+function openSetting(row?: Setting) {
+  if (!canSetting(row ? 'edit' : 'create')) return;
+  editingSettingId.value = row?.id ?? '';
+  settingName.value = row?.name ?? '';
+  settingVisible.value = true;
+}
 async function addSetting() {
-  if (!canSetting('create')) return;
+  if (!canSetting(editingSettingId.value ? 'edit' : 'create')) return;
   const name = settingName.value.trim();
-  if (!name || state.value.settings.some((s) => s.group === settingGroup.value && s.name === name)) {
+  if (
+    !name ||
+    state.value.settings.some(
+      (s) => s.group === settingGroup.value && s.name === name && s.id !== editingSettingId.value,
+    )
+  ) {
     settingFeedback.reject('name', settingName.value, !name ? '请输入名称' : '该名称已存在');
     await rejectFormSubmission(settingDialog.value);
     return;
   }
-  state.value.settings.push({ id: uid(), group: settingGroup.value as 'nature' | 'method', name, enabled: true });
+  if (editingSettingId.value) {
+    const row = state.value.settings.find((s) => s.id === editingSettingId.value && s.group === settingGroup.value);
+    if (!row) return;
+    row.name = name;
+  } else {
+    state.value.settings.push({
+      id: uid(),
+      group: settingGroup.value as 'nature' | 'method',
+      name,
+      enabled: true,
+      createdBy: context.value.accountId,
+      createdByName: context.value.name,
+      createdAt: now(),
+    });
+  }
   settingVisible.value = false;
+  adminFeedback.actionSuccess({ action: editingSettingId.value ? '修改' : '新增', target: name });
 }
-function toggleSetting(s: Setting) {
-  if (canSetting('toggle-status')) s.enabled = !s.enabled;
+function openToggleSetting(s: Setting) {
+  if (!canSetting('toggle-status')) return;
+  pendingToggleSetting.value = s;
+  toggleSettingVisible.value = true;
+}
+function confirmToggleSetting() {
+  const s = pendingToggleSetting.value;
+  if (!s || !canSetting('toggle-status')) return;
+  s.enabled = !s.enabled;
+  toggleSettingVisible.value = false;
+  pendingToggleSetting.value = null;
+  adminFeedback.actionSuccess({ action: s.enabled ? '启用' : '停用', target: s.name });
+}
+function deleteSetting() {
+  const row = deletingSetting.value;
+  if (!row || !canSetting('delete')) return;
+  state.value.settings = state.value.settings.filter((s) => s.id !== row.id);
+  deleteSettingVisible.value = false;
+  deletingSetting.value = null;
+  adminFeedback.deleted(row.name);
 }
 const proofUrl = ref(''),
   logDetail = ref<Log | null>(null);
@@ -839,18 +911,6 @@ const priceItems = computed(() => {
     { label: '有效净收款', value: money(p.net) },
   ];
 });
-const salesColumns = [
-  { colKey: 'id', title: '订单号', width: 200, fixed: 'left' as const },
-  { colKey: 'customer', title: '客户', width: 165 },
-  { colKey: 'goods', title: '购买商品', width: 230 },
-  { colKey: 'total', title: '成交金额', width: 130 },
-  { colKey: 'payment', title: '收款情况', width: 190 },
-  { colKey: 'shipment', title: '发货进度', width: 170 },
-  { colKey: 'ownerName', title: '负责人', width: 100 },
-  { colKey: 'warnings', title: '异常', width: 150 },
-  { colKey: 'statusAt', title: '进入当前状态时间', width: 180 },
-  { colKey: 'operation', title: '操作', width: 210, fixed: 'right' as const },
-];
 const lineColumns = [
   { colKey: 'sku', title: 'SKU' },
   { colKey: 'name', title: '商品' },
@@ -888,8 +948,8 @@ const shipmentColumns = [
 const paymentColumns = [
   { colKey: 'kind', title: '类型' },
   { colKey: 'amount', title: '金额' },
-  { colKey: 'nature', title: '款项性质' },
-  { colKey: 'method', title: '方式' },
+  { colKey: 'nature', title: '款项名称' },
+  { colKey: 'method', title: '收退款渠道' },
   { colKey: 'at', title: '实际时间' },
   { colKey: 'reason', title: '原因' },
   { colKey: 'remark', title: '备注' },
@@ -917,6 +977,8 @@ const taskColumns = [
 const settingColumns = [
   { colKey: 'name', title: '名称' },
   { colKey: 'enabled', title: '状态' },
+  { colKey: 'createdByName', title: '创建人' },
+  { colKey: 'createdAt', title: '创建时间' },
   { colKey: 'operation', title: '操作' },
 ];
 </script>

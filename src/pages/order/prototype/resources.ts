@@ -23,10 +23,7 @@ export const taskActions = [
   ['ship', '登记客户发货'],
   ['receive', '登记到店收货'],
 ] as const;
-export const settingTabs = [
-  { value: 'nature', label: '款项性质' },
-  { value: 'method', label: '收退款方式' },
-];
+export const settingTabs = [{ value: 'nature', label: '款项名称' }];
 const statusActions = (status: string) =>
   salesActions.filter(([a]) => {
     if (['create', 'detail', 'copy', 'refund', 'correct-payment', 'void-payment'].includes(a)) return true;
@@ -77,12 +74,12 @@ export const storeOrderPrototype: FunctionModule = {
       ],
     },
     {
-      label: '订单配置',
+      label: '款项配置',
       value: `${prefix}.settings.menu`,
       direct: false,
       pages: [
         {
-          label: '订单配置页',
+          label: '款项配置页',
           value: `${prefix}.settings`,
           note: '本地原型配置，不写入真实门店配置',
           actions: [],
@@ -91,7 +88,9 @@ export const storeOrderPrototype: FunctionModule = {
             value: `${prefix}.settings.${t.value}`,
             actions: [
               ['create', '新增'],
+              ['edit', '编辑'],
               ['toggle-status', '停用/启用'],
+              ['delete', '删除'],
             ].map(([value, label]) => ({ label: label!, value: `${prefix}.settings.${t.value}.${value}` })),
           })),
         },

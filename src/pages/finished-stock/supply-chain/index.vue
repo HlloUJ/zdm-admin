@@ -3,7 +3,7 @@
     <AdminTopNav />
     <div class="admin-shell">
       <AdminSideMenu />
-      <main class="page" :class="{ 'page--form': formPageVisible }">
+      <main class="page zdm-admin-responsive-page" :class="{ 'page--form': formPageVisible }">
         <div v-if="formPageVisible" ref="formAnchorSlot" :style="{ height: `${formAnchorHeight}px` }">
           <AdminSectionCard class="form-anchor-card" :style="formAnchorStyle">
             <nav ref="formAnchorNav" class="form-anchor-nav" aria-label="商品信息分区导航">

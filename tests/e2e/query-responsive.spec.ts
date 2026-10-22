@@ -17,7 +17,7 @@ const routes = [
   .map(([, route]) => route);
 
 for (const route of routes) {
-  test(`official desktop query layout remains intact on ${route}`, async ({ page }) => {
+  test(`shared query layout preserves desktop and adapts without overlap on ${route}`, async ({ page }) => {
     await page.addInitScript((route) => {
       const store = route.startsWith('/store/') || route === '/store-category-management';
       const clientCode = route.includes('supply-chain') || route === '/supplier-management' ? 'supply-chain' : 'admin';

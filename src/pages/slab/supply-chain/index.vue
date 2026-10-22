@@ -946,6 +946,7 @@
       :confirmation="{ kind: 'close', text: '关闭' }"
       confirm-function="close"
       header="历史下架原因"
+      dialog-class-name="zdm-admin-responsive-dialog"
       width="800px"
       :cancel-btn="null"
       @confirm="closeOffShelfHistory"

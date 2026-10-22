@@ -1,5 +1,6 @@
 /* prettier-ignore */
 @import url('../components/foundation/official/query-layout.css');
+@import url('../components/foundation/official/responsive-layout.css');
 @import url('../components/foundation/official/product-form-layout.css');
 @import url('../components/foundation/official/form-feedback-layout.css');
 @import url('../components/foundation/official/textarea-count-layout.css');
@@ -299,4 +300,81 @@ p {
 .t-popup[data-popper-placement^='left'] > .t-menu__popup .zdm-menu-hover-bridge {
   left: auto;
   right: -16px;
+}
+
+/* Pagination uses one responsive layout for external controls and native Table.
+   Keep the desktop layout and native control appearance; only reflow when the
+   containing pagination region cannot fit the full set of controls. */
+.admin-layout :is(.zdm-admin-pagination, .zdm-admin-list-layout__pagination, .t-table__pagination) {
+  min-width: 0;
+  container-type: inline-size;
+  container-name: admin-pagination;
+}
+
+@media (max-width: 991px) {
+  .admin-layout .page:has(.t-pagination),
+  .admin-layout > .admin-shell > .page.page:has(.t-pagination) {
+    min-width: 0;
+  }
+
+  .admin-layout .zdm-admin-list-layout:has(.t-pagination) {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-layout .zdm-admin-list-layout__content:has(.t-pagination),
+  .admin-layout .t-space-item:has(.zdm-admin-pagination) {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@container admin-pagination (max-width: 640px) {
+  .admin-layout .t-pagination {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'total total total'
+      'size size size'
+      'previous pages next';
+    row-gap: var(--td-comp-margin-s);
+    min-width: 0;
+  }
+
+  .admin-layout .t-pagination__total {
+    grid-area: total;
+  }
+
+  .admin-layout .t-pagination__select {
+    grid-area: size;
+    justify-self: end;
+    margin-right: 0;
+  }
+
+  .admin-layout .t-pagination__btn-prev {
+    grid-area: previous;
+  }
+
+  .admin-layout .t-pagination__pager {
+    grid-area: pages;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: var(--td-comp-margin-s);
+  }
+
+  .admin-layout .t-pagination__btn-next {
+    grid-area: next;
+  }
+
+  .admin-layout .t-pagination__jump {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-layout .page .zdm-admin-responsive-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

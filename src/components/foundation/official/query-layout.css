@@ -75,3 +75,67 @@
 .t-form.zdm-admin-filter-form.zdm-standard-query[data-query-layout='log'] {
   --zdm-query-column-cap: 3;
 }
+
+/* Narrow viewports share one query layout across pages, dialogs and drawers.
+   The desktop 10:2 grid is unchanged. Keep labels and native controls intact;
+   place actions on their own row instead of letting them cover fields. */
+@media (max-width: 991px) {
+  .admin-layout .page:has(.zdm-standard-query),
+  .admin-layout > .admin-shell > .page.page:has(.zdm-standard-query) {
+    min-width: 0;
+  }
+
+  .admin-layout .zdm-admin-list-layout:has(.zdm-standard-query) {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-layout .list-controls:has(> .zdm-standard-query) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-row, .standard-query-row) {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--td-comp-margin-xxl);
+  }
+
+  .t-form.zdm-admin-filter-form.zdm-standard-query
+    :is(.filter-fields, .operation-log-filters)
+    :is(.t-form__controls, .t-form__controls-content) {
+    min-width: 0;
+  }
+
+  .t-form.zdm-admin-filter-form.zdm-standard-query
+    :is(.filter-fields, .operation-log-filters)
+    .t-form__controls-content
+    > :is(.t-input, .t-select, .t-date-picker, .t-date-range-picker) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-actions, .operation-log-filter-actions) {
+    min-width: 0;
+    max-width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: var(--td-comp-margin-s);
+  }
+
+  .t-form.zdm-admin-filter-form.zdm-standard-query :is(.filter-actions, .operation-log-filter-actions) > .t-space {
+    display: contents;
+  }
+
+  .t-form.zdm-admin-filter-form.zdm-standard-query
+    :is(.filter-actions, .operation-log-filter-actions)
+    :is(.t-button, .t-space-item) {
+    flex-shrink: 0;
+  }
+
+  .admin-layout .page .zdm-admin-responsive-panels:has(.zdm-standard-query) {
+    flex-direction: column;
+  }
+
+  .admin-layout .page .zdm-admin-responsive-panels:has(.zdm-standard-query) > .zdm-admin-list-layout {
+    width: 100%;
+  }
+}
