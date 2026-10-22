@@ -188,7 +188,7 @@
       v-model:visible="statusConfirmVisible"
       :function="statusConfirmRow?.status === 'enabled' ? 'disable' : 'enable'"
       :action="statusConfirmRow?.status === 'enabled' ? '停用' : '启用'"
-      :object-type="`${activeType === 'finished' ? '成品' : '大板'}价格配置`"
+      :object-type="`${commodityLabel}价格配置`"
       :object-name="statusConfirmRow?.name"
       @confirm="submitStatusConfirm"
       @cancel="statusConfirmVisible = false"
@@ -219,17 +219,9 @@ import {
 import { usePermissionTabs } from '@/composables/usePermissionTabs';
 import { hasPermission } from '@/services/adminPermissions';
 import { getLoginUser } from '@/services/auth';
-import {
-  createFinishedMarkupConfiguration,
-  deleteFinishedMarkupConfiguration,
-  getFinishedGuidePriceSetting,
-  listFinishedMarkupConfigurations,
-  reorderFinishedMarkupConfigurations,
-  updateFinishedMarkupConfiguration,
-  updateFinishedMarkupConfigurationStatus,
-  updateFinishedGuidePriceSetting,
-  type FinishedMarkupConfigurationRecord,
-} from '@/services/finishedMarkupConfigurations';
+import * as finishedPricing from '@/services/finishedMarkupConfigurations';
+import * as accessoryPricing from '@/services/accessoryMarkupConfigurations';
+import { type FinishedMarkupConfigurationRecord } from '@/services/finishedMarkupConfigurations';
 import {
   createSlabMarkupConfiguration,
   deleteSlabMarkupConfiguration,
@@ -243,16 +235,21 @@ import {
 } from '@/services/slabMarkupConfigurations';
 import { listStoreLevelPricingOptions, type StoreLevelRecord } from '@/services/storeLevels';
 
-type PriceConfigurationTab = 'finished' | 'slab';
+type PriceConfigurationTab = 'finished' | 'accessory' | 'slab';
 type MarkupConfigurationRecord = FinishedMarkupConfigurationRecord | SlabMarkupConfigurationRecord;
 
 const tabs = [
   { label: '成品价格配置', value: 'finished' },
+  { label: '配件价格配置', value: 'accessory' },
   { label: '大板价格配置', value: 'slab' },
 ] as const;
 const prefix = 'admin.product-data-center.markup-configuration';
 const loginUser = computed(() => getLoginUser());
 const activeType = ref<PriceConfigurationTab>('finished');
+const commodityPricing = computed(() => (activeType.value === 'accessory' ? accessoryPricing : finishedPricing));
+const commodityLabel = computed(() =>
+  activeType.value === 'accessory' ? '配件' : activeType.value === 'finished' ? '成品' : '大板',
+);
 const { visibleTabs, showTabRail } = usePermissionTabs({
   tabs,
   activeTab: activeType,
@@ -352,10 +349,10 @@ const loadData = async () => {
   loading.value = true;
   try {
     const [rows, guideSetting, levels] =
-      activeType.value === 'finished'
+      activeType.value !== 'slab'
         ? await Promise.all([
-            listFinishedMarkupConfigurations(),
-            getFinishedGuidePriceSetting(),
+            commodityPricing.value.listFinishedMarkupConfigurations(),
+            commodityPricing.value.getFinishedGuidePriceSetting(),
             listStoreLevelPricingOptions(),
           ])
         : await Promise.all([
@@ -384,14 +381,14 @@ const saveGuidePriceSetting = async () => {
   guideSaving.value = true;
   try {
     const setting =
-      activeType.value === 'finished'
-        ? await updateFinishedGuidePriceSetting(coefficient)
+      activeType.value !== 'slab'
+        ? await commodityPricing.value.updateFinishedGuidePriceSetting(coefficient)
         : await updateSlabGuidePriceSetting(coefficient);
     guideForm.priceCoefficient = formatPriceCoefficientInput(setting.priceCoefficient);
     guideFormRef.value?.clearValidate();
     adminFeedback.actionSuccess({
       action: '修改',
-      target: `${activeType.value === 'finished' ? '成品' : '大板'}指导价设置`,
+      target: `${commodityLabel.value}指导价设置`,
     });
   } catch (error) {
     adminFeedback.error(error instanceof Error ? error.message : '指导价设置保存失败');
@@ -471,7 +468,7 @@ const handleDragSort = async (context: { current: MarkupConfigurationRecord; tar
   sorting.value = true;
   try {
     const orderedIds = orderedRows.map((item) => item.id);
-    if (activeType.value === 'finished') await reorderFinishedMarkupConfigurations(orderedIds);
+    if (activeType.value !== 'slab') await commodityPricing.value.reorderFinishedMarkupConfigurations(orderedIds);
     else await reorderSlabMarkupConfigurations(orderedIds);
     await loadData();
     adminFeedback.actionSuccess({ action: '更新排序', target: context.current.name });
@@ -488,9 +485,9 @@ const submitForm = async () => {
   const name = storeLevels.value.find((level) => level.id === formData.storeLevelId)?.name ?? '门店级别';
   const payload = { storeLevelId: formData.storeLevelId, priceCoefficient: Number(formData.priceCoefficient) };
   try {
-    if (activeType.value === 'finished') {
-      if (editingId.value) await updateFinishedMarkupConfiguration(editingId.value, payload);
-      else await createFinishedMarkupConfiguration(payload);
+    if (activeType.value !== 'slab') {
+      if (editingId.value) await commodityPricing.value.updateFinishedMarkupConfiguration(editingId.value, payload);
+      else await commodityPricing.value.createFinishedMarkupConfiguration(payload);
     } else {
       const result = editingId.value
         ? await updateSlabMarkupConfiguration(editingId.value, payload)
@@ -526,7 +523,7 @@ const submitConfirm = async () => {
   if (!confirmRow.value) return;
   const row = confirmRow.value;
   try {
-    if (activeType.value === 'finished') await deleteFinishedMarkupConfiguration(row.id);
+    if (activeType.value !== 'slab') await commodityPricing.value.deleteFinishedMarkupConfiguration(row.id);
     else await deleteSlabMarkupConfiguration(row.id);
     await loadData();
     confirmVisible.value = false;
@@ -547,7 +544,8 @@ const submitStatusConfirm = async () => {
   const row = statusConfirmRow.value;
   const status = row.status === 'enabled' ? 'disabled' : 'enabled';
   try {
-    if (activeType.value === 'finished') await updateFinishedMarkupConfigurationStatus(row.id, status);
+    if (activeType.value !== 'slab')
+      await commodityPricing.value.updateFinishedMarkupConfigurationStatus(row.id, status);
     else await updateSlabMarkupConfigurationStatus(row.id, status);
     await loadData();
     statusConfirmVisible.value = false;

@@ -3,7 +3,7 @@ import { isFunctionAllowedForAudience } from './functionAudience';
 import { verifiedFunctionCatalog } from './functionCatalogAdminData';
 import {
   storeLevelModule,
-  storeFinishedStock,
+  storeProducts,
   storePriceConfiguration,
   storeCustomerManagement,
 } from './functionCatalogStoreData';
@@ -193,6 +193,74 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
             },
           ],
         },
+        {
+          label: '配件管理',
+          value: 'admin.accessory-management.menu',
+          direct: false,
+          pages: [
+            {
+              label: '配件管理页',
+              value: 'admin.accessory-management',
+              audiences: ['admin'],
+              actions: [{ label: '操作日志', value: 'admin.accessory-management.operation-log.view' }],
+              tabs: [
+                {
+                  label: '仓库中',
+                  value: 'admin.accessory-management.warehouse',
+                  actions: [
+                    { label: '查看', value: 'admin.accessory-management.warehouse.view' },
+                    { label: '批量上架', value: 'admin.accessory-management.warehouse.batch-shelf' },
+                    { label: '上架', value: 'admin.accessory-management.warehouse.shelf' },
+                    { label: '编辑', value: 'admin.accessory-management.warehouse.edit' },
+                    { label: '删除', value: 'admin.accessory-management.warehouse.delete' },
+                  ],
+                },
+                {
+                  label: '已上架',
+                  value: 'admin.accessory-management.selling',
+                  actions: [
+                    { label: '查看', value: 'admin.accessory-management.selling.view' },
+                    { label: '批量下架', value: 'admin.accessory-management.selling.batch-off-shelf' },
+                    { label: '下架', value: 'admin.accessory-management.selling.off-shelf' },
+                    { label: '编辑', value: 'admin.accessory-management.selling.edit' },
+                  ],
+                },
+                {
+                  label: '已下架',
+                  value: 'admin.accessory-management.off-shelf',
+                  actions: [
+                    { label: '查看', value: 'admin.accessory-management.off-shelf.view' },
+                    { label: '批量放回到仓库', value: 'admin.accessory-management.off-shelf.batch-restore' },
+                    { label: '详情', value: 'admin.accessory-management.off-shelf.detail' },
+                    { label: '放回仓库', value: 'admin.accessory-management.off-shelf.restore' },
+                    { label: '删除', value: 'admin.accessory-management.off-shelf.delete' },
+                  ],
+                },
+                {
+                  label: '已售完',
+                  value: 'admin.accessory-management.sold-out',
+                  actions: [
+                    { label: '查看', value: 'admin.accessory-management.sold-out.view' },
+                    { label: '详情', value: 'admin.accessory-management.sold-out.detail' },
+                  ],
+                },
+                {
+                  label: '回收站',
+                  value: 'admin.accessory-management.recycle',
+                  actions: [
+                    { label: '查看', value: 'admin.accessory-management.recycle.view' },
+                    { label: '批量放回到仓库', value: 'admin.accessory-management.recycle.batch-restore' },
+                    { label: '批量彻底删除', value: 'admin.accessory-management.recycle.batch-purge' },
+                    { label: '清空回收站', value: 'admin.accessory-management.recycle.clear' },
+                    { label: '详情', value: 'admin.accessory-management.recycle.detail' },
+                    { label: '放回仓库', value: 'admin.accessory-management.recycle.restore' },
+                    { label: '彻底删除', value: 'admin.accessory-management.recycle.purge' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
         ...(slabManagementMenu ? [slabManagementMenu] : []),
         {
           label: '商品公共基础数据',
@@ -216,7 +284,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
 
 const navigationModuleOrder = [
   'admin.tenant',
-  'store.finished-stock-management',
+  'store.products',
   'store.customer-management',
   'store.order-management',
   'store.price-configuration',
@@ -280,7 +348,7 @@ export const fullFunctionCatalog = applyConfirmedNavigationStructure(
     withDefaultViewPermissions(
       withAdministrationTabs([
         storeLevelModule,
-        storeFinishedStock,
+        storeProducts,
         storeCustomerManagement,
         storeOrderPrototype,
         storePriceConfiguration,

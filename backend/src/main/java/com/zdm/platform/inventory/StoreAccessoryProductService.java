@@ -1,0 +1,903 @@
+package com.zdm.platform.inventory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Store-owned selection and prices over the shared accessory-product catalog and stock. */
+@Service
+public class StoreAccessoryProductService {
+  public record SkuPrice(Long skuId, String label, Integer stock, BigDecimal costPrice,
+      BigDecimal guidePrice, BigDecimal salePrice, String priceMode, BigDecimal saleCoefficient,
+      String displayMode, Map<String, String> salesAttributes, String material,
+      String lengthValue, String color, String sizeValue) {
+    public SkuPrice {
+      salesAttributes = salesAttributes == null ? null
+          : Collections.unmodifiableMap(new LinkedHashMap<>(salesAttributes));
+    }
+  }
+  public record ProductView(Long id, Long productId, String name, String merchantCode,
+      String status, String effectiveStatus, boolean sourceUnavailable, String sourceMessage,
+      Integer totalStock, String imageUrl, List<String> imageUrls, String videoUrl,
+      String detail, Long categoryId, String categoryName,
+      List<AccessoryProductAttributeEntry> attributes, List<AccessorySpecDimension> specDimensions,
+      List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
+      String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
+      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt, String stateOperatorClientCode) {
+    public ProductView {
+      imageUrls = List.copyOf(imageUrls);
+      attributes = List.copyOf(attributes);
+      specDimensions = specDimensions == null ? null : List.copyOf(specDimensions);
+      skus = List.copyOf(skus);
+      attributeNames = Map.copyOf(attributeNames);
+    }
+
+    public List<String> imageUrls() { return List.copyOf(imageUrls); }
+    public List<AccessoryProductAttributeEntry> attributes() { return List.copyOf(attributes); }
+    public List<AccessorySpecDimension> specDimensions() {
+      return specDimensions == null ? null : List.copyOf(specDimensions);
+    }
+    public List<SkuPrice> skus() { return List.copyOf(skus); }
+    public Map<String, String> attributeNames() { return Map.copyOf(attributeNames); }
+  }
+  public record PoolProduct(Long id, String name, String merchantCode, Integer totalStock,
+      String imageUrl, Long categoryId, BigDecimal guidePriceMin,
+      BigDecimal guidePriceMax, BigDecimal partnerPriceMin, BigDecimal partnerPriceMax,
+      String storeLevelName) {}
+  public record PoolSku(Long skuId, String label, Integer stock, BigDecimal guidePrice,
+      BigDecimal partnerPrice, String displayMode, Map<String, String> salesAttributes,
+      String material, String lengthValue, String color, String sizeValue) {
+    public PoolSku {
+      salesAttributes = salesAttributes == null ? null
+          : Collections.unmodifiableMap(new LinkedHashMap<>(salesAttributes));
+    }
+  }
+  public record PoolDetail(Long id, String name, String merchantCode, Integer totalStock,
+      String imageUrl, List<String> imageUrls, String videoUrl, String detail,
+      String categoryName, List<AccessoryProductAttributeEntry> attributes,
+      List<AccessorySpecDimension> specDimensions, List<PoolSku> skus, Map<String, String> attributeNames,
+      String storeLevelName) {
+    public PoolDetail {
+      imageUrls = List.copyOf(imageUrls);
+      attributes = List.copyOf(attributes);
+      specDimensions = List.copyOf(specDimensions);
+      skus = List.copyOf(skus);
+      attributeNames = Map.copyOf(attributeNames);
+    }
+  }
+  public record LogEntry(Long id, Long listingId, Long productId, String productName,
+      String operationType, String operationSummary, String beforeStatus, String afterStatus,
+      String changeDetails, String operatorName, LocalDateTime operatedAt) {}
+  public record LogPage(List<LogEntry> records, long total, int page, int pageSize) {
+    public LogPage {
+      records = List.copyOf(records);
+    }
+  }
+  public record SalePriceInput(Long skuId, BigDecimal salePrice, String priceMode, BigDecimal saleCoefficient) {}
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private AccessoryStateActivityService stateActivities;
+  private final AccessoryInvalidationMedia invalidationMedia;
+  private final JdbcTemplate jdbc;
+  private final CityPartnerStoreScope scopes;
+  private final AccessoryProductService products;
+  private final AccessoryProductMapper productMapper;
+  private final ObjectMapper json;
+  private final StoreAccessoryLogReader logReader;
+  private final StoreAccessorySelectionSnapshot selectionSnapshots;
+  private final StoreAccessorySalePriceService salePrices;
+  private final AccessoryOperationLogService operationLogs;
+
+  public StoreAccessoryProductService(JdbcTemplate jdbc, CityPartnerStoreScope scopes,
+      AccessoryProductService products, AccessoryProductMapper productMapper, ObjectMapper json, StoreAccessorySelectionSnapshot selectionSnapshots, AccessoryInvalidationMedia invalidationMedia, StoreAccessorySalePriceService salePrices, AccessoryOperationLogService operationLogs) {
+    this.invalidationMedia = invalidationMedia;
+    this.salePrices = salePrices;
+    this.operationLogs = operationLogs;
+    this.jdbc = jdbc;
+    this.scopes = scopes;
+    this.products = products;
+    this.productMapper = productMapper;
+    this.json = json;
+    this.selectionSnapshots = selectionSnapshots;
+    this.logReader = new StoreAccessoryLogReader(jdbc, scopes, selectionSnapshots);
+  }
+
+  public record PoolCategory(Long id, Long parentId, String name) {}
+
+  public List<PoolCategory> listCategories() {
+    scopes.require();
+    return jdbc.query("""
+        SELECT id, parent_id, name FROM product_categories
+        WHERE scope = 'accessory' AND tenant_id IS NULL AND status = 'enabled'
+        ORDER BY sort_order, id
+        """, (row, index) -> new PoolCategory(row.getLong("id"),
+            row.getObject("parent_id", Long.class), row.getString("name")));
+  }
+
+  public List<PoolCategory> poolCategories() {
+    scopes.require();
+    return jdbc.query("""
+        SELECT id, parent_id, name FROM product_categories
+        WHERE scope = 'accessory' AND tenant_id IS NULL
+        ORDER BY sort_order, id
+        """, (row, index) -> new PoolCategory(row.getLong("id"),
+            row.getObject("parent_id", Long.class), row.getString("name")));
+  }
+
+  public List<PoolProduct> pool() {
+    var store = scopes.require();
+    List<Map<String, Object>> rows = jdbc.queryForList("""
+        SELECT product.id, product.name, product.sku, product.total_stock,
+          product.category_id
+        FROM accessory_products product
+        WHERE product.status = 'selling' AND product.source_status IN ('selling', 'soldOut')
+          AND product.operations_deleted = FALSE AND product.operations_invalidated_at IS NULL AND product.total_stock > 0
+          AND NOT EXISTS (SELECT 1 FROM store_accessory_products selected
+            WHERE selected.store_id = ? AND selected.accessory_product_id = product.id
+)
+        ORDER BY product.created_at DESC, product.id DESC
+        """, store.storeId());
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<Long> ids = rows.stream().map(row -> number(row.get("id"))).toList();
+    Map<Long, AccessoryProduct> details = products.withListDetails(
+        productMapper.selectBatchIds(ids)).stream()
+        .collect(java.util.stream.Collectors.toMap(AccessoryProduct::getId, product -> product));
+    String storeLevelName = store.storeLevelId() == null ? null
+        : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
+    return rows.stream().map(row -> {
+      Long id = number(row.get("id"));
+      AccessoryProduct detailed = details.get(id);
+      if (detailed == null) {
+        throw new IllegalArgumentException("来源商品不存在");
+      }
+      return new PoolProduct(id, (String) row.get("name"), (String) row.get("sku"),
+          ((Number) row.get("total_stock")).intValue(), detailed.getMainImageUrl(),
+          number(row.get("category_id")),
+          priceBound(detailed, sku -> guidePrice(detailed, sku.getId()), false),
+          priceBound(detailed, sku -> guidePrice(detailed, sku.getId()), true),
+          priceBound(detailed, sku -> partnerPrice(store, detailed, sku.getId()), false),
+          priceBound(detailed, sku -> partnerPrice(store, detailed, sku.getId()), true), storeLevelName);
+    }).toList();
+  }
+
+  private BigDecimal priceBound(AccessoryProduct product,
+      Function<AccessoryProductVariant, BigDecimal> price, boolean maximum) {
+    var values = (product.getVariants() == null ? List.<AccessoryProductVariant>of()
+        : product.getVariants()).stream().map(price).filter(Objects::nonNull);
+    return (maximum ? values.max(BigDecimal::compareTo) : values.min(BigDecimal::compareTo))
+        .orElse(null);
+  }
+
+  public PoolDetail poolDetail(Long id) {
+    var store = scopes.require();
+    Long available = jdbc.queryForObject("""
+        SELECT COUNT(*) FROM accessory_products product
+        WHERE product.id = ? AND product.status = 'selling'
+          AND product.source_status IN ('selling', 'soldOut')
+          AND product.operations_deleted = FALSE AND product.operations_invalidated_at IS NULL AND product.total_stock > 0
+          AND NOT EXISTS (SELECT 1 FROM store_accessory_products selected
+            WHERE selected.store_id = ? AND selected.accessory_product_id = product.id
+)
+        """, Long.class, id, store.storeId());
+    if (available == null || available == 0) {
+      throw new IllegalArgumentException("商品不存在或不可挑选");
+    }
+    AccessoryProduct product = publicProduct(id);
+    String categoryName = poolCategoryPath(product.getCategoryId());
+    List<PoolSku> skus = (product.getVariants() == null ? List.<AccessoryProductVariant>of()
+        : product.getVariants()).stream().map(sku -> new PoolSku(sku.getId(),
+            sku.getVariantLabel(), sku.getStock(), guidePrice(product, sku.getId()),
+            partnerPrice(store, product, sku.getId()), sku.getDisplayMode(),
+            sku.getSalesAttributes(), sku.getMaterial(), sku.getLengthValue(),
+            sku.getColor(), sku.getSizeValue())).toList();
+    return new PoolDetail(id, product.getName(), product.getSku(), product.getTotalStock(),
+        product.getMainImageUrl(), product.getMainImageUrls() == null ? List.of()
+            : product.getMainImageUrls(), product.getVideoUrl(), product.getDetail(),
+        categoryName, product.getAttributes() == null ? List.of()
+            : product.getAttributes(), product.getSpecDimensions() == null ? List.of()
+            : product.getSpecDimensions(), skus, poolAttributeNames(skus),
+        store.storeLevelId() == null ? null
+            : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId()));
+  }
+
+  private String poolCategoryPath(Long categoryId) {
+    List<String> names = new ArrayList<>();
+    java.util.Set<Long> visited = new java.util.HashSet<>();
+    Long current = categoryId;
+    while (current != null && current != 0 && visited.add(current)) {
+      List<Map<String, Object>> rows = jdbc.queryForList("""
+          SELECT name, parent_id FROM product_categories
+          WHERE id = ? AND scope = 'accessory' AND tenant_id IS NULL
+          """, current);
+      if (rows.isEmpty()) {
+        names.addFirst("历史上级类目已不可用");
+        break;
+      }
+      names.addFirst((String) rows.getFirst().get("name"));
+      current = number(rows.getFirst().get("parent_id"));
+    }
+    return names.isEmpty() ? null : String.join(" / ", names);
+  }
+
+  private Map<Long, String> categoryPaths() {
+    Map<Long, Map<String, Object>> categories = new LinkedHashMap<>();
+    jdbc.queryForList("SELECT id,name,parent_id FROM product_categories WHERE scope='accessory' AND tenant_id IS NULL")
+        .forEach(row -> categories.put(number(row.get("id")), row));
+    Map<Long, String> paths = new LinkedHashMap<>();
+    for (Long id : categories.keySet()) {
+      List<String> names = new ArrayList<>();
+      java.util.Set<Long> visited = new java.util.HashSet<>();
+      Long current = id;
+      while (current != null && current != 0 && visited.add(current)) {
+        Map<String, Object> category = categories.get(current);
+        if (category == null) {
+          names.addFirst("历史上级类目已不可用");
+          break;
+        }
+        names.addFirst((String) category.get("name"));
+        current = number(category.get("parent_id"));
+      }
+      paths.put(id, String.join(" / ", names));
+    }
+    return paths;
+  }
+
+  private Map<String, String> poolAttributeNames(List<PoolSku> skus) {
+    return attributeNamesForKeys(skus.stream().filter(sku -> sku.salesAttributes() != null)
+        .flatMap(sku -> sku.salesAttributes().keySet().stream()).toList());
+  }
+
+  private Map<String, String> attributeNamesForKeys(List<String> keys) {
+    List<Long> ids = keys.stream()
+        .filter(key -> key.matches("attribute_[0-9]{1,18}"))
+        .map(key -> Long.valueOf(key.substring("attribute_".length()))).distinct().toList();
+    if (ids.isEmpty()) { return Map.of(); }
+    Map<String, String> names = new LinkedHashMap<>();
+    queryByIds("SELECT id, name FROM product_attributes WHERE scope IN ('shared', 'accessory') AND id IN (", ids)
+        .forEach(row -> names.put("attribute_" + number(row.get("id")), (String) row.get("name")));
+    return names;
+  }
+
+  public List<ProductView> list() {
+    var store = scopes.require();
+    List<Map<String, Object>> listings = jdbc.queryForList("""
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, activity.operator_client_code AS state_operator_client_code, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
+        FROM store_accessory_products listing
+        LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
+        LEFT JOIN product_state_activity activity ON activity.kind='store-accessory' AND activity.business_client_code='store' AND activity.record_id=listing.id
+        LEFT JOIN accounts state_actor ON state_actor.id=activity.operator_account_id
+        JOIN accessory_products product ON product.id = listing.accessory_product_id
+        WHERE listing.tenant_id = ? AND listing.store_id = ?
+        ORDER BY listing.created_at DESC, listing.id DESC
+        """, store.tenantId(), store.storeId());
+    if (listings.isEmpty()) { return List.of(); }
+    return listViews(store, listings);
+  }
+
+  public ProductView detail(Long id) {
+    var store = scopes.require();
+    return view(store, listing(store, id, false));
+  }
+
+  @Transactional
+  public List<ProductView> select(List<Long> productIds) {
+    var store = scopes.require();
+    if (productIds == null || productIds.isEmpty() || productIds.size() > 100
+        || productIds.stream().anyMatch(Objects::isNull)
+        || productIds.stream().distinct().count() != productIds.size()) {
+      throw new IllegalArgumentException("请选择有效的商品，单次最多 100 件");
+    }
+    List<ProductView> selected = new ArrayList<>();
+    for (Long productId : productIds) {
+      Map<String, Object> source = source(productId, true);
+      if (!isSelectable(source)) {
+        throw new IllegalArgumentException("所选商品已不在运营端已上架商品池");
+      }
+      Long exists = jdbc.queryForObject("""
+          SELECT COUNT(*) FROM store_accessory_products
+          WHERE store_id = ? AND accessory_product_id = ?
+          """, Long.class, store.storeId(), productId);
+      if (exists != null && exists > 0) {
+        throw new IllegalArgumentException("本店已存在该商品，请先彻底删除旧记录后再重新选择");
+      }
+      Map<String, Object> snapshot = selectionSnapshots.capture(poolDetail(productId), store.storeLevelId());
+      jdbc.update("""
+          INSERT INTO store_accessory_products
+            (tenant_id, store_id, accessory_product_id, status, selected_by_account_id, selection_generation)
+          VALUES (?, ?, ?, 'warehouse', ?, ?)
+          """, store.tenantId(), store.storeId(), productId, store.accountId(), source.get("selection_generation"));
+      Long listingId = jdbc.queryForObject("""
+          SELECT id FROM store_accessory_products
+          WHERE store_id = ? AND accessory_product_id = ?
+          """, Long.class, store.storeId(), productId);
+      Long logId = log(store, listingId, productId, (String) source.get("name"), "SELECT", "从运营端已上架商品池挑选商品，放入本店仓库",
+          null, "warehouse", snapshot);
+      selectionSnapshots.retain(logId, snapshot);
+      selected.add(detail(listingId));
+    }
+    return selected;
+  }
+
+  @Transactional
+  public ProductView changeStatus(Long id, String target, String reason, String detail) {
+    var store = scopes.require();
+    Map<String, Object> listing = listing(store, id, false);
+    Map<String, Object> source = source(number(listing.get("accessory_product_id")), true);
+    if ("selling".equals(target)) { salePrices.lockCategories(store.storeId()); }
+    listing = listing(store, id, true);
+    String current = (String) listing.get("status");
+    if ("purged".equals(target)) {
+      return purge(store, listing, source);
+    }
+    if (invalidated(listing) || !isUsable(source)) {
+      throw new IllegalArgumentException(sourceMessage(listing, source));
+    }
+    if ("selling".equals(current) && stock(source) == 0) {
+      throw new IllegalArgumentException("统一库存已售完，不能改变商品状态");
+    }
+    boolean allowed = switch (current) {
+      case "warehouse" -> List.of("selling", "recycle").contains(target);
+      case "selling" -> "offShelf".equals(target);
+      case "offShelf" -> List.of("warehouse", "recycle").contains(target);
+      case "recycle" -> "warehouse".equals(target);
+      default -> false;
+    };
+    if (!allowed) {
+      throw new IllegalArgumentException("当前门店商品状态不允许此操作");
+    }
+    if ("selling".equals(target)) {
+      requireReadyToSell(store, id, source);
+    }
+    if ("offShelf".equals(target) && (reason == null || reason.isBlank())) {
+      throw new IllegalArgumentException("请选择下架原因");
+    }
+    if (reason != null && reason.length() > 80 || detail != null && detail.length() > 500) {
+      throw new IllegalArgumentException("下架说明超出长度限制");
+    }
+    jdbc.update("""
+        UPDATE store_accessory_products
+        SET status = ?, off_shelf_reason = ?, off_shelf_detail = ?,
+          off_shelf_at = CASE WHEN ? = 'offShelf' THEN CURRENT_TIMESTAMP ELSE NULL END
+        WHERE id = ? AND tenant_id = ? AND store_id = ?
+        """, target, "offShelf".equals(target) ? reason : null,
+        "offShelf".equals(target) ? detail : null, target, id, store.tenantId(), store.storeId());
+    String type = switch (target) {
+      case "selling" -> "SHELF";
+      case "offShelf" -> "OFF_SHELF";
+      case "warehouse" -> "RESTORE";
+      default -> "DELETE_TO_RECYCLE";
+    };
+    String summary = switch (target) {
+      case "selling" -> "上架商品";
+      case "offShelf" -> "下架商品";
+      case "warehouse" -> "放回仓库";
+      default -> "删除至回收站";
+    };
+    Map<String, Object> changes = new LinkedHashMap<>();
+    changes.put("状态", Map.of("before", current, "after", target));
+    if ("offShelf".equals(target)) {
+      changes.put("下架原因", reason);
+      if (detail != null && !detail.isBlank()) { changes.put("详细说明", detail); }
+    }
+    log(store, id, number(listing.get("accessory_product_id")), (String) source.get("name"),
+        type, summary, current, target, changes);
+    return detail(id);
+  }
+
+  @Transactional
+  public List<ProductView> changeStatusBatch(List<Long> ids, String target, String reason, String detail) {
+    List<ProductView> changed = new ArrayList<>();
+    for (Long id : ids) { changed.add(changeStatus(id, target, reason, detail)); }
+    return changed;
+  }
+
+  @Transactional
+  public void purge(Long id) {
+    var store = scopes.require();
+    Map<String, Object> listing = listing(store, id, false);
+    Map<String, Object> source = source(number(listing.get("accessory_product_id")), true);
+    listing = listing(store, id, true);
+    purge(store, listing, source);
+  }
+
+  @Transactional
+  public void purgeBatch(List<Long> ids) {
+    for (Long id : ids) { purge(id); }
+  }
+
+  @Transactional
+  public void clearRecycle() {
+    var store = scopes.require();
+    List<Long> ids = jdbc.queryForList("""
+        SELECT listing.id FROM store_accessory_products listing
+        JOIN accessory_products product ON product.id = listing.accessory_product_id
+        WHERE listing.tenant_id = ? AND listing.store_id = ? AND listing.status = 'recycle'
+        """, Long.class, store.tenantId(), store.storeId());
+    purgeBatch(ids);
+  }
+
+  private ProductView purge(CityPartnerStoreScope.Store store, Map<String, Object> listing,
+      Map<String, Object> source) {
+    String current = (String) listing.get("status");
+    if (!"recycle".equals(current) && !invalidated(listing) && isUsable(source)) {
+      throw new IllegalArgumentException("只有回收站或上游不可用的商品可以彻底删除");
+    }
+    Long listingId = number(listing.get("id"));
+    Long productId = number(listing.get("accessory_product_id"));
+    log(store, listingId, productId, (String) source.get("name"), "PURGE", "彻底删除商品",
+        current, "purged", Map.of("状态", Map.of("before", current, "after", "purged")));
+    jdbc.update("DELETE FROM store_accessory_products WHERE id = ? AND tenant_id = ? AND store_id = ?",
+        listingId, store.tenantId(), store.storeId());
+    products.releaseFullyPurgedIfUnreferenced(productId);
+    return null;
+  }
+
+  public List<StoreAccessorySalePriceService.Category> editCategories(Long id) {
+    var store = scopes.require(); listing(store, id, false);
+    return List.copyOf(salePrices.context(store.storeId(), List.of()).categories().values());
+  }
+
+  @Transactional
+  public ProductView saveEdit(Long id, Long categoryId, List<SalePriceInput> inputs) {
+    var store = scopes.require();
+    Map<String, Object> listing = listing(store, id, false);
+    Map<String, Object> source = source(number(listing.get("accessory_product_id")), true);
+    salePrices.lockCategories(store.storeId());
+    listing = listing(store, id, true); requirePriceEditable(listing, source);
+    var context = salePrices.context(store.storeId(), List.of(id));
+    salePrices.requireCategory(context, categoryId);
+    AccessoryProduct product = publicProduct(number(source.get("id")));
+    var variants = product.getVariants() == null ? List.<AccessoryProductVariant>of() : product.getVariants();
+    if (inputs == null || inputs.size() != variants.size() || inputs.stream().anyMatch(Objects::isNull)
+        || inputs.stream().map(SalePriceInput::skuId).distinct().count() != inputs.size()
+        || !new java.util.HashSet<>(inputs.stream().map(SalePriceInput::skuId).toList()).equals(new java.util.HashSet<>(variants.stream().map(AccessoryProductVariant::getId).toList()))) {
+      throw new IllegalArgumentException("商品规格已变化，请刷新后重试");
+    }
+    Map<String, Object> changes = new LinkedHashMap<>();
+    Long previousCategory = number(listing.get("store_category_id"));
+    if (!Objects.equals(previousCategory, categoryId)) { changes.put("门店分类", change(context.categoryName(previousCategory), context.categoryName(categoryId))); }
+    Map<String, Object> beforeSales = salesEditSnapshot(detail(id), store.storeLevelId());
+    if (product.getAttributeDisplayOrder() != null) { beforeSales.put("字段顺序", product.getAttributeDisplayOrder()); }
+    boolean salesChanged = false;
+    Map<Long, StoreAccessorySalePriceService.Price> prepared = new LinkedHashMap<>();
+    for (SalePriceInput input : inputs) {
+      if (!List.of("auto", "manual").contains(Objects.toString(input.priceMode(), ""))) { throw new IllegalArgumentException("商品售价模式不正确"); }
+      BigDecimal partner = partnerPrice(store, product, input.skuId());
+      BigDecimal amount = "auto".equals(input.priceMode()) ? StoreAccessorySalePriceService.calculate(partner, context.coefficient(categoryId)) : input.salePrice();
+      if (amount == null && "auto".equals(input.priceMode())) { throw new IllegalArgumentException("价格配置已变化，请刷新后重新填写商品售价"); }
+      if (amount == null) { throw new IllegalArgumentException("请输入商品售价"); }
+      requirePrice(amount);
+      BigDecimal coefficient = "auto".equals(input.priceMode()) ? context.coefficient(categoryId) : input.saleCoefficient();
+      if (coefficient == null) { throw new IllegalArgumentException("请输入系数"); }
+      requirePrice(coefficient);
+      var before = context.effective(id, input.skuId(), previousCategory, partner);
+      boolean coefficientChanged = before.coefficient() == null || before.coefficient().compareTo(coefficient) != 0;
+      boolean amountChanged = before.amount() == null || before.amount().compareTo(amount) != 0;
+      if (!Objects.equals(before.mode(), input.priceMode()) || amountChanged || coefficientChanged) {
+        salesChanged = true;
+      }
+      prepared.put(input.skuId(), new StoreAccessorySalePriceService.Price(amount, input.priceMode(), coefficient));
+    }
+    prepared.forEach((skuId, price) -> salePrices.save(id, skuId, price, store.accountId()));
+    jdbc.update("UPDATE store_accessory_products SET store_category_id=?, sale_price_attention=FALSE WHERE id=? AND tenant_id=? AND store_id=?", categoryId, id, store.tenantId(), store.storeId());
+    ProductView updated = detail(id);
+    if (salesChanged) {
+      Map<String, Object> afterSales = salesEditSnapshot(updated, store.storeLevelId());
+      if (product.getAttributeDisplayOrder() != null) { afterSales.put("字段顺序", product.getAttributeDisplayOrder()); }
+      beforeSales.forEach((field, beforeValue) -> {
+        if (!Objects.equals(json.valueToTree(beforeValue), json.valueToTree(afterSales.get(field)))) {
+          changes.put(field, change(beforeValue, afterSales.get(field)));
+        }
+      });
+      operationLogs.retainChangedVariants(beforeSales, afterSales, changes);
+      if (product.getAttributeDisplayOrder() != null) { changes.put("字段顺序", change(beforeSales.get("字段顺序"), afterSales.get("字段顺序"))); }
+    }
+    if (!changes.isEmpty()) { log(store, id, product.getId(), product.getName(), "UPDATE", "编辑商品", (String) listing.get("status"), (String) listing.get("status"), changes); }
+    return updated;
+  }
+
+  private static Map<String, Object> salesEditSnapshot(ProductView product, Long levelId) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("规格维度", product.specDimensions());
+    snapshot.put("销售属性名称", product.attributeNames());
+    snapshot.put("销售规格", product.skus().stream().map(sku -> {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("skuId", sku.skuId()); row.put("variantLabel", sku.label());
+      row.put("stock", sku.stock()); row.put("displayMode", sku.displayMode());
+      row.put("salesAttributes", sku.salesAttributes());
+      row.put("salePrice", sku.salePrice()); row.put("saleCoefficient", sku.saleCoefficient());
+      row.put("priceMode", sku.priceMode());
+      return row;
+    }).toList());
+    snapshot.put("指导价", product.skus().stream().map(sku -> {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("skuId", sku.skuId()); row.put("price", sku.guidePrice()); return row;
+    }).toList());
+    snapshot.put("层级价格", levelId == null ? List.of() : product.skus().stream().map(sku -> {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("skuId", sku.skuId()); row.put("price", sku.costPrice());
+      row.put("storeLevelId", levelId); row.put("storeLevelName", product.storeLevelName()); return row;
+    }).toList());
+    return snapshot;
+  }
+
+  private static Map<String, Object> change(Object before, Object after) {
+    Map<String, Object> result = new LinkedHashMap<>(); result.put("before", before); result.put("after", after); return result;
+  }
+
+  public List<LogEntry> logs() {
+    return logReader.logs();
+  }
+
+  public LogPage logPage(String keyword, String operationType, String operatorName,
+      String startDate, String endDate, int requestedPage, int requestedSize) {
+    return logReader.logPage(keyword, operationType, operatorName,
+        startDate, endDate, requestedPage, requestedSize);
+  }
+
+  public LogEntry logDetail(Long id) {
+    return logReader.logDetail(id);
+  }
+
+  // Internal upstream propagation only: ownership is loaded from each persisted listing.
+  void invalidateFromUpstream(Long productId, String reason) {
+    for (Map<String, Object> row : jdbc.queryForList("""
+        SELECT listing.*, store.store_level_id FROM store_accessory_products listing
+        JOIN stores store ON store.id=listing.store_id AND store.tenant_id=listing.tenant_id
+        JOIN accessory_products product ON product.id=listing.accessory_product_id
+        WHERE listing.accessory_product_id=? AND listing.selection_generation=product.selection_generation
+        """, productId)) {
+      if (invalidated(row)) {
+        jdbc.update("UPDATE store_accessory_products SET invalidated_reason=? WHERE id=?", reason, row.get("id"));
+        continue;
+      }
+      var owner = new CityPartnerStoreScope.Store(number(row.get("tenant_id")), number(row.get("store_id")),
+          number(row.get("store_level_id")), null, null);
+      try {
+        var snapshot = json.valueToTree(view(owner, row));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) snapshot).put("sourceUnavailable", true)
+            .put("sourceMessage", reason);
+        invalidationMedia.capture((com.fasterxml.jackson.databind.node.ObjectNode) snapshot, productId,
+            "STORE_ACCESSORY_INVALIDATION", number(row.get("id")));
+        jdbc.update("UPDATE store_accessory_products SET invalidated_reason=?,invalidated_at=NOW(),invalidated_snapshot=? WHERE id=? AND invalidated_at IS NULL",
+            reason, json.writeValueAsString(snapshot), row.get("id"));
+      } catch (JsonProcessingException error) { throw new IllegalStateException("门店失效快照保存失败", error); }
+    }
+  }
+
+  private ProductView frozenView(Map<String, Object> listing) {
+    if (!invalidated(listing) || listing.get("invalidated_snapshot") == null) { return null; }
+    try {
+      var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(listing.get("invalidated_snapshot").toString());
+      invalidationMedia.render(snapshot, true);
+      snapshot.put("sourceMessage", AccessorySourceMessage.normalize((String) listing.get("invalidated_reason")));
+      return json.treeToValue(snapshot, ProductView.class);
+    }
+    catch (JsonProcessingException error) { throw new IllegalStateException("门店失效快照读取失败", error); }
+  }
+
+  private List<ProductView> listViews(CityPartnerStoreScope.Store store,
+      List<Map<String, Object>> listings) {
+    List<Long> productIds = listings.stream()
+        .map(listing -> number(listing.get("accessory_product_id"))).distinct().toList();
+    List<Long> listingIds = listings.stream().map(listing -> number(listing.get("id"))).toList();
+    Map<Long, AccessoryProduct> productById = new LinkedHashMap<>();
+    products.withListDetails(productMapper.selectBatchIds(productIds))
+        .forEach(product -> productById.put(product.getId(), product));
+    Map<Long, Map<String, Object>> sourceById = new LinkedHashMap<>();
+    queryByIds("SELECT * FROM accessory_products WHERE id IN (", productIds)
+        .forEach(source -> sourceById.put(number(source.get("id")), source));
+    Map<Long, String> categoryNames = categoryPaths();
+    Map<String, String> attributeNames = attributeNamesForKeys(productById.values().stream()
+        .filter(product -> product.getVariants() != null).flatMap(product -> product.getVariants().stream())
+        .filter(variant -> variant.getSalesAttributes() != null)
+        .flatMap(variant -> variant.getSalesAttributes().keySet().stream()).toList());
+    String storeLevelName = store.storeLevelId() == null ? null
+        : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
+    var pricing = salePrices.context(store.storeId(), listingIds);
+    return listings.stream().map(listing -> {
+      ProductView frozen = frozenView(listing);
+      if (frozen != null) { return frozen; }
+      Long productId = number(listing.get("accessory_product_id"));
+      AccessoryProduct product = productById.get(productId);
+      if (product == null) { throw new IllegalArgumentException("来源商品不存在"); }
+      Map<String, Object> source = sourceById.get(productId);
+      if (source == null) { throw new IllegalArgumentException("来源商品不存在"); }
+      Long listingId = number(listing.get("id"));
+      return renderView(listing, product, source,
+          product.getCategoryId() == null ? null : categoryNames.get(product.getCategoryId()),
+          attributeNames, storeLevelName, pricing, variant -> skuPrice(store, listing, product, variant, pricing));
+    }).toList();
+  }
+
+  private List<Map<String, Object>> queryByIds(String sqlPrefix, List<Long> ids) {
+    String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+    return jdbc.queryForList(sqlPrefix + placeholders + ")", ids.toArray());
+  }
+
+  private Map<Long, String> namesById(String table, List<Long> ids) {
+    if (ids.isEmpty()) { return Map.of(); }
+    Map<Long, String> names = new LinkedHashMap<>();
+    queryByIds("SELECT id, name FROM " + table + " WHERE id IN (", ids)
+        .forEach(row -> names.put(number(row.get("id")), (String) row.get("name")));
+    return names;
+  }
+
+  private ProductView view(CityPartnerStoreScope.Store store, Map<String, Object> listing) {
+    ProductView frozen = frozenView(listing);
+    if (frozen != null) { return frozen; }
+    Long productId = number(listing.get("accessory_product_id"));
+    AccessoryProduct product = publicProduct(productId);
+    Map<String, Object> source = source(productId, false);
+    String categoryName = categoryPaths().get(product.getCategoryId());
+    Map<String, String> attributeNames = attributeNamesForKeys(product.getVariants() == null ? List.of()
+        : product.getVariants().stream().filter(variant -> variant.getSalesAttributes() != null)
+            .flatMap(variant -> variant.getSalesAttributes().keySet().stream()).toList());
+    String storeLevelName = store.storeLevelId() == null ? null
+        : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId());
+    var pricing = salePrices.context(store.storeId(), List.of(number(listing.get("id"))));
+    return renderView(listing, product, source, categoryName, attributeNames, storeLevelName, pricing,
+        variant -> skuPrice(store, listing, product, variant, pricing));
+  }
+
+  private ProductView renderView(Map<String, Object> listing, AccessoryProduct product,
+      Map<String, Object> source, String categoryName, Map<String, String> attributeNames,
+      String storeLevelName, StoreAccessorySalePriceService.Context pricing, Function<AccessoryProductVariant, SkuPrice> priceForVariant) {
+    Long productId = number(listing.get("accessory_product_id"));
+    boolean unavailable = invalidated(listing) || !isUsable(source);
+    String status = (String) listing.get("status");
+    String effective = !invalidated(listing) && "selling".equals(status) && stock(source) == 0 ? "soldOut" : status;
+    String reason = sourceMessage(listing, source);
+    List<SkuPrice> prices = product.getVariants() == null ? List.of()
+        : product.getVariants().stream().map(priceForVariant).toList();
+    ProductView rendered = new ProductView(number(listing.get("id")), productId, product.getName(), product.getSku(),
+        status, effective, unavailable, reason, product.getTotalStock(), product.getMainImageUrl(),
+        product.getMainImageUrls() == null ? List.of() : product.getMainImageUrls(), product.getVideoUrl(),
+        product.getDetail(), product.getCategoryId(), categoryName,
+        product.getAttributes() == null ? List.of() : product.getAttributes(), product.getSpecDimensions(),
+        prices, (String) listing.get("created_by_name"), timestamp(listing.get("created_at")), (String) listing.get("off_shelf_reason"),
+        (String) listing.get("off_shelf_detail"), timestamp(listing.get("off_shelf_at")),
+        attributeNames.entrySet().stream().filter(entry -> prices.stream()
+            .anyMatch(sku -> sku.salesAttributes() != null && sku.salesAttributes().containsKey(entry.getKey())))
+            .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
+        pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")),
+        effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_name") : null,
+        effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null,
+        effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_client_code") : null);
+    return legacyHistoricalView(listing, rendered);
+  }
+
+  // Pre-migration invalid records have no invalidation-time snapshot. Use their genuine
+  // selection snapshot, explicitly labelled; never pretend current source prices are historical.
+  private ProductView legacyHistoricalView(Map<String, Object> listing, ProductView current) {
+    if (!invalidated(listing) || listing.get("invalidated_snapshot") != null) { return current; }
+    List<String> logs = jdbc.queryForList("""
+        SELECT change_details FROM store_accessory_operation_logs
+        WHERE listing_id=? AND tenant_id=? AND store_id=? AND operation_type='SELECT'
+        ORDER BY id LIMIT 1
+        """, String.class, listing.get("id"), listing.get("tenant_id"), listing.get("store_id"));
+    try {
+      var result = (com.fasterxml.jackson.databind.node.ObjectNode) json.valueToTree(current);
+      if (logs.isEmpty() || logs.getFirst() == null) {
+        result.put("sourceMessage", current.sourceMessage() + "；缺少历史详情快照");
+        result.putArray("skus");
+        return json.treeToValue(result, ProductView.class);
+      }
+      var snapshot = json.readTree(selectionSnapshots.resolve(logs.getFirst()));
+      if (!snapshot.has("销售规格")) {
+        result.put("sourceMessage", current.sourceMessage() + "；缺少历史详情快照");
+        result.putArray("skus");
+        return json.treeToValue(result, ProductView.class);
+      }
+      Map<String, String> fields = Map.of("商品名称", "name", "商品分类", "categoryName",
+          "商品属性", "attributes", "规格维度", "specDimensions", "总库存", "totalStock",
+          "门店级别", "storeLevelName", "销售属性名称", "attributeNames");
+      fields.forEach((from, to) -> { if (snapshot.hasNonNull(from)) { result.set(to, snapshot.get(from)); } });
+      var skus = result.putArray("skus");
+      for (var archived : snapshot.path("销售规格")) {
+        var sku = skus.addObject();
+        sku.setAll((com.fasterxml.jackson.databind.node.ObjectNode) archived.deepCopy());
+        sku.set("label", sku.remove("variantLabel"));
+        sku.putNull("salePrice");
+        sku.putNull("saleCoefficient");
+        sku.put("priceMode", "manual");
+        for (var guide : snapshot.path("指导价")) {
+          if (guide.path("skuId").equals(archived.path("skuId"))) { sku.set("guidePrice", guide.path("price")); }
+        }
+        for (var tier : snapshot.path("层级价格")) {
+          if (tier.path("skuId").equals(archived.path("skuId"))) { sku.set("costPrice", tier.path("price")); }
+        }
+      }
+      var images = result.putArray("imageUrls");
+      result.putNull("imageUrl"); result.putNull("videoUrl");
+      for (var media : snapshot.path("媒体")) {
+        var url = media.path("resource").get("url");
+        if (url == null) { continue; }
+        if (media.path("field").asText().startsWith("mainImage")) { images.add(url); }
+        if (media.path("field").asText().equals("video")) { result.set("videoUrl", url); }
+      }
+      if (!images.isEmpty()) { result.set("imageUrl", images.get(0)); }
+      result.put("detail", snapshot.path("宝贝详情").asText(""));
+      result.put("sourceMessage", current.sourceMessage() + "；历史详情为首次选入快照");
+      return json.treeToValue(result, ProductView.class);
+    } catch (JsonProcessingException error) { throw new IllegalStateException("门店历史详情快照读取失败", error); }
+  }
+
+  private SkuPrice skuPrice(CityPartnerStoreScope.Store store, Map<String, Object> listing,
+      AccessoryProduct product, AccessoryProductVariant variant, StoreAccessorySalePriceService.Context pricing) {
+    BigDecimal partner = partnerPrice(store, product, variant.getId());
+    var price = pricing.effective(number(listing.get("id")), variant.getId(), number(listing.get("store_category_id")), partner);
+    return skuPriceView(variant, partner, guidePrice(product, variant.getId()), price);
+  }
+
+  private BigDecimal partnerPrice(CityPartnerStoreScope.Store store,
+      AccessoryProduct product, Long skuId) {
+    return product.getMarkupPrices() == null ? null : product.getMarkupPrices().stream()
+        .filter(price -> Objects.equals(price.getSkuId(), skuId)
+            && Objects.equals(price.getStoreLevelId(), store.storeLevelId()))
+        .map(AccessoryProductPrice::getPrice).findFirst().orElse(null);
+  }
+
+  private BigDecimal guidePrice(AccessoryProduct product, Long skuId) {
+    return product.getGuidePrices() == null ? null : product.getGuidePrices().stream()
+        .filter(price -> Objects.equals(price.getSkuId(), skuId))
+        .map(AccessoryProductGuidePrice::getPrice).findFirst().orElse(null);
+  }
+
+  private SkuPrice skuPriceView(AccessoryProductVariant variant, BigDecimal cost,
+      BigDecimal operationsGuide, StoreAccessorySalePriceService.Price price) {
+    return new SkuPrice(variant.getId(), variant.getVariantLabel(), variant.getStock(), cost,
+        operationsGuide, price.amount(), price.mode(), price.coefficient(), variant.getDisplayMode(), variant.getSalesAttributes(),
+        variant.getMaterial(), variant.getLengthValue(), variant.getColor(), variant.getSizeValue());
+  }
+
+  private AccessoryProduct publicProduct(Long productId) {
+    AccessoryProduct product = productMapper.selectById(productId);
+    if (product == null) { throw new IllegalArgumentException("来源商品不存在"); }
+    // Product selection and reads are scoped by CityPartnerStoreScope and the store listing;
+    // AccessoryProductService.getById checks the platform creator and rejects store self-scope.
+    return products.withDetails(product);
+  }
+
+  private void requireReadyToSell(CityPartnerStoreScope.Store store, Long listingId,
+      Map<String, Object> source) {
+    if (stock(source) <= 0) { throw new IllegalArgumentException("统一库存已售完，不能上架"); }
+    ProductView view = view(store, listing(store, listingId, false));
+    List<SkuPrice> sellableSkus = view.skus().stream()
+        .filter(sku -> sku.stock() != null && sku.stock() > 0).toList();
+    if (sellableSkus.isEmpty() || sellableSkus.stream().anyMatch(sku ->
+        sku.costPrice() == null || sku.guidePrice() == null)) {
+      throw new IllegalArgumentException("请先完善每条可售规格的成本价和指导价");
+    }
+    salePrices.requireCategory(salePrices.context(store.storeId(), List.of(listingId)), view.storeCategoryId());
+    if (view.skus().stream().anyMatch(sku -> sku.salePrice() == null || sku.saleCoefficient() == null)) {
+      throw new IllegalArgumentException("请先完善每条可售规格的商品售价");
+    }
+  }
+
+  private String sourceMessage(Map<String, Object> listing, Map<String, Object> source) {
+    if (invalidated(listing)) {
+      return AccessorySourceMessage.normalize((String) listing.get("invalidated_reason"));
+    }
+    List<String> reasons = new ArrayList<>();
+    String supply = AccessoryLifecycleService.sourceBlockMessage((String) source.get("source_status"), (String) source.get("source_block_reason"));
+    if (supply != null) { reasons.add(supply); }
+    if (source.get("operations_invalidated_reason") != null) {
+      reasons.add(AccessorySourceMessage.normalize((String) source.get("operations_invalidated_reason")));
+    } else if (Boolean.TRUE.equals(source.get("operations_deleted"))) {
+      reasons.add("该商品已被运营管理平台彻底删除");
+    } else if ("recycle".equals(source.get("status"))) {
+      reasons.add("该商品已被运营管理平台删除至回收站");
+    } else if ("offShelf".equals(source.get("status"))) {
+      reasons.add("该商品已被运营管理平台下架");
+    } else if ("warehouse".equals(source.get("status"))) {
+      reasons.add("该商品当前未在运营管理平台上架");
+    }
+    return reasons.isEmpty() ? null : String.join("；", reasons.stream().distinct().toList());
+  }
+
+  private void requirePriceEditable(Map<String, Object> listing, Map<String, Object> source) {
+    if (invalidated(listing) || !isUsable(source)) { throw new IllegalArgumentException(sourceMessage(listing, source)); }
+    if (!List.of("warehouse", "selling").contains(listing.get("status"))
+        || "selling".equals(listing.get("status")) && stock(source) == 0) {
+      throw new IllegalArgumentException("当前商品只能查看价格，不能修改");
+    }
+  }
+
+  private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
+    List<Map<String, Object>> rows = jdbc.queryForList("""
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, activity.operator_client_code AS state_operator_client_code, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
+        FROM store_accessory_products listing
+        LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
+        LEFT JOIN product_state_activity activity ON activity.kind='store-accessory' AND activity.business_client_code='store' AND activity.record_id=listing.id
+        LEFT JOIN accounts state_actor ON state_actor.id=activity.operator_account_id
+        JOIN accessory_products product ON product.id = listing.accessory_product_id
+        WHERE listing.id = ? AND listing.tenant_id = ? AND listing.store_id = ?
+        """ + (lock ? " FOR UPDATE" : ""), id, store.tenantId(), store.storeId());
+    if (rows.isEmpty()) { throw new IllegalArgumentException("本门店商品不存在或不可访问"); }
+    return rows.getFirst();
+  }
+
+  private Map<String, Object> source(Long id, boolean lock) {
+    List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM accessory_products WHERE id = ?"
+        + (lock ? " FOR UPDATE" : ""), id);
+    if (rows.isEmpty()) { throw new IllegalArgumentException("来源商品不存在"); }
+    return rows.getFirst();
+  }
+
+  private static boolean invalidated(Map<String, Object> listing) {
+    return listing.get("invalidated_at") != null;
+  }
+
+  private static boolean isSelectable(Map<String, Object> source) {
+    return "selling".equals(source.get("status"))
+        && List.of("selling", "soldOut").contains(source.get("source_status"))
+        && source.get("operations_invalidated_at") == null && !flag(source.get("operations_deleted")) && stock(source) > 0;
+  }
+
+  private static boolean isUsable(Map<String, Object> source) {
+    return List.of("selling", "soldOut").contains(source.get("status"))
+        && List.of("selling", "soldOut").contains(source.get("source_status"))
+        && source.get("operations_invalidated_at") == null && !flag(source.get("operations_deleted"));
+  }
+
+  private static boolean flag(Object value) {
+    return Boolean.TRUE.equals(value) || value instanceof Number number && number.intValue() != 0;
+  }
+
+  private static int stock(Map<String, Object> source) {
+    Object value = source.get("total_stock");
+    return value instanceof Number number ? number.intValue() : 0;
+  }
+
+  private static Long number(Object value) {
+    return value instanceof Number number ? number.longValue() : null;
+  }
+
+  private static LocalDateTime timestamp(Object value) {
+    if (value instanceof LocalDateTime time) { return time; }
+    return value instanceof Timestamp time ? time.toLocalDateTime() : null;
+  }
+
+  private static void requirePrice(BigDecimal price) {
+    if (price == null || price.scale() > 2 || price.signum() < 0 || price.compareTo(new BigDecimal("9999999999.99")) > 0) {
+      throw new IllegalArgumentException("请输入正确的价格");
+    }
+  }
+
+  private Long log(CityPartnerStoreScope.Store store, Long listingId, Long productId,
+      String name, String type, String summary, String before, String after,
+      Map<String, Object> changes) {
+    String serialized;
+    try {
+      serialized = json.writeValueAsString(changes);
+    } catch (JsonProcessingException exception) {
+      throw new IllegalStateException("配件操作日志序列化失败", exception);
+    }
+    jdbc.update("""
+        INSERT INTO store_accessory_operation_logs
+          (tenant_id, store_id, listing_id, accessory_product_id, product_name,
+           operation_type, operation_summary, before_status, after_status, change_details,
+           operator_account_id, operator_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, store.tenantId(), store.storeId(), listingId, productId, name, type, summary,
+        before, after, serialized, store.accountId(), store.operatorName());
+    Long logId=jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    stateActivities.record("store-accessory","store",listingId,before,after,store.accountId(),"store");
+    return logId;
+  }
+}

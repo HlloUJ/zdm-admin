@@ -273,6 +273,24 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
                 ],
               },
               {
+                label: '配件价格配置',
+                value: 'admin.product-data-center.markup-configuration.accessory',
+                actions: [
+                  {
+                    label: '保存指导价',
+                    value: 'admin.product-data-center.markup-configuration.accessory.guide-price.edit',
+                  },
+                  { label: '新增', value: 'admin.product-data-center.markup-configuration.accessory.create' },
+                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.accessory.edit' },
+                  {
+                    label: '停用/启用',
+                    value: 'admin.product-data-center.markup-configuration.accessory.toggle-status',
+                  },
+                  { label: '排序', value: 'admin.product-data-center.markup-configuration.accessory.sort' },
+                  { label: '删除', value: 'admin.product-data-center.markup-configuration.accessory.delete' },
+                ],
+              },
+              {
                 label: '大板价格配置',
                 value: 'admin.product-data-center.markup-configuration.slab',
                 actions: [

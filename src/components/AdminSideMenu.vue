@@ -106,7 +106,11 @@ onMounted(async () => {
 onBeforeUnmount(rememberScroll);
 
 const activeMenu = computed(() =>
-  route.name === 'storeFinishedStockEdit' ? '/store/finished-stock-management' : route.path,
+  route.name === 'storeAccessoryEdit'
+    ? '/store/accessory-management'
+    : route.name === 'storeFinishedStockEdit'
+      ? '/store/finished-stock-management'
+      : route.path,
 );
 const loginUser = computed(() => getLoginUser());
 const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
@@ -133,6 +137,7 @@ const visibleMenuEntries = computed<AdminMenuEntry[]>(() =>
 
 const baseInfoPaths = new Set([
   '/finished-stock-management',
+  '/accessory-management',
   '/slab-management',
   '/product-category',
   '/product-attribute',
@@ -161,6 +166,9 @@ watch(
   () => route.path,
   () => {
     const requiredExpandedMenus = [];
+    if (/^\/store\/(finished-stock-management|accessory-management)(?:\/|$)/.test(route.path)) {
+      requiredExpandedMenus.push('store-products');
+    }
     if (tenantManagementPaths.has(route.path)) requiredExpandedMenus.push('tenant-management');
     if (route.path === '/store-level-management') requiredExpandedMenus.push('store-base-data-management');
     if (baseInfoPaths.has(route.path)) requiredExpandedMenus.push('product-management');

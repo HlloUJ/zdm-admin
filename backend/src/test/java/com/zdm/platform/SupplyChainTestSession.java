@@ -11,7 +11,7 @@ public final class SupplyChainTestSession {
   private SupplyChainTestSession() {}
   public static String create(JdbcTemplate jdbc, AuthAccountMapper accounts, SessionTokenService sessions) {
     List<String> permissions=new ArrayList<>();
-    for(String module:List.of("slab-management","finished-stock-management")) {
+    for(String module:List.of("slab-management","finished-stock-management","accessory-management")) {
       String prefix="supply-chain."+module;
       permissions.add(prefix+".operation-log.view");
       for(String tab:List.of("warehouse","selling","off-shelf","sold-out","recycle")) permissions.add(prefix+"."+tab+".view");

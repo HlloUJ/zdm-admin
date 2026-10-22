@@ -1,0 +1,174 @@
+package com.zdm.platform.inventory;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zdm.platform.common.StoreLevelPricingDirectory;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.function.Function;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+@Service
+public class AccessoryProductPriceService {
+  private final AccessoryProductPriceMapper mapper;
+  private final StoreLevelPricingDirectory storeLevelDirectory;
+  private final AccessoryMarkupConfigurationMapper configurationMapper;
+
+  public AccessoryProductPriceService(AccessoryProductPriceMapper mapper,
+      StoreLevelPricingDirectory storeLevelDirectory, AccessoryMarkupConfigurationMapper configurationMapper) {
+    this.mapper = mapper;
+    this.configurationMapper = configurationMapper;
+    this.storeLevelDirectory = storeLevelDirectory;
+  }
+
+  public List<AccessoryProductPrice> listPrices(Long productId) {
+    List<AccessoryProductPrice> prices = mapper.selectList(Wrappers.<AccessoryProductPrice>lambdaQuery()
+        .eq(AccessoryProductPrice::getAccessoryProductId, productId)
+        .orderByAsc(AccessoryProductPrice::getSkuId)
+        .orderByAsc(AccessoryProductPrice::getId));
+    return prices;
+  }
+
+  public Map<Long, List<AccessoryProductPrice>> listPricesByProductIds(List<Long> productIds) {
+    if (productIds.isEmpty()) {
+      return Map.of();
+    }
+    return mapper.selectList(Wrappers.<AccessoryProductPrice>lambdaQuery()
+        .in(AccessoryProductPrice::getAccessoryProductId, productIds)
+        .orderByAsc(AccessoryProductPrice::getAccessoryProductId)
+        .orderByAsc(AccessoryProductPrice::getSkuId)
+        .orderByAsc(AccessoryProductPrice::getId)).stream()
+        .collect(Collectors.groupingBy(AccessoryProductPrice::getAccessoryProductId));
+  }
+
+  public void requireCompletePrices(Long productId, List<AccessoryProductVariant> variants) {
+    List<AccessoryProductPrice> prices = listPrices(productId);
+    Set<Long> expectedLevels = storeLevelDirectory.listOperationalPricingLevels().stream()
+        .map(StoreLevelPricingDirectory.Level::id).collect(Collectors.toSet());
+    if (expectedLevels.isEmpty()) {
+      throw new IllegalArgumentException("请先在门店级别管理配置门店级别");
+    }
+    for (AccessoryProductVariant variant : variants) {
+      List<AccessoryProductPrice> skuPrices = prices.stream()
+          .filter(price -> variant.getId().equals(price.getSkuId())
+              && expectedLevels.contains(price.getStoreLevelId())).toList();
+      Set<Long> actualLevels = skuPrices.stream().map(AccessoryProductPrice::getStoreLevelId).collect(Collectors.toSet());
+      if (!actualLevels.equals(expectedLevels) || skuPrices.size() != expectedLevels.size()
+          || skuPrices.stream().anyMatch(price -> price.getPriceCoefficient() == null || price.getPriceCoefficient().signum() < 0
+              || price.getCostPrice() == null || price.getCostPrice().signum() < 0
+              || price.getPrice() == null || price.getPrice().signum() < 0)) {
+        throw new IllegalArgumentException("请完善全部配件价格后再上架");
+      }
+    }
+  }
+
+  @Transactional
+  public void replacePrices(Long productId, List<AccessoryProductPrice> requestedPrices) {
+    List<AccessoryProductPrice> existingPrices = listPrices(productId);
+    Map<Long, String> levelNames = new LinkedHashMap<>();
+    storeLevelDirectory.listOperationalPricingLevels().forEach(level -> levelNames.put(level.id(), level.name()));
+    existingPrices.forEach(price -> {
+      if (levelNames.containsKey(price.getStoreLevelId())) {
+        levelNames.put(price.getStoreLevelId(), price.getStoreLevelName());
+      }
+    });
+    Set<Long> expectedIds = levelNames.keySet();
+    if (expectedIds.isEmpty() && (requestedPrices == null || requestedPrices.isEmpty())) {
+      return;
+    }
+    if (requestedPrices == null || requestedPrices.isEmpty()) {
+      throw new IllegalArgumentException("请完善全部配件价格");
+    }
+    Map<Long, List<AccessoryProductPrice>> byVariant = requestedPrices.stream().collect(Collectors.groupingBy(
+        item -> normalizedSkuId(item.getSkuId()), LinkedHashMap::new, Collectors.toList()));
+    Map<Long, AccessoryMarkupConfiguration> configurations = configurationMapper.selectList(
+        Wrappers.<AccessoryMarkupConfiguration>lambdaQuery()).stream()
+        .collect(Collectors.toMap(AccessoryMarkupConfiguration::getStoreLevelId, Function.identity()));
+    List<AccessoryProductPrice> normalized = new ArrayList<>();
+    byVariant.forEach((skuId, prices) -> {
+      Set<Long> actualIds = prices.stream().map(AccessoryProductPrice::getStoreLevelId)
+          .collect(Collectors.toSet());
+      if (!actualIds.equals(expectedIds) || actualIds.size() != prices.size()) {
+        throw new IllegalArgumentException("每个配件规格都必须填写全部启用的价格层级");
+      }
+      prices.forEach(price -> {
+        AccessoryProductPrice result = normalize(productId, skuId, price, levelNames);
+        AccessoryProductPrice existing = existingPrices.stream().filter(item ->
+            skuId.equals(item.getSkuId()) && price.getStoreLevelId().equals(item.getStoreLevelId()))
+            .findFirst().orElse(null);
+        applySource(result, price, existing, configurations.get(price.getStoreLevelId()));
+        normalized.add(result);
+      });
+    });
+    mapper.delete(Wrappers.<AccessoryProductPrice>lambdaQuery()
+        .eq(AccessoryProductPrice::getAccessoryProductId, productId)
+        .in(AccessoryProductPrice::getStoreLevelId, expectedIds));
+    normalized.forEach(mapper::insert);
+  }
+
+  private AccessoryProductPrice normalize(Long productId, Long skuId, AccessoryProductPrice price,
+      Map<Long, String> levelNames) {
+    if (price.getStoreLevelId() == null || !levelNames.containsKey(price.getStoreLevelId())) {
+      throw new IllegalArgumentException("配件价格层级不存在或已停用");
+    }
+    BigDecimal coefficient = price.getPriceCoefficient();
+    BigDecimal cost = price.getCostPrice();
+    BigDecimal value = price.getPrice();
+    if (coefficient == null
+        || coefficient.signum() < 0
+        || cost == null
+        || cost.signum() < 0
+        || value == null
+        || value.signum() < 0) {
+      throw new IllegalArgumentException("价格系数、成本价和价格不能为空且不能小于0");
+    }
+    BigDecimal expected = cost.multiply(coefficient).setScale(2, RoundingMode.HALF_UP);
+    if (value.setScale(2, RoundingMode.HALF_UP).compareTo(expected) != 0) {
+      throw new IllegalArgumentException("价格必须等于成本价按价格系数计算后的结果");
+    }
+    AccessoryProductPrice normalized = new AccessoryProductPrice();
+    normalized.setAccessoryProductId(productId);
+    normalized.setSkuId(skuId);
+    normalized.setVariantLabel(StringUtils.hasText(price.getVariantLabel()) ? price.getVariantLabel().trim() : null);
+    normalized.setStoreLevelId(price.getStoreLevelId());
+    normalized.setStoreLevelName(levelNames.get(price.getStoreLevelId()));
+    normalized.setPriceCoefficient(coefficient.setScale(4, RoundingMode.HALF_UP));
+    normalized.setCostPrice(cost.setScale(2, RoundingMode.HALF_UP));
+    normalized.setPrice(expected);
+    return normalized;
+  }
+
+  private void applySource(AccessoryProductPrice result, AccessoryProductPrice requested,
+      AccessoryProductPrice existing, AccessoryMarkupConfiguration configuration) {
+    String source = requested.getPriceSource();
+    boolean matches = configuration != null
+        && result.getPriceCoefficient().compareTo(configuration.getPriceCoefficient()) == 0
+        && ("enabled".equals(configuration.getStatus()) || (existing != null
+            && "auto".equals(existing.getPriceSource())
+            && configuration.getId().equals(existing.getSourceConfigurationId())));
+    if (source != null && !List.of("auto", "manual").contains(source)) {
+      throw new IllegalArgumentException("配件价格来源不正确");
+    }
+    boolean auto = source == null
+        ? matches && (existing == null || "auto".equals(existing.getPriceSource())) : "auto".equals(source);
+    if (auto && !matches) {
+      throw new IllegalArgumentException("跟随配置价格必须使用当前有效系数");
+    }
+    result.setPriceSource(auto ? "auto" : "manual");
+    result.setSourceConfigurationId(auto ? configuration.getId() : null);
+  }
+
+  private Long normalizedSkuId(Long value) {
+    if (value == null || value <= 0) {
+      throw new IllegalArgumentException("SKU ID 不能为空");
+    }
+    return value;
+  }
+}

@@ -19,6 +19,27 @@ const router = createRouter({
       component: () => import('@/pages/finished-stock/supply-chain/index.vue'),
     },
     {
+      path: '/supply-chain/accessory-management',
+      name: 'supplyChainAccessory',
+      component: () => import('@/modules/accessory/routes').then((m) => m.SupplyChainAccessory),
+    },
+    {
+      path: '/accessory-management',
+      name: 'accessoryManagement',
+      component: () => import('@/modules/accessory/routes').then((m) => m.AccessoryManagement),
+    },
+    {
+      path: '/store/accessory-management',
+      name: 'storeAccessoryManagement',
+      component: () => import('@/modules/accessory/routes').then((m) => m.StoreAccessory),
+    },
+    {
+      path: '/store/accessory-management/:id/edit',
+      name: 'storeAccessoryEdit',
+      component: () => import('@/modules/accessory/routes').then((m) => m.StoreAccessory),
+      meta: { permissionPrefix: 'store.accessory-management' },
+    },
+    {
       path: '/supply-chain/slab-management',
       name: 'supplyChainSlab',
       component: () => import('@/pages/slab/supply-chain/index.vue'),

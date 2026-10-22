@@ -7,6 +7,7 @@ type FormIssue = { kind: 'error' | 'warning'; message: string; tab?: FormSection
 
 export interface FinishedStockValidationInput {
   client: 'admin' | 'supply-chain';
+  commodityLabel?: string;
   operationsEdit: boolean;
   specMode: SpecMode;
   specDimensionsCount: number;
@@ -92,7 +93,7 @@ export function finishedStockFormIssues(input: FinishedStockValidationInput): Fo
     {
       valid: client !== 'admin' || input.editingProduct || input.guidePriceSettingCoefficient != null,
       tab: 'sales',
-      message: '请先配置成品指导价默认系数',
+      message: `请先配置${input.commodityLabel ?? '成品'}指导价默认系数`,
       operation: true,
     },
     {

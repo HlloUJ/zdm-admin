@@ -31,4 +31,17 @@ public class ProductFormCatalogService implements ProductFormCatalogDirectory {
         .map(item -> new Attribute(item.getId(), item.getScope(), item.getName(), item.getValueType(),
             item.getAttributeRole(), item.getStatus())).toList();
   }
+  @Override
+  public List<Category> accessoryCategories() {
+    return guard.filterData(categories.listNewestFirst(List.of("accessory"))).stream()
+        .map(item -> new Category(item.getId(), item.getParentId(), item.getScope(), item.getName(),
+            item.getSortOrder(), item.getStatus())).toList();
+  }
+
+  @Override
+  public List<Attribute> accessoryAttributes() {
+    return guard.filterData(attributes.listWithTemplateCounts(List.of("shared", "accessory"))).stream()
+        .map(item -> new Attribute(item.getId(), item.getScope(), item.getName(), item.getValueType(),
+            item.getAttributeRole(), item.getStatus())).toList();
+  }
 }

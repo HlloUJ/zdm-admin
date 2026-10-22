@@ -237,7 +237,7 @@
               >
             </template>
           </AdminListToolbar>
-          <t-empty description="暂无成品现货管理权限" />
+          <t-empty :description="`暂无${commodity.label}管理权限`" />
         </template>
       </main>
     </div>
@@ -486,6 +486,9 @@
 </template>
 
 <script setup lang="ts">
+import { useCommodityModule } from '@/composables/useCommodityModule';
+const commodity = useCommodityModule();
+
 import { operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -509,24 +512,26 @@ import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
 import { finishedProductOperationSummary } from '@/services/productOperationLog';
 import {
+  type StorePoolDetail,
+  type StorePoolCategory,
+  type StoreFinishedProduct,
+  type StoreFinishedStatus,
+  type StorePoolProduct,
+} from '@/services/storeFinishedStock';
+const {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,
   clearStoreFinishedRecycle,
   getStoreFinishedProduct,
   getStoreFinishedPoolDetail,
-  type StorePoolDetail,
   listStoreFinishedPool,
   listStoreFinishedPoolCategories,
   listStoreFinishedCategories,
-  type StorePoolCategory,
   listStoreFinishedProducts,
   purgeStoreFinishedProduct,
   purgeStoreFinishedProducts,
   selectStoreFinishedProducts,
-  type StoreFinishedProduct,
-  type StoreFinishedStatus,
-  type StorePoolProduct,
-} from '@/services/storeFinishedStock';
+} = commodity.store;
 import { useRoute, useRouter } from 'vue-router';
 import StoreFinishedEditor from './StoreFinishedEditor.vue';
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
@@ -536,9 +541,9 @@ import StorePoolProductDetail from '../shared/StoreFinishedStockPoolDetailAdapte
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
 const route = useRoute();
 const router = useRouter();
-const editingId = computed(() => (route.name === 'storeFinishedStockEdit' ? Number(route.params.id) : null));
+const editingId = computed(() => (route.name === commodity.storeEditRoute ? Number(route.params.id) : null));
 const user = getLoginUser();
-const prefix = 'store.finished-stock-management';
+const prefix = `store.${commodity.moduleKey}`;
 const can = (tab: string, action: string) => hasPermission(user, `${prefix}.${tab}.${action}`);
 const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);
 const statusLabels: Record<string, string> = {
@@ -621,9 +626,9 @@ function closeRowWarning(id: number) {
 
 const confirming = ref(false);
 const batchConfirmDescriptions: Partial<Record<ActionKind, string>> = {
-  'batch-shelf': '是否批量上架所选成品现货？',
-  'batch-restore': '是否将所选成品现货放回仓库？',
-  'batch-purge': '是否批量彻底删除所选成品现货？',
+  'batch-shelf': `是否批量上架所选${commodity.label}？`,
+  'batch-restore': `是否将所选${commodity.label}放回仓库？`,
+  'batch-purge': `是否批量彻底删除所选${commodity.label}？`,
   clear: '是否清空回收站？',
 };
 const submittingOffShelf = ref(false);
@@ -830,7 +835,7 @@ const handleStoreToolbarAction = (action: string) => {
 const handleStoreRowButton = async (action: string, row: StoreFinishedProduct) => {
   if (!['detail', 'purge'].includes(action) && !(await refreshAvailability([row.id]))) return;
   if (action === 'detail') void openDetail(row);
-  else if (action === 'edit') void router.push({ name: 'storeFinishedStockEdit', params: { id: row.id } });
+  else if (action === 'edit') void router.push({ name: commodity.storeEditRoute, params: { id: row.id } });
   else prepareAction(action === 'offShelf' ? 'off-shelf' : (action as ActionKind), row);
 };
 const baseColumns: PrimaryTableCol<TableRowData>[] = [
@@ -985,7 +990,7 @@ async function openDetail(row: StoreFinishedProduct) {
   if (await loadCurrent(row)) detailVisible.value = true;
 }
 function closeEdit() {
-  return router.push({ name: 'storeFinishedStockManagement' });
+  return router.push({ name: commodity.storeListRoute });
 }
 async function finishEdit(product: StoreFinishedProduct) {
   rows.value = rows.value.map((item) => (item.id === product.id ? product : item));

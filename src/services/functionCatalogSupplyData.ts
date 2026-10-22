@@ -4,17 +4,18 @@ export const supplyChainProducts: FunctionModule = {
   label: '商品管理',
   value: 'supply-chain.products',
   audiences: ['supply-chain'],
-  menus: (['finished-stock-management', 'slab-management'] as const).map((key) => {
+  menus: (['finished-stock-management', 'accessory-management', 'slab-management'] as const).map((key) => {
     const prefix = `supply-chain.${key}`;
     const actions = (tab: string, entries: [string, string][]): FunctionAction[] =>
       entries.map(([value, label]) => ({ label, value: `${prefix}.${tab}.${value}` }));
     return {
       value: `${prefix}.menu`,
-      label: key === 'slab-management' ? '大板管理' : '成品现货管理',
+      label: key === 'slab-management' ? '大板管理' : key === 'accessory-management' ? '配件管理' : '成品现货管理',
       direct: false,
       pages: [
         {
-          label: key === 'slab-management' ? '大板管理页' : '成品现货管理页',
+          label:
+            key === 'slab-management' ? '大板管理页' : key === 'accessory-management' ? '配件管理页' : '成品现货管理页',
           value: prefix,
           audiences: ['supply-chain'],
           actions: [{ label: '操作日志', value: `${prefix}.operation-log.view` }],

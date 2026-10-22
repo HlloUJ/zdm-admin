@@ -1,0 +1,212 @@
+import { request } from './http';
+import type { ProductCategoryRecord } from './productCategories';
+import type { ProductAttributeRecord } from './productAttributes';
+import type { SupplierRecord } from './suppliers';
+
+export function listFinishedProductFormOptions() {
+  return request<{
+    categories: ProductCategoryRecord[];
+    attributes: ProductAttributeRecord[];
+    suppliers: Pick<SupplierRecord, 'id' | 'name' | 'status' | 'supplyTypeIds' | 'supplyTypes'>[];
+  }>('/admin/accessory-products/form-options');
+}
+
+import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
+
+export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+
+export interface FinishedProductPrice {
+  priceSource?: 'auto' | 'manual';
+  sourceConfigurationId?: number;
+  storeLevelId: number;
+  storeLevelName?: string;
+  priceCoefficient: number;
+  costPrice: number;
+  price: number;
+  skuId: number;
+  variantLabel?: string;
+}
+export interface FinishedProductGuidePrice {
+  priceCoefficient: number;
+  costPrice: number;
+  price: number;
+  skuId: number;
+  variantLabel?: string;
+}
+
+export interface FinishedProductAttributeEntry {
+  id?: number;
+  attributeId: number;
+  attributeName: string;
+  value: string;
+}
+
+export interface FinishedSpecDimension {
+  key: string;
+  name: string;
+  values: string[];
+}
+
+export interface FinishedProductVariant {
+  costPrice?: number;
+  id?: number;
+  variantLabel: string;
+  displayMode: 'single' | 'layered';
+  salesAttributes?: Record<string, string>;
+  material?: string;
+  lengthValue?: string;
+  color?: string;
+  sizeValue?: string;
+  stock: number;
+}
+
+export interface FinishedProductRecord {
+  stateOperatorName?: string;
+  stateOperatedAt?: string;
+  stateOperatorClientCode?: string;
+
+  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
+  sourceUnavailable?: boolean;
+  sourceMessage?: string;
+  sourceOffShelfReason?: string;
+  sourceOffShelfDetail?: string;
+  sourceOffShelfAt?: string;
+  operationsDeleted?: boolean;
+  id: number;
+  categoryId?: number;
+  supplierId?: number;
+  name: string;
+  sku: string;
+  mainImageMediaId?: number;
+  mainImageMediaIds?: number[];
+  mainImageUrls?: string[];
+  videoMediaId?: number;
+  mainImageUrl?: string;
+  videoUrl?: string;
+  coverImage?: string;
+  detail?: string;
+  publisherType?: string;
+  totalStock?: number;
+  guidePrice?: number;
+  guidePrices?: FinishedProductGuidePrice[];
+  markupPrices?: FinishedProductPrice[];
+  attributes?: FinishedProductAttributeEntry[];
+  variants?: FinishedProductVariant[];
+  specDimensions?: FinishedSpecDimension[];
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
+  offShelfReason?: string;
+  offShelfAt?: string;
+  offShelfDetail?: string;
+  offShelfByName?: string;
+  createdByName?: string;
+  createdByAccountId?: number;
+  status?: FinishedProductStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FinishedProductPayload {
+  categoryId?: number;
+  supplierId?: number;
+  name: string;
+  sku: string;
+  mainImageMediaId: number;
+  mainImageMediaIds?: number[];
+  videoMediaId: number;
+  detail: string;
+  totalStock?: number;
+  guidePrice?: number;
+  guidePrices?: FinishedProductGuidePrice[];
+  markupPrices?: FinishedProductPrice[];
+  attributes: FinishedProductAttributeEntry[];
+  variants: FinishedProductVariant[];
+  specDimensions?: FinishedSpecDimension[];
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
+  offShelfReason?: string;
+  offShelfAt?: string;
+  offShelfDetail?: string;
+  status: FinishedProductStatus;
+}
+
+export function listFinishedProducts() {
+  return request<FinishedProductRecord[]>('/admin/accessory-products');
+}
+
+export function createFinishedProduct(payload: FinishedProductPayload) {
+  return request<FinishedProductRecord>('/admin/accessory-products', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function uploadFinishedProductMedia(file: File) {
+  return uploadMedia('/admin/accessory-products/media', file);
+}
+
+export function releaseTemporaryFinishedProductMedia(mediaId: MediaResource['id']) {
+  return releaseTemporaryMedia('/admin/accessory-products/media', mediaId);
+}
+
+export function updateFinishedProduct(
+  id: number,
+  payload: FinishedProductPayload | Pick<FinishedProductPayload, 'name' | 'status' | 'guidePrices' | 'markupPrices'>,
+) {
+  return request<FinishedProductRecord>(`/admin/accessory-products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function editFinishedProduct(id: number, payload: FinishedProductPayload) {
+  return request<FinishedProductRecord>(`/admin/accessory-products/${id}/edit`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateFinishedProductSourceCosts(id: number, variants: { skuId: number; costPrice: number }[]) {
+  return request<FinishedProductRecord>(`/admin/accessory-products/${id}/source-costs`, {
+    method: 'PUT',
+    body: JSON.stringify({ variants }),
+  });
+}
+
+export function deleteFinishedProduct(id: number) {
+  return request<boolean>(`/admin/accessory-products/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export interface FinishedProductPriceLevelOption {
+  id: number;
+  name: string;
+  sortOrder?: number;
+}
+export const listFinishedProductPriceLevelOptions = () =>
+  request<FinishedProductPriceLevelOption[]>('/admin/accessory-products/price-level-options');
+
+export interface FinishedProductTemplateAttribute {
+  categoryId: number;
+  attributeId: number;
+  name: string;
+  valueType: string;
+  attributeRole: 'product' | 'sales' | '';
+  requiredFlag: boolean;
+  skuFlag: boolean;
+  sortOrder: number;
+  options: { id: number; value: string; code?: string }[];
+}
+export async function listFinishedProductTemplateAttributes(): Promise<FinishedProductTemplateAttribute[]> {
+  const templates = await request<
+    { categoryId: number; content: Omit<FinishedProductTemplateAttribute, 'categoryId'>[] }[]
+  >('/admin/accessory-products/attribute-template-options');
+  return templates.flatMap((template) =>
+    template.content.map((attribute) => ({ ...attribute, categoryId: template.categoryId })),
+  );
+}
+
+export const getFinishedProductDetail = (id: number) =>
+  request<FinishedProductRecord>(`/admin/accessory-products/${id}`);
+
+export const checkFinishedProductShelf = (id: number) =>
+  request<boolean>(`/admin/accessory-products/${id}/shelf-check`, { method: 'POST' });

@@ -94,7 +94,7 @@ describe('full function catalog', () => {
   it('keeps platform, supplier and store capabilities in their respective audiences', () => {
     expect(fullFunctionCatalog.map((module) => module.value)).toEqual([
       'admin.tenant',
-      'store.finished-stock-management',
+      'store.products',
       'store.customer-management',
       'store.order-management',
       'store.price-configuration',
@@ -106,7 +106,7 @@ describe('full function catalog', () => {
       'admin.permission-management',
     ]);
     expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([
-      'store.finished-stock-management',
+      'store.products',
       'store.customer-management',
       'store.order-management',
       'store.price-configuration',
@@ -160,9 +160,37 @@ describe('full function catalog', () => {
     }
   });
 
-  it('assigns store finished stock as a direct menu with five tabs and separate role pricing', () => {
-    const stock = terminalFunctionTrees.store.find((module) => module.value === 'store.finished-stock-management')!;
-    expect(stock.menus[0].direct).toBe(true);
+  it('preserves assigned product grants while filtering the shared product group', () => {
+    const products = terminalFunctionTrees.store.find((module) => module.value === 'store.products')!;
+    const grants = getFunctionCatalogPermissionValues([products]);
+    expect(new Set(grants).size).toBe(grants.length);
+    expect(normalizeTerminalPermissions('store', grants)).toEqual(grants);
+    expect(grants.every((value) => /^store\.(finished-stock-management|accessory-management)\./.test(value))).toBe(
+      true,
+    );
+    expect(collectFunctionCatalogRows(products).map((row) => row.menuLabel)).toEqual([
+      ...Array(6).fill('成品现货管理'),
+      ...Array(6).fill('配件管理'),
+    ]);
+    for (const scope of ['finished-stock-management', 'accessory-management']) {
+      const assigned = [`store.${scope}.warehouse.view`, `store.${scope}.warehouse.edit`];
+      expect(normalizeTerminalPermissions('store', assigned)).toEqual(assigned);
+      const filtered = filterFunctionCatalogByPermissions(terminalFunctionTrees.store, assigned);
+      expect(filtered.map((module) => module.value)).toEqual(['store.products']);
+      expect(filtered[0].menus.map((menu) => menu.value)).toEqual([`store.${scope}.menu`]);
+      expect(getFunctionCatalogPermissionValues(filtered)).toEqual(assigned);
+    }
+    expect(filterFunctionCatalogByPermissions([products], [])).toEqual([]);
+  });
+
+  it('assigns store products as secondary menus with five tabs and separate role pricing', () => {
+    const stock = terminalFunctionTrees.store.find((module) => module.value === 'store.products')!;
+    expect(stock.label).toBe('商品管理');
+    expect(stock.menus.map((menu) => [menu.label, menu.value, menu.direct])).toEqual([
+      ['成品现货管理', 'store.finished-stock-management.menu', false],
+      ['配件管理', 'store.accessory-management.menu', false],
+    ]);
+    expect(stock.menus[0].direct).toBe(false);
     expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual([
       '仓库中',
       '已上架',

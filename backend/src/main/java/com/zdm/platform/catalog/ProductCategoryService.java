@@ -88,7 +88,7 @@ public class ProductCategoryService extends CreatorAwareService<ProductCategoryM
       throw new IllegalArgumentException("该分类包含下级分类，请先删除或转移下级分类");
     }
     Long referencedProductCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM finished_products WHERE category_id = ?",
+        "SELECT COUNT(*) FROM (SELECT category_id FROM finished_products UNION ALL SELECT category_id FROM accessory_products) products WHERE category_id = ?",
         Long.class,
         id);
     if (referencedProductCount != null && referencedProductCount > 0) {
@@ -106,13 +106,13 @@ public class ProductCategoryService extends CreatorAwareService<ProductCategoryM
 
   private List<ProductCategory> attachActualFinishedProductCounts(
       List<ProductCategory> categories) {
-    if (categories.stream().noneMatch(category -> "finished".equals(category.getScope()))) {
+    if (categories.stream().noneMatch(category -> List.of("finished", "accessory").contains(category.getScope()))) {
       return categories;
     }
     Map<Long, Integer> countByCategoryId = jdbcTemplate.query(
         """
         SELECT category_id, COUNT(*)
-        FROM finished_products
+        FROM (SELECT category_id FROM finished_products UNION ALL SELECT category_id FROM accessory_products) products
         WHERE category_id IS NOT NULL
         GROUP BY category_id
         """,
@@ -124,18 +124,18 @@ public class ProductCategoryService extends CreatorAwareService<ProductCategoryM
           return counts;
         });
     categories.stream()
-        .filter(category -> "finished".equals(category.getScope()))
+        .filter(category -> List.of("finished", "accessory").contains(category.getScope()))
         .forEach(category -> category.setProductCount(
             countByCategoryId.getOrDefault(category.getId(), 0)));
     return categories;
   }
 
   private int resolveActualProductCount(ProductCategory category) {
-    if (!"finished".equals(category.getScope())) {
+    if (!List.of("finished", "accessory").contains(category.getScope())) {
       return category.getProductCount() == null ? 0 : category.getProductCount();
     }
     Long count = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM finished_products WHERE category_id = ?",
+        "SELECT COUNT(*) FROM (SELECT category_id FROM finished_products UNION ALL SELECT category_id FROM accessory_products) products WHERE category_id = ?",
         Long.class,
         category.getId());
     return count == null ? 0 : Math.toIntExact(count);

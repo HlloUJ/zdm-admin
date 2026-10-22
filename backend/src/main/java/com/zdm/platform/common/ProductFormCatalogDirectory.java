@@ -9,4 +9,6 @@ public interface ProductFormCatalogDirectory {
 
   List<Category> finishedCategories();
   List<Attribute> finishedAttributes();
+  List<Category> accessoryCategories();
+  List<Attribute> accessoryAttributes();
 }

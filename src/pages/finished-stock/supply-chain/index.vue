@@ -1113,6 +1113,9 @@
 </template>
 
 <script setup lang="ts">
+import { useCommodityModule } from '@/composables/useCommodityModule';
+const commodity = useCommodityModule();
+
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
@@ -1180,8 +1183,13 @@ import {
 } from '@/components/foundation';
 import { type FinishedMarkupConfigurationRecord } from '@/services/finishedMarkupConfigurations';
 import {
-  createFinishedProduct,
   type FinishedProductPriceLevelOption,
+  type FinishedProductPayload,
+  type FinishedSpecDimension,
+  type FinishedProductRecord,
+} from '@/services/finishedProducts';
+const {
+  createFinishedProduct,
   deleteFinishedProduct,
   editFinishedProduct,
   listFinishedProducts,
@@ -1189,15 +1197,10 @@ import {
   releaseTemporaryFinishedProductMedia,
   updateFinishedProduct,
   uploadFinishedProductMedia,
-  type FinishedProductPayload,
-  type FinishedSpecDimension,
-  type FinishedProductRecord,
-} from '@/services/finishedProducts';
+} = commodity.products;
 import { type ProductCategoryRecord } from '@/services/productCategories';
-import {
-  listFinishedProductTemplateAttributes,
-  type FinishedProductTemplateAttribute,
-} from '@/services/finishedProducts';
+import { type FinishedProductTemplateAttribute } from '@/services/finishedProducts';
+const { listFinishedProductTemplateAttributes } = commodity.products;
 import { type ProductAttributeRecord } from '@/services/productAttributes';
 import { type SupplierRecord } from '@/services/suppliers';
 import ProductDetail from '../management/components/ProductDetail.vue';
@@ -1215,7 +1218,7 @@ const tabs: TabConfig[] = [
 ];
 const pageSizeOptions = [10, 20, 50];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
-const productPermissionPrefix = computed(() => `${'supply-chain'}.finished-stock-management`);
+const productPermissionPrefix = computed(() => `${'supply-chain'}.${commodity.moduleKey}`);
 const sourceBlocked: (row: StockItem) => boolean = () => false;
 const activeTab = ref<StockStatus>('warehouse');
 const finishedScope: Record<StockStatus, string> = {
@@ -1439,7 +1442,7 @@ const dataItems = ref<StockItem[]>([]);
 const shelfErrors = reactive<Record<number, string>>({});
 const categoryCascaderOptions = computed<CategoryCascaderOption[]>(() => {
   const enabled = productCategories.value.filter(
-    (category) => category.scope === 'finished' && category.status !== 'disabled',
+    (category) => category.scope === commodity.scope && category.status !== 'disabled',
   );
   const childrenByParent = new Map<number | undefined, ProductCategoryRecord[]>();
   enabled.forEach((category) => {
@@ -1460,7 +1463,7 @@ const categoryCascaderOptions = computed<CategoryCascaderOption[]>(() => {
 });
 const enabledFinishedCategories = computed(() =>
   productCategories.value
-    .filter((category) => category.scope === 'finished' && category.status !== 'disabled')
+    .filter((category) => category.scope === commodity.scope && category.status !== 'disabled')
     .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id),
 );
 const categoryChildrenByParent = computed(() => {
@@ -1673,7 +1676,8 @@ const confirmAction = computed(() => {
   return actionMap[confirmState.type];
 });
 const isFinishedSupplyType = (type: SupplierRecord['supplyTypes'][number]) =>
-  type.status !== 'disabled' && (type.code === 'finished' || type.name === '成品' || type.name === '成品现货');
+  type.status !== 'disabled' &&
+  (type.code === commodity.scope || type.name === commodity.shortLabel || type.name === commodity.label);
 const supplierOptions = computed(() => {
   return productSuppliers.value
     .filter((supplier) => supplier.status !== 'disabled' && supplier.supplyTypes.some(isFinishedSupplyType))
@@ -1803,7 +1807,7 @@ const loadInventoryData = async () => {
     dataItems.value = products.map(toStockItem);
     selectedKeys.value = [];
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '成品库存加载失败');
+    adminFeedback.error(error instanceof Error ? error.message : `${commodity.shortLabel}库存加载失败`);
   } finally {
     loading.value = false;
   }
@@ -1840,7 +1844,7 @@ const canChooseShelfLater = computed(
 );
 const totalStock = computed(() => specRows.value.reduce((sum, row) => sum + Number(row.quantity || 0), 0));
 const detailMediaUploading = ref(false);
-const productListPath = computed(() => '/supply-chain/finished-stock-management');
+const productListPath = computed(() => `/supply-chain/${commodity.moduleKey}`);
 const handleMenuReselect = (event: Event) => {
   const detail = (
     event as CustomEvent<{
@@ -2090,7 +2094,7 @@ const handleBatchAction = (action: BatchAction) => {
     return;
   }
   if (action === 'batchShelf') {
-    openConfirm('batchShelf', null, '是否批量上架所选成品现货？');
+    openConfirm('batchShelf', null, `是否批量上架所选${commodity.label}？`);
     return;
   }
   if (action === 'batchOffShelf') {
@@ -2098,11 +2102,11 @@ const handleBatchAction = (action: BatchAction) => {
     return;
   }
   if (action === 'batchRestore') {
-    openConfirm('batchRestore', null, '是否将所选成品现货放回仓库？');
+    openConfirm('batchRestore', null, `是否将所选${commodity.label}放回仓库？`);
     return;
   }
   if (action === 'batchPurge') {
-    openConfirm('batchPurge', null, '是否批量彻底删除所选成品现货？');
+    openConfirm('batchPurge', null, `是否批量彻底删除所选${commodity.label}？`);
     return;
   }
   openConfirm('clearRecycle', null, '是否清空回收站？');
@@ -2182,7 +2186,7 @@ const confirmCategory = () => {
   if (formPageVisible.value && formPageMode.value === 'edit') return;
   const categoryId = categoryPickerSelection.value.at(-1);
   if (categoryId == null) {
-    adminFeedback.warning('请选择成品现货分类');
+    adminFeedback.warning(`请选择${commodity.label}分类`);
     return;
   }
   if (hasCategoryChildren(categoryId)) {
@@ -2500,6 +2504,7 @@ const deleteSpec = (id: number) => {
 };
 const validateProductForm = () => {
   const issues = finishedStockFormIssues({
+    commodityLabel: commodity.shortLabel,
     client: 'supply-chain',
     operationsEdit: isOperationsEdit.value,
     specMode: confirmedSpecMode.value,

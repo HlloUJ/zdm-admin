@@ -68,6 +68,9 @@
   </AdminDialog>
 </template>
 <script setup lang="ts">
+import { useCommodityModule } from '@/composables/useCommodityModule';
+const commodity = useCommodityModule();
+
 import { computed, reactive, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
 import { formatProductDateTime } from '@/utils/formatProductDateTime';
@@ -79,12 +82,8 @@ import {
   productLogFilterOptions,
   type ProductOperationLogRow,
 } from '@/services/productOperationLog';
-import {
-  listFinishedOperationLogs,
-  getFinishedOperationLog,
-  finishedLogStates,
-  type FinishedOperationLog,
-} from '@/services/finishedOperationLogs';
+import { type FinishedOperationLog } from '@/services/finishedOperationLogs';
+const { listFinishedOperationLogs, getFinishedOperationLog, finishedLogStates } = commodity.logs;
 import SalesLogFullscreen from './SalesLogFullscreen.vue';
 import FinishedSalesLogTable from './FinishedSalesLogTable.vue';
 import { priceLogSnapshot } from '../priceLogSnapshot';

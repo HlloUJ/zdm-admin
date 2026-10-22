@@ -75,6 +75,10 @@ public class StoreLevelService extends CreatorAwareService<StoreLevelMapper, Sto
         "UPDATE finished_markup_configurations SET name = ? WHERE store_level_id = ?",
         payload.getName(),
         id);
+      jdbcTemplate.update(
+        "UPDATE accessory_markup_configurations SET name = ? WHERE store_level_id = ?",
+        payload.getName(),
+        id);
     jdbcTemplate.update(
         "UPDATE slab_markup_configurations SET name = ? WHERE store_level_id = ?",
         payload.getName(),
@@ -114,6 +118,10 @@ public class StoreLevelService extends CreatorAwareService<StoreLevelMapper, Sto
       updateById(level);
       jdbcTemplate.update(
           "UPDATE finished_markup_configurations SET sort_order = ? WHERE store_level_id = ?",
+          index + 1,
+          level.getId());
+      jdbcTemplate.update(
+          "UPDATE accessory_markup_configurations SET sort_order = ? WHERE store_level_id = ?",
           index + 1,
           level.getId());
       jdbcTemplate.update(
@@ -202,11 +210,11 @@ public class StoreLevelService extends CreatorAwareService<StoreLevelMapper, Sto
     if (referenceCount > 0) {
       throw new IllegalArgumentException(STORE_REFERENCED_MESSAGE);
     }
-    if (isPriceConfigured("finished_markup_configurations", id)
+    if (isPriceConfigured("accessory_markup_configurations", id) || isPriceConfigured("finished_markup_configurations", id)
         || isPriceConfigured("slab_markup_configurations", id)) {
       throw new IllegalArgumentException(PRICE_REFERENCED_MESSAGE);
     }
-    if (isPriceConfigured("finished_product_prices", id)
+    if (isPriceConfigured("accessory_product_prices", id) || isPriceConfigured("finished_product_prices", id)
         || isPriceConfigured("slab_prices", id)) {
       throw new IllegalArgumentException(PRODUCT_PRICE_REFERENCED_MESSAGE);
     }
