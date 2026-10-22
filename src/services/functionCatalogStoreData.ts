@@ -92,7 +92,7 @@ export const storeLevelModule: FunctionModule = {
   ],
 };
 
-export const storeFinishedStock: FunctionModule = {
+const storeFinishedStock: FunctionModule = {
   label: '成品现货管理',
   value: 'store.finished-stock-management',
   audiences: ['store'],
@@ -100,7 +100,7 @@ export const storeFinishedStock: FunctionModule = {
     {
       label: '成品现货管理',
       value: 'store.finished-stock-management.menu',
-      direct: true,
+      direct: false,
       pages: [
         {
           label: '成品现货管理页',
@@ -164,7 +164,7 @@ export const storeFinishedStock: FunctionModule = {
   ],
 };
 
-export const storeAccessoryStock: FunctionModule = {
+const storeAccessoryStock: FunctionModule = {
   label: '配件管理',
   value: 'store.accessory-management',
   audiences: ['store'],
@@ -172,7 +172,7 @@ export const storeAccessoryStock: FunctionModule = {
     {
       label: '配件管理',
       value: 'store.accessory-management.menu',
-      direct: true,
+      direct: false,
       pages: [
         {
           label: '配件管理页',
@@ -234,6 +234,13 @@ export const storeAccessoryStock: FunctionModule = {
       ],
     },
   ],
+};
+
+export const storeProducts: FunctionModule = {
+  label: '商品管理',
+  value: 'store.products',
+  audiences: ['store'],
+  menus: [...storeFinishedStock.menus, ...storeAccessoryStock.menus],
 };
 
 export const storePriceConfiguration: FunctionModule = {

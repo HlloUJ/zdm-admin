@@ -151,6 +151,12 @@
           "after": "        if (grandchildren.length) visibleChildren.push({ ...child, children: grandchildren });\n        return visibleChildren;\n      }, []);\n      return children.length ? { ...entry, children } : null;\n    })\n    .filter((entry): entry is AdminMenuEntry => Boolean(entry)),\n);\n\nconst baseInfoPaths = new Set([\n  '/finished-stock-management',\n  '/accessory-management',\n  '/slab-management',\n  '/product-category',\n  '/product-attribute',\n  '/product-attribute-value',\n  '/category-attribute-template',\n  '/finished-stock-category',\n  '/accessory-category',\n  '/finished-stock-attribute',\n  '/accessory-attribute',\n  '/slab-variety',\n",
           "reason": "2026-10-22 用户确认三端配件管理和独立配件价格配置，复用成品现货对应界面与业务规则",
           "stage": "before-migrations"
+        },
+        {
+          "before": "    const requiredExpandedMenus = [];\n",
+          "after": "    const requiredExpandedMenus = [];\n    if (/^\\/store\\/(finished-stock-management|accessory-management)(?:\\/|$)/.test(route.path)) {\n      requiredExpandedMenus.push('store-products');\n    }\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单及成品现货、配件二级菜单，打开对应列表或编辑页时展开商品管理，保留原权限与地址",
+          "stage": "before-migrations"
         }
       ]
     },
@@ -9948,6 +9954,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "export const adminMenuEntries: AdminMenuEntry[] = [\n  { label: '工作台', path: '/dashboard', icon: 'dashboard' },\n  {\n    label: '成品现货管理',\n    path: '/store/finished-stock-management',\n    icon: 'layers',\n    permissionPrefix: 'store.finished-stock-management',\n  },\n  {\n    label: '客户管理',\n    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '配件管理',\n    path: '/store/accessory-management',\n    icon: 'layers',\n    permissionPrefix: 'store.accessory-management',\n  },\n  {\n    label: '订单管理',\n",
+          "after": "export const adminMenuEntries: AdminMenuEntry[] = [\n  { label: '工作台', path: '/dashboard', icon: 'dashboard' },\n  {\n    label: '商品管理',\n    value: 'store-products',\n    icon: 'layers',\n    children: [\n      {\n        label: '成品现货管理',\n        path: '/store/finished-stock-management',\n        permissionPrefix: 'store.finished-stock-management',\n      },\n      {\n        label: '配件管理',\n        path: '/store/accessory-management',\n        permissionPrefix: 'store.accessory-management',\n      },\n    ],\n  },\n  {\n    label: '客户管理',\n    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '订单管理',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
           "before": "    icon: 'layers',\n    permissionPrefix: 'store.finished-stock-management',\n  },\n  {\n    label: '客户管理',\n    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '订单管理',\n    value: 'store-order-management',\n    icon: 'assignment',\n    children: [\n      { label: '销售订单', path: '/store/order-management/sales', permissionPrefix: 'store.order-management.sales' },\n      {\n        label: '履约任务',\n        path: '/store/order-management/fulfillment',\n        permissionPrefix: 'store.order-management.fulfillment',\n      },\n",
           "after": "    icon: 'layers',\n    permissionPrefix: 'store.finished-stock-management',\n  },\n  {\n    label: '客户管理',\n    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '配件管理',\n    path: '/store/accessory-management',\n    icon: 'layers',\n    permissionPrefix: 'store.accessory-management',\n  },\n  {\n    label: '订单管理',\n    value: 'store-order-management',\n    icon: 'assignment',\n    children: [\n      { label: '销售订单', path: '/store/order-management/sales', permissionPrefix: 'store.order-management.sales' },\n      {\n        label: '履约任务',\n        path: '/store/order-management/fulfillment',\n        permissionPrefix: 'store.order-management.fulfillment',\n      },\n",
           "reason": "2026-10-22 用户确认三端配件管理和独立配件价格配置，复用成品现货对应界面与业务规则",
@@ -10027,6 +10039,12 @@
       "content": "48ee44f52cc27d9060a6ccdb7b317f44f665955377777479313a8a32fb66e2eb",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "      expect(getRuntimeFunctionCatalog(audience).some((item) => item.value === module.value)).toBe(false);\n    }\n  });\n  it('places the store-only customer menu immediately below finished stock', () => {\n    const index = adminMenuEntries.findIndex(\n      (item) => 'path' in item && item.path === '/store/finished-stock-management',\n    );\n    expect(adminMenuEntries[index + 1]).toMatchObject({\n      label: '客户管理',\n      path: '/store/customer-management',\n",
+          "after": "      expect(getRuntimeFunctionCatalog(audience).some((item) => item.value === module.value)).toBe(false);\n    }\n  });\n  it('places the store-only customer menu immediately below product management', () => {\n    const index = adminMenuEntries.findIndex((item) => 'value' in item && item.value === 'store-products');\n    expect(adminMenuEntries[index + 1]).toMatchObject({\n      label: '客户管理',\n      path: '/store/customer-management',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
@@ -10150,6 +10168,24 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  it('keeps platform, supplier and store capabilities in their respective audiences', () => {\n    expect(fullFunctionCatalog.map((module) => module.value)).toEqual([\n      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.accessory-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n",
+          "after": "  it('keeps platform, supplier and store capabilities in their respective audiences', () => {\n    expect(fullFunctionCatalog.map((module) => module.value)).toEqual([\n      'admin.tenant',\n      'store.products',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "      'admin.permission-management',\n    ]);\n    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.accessory-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n",
+          "after": "      'admin.permission-management',\n    ]);\n    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.products',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    }\n  });\n\n  it('assigns store finished stock as a direct menu with five tabs and separate role pricing', () => {\n    const stock = terminalFunctionTrees.store.find((module) => module.value === 'store.finished-stock-management')!;\n    expect(stock.menus[0].direct).toBe(true);\n    expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual([\n      '仓库中',\n      '已上架',\n",
+          "after": "    }\n  });\n\n  it('preserves assigned product grants while filtering the shared product group', () => {\n    const products = terminalFunctionTrees.store.find((module) => module.value === 'store.products')!;\n    const grants = getFunctionCatalogPermissionValues([products]);\n    expect(new Set(grants).size).toBe(grants.length);\n    expect(normalizeTerminalPermissions('store', grants)).toEqual(grants);\n    expect(grants.every((value) => /^store\\.(finished-stock-management|accessory-management)\\./.test(value))).toBe(\n      true,\n    );\n    expect(collectFunctionCatalogRows(products).map((row) => row.menuLabel)).toEqual([\n      ...Array(6).fill('成品现货管理'),\n      ...Array(6).fill('配件管理'),\n    ]);\n    for (const scope of ['finished-stock-management', 'accessory-management']) {\n      const assigned = [`store.${scope}.warehouse.view`, `store.${scope}.warehouse.edit`];\n      expect(normalizeTerminalPermissions('store', assigned)).toEqual(assigned);\n      const filtered = filterFunctionCatalogByPermissions(terminalFunctionTrees.store, assigned);\n      expect(filtered.map((module) => module.value)).toEqual(['store.products']);\n      expect(filtered[0].menus.map((menu) => menu.value)).toEqual([`store.${scope}.menu`]);\n      expect(getFunctionCatalogPermissionValues(filtered)).toEqual(assigned);\n    }\n    expect(filterFunctionCatalogByPermissions([products], [])).toEqual([]);\n  });\n\n  it('assigns store products as secondary menus with five tabs and separate role pricing', () => {\n    const stock = terminalFunctionTrees.store.find((module) => module.value === 'store.products')!;\n    expect(stock.label).toBe('商品管理');\n    expect(stock.menus.map((menu) => [menu.label, menu.value, menu.direct])).toEqual([\n      ['成品现货管理', 'store.finished-stock-management.menu', false],\n      ['配件管理', 'store.accessory-management.menu', false],\n    ]);\n    expect(stock.menus[0].direct).toBe(false);\n    expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual([\n      '仓库中',\n      '已上架',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
           "before": "      );\n    }\n    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(14);\n  });\n\n  it('keeps platform, supplier and store capabilities in their respective audiences', () => {\n    expect(fullFunctionCatalog.map((module) => module.value)).toEqual([\n      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n      'admin.supplier-supply-type-management',\n      'supply-chain.products',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n      'admin.permission-management',\n    ]);\n    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n      'admin.permission-management',\n    ]);\n    expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual([\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n      'admin.permission-management',\n",
           "after": "      );\n    }\n    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(14);\n  });\n\n  it('keeps platform, supplier and store capabilities in their respective audiences', () => {\n    expect(fullFunctionCatalog.map((module) => module.value)).toEqual([\n      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.accessory-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n      'admin.supplier-supply-type-management',\n      'supply-chain.products',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n      'admin.permission-management',\n    ]);\n    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.accessory-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n      'admin.permission-management',\n    ]);\n    expect(terminalFunctionTrees.supplier.map((module) => module.value)).toEqual([\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n      'admin.permission-management',\n",
           "reason": "2026-10-22 用户确认三端配件管理和独立配件价格配置，复用成品现货对应界面与业务规则",
@@ -10185,6 +10221,24 @@
       "content": "1209bc105a9465acd24974c6fd642993f1463bc39659f30d418a2eae55f6f190",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "import { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n  storeLevelModule,\n  storeFinishedStock,\n  storeAccessoryStock,\n  storePriceConfiguration,\n  storeCustomerManagement,\n} from './functionCatalogStoreData';\n",
+          "after": "import { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n  storeLevelModule,\n  storeProducts,\n  storePriceConfiguration,\n  storeCustomerManagement,\n} from './functionCatalogStoreData';\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "\nconst navigationModuleOrder = [\n  'admin.tenant',\n  'store.finished-stock-management',\n  'store.customer-management',\n  'store.accessory-management',\n  'store.order-management',\n  'store.price-configuration',\n  'admin.product-data-center',\n",
+          "after": "\nconst navigationModuleOrder = [\n  'admin.tenant',\n  'store.products',\n  'store.customer-management',\n  'store.order-management',\n  'store.price-configuration',\n  'admin.product-data-center',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    withDefaultViewPermissions(\n      withAdministrationTabs([\n        storeLevelModule,\n        storeFinishedStock,\n        storeAccessoryStock,\n        storeCustomerManagement,\n        storeOrderPrototype,\n        storePriceConfiguration,\n",
+          "after": "    withDefaultViewPermissions(\n      withAdministrationTabs([\n        storeLevelModule,\n        storeProducts,\n        storeCustomerManagement,\n        storeOrderPrototype,\n        storePriceConfiguration,\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
         {
           "before": "import { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n  storeLevelModule,\n  storeFinishedStock,\n  storePriceConfiguration,\n  storeCustomerManagement,\n} from './functionCatalogStoreData';\nimport { supplyChainProducts, supplyTypeModule } from './functionCatalogSupplyData';\nimport { expandLegacyScopedPermission } from './functionPermissionCompatibility';\n\nexport type TerminalType = 'store' | 'supplier' | 'supply-chain';\nexport type FunctionAudience = 'admin' | TerminalType;\n\nexport interface FunctionAction {\n",
           "after": "import { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n  storeLevelModule,\n  storeFinishedStock,\n  storeAccessoryStock,\n  storePriceConfiguration,\n  storeCustomerManagement,\n} from './functionCatalogStoreData';\nimport { supplyChainProducts, supplyTypeModule } from './functionCatalogSupplyData';\nimport { expandLegacyScopedPermission } from './functionPermissionCompatibility';\n\nexport type TerminalType = 'store' | 'supplier' | 'supply-chain';\nexport type FunctionAudience = 'admin' | TerminalType;\n\nexport interface FunctionAction {\n",
@@ -10245,6 +10299,36 @@
       "content": "39a9ce84ce5c5bedd35582287c540670fbd8ffb0774b8545fdaa553452199a08",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "  ],\n};\n\nexport const storeFinishedStock: FunctionModule = {\n  label: '成品现货管理',\n  value: 'store.finished-stock-management',\n  audiences: ['store'],\n",
+          "after": "  ],\n};\n\nconst storeFinishedStock: FunctionModule = {\n  label: '成品现货管理',\n  value: 'store.finished-stock-management',\n  audiences: ['store'],\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    {\n      label: '成品现货管理',\n      value: 'store.finished-stock-management.menu',\n      direct: true,\n      pages: [\n        {\n          label: '成品现货管理页',\n",
+          "after": "    {\n      label: '成品现货管理',\n      value: 'store.finished-stock-management.menu',\n      direct: false,\n      pages: [\n        {\n          label: '成品现货管理页',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  ],\n};\n\nexport const storeAccessoryStock: FunctionModule = {\n  label: '配件管理',\n  value: 'store.accessory-management',\n  audiences: ['store'],\n",
+          "after": "  ],\n};\n\nconst storeAccessoryStock: FunctionModule = {\n  label: '配件管理',\n  value: 'store.accessory-management',\n  audiences: ['store'],\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    {\n      label: '配件管理',\n      value: 'store.accessory-management.menu',\n      direct: true,\n      pages: [\n        {\n          label: '配件管理页',\n",
+          "after": "    {\n      label: '配件管理',\n      value: 'store.accessory-management.menu',\n      direct: false,\n      pages: [\n        {\n          label: '配件管理页',\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "      ],\n    },\n  ],\n};\n\nexport const storePriceConfiguration: FunctionModule = {\n",
+          "after": "      ],\n    },\n  ],\n};\n\nexport const storeProducts: FunctionModule = {\n  label: '商品管理',\n  value: 'store.products',\n  audiences: ['store'],\n  menus: [...storeFinishedStock.menus, ...storeAccessoryStock.menus],\n};\n\nexport const storePriceConfiguration: FunctionModule = {\n",
+          "reason": "2026-10-22 用户确认门店商品管理一级菜单、成品现货与配件二级菜单；同步目录及对应结构测试，保留原权限编码与授权",
+          "stage": "before-migrations"
+        },
         {
           "before": "                ['purge', '彻底删除'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.recycle.${code}` })),\n            },\n          ],\n        },\n      ],\n    },\n  ],\n};\n\nexport const storePriceConfiguration: FunctionModule = {\n  label: '价格配置',\n  value: 'store.price-configuration',\n  audiences: ['store'],\n  menus: [\n    {\n      label: '价格配置',\n      value: 'store.price-configuration.menu',\n      direct: true,\n      pages: [\n",
           "after": "                ['purge', '彻底删除'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.recycle.${code}` })),\n            },\n          ],\n        },\n      ],\n    },\n  ],\n};\n\nexport const storeAccessoryStock: FunctionModule = {\n  label: '配件管理',\n  value: 'store.accessory-management',\n  audiences: ['store'],\n  menus: [\n    {\n      label: '配件管理',\n      value: 'store.accessory-management.menu',\n      direct: true,\n      pages: [\n        {\n          label: '配件管理页',\n          value: 'store.accessory-management',\n          actions: [{ label: '操作日志', value: 'store.accessory-management.operation-log.view' }],\n          tabs: [\n            {\n              label: '仓库中',\n              value: 'store.accessory-management.warehouse',\n              actions: [\n                ['select', '商品中心'],\n                ['batch-shelf', '批量上架'],\n                ['shelf', '上架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.accessory-management.warehouse.${code}` })),\n            },\n            {\n              label: '已上架',\n              value: 'store.accessory-management.selling',\n              actions: [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n              ].map(([code, label]) => ({ label, value: `store.accessory-management.selling.${code}` })),\n            },\n            {\n              label: '已下架',\n              value: 'store.accessory-management.off-shelf',\n              actions: [\n                ['batch-restore', '批量放回到仓库'],\n                ['detail', '详情'],\n                ['restore', '放回仓库'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.accessory-management.off-shelf.${code}` })),\n            },\n            {\n              label: '已售完',\n              value: 'store.accessory-management.sold-out',\n              actions: [['detail', '详情']].map(([code, label]) => ({\n                label,\n                value: `store.accessory-management.sold-out.${code}`,\n              })),\n            },\n            {\n              label: '回收站',\n              value: 'store.accessory-management.recycle',\n              actions: [\n                ['batch-restore', '批量放回到仓库'],\n                ['batch-purge', '批量彻底删除'],\n                ['clear', '清空回收站'],\n                ['detail', '详情'],\n                ['restore', '放回仓库'],\n                ['purge', '彻底删除'],\n              ].map(([code, label]) => ({ label, value: `store.accessory-management.recycle.${code}` })),\n            },\n          ],\n        },\n      ],\n    },\n  ],\n};\n\nexport const storePriceConfiguration: FunctionModule = {\n  label: '价格配置',\n  value: 'store.price-configuration',\n  audiences: ['store'],\n  menus: [\n    {\n      label: '价格配置',\n      value: 'store.price-configuration.menu',\n      direct: true,\n      pages: [\n",

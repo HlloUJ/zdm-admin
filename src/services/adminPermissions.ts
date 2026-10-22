@@ -29,22 +29,27 @@ export type AdminMenuEntry = AdminMenuItem | AdminMenuGroup;
 export const adminMenuEntries: AdminMenuEntry[] = [
   { label: '工作台', path: '/dashboard', icon: 'dashboard' },
   {
-    label: '成品现货管理',
-    path: '/store/finished-stock-management',
+    label: '商品管理',
+    value: 'store-products',
     icon: 'layers',
-    permissionPrefix: 'store.finished-stock-management',
+    children: [
+      {
+        label: '成品现货管理',
+        path: '/store/finished-stock-management',
+        permissionPrefix: 'store.finished-stock-management',
+      },
+      {
+        label: '配件管理',
+        path: '/store/accessory-management',
+        permissionPrefix: 'store.accessory-management',
+      },
+    ],
   },
   {
     label: '客户管理',
     path: '/store/customer-management',
     icon: 'address-book',
     permissionPrefix: 'store.customer-management',
-  },
-  {
-    label: '配件管理',
-    path: '/store/accessory-management',
-    icon: 'layers',
-    permissionPrefix: 'store.accessory-management',
   },
   {
     label: '订单管理',

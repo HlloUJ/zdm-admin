@@ -1320,24 +1320,19 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {
     await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
     await expect(moduleList.locator('.permission-module-item > span:first-child')).toHaveText([
-      ...(terminal === '城市合伙人门店管理后台'
-        ? ['成品现货管理', '客户管理', '配件管理', '订单管理', '价格配置']
-        : []),
+      ...(terminal === '城市合伙人门店管理后台' ? ['商品管理', '客户管理', '订单管理', '价格配置'] : []),
       '供应商管理',
       '门店分类管理',
       '权限管理',
     ]);
     if (terminal === '城市合伙人门店管理后台') {
-      await moduleList.getByText('成品现货管理', { exact: true }).click();
-      await expect(matrix.getByText('一级菜单直达')).toBeVisible();
-      await expect(matrix.locator('tbody .permission-menu-cell').first()).toHaveText('一级菜单直达');
-      for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
-        await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
-      }
-      await moduleList.getByText('配件管理', { exact: true }).click();
+      await moduleList.getByText('商品管理', { exact: true }).click();
+      await expect(matrix.getByText('一级菜单直达')).toHaveCount(0);
+      await expect(matrix.locator('tbody .permission-menu-cell')).toHaveText(['成品现货管理', '配件管理']);
+      await expect(matrix.getByText('成品现货管理页', { exact: true })).toBeVisible();
       await expect(matrix.getByText('配件管理页', { exact: true })).toBeVisible();
       for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
-        await expect(matrix.getByText(tab, { exact: true })).toBeVisible();
+        await expect(matrix.getByText(tab, { exact: true })).toHaveCount(2);
       }
       await moduleList.getByText('客户管理', { exact: true }).click();
       await expect(matrix.getByText('日常客户', { exact: true })).toBeVisible();
@@ -1459,7 +1454,9 @@ for (const storeType of ['cityPartner', 'slabSupplier']) {
     await expect(page).toHaveURL(/store-category-management$/);
     const menu = page.locator('.side-nav');
     await expect(menu.getByText('门店分类管理', { exact: true })).toBeVisible();
-    await expect(menu.getByText('商品管理', { exact: true })).toHaveCount(0);
+    await expect(menu.getByText('商品管理', { exact: true })).toHaveCount(storeType === 'cityPartner' ? 1 : 0);
+    await expect(menu.locator('[data-menu-path="/finished-stock-management"]')).toHaveCount(0);
+    await expect(menu.locator('[data-menu-path="/accessory-management"]')).toHaveCount(0);
     await expect(menu.getByText('租户与门店', { exact: true })).toHaveCount(0);
     await expect(menu.getByText('终端功能分配', { exact: true })).toHaveCount(0);
     await page.goto('/terminal-function-allocation');

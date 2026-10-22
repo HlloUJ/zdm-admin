@@ -3,8 +3,7 @@ import { isFunctionAllowedForAudience } from './functionAudience';
 import { verifiedFunctionCatalog } from './functionCatalogAdminData';
 import {
   storeLevelModule,
-  storeFinishedStock,
-  storeAccessoryStock,
+  storeProducts,
   storePriceConfiguration,
   storeCustomerManagement,
 } from './functionCatalogStoreData';
@@ -285,9 +284,8 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
 
 const navigationModuleOrder = [
   'admin.tenant',
-  'store.finished-stock-management',
+  'store.products',
   'store.customer-management',
-  'store.accessory-management',
   'store.order-management',
   'store.price-configuration',
   'admin.product-data-center',
@@ -350,8 +348,7 @@ export const fullFunctionCatalog = applyConfirmedNavigationStructure(
     withDefaultViewPermissions(
       withAdministrationTabs([
         storeLevelModule,
-        storeFinishedStock,
-        storeAccessoryStock,
+        storeProducts,
         storeCustomerManagement,
         storeOrderPrototype,
         storePriceConfiguration,

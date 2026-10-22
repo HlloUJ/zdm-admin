@@ -47,11 +47,8 @@ describe('commodity module isolation', () => {
           .replaceAll('finished-stock-management', 'accessory-management')
           .replaceAll('成品现货', '配件'),
       );
-    const store = terminalFunctionTrees.store;
-    expect(store.find((m) => m.value === 'store.accessory-management')).toEqual(
-      normalize(store.find((m) => m.value === 'store.finished-stock-management')),
-    );
     for (const [catalog, prefix] of [
+      [terminalFunctionTrees.store, 'store'],
       [fullFunctionCatalog, 'admin'],
       [terminalFunctionTrees['supply-chain'], 'supply-chain'],
     ] as const) {

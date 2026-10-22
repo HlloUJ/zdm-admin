@@ -166,6 +166,9 @@ watch(
   () => route.path,
   () => {
     const requiredExpandedMenus = [];
+    if (/^\/store\/(finished-stock-management|accessory-management)(?:\/|$)/.test(route.path)) {
+      requiredExpandedMenus.push('store-products');
+    }
     if (tenantManagementPaths.has(route.path)) requiredExpandedMenus.push('tenant-management');
     if (route.path === '/store-level-management') requiredExpandedMenus.push('store-base-data-management');
     if (baseInfoPaths.has(route.path)) requiredExpandedMenus.push('product-management');
