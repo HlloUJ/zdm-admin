@@ -309,50 +309,52 @@
             >批量选择</t-button
           >
         </AdminListToolbar>
-        <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
-          <template #poolSelectTitle>
-            <t-checkbox
-              :checked="poolPageAllSelected"
-              :indeterminate="poolPagePartlySelected"
-              :disabled="!poolPageRows.length"
-              @change="togglePoolPage"
-            />
-          </template>
-          <template #select="{ row }"
-            ><t-checkbox
-              :checked="poolSelected.includes(row.id)"
-              @change="
-                (checked: boolean) =>
-                  (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))
-              "
-          /></template>
-          <template #imageUrl="{ row }"
-            ><t-image
-              v-if="row.imageUrl"
-              :src="row.imageUrl"
-              fit="cover"
-              :style="{ width: '48px', height: '48px' }"
-              @click="imagePreview = row.imageUrl"
-          /></template>
-          <template #product="{ row }"
-            >{{ row.name }}
-            <div>ID：{{ row.id }}</div></template
-          >
-          <template #guidePrice="{ row }">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>
-          <template #partnerPrice="{ row }">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>
-          <template #operation="{ row }"
-            ><t-link hover="color" :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
-          >
-          <template #empty>暂无可挑选的已上架商品</template>
-        </t-table>
-        <AdminPagination
-          :current="poolPage"
-          :page-size="poolPageSize"
-          :total="filteredPool.length"
-          :page-size-options="[10, 20, 50]"
-          @update:current="poolPage = $event"
-          @update:page-size="poolPageSize = $event"
-        />
+        <div>
+          <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
+            <template #poolSelectTitle>
+              <t-checkbox
+                :checked="poolPageAllSelected"
+                :indeterminate="poolPagePartlySelected"
+                :disabled="!poolPageRows.length"
+                @change="togglePoolPage"
+              />
+            </template>
+            <template #select="{ row }"
+              ><t-checkbox
+                :checked="poolSelected.includes(row.id)"
+                @change="
+                  (checked: boolean) =>
+                    (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))
+                "
+            /></template>
+            <template #imageUrl="{ row }"
+              ><t-image
+                v-if="row.imageUrl"
+                :src="row.imageUrl"
+                fit="cover"
+                :style="{ width: '48px', height: '48px' }"
+                @click="imagePreview = row.imageUrl"
+            /></template>
+            <template #product="{ row }"
+              >{{ row.name }}
+              <div>ID：{{ row.id }}</div></template
+            >
+            <template #guidePrice="{ row }">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>
+            <template #partnerPrice="{ row }">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>
+            <template #operation="{ row }"
+              ><t-link hover="color" :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
+            >
+            <template #empty>暂无可挑选的已上架商品</template>
+          </t-table>
+          <AdminPagination
+            :current="poolPage"
+            :page-size="poolPageSize"
+            :total="filteredPool.length"
+            :page-size-options="[10, 20, 50]"
+            @update:current="poolPage = $event"
+            @update:page-size="poolPageSize = $event"
+          />
+        </div>
       </t-space>
     </AdminDialog>
 

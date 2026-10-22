@@ -77,7 +77,7 @@
             </template>
           </t-table>
 
-          <div class="pagination-bar">
+          <div class="pagination-bar zdm-admin-pagination">
             <t-pagination
               v-model:current="pagination.current"
               v-model:page-size="pagination.pageSize"
@@ -455,12 +455,6 @@ onMounted(loadVarieties);
   justify-content: flex-start;
   align-items: center;
   gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
-}
-
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--td-comp-margin-xxl);
 }
 
 @media (max-width: 960px) {

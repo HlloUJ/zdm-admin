@@ -408,9 +408,6 @@ onMounted(loadData);
   justify-content: flex-start;
   gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
-.zdm-admin-pagination {
-  margin-top: var(--td-comp-margin-xxl);
-}
 @media (max-width: 960px) {
   .page-header {
     align-items: flex-start;

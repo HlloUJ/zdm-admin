@@ -489,7 +489,4 @@ onMounted(async () => {
 .table-actions {
   gap: var(--td-comp-margin-m) var(--td-comp-margin-l);
 }
-.zdm-admin-pagination {
-  margin-top: var(--td-comp-margin-xxl);
-}
 </style>
