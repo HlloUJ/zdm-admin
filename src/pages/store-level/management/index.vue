@@ -351,7 +351,4 @@ onMounted(loadLevels);
   align-items: center;
   margin-bottom: var(--td-comp-margin-xxl);
 }
-.zdm-admin-pagination {
-  margin-top: var(--td-comp-margin-xxl);
-}
 </style>

@@ -166,11 +166,6 @@
     "controlWidth": "100% of available field content",
     "forms": [
       {
-        "file": "src/pages/accessory/attribute/index.vue",
-        "visible": "formDialogVisible",
-        "tag": "t-dialog"
-      },
-      {
         "file": "src/pages/craft/finished-stock/index.vue",
         "visible": "formDialogVisible",
         "tag": "t-dialog"
@@ -184,11 +179,6 @@
         "file": "src/pages/customer/index.vue",
         "visible": "followVisible",
         "tag": "AdminFormDialog"
-      },
-      {
-        "file": "src/pages/finished-stock/attribute/index.vue",
-        "visible": "formDialogVisible",
-        "tag": "t-dialog"
       },
       {
         "file": "src/pages/finished-stock/store/price-configuration.vue",
@@ -306,16 +296,6 @@
     ],
     "excludedForms": [
       {
-        "file": "src/pages/accessory/attribute/index.vue",
-        "visible": "optionDialogVisible",
-        "reason": "选项列表管理"
-      },
-      {
-        "file": "src/pages/finished-stock/attribute/index.vue",
-        "visible": "optionDialogVisible",
-        "reason": "选项列表管理"
-      },
-      {
         "file": "src/pages/finished-stock/management/index.vue",
         "visible": "specDialogVisible",
         "reason": "规格矩阵编辑器"
@@ -384,6 +364,16 @@
         "file": "src/pages/tenant/management/index.vue",
         "visible": "purgeDialogVisible",
         "reason": "高风险删除确认流程"
+      },
+      {
+        "file": "src/pages/order/prototype/OrderEditor.vue",
+        "visible": "visible",
+        "reason": "用户批准：订单 SKU 和价格多列表单，复用公共页面与表单组件。"
+      },
+      {
+        "file": "src/pages/order/prototype/OrderActionDialog.vue",
+        "visible": "visible",
+        "reason": "用户批准：取消结算需要商品、数量与优惠矩阵；其他普通操作保留 480px 单列表单。"
       }
     ]
   }

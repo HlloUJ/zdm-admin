@@ -1,3 +1,4 @@
+import { storeOrderPrototype } from '@/pages/order/prototype/resources';
 import { isFunctionAllowedForAudience } from './functionAudience';
 import { verifiedFunctionCatalog } from './functionCatalogAdminData';
 import {
@@ -217,6 +218,7 @@ const navigationModuleOrder = [
   'admin.tenant',
   'store.finished-stock-management',
   'store.customer-management',
+  'store.order-management',
   'store.price-configuration',
   'admin.product-data-center',
   'admin.supplier-supply-type-management',
@@ -280,6 +282,7 @@ export const fullFunctionCatalog = applyConfirmedNavigationStructure(
         storeLevelModule,
         storeFinishedStock,
         storeCustomerManagement,
+        storeOrderPrototype,
         storePriceConfiguration,
         ...verifiedFunctionCatalog,
         supplyChainProducts,

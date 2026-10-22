@@ -13,6 +13,7 @@ import {
   registryViolations,
   buttonClasses,
   buttonStyleViolations,
+  isApprovedOrderReferenceBorder,
 } from './button-color-policy.mjs';
 import { businessFingerprint, contractViolations } from './visual-refactor-contract.mjs';
 const refactor = JSON.parse(readFileSync('docs/ui/visual-refactor.json', 'utf8'));
@@ -636,8 +637,6 @@ test('store controls include composite selects and native datetime placeholders 
 test('submit validation entries share one summary and location implementation without intercepting operation feedback', async () => {
   const ts = (await import('typescript')).default;
   const entries = {
-    'src/pages/accessory/attribute/index.vue': ['handleSubmit', 'handleAddOption'],
-    'src/pages/finished-stock/attribute/index.vue': ['handleSubmit', 'handleAddOption'],
     'src/pages/craft/finished-stock/index.vue': ['handleSubmit'],
     'src/pages/store-category/management/index.vue': ['handleSubmit'],
     'src/pages/product/attribute/index.vue': ['submit'],
@@ -940,6 +939,7 @@ test('native button appearance and disabled states have no internal-selector ski
       postcss.parse(css).walkRules((rule) => {
         if (!/\.t-button(?:--[\w-]+)?\b/.test(rule.selector)) return;
         rule.walkDecls((declaration) => {
+          if (isApprovedOrderReferenceBorder(file, declaration)) return;
           if (/^(?:color|background(?:-[\w-]+)?|border(?:-[\w-]+)?|opacity|filter|box-shadow)$/.test(declaration.prop))
             violations.push(`${file}: ${rule.selector} overrides ${declaration.prop}`);
         });
@@ -947,4 +947,35 @@ test('native button appearance and disabled states have no internal-selector ski
     }
   }
   assert.deepEqual(violations, [], 'Keep native button themes, shapes and disabled states; preserve business layout');
+});
+
+import { placeholderViolations } from './placeholder-policy.mjs';
+const approvedOrderFile = 'src/pages/order/prototype/SalesOrderList.vue';
+test('reference-image placeholders are scoped to exact approved file, tag, marker and text', () => {
+  const approved = '<template><t-select data-design-control="order-filter-select" placeholder="请选择" /></template>';
+  assert.deepEqual(placeholderViolations(approvedOrderFile, approved), []);
+  assert.equal(placeholderViolations('new.vue', approved).length, 1);
+  assert.equal(placeholderViolations(approvedOrderFile, approved.replace('order-filter-select', 'other')).length, 1);
+  assert.equal(placeholderViolations(approvedOrderFile, approved.replace('t-select', 't-input')).length, 1);
+  assert.equal(
+    placeholderViolations(approvedOrderFile, approved.replace('placeholder="请选择"', 'placeholder="随便填"')).length,
+    1,
+  );
+  const dates =
+    '<template><t-date-range-picker data-design-control="order-filter-dates" :placeholder="[\'开始日期\', \'结束日期\']" /></template>';
+  assert.deepEqual(placeholderViolations(approvedOrderFile, dates), []);
+  assert.equal(placeholderViolations('new.vue', dates).length, 1);
+  assert.equal(placeholderViolations(approvedOrderFile, dates.replace('结束日期', '结束时间')).length, 1);
+});
+
+test('scheme one rejects superseded raster border skins', () => {
+  const selector = '.order-card__actions :deep(.t-button--variant-outline.t-button--theme-primary)';
+  const css = `${selector} { border: 1px solid #bfd1f6; }`;
+  assert.equal(buttonStyleViolations(approvedOrderFile, css).length, 1);
+  assert.equal(buttonStyleViolations('other.vue', css).length, 1);
+  assert.equal(buttonStyleViolations(approvedOrderFile, css.replace('#bfd1f6', '#ff0000')).length, 1);
+  assert.equal(buttonStyleViolations(approvedOrderFile, css.replace(selector, selector + '.t-is-disabled')).length, 1);
+  const declaration = postcss.parse(css).first.first;
+  assert.equal(isApprovedOrderReferenceBorder(approvedOrderFile, declaration), false);
+  assert.equal(isApprovedOrderReferenceBorder(approvedOrderFile, { ...declaration, prop: 'background' }), false);
 });

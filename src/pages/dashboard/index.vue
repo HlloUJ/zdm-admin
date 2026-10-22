@@ -5,7 +5,7 @@
     <div class="admin-shell">
       <AdminSideMenu />
 
-      <main class="page">
+      <main class="page zdm-admin-responsive-page">
         <section class="metric-grid">
           <div v-for="item in metrics" :key="item.label" class="metric-card">
             <span>{{ item.label }}</span>
@@ -14,7 +14,7 @@
           </div>
         </section>
 
-        <section class="dashboard-grid">
+        <section class="dashboard-grid zdm-admin-responsive-panels">
           <div class="panel">
             <div class="panel-title">整合菜单</div>
             <t-table row-key="path" :data="menuRows" :columns="menuColumns" size="medium" table-layout="fixed" />

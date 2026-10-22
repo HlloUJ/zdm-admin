@@ -26,12 +26,10 @@
     "src/components/permission/PermissionAssignmentMatrix.vue",
     "src/components/product-logs/ProductLogFieldValue.vue",
     "src/components/product-logs/ProductOperationLogTemplate.vue",
-    "src/pages/accessory/attribute/index.vue",
     "src/pages/craft/finished-stock/index.vue",
     "src/pages/customer/index.vue",
     "src/pages/dashboard/index.vue",
     "src/pages/employee-invite/index.vue",
-    "src/pages/finished-stock/attribute/index.vue",
     "src/pages/finished-stock/management/components/FinishedAttributeChanges.vue",
     "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue",
     "src/pages/finished-stock/management/components/FinishedEditChanges.vue",
@@ -82,7 +80,9 @@
     "src/styles/index.css",
     "src/components/IdentityContextIcon.vue",
     "src/components/foundation/AdminPhoneInput.vue",
-    "src/components/foundation/official/textarea-count-layout.css"
+    "src/components/foundation/official/textarea-count-layout.css",
+    "src/pages/order/prototype/SalesOrderList.vue",
+    "src/components/foundation/official/responsive-layout.css"
   ],
   "contracts": {
     "src/App.vue": {
@@ -656,7 +656,15 @@
     "src/components/foundation/AdminPaginationBar.vue": {
       "script": "63045a5a3430bc17bedebe6585ec9974cdd02b64c2305519b82d903d4d9d7a32",
       "template": "ae3f070cffb40192164a0c933d9d463cb1a38e2e69e6437a96071815b2938a59",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user explicitly approved removing all remaining unused legacy pagination class hooks; wrappers, component API, business props and events retained.",
+          "before": "<template>\n  <div :class=\"['zdm-admin-pagination-bar', `zdm-admin-pagination-bar--${align}`]\">\n    <slot />\n  </div>",
+          "after": "<template>\n  <div>\n    <slot />\n  </div>"
+        }
+      ]
     },
     "src/components/foundation/AdminSectionCard.vue": {
       "script": "22b85dd9d735c1d93382744983e8ca6a469c2a06cad588d3f8e389dd0153f8ff",
@@ -1066,6 +1074,12 @@
       "approvedBusinessPatches": [
         {
           "stage": "before-migrations",
+          "reason": "2026-10-22 user approved standard pagination spacing for 12 routed regions; presentation only, preserving all scripts, table props and pagination events.",
+          "before": "      <t-table row-key=\"id\" :data=\"records\" :columns=\"columns\" :loading=\"loading\" hover>\n        <template #subjectName=\"{ row }\">\n          <div>{{ row.subjectName }}</div>\n          <div>ID：{{ row.subjectId }}</div>\n          <div v-if=\"row.subjectCode && subjectCodeLabel\">{{ subjectCodeLabel }}：{{ row.subjectCode }}</div>\n        </template>\n        <template #operationType=\"{ row }\">{{ productOperationTypeLabel(row.operationType) }}</template>\n        <template #operationSummary=\"{ row }\">{{ summaryLabel(row) }}</template>\n        <template #operatedAt=\"{ row }\">{{ formatTime(row.operatedAt) }}</template>\n        <template #operation=\"{ row }\"\n          ><t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"emit('open-detail', row.id)\"\n            >详情</t-link\n          ></template\n        >\n        <template #empty>暂无操作日志</template>\n      </t-table>\n      <AdminPagination\n        :current=\"pagination.current\"\n        :page-size=\"pagination.pageSize\"\n        :total=\"total\"\n        @change=\"emit('page-change', $event)\"\n      />",
+          "after": "      <div>\n        <t-table row-key=\"id\" :data=\"records\" :columns=\"columns\" :loading=\"loading\" hover>\n          <template #subjectName=\"{ row }\">\n            <div>{{ row.subjectName }}</div>\n            <div>ID：{{ row.subjectId }}</div>\n            <div v-if=\"row.subjectCode && subjectCodeLabel\">{{ subjectCodeLabel }}：{{ row.subjectCode }}</div>\n          </template>\n          <template #operationType=\"{ row }\">{{ productOperationTypeLabel(row.operationType) }}</template>\n          <template #operationSummary=\"{ row }\">{{ summaryLabel(row) }}</template>\n          <template #operatedAt=\"{ row }\">{{ formatTime(row.operatedAt) }}</template>\n          <template #operation=\"{ row }\"\n            ><t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"emit('open-detail', row.id)\"\n              >详情</t-link\n            ></template\n          >\n          <template #empty>暂无操作日志</template>\n        </t-table>\n        <AdminPagination\n          :current=\"pagination.current\"\n          :page-size=\"pagination.pageSize\"\n          :total=\"total\"\n          @change=\"emit('page-change', $event)\"\n        />\n      </div>"
+        },
+        {
+          "stage": "before-migrations",
           "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
           "before": "        <template #operationSummary=\"{ row }\">{{ summaryLabel(row) }}</template>\n        <template #operatedAt=\"{ row }\">{{ formatTime(row.operatedAt) }}</template>\n        <template #operation=\"{ row }\"\n          ><t-link :theme=\"buttonTheme('view')\" @click=\"emit('open-detail', row.id)\">详情</t-link></template\n        >\n        <template #empty>暂无操作日志</template>\n      </t-table>\n",
           "after": "        <template #operationSummary=\"{ row }\">{{ summaryLabel(row) }}</template>\n        <template #operatedAt=\"{ row }\">{{ formatTime(row.operatedAt) }}</template>\n        <template #operation=\"{ row }\"\n          ><t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"emit('open-detail', row.id)\"\n            >详情</t-link\n          ></template\n        >\n        <template #empty>暂无操作日志</template>\n      </t-table>\n"
@@ -1133,206 +1147,6 @@
     "src/main.ts": {
       "content": "78f494eac5ca559e2eab09afbaa3a9b49d4fa76ad06c6971b3c50cd792103173",
       "approvedPlaceholderPatches": []
-    },
-    "src/pages/accessory/attribute/index.vue": {
-      "script": "c2dc0b206f50c090b167033dfc72886d866f348cdad2e7d3862ed15024e5bf43",
-      "template": "29556057f41aa1aeccd23b2808dcd292f9cafb55973d48062d0f939c7553dda7",
-      "approvedVisualPatches": [
-        {
-          "reason": "2026-10-15 user authorized global migration of existing query areas to accepted adaptive-query-grid-v1: layout only; preserve fields, labels, values, conditions, permissions and all handlers.",
-          "before": "<t-form class=\"zdm-admin-filter-form\" label-width=\"80px\" :data=\"searchForm\" colon>",
-          "after": "<t-form class=\"zdm-admin-filter-form zdm-standard-query\" label-width=\"80px\" :data=\"searchForm\" colon>"
-        }
-      ],
-      "approvedPlaceholderPatches": [
-        {
-          "before": "      @close=\"closeOptionDialog\"\n    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input\n            v-model=\"optionCodeInput\"\n            :status=\"optionFeedback.field('code', optionCodeInput).status\"\n",
-          "after": "      @close=\"closeOptionDialog\"\n    >\n      <div class=\"option-panel\">\n        <div ref=\"optionFormRoot\" class=\"option-toolbar\">\n          <t-input\n            v-model=\"optionCodeInput\"\n            :status=\"optionFeedback.field('code', optionCodeInput).status\"\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "</template>\n\n<script setup lang=\"ts\">\nimport { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\n",
-          "after": "</template>\n\n<script setup lang=\"ts\">\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "};\n\nconst optionDialogVisible = ref(false);\nconst optionFeedback = useFormFeedback(optionDialogVisible);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\n",
-          "after": "};\n\nconst optionDialogVisible = ref(false);\nconst optionFormRoot = ref<HTMLElement>();\nconst optionFeedback = useFormFeedback(optionDialogVisible);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "\nconst handleSubmit = async () => {\n  const result = await formRef.value?.validate();\n  if (result !== true) return;\n\n  const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;\n  tableData.value.unshift({\n",
-          "after": "\nconst handleSubmit = async () => {\n  const result = await formRef.value?.validate();\n  if (result !== true) return rejectFormSubmission(formRef.value);\n\n  const nextId = Math.max(...tableData.value.map((item) => item.id), 0) + 1;\n  tableData.value.unshift({\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "const handleAddOption = () => {\n  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    return;\n  }\n\n  if (currentOptions.value.some((item) => item.value === value || item.code === code)) {\n    if (currentOptions.value.some((item) => item.value === value))\n      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    return;\n  }\n\n  const nextId = Math.max(...currentOptions.value.map((item) => item.id), 0) + 1;\n  optionTarget.value?.options.unshift({ id: nextId, code, value, status: 'normal', sort: 1 });\n",
-          "after": "const handleAddOption = () => {\n  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  const duplicateValue = currentOptions.value.some((item) => item.value === value);\n  const duplicateCode = currentOptions.value.some((item) => item.code === code);\n  if (!value || !code) {\n    if (!value) optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    if (!code) optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n  }\n\n  if (duplicateValue || duplicateCode) {\n    if (duplicateValue) optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (duplicateCode) optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n  }\n\n  if (!value || !code || duplicateValue || duplicateCode) return rejectFormSubmission(optionFormRoot.value);\n\n  const nextId = Math.max(...currentOptions.value.map((item) => item.id), 0) + 1;\n  optionTarget.value?.options.unshift({ id: nextId, code, value, status: 'normal', sort: 1 });\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    adminFeedback.warning('请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    adminFeedback.warning('请输入选项编码');\n    return;\n  }\n\n",
-          "after": "  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    return;\n  }\n\n",
-          "reason": "用户批准全局校验反馈补充：短表单弹窗校验只显示红框和字段提示，移除重复校验Toast；长表单汇总及提交失败、网络和业务前置提醒保留，所有校验规则、返回条件、权限和请求保持不变。"
-        },
-        {
-          "before": "      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    adminFeedback.warning('选项名称或编码已存在');\n    return;\n  }\n\n",
-          "after": "      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    return;\n  }\n\n",
-          "reason": "用户批准全局校验反馈补充：短表单弹窗校验只显示红框和字段提示，移除重复校验Toast；长表单汇总及提交失败、网络和业务前置提醒保留，所有校验规则、返回条件、权限和请求保持不变。"
-        },
-        {
-          "before": "    </div>\n\n    <t-dialog\n      v-model:visible=\"formDialogVisible\"\n      header=\"新增标准属性\"\n      width=\"560px\"\n      placement=\"center\"\n      confirm-btn=\"提交\"\n      cancel-btn=\"取消\"\n",
-          "after": "    </div>\n\n    <t-dialog\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      v-model:visible=\"formDialogVisible\"\n      header=\"新增标准属性\"\n      width=\"480px\"\n      placement=\"center\"\n      confirm-btn=\"提交\"\n      cancel-btn=\"取消\"\n",
-          "reason": "用户确认普通单列新增编辑弹窗统一官方默认480px、100px标签列及控件填满可用区域；只改尺寸与公共样式接入，查询、大表单、矩阵及业务契约保持不变。"
-        },
-        {
-          "before": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input v-model=\"optionCodeInput\" tips=\"选项编码，如 polished\" clearable placeholder=\"请输入选项编码\" />\n          <t-input v-model=\"optionInput\" tips=\"选项名称，如 亮光\" clearable placeholder=\"请输入选项名称\" />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n",
-          "after": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input\n            v-model=\"optionCodeInput\"\n            :status=\"optionFeedback.field('code', optionCodeInput).status\"\n            :tips=\"optionFeedback.field('code', optionCodeInput).tips || '选项编码，如 polished'\"\n            clearable\n            placeholder=\"请输入选项编码\"\n          />\n          <t-input\n            v-model=\"optionInput\"\n            :status=\"optionFeedback.field('value', optionInput).status\"\n            :tips=\"optionFeedback.field('value', optionInput).tips || '选项名称，如 亮光'\"\n            clearable\n            placeholder=\"请输入选项名称\"\n          />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "</template>\n\n<script setup lang=\"ts\">\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\n",
-          "after": "</template>\n\n<script setup lang=\"ts\">\nimport { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "};\n\nconst optionDialogVisible = ref(false);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\nconst optionTarget = ref<AttributeItem | null>(null);\n",
-          "after": "};\n\nconst optionDialogVisible = ref(false);\nconst optionFeedback = useFormFeedback(optionDialogVisible);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\nconst optionTarget = ref<AttributeItem | null>(null);\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  if (!value) {\n    adminFeedback.warning('请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    adminFeedback.warning('请输入选项编码');\n    return;\n  }\n\n  if (currentOptions.value.some((item) => item.value === value || item.code === code)) {\n    adminFeedback.warning('选项名称或编码已存在');\n    return;\n  }\n",
-          "after": "  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    adminFeedback.warning('请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    adminFeedback.warning('请输入选项编码');\n    return;\n  }\n\n  if (currentOptions.value.some((item) => item.value === value || item.code === code)) {\n    if (currentOptions.value.some((item) => item.value === value))\n      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    adminFeedback.warning('选项名称或编码已存在');\n    return;\n  }\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "      <AdminSideMenu />\n\n      <main class=\"page\">\n        <header class=\"page-header\">\n          <div>\n            <t-breadcrumb>\n              <t-breadcrumb-item>基础信息管理</t-breadcrumb-item>\n              <t-breadcrumb-item>配件属性管理</t-breadcrumb-item>\n            </t-breadcrumb>\n          </div>\n          <t-tag theme=\"primary\" variant=\"light\">全局标准属性库</t-tag>\n        </header>\n\n        <t-alert theme=\"info\" closeable>\n          属性和值为全平台标准数据：配件分类只引用属性模板；已经被商品使用的标准选项仅支持停用。\n        </t-alert>\n",
-          "after": "      <AdminSideMenu />\n\n      <main class=\"page\">\n        <t-alert theme=\"info\" closeable>\n          属性和值为全平台标准数据：配件分类只引用属性模板；已经被商品使用的标准选项仅支持停用。\n        </t-alert>\n",
-          "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
-        },
-        {
-          "before": "        </section>\n\n        <section class=\"table-card\">\n          <div class=\"table-toolbar\">\n            <t-button theme=\"primary\" @click=\"openCreateDialog\">\n              <template #icon><t-icon name=\"add\" /></template>\n              新增\n            </t-button>\n          </div>\n\n          <t-table row-key=\"id\" :data=\"pageData\" :columns=\"columns\" hover table-layout=\"fixed\">\n            <template #index=\"{ rowIndex }\">\n",
-          "after": "        </section>\n\n        <section class=\"table-card\">\n          <AdminListToolbar :has-actions=\"true\"\n            ><t-button theme=\"primary\" @click=\"openCreateDialog\">\n              <template #icon><t-icon name=\"add\" /></template>\n              新增\n            </t-button></AdminListToolbar\n          >\n\n          <t-table row-key=\"id\" :data=\"pageData\" :columns=\"columns\" hover table-layout=\"fixed\">\n            <template #index=\"{ rowIndex }\">\n",
-          "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
-        },
-        {
-          "before": "</template>\n\n<script setup lang=\"ts\">\nimport type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\nimport AdminTopNav from '@/components/AdminTopNav.vue';\n",
-          "after": "</template>\n\n<script setup lang=\"ts\">\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\nimport AdminTopNav from '@/components/AdminTopNav.vue';\n",
-          "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "            <div class=\"filter-row\">\n              <div class=\"filter-fields\">\n                <t-form-item label=\"属性\" name=\"name\">\n                  <t-input v-model=\"searchForm.name\" clearable placeholder=\"请输入\" />\n                </t-form-item>\n                <t-form-item class=\"zdm-status-filter\" label=\"状态\" name=\"status\">\n                  <t-select v-model=\"searchForm.status\" clearable placeholder=\"请选择\">\n                    <t-option label=\"正常\" value=\"normal\" />\n                    <t-option label=\"停用\" value=\"disabled\" />\n                  </t-select>\n",
-          "after": "            <div class=\"filter-row\">\n              <div class=\"filter-fields\">\n                <t-form-item label=\"属性\" name=\"name\">\n                  <t-input v-model=\"searchForm.name\" clearable placeholder=\"请输入属性\" />\n                </t-form-item>\n                <t-form-item class=\"zdm-status-filter\" label=\"状态\" name=\"status\">\n                  <t-select v-model=\"searchForm.status\" clearable placeholder=\"请选择状态\">\n                    <t-option label=\"正常\" value=\"normal\" />\n                    <t-option label=\"停用\" value=\"disabled\" />\n                  </t-select>\n"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "    >\n      <t-form ref=\"formRef\" :data=\"formData\" :rules=\"formRules\" label-width=\"100px\" colon>\n        <t-form-item label=\"属性\" name=\"name\" required-mark>\n          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入\" />\n        </t-form-item>\n        <t-form-item label=\"属性编码\" name=\"code\" required-mark>\n          <t-input v-model=\"formData.code\" clearable placeholder=\"如：material / finish\" />\n        </t-form-item>\n        <t-form-item label=\"控件类型\" name=\"controlType\" required-mark>\n          <t-radio-group v-model=\"formData.controlType\">\n",
-          "after": "    >\n      <t-form ref=\"formRef\" :data=\"formData\" :rules=\"formRules\" label-width=\"100px\" colon>\n        <t-form-item label=\"属性\" name=\"name\" required-mark>\n          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入属性\" />\n        </t-form-item>\n        <t-form-item help=\"如：material / finish\" label=\"属性编码\" name=\"code\" required-mark>\n          <t-input v-model=\"formData.code\" clearable placeholder=\"请输入属性编码\" />\n        </t-form-item>\n        <t-form-item label=\"控件类型\" name=\"controlType\" required-mark>\n          <t-radio-group v-model=\"formData.controlType\">\n"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n",
-          "after": "        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input v-model=\"optionCodeInput\" clearable placeholder=\"选项编码，如 polished\" />\n          <t-input v-model=\"optionInput\" clearable placeholder=\"选项名称，如 亮光\" />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n",
-          "after": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input v-model=\"optionCodeInput\" tips=\"选项编码，如 polished\" clearable placeholder=\"请输入选项编码\" />\n          <t-input v-model=\"optionInput\" tips=\"选项名称，如 亮光\" clearable placeholder=\"请输入选项名称\" />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n"
-        }
-      ],
-      "approvedBusinessPatches": [
-        {
-          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
-          "stage": "before-migrations",
-          "before": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
-          "after": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
-        },
-        {
-          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
-          "stage": "before-migrations",
-          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
-          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation('create'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
-        },
-        {
-          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
-          "stage": "before-migrations",
-          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n",
-          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "              <div class=\"filter-actions\">\n                <t-button theme=\"primary\" @click=\"handleSearch\">\n                  <template #icon><t-icon name=\"search\" /></template>\n",
-          "after": "              <div class=\"filter-actions\">\n                <t-button :theme=\"buttonTheme('search')\" @click=\"handleSearch\">\n                  <template #icon><t-icon name=\"search\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                </t-button>\n                <t-button theme=\"default\" variant=\"base\" @click=\"handleReset\">\n                  <template #icon><t-icon name=\"refresh\" /></template>\n",
-          "after": "                </t-button>\n                <t-button :theme=\"buttonTheme('reset')\" variant=\"base\" @click=\"handleReset\">\n                  <template #icon><t-icon name=\"refresh\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "          <AdminListToolbar :has-actions=\"true\"\n            ><t-button theme=\"primary\" @click=\"openCreateDialog\">\n              <template #icon><t-icon name=\"add\" /></template>\n",
-          "after": "          <AdminListToolbar :has-actions=\"true\"\n            ><t-button :theme=\"buttonTheme('create')\" @click=\"openCreateDialog\">\n              <template #icon><t-icon name=\"add\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                  v-if=\"row.controlType === 'select'\"\n                  theme=\"primary\"\n                  hover=\"color\"\n",
-          "after": "                  v-if=\"row.controlType === 'select'\"\n                  :theme=\"buttonTheme('options')\"\n                  hover=\"color\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                <t-link\n                  :theme=\"row.status === 'normal' ? 'warning' : 'success'\"\n                  hover=\"color\"\n",
-          "after": "                <t-link\n                  :theme=\"buttonTheme(row.status === 'normal' ? 'disable' : 'enable')\"\n                  hover=\"color\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                </t-link>\n                <t-link theme=\"danger\" hover=\"color\" @click=\"openDeleteConfirm(row)\">删除</t-link>\n              </div>\n",
-          "after": "                </t-link>\n                <t-link :theme=\"buttonTheme('delete')\" hover=\"color\" @click=\"openDeleteConfirm(row)\">删除</t-link>\n              </div>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "    <t-dialog\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      v-model:visible=\"formDialogVisible\"\n      header=\"新增标准属性\"\n",
-          "after": "    <t-dialog\n      v-model:visible=\"formDialogVisible\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      header=\"新增标准属性\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "      placement=\"center\"\n      confirm-btn=\"提交\"\n      cancel-btn=\"取消\"\n      @confirm=\"handleSubmit\"\n",
-          "after": "      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "          />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n",
-          "after": "          />\n          <t-button :theme=\"buttonTheme('create')\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "            <t-link\n              :theme=\"row.status === 'normal' ? 'warning' : 'success'\"\n              hover=\"color\"\n",
-          "after": "            <t-link\n              :theme=\"buttonTheme(row.status === 'normal' ? 'disable' : 'enable')\"\n              hover=\"color\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "      v-model:visible=\"confirmDialogVisible\"\n      :action=\"confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'\"\n",
-          "after": "      v-model:visible=\"confirmDialogVisible\"\n      :function=\"buttonFunctionFor('status', confirmState.type)\"\n      :action=\"confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "<script setup lang=\"ts\">\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
-          "after": "<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
-        }
-      ]
     },
     "src/pages/craft/finished-stock/index.vue": {
       "script": "b8d16a2c14fe374d9937421d12b4253317eb9d36fb1177ef280d275c16e63aea",
@@ -2570,6 +2384,20 @@
           "after": "      <AdminSideMenu />\n\n      <main class=\"page\">\n        <section class=\"metric-grid\">\n          <div v-for=\"item in metrics\" :key=\"item.label\" class=\"metric-card\">\n            <span>{{ item.label }}</span>\n",
           "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 authorized narrow dashboard list containment: reuse shared zero-minimum grid track, preserve desktop and all business content.",
+          "before": "class=\"dashboard-grid\"",
+          "after": "class=\"dashboard-grid zdm-admin-responsive-panels\""
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "class=\"page\"",
+          "after": "class=\"page zdm-admin-responsive-page\""
+        }
       ]
     },
     "src/pages/employee-invite/index.vue": {
@@ -2639,216 +2467,6 @@
           "stage": "before-migrations",
           "before": "<script setup lang=\"ts\">\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
           "after": "<script setup lang=\"ts\">\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
-        }
-      ]
-    },
-    "src/pages/finished-stock/attribute/index.vue": {
-      "script": "dd2c66b82411ea4368492a70366b92ffc3cd5a21a8065db05ae6972c45ecd0ef",
-      "template": "c67f2621b79fdd8f468cab03573a8256fd0d84612dd6aba4b34069058ff7ff45",
-      "approvedVisualPatches": [
-        {
-          "reason": "2026-10-15 user authorized global migration of existing query areas to accepted adaptive-query-grid-v1: layout only; preserve fields, labels, values, conditions, permissions and all handlers.",
-          "before": "<t-form class=\"zdm-admin-filter-form\" label-width=\"80px\" :data=\"currentState.searchForm\" colon>",
-          "after": "<t-form\n              class=\"zdm-admin-filter-form zdm-standard-query\"\n              label-width=\"80px\"\n              :data=\"currentState.searchForm\"\n              colon\n            >"
-        }
-      ],
-      "approvedPlaceholderPatches": [
-        {
-          "before": "      @close=\"closeOptionDialog\"\n    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input\n            v-model=\"optionCodeInput\"\n            :status=\"optionFeedback.field('code', optionCodeInput).status\"\n",
-          "after": "      @close=\"closeOptionDialog\"\n    >\n      <div class=\"option-panel\">\n        <div ref=\"optionFormRoot\" class=\"option-toolbar\">\n          <t-input\n            v-model=\"optionCodeInput\"\n            :status=\"optionFeedback.field('code', optionCodeInput).status\"\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "</template>\n\n<script setup lang=\"ts\">\nimport { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\n",
-          "after": "</template>\n\n<script setup lang=\"ts\">\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "};\n\nconst optionDialogVisible = ref(false);\nconst optionFeedback = useFormFeedback(optionDialogVisible);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\n",
-          "after": "};\n\nconst optionDialogVisible = ref(false);\nconst optionFormRoot = ref<HTMLElement>();\nconst optionFeedback = useFormFeedback(optionDialogVisible);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "\nconst handleSubmit = async () => {\n  const result = await formRef.value?.validate();\n  if (result !== true) return;\n\n  const name = formData.name.trim();\n  if (currentState.value.tableData.some((item) => item.name === name)) {\n    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '属性已存在' }] });\n    return;\n  }\n\n  const nextId = Math.max(...currentState.value.tableData.map((item) => item.id), 0) + 1;\n  currentState.value.tableData.unshift({\n",
-          "after": "\nconst handleSubmit = async () => {\n  const result = await formRef.value?.validate();\n\n  const name = formData.name.trim();\n  const duplicateName = currentState.value.tableData.some((item) => item.name === name);\n  if (duplicateName) {\n    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '属性已存在' }] });\n  }\n  if (result !== true || duplicateName) return rejectFormSubmission(formRef.value);\n\n  const nextId = Math.max(...currentState.value.tableData.map((item) => item.id), 0) + 1;\n  currentState.value.tableData.unshift({\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "const handleAddOption = () => {\n  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    return;\n  }\n\n  if (currentOptions.value.some((item) => item.value === value || item.code === code)) {\n    if (currentOptions.value.some((item) => item.value === value))\n      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    return;\n  }\n\n  const nextId = Math.max(...currentOptions.value.map((item) => item.id), 0) + 1;\n  optionTarget.value?.options.unshift({ id: nextId, code, value, status: 'normal', sort: 1 });\n",
-          "after": "const handleAddOption = () => {\n  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  const duplicateValue = currentOptions.value.some((item) => item.value === value);\n  const duplicateCode = currentOptions.value.some((item) => item.code === code);\n  if (!value || !code) {\n    if (!value) optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    if (!code) optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n  }\n\n  if (duplicateValue || duplicateCode) {\n    if (duplicateValue) optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (duplicateCode) optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n  }\n\n  if (!value || !code || duplicateValue || duplicateCode) return rejectFormSubmission(optionFormRoot.value);\n\n  const nextId = Math.max(...currentOptions.value.map((item) => item.id), 0) + 1;\n  optionTarget.value?.options.unshift({ id: nextId, code, value, status: 'normal', sort: 1 });\n",
-          "reason": "User approved unified submit validation: one fixed summary, all existing field feedback and first-error location; no Toast or scroll on input/blur; preserve original rules, required conditions, requests, permissions and operation failures."
-        },
-        {
-          "before": "  const name = formData.name.trim();\n  if (currentState.value.tableData.some((item) => item.name === name)) {\n    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '属性已存在' }] });\n    adminFeedback.warning('属性已存在');\n    return;\n  }\n\n",
-          "after": "  const name = formData.name.trim();\n  if (currentState.value.tableData.some((item) => item.name === name)) {\n    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '属性已存在' }] });\n    return;\n  }\n\n",
-          "reason": "用户批准全局校验反馈补充：短表单弹窗校验只显示红框和字段提示，移除重复校验Toast；长表单汇总及提交失败、网络和业务前置提醒保留，所有校验规则、返回条件、权限和请求保持不变。"
-        },
-        {
-          "before": "  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    adminFeedback.warning('请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    adminFeedback.warning('请输入选项编码');\n    return;\n  }\n\n",
-          "after": "  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    return;\n  }\n\n",
-          "reason": "用户批准全局校验反馈补充：短表单弹窗校验只显示红框和字段提示，移除重复校验Toast；长表单汇总及提交失败、网络和业务前置提醒保留，所有校验规则、返回条件、权限和请求保持不变。"
-        },
-        {
-          "before": "      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    adminFeedback.warning('选项名称或编码已存在');\n    return;\n  }\n\n",
-          "after": "      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    return;\n  }\n\n",
-          "reason": "用户批准全局校验反馈补充：短表单弹窗校验只显示红框和字段提示，移除重复校验Toast；长表单汇总及提交失败、网络和业务前置提醒保留，所有校验规则、返回条件、权限和请求保持不变。"
-        },
-        {
-          "before": "    </div>\n\n    <t-dialog\n      v-model:visible=\"formDialogVisible\"\n      :header=\"`新增${activeTab === 'goods' ? '商品属性' : '销售属性'}`\"\n      width=\"560px\"\n      placement=\"center\"\n      confirm-btn=\"提交\"\n      cancel-btn=\"取消\"\n",
-          "after": "    </div>\n\n    <t-dialog\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      v-model:visible=\"formDialogVisible\"\n      :header=\"`新增${activeTab === 'goods' ? '商品属性' : '销售属性'}`\"\n      width=\"480px\"\n      placement=\"center\"\n      confirm-btn=\"提交\"\n      cancel-btn=\"取消\"\n",
-          "reason": "用户确认普通单列新增编辑弹窗统一官方默认480px、100px标签列及控件填满可用区域；只改尺寸与公共样式接入，查询、大表单、矩阵及业务契约保持不变。"
-        },
-        {
-          "before": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input v-model=\"optionCodeInput\" tips=\"选项编码，如 polished\" clearable placeholder=\"请输入选项编码\" />\n          <t-input v-model=\"optionInput\" tips=\"选项名称，如 亮光\" clearable placeholder=\"请输入选项名称\" />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n",
-          "after": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input\n            v-model=\"optionCodeInput\"\n            :status=\"optionFeedback.field('code', optionCodeInput).status\"\n            :tips=\"optionFeedback.field('code', optionCodeInput).tips || '选项编码，如 polished'\"\n            clearable\n            placeholder=\"请输入选项编码\"\n          />\n          <t-input\n            v-model=\"optionInput\"\n            :status=\"optionFeedback.field('value', optionInput).status\"\n            :tips=\"optionFeedback.field('value', optionInput).tips || '选项名称，如 亮光'\"\n            clearable\n            placeholder=\"请输入选项名称\"\n          />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "</template>\n\n<script setup lang=\"ts\">\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\n",
-          "after": "</template>\n\n<script setup lang=\"ts\">\nimport { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "};\n\nconst optionDialogVisible = ref(false);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\nconst optionTarget = ref<AttributeItem | null>(null);\n",
-          "after": "};\n\nconst optionDialogVisible = ref(false);\nconst optionFeedback = useFormFeedback(optionDialogVisible);\nconst optionInput = ref('');\nconst optionCodeInput = ref('');\nconst optionTarget = ref<AttributeItem | null>(null);\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "\n  const name = formData.name.trim();\n  if (currentState.value.tableData.some((item) => item.name === name)) {\n    adminFeedback.warning('属性已存在');\n    return;\n  }\n",
-          "after": "\n  const name = formData.name.trim();\n  if (currentState.value.tableData.some((item) => item.name === name)) {\n    formRef.value?.setValidateMessage({ name: [{ type: 'error', message: '属性已存在' }] });\n    adminFeedback.warning('属性已存在');\n    return;\n  }\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  if (!value) {\n    adminFeedback.warning('请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    adminFeedback.warning('请输入选项编码');\n    return;\n  }\n\n  if (currentOptions.value.some((item) => item.value === value || item.code === code)) {\n    adminFeedback.warning('选项名称或编码已存在');\n    return;\n  }\n",
-          "after": "  const value = optionInput.value.trim();\n  const code = optionCodeInput.value.trim();\n  if (!value) {\n    optionFeedback.reject('value', optionInput.value, '请输入选项值');\n    adminFeedback.warning('请输入选项值');\n    return;\n  }\n\n  if (!code) {\n    optionFeedback.reject('code', optionCodeInput.value, '请输入选项编码');\n    adminFeedback.warning('请输入选项编码');\n    return;\n  }\n\n  if (currentOptions.value.some((item) => item.value === value || item.code === code)) {\n    if (currentOptions.value.some((item) => item.value === value))\n      optionFeedback.reject('value', optionInput.value, '选项名称已存在');\n    if (currentOptions.value.some((item) => item.code === code))\n      optionFeedback.reject('code', optionCodeInput.value, '选项编码已存在');\n    adminFeedback.warning('选项名称或编码已存在');\n    return;\n  }\n",
-          "reason": "用户批准全局表单校验红框与字段下方具体错误提示，补充原生status/tips及已拒绝条件的字段反馈；保留既有校验规则、必填、触发时机、Toast摘要和提交业务交互。"
-        },
-        {
-          "before": "      <AdminSideMenu />\n\n      <main class=\"page\">\n        <header class=\"page-header\">\n          <div>\n            <t-breadcrumb>\n              <t-breadcrumb-item>基础信息管理</t-breadcrumb-item>\n              <t-breadcrumb-item>成品现货属性管理</t-breadcrumb-item>\n            </t-breadcrumb>\n          </div>\n          <t-tag theme=\"primary\" variant=\"light\">全局标准属性库</t-tag>\n        </header>\n\n        <section class=\"content-card\">\n          <t-alert theme=\"info\" closeable>\n            属性和值为全平台标准数据：分类只引用属性模板；已被商品或 SKU 使用的属性值只能停用，不能直接删除。\n",
-          "after": "      <AdminSideMenu />\n\n      <main class=\"page\">\n        <section class=\"content-card\">\n          <t-alert theme=\"info\" closeable>\n            属性和值为全平台标准数据：分类只引用属性模板；已被商品或 SKU 使用的属性值只能停用，不能直接删除。\n",
-          "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
-        },
-        {
-          "before": "          </section>\n\n          <section class=\"table-card\">\n            <div class=\"table-toolbar\">\n              <t-button theme=\"primary\" @click=\"openCreateDialog\">\n                <template #icon><t-icon name=\"add\" /></template>\n                新增\n              </t-button>\n            </div>\n\n            <t-table row-key=\"id\" :data=\"pageData\" :columns=\"columns\" hover table-layout=\"fixed\">\n              <template #index=\"{ rowIndex }\">\n",
-          "after": "          </section>\n\n          <section class=\"table-card\">\n            <AdminListToolbar :has-actions=\"true\"\n              ><t-button theme=\"primary\" @click=\"openCreateDialog\">\n                <template #icon><t-icon name=\"add\" /></template>\n                新增\n              </t-button></AdminListToolbar\n            >\n\n            <t-table row-key=\"id\" :data=\"pageData\" :columns=\"columns\" hover table-layout=\"fixed\">\n              <template #index=\"{ rowIndex }\">\n",
-          "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
-        },
-        {
-          "before": "</template>\n\n<script setup lang=\"ts\">\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\nimport AdminTopNav from '@/components/AdminTopNav.vue';\n",
-          "after": "</template>\n\n<script setup lang=\"ts\">\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\nimport AdminTopNav from '@/components/AdminTopNav.vue';\n",
-          "reason": "用户批准全局移除页顶展示标题栏，使用公共操作栏将既有日志置右、已选数量置左且仅可用批量操作并选中时显示；保留编辑导航、原动作及权限。"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "              <div class=\"filter-row\">\n                <div class=\"filter-fields\">\n                  <t-form-item label=\"属性\" name=\"name\">\n                    <t-input v-model=\"currentState.searchForm.name\" clearable placeholder=\"请输入\" />\n                  </t-form-item>\n                  <t-form-item class=\"zdm-status-filter\" label=\"状态\" name=\"status\">\n                    <t-select v-model=\"currentState.searchForm.status\" clearable placeholder=\"请选择\">\n                      <t-option label=\"正常\" value=\"normal\" />\n                      <t-option label=\"停用\" value=\"disabled\" />\n                    </t-select>\n",
-          "after": "              <div class=\"filter-row\">\n                <div class=\"filter-fields\">\n                  <t-form-item label=\"属性\" name=\"name\">\n                    <t-input v-model=\"currentState.searchForm.name\" clearable placeholder=\"请输入属性\" />\n                  </t-form-item>\n                  <t-form-item class=\"zdm-status-filter\" label=\"状态\" name=\"status\">\n                    <t-select v-model=\"currentState.searchForm.status\" clearable placeholder=\"请选择状态\">\n                      <t-option label=\"正常\" value=\"normal\" />\n                      <t-option label=\"停用\" value=\"disabled\" />\n                    </t-select>\n"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "    >\n      <t-form ref=\"formRef\" :data=\"formData\" :rules=\"formRules\" label-width=\"100px\" colon>\n        <t-form-item label=\"属性\" name=\"name\" required-mark>\n          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入\" />\n        </t-form-item>\n        <t-form-item label=\"属性编码\" name=\"code\" required-mark>\n          <t-input v-model=\"formData.code\" clearable placeholder=\"如：material / size\" />\n        </t-form-item>\n        <t-form-item label=\"控件类型\" name=\"controlType\" required-mark>\n          <t-radio-group v-model=\"formData.controlType\">\n",
-          "after": "    >\n      <t-form ref=\"formRef\" :data=\"formData\" :rules=\"formRules\" label-width=\"100px\" colon>\n        <t-form-item label=\"属性\" name=\"name\" required-mark>\n          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入属性\" />\n        </t-form-item>\n        <t-form-item help=\"如：material / size\" label=\"属性编码\" name=\"code\" required-mark>\n          <t-input v-model=\"formData.code\" clearable placeholder=\"请输入属性编码\" />\n        </t-form-item>\n        <t-form-item label=\"控件类型\" name=\"controlType\" required-mark>\n          <t-radio-group v-model=\"formData.controlType\">\n"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n",
-          "after": "        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n"
-        },
-        {
-          "reason": "用户批准全系统占位提示按现有标题统一，示例限制保留在help/tips；仅修改提示与公共文案函数导入。",
-          "before": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input v-model=\"optionCodeInput\" clearable placeholder=\"选项编码，如 polished\" />\n          <t-input v-model=\"optionInput\" clearable placeholder=\"选项名称，如 亮光\" />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n",
-          "after": "    >\n      <div class=\"option-panel\">\n        <div class=\"option-toolbar\">\n          <t-input v-model=\"optionCodeInput\" tips=\"选项编码，如 polished\" clearable placeholder=\"请输入选项编码\" />\n          <t-input v-model=\"optionInput\" tips=\"选项名称，如 亮光\" clearable placeholder=\"请输入选项名称\" />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n            添加\n"
-        }
-      ],
-      "approvedBusinessPatches": [
-        {
-          "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
-          "stage": "before-migrations",
-          "before": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
-          "after": "          </t-radio-group>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea v-model=\"formData.remark\" placeholder=\"请输入备注\" :maxlength=\"100\" :autosize=\"{}\" />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n"
-        },
-        {
-          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
-          "stage": "before-migrations",
-          "before": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n",
-          "after": "      width=\"480px\"\n      placement=\"center\"\n      :confirm-btn=\"dialogButtonProps('submit', formConfirmation('create'))\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
-        },
-        {
-          "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
-          "stage": "before-migrations",
-          "before": "\n<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n",
-          "after": "\n<script setup lang=\"ts\">\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { useFormFeedback } from '@/utils/formValidation';\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                <div class=\"filter-actions\">\n                  <t-button theme=\"primary\" @click=\"handleSearch\">\n                    <template #icon><t-icon name=\"search\" /></template>\n",
-          "after": "                <div class=\"filter-actions\">\n                  <t-button :theme=\"buttonTheme('search')\" @click=\"handleSearch\">\n                    <template #icon><t-icon name=\"search\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                  </t-button>\n                  <t-button theme=\"default\" variant=\"base\" @click=\"handleReset\">\n                    <template #icon><t-icon name=\"refresh\" /></template>\n",
-          "after": "                  </t-button>\n                  <t-button :theme=\"buttonTheme('reset')\" variant=\"base\" @click=\"handleReset\">\n                    <template #icon><t-icon name=\"refresh\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "            <AdminListToolbar :has-actions=\"true\"\n              ><t-button theme=\"primary\" @click=\"openCreateDialog\">\n                <template #icon><t-icon name=\"add\" /></template>\n",
-          "after": "            <AdminListToolbar :has-actions=\"true\"\n              ><t-button :theme=\"buttonTheme('create')\" @click=\"openCreateDialog\">\n                <template #icon><t-icon name=\"add\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                    v-if=\"row.controlType === 'select'\"\n                    theme=\"primary\"\n                    hover=\"color\"\n",
-          "after": "                    v-if=\"row.controlType === 'select'\"\n                    :theme=\"buttonTheme('options')\"\n                    hover=\"color\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                  <t-link\n                    :theme=\"row.status === 'normal' ? 'warning' : 'success'\"\n                    hover=\"color\"\n",
-          "after": "                  <t-link\n                    :theme=\"buttonTheme(row.status === 'normal' ? 'disable' : 'enable')\"\n                    hover=\"color\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "                  </t-link>\n                  <t-link theme=\"danger\" hover=\"color\" @click=\"openDeleteConfirm(row)\">删除</t-link>\n                </div>\n",
-          "after": "                  </t-link>\n                  <t-link :theme=\"buttonTheme('delete')\" hover=\"color\" @click=\"openDeleteConfirm(row)\">删除</t-link>\n                </div>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "    <t-dialog\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      v-model:visible=\"formDialogVisible\"\n      :header=\"`新增${activeTab === 'goods' ? '商品属性' : '销售属性'}`\"\n",
-          "after": "    <t-dialog\n      v-model:visible=\"formDialogVisible\"\n      dialog-class-name=\"zdm-admin-dialog zdm-admin-single-form\"\n      :header=\"`新增${activeTab === 'goods' ? '商品属性' : '销售属性'}`\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "      placement=\"center\"\n      confirm-btn=\"提交\"\n      cancel-btn=\"取消\"\n      @confirm=\"handleSubmit\"\n",
-          "after": "      placement=\"center\"\n      :confirm-btn=\"actionButtonProps('submit', '提交', '确认')\"\n      :cancel-btn=\"cancelButtonProps('取消')\"\n      @confirm=\"handleSubmit\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "          />\n          <t-button theme=\"primary\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n",
-          "after": "          />\n          <t-button :theme=\"buttonTheme('create')\" @click=\"handleAddOption\">\n            <template #icon><t-icon name=\"add\" /></template>\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "            <t-link\n              :theme=\"row.status === 'normal' ? 'warning' : 'success'\"\n              hover=\"color\"\n",
-          "after": "            <t-link\n              :theme=\"buttonTheme(row.status === 'normal' ? 'disable' : 'enable')\"\n              hover=\"color\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "      v-model:visible=\"confirmDialogVisible\"\n      :action=\"confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'\"\n",
-          "after": "      v-model:visible=\"confirmDialogVisible\"\n      :function=\"buttonFunctionFor('status', confirmState.type)\"\n      :action=\"confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'\"\n"
-        },
-        {
-          "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
-          "stage": "before-migrations",
-          "before": "<script setup lang=\"ts\">\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
-          "after": "<script setup lang=\"ts\">\nimport {\n  buttonTheme,\n  buttonFunctionFor,\n  actionButtonProps,\n  cancelButtonProps,\n} from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n"
         }
       ]
     },
@@ -3525,6 +3143,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "class=\"page\"",
+          "after": "class=\"page zdm-admin-responsive-page\""
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -4269,6 +3893,21 @@
       "template": "a62d729be2ab3ea4325042db4d4d1580bb55bdf2cb7afb78e827f86d0f7f4dea",
       "approvedVisualPatches": [
         {
+          "reason": "2026-10-22 overlay defect repair: move unchanged native media dialogs after their log parent so official masks and close controls are topmost; preserve every prop, event, script byte and content layout.",
+          "before": "    </ProductOperationLogTemplate>",
+          "after": "    </ProductOperationLogTemplate>\n    <AdminDialog\n      :visible=\"Boolean(logVideoPreview)\"\n      header=\"商品视频\"\n      width=\"min(960px, 94vw)\"\n      :cancel-btn=\"null\"\n      confirm-btn=\"关闭\"\n      @confirm=\"logVideoPreview = null\"\n      @close=\"logVideoPreview = null\"\n      @update:visible=\"!$event && (logVideoPreview = null)\"\n    >\n      <video v-if=\"logVideoPreview\" :src=\"logVideoPreview\" controls autoplay playsinline class=\"log-video-preview\" />\n    </AdminDialog>\n    <AdminDialog\n      :visible=\"Boolean(imagePreview)\"\n      header=\"商品主图\"\n      width=\"min(960px, 94vw)\"\n      :footer=\"false\"\n      @close=\"imagePreview = null\"\n      @update:visible=\"!$event && (imagePreview = null)\"\n    >\n      <img v-if=\"imagePreview\" :src=\"imagePreview\" alt=\"商品主图\" style=\"max-width: 100%\" />\n    </AdminDialog>"
+        },
+        {
+          "reason": "2026-10-22 overlay defect repair: move unchanged native media dialogs after their log parent so official masks and close controls are topmost; preserve every prop, event, script byte and content layout.",
+          "before": "\n\n    <AdminDialog\n      :visible=\"Boolean(logVideoPreview)\"\n      header=\"商品视频\"\n      width=\"min(960px, 94vw)\"\n      :cancel-btn=\"null\"\n      confirm-btn=\"关闭\"\n      @confirm=\"logVideoPreview = null\"\n      @close=\"logVideoPreview = null\"\n      @update:visible=\"!$event && (logVideoPreview = null)\"\n    >\n      <video v-if=\"logVideoPreview\" :src=\"logVideoPreview\" controls autoplay playsinline class=\"log-video-preview\" />\n    </AdminDialog>\n    <t-drawer v-model:visible=\"detailVisible\"",
+          "after": "\n\n    <t-drawer v-model:visible=\"detailVisible\""
+        },
+        {
+          "reason": "2026-10-22 overlay defect repair: move unchanged native media dialogs after their log parent so official masks and close controls are topmost; preserve every prop, event, script byte and content layout.",
+          "before": "\n\n    <AdminDialog\n      :visible=\"Boolean(imagePreview)\"\n      header=\"商品主图\"\n      width=\"min(960px, 94vw)\"\n      :footer=\"false\"\n      @close=\"imagePreview = null\"\n      @update:visible=\"!$event && (imagePreview = null)\"\n    >\n      <img v-if=\"imagePreview\" :src=\"imagePreview\" alt=\"商品主图\" style=\"max-width: 100%\" />\n    </AdminDialog>\n\n    <AdminDialog\n      v-model:visible=\"offShelfVisible\"",
+          "after": "\n\n    <AdminDialog\n      v-model:visible=\"offShelfVisible\""
+        },
+        {
           "reason": "User approved purely visual native warning theme; preserve action IDs, labels, disabled states, permissions and handlers.",
           "before": ":theme=\"action.theme\"",
           "after": ":theme=\"action.className === 'brown-button' ? 'warning' : action.theme\""
@@ -4392,6 +4031,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "class=\"page\"",
+          "after": "class=\"page zdm-admin-responsive-page\""
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved standard pagination spacing for 12 routed regions; presentation only, preserving all scripts, table props and pagination events.",
+          "before": "        <t-table row-key=\"id\" :data=\"poolPageRows\" :columns=\"poolColumns\" hover>\n          <template #poolSelectTitle>\n            <t-checkbox\n              :checked=\"poolPageAllSelected\"\n              :indeterminate=\"poolPagePartlySelected\"\n              :disabled=\"!poolPageRows.length\"\n              @change=\"togglePoolPage\"\n            />\n          </template>\n          <template #select=\"{ row }\"\n            ><t-checkbox\n              :checked=\"poolSelected.includes(row.id)\"\n              @change=\"\n                (checked: boolean) =>\n                  (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))\n              \"\n          /></template>\n          <template #imageUrl=\"{ row }\"\n            ><t-image\n              v-if=\"row.imageUrl\"\n              :src=\"row.imageUrl\"\n              fit=\"cover\"\n              :style=\"{ width: '48px', height: '48px' }\"\n              @click=\"imagePreview = row.imageUrl\"\n          /></template>\n          <template #product=\"{ row }\"\n            >{{ row.name }}\n            <div>ID：{{ row.id }}</div></template\n          >\n          <template #guidePrice=\"{ row }\">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>\n          <template #partnerPrice=\"{ row }\">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>\n          <template #operation=\"{ row }\"\n            ><t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"openPoolDetail(row)\">详情</t-link></template\n          >\n          <template #empty>暂无可挑选的已上架商品</template>\n        </t-table>\n        <AdminPagination\n          :current=\"poolPage\"\n          :page-size=\"poolPageSize\"\n          :total=\"filteredPool.length\"\n          :page-size-options=\"[10, 20, 50]\"\n          @update:current=\"poolPage = $event\"\n          @update:page-size=\"poolPageSize = $event\"\n        />",
+          "after": "        <div>\n          <t-table row-key=\"id\" :data=\"poolPageRows\" :columns=\"poolColumns\" hover>\n            <template #poolSelectTitle>\n              <t-checkbox\n                :checked=\"poolPageAllSelected\"\n                :indeterminate=\"poolPagePartlySelected\"\n                :disabled=\"!poolPageRows.length\"\n                @change=\"togglePoolPage\"\n              />\n            </template>\n            <template #select=\"{ row }\"\n              ><t-checkbox\n                :checked=\"poolSelected.includes(row.id)\"\n                @change=\"\n                  (checked: boolean) =>\n                    (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))\n                \"\n            /></template>\n            <template #imageUrl=\"{ row }\"\n              ><t-image\n                v-if=\"row.imageUrl\"\n                :src=\"row.imageUrl\"\n                fit=\"cover\"\n                :style=\"{ width: '48px', height: '48px' }\"\n                @click=\"imagePreview = row.imageUrl\"\n            /></template>\n            <template #product=\"{ row }\"\n              >{{ row.name }}\n              <div>ID：{{ row.id }}</div></template\n            >\n            <template #guidePrice=\"{ row }\">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>\n            <template #partnerPrice=\"{ row }\">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>\n            <template #operation=\"{ row }\"\n              ><t-link hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"openPoolDetail(row)\">详情</t-link></template\n            >\n            <template #empty>暂无可挑选的已上架商品</template>\n          </t-table>\n          <AdminPagination\n            :current=\"poolPage\"\n            :page-size=\"poolPageSize\"\n            :total=\"filteredPool.length\"\n            :page-size-options=\"[10, 20, 50]\"\n            @update:current=\"poolPage = $event\"\n            @update:page-size=\"poolPageSize = $event\"\n          />\n        </div>"
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -4614,6 +4265,12 @@
       "script": "75d9397a56222144493f74c7f20438b35f39edbce7d3ff0dd146f92645e4a435",
       "template": "ebb4878bc7f0fc8b0b22a500a07cfd0d164e2544418482624da67cf5bf2285d3",
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved all query-region overflow repairs; reuse shared narrow workspace layout while preserving desktop, events, fields and business logic.",
+          "before": "class=\"price-workspace\"",
+          "after": "class=\"price-workspace zdm-admin-responsive-panels\""
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
@@ -5469,6 +5126,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "class=\"page\"",
+          "after": "class=\"page zdm-admin-responsive-page\""
+        },
+        {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
           "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
@@ -6078,6 +5741,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "class=\"page\"",
+          "after": "class=\"page zdm-admin-responsive-page\""
+        },
+        {
           "reason": "2026-10-19 用户要求全平台编辑保存成功Toast统一修改成功；仅将既有保存成功提示接入全局修改动作映射，权限、请求、触发、草稿自动保存、失败反馈和其他操作话术不变。",
           "stage": "before-migrations",
           "before": "adminFeedback.success('终端功能分配已保存');",
@@ -6629,6 +6298,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "<t-drawer v-model:visible=\"historyVisible\" header=\"版本记录\" size=\"760px\" :footer=\"false\">",
+          "after": "<t-drawer\n      v-model:visible=\"historyVisible\"\n      class=\"zdm-admin-responsive-drawer\"\n      header=\"版本记录\"\n      size=\"760px\"\n      :footer=\"false\"\n    >"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved browser-proven narrow pagination overflow repair; stack the split panels only on narrow screens without changing business bindings or desktop layout.",
+          "before": "class=\"version-layout\"",
+          "after": "class=\"version-layout zdm-admin-responsive-panels\""
+        },
         {
           "reason": "2026-10-19 用户要求全平台编辑保存成功Toast统一修改成功；仅将既有保存成功提示接入全局修改动作映射，权限、请求、触发、草稿自动保存、失败反馈和其他操作话术不变。",
           "stage": "before-migrations",
@@ -7196,6 +6877,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "header=\"色系分类管理\"",
+          "after": "header=\"色系分类管理\"\n      dialog-class-name=\"zdm-admin-responsive-dialog\""
+        },
+        {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
           "before": "          </t-select>\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </AdminDialog>\n",
@@ -7564,6 +7251,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "header=\"历史下架原因\"",
+          "after": "header=\"历史下架原因\"\n      dialog-class-name=\"zdm-admin-responsive-dialog\""
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -8308,6 +8001,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
+          "before": "header=\"历史下架原因\"",
+          "after": "header=\"历史下架原因\"\n      dialog-class-name=\"zdm-admin-responsive-dialog\""
+        },
+        {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
           "before": "          </t-select>\n        </t-form-item>\n        <t-form-item name=\"detail\" label=\"详细说明\">\n          <t-textarea\n            v-model=\"reasonForm.detail\"\n            :maxlength=\"100\"\n            placeholder=\"请输入详细说明\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
@@ -8939,6 +8638,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved reusing public pagination styles and removing legacy style hooks only; all business props and handlers retained.",
+          "before": "class=\"pagination-bar zdm-admin-pagination\"",
+          "after": "class=\"zdm-admin-pagination\""
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved standard pagination spacing for 12 routed regions; presentation only, preserving all scripts, table props and pagination events.",
+          "before": "          <div class=\"pagination-bar\">",
+          "after": "          <div class=\"pagination-bar zdm-admin-pagination\">"
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -9978,6 +9689,14 @@
           "after": "      path: '/product-attribute',\n      name: 'productAttribute',\n      component: () => import('@/pages/product/attribute/index.vue'),\n    },\n    {\n      path: '/slab-variety',\n",
           "reason": "User explicitly requested complete measurement-unit module retirement, including its page, route, service and sidebar residue, preserving all other modules."
         }
+      ],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "      name: 'storeCustomerManagement',\n      component: () => import('@/pages/customer/index.vue'),\n    },\n    {\n      path: '/store/price-configuration',\n      name: 'storeFinishedPriceConfiguration',\n",
+          "after": "      name: 'storeCustomerManagement',\n      component: () => import('@/pages/customer/index.vue'),\n    },\n    { path: '/store/order-management', redirect: '/store/order-management/sales' },\n    ...(['sales', 'fulfillment', 'settings'] as const).map((part) => ({\n      path: `/store/order-management/${part}`,\n      name: `storeOrder-${part}`,\n      component: () => import('@/pages/order/prototype/index.vue'),\n      meta: { permissionPrefix: `store.order-management.${part}` },\n    })),\n    {\n      path: '/store/price-configuration',\n      name: 'storeFinishedPriceConfiguration',\n"
+        }
       ]
     },
     "src/services/adminPermissions.test.ts": {
@@ -9986,7 +9705,57 @@
     },
     "src/services/adminPermissions.ts": {
       "content": "7e7603f317a8814cb9c6872c2d0bb220ee7d034c8bdb4a2655e2ffb9f4e48edf",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "用户要求移除渠道配置并将菜单更名为款项配置，保留款项名称权限编码和菜单路径。",
+          "stage": "before-migrations",
+          "before": "        label: '收退款配置',\n        path: '/store/order-management/settings',\n",
+          "after": "        label: '款项配置',\n        path: '/store/order-management/settings',\n"
+        },
+        {
+          "reason": "用户明确要求将订单配置菜单更名为收退款配置，路径及权限编码保持不变。",
+          "stage": "before-migrations",
+          "before": "        label: '订单配置',\n        path: '/store/order-management/settings',\n",
+          "after": "        label: '收退款配置',\n        path: '/store/order-management/settings',\n"
+        },
+        {
+          "reason": "用户要求订单管理使用订单单据样式图标，采用当前组件库官方 assignment 图标，仅修改该菜单图标。",
+          "stage": "before-migrations",
+          "before": "    value: 'store-order-management',\n    icon: 'order-adjustment',\n    children: [\n",
+          "after": "    value: 'store-order-management',\n    icon: 'assignment',\n    children: [\n"
+        },
+        {
+          "reason": "用户明确批准仅5175本机订单原型开发预览向门店身份开放模拟菜单及操作；不修改真实权限或其他模块。",
+          "stage": "before-migrations",
+          "before": "import { getUserFunctionAudience, isFunctionAllowedForAudience } from './functionAudience';\nimport type { LoginUser } from './auth';\n\n",
+          "after": "import { canPreviewStoreOrders } from './orderPrototypePreview';\nimport { getUserFunctionAudience, isFunctionAllowedForAudience } from './functionAudience';\nimport type { LoginUser } from './auth';\n\n"
+        },
+        {
+          "reason": "用户明确批准仅5175本机订单原型开发预览向门店身份开放模拟菜单及操作；不修改真实权限或其他模块。",
+          "stage": "before-migrations",
+          "before": "}\n\nexport function hasPermission(user: LoginUser, permission: string) {\n  if (!isFunctionAllowedForAudience(permission, getUserFunctionAudience(user))) return false;\n  return (\n    isSuperAdmin(user) ||\n",
+          "after": "}\n\nexport function hasPermission(user: LoginUser, permission: string) {\n  if (canPreviewStoreOrders(user, permission)) return true;\n  if (!isFunctionAllowedForAudience(permission, getUserFunctionAudience(user))) return false;\n  return (\n    isSuperAdmin(user) ||\n"
+        },
+        {
+          "reason": "用户明确批准仅5175本机订单原型开发预览向门店身份开放模拟菜单及操作；不修改真实权限或其他模块。",
+          "stage": "before-migrations",
+          "before": "}\n\nexport function hasPermissionPrefix(user: LoginUser, prefix?: string) {\n  if (!prefix) return true;\n  if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;\n  if (isSuperAdmin(user) || user.permissions.includes('all')) return true;\n",
+          "after": "}\n\nexport function hasPermissionPrefix(user: LoginUser, prefix?: string) {\n  if (canPreviewStoreOrders(user, prefix)) return true;\n  if (!prefix) return true;\n  if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;\n  if (isSuperAdmin(user) || user.permissions.includes('all')) return true;\n"
+        },
+        {
+          "reason": "用户明确批准仅5175本机订单原型开发预览向门店身份开放模拟菜单及操作；不修改真实权限或其他模块。",
+          "stage": "before-migrations",
+          "before": "}\n\nexport function hasMenuPermission(user: LoginUser, prefix?: string) {\n  if (prefix === 'admin.permission-management.terminal-function-allocation') return isPlatformSuperAdmin(user);\n  if (!prefix) return isSuperAdmin(user) || user.permissions.includes('all');\n  if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;\n",
+          "after": "}\n\nexport function hasMenuPermission(user: LoginUser, prefix?: string) {\n  if (canPreviewStoreOrders(user, prefix)) return true;\n  if (prefix === 'admin.permission-management.terminal-function-allocation') return isPlatformSuperAdmin(user);\n  if (!prefix) return isSuperAdmin(user) || user.permissions.includes('all');\n  if (!isFunctionAllowedForAudience(prefix, getUserFunctionAudience(user))) return false;\n"
+        },
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '价格配置',\n",
+          "after": "    path: '/store/customer-management',\n    icon: 'address-book',\n    permissionPrefix: 'store.customer-management',\n  },\n  {\n    label: '订单管理',\n    value: 'store-order-management',\n    icon: 'order-adjustment',\n    children: [\n      { label: '销售订单', path: '/store/order-management/sales', permissionPrefix: 'store.order-management.sales' },\n      {\n        label: '履约任务',\n        path: '/store/order-management/fulfillment',\n        permissionPrefix: 'store.order-management.fulfillment',\n      },\n      {\n        label: '订单配置',\n        path: '/store/order-management/settings',\n        permissionPrefix: 'store.order-management.settings',\n      },\n    ],\n  },\n  {\n    label: '价格配置',\n"
+        }
+      ]
     },
     "src/services/auth.ts": {
       "content": "134279d1224efab5afba09d5036dd764dca7e8962ccf694c9a74cb736b212263",
@@ -10108,12 +9877,32 @@
     },
     "src/services/functionAudience.ts": {
       "content": "72a32d99048b4e9a37151a2267c98a9803a164c9b11ec80e5df89b2497db3068",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "\nexport function isFunctionAllowedForAudience(permission: string, audience: string) {\n  if (!['admin', 'store', 'supplier', 'supply-chain'].includes(audience)) return false;\n  const rule = rules\n    .filter(({ prefix }) => permission === prefix || permission.startsWith(`${prefix}.`))\n    .sort((a, b) => b.prefix.length - a.prefix.length)[0];\n",
+          "after": "\nexport function isFunctionAllowedForAudience(permission: string, audience: string) {\n  if (!['admin', 'store', 'supplier', 'supply-chain'].includes(audience)) return false;\n  // Front-end prototype only; backend authorization is not changed.\n  if (permission === 'store.order-management' || permission.startsWith('store.order-management.'))\n    return audience === 'store';\n  const rule = rules\n    .filter(({ prefix }) => permission === prefix || permission.startsWith(`${prefix}.`))\n    .sort((a, b) => b.prefix.length - a.prefix.length)[0];\n"
+        }
+      ]
     },
     "src/services/functionCatalog.test.ts": {
       "content": "74ccb48297c3d1c6b680750b1e260a63db93b4fe16c97d1d9001ae759868ac67",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n      'admin.supplier-supply-type-management',\n",
+          "after": "      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n      'admin.supplier-supply-type-management',\n"
+        },
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n",
+          "after": "    expect(terminalFunctionTrees.store.map((module) => module.value)).toEqual([\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.supplier-management',\n      'admin.tenant.store-category-management',\n"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-19 user authorized native right-side customer drawer and standalone list followup after detail in both customer tabs, with matching full catalog. User explicitly declined automatic permission grants; preserve organization, data scope and existing record edit/delete.",
@@ -10130,7 +9919,27 @@
     },
     "src/services/functionCatalog.ts": {
       "content": "1209bc105a9465acd24974c6fd642993f1463bc39659f30d418a2eae55f6f190",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "import { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n",
+          "after": "import { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n"
+        },
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "  'admin.tenant',\n  'store.finished-stock-management',\n  'store.customer-management',\n  'store.price-configuration',\n  'admin.product-data-center',\n  'admin.supplier-supply-type-management',\n",
+          "after": "  'admin.tenant',\n  'store.finished-stock-management',\n  'store.customer-management',\n  'store.order-management',\n  'store.price-configuration',\n  'admin.product-data-center',\n  'admin.supplier-supply-type-management',\n"
+        },
+        {
+          "reason": "2026-10-21 用户明确批准登记门店订单前端原型的菜单、路由、终端范围及功能目录变更；仅此模块，不变更其他模块业务、后端权限或真实授权。",
+          "stage": "before-migrations",
+          "before": "        storeLevelModule,\n        storeFinishedStock,\n        storeCustomerManagement,\n        storePriceConfiguration,\n        ...verifiedFunctionCatalog,\n        supplyChainProducts,\n",
+          "after": "        storeLevelModule,\n        storeFinishedStock,\n        storeCustomerManagement,\n        storeOrderPrototype,\n        storePriceConfiguration,\n        ...verifiedFunctionCatalog,\n        supplyChainProducts,\n"
+        }
+      ]
     },
     "src/services/functionCatalogAdminData.ts": {
       "content": "f9b8d99e939bd6e5da1ee6e529b82ad8e6c2d5e1ec028d4277dcc1ec301d057a",
@@ -10355,14 +10164,37 @@
           "stage": "before-migrations"
         }
       ]
+    },
+    "src/pages/order/prototype/SalesOrderList.vue": {
+      "script": "de6698c6499ced6f85b369eb6af1aaf4e5c8360e3a56a211513d6da09f3d4365",
+      "template": "b8604377a6041b26fae4a771ebeac40b25e90c26a5f07936f09fd6a59b735c54",
+      "reason": "2026-10-21 用户明确指定「分区摘要卡片」原图（exec-36b11d81-a9a5-4237-89d4-0168e81f9332.png）作为唯一参照，要求右侧全部细节1:1还原；顶部和左侧不动。",
+      "approvedPlaceholders": [
+        {
+          "control": "order-filter-select",
+          "tag": "t-select",
+          "text": "请选择",
+          "reason": "2026-10-21 用户明确指定「分区摘要卡片」原图（exec-36b11d81-a9a5-4237-89d4-0168e81f9332.png）作为唯一参照，要求右侧全部细节1:1还原；顶部和左侧不动。"
+        },
+        {
+          "control": "order-filter-dates",
+          "tag": "t-date-range-picker",
+          "expression": "['开始日期', '结束日期']",
+          "reason": "2026-10-21 用户明确指定「分区摘要卡片」原图（exec-36b11d81-a9a5-4237-89d4-0168e81f9332.png）作为唯一参照，要求右侧全部细节1:1还原；顶部和左侧不动。"
+        }
+      ],
+      "designReference": "store-order-partition-card-2026-10-21",
+      "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 user approved reusing public pagination styles and removing legacy style hooks only; all business props and handlers retained.",
+          "before": "class=\"order-pagination\"",
+          "after": "class=\"zdm-admin-pagination\""
+        }
+      ]
     }
   },
   "modules": [
-    {
-      "file": "src/pages/accessory/attribute/index.vue",
-      "status": "implemented-pending-final-validation",
-      "visualRoute": "official token/component styles; business script and template contract frozen"
-    },
     {
       "file": "src/pages/craft/finished-stock/index.vue",
       "status": "implemented-pending-final-validation",
@@ -10380,11 +10212,6 @@
     },
     {
       "file": "src/pages/employee-invite/index.vue",
-      "status": "implemented-pending-final-validation",
-      "visualRoute": "official token/component styles; business script and template contract frozen"
-    },
-    {
-      "file": "src/pages/finished-stock/attribute/index.vue",
       "status": "implemented-pending-final-validation",
       "visualRoute": "official token/component styles; business script and template contract frozen"
     },

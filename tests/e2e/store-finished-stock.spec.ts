@@ -183,9 +183,24 @@ for (const displayMode of ['single', 'layered'] as const) {
     const keyword = dialog.getByPlaceholder('请输入商品名称/ID');
     const search = dialog.getByRole('button', { name: '查询', exact: true });
     const reset = dialog.getByRole('button', { name: '重置', exact: true });
-    const initialInputWidth = await keyword.evaluate((element) => element.clientWidth);
+    // A native clear button consumes space inside the input after text is entered.
+    // The control boundary must stay fixed; its internal text area may shrink.
+    const controlBounds = () =>
+      keyword.evaluate((element) => {
+        const { x, width } = element.closest('.t-input')!.getBoundingClientRect();
+        return { x, width };
+      });
+    await dialog.evaluate((element) =>
+      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
+    const initialInputBounds = await controlBounds();
     await keyword.fill('用于检查宽度是否稳定的很长商品名称或商品ID1234567890');
-    expect(await keyword.evaluate((element) => element.clientWidth)).toBe(initialInputWidth);
+    expect(await controlBounds()).toEqual(initialInputBounds);
+    await expect(keyword).toHaveValue('用于检查宽度是否稳定的很长商品名称或商品ID1234567890');
+    await keyword.locator('xpath=ancestor::div[contains(@class,"t-input")][1]').hover();
+    await dialog.locator('.t-input__suffix-clear').first().click();
+    await expect(keyword).toHaveValue('');
+    expect(await controlBounds()).toEqual(initialInputBounds);
     await expect
       .poll(async () => {
         const tableBox = (await dialog.locator('.t-table').boundingBox())!;

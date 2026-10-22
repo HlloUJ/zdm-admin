@@ -580,10 +580,6 @@
   margin-bottom: 16px;
 }
 
-:deep(.t-drawer) {
-  max-width: calc(100vw - 32px);
-}
-
 .drawer-head div {
   display: grid;
   gap: 4px;

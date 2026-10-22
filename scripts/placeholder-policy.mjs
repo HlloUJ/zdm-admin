@@ -1,5 +1,6 @@
 import { parse as parseSfc } from '@vue/compiler-sfc';
 import { parse } from '@vue/compiler-dom';
+import visualApprovals from '../docs/ui/visual-refactor.json' with { type: 'json' };
 
 const inputTags = new Set([
   't-input',
@@ -72,7 +73,22 @@ export function placeholderViolations(file, source, { includeCompositeSelects = 
           valid =
             (text?.startsWith(prefix) && text.length > prefix.length) ||
             /^controlPlaceholder\(.+, '(input|select)'\)$/u.test(expression ?? '');
-        if (!valid) violations.push(`${file}:${node.loc.start.line}: ${node.tag} placeholder must follow its title`);
+        // Exact controls from an explicitly approved reference image only. The
+        // ordinary title rules remain unchanged for every other control/file.
+        const control = attr(node, 'data-design-control')?.value?.content;
+        const exception =
+          control &&
+          visualApprovals.approvedVisualFiles.includes(file) &&
+          visualApprovals.contracts[file]?.approvedPlaceholders?.find(
+            (entry) =>
+              entry.control === control &&
+              entry.tag === node.tag &&
+              entry.reason?.trim() &&
+              ((entry.text !== undefined && text === entry.text && !expression) ||
+                (entry.expression !== undefined && expression === entry.expression && !text)),
+          );
+        if (!valid && !exception)
+          violations.push(`${file}:${node.loc.start.line}: ${node.tag} placeholder must follow its title`);
       }
     }
     for (const child of node.children ?? []) walk(child, [...ancestors, node]);

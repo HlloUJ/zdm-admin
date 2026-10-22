@@ -6,13 +6,11 @@
 
 | 文件／字段                                                             | 原上限     | 原错误来源                       | 本轮处理                                      |
 | ---------------------------------------------------------------------- | ---------- | -------------------------------- | --------------------------------------------- |
-| `src/pages/accessory/attribute/index.vue`／`formData.remark`           | 100        | Form原生rules                    | 100字符／框内统计；原规则与错误展示保持       |
 | `src/pages/craft/finished-stock/index.vue`／`formData.remark`          | 100        | 无独立字段错误文案链路（可编辑） | 100字符／框内统计；不新增独立错误校验         |
 | `src/pages/customer/index.vue`／`profile.requirement`                  | 100        | 无独立字段错误文案链路（可编辑） | 100字符／框内统计；不新增独立错误校验         |
 | `src/pages/customer/index.vue`／`profile.remark`                       | 100        | 无独立字段错误文案链路（可编辑） | 100字符／框内统计；不新增独立错误校验         |
 | `src/pages/customer/index.vue`／`followForm.content`                   | 100        | 既有手工反馈                     | 100字符／框内统计；保留status／tips及空白占位 |
 | `src/pages/customer/index.vue`／`followForm.nextFollowTask`            | 100        | 无独立字段错误文案链路（可编辑） | 100字符／框内统计；不新增独立错误校验         |
-| `src/pages/finished-stock/attribute/index.vue`／`formData.remark`      | 100        | Form原生rules                    | 100字符／框内统计；原规则与错误展示保持       |
 | `src/pages/finished-stock/management/index.vue`／`reasonForm.detail`   | 无明确上限 | 无独立字段错误文案链路（可编辑） | 100字符／框内统计；不新增独立错误校验         |
 | `src/pages/finished-stock/store/index.vue`／`offShelf.detail`          | 500        | 无独立字段错误文案链路（可编辑） | 100字符／框内统计；不新增独立错误校验         |
 | `src/pages/finished-stock/supply-chain/index.vue`／`reasonForm.detail` | 无明确上限 | 无独立字段错误文案链路（可编辑） | 100字符／框内统计；不新增独立错误校验         |
@@ -61,3 +59,7 @@
 - 专项自动化62项通过，覆盖桌面／窄屏增高、删除后收缩、无手动拖动、超过6行仍完整显示、统计防遮挡、历史长值、错误稳定及客户保存。
 - 完整前端E2E共470项通过，零跳过、零重试；变更源码守卫、类型、ESLint、Stylelint及相关单元测试全部通过。
 - 未涉及后端或运行配置，本轮未执行后端测试；预览未重启或切换。
+
+## 历史页面清理（2026-10-22）
+
+按确认删除两个无业务入口的旧属性页面，表内同步移除它们的两处字段登记。上文日期对应的统计与验收数量保留为历史记录，不代表清理后的现存字段数量；其他多行文本规则与实现未改变。

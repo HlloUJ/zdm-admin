@@ -1311,7 +1311,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   for (const terminal of ['城市合伙人门店管理后台', '大板供应商门店管理后台']) {
     await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
     await expect(moduleList.locator('.permission-module-item > span:first-child')).toHaveText([
-      ...(terminal === '城市合伙人门店管理后台' ? ['成品现货管理', '客户管理', '价格配置'] : []),
+      ...(terminal === '城市合伙人门店管理后台' ? ['成品现货管理', '客户管理', '订单管理', '价格配置'] : []),
       '供应商管理',
       '门店分类管理',
       '权限管理',

@@ -63,6 +63,13 @@ const router = createRouter({
       name: 'storeCustomerManagement',
       component: () => import('@/pages/customer/index.vue'),
     },
+    { path: '/store/order-management', redirect: '/store/order-management/sales' },
+    ...(['sales', 'fulfillment', 'settings'] as const).map((part) => ({
+      path: `/store/order-management/${part}`,
+      name: `storeOrder-${part}`,
+      component: () => import('@/pages/order/prototype/index.vue'),
+      meta: { permissionPrefix: `store.order-management.${part}` },
+    })),
     {
       path: '/store/price-configuration',
       name: 'storeFinishedPriceConfiguration',
