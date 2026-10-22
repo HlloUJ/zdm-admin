@@ -178,7 +178,8 @@ public class ProductAttributeService extends CreatorAwareService<ProductAttribut
         query,
         Long.class,
         attributeId);
-    return count == null ? 0 : count;
+    Long accessoryCount = jdbcTemplate.queryForObject(query.replace("finished_product_attribute_entries", "accessory_product_attribute_entries").replace("finished_products", "accessory_products").replace("finished_product_id", "accessory_product_id"), Long.class, attributeId);
+    return (count == null ? 0 : count) + (accessoryCount == null ? 0 : accessoryCount);
   }
 
   private ProductAttribute requireAttribute(Long id) {

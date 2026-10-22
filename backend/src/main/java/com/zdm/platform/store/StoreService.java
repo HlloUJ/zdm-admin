@@ -172,6 +172,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
           AND (
             EXISTS (SELECT 1 FROM slab_inventory slab WHERE slab.supplier_id = supplier.id)
             OR EXISTS (SELECT 1 FROM finished_products product WHERE product.supplier_id = supplier.id)
+            OR EXISTS (SELECT 1 FROM accessory_products product WHERE product.supplier_id = supplier.id)
           )
         """,
         Integer.class,

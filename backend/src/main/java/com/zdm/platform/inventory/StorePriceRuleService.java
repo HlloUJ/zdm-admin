@@ -16,6 +16,8 @@ public class StorePriceRuleService {
   public record CategoryOption(Long id, Long parentId, String scope, String name, String status) {}
   public record RoleOption(Long id, String name, String status) {}
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.inventory.StoreAccessorySalePriceService accessorySalePrices;
   private final JdbcTemplate jdbc;
   private final CityPartnerStoreScope scopes;
   private final StoreFinishedSalePriceService salePrices;
@@ -156,6 +158,7 @@ public class StorePriceRuleService {
     requireType("price", scope);
     var store = scopes.require();
     if ("finished".equals(scope)) { salePrices.lockCategories(store.storeId()); }
+    if ("accessory".equals(scope)) { accessorySalePrices.lockCategories(store.storeId()); }
     validateCoefficient("price", coefficient);
     validateTargets("price", scope, targetIds);
     var arguments = targetIds.stream().map(id -> new Object[] {store.tenantId(), store.storeId(), "price",
@@ -173,8 +176,10 @@ public class StorePriceRuleService {
     requireType("price", scope);
     var store = scopes.require();
     if ("finished".equals(scope)) { salePrices.lockCategories(store.storeId()); }
+    if ("accessory".equals(scope)) { accessorySalePrices.lockCategories(store.storeId()); }
     validateTargets("price", scope, targetIds);
     if ("finished".equals(scope)) { salePrices.freezeCategories(store.storeId(), targetIds); }
+    if ("accessory".equals(scope)) { accessorySalePrices.freezeCategories(store.storeId(), targetIds); }
     var arguments = targetIds.stream()
         .map(id -> new Object[] {store.tenantId(), store.storeId(), scope, id}).toList();
     jdbc.batchUpdate("""
@@ -191,6 +196,7 @@ public class StorePriceRuleService {
     requireType("price", scope);
     var store = scopes.require();
     if ("finished".equals(scope)) { salePrices.lockCategories(store.storeId()); }
+    if ("accessory".equals(scope)) { accessorySalePrices.lockCategories(store.storeId()); }
     if (changes == null || changes.stream().anyMatch(Objects::isNull)) {
       throw new IllegalArgumentException("请选择需要保存的分类");
     }
@@ -214,6 +220,9 @@ public class StorePriceRuleService {
     }
     if ("finished".equals(scope)) {
       salePrices.freezeCategories(store.storeId(), changes.stream().filter(change -> change.coefficient() == null).map(PriceChange::categoryId).toList());
+    }
+    if ("accessory".equals(scope)) {
+      accessorySalePrices.freezeCategories(store.storeId(), changes.stream().filter(change -> change.coefficient() == null).map(PriceChange::categoryId).toList());
     }
     var clears = changes.stream().filter(change -> change.coefficient() == null)
         .map(change -> new Object[] {store.tenantId(), store.storeId(), scope, change.categoryId()}).toList();

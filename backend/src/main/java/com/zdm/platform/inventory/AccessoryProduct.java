@@ -1,0 +1,277 @@
+package com.zdm.platform.inventory;
+
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.zdm.platform.common.BaseEntity;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import java.math.BigDecimal;
+import java.util.List;
+
+@TableName(value = "accessory_products", autoResultMap = true)
+public class AccessoryProduct extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned, StateActivityAware {
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private java.time.LocalDateTime stateOperatedAt;
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String stateOperatorName;
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String stateOperatorClientCode;
+  public java.time.LocalDateTime getStateOperatedAt() { return stateOperatedAt; }
+  public void setStateOperatedAt(java.time.LocalDateTime value) { stateOperatedAt=value; }
+  public String getStateOperatorName() { return stateOperatorName; }
+  public void setStateOperatorName(String value) { stateOperatorName=value; }
+  public String getStateOperatorClientCode() { return stateOperatorClientCode; }
+  public void setStateOperatorClientCode(String value) { stateOperatorClientCode=value; }
+  @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+  private List<AccessorySpecDimension> specDimensions;
+
+  public List<AccessorySpecDimension> getSpecDimensions() {
+    return specDimensions == null ? null : List.copyOf(specDimensions);
+  }
+
+  public void setSpecDimensions(List<AccessorySpecDimension> value) {
+    specDimensions = value == null ? null : List.copyOf(value);
+  }
+
+
+  @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+  private java.util.Map<String, List<String>> attributeDisplayOrder;
+
+  public java.util.Map<String, List<String>> getAttributeDisplayOrder() {
+    return attributeDisplayOrder == null ? null : new java.util.LinkedHashMap<>(attributeDisplayOrder);
+  }
+  public void setAttributeDisplayOrder(java.util.Map<String, List<String>> value) {
+    attributeDisplayOrder = value == null ? null : new java.util.LinkedHashMap<>(value);
+  }
+
+  private String sourceOffShelfReason;
+  private String sourceOffShelfDetail;
+  private java.time.LocalDateTime sourceOffShelfAt;
+  public String getSourceOffShelfReason() { return sourceOffShelfReason; }
+  public void setSourceOffShelfReason(String value) { sourceOffShelfReason=value; }
+  public String getSourceOffShelfDetail() { return sourceOffShelfDetail; }
+  public void setSourceOffShelfDetail(String value) { sourceOffShelfDetail=value; }
+  public java.time.LocalDateTime getSourceOffShelfAt() { return sourceOffShelfAt; }
+  public void setSourceOffShelfAt(java.time.LocalDateTime value) { sourceOffShelfAt=value; }
+  private String sourceStatus = "warehouse";
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String sourceBlockReason;
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String operationsInvalidatedReason;
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String operationsInvalidatedSnapshot;
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public String getOperationsInvalidatedSnapshot() { return operationsInvalidatedSnapshot; }
+  public void setOperationsInvalidatedSnapshot(String value) { operationsInvalidatedSnapshot = value; }
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private java.time.LocalDateTime operationsInvalidatedAt;
+  public String getOperationsInvalidatedReason() { return operationsInvalidatedReason; }
+  public void setOperationsInvalidatedReason(String value) { operationsInvalidatedReason = value; }
+  public java.time.LocalDateTime getOperationsInvalidatedAt() { return operationsInvalidatedAt; }
+  public void setOperationsInvalidatedAt(java.time.LocalDateTime value) { operationsInvalidatedAt = value; }
+  private Boolean operationsDeleted = false;
+  public String getSourceStatus() { return sourceStatus; }
+  public void setSourceStatus(String value) { sourceStatus = value; }
+  public String getSourceBlockReason() { return sourceBlockReason; }
+  public void setSourceBlockReason(String value) { sourceBlockReason = value; }
+  public String getSourceMessage() { return AccessorySourceMessage.normalize(operationsInvalidatedReason != null ? operationsInvalidatedReason : AccessoryLifecycleService.sourceBlockMessage(sourceStatus, sourceBlockReason)); }
+  public Boolean getOperationsDeleted() { return operationsDeleted; }
+  public void setOperationsDeleted(Boolean value) { operationsDeleted = value; }
+  public boolean isSourceUnavailable() { return operationsInvalidatedReason != null || AccessoryLifecycleService.unavailable(sourceStatus); }
+
+  private Long categoryId;
+  private Long supplierId;
+
+  @NotBlank
+  private String name;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String sku;
+
+  /** @deprecated kept only for compatibility with pre-media rows. */
+  @Deprecated(forRemoval = false)
+  private String coverImage;
+  private Long mainImageMediaId;
+  private Long videoMediaId;
+
+  @TableField(exist = false)
+  private List<Long> mainImageMediaIds;
+
+  @TableField(exist = false)
+  private List<String> mainImageUrls;
+
+  @TableField(exist = false)
+  private String mainImageUrl;
+
+  @TableField(exist = false)
+  private String videoUrl;
+
+  private String detail;
+  private String publisherType;
+  private Integer totalStock;
+  private BigDecimal guidePrice;
+  @TableField(exist = false)
+  private String offShelfByName;
+  public String getOffShelfByName() { return offShelfByName; }
+  public void setOffShelfByName(String value) { offShelfByName = value; }
+
+  private String offShelfReason;
+  private java.time.LocalDateTime offShelfAt;
+  public java.time.LocalDateTime getOffShelfAt() { return offShelfAt; }
+  public void setOffShelfAt(java.time.LocalDateTime value) { this.offShelfAt = value; }
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String offShelfDetail;
+  public String getOffShelfDetail() { return offShelfDetail; }
+  public void setOffShelfDetail(String value) { this.offShelfDetail = value; }
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+  private String createdByName;
+  private Long createdByAccountId;
+
+  @Valid
+  @TableField(exist = false)
+  private List<AccessoryProductPrice> markupPrices;
+
+  @Valid
+  @TableField(exist = false)
+  private List<AccessoryProductGuidePrice> guidePrices;
+
+  @Valid
+  @TableField(exist = false)
+  private List<AccessoryProductAttributeEntry> attributes;
+
+  @Valid
+  @TableField(exist = false)
+  private List<AccessoryProductVariant> variants;
+
+  public Long getCategoryId() {
+    return categoryId;
+  }
+
+  public void setCategoryId(Long categoryId) {
+    this.categoryId = categoryId;
+  }
+
+  public Long getSupplierId() {
+    return supplierId;
+  }
+
+  public void setSupplierId(Long supplierId) {
+    this.supplierId = supplierId;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public String getSku() {
+    return sku;
+  }
+
+  public void setSku(String sku) {
+    this.sku = sku;
+  }
+
+  public String getCoverImage() {
+    return coverImage;
+  }
+
+  public void setCoverImage(String coverImage) {
+    this.coverImage = coverImage;
+  }
+
+  public Long getMainImageMediaId() { return mainImageMediaId; }
+  public void setMainImageMediaId(Long mainImageMediaId) { this.mainImageMediaId = mainImageMediaId; }
+  public List<Long> getMainImageMediaIds() {
+    return mainImageMediaIds == null ? null : new java.util.ArrayList<>(mainImageMediaIds);
+  }
+  public void setMainImageMediaIds(List<Long> mainImageMediaIds) {
+    this.mainImageMediaIds = mainImageMediaIds == null ? null : new java.util.ArrayList<>(mainImageMediaIds);
+  }
+  public List<String> getMainImageUrls() {
+    return mainImageUrls == null ? null : List.copyOf(mainImageUrls);
+  }
+  public void setMainImageUrls(List<String> mainImageUrls) {
+    this.mainImageUrls = mainImageUrls == null ? null : List.copyOf(mainImageUrls);
+  }
+  public Long getVideoMediaId() { return videoMediaId; }
+  public void setVideoMediaId(Long videoMediaId) { this.videoMediaId = videoMediaId; }
+  public String getMainImageUrl() { return mainImageUrl; }
+  public void setMainImageUrl(String mainImageUrl) { this.mainImageUrl = mainImageUrl; }
+  public String getVideoUrl() { return videoUrl; }
+  public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+  public String getDetail() { return detail; }
+  public void setDetail(String detail) { this.detail = detail; }
+
+  public String getPublisherType() {
+    return publisherType;
+  }
+
+  public void setPublisherType(String publisherType) {
+    this.publisherType = publisherType;
+  }
+
+  public Integer getTotalStock() {
+    return totalStock;
+  }
+
+  public void setTotalStock(Integer totalStock) {
+    this.totalStock = totalStock;
+  }
+
+  public BigDecimal getGuidePrice() {
+    return guidePrice;
+  }
+
+  public void setGuidePrice(BigDecimal guidePrice) {
+    this.guidePrice = guidePrice;
+  }
+
+  public String getOffShelfReason() { return offShelfReason; }
+  public void setOffShelfReason(String offShelfReason) { this.offShelfReason = offShelfReason; }
+  public String getCreatedByName() { return createdByName; }
+  public void setCreatedByName(String createdByName) { this.createdByName = createdByName; }
+  public Long getCreatedByAccountId() { return createdByAccountId; }
+  public void setCreatedByAccountId(Long createdByAccountId) { this.createdByAccountId = createdByAccountId; }
+
+  public List<AccessoryProductPrice> getMarkupPrices() {
+    return markupPrices == null ? null : List.copyOf(markupPrices);
+  }
+
+  public void setMarkupPrices(List<AccessoryProductPrice> markupPrices) {
+    this.markupPrices = markupPrices == null ? null : List.copyOf(markupPrices);
+  }
+
+  public List<AccessoryProductGuidePrice> getGuidePrices() {
+    return guidePrices == null ? null : List.copyOf(guidePrices);
+  }
+
+  public void setGuidePrices(List<AccessoryProductGuidePrice> guidePrices) {
+    this.guidePrices = guidePrices == null ? null : List.copyOf(guidePrices);
+  }
+
+  public List<AccessoryProductAttributeEntry> getAttributes() {
+    return attributes == null ? null : List.copyOf(attributes);
+  }
+
+  public void setAttributes(List<AccessoryProductAttributeEntry> attributes) {
+    this.attributes = attributes == null ? null : List.copyOf(attributes);
+  }
+
+  public List<AccessoryProductVariant> getVariants() {
+    return variants == null ? null : List.copyOf(variants);
+  }
+
+  public void setVariants(List<AccessoryProductVariant> variants) {
+    this.variants = variants == null ? null : List.copyOf(variants);
+  }
+}

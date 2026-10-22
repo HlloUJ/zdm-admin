@@ -130,18 +130,17 @@
   </section>
 </template>
 <script setup lang="ts">
+import { useCommodityModule } from '@/composables/useCommodityModule';
+const commodity = useCommodityModule();
+
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch, h } from 'vue';
 import type { FormInstanceFunctions, PrimaryTableCol } from 'tdesign-vue-next';
 import { AdminSectionCard, adminFeedback, getSafeErrorMessage } from '@/components/foundation';
-import {
-  listStoreFinishedEditCategories,
-  saveStoreFinishedEdit,
-  type StoreFinishedProduct,
-  type StoreFinishedEditCategory,
-} from '@/services/storeFinishedStock';
+import { type StoreFinishedProduct, type StoreFinishedEditCategory } from '@/services/storeFinishedStock';
+const { listStoreFinishedEditCategories, saveStoreFinishedEdit } = commodity.store;
 import StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';
 import SpecPriceInput from '../management/components/SpecPriceInput.vue';
 import PriceSourceToggle from '../management/components/PriceSourceToggle.vue';

@@ -74,6 +74,14 @@
                           >
                         </t-space>
                         <t-button
+                          v-if="editable"
+                          class="add-attribute"
+                          :theme="buttonTheme('create')"
+                          variant="outline"
+                          @click="openAdd"
+                          ><template #icon><t-icon name="add" /></template>添加属性</t-button
+                        >
+                        <t-button
                           v-if="can('create')"
                           :theme="buttonTheme('publish-version')"
                           class="publish-draft"
@@ -82,12 +90,11 @@
                           >发布新版本</t-button
                         >
                         <t-button
-                          v-if="editable"
-                          class="add-attribute"
-                          :theme="buttonTheme('create')"
-                          variant="outline"
-                          @click="openAdd"
-                          ><template #icon><t-icon name="add" /></template>添加属性</t-button
+                          v-if="can('create')"
+                          :theme="buttonTheme('delete')"
+                          :disabled="busy || loading"
+                          @click="discardTarget = selected"
+                          >删除草稿</t-button
                         >
                       </div>
                       <div v-if="!isDraft" class="version-toolbar">
@@ -325,6 +332,19 @@
       />
     </AdminDialog>
     <AdminConfirmDialog
+      function="delete"
+      action="删除"
+      :visible="!!discardTarget"
+      object-type="模板草稿"
+      :object-name="discardCategoryName"
+      :confirm-btn="{ loading: busy }"
+      :close-on-overlay-click="!busy"
+      :close-on-esc-keydown="!busy"
+      @confirm="discardDraft"
+      @close="!busy && (discardTarget = undefined)"
+      @cancel="!busy && (discardTarget = undefined)"
+    />
+    <AdminConfirmDialog
       function="remove"
       :visible="!!removeTarget"
       action="移除"
@@ -428,6 +448,7 @@ import {
   saveTemplateDraft,
   saveTemplateDisplayOrder,
   publishTemplateDraft,
+  discardTemplateDraft,
   versionLabel,
   type TemplateScope,
   type TemplateVersion,
@@ -482,6 +503,7 @@ const note = ref('');
 const saved = ref('');
 const loading = ref(false);
 const busy = ref(false);
+const discarding = ref(false);
 let savePromise: Promise<boolean> | undefined;
 const validatedAttributeIds = ref<number[]>([]);
 let loadSequence = 0;
@@ -490,7 +512,7 @@ const draft = computed(() => versions.value.find((v) => v.state === 'draft'));
 const isDraft = computed(() => selected.value?.state === 'draft');
 const editable = computed(() => isDraft.value && can('create') && !busy.value);
 const canSortAttributes = computed(
-  () => !!selected.value && can('sort') && (!isDraft.value || editable.value) && !busy.value && !loading.value,
+  () => !!selected.value && (isDraft.value ? editable.value : can('sort')) && !busy.value && !loading.value,
 );
 const specificationCount = computed(
   () => rows.value.filter((row) => row.attributeRole === 'sales' && row.skuFlag).length,
@@ -536,6 +558,7 @@ const categoryTree = computed(() => {
   const build = (parentId?: number): CategoryNode[] =>
     categories.value
       .filter((c) => (c.parentId || undefined) === parentId)
+      .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0))
       .map((c) => {
         const children = build(c.id);
         return { ...c, children, disabled: false };
@@ -763,7 +786,7 @@ function save(): Promise<boolean> {
   savePromise = (async () => {
     try {
       // Serialize saves so rapid edits always use the latest server revision.
-      while (selected.value?.id === draftId && isDraft.value && dirty.value) {
+      while (selected.value?.id === draftId && isDraft.value && dirty.value && !discarding.value) {
         const snapshot = JSON.stringify([content(), note.value]);
         const [draftContent, draftNote] = JSON.parse(snapshot) as [TemplateVersion['content'], string];
         const updated = await saveTemplateDraft(draftId, selected.value.revision, draftContent, draftNote);
@@ -785,10 +808,40 @@ function save(): Promise<boolean> {
 watch(
   () => JSON.stringify([selectedId.value, content(), note.value]),
   () => {
-    if (isDraft.value && can('create') && !loading.value && dirty.value) void save();
+    if (isDraft.value && can('create') && !loading.value && !discarding.value && dirty.value) void save();
   },
   { flush: 'post' },
 );
+const discardTarget = ref<TemplateVersion>();
+const discardCategoryName = computed(
+  () => categories.value.find((c) => c.id === discardTarget.value?.categoryId)?.name || '',
+);
+async function discardDraft() {
+  const target = discardTarget.value;
+  if (!target || busy.value || loading.value || !can('create') || !isDraft.value || selectedId.value !== target.id)
+    return;
+  const targetName = discardCategoryName.value;
+  busy.value = true;
+  discarding.value = true;
+  try {
+    if (savePromise && !(await savePromise)) return;
+    const current = versions.value.find((v) => v.id === target.id);
+    if (!current || current.state !== 'draft') return;
+    await discardTemplateDraft(current.id, current.revision);
+    pendingEdits.delete(current.id);
+    versions.value = versions.value.filter((v) => v.id !== current.id);
+    const published = versions.value.find((v) => v.state === 'published');
+    viewSelections.set(viewKey(), published?.id);
+    choose(published);
+    discardTarget.value = undefined;
+    adminFeedback.actionSuccess({ action: '删除', target: targetName });
+  } catch (e) {
+    error(e, '删除', targetName);
+  } finally {
+    busy.value = false;
+    discarding.value = false;
+  }
+}
 const publishVisible = ref(false);
 async function preparePublish() {
   if (!(await save())) return;
@@ -1064,9 +1117,6 @@ onBeforeUnmount(() => {
 .draft-status {
   margin-right: auto;
 }
-.add-attribute {
-  order: 1;
-}
 .template-tab-bar {
   display: flex;
   align-items: center;
@@ -1074,9 +1124,6 @@ onBeforeUnmount(() => {
 }
 .exit-edit {
   flex-shrink: 0;
-}
-.publish-draft {
-  order: 2;
 }
 @media (max-width: 1180px) {
   .version-layout {

@@ -37,10 +37,8 @@ describe('customer catalog', () => {
       expect(getRuntimeFunctionCatalog(audience).some((item) => item.value === module.value)).toBe(false);
     }
   });
-  it('places the store-only customer menu immediately below finished stock', () => {
-    const index = adminMenuEntries.findIndex(
-      (item) => 'path' in item && item.path === '/store/finished-stock-management',
-    );
+  it('places the store-only customer menu immediately below product management', () => {
+    const index = adminMenuEntries.findIndex((item) => 'value' in item && item.value === 'store-products');
     expect(adminMenuEntries[index + 1]).toMatchObject({
       label: '客户管理',
       path: '/store/customer-management',

@@ -335,7 +335,9 @@ test('store uses a direct menu, selects an operations product, and edits only it
   const menu = page.getByRole('complementary');
   await expect(menu.getByText('成品现货管理', { exact: true })).toBeVisible();
   await expect(menu.getByText('价格配置', { exact: true })).toBeVisible();
-  await expect(menu.getByText('商品管理', { exact: true })).toHaveCount(0);
+  await expect(menu.getByText('商品管理', { exact: true })).toBeVisible();
+  await expect(menu.locator('[data-menu-path="/finished-stock-management"]')).toHaveCount(0);
+  await expect(menu.locator('[data-menu-path="/accessory-management"]')).toHaveCount(0);
   const main = page.getByRole('main');
   await expect(main.locator('.filter-row')).toHaveCSS('display', 'grid');
   await expect(main.locator('.filter-fields')).toHaveCSS('display', 'grid');

@@ -327,7 +327,7 @@ public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
     if (count(
         """
         SELECT COUNT(*)
-        FROM finished_products fp
+        FROM (SELECT category_id FROM finished_products UNION ALL SELECT category_id FROM accessory_products) fp
         JOIN product_categories pc ON pc.id = fp.category_id
         WHERE pc.tenant_id = ?
         """,

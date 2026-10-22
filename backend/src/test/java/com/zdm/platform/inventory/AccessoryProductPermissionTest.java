@@ -1,0 +1,100 @@
+package com.zdm.platform.inventory;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+import com.zdm.platform.security.CurrentIdentity;
+import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.PermissionGuard;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
+
+class AccessoryProductPermissionTest {
+  private final AccessoryProductService service = mock(AccessoryProductService.class);
+  private AccessoryProductController controller(String... permissions) { return controllerFor("admin",permissions); }
+  private AccessoryProductController sourceController(String... permissions) { return controllerFor("supply-chain",permissions); }
+  private AccessoryProductController controllerFor(String client,String... permissions) {
+    CurrentIdentityProvider identities = mock(CurrentIdentityProvider.class);
+    when(identities.require()).thenReturn(new CurrentIdentity(2L, 2L, 2L, 2L, client, null, null,
+        "测试员工", "all", List.of("ADMIN_MANAGER"), java.util.Arrays.stream(permissions).map(permission -> client+".accessory-management." + permission).toList()));
+    return new AccessoryProductController(service, null, new PermissionGuard(identities), null, null);
+  }
+  private AccessoryProduct product(String status) {
+    AccessoryProduct value = new AccessoryProduct();
+    value.setStatus(status);
+    value.setSourceStatus("selling");
+    return value;
+  }
+  @Test void viewCannotEditOrPublish() {
+    when(service.getById(1L)).thenReturn(product("warehouse"));
+    assertThatThrownBy(() -> controller("warehouse.view").update(1L, product("warehouse"))).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> controller("warehouse.view").create(product("warehouse"))).isInstanceOf(AccessDeniedException.class);
+    verify(service, never()).updateWithDetails(any(), any());
+    verify(service, never()).updateOperationWithDetails(any(), any(), anyBoolean());
+  }
+  @Test void onlySourceClientCanPublishAndEdit() {
+    AccessoryProduct request=product("selling");
+    sourceController("selling.publish").create(request);
+    verify(service).createWithDetails(request);
+    assertThatThrownBy(() -> controller("selling.publish").create(request)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> sourceController("warehouse.publish").create(request)).isInstanceOf(AccessDeniedException.class);
+    when(service.getById(1L)).thenReturn(product("selling"));
+    sourceController("selling.edit").update(1L,request);
+    verify(service).updateWithDetails(1L,request);
+    controller("selling.edit").update(1L,request);
+    verify(service).updateOperationWithDetails(1L,request,true);
+  }
+  @Test void statusPermissionsUseRestrictedUpdateAndRejectOtherOperations() {
+    for (String permission : List.of("warehouse.shelf", "warehouse.batch-shelf")) {
+      reset(service);
+      when(service.getById(1L)).thenReturn(product("warehouse"));
+      AccessoryProduct request = product("selling");
+      controller(permission).update(1L, request);
+      verify(service).updateOperationWithDetails(1L, request, false);
+      verify(service, never()).updateWithDetails(any(), any());
+      assertThatThrownBy(() -> controller(permission).update(1L, product("recycle"))).isInstanceOf(AccessDeniedException.class);
+    }
+  }
+  @Test void priceCannotEditOtherFieldsOrChangeStatus() {
+    when(service.getById(1L)).thenReturn(product("warehouse"));
+    AccessoryProduct request = product("warehouse");
+    controller("warehouse.edit").update(1L, request);
+    verify(service).updateOperationWithDetails(1L, request, true);
+    verify(service, never()).updateWithDetails(any(), any());
+    assertThatThrownBy(() -> controller("warehouse.edit").update(1L, product("selling"))).isInstanceOf(AccessDeniedException.class);
+    when(service.getById(1L)).thenReturn(product("soldOut"));
+    assertThatThrownBy(() -> controller("sold-out.price").update(1L, product("soldOut"))).isInstanceOf(AccessDeniedException.class);
+  }
+  @Test void recyclingAndPermanentDeletionRemainDistinct() {
+    when(service.getById(1L)).thenReturn(product("recycle"));
+    assertThatThrownBy(() -> controller("warehouse.delete").delete(1L)).isInstanceOf(AccessDeniedException.class);
+    controller("recycle.purge").delete(1L);
+    verify(service).removeById(1L);
+  }
+  @Test void sourceEditingAndShelvingRequiresBothPermissions() {
+    AccessoryProduct existing=product("warehouse"); existing.setSourceStatus("warehouse");
+    when(service.getById(1L)).thenReturn(existing);
+    AccessoryProduct request=product("selling");
+    sourceController("warehouse.edit","warehouse.shelf").update(1L,request);
+    verify(service).updateWithDetails(1L,request);
+    assertThatThrownBy(() -> sourceController("warehouse.edit").update(1L,request)).isInstanceOf(AccessDeniedException.class);
+    sourceController("warehouse.edit", "warehouse.shelf").edit(1L, request);
+    verify(service).updateWithDetails(1L, request, true);
+    assertThatThrownBy(() -> sourceController("warehouse.shelf").edit(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
+  }
+
+  @Test void returningSellingProductToWarehouseRequiresEditAndOffShelfPermissions() {
+    AccessoryProduct existing = product("selling");
+    when(service.getById(1L)).thenReturn(existing);
+    AccessoryProduct request = product("warehouse");
+    sourceController("selling.edit", "selling.off-shelf").edit(1L, request);
+    verify(service).updateWithDetails(1L, request, true);
+    assertThatThrownBy(() -> sourceController("selling.edit").edit(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> sourceController("selling.off-shelf").edit(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> sourceController("selling.edit", "selling.off-shelf").update(1L, request))
+        .isInstanceOf(AccessDeniedException.class);
+  }
+}

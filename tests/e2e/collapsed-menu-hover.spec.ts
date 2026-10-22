@@ -95,7 +95,7 @@ test('a slow diagonal move from the icon into the last menu item retains the pan
   await expect(second).toBeVisible();
 });
 
-test('store permission popup remains usable when the active page is a direct menu item', async ({ page }) => {
+test('store permission popup remains usable when the active page is a product submenu', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       'zdm-admin-user',

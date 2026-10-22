@@ -147,6 +147,8 @@ public class SupplierService extends CreatorAwareService<SupplierMapper, Supplie
     SupplierScope scope = SupplierScope.from(identity);
     requireScopedSupplier(id, identity, scope);
 
+    Long accessoryReferences = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accessory_products WHERE supplier_id = ?", Long.class, id);
+    if (accessoryReferences != null && accessoryReferences > 0) { throw new IllegalArgumentException("该供应商已关联配件，不能删除"); }
     Long slabInventoryReferenceCount = jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM slab_inventory WHERE supplier_id = ?",
         Long.class,

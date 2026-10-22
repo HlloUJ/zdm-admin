@@ -150,5 +150,41 @@
   {
     "prefix": "store.customer-management",
     "scope": "store-only"
+  },
+  {
+    "prefix": "admin.accessory-management",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "store.accessory-management",
+    "scope": "store-only"
+  },
+  {
+    "prefix": "admin.accessory-management.create",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.accessory-management.edit",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.accessory-management.warehouse.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.accessory-management.selling.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.accessory-management.warehouse.edit",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.accessory-management.selling.edit",
+    "scope": "admin-only"
+  },
+  {
+    "prefix": "admin.accessory-management.off-shelf.edit",
+    "scope": "removed"
   }
 ]

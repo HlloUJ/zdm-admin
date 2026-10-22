@@ -1,0 +1,620 @@
+import { expect, test, type Page } from '@playwright/test';
+import { installAdminApiMocks } from './accessory-api-mocks';
+
+async function setup(page: Page, permissions: string[], clientCode = 'admin') {
+  await installAdminApiMocks(page);
+  await page.route('**/api/admin/accessory-products/price-level-options', (route) =>
+    route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
+  );
+  await page.route('**/api/admin/accessory-products/attribute-template-options', (route) =>
+    route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
+  );
+  await page.addInitScript(
+    ({ permissions, clientCode }) => {
+      localStorage.setItem('zdm-admin-token', 'dev-token');
+      localStorage.setItem(
+        'zdm-admin-user',
+        JSON.stringify({
+          id: 2,
+          clientCode,
+          name: '目录测试',
+          roles: ['ADMIN_MANAGER'],
+          permissions,
+          dataPermission: 'all',
+        }),
+      );
+    },
+    { permissions, clientCode },
+  );
+}
+const prefix = 'admin.accessory-management.';
+test('hides finished stock menu without its permissions', async ({ page }) => {
+  await setup(page, ['admin.slab-management.warehouse.view']);
+  await page.goto('/slab-management');
+  await expect(page.locator('.admin-side-menu').getByText('配件管理', { exact: true })).toHaveCount(0);
+});
+test('one tab hides rail and only grants requested row operation', async ({ page }) => {
+  await setup(
+    page,
+    ['supply-chain.accessory-management.warehouse.view', 'supply-chain.accessory-management.warehouse.edit'],
+    'supply-chain',
+  );
+  await page.goto('/supply-chain/accessory-management');
+  const main = page.getByRole('main');
+  await expect(main.getByText('意式轻奢岩板餐桌', { exact: true })).toBeVisible();
+  await expect(main.locator('.status-tabs')).toHaveCount(0);
+  await expect(main.locator('.table-actions .t-link')).toHaveText(['编辑']);
+  await expect(main.getByRole('button', { name: '发布商品' })).toHaveCount(0);
+  await expect(main.getByText('操作日志', { exact: true })).toHaveCount(0);
+  await main.locator('.table-actions .t-link').getByText('编辑', { exact: true }).click();
+  await expect(main.getByRole('radio', { name: '立刻上架', exact: true })).toBeDisabled();
+  await expect(main.getByRole('radio', { name: '暂不上架', exact: true })).toBeEnabled();
+});
+for (const canViewPrice of [true, false]) {
+  test(`supply-chain off-shelf detail is ${canViewPrice ? 'read-only when granted' : 'hidden without permission'}`, async ({
+    page,
+  }) => {
+    await setup(
+      page,
+      [
+        'supply-chain.accessory-management.off-shelf.view',
+        'supply-chain.accessory-management.off-shelf.detail',
+        'supply-chain.accessory-management.off-shelf.restore',
+        'supply-chain.accessory-management.off-shelf.delete',
+        ...(canViewPrice ? ['supply-chain.accessory-management.off-shelf.price'] : []),
+      ],
+      'supply-chain',
+    );
+    const product = {
+      id: 72,
+      name: '已下架成本商品',
+      status: 'offShelf',
+      sourceStatus: 'offShelf',
+      totalStock: 1,
+      variants: [{ id: 821, variantLabel: '标准规格', displayMode: 'single', stock: 1, costPrice: 10 }],
+      guidePrices: [{ skuId: 821, price: 20, priceCoefficient: 2 }],
+      markupPrices: [],
+    };
+    await page.route('**/api/admin/accessory-products', (route) =>
+      route.fulfill({ json: { code: 0, data: [product] } }),
+    );
+    await page.goto('/supply-chain/accessory-management');
+    const main = page.getByRole('main');
+    await expect(main.locator('.table-actions .t-link')).toHaveText(['详情', '放回仓库', '删除']);
+    await expect(main.locator('.table-actions').getByText('价格', { exact: true })).toHaveCount(0);
+  });
+}
+test('multiple tabs exclude unauthorized default and fall back to selling', async ({ page }) => {
+  await setup(page, [prefix + 'selling.view', prefix + 'sold-out.view']);
+  const formOptionsLoaded = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/admin/accessory-products/form-options' && response.ok(),
+  );
+  await page.goto('/accessory-management');
+  // The tab rail renders before its option request finishes; keep the mocked route alive until it settles.
+  await (await formOptionsLoaded).finished();
+  const main = page.getByRole('main');
+  await expect(main.locator('.status-tabs .t-tabs__nav-item')).toHaveText([/已上架/, /已售完/]);
+  await expect(main.locator('.status-tabs .t-tabs__nav-item.t-is-active')).toContainText('已上架');
+  await expect(main.locator('.table-actions .t-link')).toHaveCount(0);
+});
+
+test('log-only access does not expose unauthorized warehouse content', async ({ page }) => {
+  await setup(page, [prefix + 'operation-log.view']);
+  let listRequested = false;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/admin/accessory-products') listRequested = true;
+  });
+  await page.goto('/accessory-management');
+  const main = page.getByRole('main');
+  await expect(main.getByText('操作日志', { exact: true })).toBeVisible();
+  await expect(main.locator('.status-tabs')).toHaveCount(0);
+  await expect(main.locator('table')).toHaveCount(0);
+  await expect(
+    main.getByRole('button', {
+      name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+    }),
+  ).toHaveCount(0);
+  expect(listRequested).toBe(false);
+});
+
+for (const [status, scope] of [
+  ['offShelf', 'off-shelf'],
+  ['soldOut', 'sold-out'],
+  ['recycle', 'recycle'],
+]) {
+  test(`operations ${status} opens read-only complete details and preserves list`, async ({ page }, testInfo) => {
+    await setup(page, [prefix + scope + '.view', prefix + scope + '.detail']);
+    await page.route('**/api/admin/accessory-products/price-level-options', (route) =>
+      route.fulfill({ json: { code: 0, message: 'ok', data: [{ id: 1, name: '1级合伙人' }] } }),
+    );
+    const product = {
+      id: 71,
+      name: '详情验收商品',
+      status,
+      categoryId: 2,
+      supplierId: 2,
+      sourceStatus: status === 'selling' ? 'offShelf' : 'selling',
+      sourceUnavailable: status === 'selling',
+      sourceMessage: status === 'selling' ? '该商品已被供应链下架' : null,
+      publisherType: '平台发布',
+      totalStock: 6,
+      createdByName: '验收人员',
+      createdAt: '2026-09-20T10:00:00',
+      detail: '<p>完整图文资料</p>',
+      attributes: [{ attributeId: 1, attributeName: '材质', value: '岩板' }],
+      variants: [{ id: 81, variantLabel: '标准规格', stock: 6, costPrice: 88 }],
+      guidePrices: [{ skuId: 81, costPrice: 88, priceCoefficient: 2, price: 176 }],
+      markupPrices: [
+        {
+          skuId: 81,
+          storeLevelId: 1,
+          storeLevelName: '1级合伙人',
+          costPrice: 88,
+          priceCoefficient: 1.1,
+          price: 96.8,
+          priceSource: 'auto',
+        },
+      ],
+    };
+    let writes = 0;
+    await page.route('**/api/admin/accessory-products', (route) => {
+      if (route.request().method() !== 'GET') writes++;
+      return route.fulfill({ json: { code: 0, message: 'ok', data: [product] } });
+    });
+    await page.route('**/api/admin/accessory-products/71', (route) => {
+      if (route.request().method() !== 'GET') writes++;
+      return route.fulfill({ json: { code: 0, message: 'ok', data: product } });
+    });
+    await page.goto('/accessory-management');
+    const main = page.getByRole('main');
+    if (status === 'selling') {
+      const overlay = main.locator('.source-unavailable-overlay');
+      await expect(overlay).toContainText('该商品已被供应链下架');
+      await expect(overlay.getByRole('button', { name: '彻底删除', exact: true })).toHaveCount(0);
+      const rowBox = await main.locator('tr.source-unavailable').boundingBox();
+      const overlayBox = await overlay.boundingBox();
+      const containerBox = await main.locator('.source-overlay-container').boundingBox();
+      expect(Math.abs(overlayBox!.width - Math.min(rowBox!.width, containerBox!.width))).toBeLessThan(2);
+      expect(Math.abs(overlayBox!.height - rowBox!.height)).toBeLessThan(2);
+      await overlay.getByRole('button', { name: '详情', exact: true }).click();
+    } else {
+      await main.getByText('详情', { exact: true }).click();
+    }
+    const drawer = page.locator('.t-drawer:visible');
+    await expect(drawer.getByText('完整图文资料', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('SKU ID：81', { exact: true })).toBeVisible();
+    await expect(drawer.getByRole('columnheader', { name: '商家编码', exact: true })).toHaveCount(0);
+    await expect(drawer.getByText('岩板', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('操作信息', { exact: true })).toHaveCount(0);
+    await expect(drawer.locator('input,textarea')).toHaveCount(0);
+    if (status === 'warehouse') {
+      const idRow = drawer.locator('.t-descriptions tr').filter({ has: page.getByText('ID', { exact: true }) });
+      await expect(idRow.locator('td').last()).toHaveAttribute('colspan', '5');
+      await drawer.getByRole('button', { name: '全屏显示', exact: true }).click();
+      const fullscreen = page.locator('.sales-fullscreen-panel.is-fullscreen');
+      await expect(fullscreen.getByText('SKU ID：81', { exact: true })).toBeVisible();
+      await expect(fullscreen.locator('thead th')).toHaveText(['商品规格', '成本价', '指导价', '1级合伙人', '库存']);
+      const specCell = fullscreen.locator('tbody tr').first().locator('td').first();
+      await expect(specCell).toContainText('标准规格');
+      await expect(specCell.locator('.product-code')).toHaveText('SKU ID：81');
+      await expect(fullscreen.getByRole('button', { name: '跟随配置', exact: true })).toBeDisabled();
+      const box = await fullscreen.boundingBox();
+      const viewport = await page.evaluate(() => {
+        // The root reserves a stable gutter even when headless Chrome hides its scrollbar.
+        const probe = document.createElement('div');
+        Object.assign(probe.style, {
+          position: 'fixed',
+          width: '100px',
+          height: '100px',
+          overflowY: 'scroll',
+          scrollbarGutter: getComputedStyle(document.documentElement).scrollbarGutter,
+          visibility: 'hidden',
+        });
+        document.body.append(probe);
+        const gutter = probe.offsetWidth - probe.clientWidth;
+        probe.remove();
+        return { width: window.innerWidth - gutter, height: window.innerHeight };
+      });
+      expect(box?.width).toBe(viewport.width);
+      expect(box?.height).toBe(viewport.height);
+      await page.screenshot({ path: testInfo.outputPath('finished-detail-fullscreen.png') });
+      await fullscreen.getByRole('button', { name: '还原', exact: true }).click();
+      await expect(page.locator('.sales-fullscreen-panel.is-fullscreen')).toHaveCount(0);
+      await expect(drawer).toBeVisible();
+      await drawer.getByRole('button', { name: '全屏显示', exact: true }).click();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.sales-fullscreen-panel.is-fullscreen')).toHaveCount(0);
+      await expect(drawer).toBeVisible();
+      await page.screenshot({ path: testInfo.outputPath('finished-detail-cell.png') });
+    }
+    await drawer.locator('.t-drawer__close-btn').click();
+    await expect(main.getByText('详情验收商品', { exact: true })).toBeVisible();
+    expect(writes).toBe(0);
+  });
+}
+
+test('operations role catalog exposes detail permission for all five finished stock statuses', async ({ page }) => {
+  await setup(page, ['all']);
+  await page.route(/\/api\/admin\/roles(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            id: 2,
+            name: '运营管理平台角色',
+            code: 'OPS_LISTED_LABEL_TEST',
+            clientCode: 'admin',
+            createdByClientCode: 'admin',
+            dataScope: 'all',
+            status: 'enabled',
+            functionPermissions: `${prefix}selling.view,${prefix}selling.detail`,
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/role-management');
+  const row = page.locator('tbody tr').filter({ hasText: '运营管理平台角色' }).first();
+  await row.getByText('权限', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
+  await dialog.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
+  const rows = dialog.locator('.permission-matrix tbody tr');
+  const first = rows.filter({ hasText: '配件管理页' }).first();
+  const firstIndex = await first.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+  const statusNames = ['仓库中', '已上架', '已下架', '已售完', '回收站'];
+  for (const [index, label] of statusNames.entries()) {
+    const statusRow = rows.nth(firstIndex + index + 1);
+    await expect(statusRow.locator('.permission-tab-text')).toHaveText(label);
+    await expect(statusRow.getByText(index < 2 ? '编辑' : '详情', { exact: true })).toBeVisible();
+  }
+  const listed = rows.nth(firstIndex + 2);
+  await expect(listed.getByRole('checkbox', { name: '查看', exact: true })).toBeChecked();
+  await expect(listed.getByRole('checkbox', { name: '编辑', exact: true })).not.toBeChecked();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+});
+
+for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
+  test(`source availability ${sourceStatus} keeps operations blocked and distinguishes permanent deletion`, async ({
+    page,
+  }, testInfo) => {
+    await setup(page, [prefix + 'selling.view', prefix + 'selling.edit', prefix + 'recycle.purge']);
+    const product = {
+      id: 72,
+      name: '来源状态验收商品',
+      status: 'selling',
+      sourceStatus,
+      sourceUnavailable: true,
+      sourceMessage:
+        sourceStatus === 'purged'
+          ? '该商品已被供应链彻底删除'
+          : sourceStatus === 'recycle'
+            ? '该商品已被供应链删除至回收站'
+            : '该商品已被供应链下架',
+      totalStock: 6,
+      detail: '<p>保留商品资料</p>',
+      attributes: [],
+      variants: [{ id: 82, variantLabel: '标准规格', stock: 6, costPrice: 88 }],
+      guidePrices: [],
+      markupPrices: [],
+    };
+    await page.route('**/api/admin/accessory-products', (route) =>
+      route.fulfill({ json: { code: 0, message: 'ok', data: [product] } }),
+    );
+    await page.route('**/api/admin/accessory-products/72', (route) =>
+      route.fulfill({ json: { code: 0, message: 'ok', data: product } }),
+    );
+    await page.goto('/accessory-management');
+    const overlay = page.getByRole('main').locator('.source-unavailable-overlay');
+    await expect(overlay).toContainText(product.sourceMessage);
+    await expect(overlay.getByRole('button')).toHaveText(['详情', '彻底删除']);
+    await overlay.getByRole('button', { name: '详情', exact: true }).click();
+    const drawer = page.locator('.t-drawer:visible');
+    await expect(drawer.locator('.t-alert')).toHaveText(product.sourceMessage);
+    await expect(drawer.getByText('保留商品资料', { exact: true })).toBeVisible();
+    await expect(drawer.locator('input,textarea')).toHaveCount(0);
+    if (sourceStatus === 'recycle')
+      await page.screenshot({
+        path: testInfo.outputPath('finished-source-recycle-detail.png'),
+        animations: 'disabled',
+      });
+  });
+}
+
+test('operations purge logs display actual previous state to permanently deleted', async ({ page }) => {
+  await setup(page, ['all']);
+  const states = [
+    ['warehouse', '仓库中'],
+    ['selling', '已上架'],
+    ['offShelf', '已下架'],
+    ['soldOut', '已售完'],
+    ['recycle', '回收站'],
+  ];
+  const records = states.map(([beforeStatus, label], index) => ({
+    id: index + 1,
+    productId: 91,
+    productName: `${label}删除状态验收`,
+    operationType: 'PURGE',
+    operationSummary: '彻底删除运营商品',
+    beforeStatus,
+    afterStatus: 'purged',
+    operatorName: '测试人员',
+    operatedAt: '2026-09-21T10:00:00',
+    operationSource: 'MANUAL',
+    changeDetails: '{}',
+  }));
+  await page.route('**/api/admin/accessory-products/operation-logs?*', (route) =>
+    route.fulfill({ json: { code: 0, data: { records, total: records.length } } }),
+  );
+  await page.route(/\/api\/admin\/accessory-products\/operation-logs\/\d+$/, (route) => {
+    const id = Number(route.request().url().split('/').pop());
+    return route.fulfill({ json: { code: 0, data: records.find((record) => record.id === id) } });
+  });
+  await page.goto('/accessory-management');
+  await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  for (const [index, record] of records.entries()) {
+    await page.getByRole('row').filter({ hasText: record.productName }).getByText('详情', { exact: true }).click();
+    const detail = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
+    await expect(detail.getByText(`${states[index][1]} → 已彻底删除`, { exact: true })).toBeVisible();
+    await detail.getByRole('button', { name: '关闭', exact: true }).click();
+    await expect(detail).toBeHidden();
+  }
+});
+
+for (const [client, retryFailure] of [
+  ['supply-chain', false],
+  ['supply-chain', true],
+  ['admin', false],
+] as const) {
+  test(`batch shelf serializes ${client} requests and retains only unfinished selections retry=${retryFailure}`, async ({
+    page,
+  }) => {
+    await setup(page, ['all'], client);
+    const products = [81, 82, 83].map((id) => ({
+      id,
+      name: `批量上架验收${id}`,
+      status: 'warehouse',
+      sourceStatus: client === 'supply-chain' ? 'warehouse' : 'selling',
+      sourceUnavailable: false,
+      categoryId: 2,
+      supplierId: 2,
+      publisherType: '平台发布',
+      totalStock: 6,
+      detail: '<p>商品详情</p>',
+      attributes: [],
+      variants: [{ id: id + 100, variantLabel: '标准规格', stock: 6, costPrice: 10 }],
+      guidePrices: [],
+      markupPrices: [],
+    }));
+    const attempts: number[] = [];
+    let active = 0;
+    let maximumActive = 0;
+    let failedOnce = false;
+    await page.route('**/api/admin/accessory-products', (route) =>
+      route.fulfill({ json: { code: 0, data: products } }),
+    );
+    await page.route(/\/api\/admin\/accessory-products\/8[123]$/, async (route) => {
+      const id = Number(route.request().url().split('/').pop());
+      if (route.request().method() !== 'PUT') throw new Error('Unexpected method');
+      expect(route.request().postDataJSON().status).toBe('selling');
+      attempts.push(id);
+      active++;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      active--;
+      if (retryFailure && id === 82 && !failedOnce) {
+        failedOnce = true;
+        await route.fulfill({ status: 400, json: { code: 1, message: '第二个商品校验失败，请重试' } });
+        return;
+      }
+      const product = products.find((item) => item.id === id)!;
+      if (client === 'supply-chain') product.sourceStatus = 'selling';
+      else product.status = 'selling';
+      await route.fulfill({ json: { code: 0, data: product } });
+    });
+    await page.goto(client === 'admin' ? '/accessory-management' : '/supply-chain/accessory-management');
+    const main = page.getByRole('main');
+    await expect(main.getByText('批量上架验收83', { exact: true })).toBeVisible();
+    await main.locator('thead .t-checkbox__input').click();
+    await expect(main.locator('.selection-info')).toHaveText('已选 3 项');
+    if (client === 'supply-chain')
+      await expect(main.locator('.toolbar-buttons .selection-info')).toHaveText('已选 3 项');
+    await main.getByRole('button', { name: '批量上架', exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
+    if (retryFailure) {
+      await expect(page.getByText('第二个商品校验失败，请重试', { exact: true })).toBeVisible();
+      expect(attempts).toEqual([83, 82]);
+      await expect(main.locator('.selection-info')).toHaveText('已选 2 项');
+      await expect(main.getByText('批量上架验收83', { exact: true })).toHaveCount(0);
+      await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
+    }
+    await expect(dialog).toBeHidden();
+    await expect(main.locator('.selection-info')).toHaveCount(0);
+    expect(attempts).toEqual(retryFailure ? [83, 82, 82, 81] : [83, 82, 81]);
+    expect(maximumActive).toBe(1);
+    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+    for (const product of products) await expect(main.getByText(product.name, { exact: true })).toBeVisible();
+  });
+}
+
+test('operations incomplete shelf warns before confirmation without updating products', async ({ page }) => {
+  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.shelf']);
+  const product = {
+    id: 991,
+    name: '价格待补齐商品',
+    status: 'warehouse',
+    sourceStatus: 'selling',
+    totalStock: 1,
+    variants: [],
+    attributes: [],
+  };
+  await page.route('**/api/admin/accessory-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  let updates = 0;
+  await page.route('**/api/admin/accessory-products/991', (route) => {
+    updates++;
+    return route.fulfill({ json: { code: 0, data: product } });
+  });
+  await page.route('**/api/admin/accessory-products/991/shelf-check', (route) =>
+    route.fulfill({ status: 400, json: { code: 400, message: '请完善全部配件价格后再上架' } }),
+  );
+  await page.goto('/accessory-management');
+  await page.locator('tbody tr').filter({ hasText: product.name }).getByText('上架', { exact: true }).click();
+  await expect(page.getByText('请完善全部配件价格后再上架', { exact: true })).toBeVisible();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  expect(updates).toBe(0);
+});
+
+test('operations batch shelf continues after failure and retains the failed row with its warning', async ({ page }) => {
+  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.batch-shelf']);
+  const products = [991, 992, 993].map((id) => ({
+    id,
+    name: `批量验收商品${id}`,
+    status: 'warehouse',
+    sourceStatus: 'selling',
+    totalStock: 1,
+    variants: [],
+    attributes: [],
+  }));
+  await page.route('**/api/admin/accessory-products', (route) => route.fulfill({ json: { code: 0, data: products } }));
+  const updates: number[] = [];
+  await page.route(/\/api\/admin\/accessory-products\/99[123]$/, (route) => {
+    const id = Number(route.request().url().split('/').pop());
+    updates.push(id);
+    if (id === 992) return route.fulfill({ status: 400, json: { code: 400, message: '请完善全部配件价格后再上架' } });
+    const product = products.find((item) => item.id === id)!;
+    product.status = 'selling';
+    return route.fulfill({ json: { code: 0, data: product } });
+  });
+  await page.goto('/accessory-management');
+  await expect(page.locator('tbody tr')).toHaveCount(3);
+  await page.locator('thead .t-checkbox').click();
+  await page.getByRole('button', { name: '批量上架', exact: true }).click();
+  await page.locator('.t-dialog:visible').getByRole('button', { name: /^确认/ }).click();
+  await expect(page.getByText('已上架 2 个商品，未上架 1 个商品', { exact: true })).toBeVisible();
+  expect(updates).toEqual([993, 992, 991]);
+  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.locator('tbody tr')).toContainText('批量验收商品992');
+  await expect(page.locator('tbody tr').getByRole('checkbox')).toBeChecked();
+  await expect(page.locator('.finished-row-warning')).toContainText('请完善全部配件价格后再上架');
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+});
+
+for (const client of ['supply-chain', 'admin']) {
+  for (const mode of ['tabs', 'single', 'log-only'] as const) {
+    test(`${client} shared toolbar preserves log access for ${mode}`, async ({ page }) => {
+      const prefix = `${client}.accessory-management.`;
+      await setup(
+        page,
+        [
+          prefix + 'operation-log.view',
+          ...(mode === 'log-only' ? [] : [prefix + 'warehouse.view']),
+          ...(mode === 'tabs' ? [prefix + 'selling.view'] : []),
+        ],
+        client,
+      );
+      await page.route('**/api/admin/accessory-products/operation-logs?**', (route) =>
+        route.fulfill({ json: { code: 0, message: 'ok', data: { records: [], total: 0 } } }),
+      );
+      await page.goto(client === 'admin' ? '/accessory-management' : '/supply-chain/accessory-management');
+      const main = page.getByRole('main');
+      await expect(main.locator('.page-header')).toHaveCount(0);
+      const log = main.getByRole('button', { name: '操作日志', exact: true });
+      await expect(log).toBeVisible();
+      await expect(log).toHaveClass(/t-button--theme-default/);
+      await expect(log).toHaveClass(/t-button--variant-outline/);
+      await expect(main.locator('.selection-info')).toHaveCount(0);
+      if (mode !== 'log-only') {
+        const toolbar = main.locator('.table-toolbar');
+        await expect(toolbar.getByRole('button', { name: '操作日志', exact: true })).toBeVisible();
+        const toolbarBox = (await toolbar.boundingBox())!;
+        const logBox = (await log.boundingBox())!;
+        const formBox = (await main.locator('.zdm-standard-query').boundingBox())!;
+        expect(logBox.x + logBox.width).toBeCloseTo(toolbarBox.x + toolbarBox.width, 0);
+        expect(logBox.y + logBox.height / 2).toBeCloseTo(toolbarBox.y + toolbarBox.height / 2, 0);
+        expect(toolbarBox.y - formBox.y - formBox.height).toBeCloseTo(24, 0);
+        if (mode === 'tabs') {
+          await expect(main.locator('.status-tabs .t-tabs__bar')).toBeVisible();
+          await expect(main.locator('.status-tabs').getByRole('button', { name: '操作日志', exact: true })).toHaveCount(
+            0,
+          );
+          await main.locator('.status-tabs .t-tabs__nav-item').nth(1).click();
+          await expect(log).toBeVisible();
+        } else {
+          await expect(main.locator('.status-tabs')).toHaveCount(0);
+          await main.locator('tbody .t-checkbox').first().click();
+          await expect(main.locator('.selection-info')).toHaveCount(0);
+        }
+      } else {
+        await expect(main.locator('table')).toHaveCount(0);
+        await expect(main.locator('.status-tabs')).toHaveCount(0);
+      }
+      await log.click();
+      await expect(
+        page.locator('.t-drawer--open .t-drawer__header').getByText('操作日志', { exact: true }),
+      ).toBeVisible();
+    });
+  }
+}
+
+test('supply-chain publish alone does not display selected count', async ({ page }) => {
+  const prefix = 'supply-chain.accessory-management.';
+  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.publish'], 'supply-chain');
+  await page.goto('/supply-chain/accessory-management');
+  const main = page.getByRole('main');
+  await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();
+  await expect(main.getByRole('button', { name: '批量上架', exact: true })).toHaveCount(0);
+  await main.locator('tbody .t-checkbox').first().click();
+  await expect(main.locator('.selection-info')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '操作日志', exact: true })).toHaveCount(0);
+});
+
+for (const client of ['admin', 'supply-chain']) {
+  test(`${client} finished off-shelf reason keeps required rejection and field feedback`, async ({ page }) => {
+    await setup(page, ['all'], client);
+    const product = {
+      id: 87,
+      name: '下架校验商品',
+      status: 'selling',
+      sourceStatus: 'selling',
+      totalStock: 1,
+      categoryId: 2,
+      supplierId: 2,
+      variants: [],
+    };
+    let writes = 0;
+    await page.route('**/api/admin/accessory-products', (route) =>
+      route.fulfill({ json: { code: 0, data: [product] } }),
+    );
+    await page.route('**/api/admin/accessory-products/87**', (route) => {
+      if (route.request().method() !== 'GET') writes++;
+      return route.fulfill({ json: { code: 0, data: product } });
+    });
+    await page.goto(client === 'admin' ? '/accessory-management' : '/supply-chain/accessory-management');
+    await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+    await page.getByRole('row').filter({ hasText: '下架校验商品' }).getByText('下架', { exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible');
+    await dialog
+      .getByRole('button', {
+        name: /^确认(?:新增|保存|(?:批量)?(?:下架|调整归属)|配置权限|业务开通|添加属性|邀请员工)$/,
+        exact: true,
+      })
+      .click();
+    const field = dialog
+      .locator('.t-form__item')
+      .filter({ has: page.locator('.t-form__label').filter({ hasText: '下架原因' }) });
+    await expect(field.getByText('请选择下架原因', { exact: true })).toBeVisible();
+    await expect(field.locator('.t-input')).toHaveClass(/t-is-error/);
+    await expect(page.locator('.zdm-admin-feedback').filter({ hasText: /请选择.*原因/ })).toHaveCount(0);
+    expect(writes).toBe(0);
+    await field.locator('.t-select').click();
+    await page
+      .locator('.t-select-option')
+      .filter({ hasText: /^库存异常$/ })
+      .click();
+    await expect(field.getByText('请选择下架原因', { exact: true })).toHaveCount(0);
+    await expect(field.locator('.t-input')).not.toHaveClass(/t-is-error/);
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    expect(writes).toBe(0);
+  });
+}
