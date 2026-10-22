@@ -47,7 +47,17 @@ test('store order prototype has five status views and drill-down without busines
     .filter({ hasText: /^已发货（\d+）$/ })
     .click();
   await expect(page.getByText('部分发货', { exact: true }).last()).toBeVisible();
-  await page.getByText(/^XS\d{13}$/).click();
+  const number = page.getByText(/^XS\d{13}$/);
+  await expect(number).not.toHaveAttribute('role');
+  await expect(number).not.toHaveAttribute('tabindex');
+  await expect(number.locator('..')).toHaveCSS(
+    'color',
+    await number.evaluate((element) => getComputedStyle(element).getPropertyValue('--td-text-color-primary').trim()),
+  );
+  await expect(number.locator('..')).toHaveCSS('font-weight', '600');
+  await number.click();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  await page.getByRole('button', { name: '详情', exact: true }).click();
   await expect(page.getByText('金额计算过程', { exact: true })).toBeVisible();
   await expect(page.getByText('操作记录', { exact: true })).toBeVisible();
   expect(writes).toEqual([]);
@@ -152,7 +162,7 @@ test('payment configuration starts empty and supports CRUD without rewriting his
   await expect(page.getByRole('cell', { name: '首付款', exact: true })).toHaveCount(0);
   await expect(page.getByRole('cell', { name: '预付款', exact: true })).toBeVisible();
   await page.goto('/store/order-management/sales');
-  await page.getByText(/^XS\d{13}$/).click();
+  await page.getByRole('button', { name: '详情', exact: true }).click();
   await page.getByRole('button', { name: '登记收款', exact: true }).click();
   dialog = page.locator('.t-dialog:visible');
   await dialog.getByPlaceholder('请选择收退款渠道', { exact: true }).click();

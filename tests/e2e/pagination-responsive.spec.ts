@@ -130,10 +130,8 @@ for (const width of [1366, 768, 390]) {
       await expect(table.locator('tbody > tr')).toHaveCount(20);
     }
     await page.goto('/store/order-management/sales');
-    await page
-      .getByText(/^XS\d{13}$/)
-      .first()
-      .click();
+    await page.getByRole('button', { name: '详情', exact: true }).first().click();
+    await expect(page.getByText('金额计算过程', { exact: true })).toBeVisible();
     const pager = page.locator('main .t-pagination');
     const table = page.locator('main .t-table:has(.t-pagination)');
     await expect(pager.locator('.t-pagination__total')).toHaveText('共 25 条数据');

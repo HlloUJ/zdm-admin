@@ -51,13 +51,7 @@
           <header class="order-card__header">
             <div class="order-card__identity">
               <strong
-                ><span
-                  :role="can('detail', order) ? 'link' : undefined"
-                  :tabindex="can('detail', order) ? 0 : undefined"
-                  @click="can('detail', order) && emit('action', 'detail', order)"
-                  @keydown.enter="can('detail', order) && emit('action', 'detail', order)"
-                  >{{ order.id }}</span
-                ></strong
+                ><span>{{ order.id }}</span></strong
               ><t-button
                 :theme="buttonTheme('reset')"
                 variant="text"
@@ -400,10 +394,7 @@ const goodsColumns = [
 }
 .order-card__identity strong {
   font: var(--td-font-mark-medium);
-  color: var(--td-brand-color);
-}
-.order-card__identity strong span[role='link'] {
-  cursor: pointer;
+  color: var(--td-text-color-primary);
 }
 .order-card__actions {
   flex: none;

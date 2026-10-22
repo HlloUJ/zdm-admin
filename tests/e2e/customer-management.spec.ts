@@ -206,6 +206,10 @@ test('all data with grants allows ordinary staff to maintain other owner custome
   ]);
   const row = page.locator('tr').filter({ hasText: '王先生2' });
   await expect(row).toBeVisible();
+  const name = row.getByText('王先生2', { exact: true });
+  await expect(row.getByRole('link', { name: '王先生2', exact: true })).toHaveCount(0);
+  await name.click();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await expect(row.getByText('调整归属', { exact: true })).toHaveCount(0);
   await expect(row.getByText('编辑', { exact: true })).toBeVisible();
   await expect(row.getByText('归档', { exact: true })).toBeVisible();
@@ -1658,12 +1662,13 @@ for (const field of ['followedAt', 'nextFollowAt'] as const) {
   }
 }
 
-test('customer text links use native color-only hover without underlines', async ({ page }) => {
+test('customer explicit operation links use native color-only hover without underlines', async ({ page }) => {
   await setup(page, ['daily.view', 'daily.detail', 'daily.followup', 'daily.edit', 'daily.archive']);
   await page.goto('/store/customer-management');
   const row = page.locator('tr').filter({ hasText: '王先生1' });
   const links = row.locator('.t-link');
-  await expect(links).toHaveCount(5);
+  await expect(links).toHaveText(['详情', '跟进', '编辑', '归档']);
+  await expect(row.getByRole('link', { name: '王先生1', exact: true })).toHaveCount(0);
   for (const link of await links.all()) {
     await expect(link).toHaveClass(/t-link--hover-color/);
     await expect(link).not.toHaveClass(/t-link--hover-underline/);
