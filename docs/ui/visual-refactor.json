@@ -1492,6 +1492,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-10-22 用户明确批准名称、标题和编号仅作普通展示；移除客户姓名与订单号的详情触发，保留独立详情权限、复制、业务逻辑及布局。",
+          "before": "          <template #name=\"{ row }\"\n            ><t-link v-if=\"can('detail')\" hover=\"color\" :theme=\"buttonTheme('view')\" @click=\"openDetail(row.id)\">{{\n              row.name\n            }}</t-link\n            ><span v-else>{{ row.name }}</span></template\n          >\n",
+          "after": "          <template #name=\"{ row }\"\n            ><span>{{ row.name }}</span></template\n          >\n"
+        },
+        {
           "reason": "2026-10-19 用户批准客户新增及编辑跟进取消过时两列附件custom例外，接入公共单列480px弹窗、100px标签及控件满宽；仅布局，业务、权限、附件交互不变。",
           "stage": "before-migrations",
           "before": "      label-width=\"calc(7em + var(--td-comp-paddingLR-xl))\"\n      :header=\"followId ? '编辑跟进' : '新增跟进'\"\n      width=\"720px\"\n      form-layout=\"custom\"\n",
@@ -10187,6 +10193,12 @@
       "approvedBusinessPatches": [
         {
           "stage": "before-migrations",
+          "reason": "2026-10-22 用户明确批准名称、标题和编号仅作普通展示；移除客户姓名与订单号的详情触发，保留独立详情权限、复制、业务逻辑及布局。",
+          "before": "              <strong\n                ><span\n                  :role=\"can('detail', order) ? 'link' : undefined\"\n                  :tabindex=\"can('detail', order) ? 0 : undefined\"\n                  @click=\"can('detail', order) && emit('action', 'detail', order)\"\n                  @keydown.enter=\"can('detail', order) && emit('action', 'detail', order)\"\n                  >{{ order.id }}</span\n                ></strong\n",
+          "after": "              <strong\n                ><span>{{ order.id }}</span></strong\n"
+        },
+        {
+          "stage": "before-migrations",
           "reason": "2026-10-22 user approved reusing public pagination styles and removing legacy style hooks only; all business props and handlers retained.",
           "before": "class=\"order-pagination\"",
           "after": "class=\"zdm-admin-pagination\""
@@ -10471,6 +10483,13 @@
       "property": "box-shadow",
       "value": "0 4px 12px rgb(0 0 0 / 10%)",
       "reason": "2026-10-16 user explicitly requires approved proposal C shadow instead of the official default; identity popup only."
+    },
+    {
+      "file": "src/pages/order/prototype/SalesOrderList.vue",
+      "selector": ".order-card",
+      "property": "--order-identity-color",
+      "value": "#5b75a6",
+      "reason": "2026-10-22 用户最终确认销售订单号与前置竖条采用雾蓝色 #5b75a6，保持普通文本语义、字号及业务布局。"
     }
   ]
 }

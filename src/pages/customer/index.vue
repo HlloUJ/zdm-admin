@@ -30,10 +30,7 @@
           @select-change="selectRows"
         >
           <template #name="{ row }"
-            ><t-link v-if="can('detail')" hover="color" :theme="buttonTheme('view')" @click="openDetail(row.id)">{{
-              row.name
-            }}</t-link
-            ><span v-else>{{ row.name }}</span></template
+            ><span>{{ row.name }}</span></template
           >
           <template #phone="{ row }">{{ displayCustomerPhone(row) }}</template>
           <template #ownerName="{ row }">{{ row.ownerName || '-' }}</template>
