@@ -1,3 +1,4 @@
+import { displayTextViolations } from './display-text-policy.mjs';
 import { confirmationRegistryViolations, confirmationViolations } from './confirmation-policy.mjs';
 import { parse as parseSfc } from '@vue/compiler-sfc';
 import { parse as parseTemplate, NodeTypes } from '@vue/compiler-dom';
@@ -978,4 +979,53 @@ test('scheme one rejects superseded raster border skins', () => {
   const declaration = postcss.parse(css).first.first;
   assert.equal(isApprovedOrderReferenceBorder(approvedOrderFile, declaration), false);
   assert.equal(isApprovedOrderReferenceBorder(approvedOrderFile, { ...declaration, prop: 'background' }), false);
+});
+
+test('ordinary record names titles and identifiers never act as navigation or action triggers', () => {
+  const violations = files('src/pages')
+    .filter((file) => file.endsWith('.vue'))
+    .flatMap((file) => displayTextViolations(read(file)).map((issue) => `${file}: ${issue}`));
+  assert.deepEqual(violations, []);
+  assert.match(read('AGENTS.md'), /display-text-standard\.md/);
+  assert.match(read('docs/ui/standard.md'), /display-text-standard\.md/);
+});
+
+test('display text guard rejects link click keyboard and render-function regressions without blocking explicit operations', () => {
+  for (const body of [
+    '<t-link @click="openDetail(row.id)">{{ row.name }}</t-link>',
+    '<router-link :to="`/detail/${row.id}`">{{ row.title }}</router-link>',
+    '<span @click="openDetail(row.id)">{{ row.name || "未命名" }}</span>',
+    '<a href="/detail">{{ formatName(row.productName) }}</a>',
+    '<span @click="openDetail(row.id)">{{ row.orderNo ?? "-" }}</span>',
+
+    '<template #name="{ row }"><a href="/detail">{{ display(row) }}</a></template>',
+    '<span @click="openDetail(order.id)">{{ order.id }}</span>',
+    '<div @dblclick="openDetail(row.id)"><strong>{{ row.title }}</strong></div>',
+    '<span role="link" tabindex="0" @keydown.enter="openDetail(row.id)">{{ row.code }}</span>',
+    '<div :role="canView ? \'link\' : undefined">{{ row.orderNumber }}</div>',
+    '<t-link @click="openDetail(attachment.id)">{{ attachment.name }}</t-link>',
+  ])
+    assert.ok(displayTextViolations(`<template>${body}</template>`).length, body);
+  assert.ok(
+    displayTextViolations(
+      `<script setup>const cell = (h, row) => h('a', { onClick: () => detail(row.id) }, row.name);</script>`,
+    ).length,
+  );
+  assert.ok(
+    displayTextViolations(
+      `<script setup>const cell = (h, row) => h('span', { onClick: () => detail(row.id) }, row.orderNo);</script>`,
+    ).length,
+  );
+  for (const body of [
+    '<span>{{ row.name }}</span><strong>{{ order.id }}</strong>',
+    '<t-button @click="toggleExpansion(order.id)">{{ isExpanded(order.id) ? "收起" : "展开" }}</t-button>',
+
+    '<t-link v-if="canDetail" @click="openDetail(row.id)">详情</t-link>',
+    '<t-button :aria-label="`复制订单号 ${order.id}`" @click="copy(order.id)"><t-icon name="copy" /></t-button>',
+    '<t-menu><t-menu-item @click="choose(item.id)">{{ item.name }}</t-menu-item></t-menu>',
+    '<button @click="selectCategory(level, item.id)">{{ item.name }}</button>',
+    '<div tabindex="0" aria-label="可横向滚动"><span>{{ row.name }}</span></div>',
+    '<t-link :theme="buttonTheme(\'preview\')" @click="previewAttachment(record, attachment)">{{ attachment.name }}</t-link>',
+  ])
+    assert.deepEqual(displayTextViolations(`<template>${body}</template>`), [], body);
 });
