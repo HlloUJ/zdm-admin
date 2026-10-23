@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { lstatSync } from 'node:fs';
+import { existsSync, readFileSync, lstatSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,8 +62,8 @@ export function microTaskGitCommands({ branch, targetWorktree }) {
   };
 }
 
-export function previewConflictError({ currentWorktree, targetWorktree }) {
-  if (!currentWorktree) return null;
+export function previewConflictError({ currentWorktree, targetWorktree, retainedPublishedPreview = false }) {
+  if (!currentWorktree || retainedPublishedPreview) return null;
   const current = path.resolve(currentWorktree);
   if (current === path.resolve(targetWorktree)) return null;
   return `5175 当前仍由其他未交接任务使用：${currentWorktree}`;
@@ -153,11 +153,30 @@ function findManagedWorktrees(root) {
   return { worktrees, main, integration };
 }
 
+export function retainedPublishedPreview(root, selected) {
+  if (!selected || path.basename(selected) !== 'preview-current') return false;
+  try {
+    const common = (cwd) => path.resolve(cwd, captureGit(cwd, ['rev-parse', '--git-common-dir']));
+    if (common(root) !== common(selected)) return false;
+    if (captureGit(selected, ['branch', '--show-current']) !== 'codex/preview-current') return false;
+    if (captureGit(selected, ['status', '--porcelain'])) return false;
+    if (captureGit(selected, ['rev-parse', 'HEAD']) !== captureGit(root, ['rev-parse', 'origin/main'])) return false;
+    const file = path.join(common(root), 'preview-environment/environment.json');
+    if (!existsSync(file) || lstatSync(file).isSymbolicLink()) return false;
+    const record = JSON.parse(readFileSync(file, 'utf8'));
+    return (
+      record.version === 1 && path.resolve(record.repository) === common(root) && record.profile?.status === 'ready'
+    );
+  } catch {
+    return false;
+  }
+}
+
 function printHelp() {
   console.log(`Usage: npm run task:start -- [--slug <task-slug>] [--kind <kind>] [--resume | --independent]
 
 默认恢复同类型未交付批次的分支和 Worktree；没有活动批次时从最新 origin/main 创建并登记。
-随后切换 5175 并校验完整累计任务差异所需的预览环境。task:micro 保持兼容。
+业务批次随后切换 5175 并校验完整累计任务差异所需的预览环境；基建批次不占用业务预览。task:micro 保持兼容。
 
 Options:
   --slug status-copy   新批次标识；已有批次时新模块名不会创建新分支
@@ -178,6 +197,7 @@ export function startTask(options, dependencies = {}) {
     findManagedWorktrees,
     assertSafeDirectory,
     queryPreviewStatus,
+    retainedPublishedPreview,
     gitOperationInProgress,
     refsAreSynced,
     gitRefExists,
@@ -242,7 +262,10 @@ export function startTask(options, dependencies = {}) {
   }
 
   const previewService = path.join(invocationRoot, 'scripts', 'task-preview-service.mjs');
-  const previewStatus = system.queryPreviewStatus(previewService, invocationRoot);
+  const previewStatus =
+    options.kind === 'infrastructure'
+      ? { worktree: null, phase: 'not-applicable' }
+      : system.queryPreviewStatus(previewService, invocationRoot);
   if (
     previewStatus.phase === 'offline' &&
     (!previewStatus.selectionKnown ||
@@ -252,7 +275,12 @@ export function startTask(options, dependencies = {}) {
   ) {
     throw new Error('预览服务离线，尚不能证明可安全新建或切换；请先核对并显式恢复原任务，不自动建立新批次');
   }
-  const conflict = previewConflictError({ currentWorktree: previewStatus.worktree, targetWorktree });
+  const conflict = previewConflictError({
+    currentWorktree: previewStatus.worktree,
+    targetWorktree,
+    retainedPublishedPreview:
+      options.kind !== 'infrastructure' && system.retainedPublishedPreview(invocationRoot, previewStatus.worktree),
+  });
   if (conflict) throw new Error(`${conflict}\n请先验收或交接当前任务，不自动覆盖其预览。`);
 
   if (!batch) {
@@ -280,6 +308,13 @@ export function startTask(options, dependencies = {}) {
     }
     // Register before switching the preview so a failed startup remains recoverable in this batch.
     batch = system.registerBatch(targetWorktree, { id: options.slug, kind: options.kind });
+  }
+
+  if (options.kind === 'infrastructure') {
+    system.log(`基建批次已就绪：${batch.id}（${branch}）`);
+    system.log(`Worktree：${targetWorktree}`);
+    system.log('基建任务不检查、切换或占用业务预览；运行工具变化另做隔离验证。');
+    return { batch, restored };
   }
 
   const checkPreview = () =>

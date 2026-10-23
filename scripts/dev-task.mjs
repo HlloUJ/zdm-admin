@@ -1362,7 +1362,7 @@ function printHelp() {
   console.log(`Usage: npm run dev:task -- [options]
 
 Options:
-  --mode auto|frontend|full  自动识别（默认）、只用共享后端或完整任务环境
+  --mode auto|frontend|full  旧启动参数；启动须使用已安装且支持隔离数据的常驻服务
   --port 5176               指定临时任务前端端口（5175-5199）
   --temporary               从 5177-5199 自动选择临时端口，不切换固定入口
   --backend-port 8081       指定任务后端端口（8081-8099）
@@ -1401,6 +1401,15 @@ export async function main(args = process.argv.slice(2)) {
       options.stop)
   ) {
     throw new Error('--check 只能与 --port 或 --worktree 组合使用');
+  }
+
+  // This published legacy launcher cannot prove isolated persistent data inputs.
+  // The installed compatible service remains authoritative; never silently start
+  // against the integration database while its persistent replacement is retained.
+  if (!options.check && !options.handoff && !options.stop && !options.pause) {
+    throw new Error(
+      '该旧启动器未实现长期预览隔离数据契约；请使用已安装的兼容 dev:task 服务，不自动重装、切到集成API或重建预览数据',
+    );
   }
 
   if (options.check) {
