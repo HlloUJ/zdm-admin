@@ -125,6 +125,7 @@ async function main(args) {
     });
     const checks = [
       verification.preflight,
+      verification.contractPreflight,
       ...verification.frontend,
       ...verification.engineering,
       ...verification.backend,

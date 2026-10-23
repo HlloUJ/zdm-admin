@@ -23,7 +23,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "f7dd0191af276314907e8bc89d304d7719e952409a2a7c4f8df0290c6254de6a",
+      "digest": "b1f1ed35ae7c3b5ec31af8f40926ca1f3ce44046e7e2f7214af5a43552a1bb1e",
       "imports": [],
       "dynamicImports": 0
     },
@@ -115,20 +115,28 @@
       "imports": ["scripts/git-workflow-core.mjs"],
       "dynamicImports": 0
     },
+    "scripts/ci-equivalence-environment.mjs": {
+      "digest": "4aeeb6508b995d5ae0d5fe87167a04c96f90cc39da48ae07b03898f1b5c92485",
+      "imports": ["scripts/verification-evidence.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/ci-equivalence.mjs": {
-      "digest": "776c6c9fcc8d719f9fdd84aa1a02a2c0c6453a06149def2ebdb5ceba76ac273b",
+      "digest": "ca6759c6e6560cdc87dccd1457b530b9007f1390c46f203cf3a468fc5edefb2c",
       "imports": [
+        "scripts/ci-equivalence-environment.mjs",
         "scripts/frontend-test-evidence.mjs",
-        "scripts/script-test-plan.mjs",
-        "scripts/verification-evidence.mjs"
+        "scripts/script-test-plan.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.test.mjs": {
-      "digest": "6194a7cb99577c6c97c37d121043921c8988691ca8dd8e5ceece2fbce2efe276",
+      "digest": "3209d1979ce6e2c08b875a4e526599921eaa0ab2e58abac5bac4830c65a69b75",
       "imports": [
+        "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs",
         "scripts/dev-task.mjs",
+        "scripts/script-test-plan.mjs",
         "scripts/task-completion.mjs",
         "scripts/wait-quality.mjs"
       ],
@@ -444,7 +452,7 @@
       "dynamicImports": 0
     },
     "scripts/task-completion.mjs": {
-      "digest": "ec30ec288cc3a4d6893177c5f079eb367e23c3c7597661fb108a8fbe22c96db4",
+      "digest": "7a24effcd96d334f990485448c93e077ed073efd2463883418224540a2ad29fd",
       "imports": ["scripts/task-batch.mjs", "scripts/verify.mjs", "scripts/wait-quality.mjs"],
       "dynamicImports": 0
     },
@@ -511,7 +519,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "f9db2e45a779687eeb300fdd0e13037f3d9b7f7a1f49f1d424d10c59611612d3",
+      "digest": "cd3d06b9bee55e79c52783d3c3a3ecf6e8b419ffda24519bfc13c81d58f94731",
       "imports": [
         "scripts/run-frontend-tests.mjs",
         "scripts/verification-evidence.mjs",
@@ -582,7 +590,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "b47e0849d16d21eef5b0392b90bda220921f7dcda38d40ae8e5d9be5fbabca66",
+      "digest": "b87fe85466d5c8baa99a45f9db75de4b2a8bac1fb876f0b1164811de26669114",
       "imports": [
         "scripts/check-changed-plan.mjs",
         "scripts/script-test-plan.mjs",

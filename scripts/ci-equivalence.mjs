@@ -2,14 +2,14 @@
 // Every uncertainty is a miss: the unchanged normal CI commands then run.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
 import { SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
-import { hashPaths } from './verification-evidence.mjs';
+import { environmentProof, environmentObservation, validateEnvironmentProof } from './ci-equivalence-environment.mjs';
+export { executionEnvironment, environmentProof } from './ci-equivalence-environment.mjs';
 
 export const REUSABLE_JOBS = {
   formatting: 'ci-formatting',
@@ -17,20 +17,6 @@ export const REUSABLE_JOBS = {
   frontend_e2e_1: 'ci-frontend-e2e-1',
   frontend_e2e_2: 'ci-frontend-e2e-2',
 };
-const digest = (value) => createHash('sha256').update(value).digest('hex');
-export function executionEnvironment(env) {
-  // These jobs execute under the same reviewed environment on PR and main.
-  // API tokens and event-specific GitHub identities never reach test processes.
-  return Object.fromEntries(
-    Object.entries(env)
-      .filter(([key]) =>
-        /^(?:PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TMP|TEMP|LANG|LC_ALL|TZ|DISPLAY|CI|GITHUB_ACTIONS|CI_EVIDENCE_DIR|XDG_.*|PLAYWRIGHT_.*|VITE_.*|VITEST_.*|NODE_.*|NPM_CONFIG_.*)$/.test(
-          key,
-        ),
-      )
-      .sort(),
-  );
-}
 function command(program, args) {
   const result = spawnSync(program, args, { encoding: 'utf8', timeout: 60000, maxBuffer: 32 * 1024 * 1024 });
   assert.equal(result.status, 0, `${program} identity or evidence unavailable`);
@@ -44,41 +30,10 @@ export function readCommitParents(root = process.cwd()) {
   const header = git('-C', root, 'cat-file', 'commit', 'HEAD').split('\n\n', 1)[0];
   return [...header.matchAll(/^parent ([a-f0-9]{40})$/gm)].map((match) => match[1]);
 }
-export function environmentProof(env = process.env) {
-  assert.equal(process.platform, 'linux', 'Only reviewed hosted Linux jobs support CI reuse');
-  assert.ok(REUSABLE_JOBS[env.GITHUB_JOB], 'This domain has no equivalence contract; execute normally');
-  assert.equal(env.GITHUB_RUN_ATTEMPT, '1', 'Reruns cannot reuse evidence');
-  assert.ok(env.ImageOS && env.ImageVersion, 'Missing immutable runner image identity');
-  assert.equal(git('status', '--porcelain', '--untracked-files=normal'), '', 'Sources changed during setup');
-  const browser = env.GITHUB_JOB.startsWith('frontend_e2e');
-  if (browser) assert.ok(existsSync('/opt/google/chrome/chrome'), 'Actual Chrome runtime cannot be proven');
-  return {
-    version: 1,
-    contract: 'reviewed-frontend-environment-v1',
-    job: env.GITHUB_JOB,
-    image: [env.ImageOS, env.ImageVersion],
-    platform: [process.platform, process.arch, os.release()],
-    hardware: [os.cpus().length, os.cpus()[0]?.model, os.totalmem()],
-    node: [process.version, digest(readFileSync(process.execPath))],
-    packages: digest(command('dpkg-query', ['-W', '-f=${Package}=${Version}\n'])),
-    inputs: hashPaths(process.cwd(), ['node_modules'], { dependency: true }),
-    systemFiles: hashPaths('/', ['/etc/os-release', '/etc/fonts', '/usr/share/fonts']),
-    browser: browser ? hashPaths('/', ['/opt/google/chrome']) : null,
-    environment: digest(JSON.stringify(executionEnvironment(env))),
-  };
-}
 export function validateProvenance({ current, original, run, pull, commit, repository, parents, proof }) {
   assert.ok(REUSABLE_JOBS[original.job], 'Unsupported reuse domain');
-  assert.equal(proof?.version, 1);
-  assert.equal(proof?.contract, 'reviewed-frontend-environment-v1');
-  assert.equal(proof?.job, original.job);
-  assert.ok(proof.image?.length === 2 && proof.image.every(Boolean));
-  assert.ok(proof.platform?.length === 3 && proof.platform.every(Boolean));
-  assert.ok(proof.hardware?.length === 3 && proof.hardware.every(Boolean));
-  for (const key of ['packages', 'inputs', 'systemFiles', 'environment'])
-    assert.match(proof[key] ?? '', /^[a-f0-9]{64}$/);
-  assert.ok(proof.node?.length === 2 && proof.node.every(Boolean));
-  if (original.job.startsWith('frontend_e2e')) assert.match(proof.browser ?? '', /^[a-f0-9]{64}$/);
+  validateEnvironmentProof(proof, original.job);
+  validateEnvironmentProof(original.environmentProof, original.job);
   const required = {
     formatting: ['npm-ci', 'formatting'],
     frontend_static: [
@@ -186,6 +141,11 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     assert.notEqual(env.CI_EQUIVALENCE_DISABLED, 'true', 'Operator disabled equivalence reuse');
     proof = (dependencies.environmentProof ?? environmentProof)(env);
     writeFileSync(path.join(directory, 'environment-proof.json'), JSON.stringify(proof));
+    const observation = (dependencies.environmentObservation ?? environmentObservation)();
+    const currentFile = path.join(directory, 'metadata.json');
+    const observedMetadata = json(currentFile);
+    observedMetadata.environmentObservation = observation;
+    writeFileSync(currentFile, JSON.stringify(observedMetadata));
     if (env.GITHUB_EVENT_NAME !== 'push' || env.GITHUB_REF !== 'refs/heads/main')
       throw new Error('Fresh PR/dev execution');
     const repository = env.GITHUB_REPOSITORY;
@@ -261,6 +221,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
       setupPhases: current.phases,
       execution: 'reused',
       environmentProof: proof,
+      environmentObservation: current.environmentObservation,
       reusedFrom: provenance,
     };
     validateReusedMetadata(replay);
