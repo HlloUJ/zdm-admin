@@ -67,6 +67,8 @@ for (const status of ['offShelf', 'soldOut', 'recycle']) {
     await page.getByRole('main').locator('.table-actions').getByText('详情', { exact: true }).click();
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '大板详情' });
     await expect(drawer.getByText('最新协同大板', { exact: true })).toBeVisible();
+    await expect(drawer.locator('.t-card__title')).toHaveText(['图文描述', '基础信息', '销售信息']);
+    await expect(drawer.locator('.slab-detail-section-title')).toHaveCount(0);
     await expect(drawer.getByText('库存异常', { exact: true })).toHaveCount(0);
     await expect(drawer.getByText('待核对库存', { exact: true })).toHaveCount(0);
     await expect(drawer.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true })).toHaveCount(0);
@@ -414,6 +416,10 @@ test('彻底删除操作日志显示删除终态，与成品现货一致', async
   );
   await page.reload();
   await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  await expect(page.locator('.t-drawer--open .operation-log-keyword-filter input')).toHaveAttribute(
+    'placeholder',
+    '请输入大板名称/ID/大板编号',
+  );
   const logRow = page.locator('.t-drawer--open tbody tr').filter({ hasText: '已删除大板' });
   await logRow.getByText('详情', { exact: true }).click();
   await expect(page.locator('.t-dialog:visible')).toContainText('仓库中 → 已彻底删除');
@@ -493,6 +499,10 @@ for (const [source, operationType, oldSummary] of [
     const expected = sourceBlockMessage(source);
     await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toContainText(expected);
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+    await expect(page.locator('.t-drawer--open .operation-log-keyword-filter input')).toHaveAttribute(
+      'placeholder',
+      '请输入大板名称/ID/大板编号',
+    );
     const row = page.locator('.t-drawer--open tbody tr').filter({ hasText: '协同大板' });
     await expect(row).toContainText(expected);
     await expect(row).not.toContainText(oldSummary);
@@ -541,6 +551,10 @@ test('大板供应链上架入仓的列表和详情文案与成品现货一致',
   await page.reload();
   await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toHaveCount(0);
   await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+  await expect(page.locator('.t-drawer--open .operation-log-keyword-filter input')).toHaveAttribute(
+    'placeholder',
+    '请输入大板名称/ID/大板编号',
+  );
   const row = page.locator('.t-drawer--open tbody tr').filter({ hasText: '协同大板' });
   await expect(row).toContainText(expected);
   await row.getByText('详情', { exact: true }).click();

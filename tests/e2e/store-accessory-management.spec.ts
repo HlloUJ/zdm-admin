@@ -439,6 +439,7 @@ test('upstream unavailable row is masked, with detail and purge only', async ({ 
   await overlay.getByRole('button', { name: '详情' }).click();
   const detail = page.locator('.t-drawer--open');
   await expect(detail.getByText('门店商品详情')).toBeVisible();
+  await expect(detail.locator('.t-card__title')).toHaveText(['图文描述', '基础信息', '销售信息']);
   await expect(detail.getByText('家具 / 桌椅 / 餐桌', { exact: true })).toBeVisible();
   await expect(detail.getByText('本店状态', { exact: true })).toHaveCount(0);
   await expect(detail.getByText('供应商', { exact: true })).toHaveCount(0);
@@ -664,6 +665,10 @@ test('store operation logs show the same filter, pagination, and detail structur
   await page.goto('/store/accessory-management');
   await page.getByRole('main').getByText('操作日志').click();
   const drawer = page.locator('.t-drawer--open').filter({ has: page.locator('.operation-log-filters') });
+  await expect(drawer.locator('.operation-log-keyword-filter input')).toHaveAttribute(
+    'placeholder',
+    '请输入商品名称/ID',
+  );
   await expect(drawer.getByText('门店测试商品')).toBeVisible();
   const dateWidth = (await drawer.locator('.operation-log-date-picker').boundingBox())!.width;
   const keywordWidth = (await drawer.locator('.operation-log-keyword-filter .t-input').boundingBox())!.width;

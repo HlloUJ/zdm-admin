@@ -379,13 +379,7 @@
       @cancel="copyTarget = undefined"
       >当前分类已有草稿，复制后将覆盖草稿中的全部配置，是否继续？</AdminDialog
     >
-    <t-drawer
-      v-model:visible="historyVisible"
-      class="zdm-admin-responsive-drawer"
-      header="版本记录"
-      size="760px"
-      :footer="false"
-    >
+    <t-drawer v-model:visible="historyVisible" header="版本记录" size="min(760px, 100vw)" :footer="false">
       <t-table row-key="id" :data="versions.filter((v) => v.state === 'published')" :columns="historyColumns">
         <template #versionNo="{ row }">
           <t-space size="small" align="center">

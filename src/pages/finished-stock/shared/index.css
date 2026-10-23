@@ -45,8 +45,7 @@
 .table-toolbar,
 .toolbar-buttons,
 .form-title-row,
-.selected-category,
-.drawer-head {
+.selected-category {
   display: flex;
   align-items: center;
 }
@@ -278,9 +277,9 @@
   white-space: nowrap;
 }
 
-/* Use the price cell's existing feedback space without moving other specification controls. */
+/* Short table feedback uses the price row's existing reserved space. */
 :deep(.spec-table-block--stable-feedback .t-input__tips) {
-  position: absolute;
+  margin-bottom: calc(-1 * var(--td-line-height-body-small));
 }
 
 .spec-table-block .price-pair {
@@ -457,7 +456,7 @@
 .single-spec-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
+  align-items: start;
   gap: var(--td-comp-margin-s);
 }
 
@@ -470,12 +469,21 @@
 .layered-value-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
+  align-items: start;
   gap: var(--td-comp-margin-s);
+}
+
+/* These compact grids have no FormItem spacing to carry a feedback line. */
+.single-spec-row > :deep(.t-input__wrap),
+.layered-value-row > :deep(.t-input__wrap),
+.layered-value-row > :deep(.t-select__wrap) {
+  padding-bottom: var(--td-line-height-body-small);
 }
 
 .spec-value-drag-handle {
   display: inline-flex;
+  align-items: center;
+  min-height: var(--td-comp-size-m);
   cursor: grab;
 }
 
@@ -573,21 +581,6 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
-}
-
-.drawer-head {
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.drawer-head div {
-  display: grid;
-  gap: 4px;
-}
-
-.drawer-head span {
-  color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-medium);
 }
 
 .detail-panel {

@@ -151,3 +151,25 @@ test('attribute value create dialog keeps its final field error visible without 
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(dialog).toBeHidden();
 });
+
+for (const kind of ['public', 'foundation']) {
+  test(`${kind} final long error grows the dialog instead of clipping feedback`, async ({ page }) => {
+    await page.goto(`/tests/fixtures/official-ui/dialog-validation.html?kind=${kind}&long-errors=1`);
+    const dialog = page.locator('.t-dialog:visible');
+    const body = dialog.locator('.t-dialog__body');
+    const before = await body.boundingBox();
+    await dialog.getByRole('button', { name: /^确认新增$/, exact: true }).click();
+    const tip = dialog.getByText('请输入值名称，并检查分类和规格是否正确。'.repeat(12), { exact: true });
+    await expect(tip).toBeVisible();
+    const after = await body.boundingBox();
+    const box = await tip.boundingBox();
+    expect(after!.height).toBeGreaterThan(before!.height);
+    expect(box!.height).toBeGreaterThan(20);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(after!.y + after!.height);
+    expect(
+      await tip.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight,
+      ),
+    ).toBe(true);
+  });
+}

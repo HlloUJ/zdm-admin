@@ -233,13 +233,24 @@ public class StoreLevelService extends CreatorAwareService<StoreLevelMapper, Sto
     return count != null && count > 0;
   }
 
+  private boolean isPriceConfigurationEnabled(String table, Long levelId) {
+    Integer count = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM " + table + " WHERE store_level_id = ? AND status = 'enabled'",
+        Integer.class,
+        levelId);
+    return count != null && count > 0;
+  }
+
   private List<StoreLevel> enrich(List<StoreLevel> levels) {
     levels.forEach(level -> {
       boolean finished = isPriceConfigured("finished_markup_configurations", level.getId());
       boolean slab = isPriceConfigured("slab_markup_configurations", level.getId());
       level.setFinishedPriceConfigured(finished);
       level.setSlabPriceConfigured(slab);
-      level.setPriceComplete(finished && slab);
+      level.setPriceComplete(
+          isPriceConfigurationEnabled("accessory_markup_configurations", level.getId())
+              && isPriceConfigurationEnabled("finished_markup_configurations", level.getId())
+              && isPriceConfigurationEnabled("slab_markup_configurations", level.getId()));
     });
     return levels;
   }

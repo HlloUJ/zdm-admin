@@ -4,6 +4,7 @@
     :editor-layout="editorLayout"
     :attribute-names="attributeNames"
     :store-level-name="product.storeLevelName || undefined"
+    :drawer-layout="!editorLayout"
     operations
     store-mode
     @preview="(media, type) => (preview = { url: media.url, kind: type })"

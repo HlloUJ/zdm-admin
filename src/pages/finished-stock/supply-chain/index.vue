@@ -910,60 +910,52 @@
       v-model:visible="priceDrawerVisible"
       header="批量填写"
       placement="right"
-      size="1180px"
+      size="min(1180px, 100vw)"
       lazy
       destroy-on-close
-      :footer="false"
       @close="closePriceDrawer"
     >
-      <div class="drawer-head">
-        <div>
-          <strong>批量填写</strong>
-          <span>按规格属性值圈定范围，再填写要覆盖的字段</span>
-        </div>
-        <t-button :theme="buttonTheme('save')" @click="savePriceDrawer">
-          <template #icon><t-icon name="save" /></template>
-          {{ formConfirmationText('edit') }}
-        </t-button>
-      </div>
-
       <div ref="priceFormRoot" class="batch-fill-panel">
-        <section class="batch-section">
-          <div class="batch-section-head">
-            <strong>选择批量范围</strong>
-            <span>未选择属性值时默认填充全部规格</span>
-          </div>
+        <t-card class="batch-section" title="选择批量范围">
+          <template #actions
+            ><t-typography-text theme="secondary">未选择属性值时默认填充全部规格</t-typography-text></template
+          >
           <div class="batch-filter-list">
             <div v-for="filter in batchFilterOptions" :key="filter.field" class="batch-filter-row">
-              <div class="batch-filter-label">{{ filter.label }}</div>
+              <t-typography-text class="batch-filter-label" strong>{{ filter.label }}</t-typography-text>
               <div class="batch-filter-values">
-                <button
-                  type="button"
-                  :class="['batch-chip', !batchFillFilters[filter.field].length && 'active']"
-                  @click="clearBatchFilterField(filter.field)"
+                <t-check-tag
+                  :checked="!batchFillFilters[filter.field].length"
+                  size="small"
+                  :checked-props="{ theme: 'primary', variant: 'light-outline' }"
+                  :unchecked-props="{ variant: 'outline' }"
+                  @change="clearBatchFilterField(filter.field)"
                 >
                   全部
-                </button>
-                <button
+                </t-check-tag>
+                <t-check-tag
                   v-for="value in filter.values"
                   :key="value"
-                  type="button"
-                  :class="['batch-chip', isBatchFilterValueSelected(filter.field, value) && 'active']"
-                  @click="toggleBatchFilterValue(filter.field, value)"
+                  :checked="isBatchFilterValueSelected(filter.field, value)"
+                  size="small"
+                  :checked-props="{ theme: 'primary', variant: 'light-outline' }"
+                  :unchecked-props="{ variant: 'outline' }"
+                  @change="toggleBatchFilterValue(filter.field, value)"
                 >
                   {{ value }}
-                </button>
+                </t-check-tag>
               </div>
             </div>
           </div>
-          <div class="batch-match-tip">当前将批量填充 {{ batchFillMatchedRows.length }} 条规格</div>
-        </section>
+          <t-typography-text class="batch-match-tip" theme="secondary"
+            >当前将批量填充 {{ batchFillMatchedRows.length }} 条规格</t-typography-text
+          >
+        </t-card>
 
-        <section class="batch-section">
-          <div class="batch-section-head">
-            <strong>填写字段</strong>
-            <span>留空的字段不会覆盖原规格数据</span>
-          </div>
+        <t-card class="batch-section" title="填写字段">
+          <template #actions
+            ><t-typography-text theme="secondary">留空的字段不会覆盖原规格数据</t-typography-text></template
+          >
           <div class="batch-field-grid">
             <t-form-item v-if="!isOperationsEdit" label="成本价">
               <SpecPriceInput
@@ -997,7 +989,6 @@
                 placeholder="请输入数量"
                 theme="normal"
                 :min="0"
-                style="width: 100%"
                 @beforeinput.capture="preventZeroQuantity"
                 @paste.capture="preventZeroQuantity"
                 @keydown.capture="preventZeroQuantity"
@@ -1024,8 +1015,17 @@
               />
             </t-form-item>
           </div>
-        </section>
+        </t-card>
       </div>
+      <template #footer>
+        <t-space size="small">
+          <t-button :theme="buttonTheme('save')" @click="savePriceDrawer">
+            <template #icon><t-icon name="save" /></template>
+            {{ formConfirmationText('edit') }}
+          </t-button>
+          <t-button :theme="buttonTheme('cancel')" @click="closePriceDrawer">取消</t-button>
+        </t-space>
+      </template>
     </t-drawer>
     <t-dialog
       v-model:visible="reasonDialogVisible"
@@ -1056,7 +1056,7 @@
     <t-drawer
       v-model:visible="detailDialogVisible"
       header="商品详情"
-      :close-btn="false"
+      :close-btn="true"
       size="min(1240px, 100vw)"
       placement="right"
       :footer="false"
@@ -1068,6 +1068,7 @@
         :attribute-names="detailAttributeNames"
         :operations="false"
         :enabled-level-ids="enabledPriceLevels.map((level) => level.id)"
+        drawer-layout
         @preview="openProductMediaPreview"
       />
     </t-drawer>
