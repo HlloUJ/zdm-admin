@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   mkdtempSync,
@@ -12,7 +13,13 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { executionEnvironment, validateProvenance, validateReusedMetadata, tryReuse } from './ci-equivalence.mjs';
+import {
+  executionEnvironment,
+  readCommitParents,
+  validateProvenance,
+  validateReusedMetadata,
+  tryReuse,
+} from './ci-equivalence.mjs';
 import { main as legacyPreviewMain } from './dev-task.mjs';
 import { waitQuality } from './wait-quality.mjs';
 import { assetKind, preserveAssets, previewContract } from './task-completion.mjs';
@@ -499,4 +506,30 @@ test('asset preservation rejects a preexisting nonprivate destination', (t) => {
   mkdirSync(dest);
   chmodSync(dest, 0o755);
   assert.throws(() => preserveAssets(root, dest, []), /owner-only/);
+});
+
+test('actual depth-one CI checkout retains exact ordered merge parents without fetching', (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'ci-shallow-merge-'));
+  t.after(() => rmSync(root, { recursive: true }));
+  const source = path.join(root, 'source');
+  const shallow = path.join(root, 'shallow');
+  const run = (cwd, ...args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  mkdirSync(source);
+  run(source, 'init', '--initial-branch=main');
+  run(source, 'config', 'user.name', 'CI regression');
+  run(source, 'config', 'user.email', 'ci@example.invalid');
+  run(source, 'commit', '--allow-empty', '-m', 'base');
+  run(source, 'checkout', '-b', 'task');
+  run(source, 'commit', '--allow-empty', '-m', 'task');
+  const task = run(source, 'rev-parse', 'HEAD');
+  run(source, 'checkout', 'main');
+  run(source, 'commit', '--allow-empty', '-m', 'main advance');
+  const base = run(source, 'rev-parse', 'HEAD');
+  run(source, 'merge', '--no-ff', '-m', 'merge task', 'task');
+  run(root, 'clone', '--depth=1', `file://${source}`, shallow);
+  assert.equal(run(shallow, 'rev-parse', '--is-shallow-repository'), 'true');
+  assert.equal(run(shallow, 'show', '-s', '--format=%P', 'HEAD'), '');
+  assert.deepEqual(readCommitParents(shallow), [base, task]);
+  assert.equal(run(shallow, 'rev-parse', '--is-shallow-repository'), 'true');
 });
