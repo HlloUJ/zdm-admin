@@ -3,6 +3,7 @@
     :product="detail"
     :attribute-names="attributeNames"
     :store-level-name="product.storeLevelName || undefined"
+    drawer-layout
     operations
     pool-mode
     @preview="(media, type) => (preview = { url: media.url, kind: type })"

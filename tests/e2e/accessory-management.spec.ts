@@ -1,4 +1,4 @@
-import { expectEditableDrawer } from './drawer-standard-assertions';
+import { expectEditableDrawer, expectDrawerWithinViewport } from './drawer-standard-assertions';
 import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
 import { checkDecimalEditing } from './decimal-editing';
@@ -561,6 +561,7 @@ test('source specification editor exposes cost and stock without operations pric
   await expect(page.locator('.batch-field-grid').getByText('指导价', { exact: true })).toHaveCount(0);
   const drawer = page.locator('.t-drawer--open');
   await expectEditableDrawer(drawer, '批量填写');
+  await expectDrawerWithinViewport(drawer);
   await expect(drawer.getByText('按规格属性值圈定范围，再填写要覆盖的字段', { exact: true })).toHaveCount(0);
   const valuesBefore = await table
     .locator('tbody input')
@@ -1195,6 +1196,10 @@ for (const client of ['admin', 'supply-chain']) {
     await page.goto(path);
     await expect(page.getByRole('main')).not.toContainText('商家编码');
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
+    await expect(page.locator('.t-drawer--open .operation-log-keyword-filter input')).toHaveAttribute(
+      'placeholder',
+      '请输入商品名称/ID',
+    );
     for (const record of records) {
       const row = page
         .getByRole('row')
@@ -2420,7 +2425,7 @@ for (const submittedBeforeCreation of [false, true]) {
     await expect(table.locator('.t-input__tips')).toHaveCount(0);
     await expect(table.locator('.t-is-error')).toHaveCount(0);
     if (submittedBeforeCreation)
-      await expect(page.getByPlaceholder('请输入商品名称').locator('..')).toHaveClass(/t-is-error/);
+      await expect(page.getByPlaceholder('请输入商品名称', { exact: true }).locator('..')).toHaveClass(/t-is-error/);
     await quantity.pressSequentially('abc-+.e中文');
     await expect(quantity).toHaveValue('');
     await quantity.pressSequentially('0');
@@ -2530,6 +2535,7 @@ test('operations batch drawer uses native footer and cancel keeps specification 
   const valuesBefore = await inputs.evaluateAll((items) => items.map((input) => (input as HTMLInputElement).value));
   const drawer = page.locator('.t-drawer--open');
   await expectEditableDrawer(drawer, '批量填写');
+  await expectDrawerWithinViewport(drawer);
   await expect(drawer.getByText('按规格属性值圈定范围，再填写要覆盖的字段', { exact: true })).toHaveCount(0);
   await drawer.locator('.t-drawer__footer').getByRole('button', { name: '取消', exact: true }).click();
   await expect(drawer).not.toBeVisible();

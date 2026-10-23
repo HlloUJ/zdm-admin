@@ -910,7 +910,7 @@
       v-model:visible="priceDrawerVisible"
       header="批量填写"
       placement="right"
-      size="1180px"
+      size="min(1180px, 100vw)"
       lazy
       destroy-on-close
       @close="closePriceDrawer"
@@ -1065,6 +1065,7 @@
         :attribute-names="detailAttributeNames"
         :operations="false"
         :enabled-level-ids="enabledPriceLevels.map((level) => level.id)"
+        drawer-layout
         @preview="openProductMediaPreview"
       />
     </t-drawer>

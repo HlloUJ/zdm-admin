@@ -30,3 +30,16 @@ export async function expectEditableDrawer(drawer: Locator, title: string) {
   expect(await header.boundingBox()).toEqual(headerBefore);
   expect(await footer.boundingBox()).toEqual(footerBefore);
 }
+
+export async function expectDrawerWithinViewport(drawer: Locator) {
+  const page = drawer.page();
+  const previous = page.viewportSize();
+  await page.setViewportSize({ width: 760, height: 600 });
+  await drawer.locator('.t-drawer__footer').getByRole('button', { name: '取消', exact: true }).click({ trial: true });
+  const box = await drawer.locator('.t-drawer__content-wrapper').boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.width).toBeLessThanOrEqual(760);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(760);
+  if (previous) await page.setViewportSize(previous);
+}

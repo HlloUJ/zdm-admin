@@ -182,6 +182,8 @@ for (const [status, scope] of [
     }
     const drawer = page.locator('.t-drawer:visible');
     await expect(drawer.getByText('完整图文资料', { exact: true })).toBeVisible();
+    await expect(page.locator('.t-drawer--open .t-card__title')).toHaveText(['图文描述', '基础信息', '销售信息']);
+    await expect(page.locator('.t-drawer--open .product-detail__card-title')).toHaveCount(0);
     await expect(drawer.getByText('SKU ID：81', { exact: true })).toBeVisible();
     await expect(drawer.getByRole('columnheader', { name: '商家编码', exact: true })).toHaveCount(0);
     await expect(drawer.getByText('岩板', { exact: true })).toBeVisible();

@@ -20,7 +20,8 @@
               <t-input
                 :value="filter.keyword"
                 clearable
-                :placeholder="controlPlaceholder(subjectLabel, 'input')"
+                :data-query-search-scope="keywordPlaceholder"
+                :placeholder="controlPlaceholder(keywordPlaceholder ?? subjectLabel, 'input')"
                 @change="emit('filter-change', 'keyword', $event)"
               />
             </t-form-item>
