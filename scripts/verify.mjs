@@ -46,6 +46,15 @@ export function createVerificationPlan({
   const browserEnv = browser ? { ...env, PLAYWRIGHT_CHANNEL: browser } : env;
   const plan = {
     preflight: task('format check', 'format:check', { reuse: false }),
+    contractPreflight:
+      !affected ||
+      files.some((file) =>
+        /^(?:scripts\/(?:ci-|verify|verification-|frontend-test-evidence)|\.github\/workflows\/quality\.yml)/.test(
+          file,
+        ),
+      )
+        ? task('CI reuse contract preflight', 'test:ci-reuse', { reuse: false })
+        : null,
     frontend: [
       task('frontend quality', 'quality:checks'),
       task('frontend build', 'build:app', { artifacts: ['dist'], reuse: false }),
@@ -133,6 +142,7 @@ export async function executeVerification(
   }
   const execute = (task) => run(task, { force, report });
   if ((await execute(plan.preflight)).exitCode !== 0) return 1;
+  if (plan.contractPreflight && (await execute(plan.contractPreflight)).exitCode !== 0) return 1;
   // Mock browser / isolated Testcontainers checks do not start or reconfigure the shared backend.
   if (plan.runtime && (await execute(plan.runtime)).exitCode !== 0) return 1;
   const pipeline = async (tasks) => {
@@ -189,6 +199,8 @@ export async function main(args = process.argv.slice(2)) {
     console.log(`Mode: ${affected ? 'affected delivery checks; final CI still required' : 'full automated checks'}`);
     if (affected) console.log(`Impact: ${JSON.stringify(plan.impact)}`);
     console.log(`Preflight: ${plan.preflight.command} ${plan.preflight.args.join(' ')}`);
+    if (plan.contractPreflight)
+      console.log(`Contract preflight: ${plan.contractPreflight.command} ${plan.contractPreflight.args.join(' ')}`);
     console.log(
       plan.runtime
         ? `Runtime: ${plan.runtime.command} ${plan.runtime.args.join(' ')}`

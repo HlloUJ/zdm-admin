@@ -604,7 +604,7 @@ test('format failure stops early; runtime is sequential; two pipelines preserve 
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.slice(0, 2), ['format check', 'task runtime identity']);
+  assert.deepEqual(calls.slice(0, 3), ['format check', 'CI reuse contract preflight', 'task runtime identity']);
   assert.equal(calls.includes('backend static quality'), false);
   assert.equal(calls.includes('browser tests'), true);
 });
@@ -740,4 +740,21 @@ test('a real scoped command failure stays blocked after an unrelated candidate c
   assert.equal(forced.exitCode, 1);
   assert.equal(record(forced).commandExitCode, 0);
   assert.equal(record(forced).firstFailure.attemptId, failed.attemptId);
+});
+
+test('failed CI contract preflight prevents expensive checks and runtime actions', async () => {
+  const plan = createVerificationPlan({ root: '/fixture', runtime: true });
+  const called = [];
+  const code = await executeVerification(plan, {
+    capture: () => ({ digest: 'fixed', baseline: 'base', mergeBase: 'base', mutationStamp: 'fixed' }),
+    report: () => {},
+    run: async (task) => {
+      called.push(task.name);
+      return { exitCode: task.name === 'CI reuse contract preflight' ? 1 : 0 };
+    },
+  });
+  assert.equal(code, 1);
+  assert.deepEqual(called, ['format check', 'CI reuse contract preflight']);
+  const ordinary = createVerificationPlan({ root: '/fixture', affected: true, files: ['src/views/ExampleView.vue'] });
+  assert.equal(ordinary.contractPreflight, null);
 });

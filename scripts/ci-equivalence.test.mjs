@@ -20,25 +20,32 @@ import {
   validateReusedMetadata,
   tryReuse,
 } from './ci-equivalence.mjs';
+import { environmentProofFromSnapshot, validateEnvironmentProof } from './ci-equivalence-environment.mjs';
+import { verifyFrontendEvidence } from './ci-quality-evidence.mjs';
+import { SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { main as legacyPreviewMain } from './dev-task.mjs';
 import { waitQuality } from './wait-quality.mjs';
 import { assetKind, preserveAssets, previewContract } from './task-completion.mjs';
 
+function snapshot() {
+  return {
+    runnerEnvironment: 'github-hosted',
+    platform: 'linux',
+    arch: 'x64',
+    imageOS: 'ubuntu24',
+    imageVersion: '20261012.334.1',
+    kernel: 'kernel',
+    hardware: { logicalCpus: 4, cpuModel: 'AMD', totalMemoryBytes: 16_766_414_848 },
+    node: ['v22.23.3', 'a'.repeat(64)],
+    ...Object.fromEntries(
+      ['inputs', 'environment', 'packages', 'systemFiles', 'browser'].map((k) => [k, 'a'.repeat(64)]),
+    ),
+  };
+}
 function fixture() {
   const parents = ['base', 'task'];
   const repository = 'owner/repo';
-  const proof = {
-    version: 1,
-    contract: 'reviewed-frontend-environment-v1',
-    job: 'frontend_e2e_1',
-    image: ['Ubuntu', '20260101'],
-    platform: ['linux', 'x64', 'kernel'],
-    hardware: [4, 'cpu', 1000],
-    node: ['v22', 'hash'],
-    ...Object.fromEntries(
-      ['packages', 'inputs', 'systemFiles', 'environment', 'browser'].map((key) => [key, 'a'.repeat(64)]),
-    ),
-  };
+  const proof = environmentProofFromSnapshot('frontend_e2e_1', snapshot());
   const current = {
     eventName: 'push',
     attempt: '1',
@@ -532,4 +539,226 @@ test('actual depth-one CI checkout retains exact ordered merge parents without f
   assert.equal(run(shallow, 'show', '-s', '--format=%P', 'HEAD'), '');
   assert.deepEqual(readCommitParents(shallow), [base, task]);
   assert.equal(run(shallow, 'rev-parse', '--is-shallow-repository'), 'true');
+});
+
+for (const job of ['formatting', 'frontend_static', 'frontend_e2e_1', 'frontend_e2e_2']) {
+  test(`${job} accepts CPU-vendor and small capacity differences within the reviewed resource class`, () => {
+    const a = snapshot();
+    const b = structuredClone(a);
+    b.hardware.cpuModel = 'Intel';
+    b.hardware.totalMemoryBytes += 4096;
+    const proof = environmentProofFromSnapshot(job, a);
+    assert.deepEqual(environmentProofFromSnapshot(job, b), proof);
+    for (const change of [
+      (s) => (s.hardware.logicalCpus = 2),
+      (s) => (s.hardware.totalMemoryBytes = 8_000_000_000),
+      (s) => (s.platform = 'darwin'),
+      (s) => (s.arch = 'arm64'),
+      (s) => (s.imageOS = 'ubuntu26'),
+      (s) => (s.runnerEnvironment = 'self-hosted'),
+    ]) {
+      const c = structuredClone(a);
+      change(c);
+      assert.throws(() => environmentProofFromSnapshot(job, c));
+    }
+  });
+  test(`${job} fingerprints exactly its reviewed input domains`, () => {
+    const a = snapshot();
+    const proof = environmentProofFromSnapshot(job, a);
+    for (const field of ['inputs', 'environment']) {
+      const b = structuredClone(a);
+      b[field] = 'b'.repeat(64);
+      assert.notDeepEqual(environmentProofFromSnapshot(job, b), proof);
+    }
+    const node = structuredClone(a);
+    node.node[1] = 'b'.repeat(64);
+    assert.notDeepEqual(environmentProofFromSnapshot(job, node), proof);
+    for (const field of ['imageVersion', 'kernel', 'packages', 'systemFiles', 'browser']) {
+      const b = structuredClone(a);
+      b[field] = ['packages', 'systemFiles', 'browser'].includes(field) ? 'b'.repeat(64) : 'other';
+      const affected = job !== 'formatting' && (field !== 'browser' || job.startsWith('frontend_e2e'));
+      assert.equal(JSON.stringify(environmentProofFromSnapshot(job, b)) !== JSON.stringify(proof), affected, field);
+    }
+    for (const field of Object.keys(proof)) {
+      const broken = structuredClone(proof);
+      delete broken[field];
+      assert.throws(() => validateEnvironmentProof(broken, job), field);
+    }
+    assert.throws(() => validateEnvironmentProof({ ...proof, version: 1 }, job));
+    assert.throws(() => validateEnvironmentProof({ ...proof, hardware: ['CPU', 4, 16] }, job));
+  });
+}
+
+function completeFrontendResult(kind) {
+  const files = kind === 'unit' ? ['unit-module-id'] : SOURCE_GUARD_TESTS;
+  const ids = files.map((_, i) => `${kind}-${i}`);
+  return {
+    schemaVersion: 1,
+    kind,
+    runId: kind,
+    complete: true,
+    files,
+    completedFiles: files,
+    collectedTests: ids,
+    suites: [],
+    errors: [],
+    tests: files.map((file, i) => ({
+      id: ids[i],
+      file,
+      name: ids[i],
+      status: 'passed',
+      retryCount: 0,
+      repeatCount: 0,
+      flaky: false,
+      expectedFailure: false,
+    })),
+  };
+}
+const completeBrowserReport = (ids, executed) => ({
+  suites: [
+    {
+      specs: ids.map((id) => ({
+        id,
+        tests: [
+          {
+            projectName: 'chromium',
+            ...(executed
+              ? { expectedStatus: 'passed', status: 'expected', results: [{ status: 'passed', retry: 0 }] }
+              : {}),
+          },
+        ],
+      })),
+    },
+  ],
+  errors: [],
+});
+
+test('all four job contracts acquire and replay original reports, then pass the unchanged two-shard aggregate', async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'ci-all-job-replay-'));
+  t.after(() => rmSync(root, { recursive: true }));
+  const groups = [];
+  for (const job of ['formatting', 'frontend_static', 'frontend_e2e_1', 'frontend_e2e_2']) {
+    const f = fixture();
+    const a = snapshot();
+    const b = structuredClone(a);
+    b.hardware.cpuModel = 'Intel';
+    b.hardware.totalMemoryBytes += 4096;
+    f.proof = environmentProofFromSnapshot(job, b);
+    f.original.environmentProof = environmentProofFromSnapshot(job, a);
+    f.original.job = job;
+    f.original.candidateSha = 'c'.repeat(40);
+    f.commit.sha = f.original.candidateSha;
+    f.pull.number = 5;
+    f.pull.merged_at = '2026-01-01T00:00:00Z';
+    f.run.run_number = 12;
+    const names = {
+      formatting: ['npm-ci', 'formatting'],
+      frontend_static: [
+        'npm-ci',
+        'frontend-quality',
+        'frontend-unit',
+        'frontend-source-guards',
+        'frontend-build',
+        'frontend-test-list',
+      ],
+      frontend_e2e_1: ['npm-ci', 'chrome-install', 'e2e-1'],
+      frontend_e2e_2: ['npm-ci', 'chrome-install', 'e2e-2'],
+    }[job];
+    f.original.phases = names.map((name) => ({
+      name,
+      exitCode: 0,
+      ...(name === 'frontend-unit'
+        ? { runId: 'unit', command: ['npm', 'run', 'test:unit'] }
+        : name === 'frontend-source-guards'
+          ? { runId: 'source-guards', command: ['npm', 'run', 'test:source-guards'] }
+          : {}),
+    }));
+    if (job === 'frontend_static')
+      f.original.frontendResults = {
+        unit: completeFrontendResult('unit'),
+        'source-guards': completeFrontendResult('source-guards'),
+      };
+    const current = {
+      ...f.current,
+      job,
+      workflowRunId: '456',
+      phases: [{ name: 'npm-ci', exitCode: 0 }],
+      startedAt: 'current-time',
+    };
+    const directory = path.join(root, job);
+    const staging = path.join(root, job + '-source');
+    mkdirSync(directory);
+    writeFileSync(path.join(directory, 'metadata.json'), JSON.stringify(current));
+    const report = completeBrowserReport(
+      job === 'frontend_static' ? ['a', 'b'] : job === 'frontend_e2e_1' ? ['a'] : ['b'],
+      job !== 'frontend_static',
+    );
+    const raw = JSON.stringify(report);
+    const result = await tryReuse(
+      directory,
+      {
+        GITHUB_JOB: job,
+        GITHUB_RUN_ID: '456',
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: f.repository,
+        GITHUB_OUTPUT: path.join(directory, 'output'),
+      },
+      {
+        environmentProof: () => f.proof,
+        environmentObservation: () => b.hardware,
+        parents: () => f.parents,
+        staging,
+        api: (suffix) => {
+          if (suffix.endsWith('/pulls')) return [f.pull];
+          if (suffix === 'pulls/5') return f.pull;
+          if (suffix.startsWith('actions/workflows')) return { workflow_runs: [f.run] };
+          if (suffix.includes('/jobs?'))
+            return { jobs: ['Frontend quality', 'Backend quality'].map((name) => ({ name, conclusion: 'success' })) };
+          if (suffix.startsWith('git/commits/')) return f.commit;
+          throw Error('Unexpected API ' + suffix);
+        },
+        download: () => {
+          writeFileSync(path.join(staging, 'metadata.json'), JSON.stringify(f.original));
+          if (job !== 'formatting')
+            writeFileSync(path.join(staging, job === 'frontend_static' ? 'all-tests.json' : 'report.json'), raw);
+        },
+      },
+    );
+    assert.equal(result, true, job);
+    const replay = JSON.parse(readFileSync(path.join(directory, 'metadata.json')));
+    validateReusedMetadata(replay);
+    assert.equal(replay.execution, 'reused');
+    assert.deepEqual(replay.environmentObservation, b.hardware);
+    assert.equal(replay.reusedFrom.original.workflowRunId, '123');
+    assert.deepEqual(replay.setupPhases, current.phases);
+    if (job !== 'formatting') {
+      assert.equal(
+        readFileSync(path.join(directory, job === 'frontend_static' ? 'all-tests.json' : 'report.json'), 'utf8'),
+        raw,
+      );
+      groups.push({ metadata: replay, report: JSON.parse(raw) });
+    }
+  }
+  const needs = Object.fromEntries(
+    ['frontend_static', 'frontend_e2e_1', 'frontend_e2e_2'].map((name) => [name, { result: 'success' }]),
+  );
+  const verify = (items) => {
+    for (const group of items) validateReusedMetadata(group.metadata);
+    return verifyFrontendEvidence(needs, items);
+  };
+  assert.equal(verify(groups).testCount, 2);
+  assert.equal(verify(groups).shardCount, 2);
+  for (const mutate of [
+    (g) => (g[2].report.suites[0].specs = []),
+    (g) => (g[2].report.suites[0].specs[0].id = 'a'),
+    (g) => g[1].report.suites[0].specs[0].tests[0].results.push({ status: 'passed', retry: 1 }),
+    (g) => (g[1].report.suites[0].specs[0].tests[0].status = 'skipped'),
+    (g) => (g[0].metadata.attempt = '2'),
+    (g) => g[0].metadata.phases.pop(),
+  ]) {
+    const broken = structuredClone(groups);
+    mutate(broken);
+    assert.throws(() => verify(broken));
+  }
 });
