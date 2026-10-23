@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { classifyChangedFiles } from './verification-impact.mjs';
 import { engineeringDomainProof, scriptTestFiles, SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { backendReportState, validateBackendReports } from './backend-test-evidence.mjs';
+import { executionEnvironment, validateReusedMetadata, environmentProof } from './ci-equivalence.mjs';
 import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
@@ -68,6 +69,9 @@ export function testIdentities(report, executed = false) {
         assert.ok(item.projectName, 'Playwright project identity is missing');
         if (executed) {
           assert.ok(item.results?.length, `Test has no execution result: ${spec.id}`);
+          assert.equal(item.expectedStatus ?? 'passed', 'passed', `Expected failure cannot pass: ${spec.id}`);
+          assert.equal(item.results?.length, 1, `Every execution must pass exactly once: ${spec.id}`);
+          assert.equal(item.results[0].retry ?? 0, 0, `Test retried: ${spec.id}`);
           assert.equal(item.status, 'expected', `Test was skipped, flaky or unexpected: ${spec.id}`);
           assert.ok(
             item.results.every((result) => result.status === 'passed'),
@@ -183,6 +187,7 @@ export function changeScope(event, identity, git = gitRaw, engineeringProof = en
 
 export function verifyScope(scope, identity) {
   requireFirstAttempt(identity);
+  validateReusedMetadata(identity);
   assert.equal(scope.schemaVersion, 1, 'Unknown classification schema');
   const engineeringProof = engineeringDomainProof(process.cwd());
   assert.deepEqual(scope.engineeringProof, engineeringProof, 'Engineering input proof differs from current candidate');
@@ -318,6 +323,9 @@ function main(args) {
   const metadata = loadMetadata(directory);
   const file = path.join(directory, 'metadata.json');
   if (mode === 'finish') {
+    if (metadata.environmentProof)
+      assert.deepEqual(environmentProof(), metadata.environmentProof, 'Execution inputs changed during CI');
+    validateReusedMetadata(metadata);
     metadata.status = process.env.JOB_STATUS ?? 'failure';
     metadata.finishedAt = new Date().toISOString();
     metadata.observedElapsedMs = Date.parse(metadata.finishedAt) - Date.parse(metadata.startedAt);
@@ -337,11 +345,12 @@ function main(args) {
   if (name === 'engineering-tests') metadata.engineeringTests = scriptTestFiles(process.cwd(), 'engineering');
   const frontendKind = { 'frontend-unit': 'unit', 'frontend-source-guards': 'source-guards' }[name];
   const runId = name === 'engineering-tests' || frontendKind ? randomUUID() : null;
+  const executionEnv = process.env.CI_EQUIVALENCE_ELIGIBLE === 'true' ? executionEnvironment(process.env) : process.env;
   const result = spawnSync(command, childArgs, {
     stdio: 'inherit',
     env: runId
-      ? { ...process.env, CI_EVIDENCE_DIR: directory, ENGINEERING_RUN_ID: runId, FRONTEND_TEST_RUN_ID: runId }
-      : process.env,
+      ? { ...executionEnv, CI_EVIDENCE_DIR: directory, ENGINEERING_RUN_ID: runId, FRONTEND_TEST_RUN_ID: runId }
+      : executionEnv,
   });
   let exitCode = result.status ?? 1;
   let reportError = null;

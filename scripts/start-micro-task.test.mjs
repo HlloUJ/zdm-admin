@@ -524,3 +524,27 @@ test('batched Git marker query still detects every in-progress operation relativ
   }
   assert.equal(gitOperationInProgress(f.anchor), false);
 });
+
+test('infrastructure start and restore never read or switch an occupied business preview', () => {
+  for (const active of [null, { ...businessBatch, kind: 'infrastructure' }]) {
+    const f = fixture({ active, preview: '/repo-worktrees/preview-current' });
+    main(['--slug', 'infrastructure', '--kind', 'infrastructure'], f.dependencies);
+    assert.equal(
+      f.events.some(([event]) => event === 'previewStatus'),
+      false,
+    );
+    assert.equal(
+      commands(f.events).some(({ command }) => command === process.execPath),
+      false,
+    );
+  }
+});
+
+test('a proven published persistent preview carrier can hand over to the next business batch', () => {
+  const f = fixture({ preview: '/repo-worktrees/preview-current' });
+  f.dependencies.retainedPublishedPreview = (root, selected) =>
+    root === '/repo' && selected === '/repo-worktrees/preview-current';
+  const result = main(['--slug', 'next-business'], f.dependencies);
+  assert.equal(result.batch.kind, 'business');
+  assert.ok(commands(f.events).some(({ args }) => args.includes('switch')));
+});

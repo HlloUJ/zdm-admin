@@ -125,7 +125,7 @@ function requestUpgrade(url) {
   });
 }
 
-test('keeps one gateway online while switching between integration and task upstreams', async (context) => {
+test('keeps the gateway online and never falls back to integration while preview is unavailable', async (context) => {
   const integration = http.createServer((request, response) => response.end(`integration:${request.url}`));
   const task = http.createServer((request, response) => response.end(`task:${request.url}`));
   task.on('upgrade', (request, socket) => {
@@ -142,11 +142,9 @@ test('keeps one gateway online while switching between integration and task upst
     await Promise.all([closeServer(integration), closeServer(task)]);
   });
 
-  assert.equal(gateway.status().mode, 'integration-fallback');
-  assert.deepEqual(await requestText(new URL('/category', serverUrl(gateway.server))), {
-    status: 200,
-    body: 'integration:/category',
-  });
+  assert.equal(gateway.status().mode, 'preview-unavailable');
+  assert.equal(gateway.status().upstream, null);
+  assert.equal((await requestText(new URL('/category', serverUrl(gateway.server)))).status, 503);
 
   gateway.useTask(taskAddress.port);
   assert.equal(gateway.status().mode, 'task');
@@ -157,11 +155,10 @@ test('keeps one gateway online while switching between integration and task upst
   assert.equal(await requestUpgrade(serverUrl(gateway.server)), 'HTTP/1.1 101 Switching Protocols');
 
   gateway.useIntegration();
-  assert.equal(gateway.status().mode, 'integration-fallback');
-  assert.deepEqual(await requestText(new URL('/again', serverUrl(gateway.server))), {
-    status: 200,
-    body: 'integration:/again',
-  });
+  assert.equal(gateway.status().mode, 'preview-unavailable');
+  assert.equal(gateway.status().upstream, null);
+  assert.equal((await requestText(new URL('/again', serverUrl(gateway.server)))).status, 503);
+  assert.equal(await requestUpgrade(serverUrl(gateway.server)), 'HTTP/1.1 503 Service Unavailable');
 });
 
 test('keeps the gateway reachable when the integration upstream is unavailable', async (context) => {
@@ -256,7 +253,7 @@ function supervisorFixture({ unhealthy = false, blocked = false } = {}) {
       return { mode: this.mode, upstream: 'http://127.0.0.1:5176', listening: true };
     },
     useIntegration() {
-      this.mode = 'integration-fallback';
+      this.mode = 'preview-unavailable';
     },
     useTask() {
       this.mode = 'task';
@@ -336,7 +333,7 @@ test('recovery propagates launcher protection failure and preserves the selected
     await assert.rejects(f.supervisor.switch(f.root, f.config.taskArgs), /共享数据库/);
     assert.equal(f.supervisor.config.selectedWorktree, f.root);
     assert.equal(f.supervisor.child, null);
-    assert.equal(f.gateway.mode, 'integration-fallback');
+    assert.equal(f.gateway.mode, 'preview-unavailable');
     assert.equal(f.events.filter((event) => event === 'launch-protected-task').length, 1);
   } finally {
     f.supervisor.clearRestart();

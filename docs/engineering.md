@@ -3,6 +3,7 @@
 ## 权威入口
 
 - 开发运行、验收、备份与回滚：`docs/dev-setup.md`。
+- 任务完成编排、预览契约、CI等价复用与资产保留：`docs/task-completion.md`。
 - 当前项目工程效率与质量门禁基线：`docs/project-optimization-baseline.md`。
 - 产品架构最终图及文档索引：`docs/product-architecture.md`。
 - 技术分层和模块边界：`docs/platform-architecture.md`。
