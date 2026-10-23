@@ -56,6 +56,11 @@ preview:
     database_risk:
       cwd: integration_worktree
       run: 'npm run dev:task -- --worktree "{task_worktree}" --database-risk'
+    # The installed persistent service is authoritative; do not reinstall during delivery.
+    # Read-only contract check precedes any preview change.
+    contract:
+      cwd: task_worktree
+      run: npm run task:completion -- runtime
     stop:
       cwd: integration_worktree
       run: 'npm run dev:task:stop -- --worktree "{task_worktree}"'
@@ -75,15 +80,21 @@ preview:
     integration_port: 8080
     task_port_range: 8081-8099
     routing:
-      frontend_only: integration
+      frontend_only: persistent-preview-backend
+      persistent_preview: retain-database-media-and-api
+      unavailable: explicit-503-no-integration-fallback
       backend_api_migration_or_runtime: task
 
 database:
-  strategy: shared-integration
-  name: zdm_admin
+  strategy: persistent-preview-isolated-from-integration
+  integration_name: zdm_admin
+  preview_registry: git-common-dir/preview-environment/environment.json
+  preview_identity: runtime-profile-no-credentials-in-config
   migration: flyway
   safety:
     create_task_database: false
+    retain_preview_database_and_media: true
+    auto_rebuild_missing_preview_data: false
     launcher_enforced: true
     backup_for:
       - flyway
@@ -103,6 +114,12 @@ verification:
     force: npm run verify:local -- --force
 
 delivery:
+  plan:
+    cwd: task_worktree
+    run: npm run task:completion -- plan
+  asset_preservation:
+    cwd: task_worktree
+    run: npm run task:completion -- preserve
   completion_gate:
     after_integration_sync:
       - stop_task_preview

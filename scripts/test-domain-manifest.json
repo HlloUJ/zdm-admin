@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "sourceGuards": ["scripts/feedback-foundation.test.mjs"],
+  "sourceGuards": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
   "files": {
     ".codex/zdm-project-workflow.yaml": {
-      "digest": "ce1c485a89de43094295216d5938dea0469ead1432063697df4870823c0be455",
+      "digest": "11d291aa6c31504bc3a000a855658338fc2753d250f1d55ca3975434181ec247",
       "imports": [],
       "dynamicImports": 0
     },
@@ -23,7 +23,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "32081d24aafdcfc361901eecbc201a87f4cb4b6b66b82b82eeb280a14023e5a1",
+      "digest": "f7dd0191af276314907e8bc89d304d7719e952409a2a7c4f8df0290c6254de6a",
       "imports": [],
       "dynamicImports": 0
     },
@@ -72,6 +72,15 @@
       "imports": [],
       "dynamicImports": 0
     },
+    "scripts/button-color-policy.mjs": {
+      "digest": "13dd41c19c9c5e4716beeb538392ae240db8acc31724b1a8fc19e19f6d18e5c9",
+      "imports": [
+        "docs/ui/visual-refactor.json",
+        "src/components/foundation/actions/button-controls.json",
+        "src/components/foundation/actions/button-functions.json"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/check-changed-plan.mjs": {
       "digest": "5a6cacc2e44bf6fdb6172dfd7919d24275775a59652aa7d676c465fc41e3f6df",
       "imports": [
@@ -106,10 +115,30 @@
       "imports": ["scripts/git-workflow-core.mjs"],
       "dynamicImports": 0
     },
+    "scripts/ci-equivalence.mjs": {
+      "digest": "f5c2524ec4f3a123e3ac9246fbb87f561cd9c1f9388619c7bbe7d6487c27ef36",
+      "imports": [
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/verification-evidence.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-equivalence.test.mjs": {
+      "digest": "2b2c70fa1e6c77e603794de37a99172d068bea227b11dc405480f5c0d36454ed",
+      "imports": [
+        "scripts/ci-equivalence.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/ci-quality-evidence.mjs": {
-      "digest": "7c92e477a4030b3e54dc232dd7281cec2b96066bf5265c001afd0c31bd8bf325",
+      "digest": "3a63d186d493f2ed98a7a9d9302efb7039bceae07e5d1a6eb32da5b202e37152",
       "imports": [
         "scripts/backend-test-evidence.mjs",
+        "scripts/ci-equivalence.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/run-script-tests.mjs",
         "scripts/script-test-plan.mjs",
@@ -118,14 +147,18 @@
       "dynamicImports": 0
     },
     "scripts/ci-quality-evidence.test.mjs": {
-      "digest": "197f934759d23b6126e465b50a2ce083bb9dfc0dab9ba7f13ec8da00499e96cd",
+      "digest": "824c60916f5a92b8ee6d82f9501daba596391384503ff6cd9267c117b983dedd",
       "imports": [
         "scripts/ci-quality-evidence.mjs",
-        "scripts/feedback-foundation.test.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/task-batch.mjs",
         "scripts/verification-impact.mjs"
       ],
+      "dynamicImports": 0
+    },
+    "scripts/confirmation-policy.mjs": {
+      "digest": "72c8ce0a1e4cec66958654f171d86e500fc67e22d69d716a73b828d729667175",
+      "imports": ["src/components/foundation/actions/button-functions.json"],
       "dynamicImports": 0
     },
     "scripts/delivery-launcher.mjs": {
@@ -163,7 +196,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "cc29108f0f2e47b302c4e42acf57602cc58cd03395d37ed7269c042fcc7bb1ef",
+      "digest": "8c61e9c89829c6f1877a129354e0a24a912edbbf1534e0c2036ad8bb85b8fc84",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -175,7 +208,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.test.mjs": {
-      "digest": "031d064fa9655a009a1505e674955b5c985ec1eac8b672c8ebce813f3cb96914",
+      "digest": "b0cbd6ed45190abd53ecec9d1558f3a1d8addee8b1bf9a68ecaafb0edc894c8b",
       "imports": [
         "scripts/backend-test-plan.mjs",
         "scripts/dev-task.mjs",
@@ -185,6 +218,11 @@
         "scripts/task-runtime-state.mjs",
         "vite.config.js"
       ],
+      "dynamicImports": 0
+    },
+    "scripts/display-text-policy.mjs": {
+      "digest": "53daad89679d680322dd0664e31cdb93956d8e5392bf06c5351c77d7da88ab0e",
+      "imports": [],
       "dynamicImports": 0
     },
     "scripts/ensure-backend.mjs": {
@@ -203,11 +241,11 @@
       "dynamicImports": 0
     },
     "scripts/frontend-test-evidence.test.mjs": {
-      "digest": "6eb58dd65cebe13c85f2dd1cce37103388fcff4433227a6974ac8753d1dac1e7",
+      "digest": "dbf1c4d5205429923786bdf142a3f1f4d529fe9951285b08082140fb06a0eec5",
       "imports": [
-        "scripts/feedback-foundation.test.mjs",
         "scripts/frontend-test-evidence.mjs",
-        "scripts/run-frontend-tests.mjs"
+        "scripts/run-frontend-tests.mjs",
+        "scripts/script-test-plan.mjs"
       ],
       "dynamicImports": 0
     },
@@ -236,6 +274,11 @@
     "scripts/integration-handoff-state.mjs": {
       "digest": "cf7252b1ae1e1cfcc3b4cf48a1df200d382ac2f0214b42fdd0e031c7dd3d1012",
       "imports": ["scripts/task-runtime-state.mjs", "scripts/verification-impact.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/lint-policy.test.mjs": {
+      "digest": "8b986d61c1a5329838876480e702cab9346e2e751991c2c21a29d38f95dc21af",
+      "imports": [],
       "dynamicImports": 0
     },
     "scripts/local-test-entrypoints.test.mjs": {
@@ -277,6 +320,11 @@
     "scripts/node-test-evidence.mjs": {
       "digest": "6e962c5fed6489d5556a05f88de087e61dc97261440261dc439db9024145589f",
       "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/placeholder-policy.mjs": {
+      "digest": "8442ef34d31300b507fd7db102d226f0194d71c4e6404a878846da8e0408fe69",
+      "imports": ["docs/ui/visual-refactor.json"],
       "dynamicImports": 0
     },
     "scripts/playwright-evidence-reporter.mjs": {
@@ -321,7 +369,7 @@
       "dynamicImports": 0
     },
     "scripts/run-script-tests.mjs": {
-      "digest": "3c1328a9eb306d49bf7ea5cfc09f2e01e7f5745c6e0ff39037b30c8a7ddb21fa",
+      "digest": "0c08efab3b36f72bf51f4f28ff74473375394b229afe495512fe6893f596552e",
       "imports": [
         "scripts/frontend-test-evidence.mjs",
         "scripts/node-source-evidence-reporter.mjs",
@@ -336,8 +384,8 @@
       "dynamicImports": 0
     },
     "scripts/script-test-plan.mjs": {
-      "digest": "b381d1143fb0cbc1c3b8a36283a164e7b5dca72bb2dd2aab5984d759ae3bf4d4",
-      "imports": ["scripts/feedback-foundation.test.mjs"],
+      "digest": "1449d0066cb92e645060f7c85fbca977b72abb5efd90946d13f1096851d9bf6d",
+      "imports": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
       "dynamicImports": 0
     },
     "scripts/script-test-plan.test.mjs": {
@@ -356,12 +404,12 @@
       "dynamicImports": 1
     },
     "scripts/start-micro-task.mjs": {
-      "digest": "77031e3f91535db552a6686e12f6ace58c8696d99db2a2476a9be94d5bed51cc",
+      "digest": "026984384613c4ac9b54c8bf778b7d33ecd6ee88e2adf522cdb0f19d99f4d269",
       "imports": ["scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
       "dynamicImports": 0
     },
     "scripts/start-micro-task.test.mjs": {
-      "digest": "9dc27ce1d0e513c57d8d2a73512f57c702fc6b1995d379a206a6947d76114112",
+      "digest": "f8e3b2106739d710edb093e7e54ae33f5a39d861170a4f5f75f4df1fce04e41c",
       "imports": ["scripts/dev-task.mjs", "scripts/start-micro-task.mjs", "scripts/task-batch.mjs"],
       "dynamicImports": 0
     },
@@ -395,6 +443,11 @@
       "imports": ["scripts/task-batch.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-completion.mjs": {
+      "digest": "ec30ec288cc3a4d6893177c5f079eb367e23c3c7597661fb108a8fbe22c96db4",
+      "imports": ["scripts/task-batch.mjs", "scripts/verify.mjs", "scripts/wait-quality.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-dependencies.mjs": {
       "digest": "e771583db66522283935becd001598f9dd4dbb75b7cb8568e964403666125fbe",
       "imports": [],
@@ -406,24 +459,47 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "52b374ebe32eac7e510c09d861ba11dfd831b286dabcb7c32948715243f3d060",
-      "imports": [],
+      "digest": "70fead2f46d58a844805f9746cc001f405e5a43bd0778d72e99437c9be24373f",
+      "imports": ["scripts/task-data-environment.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-preview-service.test.mjs": {
-      "digest": "38c1e913e4ca385eb29989b460f59b83fc6193052a0aa8ef1f7194d6d7cb9803",
+      "digest": "acba23fbc54f14601357204609e613d01f4f88739f17bb153f52fdf1c8b14e6d",
       "imports": ["scripts/task-preview-service.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-runtime-state.mjs": {
-      "digest": "e0a5310c374fd4048bdbafbd46ce12fff4e90bf74c20eb939fa50e72856e29ac",
+      "digest": "70ecda8bcaadce54f2c7c8f8348c3b680010c09969447c287179f2cc6274c950",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/task-runtime-state.test.mjs": {
-      "digest": "86a8033ffa10b63d28de381db2adc9874e1afb283cf74a33d423311d66a8be3b",
+      "digest": "cb42075a957b4faa2deb11f773857924dba67d89b5b71cd8240c384da0d13280",
       "imports": ["scripts/task-runtime-state.mjs"],
       "dynamicImports": 0
+    },
+    "scripts/typography-policy.mjs": {
+      "digest": "68c241c4f3efda675f896eb7f328afe384234dbd7e5c113889432a4f2cb64854",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/ui-template-policy.mjs": {
+      "digest": "45e86a408d6bf2fee90f39b4e7084d7dbce6b4c4b2aa120125c02ea8cb1ecef0",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/ui-template-policy.test.mjs": {
+      "digest": "40a60676941ae380f0e6109b1c4c02360044ddb2c5068cb1a50e6236c8c3b60e",
+      "imports": [
+        "scripts/button-color-policy.mjs",
+        "scripts/confirmation-policy.mjs",
+        "scripts/display-text-policy.mjs",
+        "scripts/placeholder-policy.mjs",
+        "scripts/typography-policy.mjs",
+        "scripts/ui-template-policy.mjs",
+        "scripts/visual-refactor-contract.mjs"
+      ],
+      "dynamicImports": 4
     },
     "scripts/verification-evidence.mjs": {
       "digest": "cce1f77fb5b02f61e198ed1bd137bbb94470d7d840dc14109e5857c67f14ea0d",
@@ -435,14 +511,14 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "9b6b25ef616a2c59db20d31c18d0f539f8fd923f7c1f424bce6db9a6ea86fc44",
+      "digest": "f9db2e45a779687eeb300fdd0e13037f3d9b7f7a1f49f1d424d10c59611612d3",
       "imports": [
         "scripts/run-frontend-tests.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-runner.mjs",
         "scripts/verify.mjs"
       ],
-      "dynamicImports": 8
+      "dynamicImports": 9
     },
     "scripts/verification-impact.mjs": {
       "digest": "787e397a606865050eb98a28f61f143f4313e28a99e313cfbd835694b4eb2537",
@@ -488,7 +564,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "3cf953e2fc7556d1c16e291d93441797f529d1a525489669cb537a6b4b03fd6a",
+      "digest": "e4240562d0c886184d62f86329da79ed21d45435dc8044d0fbad8796e6fefead",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -516,8 +592,18 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/visual-refactor-contract.mjs": {
+      "digest": "efd89b3e71f6dda0376a83650ef5709b3d0c9a39c51d77dbc6012824b8eab538",
+      "imports": ["scripts/ui-template-policy.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/vitest-evidence-reporter.mjs": {
       "digest": "1bfd049f64888dd3224b23de9a870caff9234728bde7723941f8b753f495741f",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/wait-quality.mjs": {
+      "digest": "e06a8cb39b050348b732b0398ca868f7869f7489f07f049359b5788d399ed912",
       "imports": [],
       "dynamicImports": 0
     },

@@ -15,6 +15,7 @@
     "dev:task:handoff": "node scripts/dev-task.mjs --handoff",
     "task:micro": "node scripts/start-micro-task.mjs",
     "task:start": "node scripts/start-micro-task.mjs",
+    "task:completion": "node scripts/task-completion.mjs",
     "task:batch": "node scripts/task-batch.mjs",
     "dev:all": "node scripts/dev-all.mjs",
     "dev:status": "node scripts/dev-status.mjs",

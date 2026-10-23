@@ -7,11 +7,17 @@ on:
       - main
       - dev
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
+  CI_EQUIVALENCE_DISABLED: ${{ vars.CI_EQUIVALENCE_DISABLED || 'false' }}
   CI_EVIDENCE_DIR: ${{ github.workspace }}/coverage/ci-evidence
 
 jobs:
@@ -42,6 +48,8 @@ jobs:
     name: Repository formatting
     needs: scope
     runs-on: ubuntu-latest
+    env:
+      CI_EQUIVALENCE_ELIGIBLE: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,7 +57,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
-      - run: node scripts/ci-quality-evidence.mjs run formatting -- npm run format:check
+      - id: equivalent
+        run: node scripts/ci-equivalence.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run formatting -- npm run format:check
       - if: always()
         run: node scripts/ci-quality-evidence.mjs finish
         env:
@@ -92,6 +105,10 @@ jobs:
     needs: scope
     if: ${{ needs.scope.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      CI_EQUIVALENCE_ELIGIBLE: 'true'
+      PLAYWRIGHT_CHANNEL: chrome
+      PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/all-tests.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -99,11 +116,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
-      - run: node scripts/ci-quality-evidence.mjs run frontend-quality -- npm run quality:static
-      - run: node scripts/ci-quality-evidence.mjs run frontend-unit -- npm run test:unit
-      - run: node scripts/ci-quality-evidence.mjs run frontend-source-guards -- npm run test:source-guards
-      - run: node scripts/ci-quality-evidence.mjs run frontend-build -- npm run build:app
-      - run: node scripts/ci-quality-evidence.mjs run frontend-test-list -- npx playwright test --list --reporter=json
+      - id: equivalent
+        run: node scripts/ci-equivalence.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run frontend-quality -- npm run quality:static
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run frontend-unit -- npm run test:unit
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run frontend-source-guards -- npm run test:source-guards
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run frontend-build -- npm run build:app
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run frontend-test-list -- npx playwright test --list --reporter=json
         env:
           PLAYWRIGHT_CHANNEL: chrome
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/all-tests.json
@@ -124,6 +150,10 @@ jobs:
     needs: scope
     if: ${{ needs.scope.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      CI_EQUIVALENCE_ELIGIBLE: 'true'
+      PLAYWRIGHT_CHANNEL: chrome
+      PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -132,7 +162,12 @@ jobs:
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
       - run: node scripts/ci-quality-evidence.mjs run chrome-install -- npx playwright install --with-deps chrome
-      - run: node scripts/ci-quality-evidence.mjs run e2e-1 -- npm run test:e2e:ci -- --shard=1/2 --workers=1 --reporter=list,json
+      - id: equivalent
+        run: node scripts/ci-equivalence.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run e2e-1 -- npm run test:e2e:ci -- --shard=1/2 --workers=1 --reporter=list,json
         env:
           PLAYWRIGHT_CHANNEL: chrome
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
@@ -159,6 +194,10 @@ jobs:
     needs: scope
     if: ${{ needs.scope.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      CI_EQUIVALENCE_ELIGIBLE: 'true'
+      PLAYWRIGHT_CHANNEL: chrome
+      PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -167,7 +206,12 @@ jobs:
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
       - run: node scripts/ci-quality-evidence.mjs run chrome-install -- npx playwright install --with-deps chrome
-      - run: node scripts/ci-quality-evidence.mjs run e2e-2 -- npm run test:e2e:ci -- --shard=2/2 --workers=1 --reporter=list,json
+      - id: equivalent
+        run: node scripts/ci-equivalence.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: steps.equivalent.outputs.reused != 'true'
+        run: node scripts/ci-quality-evidence.mjs run e2e-2 -- npm run test:e2e:ci -- --shard=2/2 --workers=1 --reporter=list,json
         env:
           PLAYWRIGHT_CHANNEL: chrome
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json

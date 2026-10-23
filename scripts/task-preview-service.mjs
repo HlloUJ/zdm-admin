@@ -428,12 +428,12 @@ function writeUnavailableResponse(response, target, error) {
     response.end(`<!doctype html>
 <html lang="zh-CN">
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>5175 预览入口</title></head>
-  <body><main><h1>集成环境暂不可用</h1><p>5175 入口运行正常，正在等待上游 ${target.origin} 恢复。</p></main></body>
+  <body><main><h1>长期预览暂不可用</h1><p>5175 入口运行正常，正在等待上游 ${target?.origin ?? '长期预览服务'} 恢复。</p></main></body>
 </html>`);
     return;
   }
   response.setHeader('content-type', 'application/json; charset=utf-8');
-  response.end(`${JSON.stringify({ error: 'preview upstream unavailable', upstream: target.origin })}\n`);
+  response.end(`${JSON.stringify({ error: 'preview upstream unavailable', upstream: target?.origin ?? null })}\n`);
 }
 
 export class PreviewGateway {
@@ -441,8 +441,8 @@ export class PreviewGateway {
     this.host = host;
     this.port = port;
     this.integrationUrl = new URL(integrationUrl);
-    this.upstream = this.integrationUrl;
-    this.mode = 'integration-fallback';
+    this.upstream = null;
+    this.mode = 'preview-unavailable';
     this.server = null;
     this.sockets = new Set();
   }
@@ -450,14 +450,14 @@ export class PreviewGateway {
   status() {
     return {
       mode: this.mode,
-      upstream: this.upstream.origin,
+      upstream: this.upstream?.origin ?? null,
       listening: Boolean(this.server?.listening),
     };
   }
 
   useIntegration() {
-    this.mode = 'integration-fallback';
-    this.upstream = this.integrationUrl;
+    this.mode = 'preview-unavailable';
+    this.upstream = null;
   }
 
   useTask(port = MANAGED_TASK_PREVIEW_PORT) {
@@ -467,6 +467,10 @@ export class PreviewGateway {
 
   proxyRequest(request, response) {
     const target = this.upstream;
+    if (!target) {
+      writeUnavailableResponse(response, null, new Error('Persistent preview unavailable'));
+      return;
+    }
     const upstreamRequest = http.request(
       {
         hostname: target.hostname,
@@ -490,6 +494,10 @@ export class PreviewGateway {
 
   proxyUpgrade(request, socket, head) {
     const target = this.upstream;
+    if (!target) {
+      socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+      return;
+    }
     const upstreamSocket = net.connect(Number(target.port || 80), target.hostname);
     upstreamSocket.once('connect', () => {
       const headers = { ...request.headers, host: target.host };
@@ -650,7 +658,7 @@ export class PreviewSupervisor {
     const worktree = this.config.selectedWorktree;
     if (!worktree) {
       this.gateway.useIntegration();
-      this.transition('integration-fallback');
+      this.transition('preview-unavailable');
       return this.status();
     }
     const resolved = this.dependencies.resolveTaskWorktree(worktree);
@@ -752,7 +760,7 @@ export class PreviewSupervisor {
       await this.stopOwnedChild();
       this.currentWorktree = null;
       this.currentTaskArgs = [];
-      this.transition('integration-fallback');
+      this.transition('preview-unavailable');
       if (worktree) {
         const result = run(this.config.nodePath, [this.config.launcherPath, '--worktree', worktree, '--stop'], {
           cwd: worktree,
@@ -884,6 +892,9 @@ async function installService({ paths, worktree, taskArgs = [] }) {
     ? path.join(resolveTaskWorktree(launcherOverride).root, 'scripts', 'dev-task.mjs')
     : discoverIntegrationLauncher();
   if (!existsSync(launcherPath)) throw new Error('指定的任务启动器不存在');
+  const launcherSource = readFileSync(launcherPath, 'utf8');
+  if (!launcherSource.includes("from './task-data-environment.mjs'"))
+    throw new Error('所选启动器未实现长期预览隔离数据契约，不自动降级安装；保留现有常驻服务');
   const workingDirectory = path.dirname(path.dirname(launcherPath));
   ensureDirectory(paths.runtimeDirectory);
   ensureDirectory(path.dirname(paths.logFile));
