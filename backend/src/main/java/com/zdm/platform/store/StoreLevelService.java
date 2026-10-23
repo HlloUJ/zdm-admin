@@ -235,11 +235,12 @@ public class StoreLevelService extends CreatorAwareService<StoreLevelMapper, Sto
 
   private List<StoreLevel> enrich(List<StoreLevel> levels) {
     levels.forEach(level -> {
+      boolean accessory = isPriceConfigured("accessory_markup_configurations", level.getId());
       boolean finished = isPriceConfigured("finished_markup_configurations", level.getId());
       boolean slab = isPriceConfigured("slab_markup_configurations", level.getId());
       level.setFinishedPriceConfigured(finished);
       level.setSlabPriceConfigured(slab);
-      level.setPriceComplete(finished && slab);
+      level.setPriceComplete(accessory && finished && slab);
     });
     return levels;
   }

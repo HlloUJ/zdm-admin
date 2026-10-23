@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -45,6 +46,43 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "false,false,false,false",
+      "false,false,true,false",
+      "false,true,false,false",
+      "false,true,true,false",
+      "true,false,false,false",
+      "true,false,true,false",
+      "true,true,false,false",
+      "true,true,true,true"
+  })
+  @org.springframework.transaction.annotation.Transactional
+  void storeLevelPriceCompletenessRequiresAllThreeConfigurations(
+      boolean accessory, boolean finished, boolean slab, boolean complete) throws Exception {
+    jdbc.update("INSERT INTO store_levels (id,name,status,sort_order,created_by_account_id) VALUES (99409,'价格完整性测试','enabled',1,1)");
+    List<String> tables = List.of(
+        "accessory_markup_configurations", "finished_markup_configurations", "slab_markup_configurations");
+    List<Boolean> configured = List.of(accessory, finished, slab);
+    for (int index = 0; index < tables.size(); index += 1) {
+      if (configured.get(index)) {
+        jdbc.update("INSERT INTO " + tables.get(index)
+            + " (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order)"
+            + " VALUES (99409,'价格完整性测试',99409,1.5,'enabled',false,1)");
+      }
+    }
+    for (String endpoint : List.of("/api/admin/store-levels", "/api/admin/store-levels/pricing-options")) {
+      mvc.perform(get(endpoint).header("Authorization", token))
+          .andExpect(status().isOk())
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+              .jsonPath("$.data[?(@.id == 99409)].priceComplete").value(org.hamcrest.Matchers.contains(complete)))
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+              .jsonPath("$.data[?(@.id == 99409)].finishedPriceConfigured").value(org.hamcrest.Matchers.contains(finished)))
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+              .jsonPath("$.data[?(@.id == 99409)].slabPriceConfigured").value(org.hamcrest.Matchers.contains(slab)));
+    }
   }
 
   @Test
