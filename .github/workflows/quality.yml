@@ -35,6 +35,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Pure Node/Git diagnostics run before any costly quality jobs; no npm install or services.
+      - run: npm run test:ci-reuse
       - id: scope
         run: node scripts/ci-quality-evidence.mjs scope
       - uses: actions/upload-artifact@v4
