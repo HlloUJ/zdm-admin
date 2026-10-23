@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -45,6 +46,62 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "missing,missing,missing,false",
+      "missing,missing,enabled,false",
+      "missing,missing,disabled,false",
+      "missing,enabled,missing,false",
+      "missing,enabled,enabled,false",
+      "missing,enabled,disabled,false",
+      "missing,disabled,missing,false",
+      "missing,disabled,enabled,false",
+      "missing,disabled,disabled,false",
+      "enabled,missing,missing,false",
+      "enabled,missing,enabled,false",
+      "enabled,missing,disabled,false",
+      "enabled,enabled,missing,false",
+      "enabled,enabled,enabled,true",
+      "enabled,enabled,disabled,false",
+      "enabled,disabled,missing,false",
+      "enabled,disabled,enabled,false",
+      "enabled,disabled,disabled,false",
+      "disabled,missing,missing,false",
+      "disabled,missing,enabled,false",
+      "disabled,missing,disabled,false",
+      "disabled,enabled,missing,false",
+      "disabled,enabled,enabled,false",
+      "disabled,enabled,disabled,false",
+      "disabled,disabled,missing,false",
+      "disabled,disabled,enabled,false",
+      "disabled,disabled,disabled,false"
+  })
+  @org.springframework.transaction.annotation.Transactional
+  void storeLevelPriceCompletenessRequiresAllThreeEnabledConfigurations(
+      String accessory, String finished, String slab, boolean complete) throws Exception {
+    jdbc.update("INSERT INTO store_levels (id,name,status,sort_order,created_by_account_id) VALUES (99409,'价格完整性测试','enabled',1,1)");
+    List<String> tables = List.of(
+        "accessory_markup_configurations", "finished_markup_configurations", "slab_markup_configurations");
+    List<String> configurationStatuses = List.of(accessory, finished, slab);
+    for (int index = 0; index < tables.size(); index += 1) {
+      if (!"missing".equals(configurationStatuses.get(index))) {
+        jdbc.update("INSERT INTO " + tables.get(index)
+            + " (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order)"
+            + " VALUES (99409,'价格完整性测试',99409,1.5,?,false,1)", configurationStatuses.get(index));
+      }
+    }
+    for (String endpoint : List.of("/api/admin/store-levels", "/api/admin/store-levels/pricing-options")) {
+      mvc.perform(get(endpoint).header("Authorization", token))
+          .andExpect(status().isOk())
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+              .jsonPath("$.data[?(@.id == 99409)].priceComplete").value(org.hamcrest.Matchers.contains(complete)))
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+              .jsonPath("$.data[?(@.id == 99409)].finishedPriceConfigured").value(org.hamcrest.Matchers.contains(!"missing".equals(finished))))
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+              .jsonPath("$.data[?(@.id == 99409)].slabPriceConfigured").value(org.hamcrest.Matchers.contains(!"missing".equals(slab))));
+    }
   }
 
   @Test

@@ -1,12 +1,25 @@
-/* Keep manual field feedback in the same reserved area as native Form validation. */
-.t-form__controls > .t-form-item-tips {
-  position: absolute;
-  top: 100%;
-  left: 0;
+/* A short message consumes the existing one-line field spacing. Longer messages
+   participate in layout, so only their additional lines move following content. */
+.t-form__controls > :is(.t-input__extra, .t-form-item-tips),
+.t-input__tips,
+.t-textarea__tips {
+  position: static;
+  display: block;
   width: 100%;
+  min-height: var(--td-line-height-body-small);
+  margin-bottom: calc(-1 * var(--td-line-height-body-small));
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
-/* Help and feedback share the native help row, including during validation. */
+/* Native FormItem tips inherit the medium line-height (22px). Preserve that
+   component typography and compensate its actual short-message height. */
+.t-form__controls > .t-form-item-tips {
+  margin-bottom: calc(-1 * var(--td-line-height-body-medium));
+}
+
+/* Help and feedback occupy one shared row, which may grow for long errors. */
 .t-form__item.t-form__item-with-help {
   margin-bottom: var(--td-comp-margin-xs);
 }
@@ -20,31 +33,15 @@
   grid-area: 1 / 1;
 }
 
-.t-form__item-with-help > .t-form__controls > .t-input__help {
+.t-form__item-with-help > .t-form__controls > :is(.t-input__help, .t-input__extra, .t-form-item-tips) {
   grid-area: 2 / 1;
+  margin-bottom: 0;
 }
 
-.t-form__item-with-help > .t-form__controls > :is(.t-input__extra, .t-form-item-tips) {
-  position: absolute;
-  grid-area: 2 / 1;
-  inset: 0 0 auto;
-  width: 100%;
-  overflow: visible;
-  white-space: normal;
-}
-
-/* Some existing forms pass feedback directly to the input/select/textarea. */
-.t-form__item-with-help .t-form__controls-content :is(.t-input__wrap, .t-select-input, .t-textarea) {
-  position: relative;
-}
-
-.t-form__item-with-help .t-form__controls-content :is(.t-input__tips, .t-textarea__tips) {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  overflow: visible;
-  white-space: normal;
+/* A native 22px manual tip shares the existing 20px help row; its remaining
+   two pixels fit inside the native 4px field margin. Extra lines grow normally. */
+.t-form__item-with-help > .t-form__controls > .t-form-item-tips {
+  margin-bottom: calc(var(--td-line-height-body-small) - var(--td-line-height-body-medium));
 }
 
 .t-form__item-with-help
@@ -53,24 +50,70 @@
   visibility: hidden;
 }
 
-/* Upload cards retain their height while the concrete error remains below the card. */
+/* Tables own their row spacing. Reserved price controls opt into compensation
+   in their shared component; ordinary table feedback grows the row naturally. */
+.t-table .t-input__tips {
+  margin-bottom: 0;
+}
+
+/* Outside Form, wrapped upload rows need their own single reserved line. */
 .admin-media-upload {
-  position: relative;
+  padding-bottom: var(--td-line-height-body-small);
 }
 
 .admin-media-upload > .t-upload__tips {
-  position: absolute;
-  top: 100%;
-  left: 0;
+  position: static;
   margin-top: 0;
+  margin-bottom: calc(-1 * var(--td-line-height-body-small));
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
-/* Native last FormItem has no margin: reserve its error line inside public dialogs. */
-.zdm-admin-dialog .t-dialog__body > .t-form:not(:has(> .t-form__item-with-help:last-child)),
+.t-form__controls-content > .admin-media-upload,
+.t-form__controls-content > .t-space:has(.admin-media-upload) {
+  margin-bottom: calc(-1 * var(--td-line-height-body-small));
+}
+
+/* A final ordinary field owns its one-line reserve, including nested forms
+   followed by business content. Do not add another reserve on the dialog. */
+.t-form:not(.t-form-inline)
+  > .t-form__item:last-child:not(.t-form__item-with-help, .btn-container)
+  > .t-form__controls {
+  padding-bottom: var(--td-line-height-body-medium);
+}
+
+/* A following native Space already provides the feedback budget. Keep its
+   existing gap instead of adding the final-field reserve a second time. */
 .zdm-admin-dialog
   .t-dialog__body
   > .t-space
-  > .t-space-item:last-child
-  > .t-form:not(:has(> .t-form__item-with-help:last-child)) {
-  padding-bottom: var(--td-line-height-body-small);
+  > .t-space-item:not(:last-child)
+  > .t-form:has(> .t-form__item:last-child:not(.t-form__item-with-help, .btn-container)) {
+  margin-bottom: calc(-1 * var(--td-line-height-body-medium));
+}
+
+/* Reserved price controls retain their existing component contract. */
+.t-input-number.spec-price-input.spec-price-input--reserved-tips .t-input__tips {
+  position: static;
+  margin-bottom: calc(-1 * var(--td-line-height-body-small));
+  white-space: normal;
+}
+
+/* Preserve the compact input width; long errors grow within the whole column. */
+.t-table .price-coefficient-field.price-coefficient-field--invalid {
+  height: auto;
+  min-height: calc(var(--td-comp-size-m) + var(--td-line-height-body-small));
+}
+
+/* Use the containing column without changing the compact input's own width. */
+.t-table .price-coefficient-field {
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
+.t-table .price-coefficient-field .price-coefficient-input .t-input__tips {
+  position: static;
+  width: 100cqw;
+  white-space: normal;
 }

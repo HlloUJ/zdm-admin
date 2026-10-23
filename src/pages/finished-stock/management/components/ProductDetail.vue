@@ -1,8 +1,16 @@
 <template>
   <t-space direction="vertical" size="large" class="product-detail">
     <t-alert v-if="operations && product.sourceUnavailable" theme="warning" :message="sourceMessage" />
-    <AdminSectionCard :class="{ 'product-detail__bordered-card': operations && !editorLayout }">
-      <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations && !editorLayout }">
+    <component
+      :is="drawerLayout ? Card : AdminSectionCard"
+      :title="drawerLayout ? '图文描述' : undefined"
+      :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
+    >
+      <h3
+        v-if="!drawerLayout"
+        class="product-detail__section-title"
+        :class="{ 'product-detail__card-title': operations && !editorLayout }"
+      >
         图文描述
       </h3>
       <div class="product-detail__media" :class="{ 'product-detail__media--editor': editorLayout }">
@@ -16,7 +24,12 @@
         </button>
       </div>
       <t-empty v-if="!images.length && !product.videoUrl" description="暂无图片或视频" />
-      <h4 class="product-detail__subheading">宝贝详情</h4>
+      <component
+        :is="drawerLayout ? TypographyTitle : 'h4'"
+        :level="drawerLayout ? 'h5' : undefined"
+        :class="{ 'product-detail__subheading': !drawerLayout }"
+        >宝贝详情</component
+      >
       <HistoricalRichText
         v-if="product.detail"
         class="product-detail__description"
@@ -25,9 +38,17 @@
         @preview="previewDescription"
       />
       <t-empty v-else description="暂无图文描述" />
-    </AdminSectionCard>
-    <AdminSectionCard :class="{ 'product-detail__bordered-card': operations && !editorLayout }">
-      <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations && !editorLayout }">
+    </component>
+    <component
+      :is="drawerLayout ? Card : AdminSectionCard"
+      :title="drawerLayout ? '基础信息' : undefined"
+      :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
+    >
+      <h3
+        v-if="!drawerLayout"
+        class="product-detail__section-title"
+        :class="{ 'product-detail__card-title': operations && !editorLayout }"
+      >
         基础信息
       </h3>
       <template v-if="operations">
@@ -36,7 +57,12 @@
           <t-descriptions-item label="ID" :span="3">{{ product.id }}</t-descriptions-item>
           <t-descriptions-item label="商品分类" :span="3">{{ product.category || '未填写' }}</t-descriptions-item>
         </t-descriptions>
-        <h4 class="product-detail__attributes-heading">商品属性</h4>
+        <component
+          :is="drawerLayout ? TypographyTitle : 'h4'"
+          :level="drawerLayout ? 'h5' : undefined"
+          :class="{ 'product-detail__attributes-heading': !drawerLayout }"
+          >商品属性</component
+        >
         <t-descriptions bordered :column="3" class="product-detail__basic-table">
           <t-descriptions-item
             v-for="attribute in product.attributes"
@@ -66,11 +92,26 @@
         }}</t-descriptions-item>
       </t-descriptions>
       <slot name="basic-extra" />
-    </AdminSectionCard>
+    </component>
     <slot v-if="showSales !== false" name="sales" :rows="rows" :columns="columns" :span="span">
-      <AdminSectionCard :class="{ 'product-detail__bordered-card': operations }">
-        <h3 class="product-detail__section-title" :class="{ 'product-detail__card-title': operations }">销售信息</h3>
-        <h4 v-if="!operations">销售规格与价格</h4>
+      <component
+        :is="drawerLayout ? Card : AdminSectionCard"
+        :title="drawerLayout ? '销售信息' : undefined"
+        :class="{ 'product-detail__bordered-card': !drawerLayout && operations }"
+      >
+        <h3
+          v-if="!drawerLayout"
+          class="product-detail__section-title"
+          :class="{ 'product-detail__card-title': operations }"
+        >
+          销售信息
+        </h3>
+        <component
+          :is="drawerLayout ? TypographyTitle : 'h4'"
+          v-if="!operations"
+          :level="drawerLayout ? 'h5' : undefined"
+          >销售规格与价格</component
+        >
         <component :is="operations ? SalesLogFullscreen : 'div'" :title="operations ? '销售规格与价格' : undefined">
           <t-table
             :class="{ 'product-detail__layered-table': layeredDimensions.length }"
@@ -111,10 +152,10 @@
             </template>
           </t-table>
         </component>
-        <t-descriptions class="product-detail__sales-summary" bordered :column="2">
+        <t-descriptions :class="{ 'product-detail__sales-summary': !drawerLayout }" bordered :column="2">
           <t-descriptions-item label="总库存" :span="2">{{ product.stock }}</t-descriptions-item>
         </t-descriptions>
-      </AdminSectionCard>
+      </component>
     </slot>
   </t-space>
 </template>
@@ -126,7 +167,7 @@ import PriceSourceToggle from './PriceSourceToggle.vue';
 import SalesLogFullscreen from './SalesLogFullscreen.vue';
 import HistoricalRichText from './HistoricalRichText.vue';
 import DOMPurify from 'dompurify';
-import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
+import { Card, Title as TypographyTitle, type PrimaryTableCol, type TableRowData } from 'tdesign-vue-next';
 import { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';
 import type {
   FinishedProductAttributeEntry,
@@ -174,6 +215,7 @@ const props = withDefaults(
     storeLevelName?: string;
     showSales?: boolean;
     editorLayout?: boolean;
+    drawerLayout?: boolean;
     enabledLevelIds?: number[];
   }>(),
   { storeLevelName: undefined, enabledLevelIds: undefined, showSales: true },

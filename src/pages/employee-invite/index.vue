@@ -347,7 +347,7 @@ onBeforeUnmount(stopCounter);
 }
 
 .item-container :deep(.t-form__item) {
-  margin-bottom: var(--td-comp-margin-l);
+  margin-bottom: var(--td-comp-margin-xxl);
 }
 
 .item-container :deep(.t-input),

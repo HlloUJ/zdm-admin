@@ -570,13 +570,12 @@
       v-model:visible="detailDrawerVisible"
       header="大板详情"
       placement="right"
-      size="min(1240px, 100vw)"
+      size="min(1240px, 100%)"
       :footer="false"
       @close="closeDetailDrawer"
     >
       <t-space v-if="detailDrawerRow" direction="vertical" size="large" class="slab-detail-drawer">
-        <AdminSectionCard class="slab-detail-section">
-          <h3 class="slab-detail-section-title">图文描述</h3>
+        <t-card class="slab-detail-section" title="图文描述">
           <div class="slab-detail-media-grid">
             <button
               v-for="media in detailMediaItems"
@@ -593,10 +592,9 @@
               <span class="slab-detail-media-label">{{ media.label }}</span>
             </button>
           </div>
-        </AdminSectionCard>
+        </t-card>
 
-        <AdminSectionCard class="slab-detail-section">
-          <h3 class="slab-detail-section-title">基础信息</h3>
+        <t-card class="slab-detail-section" title="基础信息">
           <t-descriptions bordered :column="3">
             <t-descriptions-item label="大板名称" :span="2">{{ detailDrawerRow.name }}</t-descriptions-item>
             <t-descriptions-item label="ID">{{ detailDrawerRow.id }}</t-descriptions-item>
@@ -627,10 +625,9 @@
             }}</t-descriptions-item>
             <t-descriptions-item label="扣角4宽（mm）">{{ detailDrawerRow.corner4WidthMm ?? '-' }}</t-descriptions-item>
           </t-descriptions>
-        </AdminSectionCard>
+        </t-card>
 
-        <AdminSectionCard class="slab-detail-section">
-          <h3 class="slab-detail-section-title">销售信息</h3>
+        <t-card class="slab-detail-section" title="销售信息">
           <t-descriptions bordered :column="3">
             <t-descriptions-item label="成本价">{{
               detailPriceRows.find((row) => row.label === '成本价')?.price ?? '-'
@@ -639,7 +636,7 @@
             <t-descriptions-item label="库存">{{ detailDrawerRow.stock ?? '-' }}</t-descriptions-item>
             <t-descriptions-item label="大板编号" :span="3">{{ detailDrawerRow.code }}</t-descriptions-item>
           </t-descriptions>
-        </AdminSectionCard>
+        </t-card>
       </t-space>
     </t-drawer>
 
@@ -827,17 +824,10 @@
       v-model:visible="priceDrawerVisible"
       header="价格编辑器"
       placement="right"
-      :size="priceDrawerSize"
-      :footer="false"
+      :footer="!priceDrawerReadonly"
       @close="closePriceDrawer"
     >
-      <div ref="priceDrawerRoot" class="price-drawer-content price-drawer-content--source">
-        <div class="drawer-actions">
-          <t-button v-if="!priceDrawerReadonly" :theme="buttonTheme('save')" block @click="saveBatchPrice">
-            <template #icon><t-icon name="save" /></template>
-            {{ formConfirmationText('edit') }}
-          </t-button>
-        </div>
+      <div ref="priceDrawerRoot">
         <div class="source-cost-editor">
           <span><span class="price-required-star">*</span>成本价</span>
           <SpecPriceInput
@@ -851,6 +841,15 @@
           />
         </div>
       </div>
+      <template #footer>
+        <t-space size="small">
+          <t-button :theme="buttonTheme('save')" @click="saveBatchPrice">
+            <template #icon><t-icon name="save" /></template>
+            {{ formConfirmationText('edit') }}
+          </t-button>
+          <t-button :theme="buttonTheme('cancel')" @click="closePriceDrawer">取消</t-button>
+        </t-space>
+      </template>
     </t-drawer>
 
     <AdminDialog
@@ -1494,9 +1493,6 @@ const reasonFormRules = computed<Record<string, FormRule[]>>(() => ({
   detail: [],
 }));
 const batchPriceRows = reactive<DrawerPriceRow[]>([]);
-const priceDrawerSize = computed(() => {
-  return 'min(calc(200px + 2 * var(--td-comp-paddingLR-l)), calc(100vw - 32px))';
-});
 const uploadItems: {
   key: UploadItemKey;
   title: string;

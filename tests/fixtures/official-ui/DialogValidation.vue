@@ -45,7 +45,7 @@
         v-for="index in count"
         :key="index"
         :label="index === count ? '值名称' : `字段${index}`"
-        v-bind="fieldFeedback(submitted && !data[`name${index}`], '请输入值名称')"
+        v-bind="fieldFeedback(submitted && !data[`name${index}`], errorText)"
       >
         <t-input v-model="data[`name${index}`]" placeholder="请输入值名称" />
       </t-form-item>
@@ -62,6 +62,7 @@ import { fieldFeedback } from '@/utils/formValidation';
 const query = new URLSearchParams(location.search);
 const kind = query.get('kind') ?? 'native';
 const count = query.has('long') ? 30 : 1;
+const errorText = query.has('long-errors') ? '请输入值名称，并检查分类和规格是否正确。'.repeat(12) : '请输入值名称';
 const formRef = ref<FormInstanceFunctions>();
 const submitted = ref(false);
 async function validate() {
@@ -77,7 +78,7 @@ const rules: Record<string, FormRule[]> = {
   ...Object.fromEntries(
     Array.from({ length: count }, (_, index) => [
       `name${index + 1}`,
-      [{ required: true, message: '请输入值名称', type: 'error' }],
+      [{ required: true, message: errorText, type: 'error' }],
     ]),
   ),
 };

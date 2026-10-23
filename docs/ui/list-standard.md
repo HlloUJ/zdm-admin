@@ -35,6 +35,6 @@
 
 ## 窄屏列表容器兼容（2026-10-22）
 
-经用户明确授权的存量列表越界修复统一复用 `official/responsive-layout.css`：页面使用 `zdm-admin-responsive-page`，列表弹窗通过 `dialog-class-name` 使用 `zdm-admin-responsive-dialog`，版本记录抽屉使用 `zdm-admin-responsive-drawer`。仅在991px及以下解除存量页面最小宽度、约束弹窗／抽屉视口边界；商品编辑分区使用可收缩的单列容器，表格继续使用原生横向滚动。保留桌面尺寸、业务列宽、字段、权限、查询及分页事件，不复制局部皮肤。
+经用户明确授权的存量列表越界修复统一复用 `official/responsive-layout.css`：页面使用 `zdm-admin-responsive-page`，列表弹窗通过 `dialog-class-name` 使用 `zdm-admin-responsive-dialog`，抽屉宽度按[抽屉全局样式规范](drawer-standard.md)通过原生Drawer公开size属性限制在视口内，不再要求版本记录抽屉使用旧的 `zdm-admin-responsive-drawer` 内部容器覆盖。页面和列表弹窗仍仅在991px及以下解除存量页面最小宽度、约束弹窗视口边界；商品编辑分区使用可收缩的单列容器，表格继续使用原生横向滚动。保留桌面尺寸、业务列宽、字段、权限、查询及分页事件，不复制局部皮肤。
 
 列表中的名称、标题、姓名及编号按[展示文本标准](display-text-standard.md)呈现，详情保留独立且受权限控制的操作入口；不改变列宽、布局及其他行操作。

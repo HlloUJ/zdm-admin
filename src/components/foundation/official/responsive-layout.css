@@ -14,8 +14,4 @@
   .zdm-admin-responsive-dialog.t-dialog {
     max-width: calc(100vw - 32px);
   }
-
-  .zdm-admin-responsive-drawer .t-drawer__content-wrapper {
-    max-width: 100vw;
-  }
 }

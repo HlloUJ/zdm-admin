@@ -684,7 +684,7 @@
       v-model:visible="detailDrawerVisible"
       header="大板详情"
       placement="right"
-      size="min(1240px, 100vw)"
+      size="min(1240px, 100%)"
       :footer="false"
       @close="closeDetailDrawer"
     >
@@ -695,8 +695,7 @@
           theme="warning"
           message="历史失效详情快照缺失，当前展示来源资料，不代表失效时的商品和价格。"
         />
-        <AdminSectionCard class="slab-detail-section">
-          <h3 class="slab-detail-section-title">图文描述</h3>
+        <t-card class="slab-detail-section" title="图文描述">
           <div class="slab-detail-media-grid">
             <button
               v-for="media in detailMediaItems"
@@ -713,10 +712,9 @@
               <span class="slab-detail-media-label">{{ media.label }}</span>
             </button>
           </div>
-        </AdminSectionCard>
+        </t-card>
 
-        <AdminSectionCard class="slab-detail-section">
-          <h3 class="slab-detail-section-title">基础信息</h3>
+        <t-card class="slab-detail-section" title="基础信息">
           <t-descriptions bordered :column="3">
             <t-descriptions-item label="大板名称" :span="2">{{ detailDrawerRow.name }}</t-descriptions-item>
             <t-descriptions-item label="ID">{{ detailDrawerRow.id }}</t-descriptions-item>
@@ -747,10 +745,9 @@
             }}</t-descriptions-item>
             <t-descriptions-item label="扣角4宽（mm）">{{ detailDrawerRow.corner4WidthMm ?? '-' }}</t-descriptions-item>
           </t-descriptions>
-        </AdminSectionCard>
+        </t-card>
 
-        <AdminSectionCard class="slab-detail-section">
-          <h3 class="slab-detail-section-title">销售信息</h3>
+        <t-card class="slab-detail-section" title="销售信息">
           <t-descriptions bordered :column="3">
             <t-descriptions-item label="成本价">{{
               detailPriceRows.find((row) => row.label === '成本价')?.price ?? '-'
@@ -777,7 +774,7 @@
               </t-space>
             </template>
           </t-table>
-        </AdminSectionCard>
+        </t-card>
       </t-space>
     </t-drawer>
 
@@ -981,16 +978,10 @@
       header="价格编辑器"
       placement="right"
       :size="priceDrawerSize"
-      :footer="false"
+      :footer="!priceDrawerReadonly"
       @close="closePriceDrawer"
     >
       <div class="price-drawer-content">
-        <div class="drawer-actions">
-          <t-button v-if="!priceDrawerReadonly" :theme="buttonTheme('save')" block @click="saveBatchPrice">
-            <template #icon><t-icon name="save" /></template>
-            {{ formConfirmationText('edit') }}
-          </t-button>
-        </div>
         <t-form ref="priceDrawerFormRef" :data="priceDrawerForm" class="price-drawer-form">
           <div :key="drawerPriceSession" class="price-table">
             <div class="price-table__head">
@@ -1043,6 +1034,15 @@
           </div>
         </t-form>
       </div>
+      <template #footer>
+        <t-space size="small">
+          <t-button :theme="buttonTheme('save')" @click="saveBatchPrice">
+            <template #icon><t-icon name="save" /></template>
+            {{ formConfirmationText('edit') }}
+          </t-button>
+          <t-button :theme="buttonTheme('cancel')" @click="closePriceDrawer">取消</t-button>
+        </t-space>
+      </template>
     </t-drawer>
 
     <AdminDialog
@@ -1716,7 +1716,7 @@ const batchPriceRows = reactive<DrawerPriceRow[]>([]);
 const priceDrawerForm = reactive({ rows: batchPriceRows });
 const priceDrawerSize = computed(() => {
   const longestLabelLength = batchPriceRows.reduce((length, row) => Math.max(length, row.label.length), 0);
-  return `${Math.max(620, longestLabelLength * 16 + 430)}px`;
+  return `min(${Math.max(620, longestLabelLength * 16 + 430)}px, 100%)`;
 });
 const uploadItems: {
   key: UploadItemKey;

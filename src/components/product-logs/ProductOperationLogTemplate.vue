@@ -2,7 +2,7 @@
   <t-drawer
     :visible="visible"
     header="操作日志"
-    size="min(1240px, 100vw)"
+    size="min(1240px, 100%)"
     :footer="false"
     @update:visible="emit('update:visible', $event)"
   >
@@ -20,7 +20,8 @@
               <t-input
                 :value="filter.keyword"
                 clearable
-                :placeholder="controlPlaceholder(subjectLabel, 'input')"
+                :data-query-search-scope="keywordPlaceholder"
+                :placeholder="controlPlaceholder(keywordPlaceholder ?? subjectLabel, 'input')"
                 @change="emit('filter-change', 'keyword', $event)"
               />
             </t-form-item>

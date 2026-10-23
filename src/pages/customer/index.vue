@@ -146,7 +146,7 @@
       v-model:visible="detailVisible"
       header="客户详情"
       placement="right"
-      size="min(1100px, 100vw)"
+      size="min(1100px, 100%)"
       :confirm-btn="null"
       :cancel-btn="cancelButtonProps('关闭')"
       @cancel="detailVisible = false"

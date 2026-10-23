@@ -423,7 +423,10 @@ test('form layout and Upload visuals use one registered official implementation'
   assert.match(css, /margin: var\(--td-comp-margin-xxl\) 0 var\(--td-comp-margin-xl\)/);
   assert.match(css, /gap: var\(--td-comp-margin-xxl\) var\(--td-comp-margin-xxxl\)/);
   assert.match(css, /margin-bottom: 0/);
-  assert.match(css, /padding: var\(--td-comp-paddingTB-l\) var\(--td-comp-paddingLR-xl\)/);
+  assert.match(
+    read('tests/fixtures/official-ui/upstream/vendor/tdesign-vue-next/es/card/style/index.css'),
+    /\.t-card__body\s*\{[^}]*padding: var\(--td-comp-paddingTB-l\) var\(--td-comp-paddingLR-xl\)/,
+  );
 
   assert.match(media, /border-color: var\(--td-error-color\)/);
   assert.match(read('src/components/foundation/AdminMediaUpload.vue'), /<t-upload/);
@@ -1028,4 +1031,90 @@ test('display text guard rejects link click keyboard and render-function regress
     '<t-link :theme="buttonTheme(\'preview\')" @click="previewAttachment(record, attachment)">{{ attachment.name }}</t-link>',
   ])
     assert.deepEqual(displayTextViolations(`<template>${body}</template>`), [], body);
+});
+
+test('all shared batch drawers use native cards and check tags without retaining simulated skins', () => {
+  function inspect(source) {
+    const { descriptor } = parseSfc(source);
+    const root = parseTemplate(descriptor.template?.content ?? '');
+    const sections = [],
+      tags = [],
+      legacy = [];
+    function walk(node) {
+      if (node.type === NodeTypes.ELEMENT) {
+        const cls =
+          node.props.find((prop) => prop.type === NodeTypes.ATTRIBUTE && prop.name === 'class')?.value?.content ?? '';
+        if (cls.split(/\s+/).includes('batch-section')) sections.push(node.tag);
+        if (node.tag === 't-check-tag') tags.push(node);
+        if (cls.includes('batch-chip') || cls.includes('batch-section-head')) legacy.push(node.tag);
+      }
+      node.children?.forEach(walk);
+    }
+    walk(root);
+    return { sections, tags, legacy };
+  }
+  for (const file of [
+    'src/pages/finished-stock/management/index.vue',
+    'src/pages/finished-stock/supply-chain/index.vue',
+  ]) {
+    const result = inspect(read(file));
+    assert.deepEqual(result.sections, ['t-card', 't-card'], file);
+    assert.deepEqual(result.legacy, [], file);
+    assert.equal(result.tags.length, 2, file);
+    assert.deepEqual(
+      result.tags.map(
+        (tag) =>
+          tag.props.find(
+            (prop) => prop.type === NodeTypes.DIRECTIVE && prop.name === 'on' && prop.arg?.content === 'change',
+          )?.exp?.content,
+      ),
+      ['clearBatchFilterField(filter.field)', 'toggleBatchFilterValue(filter.field, value)'],
+    );
+    for (const tag of result.tags) {
+      assert.ok(
+        tag.props.some(
+          (prop) => prop.type === NodeTypes.DIRECTIVE && prop.name === 'bind' && prop.arg?.content === 'checked',
+        ),
+      );
+    }
+  }
+  assert.deepEqual(
+    inspect('<template><section class="batch-section"/><button class="batch-chip"/></template>').sections,
+    ['section'],
+  );
+  assert.equal(inspect('<template><button class="batch-chip"/></template>').legacy.length, 1);
+  const css = postcss.parse(read('src/components/foundation/official/product-form-layout.css'));
+  let quantityWidth;
+  css.walkRules((rule) => {
+    assert.doesNotMatch(rule.selector, /\.batch-(?:section|chip)(?:\b|[-.])/);
+    if (rule.selector === '.batch-field-grid :is(.t-input-number)')
+      quantityWidth = rule.nodes.find((node) => node.prop === 'width')?.value;
+  });
+  assert.equal(quantityWidth, '100%', 'maximum width alone does not fill the allocated field');
+  for (const file of files('src').filter((file) => /\.(?:vue|css)$/.test(file))) {
+    const text = read(file);
+    const sheets = file.endsWith('.vue') ? parseSfc(text).descriptor.styles.map((style) => style.content) : [text];
+    for (const sheet of sheets)
+      postcss.parse(sheet).walkRules((rule) => {
+        if (/\.detail-price-table\b/.test(rule.selector))
+          rule.walkDecls((decl) =>
+            assert.doesNotMatch(decl.prop, /^(?:background|color|font|border|box-shadow)/, `${file}: ${rule.selector}`),
+          );
+      });
+  }
+  for (const file of files('src').filter((file) => file.endsWith('.vue'))) {
+    for (const [opening] of read(file).matchAll(/<t-drawer\b[^>]*>/g))
+      assert.doesNotMatch(opening, /100vw/, `${file}: Drawer caps must exclude reserved scrollbar width`);
+  }
+  assert.match(
+    read('src/pages/slab/management/index.vue'),
+    /return `min\(\$\{Math\.max\(620, longestLabelLength \* 16 \+ 430\)\}px, 100%\)`/,
+  );
+  const accessory = read('src/modules/accessory/routes.ts');
+  for (const [name, component] of [
+    ['AccessoryManagement', 'Management'],
+    ['SupplyChainAccessory', 'SupplyChain'],
+    ['StoreAccessory', 'Store'],
+  ])
+    assert.ok(accessory.includes(`accessoryPage('${name}', ${component})`));
 });

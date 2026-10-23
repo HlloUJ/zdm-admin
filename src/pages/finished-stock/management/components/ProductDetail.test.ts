@@ -1,3 +1,4 @@
+import { Card } from 'tdesign-vue-next';
 import type { DefineComponent } from 'vue';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -135,4 +136,29 @@ it('运营分层详情按日志方式排序和合并规格，价格库存仍绑�
   await view.setProps({ operations: false });
   expect(vm.rows.map((row) => row.skuId)).toEqual([13, 12, 11]);
   expect(vm.span({ rowIndex: 0, col: { colKey: 'size' } })).toEqual({});
+});
+
+it('抽屉使用原生分区且保留资料与预览，整页编辑仍使用原布局', async () => {
+  const view = wrapper();
+  await view.setProps({ operations: true });
+  const model = () => {
+    const vm = view.vm as unknown as { rows: unknown[]; columns: { colKey: string }[] };
+    return JSON.stringify({ rows: vm.rows, columns: vm.columns.map((column) => column.colKey) });
+  };
+  const before = model();
+  await view.setProps({ drawerLayout: true });
+  expect(view.findAllComponents(Card).map((card) => card.props('title'))).toEqual(['图文描述', '基础信息', '销售信息']);
+  expect(view.find('.product-detail__card-title').exists()).toBe(false);
+  expect(view.find('.product-detail__attributes-heading').exists()).toBe(false);
+  expect(model()).toBe(before);
+  expect(view.find('input').exists()).toBe(false);
+  expect(view.find('script').exists()).toBe(false);
+  await view.find('button').trigger('click');
+  expect(view.emitted('preview')?.[0]).toEqual([{ url: '/image.png' }, 'image']);
+  await view.setProps({ drawerLayout: false, editorLayout: true, showSales: false });
+  expect(view.findAllComponents(Card)).toHaveLength(0);
+  expect(view.findAll('h3.product-detail__section-title').map((title) => title.text())).toEqual([
+    '图文描述',
+    '基础信息',
+  ]);
 });
