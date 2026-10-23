@@ -2,7 +2,7 @@
   <t-drawer
     :visible="visible"
     header="操作日志"
-    size="min(1240px, 100vw)"
+    size="min(1240px, 100%)"
     :footer="false"
     @update:visible="emit('update:visible', $event)"
   >

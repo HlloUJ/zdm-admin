@@ -107,6 +107,8 @@
 
 /* Use the containing column without changing the compact input's own width. */
 .t-table .price-coefficient-field {
+  display: flex;
+  flex-direction: column;
   container-type: inline-size;
 }
 

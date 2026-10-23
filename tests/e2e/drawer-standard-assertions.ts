@@ -34,6 +34,10 @@ export async function expectEditableDrawer(drawer: Locator, title: string) {
 export async function expectDrawerWithinViewport(drawer: Locator) {
   const page = drawer.page();
   const previous = page.viewportSize();
+  // Emulate classic scrollbars even on systems whose native scrollbars overlay content.
+  const scrollbar = await page.addStyleTag({
+    content: 'html { overflow-y: scroll; } html::-webkit-scrollbar { width: 15px; }',
+  });
   await page.setViewportSize({ width: 760, height: 600 });
   await drawer.locator('.t-drawer__footer').getByRole('button', { name: '取消', exact: true }).click({ trial: true });
   const box = await drawer.locator('.t-drawer__content-wrapper').boundingBox();
@@ -41,6 +45,11 @@ export async function expectDrawerWithinViewport(drawer: Locator) {
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.width).toBeLessThanOrEqual(760);
   expect(box!.x + box!.width).toBeLessThanOrEqual(760);
+  const availableWidth = await page.evaluate(() => document.documentElement.clientWidth);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(availableWidth);
+  await scrollbar.evaluate((element) => {
+    element.parentNode?.removeChild(element);
+  });
   if (previous) await page.setViewportSize(previous);
 }
 

@@ -361,7 +361,7 @@
     <t-drawer
       v-model:visible="poolDetailVisible"
       header="商品详情"
-      size="min(1200px, 100vw)"
+      size="min(1200px, 100%)"
       :footer="false"
       :close-btn="true"
       @close="poolVisible = true"
@@ -369,7 +369,7 @@
       <StorePoolProductDetail v-if="poolDetail" :product="poolDetail" />
     </t-drawer>
 
-    <t-drawer v-model:visible="detailVisible" header="商品详情" size="min(1200px, 100vw)" :footer="false">
+    <t-drawer v-model:visible="detailVisible" header="商品详情" size="min(1200px, 100%)" :footer="false">
       <StoreProductDetail v-if="current" :product="current" />
     </t-drawer>
 
