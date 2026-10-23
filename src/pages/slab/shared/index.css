@@ -467,10 +467,6 @@ video.upload-large-preview {
   margin-top: var(--zdm-admin-section-gap);
 }
 
-.detail-price-table :deep(thead th) {
-  background: var(--td-bg-color-secondarycontainer);
-}
-
 .price-table__head,
 .price-table__row {
   display: grid;

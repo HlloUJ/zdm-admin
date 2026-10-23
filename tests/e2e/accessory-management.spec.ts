@@ -1,4 +1,8 @@
-import { expectEditableDrawer, expectDrawerWithinViewport } from './drawer-standard-assertions';
+import {
+  expectEditableDrawer,
+  expectDrawerWithinViewport,
+  expectNativeBatchDrawer,
+} from './drawer-standard-assertions';
 import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
 import { checkDecimalEditing } from './decimal-editing';
@@ -562,6 +566,7 @@ test('source specification editor exposes cost and stock without operations pric
   const drawer = page.locator('.t-drawer--open');
   await expectEditableDrawer(drawer, '批量填写');
   await expectDrawerWithinViewport(drawer);
+  await expectNativeBatchDrawer(drawer);
   await expect(drawer.getByText('按规格属性值圈定范围，再填写要覆盖的字段', { exact: true })).toHaveCount(0);
   const valuesBefore = await table
     .locator('tbody input')
@@ -672,7 +677,7 @@ test('uses only template-bound role attributes and builds dynamic sales specific
   const batchFields = page.locator('.batch-field-grid');
   await expect(batchFields).toHaveCSS('row-gap', '24px');
   await expect(batchFields).toHaveCSS('column-gap', '32px');
-  await expect(page.locator('.batch-section').first()).toHaveCSS('padding', '16px 24px');
+  await expect(page.locator('.batch-section.t-card .t-card__body').first()).toHaveCSS('padding', '16px 24px');
   await expect(batchFields).not.toContainText('商品测试属性');
   await expect(batchFields).not.toContainText('无角色测试属性');
   await batchFields.locator('.t-form__item').filter({ hasText: '销售测试属性' }).getByRole('textbox').fill('大号');
@@ -2536,6 +2541,7 @@ test('operations batch drawer uses native footer and cancel keeps specification 
   const drawer = page.locator('.t-drawer--open');
   await expectEditableDrawer(drawer, '批量填写');
   await expectDrawerWithinViewport(drawer);
+  await expectNativeBatchDrawer(drawer);
   await expect(drawer.getByText('按规格属性值圈定范围，再填写要覆盖的字段', { exact: true })).toHaveCount(0);
   await drawer.locator('.t-drawer__footer').getByRole('button', { name: '取消', exact: true }).click();
   await expect(drawer).not.toBeVisible();
@@ -2543,4 +2549,49 @@ test('operations batch drawer uses native footer and cancel keeps specification 
   expect(await inputs.evaluateAll((items) => items.map((input) => (input as HTMLInputElement).value))).toEqual(
     valuesBefore,
   );
+});
+
+test('native batch range tags preserve multiple selection, all, matched writes and cancellation', async ({ page }) => {
+  await openSpecConversionFixture(page, 'single');
+  await page.locator('.t-dialog:visible').getByRole('button', { name: '取消', exact: true }).click();
+  const table = page.locator('.spec-table-block');
+  const prices = table.getByPlaceholder('请输入价格', { exact: true });
+  await expect(prices).toHaveCount(2);
+  const originalPrices = await prices.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+  await page.getByRole('button', { name: '批量填写', exact: true }).click();
+  const drawer = page.locator('.t-drawer--open');
+  await expectNativeBatchDrawer(drawer);
+  const range = drawer.locator('.batch-filter-values').first();
+  const all = range.locator('.t-tag--check').filter({ hasText: /^\s*全部\s*$/ });
+  const standard = range.locator('.t-tag--check').filter({ hasText: /^\s*标准款\s*$/ });
+  const extended = range.locator('.t-tag--check').filter({ hasText: /^\s*加长款\s*$/ });
+  await expect(all).toHaveClass(/t-tag--checked/);
+  await expect(drawer.locator('.batch-match-tip')).toHaveText('当前将批量填充 2 条规格');
+  await standard.click();
+  await expect(standard).toHaveClass(/t-tag--checked/);
+  await expect(all).not.toHaveClass(/t-tag--checked/);
+  await expect(drawer.locator('.batch-match-tip')).toHaveText('当前将批量填充 1 条规格');
+  await extended.focus();
+  await extended.press('Space');
+  await expect(extended).toHaveClass(/t-tag--checked/);
+  await expect(drawer.locator('.batch-match-tip')).toHaveText('当前将批量填充 2 条规格');
+  await standard.click();
+  await expect(standard).not.toHaveClass(/t-tag--checked/);
+  await expect(drawer.locator('.batch-match-tip')).toHaveText('当前将批量填充 1 条规格');
+  await all.click();
+  await expect(all).toHaveClass(/t-tag--checked/);
+  await expect(extended).not.toHaveClass(/t-tag--checked/);
+  await expect(drawer.locator('.batch-match-tip')).toHaveText('当前将批量填充 2 条规格');
+  await standard.click();
+  await drawer.getByPlaceholder('请输入价格', { exact: true }).fill('99');
+  await drawer.locator('.t-drawer__footer').getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(prices.nth(0)).toHaveValue(/99(?:\.00)?/);
+  await expect(prices.nth(1)).toHaveValue(originalPrices[1]);
+  await page.getByRole('button', { name: '批量填写', exact: true }).click();
+  await expect(all).toHaveClass(/t-tag--checked/);
+  await expect(drawer.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
+  await drawer.getByPlaceholder('请输入价格', { exact: true }).fill('88');
+  await drawer.locator('.t-drawer__footer').getByRole('button', { name: '取消', exact: true }).click();
+  await expect(prices.nth(0)).toHaveValue(/99(?:\.00)?/);
+  await expect(prices.nth(1)).toHaveValue(originalPrices[1]);
 });

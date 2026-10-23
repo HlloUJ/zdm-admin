@@ -43,3 +43,33 @@ export async function expectDrawerWithinViewport(drawer: Locator) {
   expect(box!.x + box!.width).toBeLessThanOrEqual(760);
   if (previous) await page.setViewportSize(previous);
 }
+
+export async function expectNativeBatchDrawer(drawer: Locator) {
+  await expect(drawer.locator('.batch-section.t-card .t-card__title')).toHaveText(['选择批量范围', '填写字段']);
+  await expect(drawer.locator('.batch-section .t-card__body').first()).toHaveCSS('padding', '16px 24px');
+  await expect(drawer.locator('.batch-chip, .batch-section-head')).toHaveCount(0);
+  const tags = drawer.locator('.batch-filter-values .t-tag--check');
+  expect(await tags.count()).toBeGreaterThan(0);
+  await expect(drawer.locator('.batch-filter-values > button')).toHaveCount(0);
+  for (const pair of await drawer.locator('.batch-field-grid .price-pair.wide').all()) {
+    const layout = await pair.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        tracks: style.gridTemplateColumns.split(' ').map(Number.parseFloat),
+        fields: Array.from(element.children).map((field) => field.getBoundingClientRect().width),
+      };
+    });
+    expect(layout.fields).toHaveLength(2);
+    for (let i = 0; i < layout.fields.length; i++)
+      expect(Math.abs(layout.fields[i] - layout.tracks[i])).toBeLessThanOrEqual(1);
+  }
+  const numbers = drawer.locator('.batch-field-grid .t-form__controls-content > .t-input-number');
+  for (const number of await numbers.all()) {
+    const widths = await number.evaluate((element) => ({
+      control: element.getBoundingClientRect().width,
+      allocation: element.parentElement!.getBoundingClientRect().width,
+    }));
+    expect(widths.control).toBeGreaterThan(0);
+    expect(Math.abs(widths.control - widths.allocation)).toBeLessThanOrEqual(1);
+  }
+}
