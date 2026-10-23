@@ -531,10 +531,6 @@ video.upload-large-preview {
   min-width: 0;
 }
 
-.drawer-actions {
-  margin-bottom: var(--td-comp-margin-l);
-}
-
 @media (max-width: 1100px) {
   .publish-base-grid,
   .dimension-grid,

@@ -1,3 +1,4 @@
+import { expectEditableDrawer } from './drawer-standard-assertions';
 import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
 import { checkDecimalEditing } from './decimal-editing';
@@ -558,6 +559,20 @@ test('source specification editor exposes cost and stock without operations pric
   await page.getByText('批量填写', { exact: true }).click();
   await expect(page.locator('.batch-field-grid').getByText('成本价', { exact: true })).toBeVisible();
   await expect(page.locator('.batch-field-grid').getByText('指导价', { exact: true })).toHaveCount(0);
+  const drawer = page.locator('.t-drawer--open');
+  await expectEditableDrawer(drawer, '批量填写');
+  await expect(drawer.getByText('按规格属性值圈定范围，再填写要覆盖的字段', { exact: true })).toHaveCount(0);
+  const valuesBefore = await table
+    .locator('tbody input')
+    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+  await drawer.getByPlaceholder('请输入价格', { exact: true }).fill('99');
+  await drawer.locator('.t-drawer__footer').getByRole('button', { name: '取消', exact: true }).click();
+  await expect(drawer).not.toBeVisible();
+  expect(
+    await table
+      .locator('tbody input')
+      .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value)),
+  ).toEqual(valuesBefore);
 });
 
 test('uses only template-bound role attributes and builds dynamic sales specifications', async ({ page }) => {
@@ -2486,3 +2501,40 @@ for (const client of ['supply-chain']) {
     expect(mark.color).not.toBe('rgba(0, 0, 0, 0)');
   });
 }
+
+test('operations batch drawer uses native footer and cancel keeps specification values', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page, 'admin');
+  await page.route('**/api/admin/accessory-products/price-level-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [] } }),
+  );
+  const product = {
+    id: 1,
+    name: '抽屉规范测试商品',
+    categoryId: 5,
+    supplierId: 2,
+    status: 'warehouse',
+    sourceStatus: 'selling',
+    totalStock: 1,
+    attributes: [],
+    variants: [{ id: 11, variantLabel: '标准规格', displayMode: 'single', costPrice: 10, stock: 1 }],
+    guidePrices: [],
+    markupPrices: [],
+  };
+  await page.route('**/api/admin/accessory-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/accessory-products/1', (route) => route.fulfill({ json: { code: 0, data: product } }));
+  await page.goto('/accessory-management');
+  await page.getByText('编辑', { exact: true }).first().click();
+  await page.getByRole('button', { name: '批量填写', exact: true }).click();
+  const inputs = page.locator('.spec-table-block tbody input');
+  const valuesBefore = await inputs.evaluateAll((items) => items.map((input) => (input as HTMLInputElement).value));
+  const drawer = page.locator('.t-drawer--open');
+  await expectEditableDrawer(drawer, '批量填写');
+  await expect(drawer.getByText('按规格属性值圈定范围，再填写要覆盖的字段', { exact: true })).toHaveCount(0);
+  await drawer.locator('.t-drawer__footer').getByRole('button', { name: '取消', exact: true }).click();
+  await expect(drawer).not.toBeVisible();
+  await expect(page.locator('.spec-table-block')).toBeVisible();
+  expect(await inputs.evaluateAll((items) => items.map((input) => (input as HTMLInputElement).value))).toEqual(
+    valuesBefore,
+  );
+});

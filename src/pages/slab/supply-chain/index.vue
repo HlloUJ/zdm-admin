@@ -828,16 +828,10 @@
       header="价格编辑器"
       placement="right"
       :size="priceDrawerSize"
-      :footer="false"
+      :footer="!priceDrawerReadonly"
       @close="closePriceDrawer"
     >
       <div ref="priceDrawerRoot" class="price-drawer-content price-drawer-content--source">
-        <div class="drawer-actions">
-          <t-button v-if="!priceDrawerReadonly" :theme="buttonTheme('save')" block @click="saveBatchPrice">
-            <template #icon><t-icon name="save" /></template>
-            {{ formConfirmationText('edit') }}
-          </t-button>
-        </div>
         <div class="source-cost-editor">
           <span><span class="price-required-star">*</span>成本价</span>
           <SpecPriceInput
@@ -851,6 +845,15 @@
           />
         </div>
       </div>
+      <template #footer>
+        <t-space size="small">
+          <t-button :theme="buttonTheme('save')" @click="saveBatchPrice">
+            <template #icon><t-icon name="save" /></template>
+            {{ formConfirmationText('edit') }}
+          </t-button>
+          <t-button :theme="buttonTheme('cancel')" @click="closePriceDrawer">取消</t-button>
+        </t-space>
+      </template>
     </t-drawer>
 
     <AdminDialog

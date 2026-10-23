@@ -45,8 +45,7 @@
 .table-toolbar,
 .toolbar-buttons,
 .form-title-row,
-.selected-category,
-.drawer-head {
+.selected-category {
   display: flex;
   align-items: center;
 }
@@ -573,21 +572,6 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--td-comp-margin-s);
-}
-
-.drawer-head {
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.drawer-head div {
-  display: grid;
-  gap: 4px;
-}
-
-.drawer-head span {
-  color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-medium);
 }
 
 .detail-panel {

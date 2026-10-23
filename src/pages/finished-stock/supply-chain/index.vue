@@ -913,20 +913,8 @@
       size="1180px"
       lazy
       destroy-on-close
-      :footer="false"
       @close="closePriceDrawer"
     >
-      <div class="drawer-head">
-        <div>
-          <strong>批量填写</strong>
-          <span>按规格属性值圈定范围，再填写要覆盖的字段</span>
-        </div>
-        <t-button :theme="buttonTheme('save')" @click="savePriceDrawer">
-          <template #icon><t-icon name="save" /></template>
-          {{ formConfirmationText('edit') }}
-        </t-button>
-      </div>
-
       <div ref="priceFormRoot" class="batch-fill-panel">
         <section class="batch-section">
           <div class="batch-section-head">
@@ -1026,6 +1014,15 @@
           </div>
         </section>
       </div>
+      <template #footer>
+        <t-space size="small">
+          <t-button :theme="buttonTheme('save')" @click="savePriceDrawer">
+            <template #icon><t-icon name="save" /></template>
+            {{ formConfirmationText('edit') }}
+          </t-button>
+          <t-button :theme="buttonTheme('cancel')" @click="closePriceDrawer">取消</t-button>
+        </t-space>
+      </template>
     </t-drawer>
     <t-dialog
       v-model:visible="reasonDialogVisible"
@@ -1056,7 +1053,7 @@
     <t-drawer
       v-model:visible="detailDialogVisible"
       header="商品详情"
-      :close-btn="false"
+      :close-btn="true"
       size="min(1240px, 100vw)"
       placement="right"
       :footer="false"

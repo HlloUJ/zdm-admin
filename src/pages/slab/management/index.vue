@@ -981,16 +981,10 @@
       header="价格编辑器"
       placement="right"
       :size="priceDrawerSize"
-      :footer="false"
+      :footer="!priceDrawerReadonly"
       @close="closePriceDrawer"
     >
       <div class="price-drawer-content">
-        <div class="drawer-actions">
-          <t-button v-if="!priceDrawerReadonly" :theme="buttonTheme('save')" block @click="saveBatchPrice">
-            <template #icon><t-icon name="save" /></template>
-            {{ formConfirmationText('edit') }}
-          </t-button>
-        </div>
         <t-form ref="priceDrawerFormRef" :data="priceDrawerForm" class="price-drawer-form">
           <div :key="drawerPriceSession" class="price-table">
             <div class="price-table__head">
@@ -1043,6 +1037,15 @@
           </div>
         </t-form>
       </div>
+      <template #footer>
+        <t-space size="small">
+          <t-button :theme="buttonTheme('save')" @click="saveBatchPrice">
+            <template #icon><t-icon name="save" /></template>
+            {{ formConfirmationText('edit') }}
+          </t-button>
+          <t-button :theme="buttonTheme('cancel')" @click="closePriceDrawer">取消</t-button>
+        </t-space>
+      </template>
     </t-drawer>
 
     <AdminDialog
