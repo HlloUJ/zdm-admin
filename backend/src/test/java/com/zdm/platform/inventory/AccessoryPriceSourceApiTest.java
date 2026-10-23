@@ -50,27 +50,46 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
 
   @ParameterizedTest
   @CsvSource({
-      "false,false,false,false",
-      "false,false,true,false",
-      "false,true,false,false",
-      "false,true,true,false",
-      "true,false,false,false",
-      "true,false,true,false",
-      "true,true,false,false",
-      "true,true,true,true"
+      "missing,missing,missing,false",
+      "missing,missing,enabled,false",
+      "missing,missing,disabled,false",
+      "missing,enabled,missing,false",
+      "missing,enabled,enabled,false",
+      "missing,enabled,disabled,false",
+      "missing,disabled,missing,false",
+      "missing,disabled,enabled,false",
+      "missing,disabled,disabled,false",
+      "enabled,missing,missing,false",
+      "enabled,missing,enabled,false",
+      "enabled,missing,disabled,false",
+      "enabled,enabled,missing,false",
+      "enabled,enabled,enabled,true",
+      "enabled,enabled,disabled,false",
+      "enabled,disabled,missing,false",
+      "enabled,disabled,enabled,false",
+      "enabled,disabled,disabled,false",
+      "disabled,missing,missing,false",
+      "disabled,missing,enabled,false",
+      "disabled,missing,disabled,false",
+      "disabled,enabled,missing,false",
+      "disabled,enabled,enabled,false",
+      "disabled,enabled,disabled,false",
+      "disabled,disabled,missing,false",
+      "disabled,disabled,enabled,false",
+      "disabled,disabled,disabled,false"
   })
   @org.springframework.transaction.annotation.Transactional
-  void storeLevelPriceCompletenessRequiresAllThreeConfigurations(
-      boolean accessory, boolean finished, boolean slab, boolean complete) throws Exception {
+  void storeLevelPriceCompletenessRequiresAllThreeEnabledConfigurations(
+      String accessory, String finished, String slab, boolean complete) throws Exception {
     jdbc.update("INSERT INTO store_levels (id,name,status,sort_order,created_by_account_id) VALUES (99409,'价格完整性测试','enabled',1,1)");
     List<String> tables = List.of(
         "accessory_markup_configurations", "finished_markup_configurations", "slab_markup_configurations");
-    List<Boolean> configured = List.of(accessory, finished, slab);
+    List<String> configurationStatuses = List.of(accessory, finished, slab);
     for (int index = 0; index < tables.size(); index += 1) {
-      if (configured.get(index)) {
+      if (!"missing".equals(configurationStatuses.get(index))) {
         jdbc.update("INSERT INTO " + tables.get(index)
             + " (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order)"
-            + " VALUES (99409,'价格完整性测试',99409,1.5,'enabled',false,1)");
+            + " VALUES (99409,'价格完整性测试',99409,1.5,?,false,1)", configurationStatuses.get(index));
       }
     }
     for (String endpoint : List.of("/api/admin/store-levels", "/api/admin/store-levels/pricing-options")) {
@@ -79,9 +98,9 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
           .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
               .jsonPath("$.data[?(@.id == 99409)].priceComplete").value(org.hamcrest.Matchers.contains(complete)))
           .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-              .jsonPath("$.data[?(@.id == 99409)].finishedPriceConfigured").value(org.hamcrest.Matchers.contains(finished)))
+              .jsonPath("$.data[?(@.id == 99409)].finishedPriceConfigured").value(org.hamcrest.Matchers.contains(!"missing".equals(finished))))
           .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-              .jsonPath("$.data[?(@.id == 99409)].slabPriceConfigured").value(org.hamcrest.Matchers.contains(slab)));
+              .jsonPath("$.data[?(@.id == 99409)].slabPriceConfigured").value(org.hamcrest.Matchers.contains(!"missing".equals(slab))));
     }
   }
 
