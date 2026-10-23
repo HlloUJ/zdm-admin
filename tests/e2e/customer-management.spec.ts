@@ -1488,9 +1488,15 @@ for (const width of [1440, 800, 600, 390]) {
       }),
     );
     await page.goto('/store/customer-management');
+    await page.addStyleTag({ content: 'html::-webkit-scrollbar { width: 15px; }' });
     await page.locator('tr').filter({ hasText: '王先生1' }).getByText('详情', { exact: true }).click();
     const drawer = page.locator('.t-drawer__content-wrapper:visible');
-    await expect(drawer).toHaveCSS('width', `${Math.min(width, 1100)}px`);
+    const availableWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    await expect(drawer).toHaveCSS('width', `${Math.min(availableWidth, 1100)}px`);
+    await drawer.locator('.t-drawer__footer').getByRole('button', { name: '关闭', exact: true }).click({ trial: true });
+    const bounds = await drawer.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(availableWidth);
     const body = drawer.locator('.t-drawer__body');
     await expect.poll(() => body.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
     await expect(drawer.locator('.t-timeline-item')).toHaveCount(1);
