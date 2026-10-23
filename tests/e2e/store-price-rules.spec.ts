@@ -758,3 +758,30 @@ test('multiline coefficient feedback grows the real price row and restores its c
   await expect(tip).toHaveCount(0);
   expect((await row.boundingBox())!.height).toBe(before!.height);
 });
+
+test('coefficient feedback keeps its exact row budget across inherited line boxes', async ({ page }) => {
+  await setup(page, ['price.finished.view', 'price.finished.batch-set']);
+  await page.goto('/store/price-configuration');
+  const row = page.getByRole('row').filter({ hasText: '石材餐桌' });
+  const field = row.locator('.price-coefficient-field');
+  const input = row.locator('input:not([type=checkbox])');
+  await expect(field).toBeVisible();
+  for (const font of ['12px/20px sans-serif', '14px/22px serif', '16px/28px monospace']) {
+    // An inline formatting context must not add font-dependent descent below the control.
+    await field.evaluate((element, font) => {
+      (element as HTMLElement).style.font = font;
+    }, font);
+    expect((await row.boundingBox())!.height).toBe(57);
+    await input.fill('1000');
+    await input.blur();
+    const tip = row.getByText('请输入0.01至999之间的系数，最多两位小数', { exact: true });
+    await expect(tip).toBeVisible();
+    expect((await tip.boundingBox())!.height).toBe(20);
+    expect((await field.boundingBox())!.height).toBe(52);
+    expect((await row.boundingBox())!.height).toBe(77);
+    await input.fill('2');
+    await input.blur();
+    await expect(tip).toHaveCount(0);
+    expect((await row.boundingBox())!.height).toBe(57);
+  }
+});

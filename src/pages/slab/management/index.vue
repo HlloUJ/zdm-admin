@@ -684,7 +684,7 @@
       v-model:visible="detailDrawerVisible"
       header="大板详情"
       placement="right"
-      size="min(1240px, 100vw)"
+      size="min(1240px, 100%)"
       :footer="false"
       @close="closeDetailDrawer"
     >
@@ -1716,7 +1716,7 @@ const batchPriceRows = reactive<DrawerPriceRow[]>([]);
 const priceDrawerForm = reactive({ rows: batchPriceRows });
 const priceDrawerSize = computed(() => {
   const longestLabelLength = batchPriceRows.reduce((length, row) => Math.max(length, row.label.length), 0);
-  return `min(${Math.max(620, longestLabelLength * 16 + 430)}px, 100vw)`;
+  return `min(${Math.max(620, longestLabelLength * 16 + 430)}px, 100%)`;
 });
 const uploadItems: {
   key: UploadItemKey;

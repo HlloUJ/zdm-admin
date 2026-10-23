@@ -1102,6 +1102,14 @@ test('all shared batch drawers use native cards and check tags without retaining
           );
       });
   }
+  for (const file of files('src').filter((file) => file.endsWith('.vue'))) {
+    for (const [opening] of read(file).matchAll(/<t-drawer\b[^>]*>/g))
+      assert.doesNotMatch(opening, /100vw/, `${file}: Drawer caps must exclude reserved scrollbar width`);
+  }
+  assert.match(
+    read('src/pages/slab/management/index.vue'),
+    /return `min\(\$\{Math\.max\(620, longestLabelLength \* 16 \+ 430\)\}px, 100%\)`/,
+  );
   const accessory = read('src/modules/accessory/routes.ts');
   for (const [name, component] of [
     ['AccessoryManagement', 'Management'],

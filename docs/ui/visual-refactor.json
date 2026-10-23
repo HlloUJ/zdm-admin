@@ -1093,6 +1093,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n    :visible=\"visible\"\n    header=\"操作日志\"\n    size=\"min(1240px, 100vw)\"\n    :footer=\"false\"\n    @update:visible=\"emit('update:visible', $event)\"\n  >",
+          "after": "<t-drawer\n    :visible=\"visible\"\n    header=\"操作日志\"\n    size=\"min(1240px, 100%)\"\n    :footer=\"false\"\n    @update:visible=\"emit('update:visible', $event)\"\n  >"
+        },
+        {
           "reason": "2026-10-23 用户确认按补充规范调整全业务端抽屉：宽度封顶、普通字段填满、日志显式搜索范围及原生详情分区；保留业务逻辑、权限、交互和非抽屉编辑表单",
           "stage": "before-migrations",
           "before": "                :placeholder=\"controlPlaceholder(subjectLabel, 'input')\"",
@@ -1517,6 +1523,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"detailVisible\"\n      header=\"客户详情\"\n      placement=\"right\"\n      size=\"min(1100px, 100vw)\"\n      :confirm-btn=\"null\"\n      :cancel-btn=\"cancelButtonProps('关闭')\"\n      @cancel=\"detailVisible = false\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"detailVisible\"\n      header=\"客户详情\"\n      placement=\"right\"\n      size=\"min(1100px, 100%)\"\n      :confirm-btn=\"null\"\n      :cancel-btn=\"cancelButtonProps('关闭')\"\n      @cancel=\"detailVisible = false\"\n    >"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-22 用户明确批准名称、标题和编号仅作普通展示；移除客户姓名与订单号的详情触发，保留独立详情权限、复制、业务逻辑及布局。",
@@ -3214,6 +3226,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"priceDrawerVisible\"\n      header=\"批量填写\"\n      placement=\"right\"\n      size=\"min(1180px, 100vw)\"\n      lazy\n      destroy-on-close\n      @close=\"closePriceDrawer\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"priceDrawerVisible\"\n      header=\"批量填写\"\n      placement=\"right\"\n      size=\"min(1180px, 100%)\"\n      lazy\n      destroy-on-close\n      @close=\"closePriceDrawer\"\n    >"
+        },
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"detailDialogVisible\"\n      header=\"商品详情\"\n      :close-btn=\"true\"\n      size=\"min(1240px, 100vw)\"\n      placement=\"right\"\n      :footer=\"false\"\n      @close=\"closeDetailDialog\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"detailDialogVisible\"\n      header=\"商品详情\"\n      :close-btn=\"true\"\n      size=\"min(1240px, 100%)\"\n      placement=\"right\"\n      :footer=\"false\"\n      @close=\"closeDetailDialog\"\n    >"
+        },
+        {
           "reason": "2026-10-23 用户确认完整抽屉清单一次性修复：原生Card与CheckTag接入、公共数量宽度；保留所有共享业务端的批量筛选、字段、权限、保存取消及校验，不改业务脚本。",
           "stage": "before-migrations",
           "before": "    <t-drawer\n      v-model:visible=\"priceDrawerVisible\"\n      header=\"批量填写\"\n      placement=\"right\"\n      size=\"min(1180px, 100vw)\"\n      lazy\n      destroy-on-close\n      @close=\"closePriceDrawer\"\n    >\n      <div ref=\"priceFormRoot\" class=\"batch-fill-panel\">\n        <section class=\"batch-section\">\n          <div class=\"batch-section-head\">\n            <strong>选择批量范围</strong>\n            <span>未选择属性值时默认填充全部规格</span>\n          </div>\n          <div class=\"batch-filter-list\">\n            <div v-for=\"filter in batchFilterOptions\" :key=\"filter.field\" class=\"batch-filter-row\">\n              <div class=\"batch-filter-label\">{{ filter.label }}</div>\n              <div class=\"batch-filter-values\">\n                <button\n                  type=\"button\"\n                  :class=\"['batch-chip', !batchFillFilters[filter.field].length && 'active']\"\n                  @click=\"clearBatchFilterField(filter.field)\"\n                >\n                  全部\n                </button>\n                <button\n                  v-for=\"value in filter.values\"\n                  :key=\"value\"\n                  type=\"button\"\n                  :class=\"['batch-chip', isBatchFilterValueSelected(filter.field, value) && 'active']\"\n                  @click=\"toggleBatchFilterValue(filter.field, value)\"\n                >\n                  {{ value }}\n                </button>\n              </div>\n            </div>\n          </div>\n          <div class=\"batch-match-tip\">当前将批量填充 {{ batchFillMatchedRows.length }} 条规格</div>\n        </section>\n\n        <section class=\"batch-section\">\n          <div class=\"batch-section-head\">\n            <strong>填写字段</strong>\n            <span>留空的字段不会覆盖原规格数据</span>\n          </div>\n          <div class=\"batch-field-grid\">\n            <t-form-item v-if=\"!isOperationsEdit\" label=\"成本价\">\n              <SpecPriceInput\n                v-model=\"batchFillForm.cost\"\n                form-layout\n                placeholder=\"请输入价格\"\n                label=\"价格\"\n                optional\n                :submitted=\"batchFillSubmitted\"\n                @change=\"handleBatchCostChange\"\n              />\n            </t-form-item>\n            <t-form-item label=\"指导价\">\n              <div class=\"price-pair wide\">\n                <SpecPriceInput\n                  v-model=\"batchFillForm.guideCoefficient\"\n                  form-layout\n                  placeholder=\"请输入系数\"\n                  label=\"系数\"\n                  optional\n                  :submitted=\"batchFillSubmitted\"\n                  @change=\"handleBatchCoefficientChange('guideCoefficient', 'guide', $event)\"\n                />\n                <SpecPriceInput\n                  v-model=\"batchFillForm.guide\"\n                  form-layout\n                  placeholder=\"请输入价格\"\n                  label=\"价格\"\n                  optional\n                  :submitted=\"batchFillSubmitted\"\n                  @change=\"handleBatchPriceChange('guide', 'guideCoefficient', $event)\"\n                />\n              </div>\n            </t-form-item>\n            <t-form-item\n              v-for=\"configuration in productPriceLevels\"\n              :key=\"configuration.id\"\n              :label=\"configuration.name\"\n            >\n              <div class=\"price-pair wide\">\n                <SpecPriceInput\n                  v-model=\"batchMarkupPrices[configuration.id].coefficient\"\n                  form-layout\n                  placeholder=\"请输入系数\"\n                  label=\"系数\"\n                  optional\n                  :submitted=\"batchFillSubmitted\"\n                  @change=\"handleBatchMarkupChange(configuration.id, 'coefficient', $event)\"\n                />\n                <SpecPriceInput\n                  v-model=\"batchMarkupPrices[configuration.id].price\"\n                  form-layout\n                  placeholder=\"请输入价格\"\n                  label=\"价格\"\n                  optional\n                  :submitted=\"batchFillSubmitted\"\n                  @change=\"handleBatchMarkupChange(configuration.id, 'price', $event)\"\n                />\n              </div>\n            </t-form-item>\n            <t-form-item v-if=\"!isOperationsEdit\" label=\"数量\">\n              <t-input-number v-model=\"batchFillForm.quantity\" placeholder=\"请输入数量\" theme=\"normal\" :min=\"0\" />\n            </t-form-item>\n            <t-form-item\n              v-for=\"field in isOperationsEdit ? [] : batchEditableSalesFields\"\n              :key=\"field.key\"\n              :label=\"field.label\"\n            >\n              <t-select\n                v-if=\"field.type === 'select'\"\n                v-model=\"batchSalesAttributes[field.key]\"\n                clearable\n                :placeholder=\"controlPlaceholder(field.label, 'select')\"\n              >\n                <t-option v-for=\"value in field.options\" :key=\"value\" :label=\"value\" :value=\"value\" />\n              </t-select>\n              <t-input\n                v-else\n                v-model=\"batchSalesAttributes[field.key]\"\n                clearable\n                :placeholder=\"controlPlaceholder(field.label, 'input')\"\n              />\n            </t-form-item>\n          </div>\n        </section>\n      </div>\n      <template #footer>\n        <t-space size=\"small\">\n          <t-button :theme=\"buttonTheme('save')\" @click=\"savePriceDrawer\">\n            <template #icon><t-icon name=\"save\" /></template>\n            {{ formConfirmationText('edit') }}\n          </t-button>\n          <t-button :theme=\"buttonTheme('cancel')\" @click=\"closePriceDrawer\">取消</t-button>\n        </t-space>\n      </template>\n    </t-drawer>",
@@ -4211,6 +4235,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"poolDetailVisible\"\n      header=\"商品详情\"\n      size=\"min(1200px, 100vw)\"\n      :footer=\"false\"\n      :close-btn=\"true\"\n      @close=\"poolVisible = true\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"poolDetailVisible\"\n      header=\"商品详情\"\n      size=\"min(1200px, 100%)\"\n      :footer=\"false\"\n      :close-btn=\"true\"\n      @close=\"poolVisible = true\"\n    >"
+        },
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer v-model:visible=\"detailVisible\" header=\"商品详情\" size=\"min(1200px, 100vw)\" :footer=\"false\">",
+          "after": "<t-drawer v-model:visible=\"detailVisible\" header=\"商品详情\" size=\"min(1200px, 100%)\" :footer=\"false\">"
+        },
         {
           "before": "            <template #auxiliary>\n              <t-button\n                v-if=\"canGlobal('operation-log.view')\"\n                :theme=\"buttonTheme('logs')\"\n                variant=\"outline\"\n                @click=\"openLogs\"\n                >操作日志</t-button\n              >\n            </template>\n          </AdminListToolbar>\n          <t-empty description=\"暂无成品现货管理权限\" />\n        </template>\n      </main>\n    </div>\n\n    <AdminDialog\n      v-model:visible=\"poolVisible\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      header=\"商品中心\"\n      :footer=\"false\"\n",
           "after": "            <template #auxiliary>\n              <t-button\n                v-if=\"canGlobal('operation-log.view')\"\n                :theme=\"buttonTheme('logs')\"\n                variant=\"outline\"\n                @click=\"openLogs\"\n                >操作日志</t-button\n              >\n            </template>\n          </AdminListToolbar>\n          <t-empty :description=\"`暂无${commodity.label}管理权限`\" />\n        </template>\n      </main>\n    </div>\n\n    <AdminDialog\n      v-model:visible=\"poolVisible\"\n      :confirmation=\"{ kind: 'none' }\"\n      confirm-function=\"close\"\n      header=\"商品中心\"\n      :footer=\"false\"\n",
@@ -5349,6 +5385,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"priceDrawerVisible\"\n      header=\"批量填写\"\n      placement=\"right\"\n      size=\"min(1180px, 100vw)\"\n      lazy\n      destroy-on-close\n      @close=\"closePriceDrawer\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"priceDrawerVisible\"\n      header=\"批量填写\"\n      placement=\"right\"\n      size=\"min(1180px, 100%)\"\n      lazy\n      destroy-on-close\n      @close=\"closePriceDrawer\"\n    >"
+        },
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"detailDialogVisible\"\n      header=\"商品详情\"\n      :close-btn=\"true\"\n      size=\"min(1240px, 100vw)\"\n      placement=\"right\"\n      :footer=\"false\"\n      @close=\"closeDetailDialog\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"detailDialogVisible\"\n      header=\"商品详情\"\n      :close-btn=\"true\"\n      size=\"min(1240px, 100%)\"\n      placement=\"right\"\n      :footer=\"false\"\n      @close=\"closeDetailDialog\"\n    >"
+        },
         {
           "reason": "2026-10-23 用户确认完整抽屉清单一次性修复：原生Card与CheckTag接入、公共数量宽度；保留所有共享业务端的批量筛选、字段、权限、保存取消及校验，不改业务脚本。",
           "stage": "before-migrations",
@@ -6607,6 +6655,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer v-model:visible=\"historyVisible\" header=\"版本记录\" size=\"min(760px, 100vw)\" :footer=\"false\">",
+          "after": "<t-drawer v-model:visible=\"historyVisible\" header=\"版本记录\" size=\"min(760px, 100%)\" :footer=\"false\">"
+        },
+        {
           "reason": "2026-10-23 用户确认全业务端抽屉按原生规范迁移：顶部标题唯一、整体操作移至底部靠左且确认在前取消在后，保留原校验、只读、权限和业务处理",
           "stage": "before-migrations",
           "before": "<t-drawer\n      v-model:visible=\"historyVisible\"\n      class=\"zdm-admin-responsive-drawer\"\n      header=\"版本记录\"\n      size=\"760px\"\n      :footer=\"false\"\n    >",
@@ -7656,6 +7710,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-23 current batch delivery fixes classic-scrollbar viewport overflow using the actual Drawer container width; retain dynamic label-based maximum.",
+          "stage": "before-migrations",
+          "before": "  return `min(${Math.max(620, longestLabelLength * 16 + 430)}px, 100vw)`;",
+          "after": "  return `min(${Math.max(620, longestLabelLength * 16 + 430)}px, 100%)`;"
+        },
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"detailDrawerVisible\"\n      header=\"大板详情\"\n      placement=\"right\"\n      size=\"min(1240px, 100vw)\"\n      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"detailDrawerVisible\"\n      header=\"大板详情\"\n      placement=\"right\"\n      size=\"min(1240px, 100%)\"\n      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >"
+        },
+        {
           "reason": "2026-10-23 用户确认按补充规范调整全业务端抽屉：宽度封顶、普通字段填满、日志显式搜索范围及原生详情分区；保留业务逻辑、权限、交互和非抽屉编辑表单",
           "stage": "before-migrations",
           "before": "  return `${Math.max(620, longestLabelLength * 16 + 430)}px`;",
@@ -8422,6 +8488,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
+          "stage": "before-migrations",
+          "before": "<t-drawer\n      v-model:visible=\"detailDrawerVisible\"\n      header=\"大板详情\"\n      placement=\"right\"\n      size=\"min(1240px, 100vw)\"\n      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >",
+          "after": "<t-drawer\n      v-model:visible=\"detailDrawerVisible\"\n      header=\"大板详情\"\n      placement=\"right\"\n      size=\"min(1240px, 100%)\"\n      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >"
+        },
         {
           "reason": "2026-10-23 用户确认按补充规范调整全业务端抽屉：宽度封顶、普通字段填满、日志显式搜索范围及原生详情分区；保留业务逻辑、权限、交互和非抽屉编辑表单",
           "stage": "before-migrations",

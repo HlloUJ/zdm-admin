@@ -570,7 +570,7 @@
       v-model:visible="detailDrawerVisible"
       header="大板详情"
       placement="right"
-      size="min(1240px, 100vw)"
+      size="min(1240px, 100%)"
       :footer="false"
       @close="closeDetailDrawer"
     >

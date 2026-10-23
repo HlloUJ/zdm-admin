@@ -945,7 +945,7 @@
       v-model:visible="priceDrawerVisible"
       header="批量填写"
       placement="right"
-      size="min(1180px, 100vw)"
+      size="min(1180px, 100%)"
       lazy
       destroy-on-close
       @close="closePriceDrawer"
@@ -1117,7 +1117,7 @@
       v-model:visible="detailDialogVisible"
       header="商品详情"
       :close-btn="true"
-      size="min(1240px, 100vw)"
+      size="min(1240px, 100%)"
       placement="right"
       :footer="false"
       @close="closeDetailDialog"
