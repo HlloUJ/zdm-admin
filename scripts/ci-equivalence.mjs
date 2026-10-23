@@ -38,6 +38,12 @@ function command(program, args) {
 }
 const git = (...args) => command('git', args);
 const json = (file) => JSON.parse(readFileSync(file, 'utf8'));
+export function readCommitParents(root = process.cwd()) {
+  // Git's revision walker hides parents at a shallow boundary; the commit object
+  // still contains the original ordered parent headers, without fetching history.
+  const header = git('-C', root, 'cat-file', 'commit', 'HEAD').split('\n\n', 1)[0];
+  return [...header.matchAll(/^parent ([a-f0-9]{40})$/gm)].map((match) => match[1]);
+}
 export function environmentProof(env = process.env) {
   assert.equal(process.platform, 'linux', 'Only reviewed hosted Linux jobs support CI reuse');
   assert.ok(REUSABLE_JOBS[env.GITHUB_JOB], 'This domain has no equivalence contract; execute normally');
@@ -185,7 +191,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     const repository = env.GITHUB_REPOSITORY;
     assert.match(repository ?? '', /^[\w.-]+\/[\w.-]+$/);
     const current = json(path.join(directory, 'metadata.json'));
-    const parents = dependencies.parents ? dependencies.parents() : git('show', '-s', '--format=%P', 'HEAD').split(' ');
+    const parents = dependencies.parents ? dependencies.parents() : readCommitParents();
     assert.equal(parents.length, 2);
     const api = dependencies.api ?? ((suffix) => JSON.parse(command('gh', ['api', `repos/${repository}/${suffix}`])));
     const pulls = api(`commits/${current.candidateSha}/pulls`);

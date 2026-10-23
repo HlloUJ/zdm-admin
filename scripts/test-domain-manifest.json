@@ -116,7 +116,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.mjs": {
-      "digest": "f5c2524ec4f3a123e3ac9246fbb87f561cd9c1f9388619c7bbe7d6487c27ef36",
+      "digest": "776c6c9fcc8d719f9fdd84aa1a02a2c0c6453a06149def2ebdb5ceba76ac273b",
       "imports": [
         "scripts/frontend-test-evidence.mjs",
         "scripts/script-test-plan.mjs",
@@ -125,7 +125,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.test.mjs": {
-      "digest": "2b2c70fa1e6c77e603794de37a99172d068bea227b11dc405480f5c0d36454ed",
+      "digest": "6194a7cb99577c6c97c37d121043921c8988691ca8dd8e5ceece2fbce2efe276",
       "imports": [
         "scripts/ci-equivalence.mjs",
         "scripts/dev-task.mjs",
