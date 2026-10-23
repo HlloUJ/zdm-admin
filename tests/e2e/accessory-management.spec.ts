@@ -2595,3 +2595,91 @@ test('native batch range tags preserve multiple selection, all, matched writes a
   await expect(prices.nth(0)).toHaveValue(/99(?:\.00)?/);
   await expect(prices.nth(1)).toHaveValue(originalPrices[1]);
 });
+
+for (const client of ['supply-chain']) {
+  for (const mode of ['single', 'layered'] as const) {
+    test(`specification duplicate feedback never overlaps wrapped rows (${client}, ${mode})`, async ({ page }) => {
+      const dialog = await openSpecConversionFixture(page, mode, ['颜色', '尺寸']);
+      const rows =
+        mode === 'single'
+          ? dialog.locator('.single-spec-row')
+          : dialog.locator('.spec-group').first().locator('.layered-value-row');
+      const addName = mode === 'single' ? '新增规格项' : '新增属性值';
+      await rows.last().getByRole('button', { name: addName, exact: true }).click();
+      if (mode === 'layered') await rows.last().getByRole('button', { name: addName, exact: true }).click();
+      const input = rows.first().getByRole('textbox');
+      await input.fill('相同规格');
+      await rows.last().getByRole('textbox').fill('相同规格');
+      const tips = rows.locator('.t-input__tips');
+      await expect(tips).toHaveCount(2);
+      for (const tip of await tips.all()) {
+        const geometry = await tip.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const row = element.closest('.single-spec-row, .layered-value-row')!;
+          const input = row.querySelector('.t-input')!.getBoundingClientRect();
+          const next = row.nextElementSibling?.getBoundingClientRect();
+          const footer = document.querySelector('.spec-dialog-footer')!.getBoundingClientRect();
+          return {
+            below: box.top >= input.bottom,
+            inside: box.bottom <= row.getBoundingClientRect().bottom,
+            beforeNext: !next || next.top < input.top + input.height || box.bottom <= next.top,
+            beforeFooter: box.bottom <= footer.top,
+          };
+        });
+        expect(geometry).toEqual({ below: true, inside: true, beforeNext: true, beforeFooter: true });
+      }
+      await rows.last().getByRole('textbox').fill('不重复的新规格');
+      await expect(tips).toHaveCount(0);
+    });
+  }
+}
+
+test('operations retains readonly specifications without creation or editing entrances', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await installFinishedMocks(page, 'admin');
+  const product = {
+    id: 1,
+    name: '运营规格只读回归商品',
+    categoryId: 5,
+    supplierId: 2,
+    status: 'warehouse',
+    sourceStatus: 'selling',
+    totalStock: 1,
+    attributes: [],
+    variants: [{ id: 11, variantLabel: '标准规格', displayMode: 'single', costPrice: 10, stock: 1 }],
+    guidePrices: [],
+    markupPrices: [],
+  };
+  await page.route('**/api/admin/accessory-products/price-level-options', (route) =>
+    route.fulfill({ json: { code: 0, data: [] } }),
+  );
+  await page.route('**/api/admin/accessory-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route('**/api/admin/accessory-products/1', (route) => route.fulfill({ json: { code: 0, data: product } }));
+  await page.goto('/accessory-management');
+  await expect(page.getByRole('button', { name: '发布商品', exact: true })).toHaveCount(0);
+  await page.getByText('编辑', { exact: true }).first().click();
+  await expect(page.locator('.form-shell')).toBeVisible();
+  await expect(page.getByRole('button', { name: '创建规格', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '编辑规格', exact: true })).toHaveCount(0);
+});
+
+test('long layered attribute errors grow wrapped rows without covering their footer', async ({ page }) => {
+  const name = '较长的销售属性名称'.repeat(12);
+  const dialog = await openSpecConversionFixture(page, 'layered', ['颜色', '尺寸', name], { attribute_4: '原属性值' });
+  await dialog.locator('.spec-attr-tag').filter({ hasText: name }).click();
+  const group = dialog.locator('.spec-group').filter({ hasText: name });
+  await group.getByRole('textbox').first().fill('');
+  await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
+  const tip = group.getByText(`请输入${name}`, { exact: true });
+  await expect(tip).toBeVisible();
+  const result = await tip.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return {
+      wraps: box.height > 20,
+      complete: element.scrollWidth <= element.clientWidth,
+      insideRow: box.bottom <= element.closest('.layered-value-row')!.getBoundingClientRect().bottom,
+      beforeFooter: box.bottom <= document.querySelector('.spec-dialog-footer')!.getBoundingClientRect().top,
+    };
+  });
+  expect(result).toEqual({ wraps: true, complete: true, insideRow: true, beforeFooter: true });
+});

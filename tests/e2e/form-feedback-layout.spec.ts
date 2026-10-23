@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { installAdminApiMocks } from './admin-api-mocks';
 
 for (const width of [1689, 1024, 768]) {
   test(`field, help, upload and price feedback retain row geometry at ${width}px`, async ({ page }) => {
@@ -80,5 +81,101 @@ for (const width of [1689, 1024, 768]) {
     await expect(fields.nth(5).locator('.t-input__help')).toBeVisible();
     expect(await geometry()).toEqual(before);
     await centered();
+  });
+}
+
+for (const width of [768, 1689]) {
+  test(`long native, manual, help, upload and price feedback grows without overlap at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto('/tests/fixtures/official-ui/feedback-layout.html?long-errors=1');
+    const fields = page.locator('.t-form > .t-form__item');
+    await expect(fields).toHaveCount(8);
+    const before = await fields.last().boundingBox();
+    await page.getByRole('button', { name: '校验', exact: true }).click();
+    const messages = page.locator(
+      '.t-input__extra, .t-form-item-tips, .t-input__tips, .t-textarea__tips, .t-upload__tips',
+    );
+    await expect(messages).toHaveCount(7);
+    for (const tip of await messages.all()) {
+      const result = await tip.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const item = element.closest('.t-form__item')!;
+        const next = item.nextElementSibling!.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        const control = item
+          .querySelector('.t-input, .t-textarea__inner, .t-upload__card-container')!
+          .getBoundingClientRect();
+        return {
+          below: box.top >= control.bottom - 1,
+          beforeNext: box.bottom <= next.top + 1,
+          wrapped: box.height > 20,
+          complete: element.scrollHeight <= element.clientHeight && element.scrollWidth <= element.clientWidth,
+          nowrap: style.whiteSpace === 'nowrap',
+        };
+      });
+      expect(result).toEqual({ below: true, beforeNext: true, wrapped: true, complete: true, nowrap: false });
+    }
+    expect((await fields.last().boundingBox())!.y).toBeGreaterThan(before!.y);
+    await page.getByRole('button', { name: '清除反馈', exact: true }).click();
+    expect(await fields.last().boundingBox()).toEqual(before);
+  });
+}
+
+test('employee invite errors fit before the next field in both registration steps', async ({ page }) => {
+  await installAdminApiMocks(page);
+  await page.goto('/employee-invite?token=e2e-invite-token');
+  const check = async () => {
+    for (const tip of await page.locator('.t-input__extra').all()) {
+      const geometry = await tip.evaluate((element) => ({
+        bottom: element.getBoundingClientRect().bottom,
+        next: element.closest('.t-form__item')!.nextElementSibling!.getBoundingClientRect().top,
+      }));
+      expect(geometry.bottom).toBeLessThanOrEqual(geometry.next);
+    }
+  };
+  await page.getByRole('button', { name: '下一步', exact: true }).click();
+  await expect(page.locator('.t-input__extra')).toHaveCount(2);
+  await check();
+  await page.getByPlaceholder('请输入手机号').fill('15926627771');
+  await page.getByPlaceholder('请输入验证码').fill('888888');
+  await page.getByRole('button', { name: '下一步', exact: true }).click();
+  await page.getByRole('button', { name: '确认提交注册', exact: true }).click();
+  await expect(page.locator('.t-input__extra')).toHaveCount(2);
+  await check();
+});
+
+for (const inside of [false, true]) {
+  test(`wrapped upload errors remain above the next card and following content (form=${inside})`, async ({ page }) => {
+    await page.goto(
+      `/tests/fixtures/official-ui/feedback-layout.html?wrapped-uploads=1${inside ? '&inside-form=1' : ''}`,
+    );
+    const area = page.getByTestId('wrapped-upload-area');
+    const followingPosition = () =>
+      page.getByTestId('after-uploads').evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
+    const before = await followingPosition();
+    await page.getByRole('button', { name: '校验', exact: true }).click();
+    const tips = area.locator('.t-upload__tips');
+    await expect(tips).toHaveCount(3);
+    for (const tip of await tips.all()) {
+      const result = await tip.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const root = element.closest('.admin-media-upload')!;
+        const card = root.querySelector('.t-upload__card-container')!.getBoundingClientRect();
+        const cards = [
+          ...document.querySelectorAll('[data-testid="wrapped-upload-area"] .t-upload__card-container'),
+        ].map((node) => node.getBoundingClientRect());
+        const nextRow = cards.filter((rect) => rect.top > card.top + card.height).sort((a, b) => a.top - b.top)[0];
+        return {
+          below: box.top >= card.bottom,
+          beforeRow: !nextRow || box.bottom <= nextRow.top,
+          beforeFollowing:
+            box.bottom <= document.querySelector('[data-testid="after-uploads"]')!.getBoundingClientRect().top,
+          complete: element.scrollWidth <= element.clientWidth,
+        };
+      });
+      expect(result).toEqual({ below: true, beforeRow: true, beforeFollowing: true, complete: true });
+    }
+    await page.getByRole('button', { name: '清除反馈', exact: true }).click();
+    expect(await followingPosition()).toBe(before);
   });
 }

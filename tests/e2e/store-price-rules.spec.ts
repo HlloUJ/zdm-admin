@@ -721,3 +721,40 @@ test('discount audit fields and permission-controlled edit, disable, enable and 
   expect(requests.filter((request) => request.method === 'DELETE')).toHaveLength(1);
   expect(requests.filter((request) => request.method === 'PUT')).toHaveLength(3);
 });
+
+test('multiline coefficient feedback grows the real price row and restores its compact height', async ({ page }) => {
+  await setup(page, ['price.finished.view', 'price.finished.batch-set']);
+  await page.goto('/store/price-configuration');
+  const row = page.getByRole('row').filter({ hasText: '石材餐桌' });
+  const field = row.locator('.price-coefficient-field');
+  await expect(field).toBeVisible();
+  // Constrain the actual field's available column area to exercise real wrapping.
+  await field.evaluate((element) => {
+    (element as HTMLElement).style.width = '120px';
+  });
+  const before = await row.boundingBox();
+  const input = row.locator('input:not([type=checkbox])');
+  await input.fill('1000');
+  await input.blur();
+  const tip = row.getByText('请输入0.01至999之间的系数，最多两位小数', { exact: true });
+  await expect(tip).toBeVisible();
+  const result = await tip.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const row = element.closest('tr')!.getBoundingClientRect();
+    const input = element.closest('.price-coefficient-field')!.querySelector('.t-input')!.getBoundingClientRect();
+    return {
+      height: box.height,
+      rowHeight: row.height,
+      below: box.top >= input.bottom,
+      inside: box.bottom <= row.bottom,
+      width: input.width,
+      complete: element.scrollWidth <= element.clientWidth,
+    };
+  });
+  expect(result.height).toBeGreaterThan(20);
+  expect(result.rowHeight).toBeGreaterThan(before!.height + 20);
+  expect(result).toMatchObject({ below: true, inside: true, width: 72, complete: true });
+  await input.fill('');
+  await expect(tip).toHaveCount(0);
+  expect((await row.boundingBox())!.height).toBe(before!.height);
+});
