@@ -121,17 +121,17 @@
       "dynamicImports": 0
     },
     "scripts/ci-browser-image.test.mjs": {
-      "digest": "2f728b298dc66700e941d783a1f7f6050e78fe97c6470dc61341a7d141a99d66",
+      "digest": "21f8b2e2f82e5d87809b03f0bec9763132524d53778802b7bb584fc19598b539",
       "imports": ["scripts/ci-browser-image.mjs", "scripts/ci-equivalence-environment.mjs"],
       "dynamicImports": 0
     },
     "scripts/ci-chrome-preparation.mjs": {
-      "digest": "602688b5ded0237f6534d12758d2d712a55fd04b56bc804ee4694f7f97faa298",
+      "digest": "c275a419fb36854a10ed8b6454e7ef54bdb7c9e67836882a0111107b3b7305d7",
       "imports": [],
       "dynamicImports": 1
     },
     "scripts/ci-chrome-preparation.test.mjs": {
-      "digest": "0eb067911acc47d648f9cb2e189b47281b735ae67f1ba8b7cf72354c54a9b92e",
+      "digest": "2092dfbbb355fd8c9fa6653b3b15a93e7f2d21fd100cafecc71817b89247f761",
       "imports": ["scripts/ci-chrome-preparation.mjs"],
       "dynamicImports": 0
     },

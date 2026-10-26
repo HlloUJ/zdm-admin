@@ -172,6 +172,8 @@ jobs:
     env:
       CI_EQUIVALENCE_ELIGIBLE: 'true'
       CI_BROWSER_IMAGE: ${{ needs.scope.outputs.browser_image }}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
       PLAYWRIGHT_CHANNEL: chrome
       PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
     steps:
@@ -229,6 +231,8 @@ jobs:
     env:
       CI_EQUIVALENCE_ELIGIBLE: 'true'
       CI_BROWSER_IMAGE: ${{ needs.scope.outputs.browser_image }}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
       PLAYWRIGHT_CHANNEL: chrome
       PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
     steps:

@@ -124,6 +124,8 @@ test('both shards select the same locked image once and keep preparation phase o
     assert.match(section, /runs-on: ubuntu-24\.04/);
     assert.match(section, /image: \$\{\{ needs\.scope\.outputs\.browser_image \}\}/);
     assert.doesNotMatch(section, /actions\/setup-node/);
+    assert.match(section, /LANG: C\.UTF-8/);
+    assert.match(section, /LC_ALL: C\.UTF-8/);
   }
 });
 

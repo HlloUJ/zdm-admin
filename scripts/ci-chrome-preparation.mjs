@@ -116,12 +116,14 @@ export async function prepareDependencies(system, browser) {
     'Playwright did not confirm the complete dependency inventory',
   );
   assert.equal(system.inspect(), browser.after, 'Browser changed during dependency preparation');
-  await system.launch();
+  const runtime = await system.launch();
+  assert.equal(runtime?.unicodeFilenameVerified, true, 'Chrome Unicode filename capability was not verified');
   return {
     version: 1,
     browserVersion: browser.after,
     completeDependencies: true,
     launchVerified: true,
+    unicodeFilenameVerified: true,
     action: system.prebuilt ? 'verified-prebuilt' : 'prepared',
   };
 }
@@ -153,6 +155,11 @@ export async function main(args) {
   }
   assert.ok(['browser', 'dependencies'].includes(args[0]));
   assert.ok(process.env.CI_EVIDENCE_DIR, 'Missing CI evidence destination');
+  if (process.env.CI_BROWSER_IMAGE) {
+    assert.equal(process.env.LANG, 'C.UTF-8');
+    assert.equal(process.env.LC_ALL, 'C.UTF-8');
+    assert.equal(run('locale', ['charmap'], true), 'UTF-8');
+  }
   const system = {
     prebuilt: Boolean(process.env.CI_BROWSER_IMAGE),
     fetch,
@@ -175,7 +182,25 @@ export async function main(args) {
     launch: async () => {
       const { chromium } = await import('@playwright/test');
       const browser = await chromium.launch({ channel: 'chrome' });
-      await browser.close();
+      try {
+        const page = await browser.newPage();
+        const [download] = await Promise.all([
+          page.waitForEvent('download', { timeout: 5000 }),
+          page.evaluate(() => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob(['locale verification'], { type: 'text/plain' }));
+            link.download = '中文文件.txt';
+            document.body.append(link);
+            link.click();
+          }),
+        ]);
+        assert.equal(download.suggestedFilename(), '中文文件.txt', 'Chrome requires a working UTF-8 locale');
+        assert.equal(await download.failure(), null);
+        await download.delete();
+        return { unicodeFilenameVerified: true };
+      } finally {
+        await browser.close();
+      }
     },
   };
   const browserFile = path.join(process.env.CI_EVIDENCE_DIR, 'chrome-browser.json');

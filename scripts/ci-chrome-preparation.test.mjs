@@ -38,7 +38,10 @@ function fixture(before = latest) {
       if (args.includes('install')) installed = latest;
       return capture ? 'All system dependencies are installed.' : '';
     },
-    launch: async () => calls.push('launch'),
+    launch: async () => {
+      calls.push('launch');
+      return { unicodeFilenameVerified: true };
+    },
   };
   return {
     system,
@@ -245,4 +248,11 @@ test('stale prebuilt Chrome fails without downloads or environment mutation', as
   f.system.prebuilt = true;
   await assert.rejects(prepareBrowser(f.system), /update the independent image/);
   assert.deepEqual(f.calls, []);
+});
+
+test('unknown Unicode download verification cannot pass dependency preparation', async () => {
+  const f = fixture();
+  const browser = await prepareBrowser(f.system);
+  f.system.launch = async () => ({});
+  await assert.rejects(prepareDependencies(f.system, browser), /Unicode filename/);
 });

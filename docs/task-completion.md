@@ -50,7 +50,7 @@ Linux、跨平台矩阵、模拟器仅用于真实失败诊断；先最小复现
 
 两个 E2E 分片使用 `scripts/ci-chrome-preparation.mjs`，保留 `channel=chrome`、两分片及 `workers=1`。`chrome-browser` 从 Google 官方 VersionHistory 获取 Linux Stable 最新版本，并保留已交付版本 `156.0.8078.47` 作为禁止降级的最低基线；实际 Chrome Stable 软件包与二进制版本一致且不低于当前基线才复用，预构建容器版本不足时明确失败，要求独立更新镜像；普通 CI 不补装、不重建，也不降级。旧虚拟机入口仍保留原安装能力。版本信息缺失、网络或安装失败均停止，不接受旧版本作为回退。
 
-独立镜像构建通过当前锁定 Playwright 的完整 `install --with-deps chrome` 准备正式浏览器、全部字体和系统依赖；普通测试中的 `chrome-dependencies` 使用相同锁定清单的公开 `install-deps chrome --dry-run` 确认没有缺失依赖，并与镜像内完整包、字体和浏览器内容清单逐项核对，同时验证实际 Chrome 可启动且版本未被改写。不得删除字体、换用 Chromium 或改为只检查文件是否存在。浏览器准备、依赖准备及测试分别计时，环境报告记录复用或安装结果。
+独立镜像构建通过当前锁定 Playwright 的完整 `install --with-deps chrome` 准备正式浏览器、全部字体和系统依赖；两个容器分片显式使用 `LANG=C.UTF-8`、`LC_ALL=C.UTF-8`，确认 `locale charmap` 为 UTF-8；这些值仍纳入原有精确环境指纹。普通测试中的 `chrome-dependencies` 使用相同锁定清单的公开 `install-deps chrome --dry-run` 确认没有缺失依赖，并与镜像内完整包、字体和浏览器内容清单逐项核对，同时验证实际 Chrome 可启动、中文 Blob 下载名保持完整且版本未被改写。不得删除字体、换用 Chromium 或改为只检查文件是否存在。浏览器准备、依赖准备及测试分别计时，环境报告记录复用或安装结果。
 
 仅在 Ubuntu 24.04 x64 的 GitHub CI 临时环境中，将已确认慢下载的 Azure Ubuntu 镜像地址替换为 Ubuntu 官方 HTTPS 地址，兼容镜像列表、旧 sources.list 与 deb822 文件；保留全部仓库、组件、签名与校验设置。APT 连接超时30秒、网络下载重试1次，索引不完整即失败；这些仅控制软件下载，不增加测试重试或放宽失败断言。配置异常保留失败，不能静默跳过依赖。浏览器目录、字体、完整系统包及其余适用版本的等价指纹维持原有精确比较；环境输入不同就重新执行适用测试。
 
