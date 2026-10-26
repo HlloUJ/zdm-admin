@@ -65,7 +65,7 @@ function fixture() {
     workflowRunId: '123',
     environmentProof: proof,
     job: 'frontend_e2e_1',
-    phases: ['npm-ci', 'chrome-install', 'e2e-1'].map((name) => ({ name, exitCode: 0 })),
+    phases: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-1'].map((name) => ({ name, exitCode: 0 })),
   };
   const run = {
     id: 123,
@@ -87,6 +87,11 @@ function fixture() {
   const commit = { sha: 'synthetic', tree: { sha: 'same-tree' }, parents: parents.map((sha) => ({ sha })) };
   return { current, original, run, pull, commit, repository, parents, proof };
 }
+test('old monolithic Chrome preparation cannot authorize the split preparation workflow', () => {
+  const f = fixture();
+  f.original.phases = ['npm-ci', 'chrome-install', 'e2e-1'].map((name) => ({ name, exitCode: 0 }));
+  assert.throws(() => validateProvenance(f), /phase inventory/);
+});
 test('exact same-repository merged candidate and installed runtime may reuse reports', () => {
   const f = fixture();
   assert.equal(validateProvenance(f), true);
@@ -661,8 +666,8 @@ test('all four job contracts acquire and replay original reports, then pass the 
         'frontend-build',
         'frontend-test-list',
       ],
-      frontend_e2e_1: ['npm-ci', 'chrome-install', 'e2e-1'],
-      frontend_e2e_2: ['npm-ci', 'chrome-install', 'e2e-2'],
+      frontend_e2e_1: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
+      frontend_e2e_2: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
     }[job];
     f.original.phases = names.map((name) => ({
       name,
@@ -689,6 +694,13 @@ test('all four job contracts acquire and replay original reports, then pass the 
     const staging = path.join(root, job + '-source');
     mkdirSync(directory);
     writeFileSync(path.join(directory, 'metadata.json'), JSON.stringify(current));
+    if (job.startsWith('frontend_e2e')) {
+      writeFileSync(
+        path.join(directory, 'chrome-browser.json'),
+        JSON.stringify({ action: 'reused', after: '156.0.8078.47' }),
+      );
+      writeFileSync(path.join(directory, 'chrome-dependencies.json'), JSON.stringify({ completeDependencies: true }));
+    }
     const report = completeBrowserReport(
       job === 'frontend_static' ? ['a', 'b'] : job === 'frontend_e2e_1' ? ['a'] : ['b'],
       job !== 'frontend_static',
@@ -732,6 +744,10 @@ test('all four job contracts acquire and replay original reports, then pass the 
     assert.deepEqual(replay.environmentObservation, b.hardware);
     assert.equal(replay.reusedFrom.original.workflowRunId, '123');
     assert.deepEqual(replay.setupPhases, current.phases);
+    if (job.startsWith('frontend_e2e')) {
+      assert.equal(replay.preparationObservation['chrome-browser.json'].action, 'reused');
+      assert.equal(replay.preparationObservation['chrome-dependencies.json'].completeDependencies, true);
+    }
     if (job !== 'formatting') {
       assert.equal(
         readFileSync(path.join(directory, job === 'frontend_static' ? 'all-tests.json' : 'report.json'), 'utf8'),
