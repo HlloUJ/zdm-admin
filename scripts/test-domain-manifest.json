@@ -121,7 +121,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-browser-image.test.mjs": {
-      "digest": "71b0a6d6cb7d53ee1205547079e0a08cacad5fbdb32999cb4c28470c8c0969ea",
+      "digest": "2f728b298dc66700e941d783a1f7f6050e78fe97c6470dc61341a7d141a99d66",
       "imports": ["scripts/ci-browser-image.mjs", "scripts/ci-equivalence-environment.mjs"],
       "dynamicImports": 0
     },

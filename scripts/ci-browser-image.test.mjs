@@ -118,7 +118,7 @@ test('image publisher stays separate from quality and cannot publish from PR eve
 test('both shards select the same locked image once and keep preparation phase order', () => {
   const text = readFileSync(new URL('../.github/workflows/quality.yml', import.meta.url), 'utf8');
   for (const job of ['frontend_e2e_1', 'frontend_e2e_2']) {
-    const section = text.split(`  ${job}:\n`)[1].split(/\n  [a-z0-9_]+:\n/)[0];
+    const section = text.split(`  ${job}:\n`)[1].split(/\n {2}[a-z0-9_]+:\n/)[0];
     assert.equal((section.match(/CI_BROWSER_IMAGE:/g) || []).length, 1);
     assert.equal((section.match(/run browser-image --/g) || []).length, 1);
     assert.match(section, /runs-on: ubuntu-24\.04/);
