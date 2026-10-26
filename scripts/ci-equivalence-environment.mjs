@@ -1,3 +1,4 @@
+import { validateBackendProof, currentBackendProof } from './ci-backend-equivalence.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -41,6 +42,7 @@ export function environmentObservation() {
   return { logicalCpus: os.cpus().length, cpuModel: os.cpus()[0]?.model, totalMemoryBytes: os.totalmem() };
 }
 export function validateEnvironmentProof(proof, job) {
+  if (job === 'backend_full') return validateBackendProof(proof);
   assert.ok(JOB_ENVIRONMENT_CONTRACTS[job], 'Unsupported environment contract');
   assert.equal(
     proof?.version,
@@ -130,6 +132,7 @@ export function environmentProofFromSnapshot(job, snapshot) {
 export function environmentProof(env = process.env) {
   assert.equal(env.GITHUB_RUN_ATTEMPT, '1', 'Reruns cannot reuse evidence');
   const job = env.GITHUB_JOB;
+  if (job === 'backend_full') return currentBackendProof(env.CI_EVIDENCE_DIR ?? 'coverage/ci-evidence', env);
   assert.ok(JOB_ENVIRONMENT_CONTRACTS[job], 'This domain has no reviewed equivalence contract');
   assert.equal(
     command('git', ['status', '--porcelain', '--untracked-files=normal']),

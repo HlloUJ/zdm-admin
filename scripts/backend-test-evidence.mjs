@@ -11,9 +11,9 @@ function filesBelow(directory) {
   });
 }
 
-export function backendReportState(root) {
+export function backendReportState(root, reportsDirectory = path.join(root, 'backend/target/surefire-reports')) {
   return Object.fromEntries(
-    filesBelow(path.join(root, 'backend/target/surefire-reports'))
+    filesBelow(reportsDirectory)
       .filter((file) => file.endsWith('.xml'))
       .map((file) => {
         const stat = statSync(file, { bigint: true });
@@ -22,7 +22,15 @@ export function backendReportState(root) {
   );
 }
 
-export function validateBackendReports(root, { startedAt, selector, previousReports = {} } = {}) {
+export function validateBackendReports(
+  root,
+  {
+    startedAt,
+    selector,
+    previousReports = {},
+    reportsDirectory = path.join(root, 'backend/target/surefire-reports'),
+  } = {},
+) {
   const sourceRoot = path.join(root, 'backend/src/test/java');
   const patterns = selector?.split(',').map((value) => {
     assert.match(value, /^[\w.*]+$/, 'Unsupported backend test selector');
@@ -44,10 +52,10 @@ export function validateBackendReports(root, { startedAt, selector, previousRepo
         !patterns || patterns.some((pattern) => pattern.test(entry.name) || pattern.test(entry.name.split('.').at(-1))),
     );
   assert.ok(classes.length, 'No expected backend test classes found');
-  const current = backendReportState(root);
+  const current = backendReportState(root, reportsDirectory);
   let total = 0;
   for (const entry of classes) {
-    const file = path.join(root, 'backend/target/surefire-reports', `TEST-${entry.name}.xml`);
+    const file = path.join(reportsDirectory, `TEST-${entry.name}.xml`);
     assert.ok(existsSync(file), `Missing backend test report: ${entry.name}`);
     if (startedAt)
       assert.ok(statSync(file).mtimeMs >= Date.parse(startedAt) - 1000, `Stale backend test report: ${entry.name}`);

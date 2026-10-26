@@ -1,3 +1,9 @@
+import {
+  BACKEND_COMMAND,
+  validateBackendEvidence,
+  recordBackendPreparation,
+  prepareBackendReuse,
+} from './ci-backend-equivalence.mjs';
 // Main may reuse only an exact, successful same-repository PR merge candidate.
 // Every uncertainty is a miss: the unchanged normal CI commands then run.
 import assert from 'node:assert/strict';
@@ -12,6 +18,7 @@ import { environmentProof, environmentObservation, validateEnvironmentProof } fr
 export { executionEnvironment, environmentProof } from './ci-equivalence-environment.mjs';
 
 export const REUSABLE_JOBS = {
+  backend_full: 'ci-backend-full',
   formatting: 'ci-formatting',
   frontend_static: 'ci-frontend-static',
   frontend_e2e_1: 'ci-frontend-e2e-1',
@@ -35,6 +42,7 @@ export function validateProvenance({ current, original, run, pull, commit, repos
   validateEnvironmentProof(proof, original.job);
   validateEnvironmentProof(original.environmentProof, original.job);
   const required = {
+    backend_full: ['backend-quality'],
     formatting: ['npm-ci', 'formatting'],
     frontend_static: [
       'npm-ci',
@@ -52,6 +60,10 @@ export function validateProvenance({ current, original, run, pull, commit, repos
     required,
     'Source phase inventory differs',
   );
+  if (original.job === 'backend_full') {
+    assert.deepEqual(original.phases[0].command, BACKEND_COMMAND);
+    assert.ok(original.backendEvidence, 'Complete backend evidence missing');
+  }
   assert.equal(current.eventName, 'push');
   assert.equal(current.attempt, '1');
   assert.equal(parents.length, 2, 'Only an ordinary exact two-parent merge supports reuse');
@@ -91,6 +103,7 @@ export function validateProvenance({ current, original, run, pull, commit, repos
 }
 export function validateSourceArtifact(directory, metadata) {
   if (metadata.job === 'formatting') return;
+  if (metadata.job === 'backend_full') return validateBackendEvidence(directory, metadata.backendEvidence);
   const listed = metadata.job === 'frontend_static';
   const report = json(path.join(directory, listed ? 'all-tests.json' : 'report.json'));
   assert.ok(Array.isArray(report.suites) && report.suites.length, 'Missing test inventory');
@@ -132,6 +145,7 @@ export function validateReusedMetadata(metadata) {
   // Replayed reports retain original run IDs, commands and results; no fabricated execution.
   assert.deepEqual(metadata.phases, p.original.phases);
   assert.deepEqual(metadata.frontendResults, p.original.frontendResults);
+  assert.deepEqual(metadata.backendEvidence, p.original.backendEvidence);
 }
 export async function tryReuse(directory, env = process.env, dependencies = {}) {
   let reused = false;
@@ -139,8 +153,9 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
   let proof = null;
   try {
     assert.notEqual(env.CI_EQUIVALENCE_DISABLED, 'true', 'Operator disabled equivalence reuse');
-    proof = (dependencies.environmentProof ?? environmentProof)(env);
-    writeFileSync(path.join(directory, 'environment-proof.json'), JSON.stringify(proof));
+    if (job === 'backend_full') recordBackendPreparation(directory, env, dependencies.backendRuntime);
+    if (job !== 'backend_full') proof = (dependencies.environmentProof ?? environmentProof)(env);
+    if (proof) writeFileSync(path.join(directory, 'environment-proof.json'), JSON.stringify(proof));
     const observation = (dependencies.environmentObservation ?? environmentObservation)();
     const currentFile = path.join(directory, 'metadata.json');
     const observedMetadata = json(currentFile);
@@ -202,7 +217,22 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     ]);
     const original = json(path.join(staging, 'metadata.json'));
     assert.equal(original.job, job);
-    validateSourceArtifact(staging, original);
+    if (job === 'backend_full') {
+      assert.match(original.candidateSha ?? '', /^[a-f0-9]{40}$/);
+      validateProvenance({
+        current,
+        original,
+        run,
+        pull: fullPull,
+        commit: api(`git/commits/${original.candidateSha}`),
+        repository,
+        parents,
+        proof: original.environmentProof,
+      });
+      proof = await (dependencies.prepareBackendReuse ?? prepareBackendReuse)(staging, original, env);
+    }
+    assert.equal(original.job, job);
+    (dependencies.validateSourceArtifact ?? validateSourceArtifact)(staging, original);
     assert.match(original.candidateSha ?? '', /^[a-f0-9]{40}$/);
     const commit = api(`git/commits/${original.candidateSha}`);
     const provenance = { original, run, pull: fullPull, commit, repository, parents };
@@ -237,6 +267,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     reused = true;
     console.log(`Equivalent ${job} evidence reused from successful PR run ${run.id}; reports retained unchanged.`);
   } catch (error) {
+    if (job === 'backend_full') proof = null;
     console.log(`CI equivalence miss: ${error.message}; run normal checks.`);
   }
   if (!reused && proof) {
