@@ -1,3 +1,4 @@
+import { completionDirectory, processScope } from './completion-process.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync, unlinkSync } from 'node:fs';
@@ -22,6 +23,7 @@ export function openCompletion(directory, batch, { now = Date.now(), requestedAt
       state.clockSource = requestedAt ? 'request-timestamp' : 'first-completion-command';
       saveCompletion(directory, state);
     }
+    Object.defineProperty(state, completionDirectory, { value: directory });
     return state;
   }
   const startedAt = requestedAt ? Date.parse(requestedAt) : now;
@@ -36,6 +38,7 @@ export function openCompletion(directory, batch, { now = Date.now(), requestedAt
     repairs: [],
   };
   saveCompletion(directory, state);
+  Object.defineProperty(state, completionDirectory, { value: directory });
   return state;
 }
 export function saveCompletion(directory, state) {
@@ -125,12 +128,14 @@ export async function completionStage(state, name, key, run, { now = Date.now, s
     key,
     startedAt: now(),
     status: 'running',
+    processTracking: 1,
+    processes: [],
     owner: { host: os.hostname(), pid: process.pid },
   };
   state.events.push(event);
   save(state);
   try {
-    const result = await run();
+    const result = await processScope(state, event, save, run);
     event.result = result;
     event.status = 'success';
     return { result, reused: false };

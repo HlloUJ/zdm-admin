@@ -559,7 +559,8 @@ const slabTextureAliases: Record<number, Array<Record<string, unknown>>> = {
 };
 
 export async function setMockBusinessClient(page: Page, clientCode: 'admin' | 'supply-chain') {
-  if (page.url() === 'about:blank') await page.goto('/login');
+  // Establish storage origin without booting the application twice. Real login tests use /login directly.
+  if (page.url() === 'about:blank') await page.goto('/tests/fixtures/mock-origin.html');
   await page.evaluate((client) => {
     localStorage.setItem('zdm-e2e-client', client);
     const user = JSON.parse(localStorage.getItem('zdm-admin-user') ?? '{}');

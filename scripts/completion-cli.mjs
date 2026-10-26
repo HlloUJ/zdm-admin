@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { runCompletionProcess } from './completion-process.mjs';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
@@ -36,7 +36,7 @@ import {
 import { retainedPublishedPreview } from './start-micro-task.mjs';
 
 function run(root, command, args) {
-  const r = spawnSync(command, args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  const r = runCompletionProcess(command, args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   if (r.status !== 0) {
     if (r.stderr) process.stderr.write(r.stderr.slice(-4000));
     throw new Error(command + ' failed; preserve state and inspect its original output');
@@ -202,7 +202,7 @@ export async function completionCommand(
       label,
       git('rev-parse', 'HEAD'),
       () => {
-        const r = spawnSync(command, commandArgs, { cwd: root, stdio: 'inherit' });
+        const r = runCompletionProcess(command, commandArgs, { cwd: root, stdio: 'inherit' });
         assert.equal(r.status, 0, 'Measured stage failed; retain its original output');
         return { exitCode: 0 };
       },

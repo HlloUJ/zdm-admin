@@ -1,3 +1,4 @@
+import { assertProcessesGone } from './completion-process.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -29,8 +30,14 @@ export function recoverWriter(directory, options) {
   unlinkSync(file); // Only the proven-dead writer's private index lock, never a database/runtime lock.
 }
 export function recoverInterrupted(state, directory, options = {}) {
+  for (const e of state.events.filter((event) => event.processTracking === 1))
+    assertProcessesGone(e, directory, options);
   for (const e of state.events.filter((event) => event.status === 'running')) {
     assert.ok(isGone(e.owner, options), 'Stage owner is alive; preserve its process');
+    assertProcessesGone(e, directory, options);
+  }
+  // Validate every owner and process group before changing any stage.
+  for (const e of state.events.filter((event) => event.status === 'running')) {
     e.status = 'failure';
     e.finishedAt = options.now ?? Date.now();
     e.failure = { category: 'interrupted' };
