@@ -784,3 +784,15 @@ test('all four job contracts acquire and replay original reports, then pass the 
     assert.throws(() => verify(broken));
   }
 });
+
+test('automatic wait selection binds event, branch and exact head and refuses ambiguous or missing runs', async () => {
+  const { selectQualityRun } = await import('./wait-quality.mjs');
+  const head = 'a'.repeat(40);
+  const run = { databaseId: 42, headSha: head, event: 'push', headBranch: 'main' };
+  const selection = { selector: 'main', branch: 'main', head };
+  assert.equal(selectQualityRun([run, { ...run, headSha: 'b'.repeat(40) }], selection), '42');
+  for (const change of [{ headBranch: 'other' }, { event: 'pull_request' }, { headSha: 'b'.repeat(40) }])
+    assert.throws(() => selectQualityRun([{ ...run, ...change }], selection));
+  assert.throws(() => selectQualityRun([run, { ...run, databaseId: 43 }], selection));
+  assert.throws(() => selectQualityRun([], selection));
+});

@@ -225,3 +225,44 @@ test('a completed failed event cannot be rewritten as a successful event', (t) =
   assert.throws(() => saveCompletion(dir, s), /immutable/);
   assert.equal(openCompletion(dir, 'example').events[0].status, 'failure');
 });
+
+test('single CI wait reports changed job steps at bounded cadence and still queries final required gates', async () => {
+  let clock = 0,
+    reads = 0;
+  const messages = [];
+  const head = 'a'.repeat(40);
+  const result = await waitQuality({
+    runId: 42,
+    expectedHead: head,
+    now: () => clock,
+    readRun: async () => ({
+      id: 42,
+      head_sha: head,
+      run_attempt: 1,
+      path: '.github/workflows/quality.yml',
+      status: clock >= 140000 ? 'completed' : 'in_progress',
+      conclusion: clock >= 140000 ? 'success' : null,
+    }),
+    readJobs: async () => {
+      reads++;
+      return clock >= 140000
+        ? ['Frontend quality', 'Backend quality'].map((name) => ({ name, conclusion: 'success' }))
+        : [
+            {
+              name: 'E2E',
+              status: 'in_progress',
+              steps: [{ name: clock < 60000 ? 'prepare' : 'test', status: 'in_progress' }],
+            },
+          ];
+    },
+    wait: async (ms) => {
+      clock += ms;
+    },
+    report: (s) => messages.push(s),
+  });
+  assert.equal(result.conclusion, 'success');
+  assert.equal(reads, 4, 'three bounded progress reads plus mandatory final gate read');
+  assert.equal(messages.filter((m) => m.includes(' jobs: ')).length, 2, 'unchanged progress is quiet');
+  assert.ok(messages.some((m) => m.includes('prepare')));
+  assert.ok(messages.some((m) => m.includes('test')));
+});

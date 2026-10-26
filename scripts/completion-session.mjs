@@ -89,7 +89,21 @@ export function saveCompletion(directory, state) {
 
 export async function completionStage(state, name, key, run, { now = Date.now, save = () => {}, reuse } = {}) {
   assert.ok(
-    ['ci', 'evidence', 'handoff', 'preserve', 'cleanup', 'close', 'prepare', 'review', 'repair'].includes(name),
+    [
+      'ci',
+      'evidence',
+      'handoff',
+      'preserve',
+      'cleanup',
+      'close',
+      'prepare',
+      'review',
+      'repair',
+      'push',
+      'pr',
+      'merge',
+      'sync',
+    ].includes(name),
     'Unknown completion stage',
   );
   assert.ok(typeof key === 'string' && key.length > 0);
